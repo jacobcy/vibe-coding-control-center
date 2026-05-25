@@ -358,6 +358,11 @@ def execute_spec_plan_async(
     _ = request, config
     from vibe3.clients.sqlite_client import SQLiteClient
 
+    # Resolve repo path from git common dir (main repo root)
+    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+
+    repo_root = resolve_orchestra_repo_root()
+
     launch = ExecutionCoordinator(
         load_orchestra_config(),
         SQLiteClient(),
@@ -372,7 +377,8 @@ def execute_spec_plan_async(
                 else f"vibe3-planner-{branch.replace('/', '-')}"
             ),
             cmd=build_self_invocation(cli_args),
-            cwd=str(Path.cwd()),
+            cwd=None,  # Let coordinator resolve worktree path
+            repo_path=str(repo_root),
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             refs=(
                 {"issue_number": str(issue_number)} if issue_number is not None else {}
@@ -405,7 +411,7 @@ def execute_spec_plan_sync(
         handoff_kind="plan",
         branch=branch,
         issue_number=issue_number,
-        cwd=Path.cwd(),
+        cwd=None,  # Sync execution uses agent's built-in cwd resolution
         config=cfg,
     )
     return CodeagentExecutionService(cfg).execute_sync(command)

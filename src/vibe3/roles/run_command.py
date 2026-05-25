@@ -61,11 +61,17 @@ def dispatch_run_command_async(
     handoff_metadata: dict[str, object] | None,
 ) -> None:
     """Dispatch manual run command asynchronously through execution."""
+    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+
     refs: dict[str, str] = {}
     if issue_number is not None:
         refs["issue_number"] = str(issue_number)
     if handoff_metadata:
         refs.update({k: str(v) for k, v in handoff_metadata.items()})
+
+    # Resolve repo path from git common dir (main repo root)
+    repo_root = resolve_orchestra_repo_root()
+
     ExecutionCoordinator(
         load_orchestra_config(),
         SQLiteClient(),
@@ -76,7 +82,8 @@ def dispatch_run_command_async(
             target_id=issue_number or 0,
             execution_name=execution_name,
             cmd=build_self_invocation(cli_args),
-            cwd=str(Path.cwd()),
+            cwd=None,  # Let coordinator resolve worktree path
+            repo_path=str(repo_root),
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             refs=refs,
             actor="agent:run",
