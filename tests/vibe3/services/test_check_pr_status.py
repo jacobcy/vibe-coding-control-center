@@ -65,7 +65,7 @@ class TestPRStatusDetection:
         assert flow["flow_status"] == "done"
 
     def test_check_detects_closed_pr(self, tmp_path):
-        """Should mark flow as aborted when PR is closed (without merge)."""
+        """Should reset issue to READY when PR is closed (without merge)."""
         # ARRANGE: Flow with closed PR
         store = SQLiteClient(db_path=tmp_path / "test.db")
         store.update_flow_state(
@@ -79,7 +79,6 @@ class TestPRStatusDetection:
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
-        # Return tmp_path/.git so that parent calculation gives tmp_path
         git_client.get_git_common_dir.return_value = tmp_path / ".git"
 
         # Mock GitHub client to return closed PR (not merged)
@@ -105,15 +104,15 @@ class TestPRStatusDetection:
         handoff_dir.mkdir(parents=True, exist_ok=True)
         (handoff_dir / "current.md").touch()
 
-        # ACT: Run check
+        # ACT: Run check with mocked reset method
         service = CheckService(
             store=store, git_client=git_client, github_client=github_client
         )
-        service.verify_current_flow()
+        with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+            service.verify_current_flow()
 
-        # ASSERT: Flow should be marked as aborted (closed without merge)
-        flow = store.get_flow_state("task/my-feature")
-        assert flow["flow_status"] == "aborted"
+            # ASSERT: Should call reset to READY (not mark as aborted)
+            mock_reset.assert_called_once_with("task/my-feature", 42)
 
     def test_check_keeps_active_flow_for_open_pr(self, tmp_path):
         """Should NOT mark flow as done when PR is still open."""
