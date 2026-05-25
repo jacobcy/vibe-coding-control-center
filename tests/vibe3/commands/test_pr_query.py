@@ -91,12 +91,35 @@ def test_resolve_pr_target_no_pr_for_branch():
 
 
 def test_resolve_pr_target_explicit_pr_number_priority():
-    """Test that explicit pr_number takes priority over branch."""
+    """Test that explicit pr_number takes priority and bypasses all resolution."""
     pr_svc = Mock()
 
-    target = _resolve_pr_target(pr_svc, pr_number=985, branch="dev/issue-946")
+    # Mock FlowService to ensure it's NOT called
+    with patch("vibe3.commands.pr_query.FlowService") as mock_fs:
+        target = _resolve_pr_target(pr_svc, pr_number=985, branch="dev/issue-946")
 
     # Should return both without inference
     assert target.pr_number == 985
     assert target.branch == "dev/issue-946"
     assert target.from_flow is False
+
+    # Must NOT construct FlowService or call resolve_issue_branch_input
+    mock_fs.assert_not_called()
+    pr_svc.store.get_flows_by_issue.assert_not_called()
+
+
+def test_resolve_pr_target_pr_number_only_no_flow():
+    """Positional pr_number must not invoke FlowService or issue resolution."""
+    pr_svc = Mock()
+
+    with patch("vibe3.commands.pr_query.FlowService") as mock_fs:
+        target = _resolve_pr_target(pr_svc, pr_number=1422, branch=None)
+
+    # Must return the pr_number directly
+    assert target.pr_number == 1422
+    assert target.branch is None
+    assert target.from_flow is False
+
+    # Must NOT construct FlowService or call resolve_issue_branch_input
+    mock_fs.assert_not_called()
+    pr_svc.store.get_flows_by_issue.assert_not_called()
