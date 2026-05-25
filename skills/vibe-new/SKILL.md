@@ -51,7 +51,27 @@ git log main..origin/main --oneline | wc -l
 
 **原因**：避免 Issue #1250 类型的问题——长时间重构期间 main 已演进，新分支从一开始就落后会导致后续严重冲突。
 
-## 3. 询问两件事
+## 3. Epic 入口阻断检查
+
+在确认目标 issue 后，检查是否为 Epic 主 issue：
+
+```bash
+gh issue view <issue-number> --json labels,body
+```
+
+检查逻辑：
+- 如果 issue 有 `roadmap/epic` 标签 **且** body 包含 `## Sub-issues` 或 `## 子任务` section：
+  - 打印 Sub-issues 列表（从 body 的 `## Sub-issues` section 解析）
+  - 告知用户："该 issue 是 Epic 主 issue，请选择具体 sub-issue 进入 /vibe-new"
+  - 停止 — 不继续 bootstrap
+- 如果只有 `roadmap/epic` 标签但无 `## Sub-issues` section：
+  - 提示用户："该 issue 标记为 Epic 但缺少 ## Sub-issues section，请先补齐 Sub-issues 或移除标签"
+  - 停止 — 不继续 bootstrap
+- 否则继续正常流程
+
+**注意**：必须同时满足标签和 section 两个条件才是有效的 Epic 主 issue。
+
+## 4. 询问两件事
 
 只需要确认：
 - 用当前仓库还是新建 worktree
@@ -63,7 +83,42 @@ git log main..origin/main --oneline | wc -l
 - `openspec:ff`
 - repo-native `vibe3 plan/run/review`
 
-## 4. Bootstrap flow scene
+## 5. 自动解析依赖关系
+
+在 bootstrap 前，自动解析依赖关系：
+
+1. 读取目标 issue body（已在 Step 1 获取，或重新获取）：
+   ```bash
+   gh issue view <issue-number> --json body
+   ```
+
+2. 解析 `## Dependencies` 或 `## 依赖` section
+
+3. 提取依赖关系（匹配以下任一格式）：
+   - `Depends on #<id>`
+   - `依赖 #<id>`
+   - `blocked by #<id>`
+   
+   对每个匹配项，提取 issue number
+
+4. 检查依赖状态：
+   ```bash
+   gh issue view <dep-id> --json state
+   ```
+   
+   - 如果依赖状态为 `open`：
+     - 添加 `--dependency <id>` 参数到 bootstrap 命令
+     - 警告用户："当前 issue 存在未关闭的依赖 #<id>，bootstrap 后 flow 将立即进入 blocked 状态。是否继续？"
+     - 等待用户确认
+   - 如果依赖状态为 `closed`：
+     - **不添加** `--dependency` 参数（依赖已满足）
+     - 提示用户："依赖 #<id> 已关闭，无需阻塞"
+   - 如果无依赖：继续
+
+5. 组装 bootstrap 命令：
+   - **只对未关闭（open）的依赖**添加 `--dependency <id>` 参数
+
+## 6. Bootstrap flow scene
 
 **强制要求**：必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径，禁止手工拼接。
 
@@ -92,10 +147,10 @@ vibe3 internal bootstrap <issue-number> \
 - branch/flow bootstrap
 - task issue 绑定
 - related issue 绑定
-- dependency issue 阻塞登记
+- dependency issue 阻塞登记（仅 open 状态的依赖）
 - worktree context 准备（如果传了 `--worktree`）
 
-## 5. 记录 handoff
+## 7. 记录 handoff
 
 bootstrap 成功后记录稳定恢复点：
 
@@ -103,7 +158,7 @@ bootstrap 成功后记录稳定恢复点：
 vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
 ```
 
-## 6. 按需继续
+## 8. 按需继续
 
 如果已经具备条件，可以继续：
 

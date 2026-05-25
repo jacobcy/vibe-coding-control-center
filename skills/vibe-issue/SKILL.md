@@ -95,7 +95,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 **命中后的行为**：
 1. 明确询问用户：「这个 issue 看起来 scope 较大，建议拆为主 issue + sub-issues 结构。是否要建主/子结构？」
 2. 若用户确认拆分：
-   - 当前 issue 作为主 issue，建议添加 `roadmap/rfc` 标签
+   - 当前 issue 作为主 issue，建议添加 `roadmap/epic` 标签
    - body 写入 `## Sub-issues` section（留空模板，格式见下方「标准 Section」）
    - 引导用户单独触发 `/vibe-issue` 创建每个 sub-issue
 3. 若用户坚持单 issue：
