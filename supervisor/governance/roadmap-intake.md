@@ -284,7 +284,7 @@ Forbidden:
 6. 对可纳入对象执行最小动作：
    - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `{manager_bot}`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
-6. 对不适合纳入的对象记录简短原因
+7. 对不适合纳入的对象记录简短原因
 8. **扫描 `supervisor + state/ready` issues**，对每个执行：
    - 先运行 `vibe3 task show <issue-number>` 确认最近没有重复 governance comment
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
