@@ -8,12 +8,42 @@ from typing import TYPE_CHECKING, Any
 import typer
 from loguru import logger
 
+from vibe3.exceptions import UserError
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.ui.flow_ui import render_error, render_flow_status
 from vibe3.utils.branch_utils import find_parent_branch
 
 if TYPE_CHECKING:
-    pass
+    from vibe3.models.flow import FlowEvent, TimelineEvent
+
+
+def _parse_remote_issue_number(raw: str) -> int:
+    """Parse issue number from raw CLI input for --remote mode."""
+    stripped = raw.strip()
+    if stripped.isdigit():
+        return int(stripped)
+    raise UserError(
+        f"Cannot parse issue number from: {raw}. " "Provide a numeric issue number."
+    )
+
+
+def _timeline_to_flow_events(
+    timeline: list["TimelineEvent"],
+    branch: str,
+) -> list["FlowEvent"]:
+    """Convert TimelineEvent objects to FlowEvent for timeline rendering."""
+    from vibe3.models.flow import FlowEvent
+
+    return [
+        FlowEvent(
+            branch=branch,
+            event_type=te.event_type,
+            actor=te.actor,
+            detail=te.detail,
+            created_at=te.timestamp,
+        )
+        for te in timeline
+    ]
 
 
 def _get_yaml() -> ModuleType:

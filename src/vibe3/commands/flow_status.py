@@ -1,16 +1,18 @@
 """Flow status commands - show, status."""
 
 import json
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.commands.command_options import (
     ActorFilterOption,
+    AllOption,
     FormatOption,
     RemoteOption,
     TraceMinMsOption,
+    TraceOption,
 )
 from vibe3.commands.common import (
     enable_method_trace,
@@ -23,7 +25,9 @@ from vibe3.commands.flow_status_helpers import (
     _fetch_pr_map,
     _fetch_worktree_map,
     _get_yaml,
+    _parse_remote_issue_number,
     _render_snapshot_format,
+    _timeline_to_flow_events,
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
@@ -40,45 +44,7 @@ from vibe3.ui.flow_ui import (
 )
 from vibe3.utils.branch_utils import find_parent_branch
 
-if TYPE_CHECKING:
-    from vibe3.models.flow import FlowEvent, TimelineEvent
-
-
-from vibe3.commands.command_options import (
-    AllOption,
-    TraceOption,
-)
-
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
-
-
-def _parse_remote_issue_number(raw: str) -> int:
-    """Parse issue number from raw CLI input for --remote mode."""
-    stripped = raw.strip()
-    if stripped.isdigit():
-        return int(stripped)
-    raise UserError(
-        f"Cannot parse issue number from: {raw}. " "Provide a numeric issue number."
-    )
-
-
-def _timeline_to_flow_events(
-    timeline: list["TimelineEvent"],
-    branch: str,
-) -> list["FlowEvent"]:
-    """Convert TimelineEvent objects to FlowEvent for timeline rendering."""
-    from vibe3.models.flow import FlowEvent
-
-    return [
-        FlowEvent(
-            branch=branch,
-            event_type=te.event_type,
-            actor=te.actor,
-            detail=te.detail,
-            created_at=te.timestamp,
-        )
-        for te in timeline
-    ]
 
 
 def show(
