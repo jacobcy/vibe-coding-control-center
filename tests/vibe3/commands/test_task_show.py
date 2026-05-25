@@ -342,13 +342,11 @@ def test_task_show_json_includes_task_issue_numbers(
     assert payload["task_issue_numbers"] == [123, 456]
 
 
-@patch("vibe3.commands.task.resolve_issue_branch_input")
 @patch("vibe3.commands.task.render_task_comments")
 @patch("vibe3.commands.task.TaskService")
 def test_task_show_issue_number_no_flow(
     mock_task_service_cls,
     mock_render_task_comments,
-    mock_resolve_issue_branch_input,
 ) -> None:
     """测试 task show <issue_number> 在没有 flow 时也能工作"""
     task_service = MagicMock()
@@ -385,9 +383,6 @@ def test_task_show_issue_number_no_flow(
 
     mock_task_service_cls.return_value = task_service
 
-    # Mock resolve_issue_branch_input to return None (no branch exists)
-    mock_resolve_issue_branch_input.return_value = None
-
     # Run command
     result = runner.invoke(app, ["task", "show", "1357"])
 
@@ -397,13 +392,11 @@ def test_task_show_issue_number_no_flow(
     assert "1357" in result.output
 
 
-@patch("vibe3.commands.task.resolve_issue_branch_input")
 @patch("vibe3.commands.task.render_task_comments")
 @patch("vibe3.commands.task.TaskService")
 def test_task_show_issue_number_with_flow(
     mock_task_service_cls,
     mock_render_task_comments,
-    mock_resolve_issue_branch_input,
 ) -> None:
     """测试 task show <issue_number> 在有 flow 时解析到分支"""
     task_service = MagicMock()
@@ -439,9 +432,6 @@ def test_task_show_issue_number_with_flow(
     task_service.flow_service = mock_flow_service
 
     mock_task_service_cls.return_value = task_service
-
-    # Mock resolve_issue_branch_input to return the branch
-    mock_resolve_issue_branch_input.return_value = "dev/issue-1357"
 
     # Run command
     result = runner.invoke(app, ["task", "show", "1357"])

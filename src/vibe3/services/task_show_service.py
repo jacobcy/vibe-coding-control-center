@@ -330,8 +330,19 @@ class TaskShowService:
         )
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
-        """Load task detail from local state plus quick remote summary."""
-        target_branch = self.resolve_branch(branch, allow_no_flow=True)
+        """Load task detail from local state plus quick remote summary.
+
+        Args:
+            branch: Pre-resolved branch/issue number (from command layer).
+                   If None, resolves current branch.
+        """
+        # Only resolve if branch is None (current branch)
+        # Otherwise, trust the pre-resolved input from command layer
+        target_branch = (
+            self.resolve_branch(branch, allow_no_flow=True)
+            if branch is None
+            else branch
+        )
         local_task = self.flow_service.get_flow_status(target_branch)
 
         issue_links = self.store.get_issue_links(target_branch)

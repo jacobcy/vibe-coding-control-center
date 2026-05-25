@@ -99,8 +99,14 @@ def resolve_issue_branch_input(
                 )
     except UserError:
         raise  # Re-raise PR detection error
-    except (subprocess.TimeoutExpired, Exception):
-        # Ignore errors in PR detection
+    except (
+        FileNotFoundError,
+        subprocess.SubprocessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+    ):
+        # Ignore errors in PR detection:
+        # gh not found, subprocess failure, timeout, JSON parse error
         pass
 
     if allow_no_flow:

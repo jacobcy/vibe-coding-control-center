@@ -51,10 +51,12 @@ def _render_issue_info_without_flow(
             markup=False,
         )
     elif output_format == "yaml":
+        issue_number = int(branch) if branch.isdigit() else None
         console.print(
             _get_yaml().dump(
                 {
                     "branch": branch,
+                    "issue_number": issue_number,
                     "title": task_result.issue_title,
                     "state": task_result.issue_state,
                     "pr": pr_data,
