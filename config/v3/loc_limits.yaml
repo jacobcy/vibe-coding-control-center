@@ -16,32 +16,18 @@ code_limits:
     # 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
     # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
     exceptions:
-      # 核心业务聚合 —— 允许 700
+      # 核心业务聚合 —— 允许 600-700
       - path: "src/vibe3/orchestra/global_dispatch_coordinator.py"
         limit: 700
         reason: "Frozen queue dispatch coordinator，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、重启恢复等紧密耦合逻辑；mixin-to-service 重构后增加委托调用，整体代码量减少（删除 mixin 250 行，新增 service 149 行）"
-      - path: "src/vibe3/services/flow_service.py"
-        limit: 600
-        reason: "核心状态机聚合，吸收 flow_query_mixin"
       - path: "src/vibe3/services/pr_service.py"
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"
         limit: 680
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑"
-      - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 600
-        reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
-      - path: "src/vibe3/services/task_resume_operations.py"
-        limit: 480
-        reason: "Task resume 操作聚合，包含 reset、label resume、failed_reason 清除等内聚操作；_clear_flow_reasons 新增 github_client/label_service 注入和 failed_reason 清除逻辑"
-      # Exceptions 聚合 —— 允许 550-590
-      - path: "src/vibe3/exceptions/error_classification.py"
-        limit: 350
-        reason: "Error classification registry with severity-aware contracts，includes all E_MODEL_*, E_API_*, E_EXEC_*, E_DISPATCH_FAILURE contracts；新增 E_DISPATCH_FAILURE 错误分类和 FailedGate threshold 控制契约"
-      - path: "src/vibe3/exceptions/error_tracking.py"
-        limit: 590
-        reason: "Error tracking 核心服务，新增 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀），severity-aware 计数、windowed status 统计，错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）"
+
+      # Exceptions 聚合 —— 允许 480-590
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 480
         reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查等紧密耦合逻辑"
@@ -49,22 +35,16 @@ code_limits:
         limit: 590
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）"
 
-      # Clients 聚合 —— 允许 500
+      # Clients 聚合 —— 允许 450-540
       - path: "src/vibe3/clients/sqlite_schema.py"
         limit: 540
         reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
         limit: 520
         reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理"
-      - path: "src/vibe3/clients/github_pr_ops.py"
-        limit: 530
-        reason: "GitHub PR 操作与查询聚合（日志和错误处理对生产环境必要）"
       - path: "src/vibe3/clients/github_pr_read_ops.py"
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
-      - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 650
-        reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
         limit: 450
         reason: |
@@ -80,16 +60,10 @@ code_limits:
           - 查询一致性（所有方法都需过滤 deleted_at）
           - 事务原子性保证
 
-      # Commands 层 —— 允许 440-650
+      # Commands 层 —— 允许 480-550
       - path: "src/vibe3/commands/task.py"
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
-      - path: "src/vibe3/commands/status.py"
-        limit: 550
-        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
-      - path: "src/vibe3/commands/scan.py"
-        limit: 470
-        reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 550
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）等紧密耦合功能"
@@ -97,7 +71,7 @@ code_limits:
         limit: 500
         reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持"
 
-      # Services 层 —— 允许 400-500
+      # Services 层 —— 允许 410-540
       - path: "src/vibe3/analysis/snapshot_service.py"
         limit: 480
         reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑"
@@ -117,33 +91,18 @@ code_limits:
         limit: 540
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑"
 
-      # Roles 层 —— 允许 350-600
+      # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/review.py"
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
-      - path: "src/vibe3/roles/run.py"
-        limit: 600
-        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、manual run 入口"
-      - path: "src/vibe3/roles/manager.py"
-        limit: 420
-        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-      - path: "src/vibe3/roles/governance.py"
-        limit: 600
-        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑、vibe-task 过滤、材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
       - path: "src/vibe3/roles/plan.py"
         limit: 480
         reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑"
 
-      # Server —— 允许 420-485
-      - path: "src/vibe3/server/mcp.py"
-        limit: 420
-        reason: "MCP server 聚合，包含 3 resources + 4 tools + 输入验证 + 输出脱敏，职责单一但 tool 注册密度高"
+      # Server —— 允许 485
       - path: "src/vibe3/server/app.py"
         limit: 485
         reason: "Orchestra CLI 入口聚合，职责单一（包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查）"
-      - path: "src/vibe3/server/registry.py"
-        limit: 420
-        reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
@@ -152,9 +111,6 @@ code_limits:
       - path: "lib/keys_support.sh"
         limit: 500
         reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
-      - path: "lib/init.sh"
-        limit: 500
-        reason: "项目初始化入口聚合，包含 profile 初始化、目录创建、GitHub labels 创建、CLAUDE.md 模板生成等紧密耦合逻辑，内嵌模板文本膨胀导致超标"
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
@@ -165,9 +121,6 @@ code_limits:
         reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开、CheckCleanupSettings 新增配置等配置加载逻辑，拆分会破坏配置系统完整性"
 
       # 基础设施核心模块
-      - path: "src/vibe3/environment/worktree.py"
-        limit: 600
-        reason: "Worktree lifecycle management"
       - path: "src/vibe3/environment/worktree_lifecycle.py"
         limit: 500
         reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
@@ -183,20 +136,9 @@ code_limits:
       - path: "src/vibe3/execution/codeagent_runner.py"
         limit: 560
         reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化等紧密耦合的执行生命周期逻辑"
-      - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 610
-        reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
-      - path: "src/vibe3/agents/backends/async_launcher.py"
-        limit: 470
-        reason: "Async launcher 工具类，包含 tmux 会话管理、日志路径分配、Codex 噪声过滤、wrapper 脚本启动四个高内聚模块"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 520
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑，职责单一但方法较多"
-
-      # Utils 层 —— 允许 550
-      - path: "src/vibe3/utils/path_helpers.py"
-        limit: 560
-        reason: "路径解析核心工具与安全验证聚合：包含路径解析、handoff 路径处理、分支名安全验证（regex校验+路径边界检查）的三层防御机制。安全函数紧密耦合，拆分会降低代码可审计性和维护性。"
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
@@ -205,42 +147,24 @@ code_limits:
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
-      - path: "tests/vibe3/agents/test_codeagent_config.py"
-        limit: 500
-        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
       - path: "tests/vibe3/execution/test_coordinator.py"
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
-      - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
-        limit: 480
-        reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
       - path: "tests/vibe3/roles/test_governance.py"
         limit: 650
         reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景；拆分 registry 测试后包含 8 个类、30 个测试，共享 fixture"
-      - path: "tests/vibe3/roles/test_manager.py"
-        limit: 500
-        reason: "Manager 角色测试集，覆盖 dispatch blocking、prompt assembly、state transition、failure handling 四个紧密耦合场景，拆分收益低"
-      - path: "tests/vibe3/roles/test_review.py"
-        limit: 480
-        reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 480
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
-      - path: "tests/vibe3/execution/test_noop_gate_unit.py"
-        limit: 480
-        reason: "Noop gate 三分支语义测试，15 个测试围绕同一 gate 函数，共享 mock fixture，拆分收益低"
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
         limit: 540
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 2 个测试后略微超标"
-      - path: "tests/vibe3/services/test_task_resume_operations.py"
-        limit: 700
-        reason: "Task resume 操作测试集，覆盖 reset、label resume、failed_reason 清除等所有场景，合并 legacy test_services 目录后测试覆盖更全面，共享 fixture，拆分收益低；follow-up issue 将拆分"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
@@ -262,18 +186,12 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_serve.py"
         limit: 500
         reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑等紧密耦合场景，新增 2 个 resume 回归测试"
-      - path: "tests/vibe3/commands/test_scan.py"
-        limit: 410
-        reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
         limit: 610
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 480
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture，拆分收益低"
-      - path: "tests/vibe3/utils/test_path_helpers.py"
-        limit: 420
-        reason: "Path helpers 测试集，覆盖 handoff 解析、路径遍历防护、分支名安全验证等紧密耦合逻辑，5 个新增测试扩展安全覆盖"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 480
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
@@ -289,9 +207,6 @@ code_limits:
       - path: "tests/vibe3/domain/handlers/test_issue_state_dispatch.py"
         limit: 500
         reason: "Issue state dispatch 测试集（从 test_manager.py 合并），覆盖 manager handler、issue state transition、dispatch blocking 等紧密耦合场景，测试类结构清晰，拆分收益低"
-      - path: "tests/vibe3/services/test_handoff_service.py"
-        limit: 500
-        reason: "Handoff service 测试集，覆盖 handoff 记录管理、路径解析、blocked_reason 清除逻辑等紧密耦合场景，rebase后略微超标"
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
@@ -328,4 +243,3 @@ code_limits:
       - "tests/vibe2/"
     v3_python:             # Python 测试路径
       - "tests/vibe3/"
-
