@@ -71,6 +71,7 @@
 | `component/pr` | PR 相关 | `gh issue edit 123 --add-label "component/pr"` |
 | `component/client` | Client 层 | `gh issue edit 123 --add-label "component/client"` |
 | `component/config` | 配置层 | `gh issue edit 123 --add-label "component/config"` |
+| `component/orchestra` | Orchestra 模块 | `gh issue edit 123 --add-label "component/orchestra"` |
 
 ### 2.2 特殊用途标签
 

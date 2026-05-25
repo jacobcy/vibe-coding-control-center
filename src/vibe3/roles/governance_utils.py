@@ -154,7 +154,7 @@ def get_orchestra_labeled_issue_numbers(
     """
     orchestra_issues = github.list_issues(
         label="orchestra",
-        state="all",
+        state="open",
         repo=config.repo,
         limit=5000,  # Fetch all orchestra-labeled issues to avoid truncation
     )
