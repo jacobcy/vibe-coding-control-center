@@ -108,7 +108,10 @@ class TestPRStatusDetection:
         service = CheckService(
             store=store, git_client=git_client, github_client=github_client
         )
-        with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+        with patch.object(
+            service._check_pr_service, "_reset_issue_after_pr_closed"
+        ) as mock_reset:
+            mock_reset.return_value = (None, [])
             service.verify_current_flow()
 
             # ASSERT: Should call reset to READY (not mark as aborted)

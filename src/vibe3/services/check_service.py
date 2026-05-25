@@ -15,6 +15,7 @@ from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
+from vibe3.services.check_pr_service import CheckPRService
 from vibe3.services.check_remote import (
     CheckRemote,
     is_empty_auto_scene,
@@ -74,6 +75,12 @@ class CheckService(CheckRemote):
             github_client=cast(GitHubClientProtocol, self.github_client),
             git_client=self.git_client,
             store=self.store,
+        )
+        self._check_pr_service = CheckPRService(
+            store=self.store,
+            git_client=self.git_client,
+            github_client=self.github_client,
+            flow_status_service=self._flow_status_service,
         )
         self._branch_to_pr: dict[str, PRResponse] = {}
         # Load config for protected branches
@@ -156,148 +163,6 @@ class CheckService(CheckRemote):
             return int(output.strip()) if output.strip() else None
         except Exception:
             return None
-
-    def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
-        """Handle PR state changes detected during check.
-
-        Returns CheckResult if PR is merged or closed, None otherwise.
-
-        - PR MERGED: flow is successfully completed → mark done.
-          Also auto-closes any linked task issues when no other active flows exist.
-        - PR CLOSED (without merge): flow was abandoned → reset issue to READY
-          and clean up flow scene (worktree, branch, flow record).
-        """
-        result_issues: list[str] = []
-
-        if pr.merged_at or pr.state == PRState.MERGED:
-            # Normal completion via merge → done
-            suggestions = self._flow_status_service.mark_flow_done(
-                branch,
-                f"PR #{pr.number} merged (detected from GitHub)",
-            )
-            self._update_pr_cache(branch, pr)
-            if suggestions.get("issue_to_close"):
-                result_issues.append(
-                    f"Issue #{suggestions['issue_to_close']} was still OPEN — "
-                    "auto-closed because PR was merged."
-                )
-            return CheckResult(is_valid=True, branch=branch, issues=result_issues)
-
-        if pr.state == PRState.CLOSED:
-            # PR closed without merge → clean up and return to READY
-            reset_error = self._reset_issue_after_pr_closed(branch, pr.number)
-            self._update_pr_cache(branch, pr)
-
-            if reset_error:
-                return CheckResult(is_valid=False, branch=branch, issues=[reset_error])
-            return CheckResult(is_valid=True, branch=branch, issues=result_issues)
-
-        return None
-
-    def _reset_issue_after_pr_closed(self, branch: str, pr_number: int) -> str | None:
-        """Reset issue to READY after PR closed without merge.
-
-        Cleans up flow scene (worktree, branch, flow record) and
-        restores issue to READY state so it can be dispatched again.
-
-        Args:
-            branch: Branch name (e.g., "task/issue-456")
-            pr_number: Closed PR number
-        """
-        from vibe3.models.flow import FlowStatusResponse
-        from vibe3.services.task_resume_operations import TaskResumeOperations
-
-        # Find task issue number
-        issue_links = self.store.get_issue_links(branch)
-        task_issue_number: int | None = None
-        for link in issue_links:
-            if link.get("issue_role") == "task":
-                task_issue_number = link.get("issue_number")
-                if isinstance(task_issue_number, int):
-                    break
-
-        if not task_issue_number:
-            logger.bind(
-                domain="check",
-                action="reset_pr_closed",
-                branch=branch,
-            ).debug("No task issue linked, marking flow as aborted instead")
-            # No issue link → just mark flow as aborted (PR abandoned)
-            self._flow_status_service.mark_flow_aborted(
-                branch, f"PR #{pr_number} closed without merge (no issue link)"
-            )
-            return None
-
-        # Check if issue already closed
-        gh_issue = self.github_client.view_issue(task_issue_number)
-        if isinstance(gh_issue, dict):
-            issue_state = str(gh_issue.get("state", "")).upper()
-            if issue_state == "CLOSED":
-                logger.bind(
-                    domain="check",
-                    action="reset_pr_closed",
-                    branch=branch,
-                    issue_number=task_issue_number,
-                ).info(f"Issue #{task_issue_number} already closed, skip reset")
-                return None
-
-        # Build minimal FlowStatusResponse for task resume
-        flow = FlowStatusResponse(
-            branch=branch,
-            flow_slug=branch,
-            flow_status="active",
-            latest_actor="vibe:check",
-            task_issue_number=task_issue_number,
-        )
-
-        # Create TaskResumeOperations and reset to READY
-        from vibe3.services.flow_service import FlowService
-        from vibe3.services.issue_flow_service import IssueFlowService
-        from vibe3.services.label_service import LabelService
-
-        label_service = LabelService()
-        flow_service = FlowService(store=self.store)
-        issue_flow_service = IssueFlowService(store=self.store)
-
-        resume_ops = TaskResumeOperations(
-            git_client=self.git_client,
-            github_client=self.github_client,
-            flow_service=flow_service,
-            label_service=label_service,
-            issue_flow_service=issue_flow_service,
-        )
-
-        try:
-            resume_ops.reset_issue_to_ready(
-                issue_number=task_issue_number,
-                resume_kind="pr_closed",
-                flow=flow,
-                repo=None,
-                reason=f"PR #{pr_number} closed without merge, resetting to READY",
-            )
-
-            logger.bind(
-                domain="check",
-                action="reset_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).info(
-                f"Reset issue #{task_issue_number} to READY after "
-                f"PR #{pr_number} closed"
-            )
-        except Exception as exc:
-            logger.bind(
-                domain="check",
-                action="reset_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).warning(f"Failed to reset issue: {exc}")
-            return (
-                f"Failed to reset issue #{task_issue_number} after PR "
-                f"#{pr_number} closed: {exc}"
-            )
-
-        return None
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
@@ -459,18 +324,34 @@ class CheckService(CheckRemote):
         # PR verification (Remote-first) - use cached PR data
         pr = self._branch_to_pr.get(branch)
         if pr:
-            result = self._handle_closed_pr(branch, pr)
-            if result:
-                return result
+            handled, pr_issues, pr_warnings = self._check_pr_service.handle_closed_pr(
+                branch, pr
+            )
+            if handled:
+                return CheckResult(
+                    is_valid=len(pr_issues) == 0,
+                    issues=pr_issues,
+                    warnings=pr_warnings,
+                    branch=branch,
+                )
         else:
             # No PR found in recent cache; ask PRService for branch status so
             # all-state branch resolution still uses the shared cache path first.
             try:
                 cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
                 if cached_or_remote_pr:
-                    result = self._handle_closed_pr(branch, cached_or_remote_pr)
-                    if result:
-                        return result
+                    handled, pr_issues, pr_warnings = (
+                        self._check_pr_service.handle_closed_pr(
+                            branch, cached_or_remote_pr
+                        )
+                    )
+                    if handled:
+                        return CheckResult(
+                            is_valid=len(pr_issues) == 0,
+                            issues=pr_issues,
+                            warnings=pr_warnings,
+                            branch=branch,
+                        )
                     self._branch_to_pr[branch] = cached_or_remote_pr
             except Exception as e:
                 logger.bind(domain="check", branch=branch).warning(
@@ -635,30 +516,3 @@ class CheckService(CheckRemote):
             )
             return FixResult(success=False, error=error)
         return FixResult(success=True, applied=fixed)
-
-    def _update_pr_cache(self, branch: str, pr: "PRResponse") -> None:
-        """Update PR cache when check discovers changes.
-
-        This is a write operation: check command updates cache
-        when it discovers PR state changes.
-
-        Args:
-            branch: Branch name
-            pr: PR response object with title and number
-        """
-        try:
-            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
-
-            title_cache = IssueTitleCacheService(self.store, self.github_client)
-            title_cache.update_pr(
-                branch=branch,
-                pr_number=pr.number,
-                pr_title=pr.title,
-            )
-            logger.bind(domain="check", branch=branch).info(
-                f"Updated PR cache: #{pr.number} - {pr.title}"
-            )
-        except Exception as e:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to update PR cache: {e}"
-            )
