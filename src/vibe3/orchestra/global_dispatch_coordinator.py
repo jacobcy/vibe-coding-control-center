@@ -637,7 +637,15 @@ class GlobalDispatchCoordinator:
         # Note: dispatch event logging is handled by _dispatch_loop internally
         dispatched_count = self._dispatch_loop(tick_id)
 
-        # Step 5: Rebuild active candidates once active queue is exhausted.
+        # Step 5: Persist queue state AFTER dispatch but BEFORE collection.
+        # This preserves the qualify-gate filtered queue (blocked entries that
+        # failed qualification have been popped). Freshly collected entries
+        # are NOT persisted — they will be qualified in the next tick's
+        # dispatch loop before being persisted.
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.persist()
+
+        # Step 6: Rebuild active candidates once active queue is exhausted.
         need_collect = self._should_collect_after_dispatch(dispatched_count)
         if need_collect:
             fresh = await self._collect_frozen_queue()
@@ -662,7 +670,3 @@ class GlobalDispatchCoordinator:
             else:
                 self._dispatch_paused = False
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
-
-        # Step 6: Persist queue state
-        self._queue_persistence.frozen_queue = self._frozen_queue
-        self._queue_persistence.persist()
