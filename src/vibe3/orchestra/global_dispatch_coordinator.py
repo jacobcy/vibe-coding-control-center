@@ -638,10 +638,10 @@ class GlobalDispatchCoordinator:
         dispatched_count = self._dispatch_loop(tick_id)
 
         # Step 5: Persist queue state AFTER dispatch but BEFORE collection.
-        # This preserves the qualify-gate filtered queue (blocked entries that
-        # failed qualification have been popped). Freshly collected entries
-        # are NOT persisted — they will be qualified in the next tick's
-        # dispatch loop before being persisted.
+        # Entries that were dispatched this tick have been popped (blocked entries
+        # that failed qualify_gate are removed). Entries skipped due to capacity
+        # limits remain in the queue and are persisted as-is.
+        # Freshly collected entries from Step 6 are NOT included in this snapshot.
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._queue_persistence.persist()
 
