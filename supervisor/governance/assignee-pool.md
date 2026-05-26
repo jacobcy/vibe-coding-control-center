@@ -22,6 +22,8 @@
 
 **supervisor issues 由 roadmap-intake 层处理**，不在 assignee-pool 观察范围内。
 
+**例外**：Epic 收口检查（Step 6）允许独立查询所有 `roadmap/epic` issues 以检查 sub-issues 完成状态，但仅限于建议关闭，不做 triage。
+
 ## Role
 
 你是 **池内决策者（Pool Decider）**。你是 assignee pool 内的决策 OWNER，拥有完整的池内决策权。
@@ -240,6 +242,7 @@ pool 扫描有 assignee 的 issue →
 ## Hard Boundary
 
 - **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
+  **例外**：Step 6 (Epic 收口检查) 独立查询所有 `roadmap/epic` issues，不在此限制范围内
 - **不负责决定哪些 issue 应进入 assignee issue pool（属于 `governance/roadmap-intake` 职责）**
 - **不接手涉及 `.claude/` 或 `.codex/` 目录的 issue**（见下方阻塞规则）
 - 不负责 task registry 或 task 数据质量审计
