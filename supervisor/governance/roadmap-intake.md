@@ -308,7 +308,10 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
+2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee 且无 `orchestra-scanned` 标签的 issue：
+   - 有 assignee → 跳过（已在 pool 中，由 assignee-pool 负责）
+   - 有 `orchestra-scanned` 标签 → 跳过（已审查过，不重复扫描）
+3. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
    ```bash
    uv run python src/vibe3/cli.py task status
    ```
@@ -403,22 +406,26 @@ Supervisor issues:
   - #ZZZ: waiting (<reason>)
 ```
 
-## 治理闭环标签（新增）
+## 治理闭环标签
 
-完成 intake 判断后，为所有已审查的 issue 打上 `orchestra-scanned` 标签：
+**两种结果，不同处理**：
+
+**接受（分配 assignee）**：不设标签。assignee 本身就是信号——issue 进入 pool，由 assignee-pool 层接手。
+
+**跳过（不接受）**：打 `orchestra-scanned` 标签，表示"已审查，不纳入"：
 
 ```bash
 gh issue edit <issue-number> --add-label "orchestra-scanned"
 ```
 
 **目的**：
-- 标记"已通过 governance observer 审查"
-- 下次 governance 扫描自动跳过已打标签的 issues
-- 实现治理闭环，避免重复扫描
+- `orchestra-scanned`：intake 层已审查，决定不接受 → 下次扫描自动跳过
+- 接受进入 pool 的 issue 不打 scanned，靠 assignee 信号自然流入 assignee-pool 层
 
-**与 `roadmap-reviewed` 配合**：
-- `orchestra-scanned`：governance observer 审查通过（入池）
-- `roadmap-reviewed`：roadmap decider 决策通过（已决策）
+**三层标签协作**：
+- `orchestra-scanned`：intake 层审查通过但**不接**（跳过）
+- `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
+- `roadmap-reviewed`：roadmap decider 已审查
 
 ## Stop Point
 
@@ -426,9 +433,12 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 **Stop Point Checklist（强制）**：
 
+- **接受（分配 assignee）**：写完 `[governance suggest]` 评论即可，不打 scanned 标签
+- **跳过（不接受）**：写完评论后必须打 `orchestra-scanned` 标签
+
 完成以下动作后才能停止：
 - [ ] 写完 `[governance suggest]` 评论
-- [ ] 打上 `orchestra-scanned` 标签
+- [ ] 如果是跳过：打上 `orchestra-scanned` 标签
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 
-**缺少标签的后果**：下次 governance 扫描会重复处理同一 issue，造成资源浪费。
+**缺少标签的后果**：跳过的 issue 会被下次扫描重复处理，造成资源浪费。

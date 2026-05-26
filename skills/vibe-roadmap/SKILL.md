@@ -262,23 +262,34 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 | `roadmap/future` | 未来考虑         | 长期规划           |
 | `roadmap/rfc`    | RFC/设计阶段     | agent 无法判断目标、架构方向或拆分形态 |
 
-#### 治理闭环标签（新增）
+#### 治理闭环标签
 
-| 标签名称           | 描述                   | 打标签时机                           | 用途                                       |
-| ------------------ | ---------------------- | ------------------------------------ | ------------------------------------------ |
-| `orchestra-scanned` | 已通过 governance observer 审查 | governance 扫描完成后              | 标记"已入池"，跳过后续 governance 扫描     |
-| `roadmap-reviewed`  | 已通过 roadmap decider 决策   | roadmap 写完 `[roadmap decision]` 后 | 标记"已决策"，跳过后续 roadmap 扫描        |
+三层标签各自闭环，由不同角色在不同阶段打上：
 
-**闭环流程**：
+| 标签名称 | 角色 | 打标签时机 | 语义 |
+| -------- | ---- | ---------- | ---- |
+| `orchestra-scanned` | roadmap-intake（入口层） | intake 审查后**跳过**时 | "已审查，不纳入"——下次 intake 自动跳过 |
+| `orchestra-governed` | assignee-pool（池内层） | pool 决策完成后 | "已决策"——下次 pool 扫描自动跳过 |
+| `roadmap-reviewed` | vibe-roadmap（审查层） | roadmap 审查完成后 | "已审查"——下次 Step 0 自动跳过 |
+
+**闭环流程（三层）**：
 ```
-governance 扫描 → 打 orchestra-scanned 标签 → roadmap 决策 → 打 roadmap-reviewed 标签
-     ↑                                                    ↓
-     └────────── 下次扫描跳过 ←─────────────────────────────┘
+broader repo ──→ intake 扫描 ──→ 接受(assignee) ──→ pool 扫描 ──→ 决策(rfc/epic/ready)
+                     │ 跳过                               │
+                     ▼                                    ▼
+              orchestra-scanned                   orchestra-governed
+              (下次 intake 跳过)                  (下次 pool 跳过)
+                                                        │
+                                                        ▼
+                                        vibe-roadmap Step 0 ──→ 审查
+                                                                    │
+                                                                    ▼
+                                                            roadmap-reviewed
+                                                            (下次 roadmap 跳过)
+                                                                    │
+                                                                    ▼
+                                                              memory.md 缓存
 ```
-
-**注意**：`orchestra` 标签将被拆分为：
-- `orchestra-scanned`：纯技术标记，跳过后续 governance 扫描
-- `orchestra-governed`：语义标签，表示 issue 需要 orchestra 治理（保留用于 supervisor 机制）
 
 ### Milestone 管理
 

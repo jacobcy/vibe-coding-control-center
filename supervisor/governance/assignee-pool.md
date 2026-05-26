@@ -233,7 +233,10 @@ issue 是否可纳入？
 
 Steps:
 
-1. 运行全局现场观察命令，读取当前 running issues、ready queue、blocked issues、remote tasks 与 flow 现场：
+1. **标签过滤（强制）**：只处理有 manager assignee 但无 `orchestra-governed` 标签的 issue：
+   - 无 assignee → 跳过（不在 pool 中，由 roadmap-intake 负责）
+   - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不重复检查）
+2. 运行全局现场观察命令，读取当前 running issues、ready queue、blocked issues、remote tasks 与 flow 现场：
    ```bash
    uv run python src/vibe3/cli.py task status
    ```
@@ -377,13 +380,14 @@ Exit:
 
 如果当前没有合适的建议 issue，明确写无，并说明原因。
 
-**orchestra-scanned 标签要求**：
-- 发布任何 `[governance suggest]` 或 `[governance auto-recover]` 评论后，**必须**立即添加 `orchestra-scanned` 标签
-- `orchestra-scanned` 标签表示该 issue 已被 governance 审查过，作为"已审查"标记
-- 如果需要重新审查某个 issue，应先移除 `orchestra-scanned` 标签（人类也可以手动移除）
-- 与 `roadmap-reviewed` 配合实现治理闭环：
-  - `orchestra-scanned`：已通过 governance observer 审查（入池）
-  - `roadmap-reviewed`：已通过 roadmap decider 决策（已决策）
+**orchestra-governed 标签要求**：
+- 完成 issue 决策后（不管结论是 rfc/epic/ready/close），**必须**立即添加 `orchestra-governed` 标签
+- `orchestra-governed` 标签表示该 issue 已经过 assignee-pool 层决策，作为"已决策"标记
+- 如果需要重新决策某个 issue，应先移除 `orchestra-governed` 标签（人类也可以手动移除）
+- 与三层标签配合实现治理闭环：
+  - `orchestra-scanned`：intake 层已审查，不接受（跳过）
+  - `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
+  - `roadmap-reviewed`：roadmap decider 已审查
 
 ## Comment Contract
 
@@ -391,7 +395,7 @@ Exit:
 
 **去重规则（强制）**：
 
-- **orchestra-scanned 标签检查**：如果 issue 已有 `orchestra-scanned` 标签，直接跳过（已审查过）
+- **orchestra-governed 标签检查**：如果 issue 已有 `orchestra-governed` 标签，直接跳过（已决策过）
 - **写评论前必须检查**：读取该 issue 的现有 comments
 - **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
@@ -498,7 +502,7 @@ Exit:
 
 完成以下动作后才能停止：
 - [ ] 写完 `[governance suggest]` 或 `[governance auto-recover]` 评论
-- [ ] 打上 `orchestra-scanned` 标签
+- [ ] 打上 `orchestra-governed` 标签
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 
-**缺少标签的后果**：下次 governance 扫描会重复处理同一 issue，造成资源浪费。
+**缺少标签的后果**：下次 pool 扫描会重复决策同一 issue，造成资源浪费。

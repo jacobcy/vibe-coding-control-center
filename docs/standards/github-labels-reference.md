@@ -77,22 +77,22 @@
 
 | 标签名称 | 描述 | 使用场景 |
 |---------|------|----------|
-| `orchestra-scanned` | 已通过 governance observer 审查 | governance 扫描完成后打标签，跳过后续 governance 扫描 |
-| `orchestra-governed` | 需要 orchestra 治理 | 标记需要 Supervisor 治理的编排问题 |
-| `roadmap-reviewed` | 已通过 roadmap decider 决策 | roadmap 写完 `[roadmap decision]` 后打标签，跳过后续 roadmap 扫描 |
+| `orchestra-scanned` | intake 层已审查，不纳入 | roadmap-intake 跳过 issue 时打标签，下次扫描自动跳过 |
+| `orchestra-governed` | assignee-pool 层已决策 | assignee-pool 决策完成后打标签，下次扫描自动跳过 |
+| `roadmap-reviewed` | 已通过 roadmap decider 审查 | roadmap 写完 `[roadmap decision]` 后打标签，Step 0 自动跳过 |
 | `supervisor` | Supervisor-governed orchestration issue | 标记需要 Supervisor 治理的编排问题 |
 | `tech-debt` | Technical debt tracking | 追踪技术债务和需要优化的代码 |
 | `improvement` | Non-urgent improvements | 非紧急的改进和增强项 |
 
 **说明**：
-- `orchestra` 标签已拆分为 `orchestra-scanned`（技术标记）和 `orchestra-governed`（语义标记）
+- `orchestra` 标签已拆分为 `orchestra-scanned`（intake 层跳过标记）和 `orchestra-governed`（pool 层决策标记）
 - `roadmap-reviewed` 与 `[roadmap decision]` 评论配合，实现治理闭环
-- 这些标签用于特定的治理和追踪场景
+- 三层标签各自闭环：intake 看 scanned，pool 看 governed，roadmap 看 reviewed
 - 可以与 `type/*`、`scope/*` 等标签组合使用
 
 **迁移说明**：
-- 现有 `orchestra` 标签逐步替换为 `orchestra-scanned`
-- 迁移期间，`orchestra` 作为兼容标签保留，新流程使用 `orchestra-scanned`
+- 现有 `orchestra` 标签逐步替换
+- 迁移期间，`orchestra` 作为兼容标签保留
 
 ### 2.3 路线图标签 (roadmap/*)
 
