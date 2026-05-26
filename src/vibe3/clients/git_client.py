@@ -197,6 +197,12 @@ class GitClient:
         for wt_path, wt_branch in self._worktree_list_cache:
             if wt_branch == ref:
                 return Path(wt_path)
+        # Cache miss: refresh and retry (worktrees may have been created
+        # after the cache was populated).
+        self._worktree_list_cache = self.list_worktrees()
+        for wt_path, wt_branch in self._worktree_list_cache:
+            if wt_branch == ref:
+                return Path(wt_path)
         return None
 
     def get_worktrees_for_branch(self, branch_name: str) -> list[str]:

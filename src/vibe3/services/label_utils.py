@@ -66,6 +66,8 @@ def should_skip_from_queue(
     Issues are skipped if:
     1. They have the supervisor label (managed by supervisor, not auto-dispatch)
     2. They don't have a manager assignee (when required for this queue stage)
+    3. They are roadmap/rfc (human discussion, not ready for execution)
+    4. They are roadmap/epic (scope too large, needs decomposition)
 
     Args:
         issue: Issue information
@@ -80,6 +82,10 @@ def should_skip_from_queue(
     """
     # Skip supervisor-managed issues
     if supervisor_label in issue.labels:
+        return True
+
+    # Skip roadmap/rfc (human discussion) and roadmap/epic (needs decomposition)
+    if "roadmap/rfc" in issue.labels or "roadmap/epic" in issue.labels:
         return True
 
     # Skip issues without manager assignee
