@@ -79,7 +79,8 @@ def record_dispatch_failure_if_unexpected(
         record_error(
             error_code="E_DISPATCH_FAILURE",
             error_message=error_message,
-            issue_number=issue_number,
+            tick_id=0,  # Manual dispatch marker
+            issue_number=issue_number or 0,  # Coerce None to 0 for manual dispatch
             branch=branch,
             store=SQLiteClient(),
         )
@@ -88,6 +89,3 @@ def record_dispatch_failure_if_unexpected(
             domain=f"{role}_dispatch",
             issue_number=issue_number,
         ).warning(f"Failed to record dispatch error: {exc}")
-
-
-# PR #1498 - Manual CLI dispatch error tracking

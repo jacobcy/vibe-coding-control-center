@@ -190,13 +190,13 @@ extract_pr_number(report_text):
 ## @wait_for_report(agent_name, expected_pr_number, timeout=180) → report | TIMEOUT | RETRY
 
 ```
-@wait_for_report(agent_name, expected_pr_number):
+@wait_for_report(agent_name, expected_pr_number, timeout=180):
   """使用 Monitor 等待 agent 报告，不主动轮询。
-  
+
   校验逻辑：
   - 提取报告中的 PR 编号（格式：【agent_report】(PR #N) 或 ## PR #N）
   - 如果不匹配目标 PR，通过 SendMessage 确认（已知路由 bug #40166/#39651）"""
-  
+
   // 使用 Monitor 等待 agent_report 事件
   Monitor(
     command=f"agent-event.sh {agent_name} | grep -q 'agent_report'",
@@ -851,8 +851,7 @@ Agent 系统已稳定，无需复杂恢复逻辑：
 - **握手超时**：Monitor 90 秒未检测到 `agent_ready` 事件 → 标记 agent 为 blocked，继续下一个 agent
 - **报告超时**：Monitor 180 秒未检测到 `agent_report` 事件 → 标记 agent 为 blocked，继续下一个 agent
 - **PR 编号路由错误**：已在 `@wait_for_report` 中通过 SendMessage 确认，无需额外处理
-
- teammate-message PR 编号路由错误（已知 bug #40166 / #39651）→ 见 debug-guide.md
+- **teammate-message PR 编号路由错误**：已知 bug #40166 / #39651，见 debug-guide.md
 
 ---
 

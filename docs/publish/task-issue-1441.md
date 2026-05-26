@@ -38,5 +38,5 @@ Create PR for issue #1441: fix manual CLI async dispatch failures
 
 ## Notes
 - This is an additive-only change (no existing code paths altered)
-- Impact: LOW risk (4 files, +64 LOC)
+- Impact: LOW-MEDIUM risk (7 files, +349/-137 LOC)
 - No baseline concerns
