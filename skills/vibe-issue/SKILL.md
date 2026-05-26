@@ -46,11 +46,11 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
   - **高相似度**：展示重复 Issue，建议用户在原 Issue 下评论或合并。
   - **低相似度**：继续创建流程。
 
-### Step 3: 上下文检查
+### Step 3: 本地 Flow 检查（轻量级）
 
-- 必须先运行 `uv run python src/vibe3/cli.py task status --all --check` 检查是否已有相关的活跃 flow / task 绑定。
-- 如果 Issue 标题与某个 Task 匹配，只记录上下文供后续参考。
-- task 只解释为执行记录，不把 issue 直接当作本地 task，也不在这里决定排期。
+- 使用 `vibe3 flow status` 检查是否已有活跃 flow 绑定到相关 issue
+- 该命令只读取本地状态，不触发 GitHub API 调用
+- 如果发现已绑定的 flow，记录上下文供后续参考，不阻止 issue 创建
 
 ### Step 3.5: 依赖识别
 
