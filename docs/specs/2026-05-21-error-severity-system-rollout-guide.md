@@ -159,7 +159,7 @@ Required changes:
 
 - replace exception-to-issue-failure default path with severity/disposition handling
 - emit warning timeline events for warning-classified signals
-- prevent warning-only signals from auto-calling `fail_issue()`
+- prevent warning-only signals from auto-blocking the flow
 
 Acceptance checks:
 
