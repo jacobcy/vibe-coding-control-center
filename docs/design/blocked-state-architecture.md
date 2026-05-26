@@ -35,7 +35,8 @@ Three independent sources track blocked state:
 ### Issues
 
 1. **Inconsistent writes**: Different code paths update different subsets
-   - `block()` → writes all three ✅
+   - `BlockedStateService.block(issue_number=...)` → writes all three ✅
+   - `BlockedStateService.block()` (no issue_number) → writes DB only ✅
    - `fail_flow()` → (Retired) legacy mechanism ❌
    - `task resume --label` → writes all three ✅
    - `qualify_gate` alignment → writes all three ✅

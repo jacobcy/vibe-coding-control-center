@@ -290,8 +290,8 @@ Every runtime signal must map to a handling contract with these fields:
 
 | Severity | Record | Timeline | Issue Action | Gate Action |
 |----------|--------|----------|--------------|-------------|
-| `CRITICAL` | Yes | Yes | local flow may block as needed | immediate `failed_gate` |
-| `ERROR` | Yes | Yes | local flow may block as needed | threshold-based `failed_gate` |
+| `CRITICAL` | Yes | Yes | record-only (no automatic flow blocking) | immediate `failed_gate` |
+| `ERROR` | Yes | Yes | record-only (no automatic flow blocking) | threshold-based `failed_gate` |
 | `WARNING` | Yes | Yes | no automatic flow blocking solely from warning | no gate activation |
 
 Important constraint:
