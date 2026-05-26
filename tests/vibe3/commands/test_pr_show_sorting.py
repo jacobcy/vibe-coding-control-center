@@ -163,6 +163,15 @@ class TestPRShowCommentSorting:
             < result.output.find("Commented mid")
             < result.output.find("Approved late")
         )
+        # Verify review state values are rendered and in chronological order
+        assert result.output.find("CHANGES_REQUESTED") < result.output.find("COMMENTED")
+        assert result.output.find("COMMENTED") < result.output.find("APPROVED")
+        # Verify each review state co-locates with its reviewer
+        assert result.output.find("reviewer_a") < result.output.find(
+            "CHANGES_REQUESTED"
+        )
+        assert result.output.find("reviewer_b") < result.output.find("COMMENTED")
+        assert result.output.find("reviewer_c") < result.output.find("APPROVED")
 
     def test_none_timestamp_does_not_crash(self, mock_pr_svc_for_sorting) -> None:
         """None timestamps in comments/reviews do not crash the command."""
@@ -221,3 +230,18 @@ class TestPRShowCommentSorting:
         assert "### Reviews" in result.output
         assert "Valid timestamp" in result.output
         assert "None timestamp" in result.output
+        # Verify None-timestamp entries sort to end
+        # (str(None) == "None" > "2026-..." lexicographically)
+        # Search within each section to avoid matching PR title
+        gc_start = result.output.find("### General Comments")
+        assert result.output.find("None timestamp", gc_start) > result.output.find(
+            "Valid timestamp", gc_start
+        )
+        rc_start = result.output.find("### Review Comments")
+        assert result.output.find("None review comment", rc_start) > result.output.find(
+            "Valid review comment", rc_start
+        )
+        r_start = result.output.find("### Reviews")
+        assert result.output.find("None review", r_start) > result.output.find(
+            "Valid review", r_start
+        )
