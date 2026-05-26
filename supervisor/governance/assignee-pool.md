@@ -18,7 +18,7 @@
 - 被 orchestra/governance 视为运行池或 ready queue 候选
 - **不是** repo 全量 open issues，**不是** supervisor issue 池
 
-**当前 governance 的观察范围只限于 assignee issue pool**。它不对 broader repo backlog 做 triage，也不决定哪些 issue 应该进入 assignee issue pool。后者属于未来 `governance/roadmap` 的职责。
+**当前 governance 的观察范围只限于 assignee issue pool**。它不对 broader repo backlog 做 triage，也不决定哪些 issue 应该进入 assignee issue pool。后者属于 `governance/roadmap-intake` 的职责。
 
 ## Role
 
@@ -135,6 +135,7 @@ Forbidden:
   - 不把普通拆分选择升级为人类阻塞
 - 若目标、架构方向或拆分形态都无法判断：
   - 写 `[governance suggest]` 建议标记 `roadmap/rfc`
+  - 命令：`gh issue edit <issue-number> --add-label "roadmap/rfc"`
 
 **队列偏浅时的保守边界**：
 - 如果当前 ready queue 只剩少量候选，或 blocked / in-progress 已经占住大部分池子，不要机械地把所有灰区 issue 都归入“保守等待”
@@ -147,12 +148,13 @@ Forbidden:
 
 ```
 issue 是否可纳入？
-  - Epic 主 issue：主 issue 保持治理容器；检查 sub-issues 是否完整，建议补齐或选择具体 sub-issue
-  - 明确范围 + 清晰验收：可纳入（包括重构）
-  - 范围过大但边界可拆：建议 manager 拆分，或由 roadmap decider 先拆
-  - 范围偏大但 manager 可收敛：放行给 manager 继续单 issue
-  - 确定不适用：建议关闭（附原因）
-  - 目标/架构/拆分形态无法判断：建议 `roadmap/rfc`
+  ├─ Epic 主 issue（roadmap/epic）：主 issue 保持治理容器；检查 sub-issues 是否完整，建议补齐或选择具体 sub-issue
+  ├─ RFC（roadmap/rfc）：目标/验收口径不明确，需要人类讨论；不纳入，跳过
+  ├─ 明确范围 + 清晰验收：可纳入（包括重构）
+  ├─ 范围过大但边界可拆：建议 manager 拆分，或由 roadmap decider 先拆
+  ├─ 范围偏大但 manager 可收敛：放行给 manager 继续单 issue
+  ├─ 确定不适用：建议关闭（附原因）
+  └─ 目标/架构/拆分形态无法判断：建议 `roadmap/rfc`
 ```
 
 ### 例子
@@ -211,7 +213,7 @@ issue 是否可纳入？
 ## Hard Boundary
 
 - **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
-- **不负责决定哪些 issue 应进入 assignee issue pool（属于 future roadmap governance）**
+- **不负责决定哪些 issue 应进入 assignee issue pool（属于 `governance/roadmap-intake` 职责）**
 - 不负责 task registry 或 task 数据质量审计
 - 不负责 runtime 绑定修复
 - 不负责 roadmap 规划或版本目标
