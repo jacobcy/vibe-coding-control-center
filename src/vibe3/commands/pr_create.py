@@ -12,7 +12,7 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
-from vibe3.models.pr import PRResponse
+from vibe3.models.pr import PRResponse, UpdatePRRequest
 from vibe3.observability.logger import setup_logging
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
@@ -234,13 +234,15 @@ def register_create_command(app: typer.Typer) -> None:
         if behind_info:
             behind_warning = format_branch_behind_body(behind_info)
             updated_body = f"{behind_warning}\n\n---\n\n{pr.body}"
-            # Update PR body via gh CLI
-            subprocess.run(
-                ["gh", "pr", "edit", str(pr.number), "--body", updated_body],
-                check=True,
-                capture_output=True,
+            # Update PR body via GitHub client wrapper
+            pr = pr_service.github_client.update_pr(
+                UpdatePRRequest(
+                    number=pr.number,
+                    title=None,
+                    body=updated_body,
+                    draft=None,
+                    base_branch=None,
+                )
             )
-            # Update local PR object
-            pr = pr.model_copy(update={"body": updated_body})
 
         _emit_pr_result(pr, json_output, yaml_output)
