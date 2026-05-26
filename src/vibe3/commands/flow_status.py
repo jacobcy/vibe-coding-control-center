@@ -1,16 +1,18 @@
 """Flow status commands - show, status."""
 
 import json
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.commands.command_options import (
     ActorFilterOption,
+    AllOption,
     FormatOption,
     RemoteOption,
     TraceMinMsOption,
+    TraceOption,
 )
 from vibe3.commands.common import (
     enable_method_trace,
@@ -23,7 +25,9 @@ from vibe3.commands.flow_status_helpers import (
     _fetch_pr_map,
     _fetch_worktree_map,
     _get_yaml,
+    _parse_remote_issue_number,
     _render_snapshot_format,
+    _timeline_to_flow_events,
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
@@ -39,15 +43,6 @@ from vibe3.ui.flow_ui import (
     render_flows_status_dashboard,
 )
 from vibe3.utils.branch_utils import find_parent_branch
-
-if TYPE_CHECKING:
-    pass
-
-
-from vibe3.commands.command_options import (
-    AllOption,
-    TraceOption,
-)
 
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
 
@@ -96,30 +91,44 @@ def show(
         output_format = "json"
 
     service = FlowService()
-    try:
-        target_branch = resolve_command_branch(
-            branch_opt=branch_opt,
-            pr_opt=pr_opt,
-            position_arg=branch_arg,
-            flow_service=service,
+
+    # Handle --remote mode: parse issue number directly, bypass local resolution
+    task_issue_number: int | None
+    if remote:
+        raw = branch_opt or branch_arg
+        if raw is None:
+            raise UserError(
+                "Cannot use --remote without an issue number. "
+                "Provide it as: flow show --remote <issue_number>"
+            )
+        task_issue_number = _parse_remote_issue_number(raw)
+        target_branch = f"remote-#{task_issue_number}"
+    else:
+        # Local mode: resolve branch via standard resolution
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=branch_arg,
+                flow_service=service,
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
+        # Get task issue number for remote fallback
+        links = service.store.get_issue_links(target_branch)
+        task_issue_number = next(
+            (link["issue_number"] for link in links if link["issue_role"] == "task"),
+            None,
         )
-    except (UserError, SystemError) as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(1) from error
 
-    # Get task issue number for remote fallback
-    links = service.store.get_issue_links(target_branch)
-    task_issue_number = next(
-        (link["issue_number"] for link in links if link["issue_role"] == "task"),
-        None,
-    )
+        # Fallback: parse issue number from branch name when local DB missing
+        if task_issue_number is None:
+            from vibe3.services.issue_flow_service import IssueFlowService
 
-    # Fallback: parse issue number from branch name when local DB missing
-    if task_issue_number is None:
-        from vibe3.services.issue_flow_service import IssueFlowService
-
-        issue_flow_service = IssueFlowService(store=service.store)
-        task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
+            issue_flow_service = IssueFlowService(store=service.store)
+            task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
 
     # Use resolver for source-aware read
     from vibe3.services.flow_status_resolver import FlowStatusResolver
@@ -222,10 +231,19 @@ def show(
 
     # Build timeline using resolver's source-aware flow_status
     # Do NOT call service.get_flow_timeline (reads from local)
-    events_data = service.store.get_events(target_branch, limit=100)
-    from vibe3.models.flow import FlowEvent
+    from vibe3.models.data_source import DataSource
 
-    events = [FlowEvent(**e) for e in events_data]
+    # Use data_source alone to decide timeline source
+    # For remote-sourced data (ISSUE_BODY_FALLBACK), always use remote timeline
+    # even if empty - never fall back to local events
+    if flow_status.data_source == DataSource.ISSUE_BODY_FALLBACK:
+        events = _timeline_to_flow_events(flow_status.timeline, target_branch)
+    else:
+        # Local mode: read from SQLite
+        events_data = service.store.get_events(target_branch, limit=100)
+        from vibe3.models.flow import FlowEvent
+
+        events = [FlowEvent(**e) for e in events_data]
 
     if not flow_status:
         logger.error(f"Flow not found: {target_branch}")
