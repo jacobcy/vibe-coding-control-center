@@ -411,12 +411,31 @@ Steps:
        - 最新评论无明确修复计划或后续步骤
 
 3. 如果判定 Issue 已过时或不需要执行：
+   - **未完成工作检查（强制）**：在关闭前必须检查是否有未完成的工作：
+     - 检查当前 issue 是否已有部分实现（如已创建分支、已有 draft PR、已有部分提交）
+     - 检查 issue body 中是否列出了多个子任务，但只完成了部分
+     - 检查是否已有 plan/report/audit 等 refs，说明已投入工作
+     - **若有未完成工作**：
+       - 创建 follow-up issue 记录剩余工作：
+         ```bash
+         gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "$(cat <<'EOF'
+         原 issue #<number> 关闭时的未完成工作：
+
+         <未完成任务清单>
+         EOF
+         )"
+         ```
+       - 在原 issue 关闭评论中引用 follow-up issue
+       - 将 follow-up issue 链接写入原 issue 评论
+     - **若无未完成工作**：
+       - 直接执行关闭流程
    - 写 issue comment，说明关闭理由（重复/已解决/低优先级无意义/测试失败无计划）
    - **署名规则**：
      - 若采纳 governance 建议：署名 `[manager] 执行 governance 建议：<理由>`
      - 若 manager 自主判断：署名 `[manager] 自主判断关闭：<理由>`
    - 若为重复，引用重复 Issue 编号
    - 若为已解决，引用解决 PR/commit 编号
+   - 若有 follow-up issue，引用 follow-up issue 编号
    - 执行关闭：
      ```bash
      gh issue close <issue-number> --comment "关闭理由：<具体理由>"
