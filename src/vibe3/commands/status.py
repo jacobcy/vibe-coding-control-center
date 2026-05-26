@@ -101,9 +101,11 @@ def status(
     from vibe3.commands.status_render import (
         render_blocked_items,
         render_completed_flows,
+        render_epic_items,
         render_issue_progress,
         render_pr_ref_items,
         render_remote_items,
+        render_rfc_items,
         render_scene_sections,
         render_supervisor_issues,
     )
@@ -280,11 +282,28 @@ def status(
     ]
     render_pr_ref_items(pr_ref_items)
 
+    # Separate RFC/Epic items from regular blocked items
+    rfc_items = [
+        item
+        for item in task_progress_items
+        if "roadmap/rfc" in cast(list[str], item.get("labels", []))
+    ]
+    epic_items = [
+        item
+        for item in task_progress_items
+        if "roadmap/epic" in cast(list[str], item.get("labels", []))
+    ]
+
     blocked_items = [
         item
         for item in task_progress_items
         if cast(IssueState, item["state"]) == IssueState.BLOCKED
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
     ]
+
+    render_rfc_items(rfc_items)
+    render_epic_items(epic_items)
     render_blocked_items(blocked_items)
 
     if all_flows:
