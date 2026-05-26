@@ -15,23 +15,23 @@ Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有
 ## 三层架构
 
 ```
-broader repo ──→ Layer 1: roadmap-intake（入口层）
+broader repo --> Layer 1: roadmap-intake (入口层)
                     扫描范围: 无 assignee 的 issue
                     过滤: 无 orchestra-scanned
-                    接受 → 分配 assignee → 流入 Layer 2
-                    跳过 → 打 orchestra-scanned → 不再看
-                          │
-                          ▼
-                 Layer 2: assignee-pool（池内决策层）
+                    接受 -> 分配 assignee -> 流入 Layer 2
+                    跳过 -> 打 orchestra-scanned -> 不再看
+                          |
+                          v
+                 Layer 2: assignee-pool (池内决策层)
                     扫描范围: 有 assignee 的 issue
                     过滤: 无 orchestra-governed
-                    决策(rfc/epic/ready) → 打 orchestra-governed → 不再看
-                          │
-                          ▼
-                 Layer 3: vibe-roadmap（上层审查层）
+                    决策(rfc/epic/ready) -> 打 orchestra-governed -> 不再看
+                          |
+                          v
+                 Layer 3: vibe-roadmap (上层审查层)
                     扫描范围: 所有 [governance suggest] 评论
                     过滤: 无 roadmap-reviewed
-                    审查 → 打 roadmap-reviewed → 写入 memory.md
+                    审查 -> 打 roadmap-reviewed -> 写入 memory.md
 ```
 
 ---
@@ -65,8 +65,8 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 **过滤逻辑**：
 ```
-intake 扫描 → 跳过有 orchestra-scanned 的 issue
-intake 扫描 → 跳过有 assignee 的 issue（已在 pool 中）
+intake 扫描 -> 跳过有 orchestra-scanned 的 issue
+intake 扫描 -> 跳过有 assignee 的 issue（已在 pool 中）
 ```
 
 ---
@@ -87,8 +87,8 @@ gh issue edit <issue-number> --add-label "orchestra-governed"
 
 **过滤逻辑**：
 ```
-pool 扫描 → 跳过有 orchestra-governed 的 issue
-pool 扫描 → 跳过无 assignee 的 issue（不在 pool 中，由 intake 负责）
+pool 扫描 -> 跳过有 orchestra-governed 的 issue
+pool 扫描 -> 跳过无 assignee 的 issue（不在 pool 中，由 intake 负责）
 ```
 
 ---
@@ -113,16 +113,11 @@ gh issue edit <issue-number> --add-label "roadmap-reviewed"
 
 **过滤逻辑**：
 ```
-Step 0 搜索 → 过滤掉有 roadmap-reviewed 的 issue
-Step 0 搜索 → 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
+Step 0 搜索 -> 过滤掉有 roadmap-reviewed 的 issue
+Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
 ```
 
 **颜色**：CC99FF（淡紫色）
-
-**过滤逻辑**：
-```
-Step 0 搜索 → 过滤掉有 roadmap-reviewed 的 issue
-```
 
 ---
 
@@ -132,31 +127,31 @@ Step 0 搜索 → 过滤掉有 roadmap-reviewed 的 issue
 
 ```
 Issue 创建（无 assignee，无标签）
-  │
-  ▼
+  |
+  v
 [intake 扫描]
-  ├─ 有 orchestra-scanned? → 跳过
-  ├─ 有 assignee? → 跳过（已在 pool）
-  └─ 无标签、无 assignee → 三级审查
-       ├─ 接受 → 分配 assignee ──→ 流入 pool（无 scanned 标签）
-       └─ 跳过 → 打 orchestra-scanned ──→ 不再看
-              │
-              ▼（如果接受了）
+  |- 有 orchestra-scanned? -> 跳过
+  |- 有 assignee? -> 跳过（已在 pool）
+  |- 无标签、无 assignee -> 三级审查
+       |- 接受 -> 分配 assignee --> 流入 pool（无 scanned 标签）
+       |- 跳过 -> 打 orchestra-scanned --> 不再看
+              |
+              v（如果接受了）
 [pool 扫描]
-  ├─ 无 assignee? → 跳过（不在 pool）
-  ├─ 有 orchestra-governed? → 跳过
-  └─ 有 assignee、无 governed → 决策
-       ├─ roadmap/rfc → 跳过执行，等人类决策
-       ├─ roadmap/epic → 跳过执行，需拆分
-       ├─ state/ready → 可执行
-       └─ 建议关闭
-       打完标签后 → 打 orchestra-governed ──→ 不再看
-              │
-              ▼
+  |- 无 assignee? -> 跳过（不在 pool）
+  |- 有 orchestra-governed? -> 跳过
+  |- 有 assignee、无 governed -> 决策
+       |- roadmap/rfc -> 跳过执行，等人类决策
+       |- roadmap/epic -> 跳过执行，需拆分
+       |- state/ready -> 可执行
+       |- 建议关闭
+       打完标签后 -> 打 orchestra-governed --> 不再看
+              |
+              v
 [vibe-roadmap 审查]
-  ├─ 有 roadmap-reviewed? → 跳过
-  └─ 无 → 审查 governance 决策
-       写 [roadmap decision] → 打 roadmap-reviewed → 写 memory.md
+  |- 有 roadmap-reviewed? -> 跳过
+  |- 无 -> 审查 governance 决策
+       写 [roadmap decision] -> 打 roadmap-reviewed -> 写 memory.md
 ```
 
 ### 两层 governance 的扫描边界
@@ -166,7 +161,7 @@ Issue 创建（无 assignee，无标签）
 | **扫描范围** | broader repo（无 assignee） | assignee pool（有 assignee） |
 | **跳过条件** | 有 assignee 或 有 `orchestra-scanned` | 无 assignee 或 有 `orchestra-governed` |
 | **打标签** | 只对跳过的打 `orchestra-scanned` | 对所有决策完的打 `orchestra-governed` |
-| **不打的含义** | 接受 → assignee 是信号 → 流入 pool | 无——所有决策完都打 |
+| **不打的含义** | 接受 -> assignee 是信号 -> 流入 pool | 无——所有决策完都打 |
 
 ---
 
@@ -188,23 +183,23 @@ Issue 创建（无 assignee，无标签）
 
 ### Layer 1: roadmap-intake
 
-- ✅ 扫描前过滤：跳过有 `orchestra-scanned` 或有 assignee 的 issue
-- ✅ 接受（分配 assignee）：不设 scanned 标签，自然流入 pool
-- ✅ 跳过（不接受）：打 `orchestra-scanned` 标签
-- ✅ Stop Point Checklist 区分接受/跳过两种情况
+- [x] 扫描前过滤：跳过有 `orchestra-scanned` 或有 assignee 的 issue
+- [x] 接受（分配 assignee）：不设 scanned 标签，自然流入 pool
+- [x] 跳过（不接受）：打 `orchestra-scanned` 标签
+- [x] Stop Point Checklist 区分接受/跳过两种情况
 
 ### Layer 2: assignee-pool
 
-- ✅ 扫描前过滤：跳过无 assignee 或有 `orchestra-governed` 的 issue
-- ✅ 决策完成（rfc/epic/ready/close）：打 `orchestra-governed` 标签
-- ✅ 去重规则检查 `orchestra-governed` 标签
-- ✅ Stop Point Checklist 要求打 governed 标签
+- [x] 扫描前过滤：跳过无 assignee 或有 `orchestra-governed` 的 issue
+- [x] 决策完成（rfc/epic/ready/close）：打 `orchestra-governed` 标签
+- [x] 去重规则检查 `orchestra-governed` 标签
+- [x] Stop Point Checklist 要求打 governed 标签
 
 ### Layer 3: vibe-roadmap
 
-- ✅ Step 0 过滤：跳过有 `roadmap-reviewed` 标签的 issue
-- ✅ 审查完成：写 `[roadmap decision]` + 打 `roadmap-reviewed` 标签
-- ✅ 结果写入 memory.md 缓存
+- [x] Step 0 过滤：跳过有 `roadmap-reviewed` 标签的 issue
+- [x] 审查完成：写 `[roadmap decision]` + 打 `roadmap-reviewed` 标签
+- [x] 结果写入 memory.md 缓存
 
 ---
 

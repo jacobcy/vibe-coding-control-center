@@ -106,9 +106,9 @@
 | `roadmap/future` | 未来考虑 | `gh issue edit 123 --add-label "roadmap/future"` |
 | `roadmap/rfc` | RFC/设计阶段（agent 无法判断目标/拆分形态） | `gh issue edit 123 --add-label "roadmap/rfc"` |
 | `roadmap/epic` | Epic 主 issue（有 Sub-issues，主 issue 作为治理容器） | `gh issue edit 123 --add-label "roadmap/epic"` |
-| `roadmap-reviewed` | 已通过 roadmap decider 决策 | `gh issue edit 123 --add-label "roadmap-reviewed"` |
 
 **说明**：
+- `roadmap-reviewed` 是审查层闭环标签，虽不以 `roadmap/` 为前缀，但与 roadmap 审查流程紧密配合。定义见 §2.2 特殊用途标签
 - `roadmap-reviewed` 标签在 `[roadmap decision]` 评论后自动添加
 - 用于实现治理闭环，避免 Step 0 重复扫描已决策的 issues
 

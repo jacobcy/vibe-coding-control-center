@@ -55,7 +55,7 @@ Allowed:
 
 - `issue`: read only（读取 issue 状态、标签、评论）
 - `labels.read`: 读取所有 labels
-- `labels.write`: 仅限非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`）
+- `labels.write`: 仅限非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`）
 - `flow`: read（读取 flow/worktree 现场信息）
 - `task`: read（读取 task 状态）
 - `handoff`: read（读取交接上下文）
