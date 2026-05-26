@@ -80,6 +80,7 @@
 | `orchestra-scanned` | intake 层已审查，不纳入 | roadmap-intake 跳过 issue 时打标签，下次扫描自动跳过 |
 | `orchestra-governed` | assignee-pool 层已决策 | assignee-pool 决策完成后打标签，下次扫描自动跳过 |
 | `roadmap-reviewed` | 已通过 roadmap decider 审查 | roadmap 写完 `[roadmap decision]` 后打标签，Step 0 自动跳过 |
+| `orchestra` | [Legacy] Orchestra 治理标记 | 已拆分为 `orchestra-scanned` 和 `orchestra-governed`，保留兼容 |
 | `supervisor` | Supervisor-governed orchestration issue | 标记需要 Supervisor 治理的编排问题 |
 | `tech-debt` | Technical debt tracking | 追踪技术债务和需要优化的代码 |
 | `improvement` | Non-urgent improvements | 非紧急的改进和增强项 |
