@@ -302,10 +302,14 @@ class TestFailedGateIntegration:
         assert tick_calls == []
         mock_gate.increment_blocked_ticks.assert_called_once()
 
-    def test_end_to_end_error_to_gate_to_heartbeat_block(
+    def test_end_to_end_gate_activation_from_threshold_errors(
         self, temp_store: SQLiteClient
     ) -> None:
-        """End-to-end test: governance error → gate activation → heartbeat block."""
+        """End-to-end test: governance errors → gate activation (threshold reached).
+
+        Note: This test verifies FailedGate activation behavior. For heartbeat
+        blocking behavior, see test_heartbeat_tick_blocked_by_active_gate().
+        """
         from vibe3.exceptions.error_severity import ErrorSeverity
 
         ErrorTrackingService.clear_instance()

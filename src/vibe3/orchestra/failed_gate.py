@@ -179,7 +179,7 @@ class FailedGate:
 
         # Diagnostic logging: report errors exist but below threshold
         if error_count > 0 and error_count < ErrorTrackingService.THRESHOLD_COUNT:
-            log.info(
+            log.debug(
                 f"ERROR-severity count below threshold: {error_count} errors "
                 f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                 f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
