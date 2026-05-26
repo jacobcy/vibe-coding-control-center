@@ -13,10 +13,13 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 **核心职责:**
 
+- **审查纠正 governance 决策**：审查 pool 层的 `roadmap/rfc`、`state/blocked` 决策，可覆盖纠正
+- **确认未 reviewed 的 issue**：所有无 `roadmap-reviewed` 标签的 issue 都需要审查
 - 判断 issue 属于哪个版本窗口或是否暂缓
 - 为有效 issue 设定规划层 metadata：milestone、`roadmap/*`、必要时的 `priority/[0-9]`
 - 管理版本目标与版本窗口边界
 - 输出规划层候选集，供后续执行 skill 使用
+- **审查完打 `roadmap-reviewed` 标签，结果写入 memory.md**
 
 intake gate 约束：
 
