@@ -34,6 +34,18 @@
 
 ### 三级审查
 
+**Level 0: `.claude/` 和 `.codex/` 目录检查**（优先级最高）
+
+**原因**：这些目录涉及 agent 权限配置，自动化流程无法修改
+
+**触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
+
+**处理动作**：
+- 写 `[governance suggest]` comment：涉及 agent 权限配置目录，无法自动化执行
+- 添加 `roadmap/rfc` 标签
+- **禁止**纳入 assignee issue pool
+- 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
+
 **Level 1: 基础条件**
 - 问题边界明确、验收口径清楚、无需额外产品讨论
 - 改动范围可控、依赖关系简单

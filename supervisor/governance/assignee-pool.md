@@ -232,6 +232,7 @@ pool 扫描有 assignee 的 issue →
 
 - **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
 - **不负责决定哪些 issue 应进入 assignee issue pool（属于 `governance/roadmap-intake` 职责）**
+- **不接手涉及 `.claude/` 目录的 issue**（见下方 `.claude` 目录阻塞规则）
 - 不负责 task registry 或 task 数据质量审计
 - 不负责 runtime 绑定修复
 - 不负责 roadmap 规划或版本目标
@@ -244,6 +245,17 @@ pool 扫描有 assignee 的 issue →
 - **允许两项 state 动作**：
   1. **入池评估与标签补齐**：有 manager assignee 但缺少 state label → 先评 priority/roadmap，再设 `state/ready`
   2. **漏改 blocked 恢复**：`state/blocked` + `blocked_reason == "state unchanged"` + authoritative ref 已存在 → 自动恢复
+
+### `.claude/` 和 `.codex/` 目录阻塞规则
+
+**禁止接手涉及 `.claude/` 或 `.codex/` 目录的 issue**
+
+- **原因**：这些目录涉及 agent 权限配置，自动化流程无法修改
+- **触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
+- **处理动作**：
+  - 写 `[governance suggest]` comment 说明：涉及 agent 权限配置目录，无法自动化执行
+  - 添加 `roadmap/rfc` 标签
+  - **禁止**设置 `state/ready` 或纳入 assignee pool
 
 ## Execution Pattern
 
