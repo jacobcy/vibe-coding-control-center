@@ -616,8 +616,6 @@ class GlobalDispatchCoordinator:
         if self._frozen_queue is None:
             self._frozen_queue = []
 
-        paused_with_pending_blocked = False
-
         # Step 3: Paused mode waits for human task resume to create a
         # non-blocked candidate again. Keep existing waiting entries resident.
         # Blocked-only rebuilds get one dispatch-time qualify pass before the
@@ -626,7 +624,17 @@ class GlobalDispatchCoordinator:
             if self._has_actionable_entries():
                 self._dispatch_paused = False
             elif self._has_pending_blocked_entries():
-                paused_with_pending_blocked = True
+                has_non_blocked = await self._probe_for_non_blocked_candidates()
+                if not has_non_blocked:
+                    append_orchestra_event(
+                        "dispatcher",
+                        "GlobalDispatchCoordinator: dispatch paused "
+                        "(blocked entries pending, no non-blocked candidates)",
+                    )
+                    self._queue_persistence.frozen_queue = self._frozen_queue
+                    self._queue_persistence.persist()
+                    return
+                self._dispatch_paused = False
             else:
                 has_non_blocked = await self._probe_for_non_blocked_candidates()
                 if not has_non_blocked:
@@ -659,16 +667,7 @@ class GlobalDispatchCoordinator:
             self._check_service = None  # Invalidate cache
             if fresh and all(entry.collected_state == "blocked" for entry in fresh):
                 self._dispatch_paused = True
-                if paused_with_pending_blocked:
-                    append_orchestra_event(
-                        "dispatcher",
-                        "GlobalDispatchCoordinator: dispatch paused "
-                        "(blocked candidates unchanged after qualify)",
-                    )
-                else:
-                    self._frozen_queue = self._merge_queue(
-                        self._frozen_queue or [], fresh
-                    )
+                self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
                 append_orchestra_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "

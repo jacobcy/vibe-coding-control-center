@@ -399,34 +399,59 @@ class TestActionableTriggeredCollection:
         ]
 
     @pytest.mark.asyncio
-    async def test_paused_blocked_queue_drops_rechecked_blocked_entries(
+    async def test_paused_blocked_queue_probes_and_returns_early(
         self, mock_coordinator
     ):
-        """After one qualify pass, stable blocked-only queues become quiet."""
+        """Paused with blocked entries: probe for non-blocked candidates
+        and return early if none."""
         mock_coordinator._dispatch_paused = True
         mock_coordinator._frozen_queue = [
             QueueEntry(issue_number=10, collected_state="blocked", waiting_state=None),
         ]
         mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._queue_persistence.persist = MagicMock()
-        mock_coordinator._probe_for_non_blocked_candidates = AsyncMock()
-
-        def mock_dispatch_loop(_tick_id: int = 0) -> int:
-            mock_coordinator._frozen_queue = []
-            return 0
-
-        mock_coordinator._dispatch_loop = MagicMock(side_effect=mock_dispatch_loop)
-
-        async def mock_collect() -> list[QueueEntry]:
-            return [QueueEntry(issue_number=10, collected_state="blocked")]
-
-        mock_coordinator._collect_frozen_queue = mock_collect
+        mock_coordinator._probe_for_non_blocked_candidates = AsyncMock(
+            return_value=False
+        )
+        mock_coordinator._dispatch_loop = MagicMock(
+            side_effect=AssertionError("Should not call _dispatch_loop")
+        )
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            side_effect=AssertionError("Should not call _collect_frozen_queue")
+        )
 
         await mock_coordinator.coordinate(tick_id=1)
 
         assert mock_coordinator._dispatch_paused is True
-        assert mock_coordinator._frozen_queue == []
-        mock_coordinator._probe_for_non_blocked_candidates.assert_not_called()
+        assert len(mock_coordinator._frozen_queue) == 1
+        assert mock_coordinator._frozen_queue[0].issue_number == 10
+        mock_coordinator._probe_for_non_blocked_candidates.assert_awaited_once()
+        mock_coordinator._dispatch_loop.assert_not_called()
+        mock_coordinator._collect_frozen_queue.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_paused_blocked_queue_resumes_when_probe_finds_non_blocked(
+        self, mock_coordinator
+    ):
+        """Paused with blocked entries but probe finds non-blocked
+        candidates: resume dispatch."""
+        mock_coordinator._dispatch_paused = True
+        mock_coordinator._frozen_queue = [
+            QueueEntry(issue_number=10, collected_state="blocked", waiting_state=None),
+        ]
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+        mock_coordinator._queue_persistence.persist = MagicMock()
+        mock_coordinator._probe_for_non_blocked_candidates = AsyncMock(
+            return_value=True
+        )
+        mock_coordinator._dispatch_loop = MagicMock(return_value=0)
+        mock_coordinator._collect_frozen_queue = AsyncMock(return_value=[])
+
+        await mock_coordinator.coordinate(tick_id=1)
+
+        assert mock_coordinator._dispatch_paused is False
+        mock_coordinator._probe_for_non_blocked_candidates.assert_awaited_once()
+        mock_coordinator._dispatch_loop.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_paused_dispatch_skips_recollect_until_non_blocked_probe_hits(
