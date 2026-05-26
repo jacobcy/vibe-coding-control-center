@@ -7,6 +7,8 @@ through role request builders from src/vibe3/roles/.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Callable
 
 from loguru import logger
@@ -24,9 +26,53 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.roles.plan import build_plan_request
 from vibe3.roles.review import build_review_request
 from vibe3.roles.run import build_run_request
+from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_context_loader import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
+
+_BLOCKED_SCOPE_PREFIXES = (".claude/", ".codex/")
+_FILES_LINE_RE = re.compile(r"^\s*-?\s*Files:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+
+
+def _validate_plan_scope(plan_ref: str | None) -> list[str]:
+    """Parse plan Files: lines and return any .claude/ or .codex/ paths found.
+
+    Returns empty list if plan_ref is None, plan file is unreadable,
+    or no blocked paths are found.
+    """
+    if not plan_ref:
+        return []
+
+    plan_path = _resolve_plan_path(plan_ref)
+    if plan_path is None:
+        return []
+
+    try:
+        content = plan_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    blocked: list[str] = []
+    for match in _FILES_LINE_RE.finditer(content):
+        files_text = match.group(1).strip()
+        for raw in files_text.split(","):
+            path = raw.strip().strip("[]").strip().strip("'\"")
+            if path and path.startswith(_BLOCKED_SCOPE_PREFIXES):
+                blocked.append(path)
+
+    return blocked
+
+
+def _resolve_plan_path(plan_ref: str) -> Path | None:
+    """Resolve plan_ref to an absolute file path. Returns None on failure."""
+    plan_path = Path(plan_ref)
+    if plan_path.is_absolute() and plan_path.is_file():
+        return plan_path
+    cwd_path = Path.cwd() / plan_ref
+    if cwd_path.is_file():
+        return cwd_path
+    return None
 
 
 def _dispatch_role_intent(
@@ -195,6 +241,27 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent, /) -> None:
         plan_ref=plan_ref,
         commit_mode=commit_mode,
     ).info("Executor dispatch triggered")
+
+    # Validate plan scope before dispatch
+    blocked_paths = _validate_plan_scope(plan_ref)
+    if blocked_paths:
+        logger.bind(
+            domain="executor_handler",
+            issue_number=event.issue_number,
+            branch=event.branch,
+            blocked_paths=blocked_paths,
+        ).warning("Plan references blocked .claude/.codex paths, blocking flow")
+
+        FlowService().block_flow(
+            event.branch,
+            reason=(
+                "Plan modifies .claude/.codex files: "
+                + ", ".join(blocked_paths)
+                + ". Executor sandbox cannot write to agent definition directories."
+            ),
+            actor="orchestra:scope-gate",
+        )
+        return
 
     try:
         _dispatch_role_intent(

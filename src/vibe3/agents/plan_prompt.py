@@ -120,7 +120,13 @@ Output a structured plan in this format:
 - [Risk description]
 
 ## Notes
-[Optional additional context]"""
+[Optional additional context]
+
+**File scope restriction**: Do NOT include files under .claude/ or .codex/ directories
+in the Files list. These contain agent and team definitions that cannot be modified
+by automated execution. If your task conceptually requires changes to these
+directories, note this in the Risks section instead — those changes require manual
+intervention."""
 
 
 def _plan_variant(mode: PlanPromptMode, context_mode: PromptContextMode) -> str:

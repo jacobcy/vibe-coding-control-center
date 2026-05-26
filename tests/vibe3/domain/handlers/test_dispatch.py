@@ -325,3 +325,507 @@ class TestDispatchNotLaunched:
         )
 
         mock_coordinator.dispatch_execution.assert_called_once()
+
+
+class TestExecutorScopeValidation:
+    """Executor dispatch should block when plan references .claude/.codex paths."""
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_blocks_on_claude_paths(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with .claude/ files should block flow and not dispatch."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        # Create temporary plan file with .claude/ path
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Modify agent
+   - Files: .claude/agents/foo.md
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        with patch(
+            "vibe3.domain.handlers.dispatch.FlowService"
+        ) as mock_flow_service_cls:
+            mock_flow_service = MagicMock()
+            mock_flow_service_cls.return_value = mock_flow_service
+
+            handle_executor_dispatch_intent(
+                ExecutorDispatchIntent(
+                    issue_number=42,
+                    branch="task/issue-42",
+                    trigger_state="in-progress",
+                )
+            )
+
+            # Verify FlowService.block_flow was called
+            mock_flow_service.block_flow.assert_called_once()
+            call_args = mock_flow_service.block_flow.call_args
+            assert call_args[0][0] == "task/issue-42"
+            assert ".claude/agents/foo.md" in call_args[1]["reason"]
+            assert call_args[1]["actor"] == "orchestra:scope-gate"
+
+        # Verify dispatch was NOT attempted
+        mock_build_request.assert_not_called()
+        mock_coordinator.dispatch_execution.assert_not_called()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_blocks_on_codex_paths(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with .codex/ files should block flow and not dispatch."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Modify codex
+   - Files: .codex/agents/bar.toml
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        with patch(
+            "vibe3.domain.handlers.dispatch.FlowService"
+        ) as mock_flow_service_cls:
+            mock_flow_service = MagicMock()
+            mock_flow_service_cls.return_value = mock_flow_service
+
+            handle_executor_dispatch_intent(
+                ExecutorDispatchIntent(
+                    issue_number=42,
+                    branch="task/issue-42",
+                    trigger_state="in-progress",
+                )
+            )
+
+            mock_flow_service.block_flow.assert_called_once()
+            call_args = mock_flow_service.block_flow.call_args
+            assert ".codex/agents/bar.toml" in call_args[1]["reason"]
+
+        mock_build_request.assert_not_called()
+        mock_coordinator.dispatch_execution.assert_not_called()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_blocks_on_multiple_blocked_paths(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with both .claude/ and .codex/ paths should list all in reason."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Modify agent
+   - Files: .claude/agents/foo.md, .codex/agents/bar.toml
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        with patch(
+            "vibe3.domain.handlers.dispatch.FlowService"
+        ) as mock_flow_service_cls:
+            mock_flow_service = MagicMock()
+            mock_flow_service_cls.return_value = mock_flow_service
+
+            handle_executor_dispatch_intent(
+                ExecutorDispatchIntent(
+                    issue_number=42,
+                    branch="task/issue-42",
+                    trigger_state="in-progress",
+                )
+            )
+
+            mock_flow_service.block_flow.assert_called_once()
+            call_args = mock_flow_service.block_flow.call_args
+            reason = call_args[1]["reason"]
+            assert ".claude/agents/foo.md" in reason
+            assert ".codex/agents/bar.toml" in reason
+
+        mock_build_request.assert_not_called()
+        mock_coordinator.dispatch_execution.assert_not_called()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_passes_on_normal_paths(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with normal files should proceed with dispatch."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Modify code
+   - Files: src/foo.py, tests/bar.py
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_executor_dispatch_intent(
+            ExecutorDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="in-progress",
+            )
+        )
+
+        # Verify dispatch proceeded normally
+        mock_build_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_passes_when_plan_ref_none(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+    ) -> None:
+        """No plan_ref should proceed with dispatch (graceful degradation)."""
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {}  # No plan_ref
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_executor_dispatch_intent(
+            ExecutorDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="in-progress",
+            )
+        )
+
+        # Verify dispatch proceeded normally
+        mock_build_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_passes_when_plan_file_unreadable(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+    ) -> None:
+        """Nonexistent plan file should proceed with dispatch (graceful degradation)."""
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {
+            "plan_ref": "nonexistent.md"
+        }  # File doesn't exist
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_executor_dispatch_intent(
+            ExecutorDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="in-progress",
+            )
+        )
+
+        # Verify dispatch proceeded normally
+        mock_build_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_blocks_on_bracketed_file_list(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with bracketed file list should still detect .claude/ path."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Modify agent
+   - Files: [.claude/rules/custom.md, src/foo.py]
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        with patch(
+            "vibe3.domain.handlers.dispatch.FlowService"
+        ) as mock_flow_service_cls:
+            mock_flow_service = MagicMock()
+            mock_flow_service_cls.return_value = mock_flow_service
+
+            handle_executor_dispatch_intent(
+                ExecutorDispatchIntent(
+                    issue_number=42,
+                    branch="task/issue-42",
+                    trigger_state="in-progress",
+                )
+            )
+
+            # Should block on .claude/ path, but not src/foo.py
+            mock_flow_service.block_flow.assert_called_once()
+            call_args = mock_flow_service.block_flow.call_args
+            reason = call_args[1]["reason"]
+            assert ".claude/rules/custom.md" in reason
+            assert "src/foo.py" not in reason
+
+        mock_build_request.assert_not_called()
+        mock_coordinator.dispatch_execution.assert_not_called()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_no_block_on_files_none(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        tmp_path: object,
+    ) -> None:
+        """Plan with 'Files: none' should proceed with dispatch."""
+        from pathlib import Path
+
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        plan_file = Path(str(tmp_path)) / "plan.md"
+        plan_file.write_text("""## Plan Summary
+Test plan
+
+## Steps
+1. Research only
+   - Files: none
+   - Effort: S
+   - Dependencies: none
+""")
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": str(plan_file)}
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_executor_dispatch_intent(
+            ExecutorDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="in-progress",
+            )
+        )
+
+        # Verify dispatch proceeded normally
+        mock_build_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
