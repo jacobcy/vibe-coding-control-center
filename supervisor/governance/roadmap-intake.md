@@ -403,6 +403,23 @@ Supervisor issues:
   - #ZZZ: waiting (<reason>)
 ```
 
+## 治理闭环标签（新增）
+
+完成 intake 判断后，为所有已审查的 issue 打上 `orchestra-scanned` 标签：
+
+```bash
+gh issue edit <issue-number> --add-label "orchestra-scanned"
+```
+
+**目的**：
+- 标记"已通过 governance observer 审查"
+- 下次 governance 扫描自动跳过已打标签的 issues
+- 实现治理闭环，避免重复扫描
+
+**与 `roadmap-reviewed` 配合**：
+- `orchestra-scanned`：governance observer 审查通过（入池）
+- `roadmap-reviewed`：roadmap decider 决策通过（已决策）
+
 ## Stop Point
 
 完成 intake 判断、supervisor issue 审查与最小纳入动作后停止。不要进入具体实现或单 flow 管理。

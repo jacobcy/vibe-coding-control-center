@@ -262,6 +262,24 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 | `roadmap/future` | 未来考虑         | 长期规划           |
 | `roadmap/rfc`    | RFC/设计阶段     | agent 无法判断目标、架构方向或拆分形态 |
 
+#### 治理闭环标签（新增）
+
+| 标签名称           | 描述                   | 打标签时机                           | 用途                                       |
+| ------------------ | ---------------------- | ------------------------------------ | ------------------------------------------ |
+| `orchestra-scanned` | 已通过 governance observer 审查 | governance 扫描完成后              | 标记"已入池"，跳过后续 governance 扫描     |
+| `roadmap-reviewed`  | 已通过 roadmap decider 决策   | roadmap 写完 `[roadmap decision]` 后 | 标记"已决策"，跳过后续 roadmap 扫描        |
+
+**闭环流程**：
+```
+governance 扫描 → 打 orchestra-scanned 标签 → roadmap 决策 → 打 roadmap-reviewed 标签
+     ↑                                                    ↓
+     └────────── 下次扫描跳过 ←─────────────────────────────┘
+```
+
+**注意**：`orchestra` 标签将被拆分为：
+- `orchestra-scanned`：纯技术标记，跳过后续 governance 扫描
+- `orchestra-governed`：语义标签，表示 issue 需要 orchestra 治理（保留用于 supervisor 机制）
+
 ### Milestone 管理
 
 - Milestone 用于标识版本目标，如 "Phase 1: 基础设施"、"Phase 2: 核心功能" 等
@@ -276,33 +294,38 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 1. **找到上次决策锚点**：
    ```bash
-   # 方式 A: 针对单个 issue 查询最近 [roadmap decision] 评论
-   gh issue view <N> --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt'
-   
-   # 方式 B: 跨 issue 搜索（使用 GraphQL 或 REST API）
-   # 注: gh issue list 不支持 --json comments，需用 gh api 或 GraphQL
-   gh api search/issues?q='comment:"[roadmap decision]"' --jq '.items[].comments_url' \
-     | xargs -I {} gh api {} --jq '.[] | select(.body | startswith("[roadmap decision]")) | .createdAt' \
-     | sort | tail -1
+   # 搜索最近的 [roadmap decision] 评论（跨 issue）
+   gh search issues '[roadmap decision]' --match comments --limit 20 --json number,updatedAt --jq '.[] | {number, updatedAt}' | sort_by(.updatedAt) | reverse | .[0]
    ```
    若无历史 `[roadmap decision]` 评论（首次运行），锚点设为 7 天前。
 
-2. **列出锚点之后所有未消化的 `[governance suggest]`**：
+2. **列出锚点之后所有未消化的 `[governance suggest]`（过滤已决策）**：
    ```bash
-   # 列出锚点之后带 [governance suggest] 评论的 issues
-   # 注: 需在本地过滤锚点时间（gh search 不支持 updated:> 按评论时间过滤）
-   gh api search/issues?q='comment:"[governance suggest]"' --jq '.items[] | .number' \
+   # 方式 A: 使用标签过滤（推荐）
+   # 搜索带 [governance suggest] 但没有 roadmap-reviewed 标签的 issues
+   gh search issues '[governance suggest]' --match comments --limit 50 --json number,labels,title \
+     --jq '.[] | select(.labels | map(.name) | index("roadmap-reviewed") | not) | {number, title, has_suggest: true}'
+   
+   # 方式 B: 时间戳比对（fallback）
+   # 若 issue 有 roadmap-reviewed 标签但标签添加时间早于最新 suggest → 仍需处理
+   gh search issues '[governance suggest]' --match comments --limit 50 --json number \
      | while read num; do
          last_decision=$(gh issue view $num --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt // "1970-01-01"')
-         if [[ "$last_decision" > "$anchor_time" ]]; then
-           echo "#$num"
+         if [[ "$last_decision" < "$anchor_time" ]]; then
+           echo "#$num needs new decision"
          fi
        done
    ```
+   
+   **优先使用方式 A（标签过滤）**，效率更高；方式 B 仅用于验证或 fallback。
 
 3. **按 issue × suggest 类型分组展示**：
    - 格式：`#N: [governance suggest] <type> — <summary>`
    - 类型：`needs split` / `Recommend Close` / `Skipped (needs human)` / `waiting on #X`
+   - 时间权重：
+     - 7 天内的 suggest → 高优先级
+     - 30 天内的 → 正常优先级
+     - 30 天外的 → 低优先级（可能已过时）
 
 4. **决策优先级**：
    - 先处理 `[governance suggest] needs split`（拆分或继续，产出最大）
@@ -310,7 +333,12 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
    - 再处理 `[governance suggest] waiting on #X`（依赖校验）
    - 最后处理 `[governance suggest] Skipped (needs human)`（判断是 `rfc` 还是可继续）
 
-5. **闭环要求**：处理完每个 suggest 后必须写 `[roadmap decision]` 评论关闭闭环。
+5. **闭环要求**：处理完每个 suggest 后必须：
+   - 写 `[roadmap decision]` 评论关闭闭环
+   - **自动打 `roadmap-reviewed` 标签**：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
+     ```
 
 ### Step 1: 检查版本目标
 
@@ -410,11 +438,15 @@ gh issue list -l "roadmap/p0"
 - 执行动作：
   1. 分配 assignee（两步骤）：
      - 读取配置：`uv run python -c "..."`
-     - 执行分配：`gh issue edit <number> --assignee <manager_bot_name>`
+     - 执行分配：`gh issue edit <number> --add-assignee <manager_bot_name>`
   2. 写 intake comment：
      ```bash
      gh issue comment <number> --body "[roadmap decision] assign to @{manager_bot} (manager-pool); scope=bugfix."
      # scope 可选值：bugfix, feature, refactor
+     ```
+  3. **打 `roadmap-reviewed` 标签**（标记已决策）：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
      ```
 
 **场景 B: 需要人类讨论**
@@ -430,6 +462,10 @@ gh issue list -l "roadmap/p0"
      ```bash
      gh issue edit <number> --add-label "roadmap/rfc"
      ```
+  4. **打 `roadmap-reviewed` 标签**（标记已决策，避免重复扫描）：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
+     ```
 
 **场景 C: 建议关闭**
 - 检查：Level 2 或 Level 3 不通过（依赖已移除、API 已废弃、重复）
@@ -440,6 +476,10 @@ gh issue list -l "roadmap/p0"
      gh issue comment <number> --body "[roadmap decision] close: dependency removed in #<PR>, API deprecated, duplicate of #<issue>."
      ```
   2. 建议人类关闭 issue（不自动关闭）
+  3. **打 `roadmap-reviewed` 标签**（标记已决策）：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
+     ```
 
 ### Step 3: 应用标签和 Milestone
 
@@ -584,7 +624,11 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 1. vibe-roadmap 的**所有**决策动作必须写 `[roadmap decision] <动作>: <理由>` comment
 2. **禁止** vibe-roadmap 写 `[governance suggest]`（marker 必须区分 observer / decider）
 3. `[roadmap decision]` marker 同时作为 cron-supervisor / 下次 vibe-roadmap 自身判断"上次审查时间"的锚点
-4. 格式：
+4. **自动打 `roadmap-reviewed` 标签**：
+   - 每个 `[roadmap decision]` 评论后必须立即打 `roadmap-reviewed` 标签
+   - 目的：标记已决策，避免 Step 0 重复扫描
+   - 命令：`gh issue edit <number> --add-label "roadmap-reviewed"`
+5. 格式：
    ```text
    [roadmap decision] <动作动词>: <简要理由>
    ```
@@ -598,6 +642,17 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 [roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
 [roadmap decision] hold #55 until #56 completes; reason: #56 provides core infrastructure #55 depends on.
 [roadmap decision] rfc #77; reason: needs human decision on architecture direction.
+```
+
+**执行流程示例**：
+```bash
+# 1. 写决策评论
+gh issue comment 78 --body "[roadmap decision] continue #78; reason: bounded enough for manager."
+
+# 2. 自动打标签（必须）
+gh issue edit 78 --add-label "roadmap-reviewed"
+
+# ✅ 闭环完成，下次 Step 0 不再扫描此 issue
 ```
 
 ## Reference Documents

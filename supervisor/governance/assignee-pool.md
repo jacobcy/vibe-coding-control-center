@@ -377,10 +377,13 @@ Exit:
 
 如果当前没有合适的建议 issue，明确写无，并说明原因。
 
-**orchestra 标签要求**：
-- 发布任何 `[governance suggest]` 或 `[governance auto-recover]` 评论后，**必须**立即添加 `orchestra` 标签
-- `orchestra` 标签表示该 issue 已被 governance 审查过，作为"已审查"标记
-- 如果需要重新审查某个 issue，应先移除 `orchestra` 标签（人类也可以手动移除）
+**orchestra-scanned 标签要求**：
+- 发布任何 `[governance suggest]` 或 `[governance auto-recover]` 评论后，**必须**立即添加 `orchestra-scanned` 标签
+- `orchestra-scanned` 标签表示该 issue 已被 governance 审查过，作为"已审查"标记
+- 如果需要重新审查某个 issue，应先移除 `orchestra-scanned` 标签（人类也可以手动移除）
+- 与 `roadmap-reviewed` 配合实现治理闭环：
+  - `orchestra-scanned`：已通过 governance observer 审查（入池）
+  - `roadmap-reviewed`：已通过 roadmap decider 决策（已决策）
 
 ## Comment Contract
 
@@ -388,7 +391,7 @@ Exit:
 
 **去重规则（强制）**：
 
-- **orchestra 标签检查**：如果 issue 已有 `orchestra` 标签，直接跳过（已审查过）
+- **orchestra-scanned 标签检查**：如果 issue 已有 `orchestra-scanned` 标签，直接跳过（已审查过）
 - **写评论前必须检查**：读取该 issue 的现有 comments
 - **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
