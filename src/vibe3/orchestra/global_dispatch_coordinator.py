@@ -390,6 +390,29 @@ class GlobalDispatchCoordinator:
             )
         )
 
+    def _has_qualifiable_blocked_entries(self) -> bool:
+        """Check if any blocked entries in queue would qualify as ready."""
+        if not self._frozen_queue:
+            return False
+
+        for entry in self._frozen_queue:
+            if entry.waiting_state is not None:
+                continue
+            if entry.collected_state != "blocked":
+                continue
+
+            # Load the issue to check qualification
+            issue = self._load_issue(entry.issue_number)
+            if issue is None:
+                continue
+
+            # Check if this blocked issue would qualify as ready
+            target_state = self._qualify_gate.qualify_blocked_issue(issue)
+            if target_state == IssueState.READY:
+                return True
+
+        return False
+
     async def _probe_for_non_blocked_candidates(self) -> bool:
         """Check if any non-blocked state issue is available after a paused period."""
         for state in (
@@ -624,17 +647,22 @@ class GlobalDispatchCoordinator:
             if self._has_actionable_entries():
                 self._dispatch_paused = False
             elif self._has_pending_blocked_entries():
-                has_non_blocked = await self._probe_for_non_blocked_candidates()
-                if not has_non_blocked:
-                    append_orchestra_event(
-                        "dispatcher",
-                        "GlobalDispatchCoordinator: dispatch paused "
-                        "(blocked entries pending, no non-blocked candidates)",
-                    )
-                    self._queue_persistence.frozen_queue = self._frozen_queue
-                    self._queue_persistence.persist()
-                    return
-                self._dispatch_paused = False
+                # Check if any blocked entries in queue would qualify as ready
+                # before probing for external non-blocked candidates
+                if self._has_qualifiable_blocked_entries():
+                    self._dispatch_paused = False
+                else:
+                    has_non_blocked = await self._probe_for_non_blocked_candidates()
+                    if not has_non_blocked:
+                        append_orchestra_event(
+                            "dispatcher",
+                            "GlobalDispatchCoordinator: dispatch paused "
+                            "(blocked entries pending, no non-blocked candidates)",
+                        )
+                        self._queue_persistence.frozen_queue = self._frozen_queue
+                        self._queue_persistence.persist()
+                        return
+                    self._dispatch_paused = False
             else:
                 has_non_blocked = await self._probe_for_non_blocked_candidates()
                 if not has_non_blocked:
