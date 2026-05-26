@@ -14,6 +14,14 @@ PATTERNS=(
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
 )
 
+# Block task resume -y without --label (grep -E lacks lookahead)
+if echo "$CMD" | grep -qiE "task\s+resume\s+.*(-y\b|--yes\b)" && \
+   ! echo "$CMD" | grep -qiE "task\s+resume\s+.*--label"; then
+  echo "[security] BLOCKED: unsafe task resume without --label" >&2
+  echo "[security] Command: $CMD" >&2
+  exit 2
+fi
+
 for pattern in "${PATTERNS[@]}"; do
   if echo "$CMD" | grep -qiE "$pattern"; then
     echo "[security] BLOCKED: destructive command pattern detected" >&2

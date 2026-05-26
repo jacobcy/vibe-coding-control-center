@@ -46,7 +46,9 @@ async def execute_periodic_check(
         # Offload blocking I/O work to a thread to avoid blocking the event loop
         import asyncio
 
-        results = await asyncio.to_thread(service.verify_all_flows, "active")
+        results = await asyncio.to_thread(
+            service.verify_all_flows, ["active", "blocked"]
+        )
 
         # Summary logging
         total = len(results)

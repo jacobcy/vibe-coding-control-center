@@ -82,13 +82,45 @@
 - 架构已变更 → 建议更新内容
 - 依赖未就绪 → 建议等依赖完成后重新提出
 
-**跳过（保守等待 / RFC）**：
-- issue 的目标/验收口径本身不明确，无法确定做完算什么
+### RFC / Epic 识别与标记
+
+在三级审查过程中，识别不应直接进入执行链的 issue 类型，并**打上对应 label**。
+
+**RFC（人类讨论）**：
+
+识别特征：
+- 验收口径不明确，无法确定"做完算什么"
 - 需要先决定架构方向、产品策略或跨团队边界
+- 尚无明确实现方案，讨论多于执行描述
+- 标题/body 语气偏向"讨论/探索/要不要做"
+
+动作：
+```bash
+gh issue edit <issue-number> --add-label "roadmap/rfc"
+```
+
+**Epic（范围过大需拆解）**：
+
+识别特征：
+- 范围横跨多个模块，单次执行无法覆盖
+- body 中包含 `## Sub-issues` 或明确的子任务列表
+- 标题包含 `[Meta]`、`Epic`、`总览`、`整体` 等关键词
+- 已有 `roadmap/epic` 标签，或 issue 本身就是拆解容器
+
+动作：
+```bash
+gh issue edit <issue-number> --add-label "roadmap/epic"
+```
+
+**跳过后处理**：
+- RFC 和 Epic 不进入 assignee issue pool
+- 在 `Skipped` 中分别记录 `rfc` 或 `epic`，注明原因
+- 不要强行 assign manager 给 RFC/Epic issue
+
+**跳过（其他）**：
+- 目标/验收口径不明确但又不到 RFC 级别时保守等待
 - 不确定是否过时
-- **Epic 主 issue**（有 `roadmap/epic` 标签且 body 包含 `## Sub-issues`）：
-  - 主 issue 是治理容器，不直接作为执行任务纳入 assignee pool
-  - 优先检查 sub-issues 是否已经覆盖拆分；不完整时建议补齐，而不是把 epic 当成失败状态
+- Epic 主 issue 已有 `roadmap/epic` 标签且 body 包含 `## Sub-issues`：主 issue 是治理容器，不直接纳入；优先检查 sub-issues 是否完整
 
 **不要误判为 `needs human decision` 的情况**：
 - 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
@@ -242,7 +274,7 @@ Allowed:
 - `issue`: read
 - `issue.assignee.write`: allowed（仅用于把适合自动化推进的 issue 纳入 assignee issue pool）
 - `labels.read`: read
-- `labels.write`: allowed（仅最小必要的 routing / priority / roadmap 类调整；避免扩大动作）
+- `labels.write`: allowed（仅最小必要的 routing / priority / roadmap 类调整；包括 `roadmap/rfc`、`roadmap/epic` 识别标记；避免扩大动作）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
 - `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）

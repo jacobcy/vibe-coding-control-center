@@ -191,12 +191,22 @@ class GitClient:
 
     def find_worktree_path_for_branch(self, branch: str) -> Path | None:
         """Find worktree path whose checked-out branch matches ``branch``."""
-        if self._worktree_list_cache is None:
-            self._worktree_list_cache = self.list_worktrees()
+        cache = self._worktree_list_cache
+        is_stale = cache is not None
+        if cache is None:
+            cache = self.list_worktrees()
+            self._worktree_list_cache = cache
         ref = f"refs/heads/{branch}"
-        for wt_path, wt_branch in self._worktree_list_cache:
+        for wt_path, wt_branch in cache:
             if wt_branch == ref:
                 return Path(wt_path)
+        # Only refresh if cache was populated before this call
+        # (worktrees may have been created after the snapshot).
+        if is_stale:
+            self._worktree_list_cache = self.list_worktrees()
+            for wt_path, wt_branch in self._worktree_list_cache:
+                if wt_branch == ref:
+                    return Path(wt_path)
         return None
 
     def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
