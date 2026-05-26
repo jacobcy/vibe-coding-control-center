@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -49,7 +50,7 @@ def select_ready_issues_from_collected_issues(
         if should_skip_from_queue(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=config.get_manager_usernames(),
+            manager_usernames=get_manager_usernames(config),
             require_manager_assignee=True,
         ):
             continue
@@ -125,7 +126,7 @@ def promote_progressed_entries(
         if should_skip_from_queue(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=config.get_manager_usernames(),
+            manager_usernames=get_manager_usernames(config),
             require_manager_assignee=True,
         ):
             removed.append(entry)

@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
@@ -247,7 +248,7 @@ def build_governance_recipe(
 
     supervisor_content_source = current.source
 
-    manager_usernames = config.get_manager_usernames()
+    manager_usernames = get_manager_usernames(config)
     manager_bot = manager_usernames[0] if manager_usernames else "vibe-manager-agent"
 
     variables: dict[str, PromptVariableSource] = {

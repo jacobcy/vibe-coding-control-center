@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.services.label_utils import normalize_assignees, normalize_labels
 from vibe3.services.orchestra_status_service import (
@@ -109,7 +110,7 @@ def build_broader_repo_entries(
 
         assignees = normalize_assignees(item.get("assignees"))
         is_assignee_issue = any(
-            assignee in config.get_manager_usernames() for assignee in assignees
+            assignee in get_manager_usernames(config) for assignee in assignees
         )
 
         if material_name == "roadmap-intake.md" and is_assignee_issue:

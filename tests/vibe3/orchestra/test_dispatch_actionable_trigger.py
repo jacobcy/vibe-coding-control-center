@@ -15,14 +15,17 @@ from vibe3.orchestra.queue_entry import QueueEntry
 
 
 @pytest.fixture
-def mock_coordinator() -> GlobalDispatchCoordinator:
+@patch(
+    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     """Create a GlobalDispatchCoordinator with all dependencies mocked."""
     config = MagicMock()
     config.repo = "owner/repo"
     config.manager_usernames = ["manager-bot"]
     config.supervisor_handoff.issue_label = "supervisor"
     config.max_concurrent_flows = 10
-    config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
 
     capacity = MagicMock()
     capacity.get_capacity_status = MagicMock(

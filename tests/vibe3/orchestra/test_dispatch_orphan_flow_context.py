@@ -38,11 +38,16 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     assert "missing flow context" in append_event.call_args[0][1]
 
 
-def test_dispatch_loop_logs_missing_flow_context_once() -> None:
+@patch(
+    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames", return_value=[]
+)
+def test_dispatch_loop_logs_missing_flow_context_once(
+    mock_get_manager_usernames,
+) -> None:
     config = MagicMock(repo="owner/repo")
     config.max_concurrent_flows = 10
     config.supervisor_handoff.issue_label = "supervisor"
-    config.get_manager_usernames.return_value = []
+    config.manager_usernames = []
     coordinator = GlobalDispatchCoordinator(
         config=config,
         capacity=MagicMock(),

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from vibe3.config.orchestra_config import get_handoff_state_label
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
@@ -310,7 +311,7 @@ def iter_supervisor_identified_events(
     from loguru import logger
 
     issue_label = config.supervisor_handoff.issue_label
-    handoff_label = config.supervisor_handoff.get_handoff_state_label()
+    handoff_label = get_handoff_state_label(config.supervisor_handoff)
 
     # Use profile resolution for supervisor template path
     resolver = ConventionResolver.from_repo()

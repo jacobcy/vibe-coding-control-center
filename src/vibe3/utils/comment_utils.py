@@ -3,6 +3,7 @@
 import re
 from typing import Any
 
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.utils.constants import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 
@@ -69,7 +70,7 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
             return False
 
         # Check manager_usernames list
-        manager_usernames = config.get_manager_usernames()
+        manager_usernames = get_manager_usernames(config)
         if manager_usernames:
             manager_logins = [u.lower() for u in manager_usernames]
             if login in manager_logins:

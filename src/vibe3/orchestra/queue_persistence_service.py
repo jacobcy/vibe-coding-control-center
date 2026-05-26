@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import promote_progressed_entries
@@ -73,7 +74,7 @@ class QueuePersistenceService:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self.supervisor_label,
-                manager_usernames=self.config.get_manager_usernames(),
+                manager_usernames=get_manager_usernames(self.config),
                 require_manager_assignee=True,
             ):
                 invalid_issue_numbers.append(issue_number)

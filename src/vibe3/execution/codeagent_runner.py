@@ -75,10 +75,11 @@ class CodeagentExecutionService:
         the next tick does not re-dispatch the same issue.
         """
         from vibe3.clients.github_labels import GhIssueLabelPort
+        from vibe3.config.orchestra_config import get_handoff_state_label
         from vibe3.config.orchestra_settings import load_orchestra_config
 
         config = load_orchestra_config()
-        handoff_label = config.supervisor_handoff.get_handoff_state_label()
+        handoff_label = get_handoff_state_label(config.supervisor_handoff)
 
         try:
             labels_client = GhIssueLabelPort()

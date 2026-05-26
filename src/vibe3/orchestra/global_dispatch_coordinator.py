@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
@@ -440,7 +441,7 @@ class GlobalDispatchCoordinator:
             if issue.state != IssueState.BLOCKED and should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.get_manager_usernames(),
+                manager_usernames=get_manager_usernames(self._config),
                 require_manager_assignee=True,
             ):
                 append_orchestra_event(
