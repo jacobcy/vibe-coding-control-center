@@ -25,6 +25,27 @@ description: Use when the user wants to inspect the current runtime scene with v
 
 - 任何修复都必须先读 shell 审计输出，再决定动作
 
+## 故障归类边界
+
+`vibe-check` 必须先判断现场是否是 flow/block 问题，还是 serve/system 问题。
+
+属于 flow/block 问题：
+
+- business blocked reason、dependency block、human block
+- task / flow / branch / worktree 绑定缺失或残留
+- terminal flow 仍残留 runtime binding
+- orphan auto task scene 需要 `task resume` 或 cleanup 回到可恢复起点
+
+属于 serve/system 问题：
+
+- dispatcher / heartbeat / frozen queue 行为异常
+- role handler 或 ExecutionCoordinator 派发失败
+- worktree 创建异常发生在 serve dispatch 链路中
+- FailedGate、error_log、`serve status` 中的系统错误
+
+如果证据指向 serve/system，`vibe-check` 只报告边界并转交 `/vibe-debug-serve`；
+不要把系统错误写成 business blocked reason，也不要在 flow repair 中扩展新机制。
+
 **Announce at start:** "我正在使用 vibe-check 技能读取 runtime 现场与审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`

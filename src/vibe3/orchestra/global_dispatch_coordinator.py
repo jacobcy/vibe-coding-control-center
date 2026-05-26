@@ -254,8 +254,20 @@ class GlobalDispatchCoordinator:
         # Get the canonical branch for this issue
         branch, _ = self._flow_context(issue.number)
 
-        # If no branch exists, fail open (allow dispatch for new issues)
+        # If no branch exists, fail open only for manager entry states that
+        # can create a fresh task scene. Worker states require an existing flow
+        # context; otherwise role builders fall back to a canonical branch that
+        # may not exist, causing invalid worktree dispatch.
         if not branch:
+            issue_state = issue.state
+            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
+                state_value = issue_state.value if issue_state else "unknown"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    f"(missing flow context for {state_value})",
+                )
+                return False
             return True
 
         # Use CheckService for unified health check
@@ -536,11 +548,6 @@ class GlobalDispatchCoordinator:
 
             # === NEW: Pre-dispatch health check ===
             if not self._health_check_before_dispatch(issue):
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                    "(health check failed)",
-                )
                 self._frozen_queue.pop(index)
                 continue
             # === END health check ===
