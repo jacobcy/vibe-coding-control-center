@@ -96,7 +96,10 @@ class TestRecordDispatchFailureIfUnexpected:
 
         mock_record_error.assert_called_once_with(
             error_code="E_DISPATCH_FAILURE",
-            error_message="planner dispatch failed: Failed to start session",
+            error_message=(
+                "manual planner dispatch failed [launch_failed]: "
+                "Failed to start session"
+            ),
             issue_number=123,
             branch="dev/test",
             store=mock_store,
@@ -126,7 +129,10 @@ class TestRecordDispatchFailureIfUnexpected:
 
         mock_record_error.assert_called_once_with(
             error_code="E_DISPATCH_FAILURE",
-            error_message="executor dispatch failed: Worktree not found",
+            error_message=(
+                "manual executor dispatch failed [worktree_unavailable]: "
+                "Worktree not found"
+            ),
             issue_number=456,
             branch="dev/test",
             store=mock_store,
@@ -162,7 +168,7 @@ class TestRecordDispatchFailureIfUnexpected:
         assert call_args[1]["error_code"] == "E_DISPATCH_FAILURE"
         assert (
             call_args[1]["error_message"]
-            == "reviewer dispatch failed: Unexpected error occurred"
+            == "manual reviewer dispatch failed [unknown]: Unexpected error occurred"
         )
         assert call_args[1]["issue_number"] == 999
         assert call_args[1]["branch"] == "feature/test"

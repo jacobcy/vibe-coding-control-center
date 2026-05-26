@@ -72,7 +72,9 @@ def record_dispatch_failure_if_unexpected(
 
     from vibe3.clients.sqlite_client import SQLiteClient
 
-    error_message = f"{role} dispatch failed: {result.reason}"
+    # Include manual marker and reason_code for disambiguation
+    reason_detail = result.reason or "(no detail)"
+    error_message = f"manual {role} dispatch failed [{reason_code}]: {reason_detail}"
     try:
         record_error(
             error_code="E_DISPATCH_FAILURE",
