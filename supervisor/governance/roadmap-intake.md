@@ -82,6 +82,41 @@
 - 架构已变更 → 建议更新内容
 - 依赖未就绪 → 建议等依赖完成后重新提出
 
+### RFC / Epic 识别与标记
+
+在三级审查过程中，识别不应直接进入执行链的 issue 类型，并**打上对应 label**。
+
+**RFC（人类讨论）**：
+
+识别特征：
+- 验收口径不明确，无法确定"做完算什么"
+- 需要先决定架构方向、产品策略或跨团队边界
+- 尚无明确实现方案，讨论多于执行描述
+- 标题/body 语气偏向"讨论/探索/要不要做"
+
+动作：
+```bash
+gh issue edit <issue-number> --add-label "roadmap/rfc"
+```
+
+**Epic（范围过大需拆解）**：
+
+识别特征：
+- 范围横跨多个模块，单次执行无法覆盖
+- body 中包含 `## Sub-issues` 或明确的子任务列表
+- 标题包含 `[Meta]`、`Epic`、`总览`、`整体` 等关键词
+- 已有 `roadmap/epic` 标签，或 issue 本身就是拆解容器
+
+动作：
+```bash
+gh issue edit <issue-number> --add-label "roadmap/epic"
+```
+
+**跳过后处理**：
+- RFC 和 Epic 不进入 assignee issue pool
+- 在 `Skipped` 中分别记录 `rfc` 或 `epic`，注明原因
+- 不要强行 assign manager 给 RFC/Epic issue
+
 **跳过（保守等待 / RFC）**：
 - issue 的目标/验收口径本身不明确，无法确定做完算什么
 - 需要先决定架构方向、产品策略或跨团队边界
