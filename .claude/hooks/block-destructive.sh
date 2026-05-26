@@ -12,6 +12,7 @@ PATTERNS=(
   "rm\s+-rf\s+.*\s+(/|~)"
   "git\s+commit\s+.*--no-verify"
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
+  "task\s+resume\s+(?!.*--label).*(-y\b|--yes\b)"
 )
 
 for pattern in "${PATTERNS[@]}"; do
