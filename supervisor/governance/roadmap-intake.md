@@ -89,6 +89,12 @@
 - 与已关闭 issue 重复
 - 明确不适用当前架构
 
+**未完成工作检查（supervisor issues 强制执行）**：
+- 关闭前必须检查是否有未完成的工作（分支/PR/部分实现/子任务）
+- **若发现未完成工作**：创建 follow-up issue 记录剩余任务
+- **若无未完成工作**：直接关闭
+- 详细检查逻辑参考 assignee-pool.md 的 `suggest_close()` 函数
+
 **建议调整**（Level 1 或 Level 2 部分不通过）：
 - 范围过大 → 建议 roadmap decider / manager 拆分；若边界清楚，也可直接纳入让 manager 拆
 - 架构已变更 → 建议更新内容
@@ -168,17 +174,28 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
     ```bash
     # 单个 issue handoff 操作
     gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
-    
+
     # 示例：issue #770 通过审查
     gh issue edit 770 --add-label "state/handoff" --remove-label "state/ready"
     ```
   - 交给 supervisor/apply 执行
   - 在 Actions 中记录：`Supervisor #XXX: handoff (passed Level 1-3)`
 - **不通过**：
-  - 建议关闭，写明原因（duplicate、过时、范围失真）
-  - **关闭命令**：
+  - **未完成工作检查（强制）**：
+    - 检查是否有已创建的分支、draft PR、部分实现
+    - 检查 issue body 中是否有部分完成的子任务
+    - 检查是否已有相关 refs（说明已投入工作）
+    - **若有未完成工作**：
+      - 创建 follow-up issue 记录剩余任务：
+        ```bash
+        gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "原 issue #<number> 关闭时的未完成工作：\n\n<未完成任务清单>"
+        ```
+      - 在关闭评论中引用 follow-up issue
+    - **若无未完成工作**：
+      - 直接关闭
+  - 关闭命令：
     ```bash
-    gh issue close <issue-number> --comment "关闭理由：<具体理由>"
+    gh issue close <issue-number> --comment "关闭理由：<具体理由><若有 follow-up，引用 #XXX>"
     ```
   - 在 Actions 中记录：`Supervisor #YYY: suggest close (duplicate with #ZZZ)`
 - **不确定**：
@@ -253,6 +270,8 @@ Allowed:
 
 - `issue`: read
 - `issue.assignee.write`: allowed（仅用于把适合自动化推进的 issue 纳入 assignee issue pool）
+- `issue.close`: allowed（仅限 supervisor issues 高置信度场景，见 Supervisor Issue Intake）
+- `issue.create`: allowed（仅限 supervisor issues 关闭前创建 follow-up issue，处理未完成工作）
 - `labels.read`: read
 - `labels.write`: allowed（仅最小必要的 routing 调整；只设 `orchestra-scanned`（跳过时）；不设 `roadmap/*`、`priority/*` 标签）
 - `comment.write`: allowed（可写简短 intake 说明）
