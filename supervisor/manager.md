@@ -193,6 +193,22 @@ This performs the same three actions as `--reason`, plus:
   可以直接关闭 issue。只允许在 `state/ready` 时执行 close。
   Close 后不再执行任何状态转换或后续流程。
 
+## Hard Boundary
+
+**禁止接手涉及 `.claude/` 或 `.codex/` 目录的 issue**（见下方阻塞规则）
+
+### `.claude/` 和 `.codex/` 目录阻塞规则
+
+**原因**：这些目录涉及 agent 权限配置，自动化流程无法修改
+
+**触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
+
+**处理动作**：
+1. 写 issue comment：`[manager] 涉及 agent 权限配置目录，无法自动化执行`
+2. 调用 `vibe3 flow blocked --reason "涉及 .claude/.codex 目录，权限问题"`
+3. 添加 `roadmap/rfc` 标签
+4. `exit()`
+
 ## Core Rules
 
 1. 先读最新评论，再判断现场
@@ -205,6 +221,7 @@ This performs the same three actions as `--reason`, plus:
 8. `state/claimed` 就表示可以进入 plan；你在 claimed 后必须停止本轮判断
 9. **主动 block 是合法决策**：`state/blocked` 不仅用于被动卡住，也用于你主动请求人类判断。当判断依据不足、风险不确定、或业务决策超出你的权限时，你应该 block 并说明原因，而不是强行推进。执行器报错由对应 agent 标记为 `state/failed`
 10. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`，要么关闭
+11. **权限目录检查优先**：在任何处理前，先检查是否涉及 `.claude/` 或 `.codex/` 目录，若涉及则立即 block
 
 ## `exit()` 语义
 - 文中出现的 `exit()` 只是**语义停止标记**，不是可执行函数

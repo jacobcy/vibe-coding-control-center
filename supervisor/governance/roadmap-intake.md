@@ -34,6 +34,18 @@
 
 ### 三级审查
 
+**Level 0: `.claude/` 和 `.codex/` 目录检查**（优先级最高）
+
+**原因**：这些目录涉及 agent 权限配置，自动化流程无法修改
+
+**触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
+
+**处理动作**：
+- 写 `[governance suggest]` comment：涉及 agent 权限配置目录，无法自动化执行
+- 添加 `roadmap/rfc` 标签
+- **禁止**纳入 assignee issue pool
+- 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
+
 **Level 1: 基础条件**
 - 问题边界明确、验收口径清楚、无需额外产品讨论
 - 改动范围可控、依赖关系简单
@@ -94,7 +106,7 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 - 依赖未就绪 → suggest 中说明等待依赖
 
 **intake 不设以下标签**（属于 assignee-pool 层决策范围）：
-- `roadmap/rfc`、`roadmap/epic`
+- `roadmap/rfc`、`roadmap/epic`（**例外**：Level 0 检查阻塞时，intake 需要添加 `roadmap/rfc` 标签以路由该 issue）
 - `roadmap/p0`、`roadmap/p1`、`roadmap/p2`
 - `priority/*`
 
