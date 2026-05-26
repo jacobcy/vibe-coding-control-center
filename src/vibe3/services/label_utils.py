@@ -80,21 +80,19 @@ def should_skip_from_queue(
     Returns:
         True if issue should be skipped, False otherwise
     """
-    # Skip supervisor-managed issues
-    if supervisor_label in issue.labels:
-        return True
+    from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 
-    # Skip roadmap/rfc (human discussion) and roadmap/epic (needs decomposition)
-    if "roadmap/rfc" in issue.labels or "roadmap/epic" in issue.labels:
-        return True
+    policy = IssueDispatchPolicy(
+        supervisor_label=supervisor_label,
+        manager_usernames=tuple(manager_usernames),
+    )
+    reasons = policy.exclusion_reasons(issue)
+    if require_manager_assignee:
+        return bool(reasons)
 
-    # Skip issues without manager assignee
-    if require_manager_assignee and not has_manager_assignee(
-        issue.assignees, manager_usernames
-    ):
-        return True
-
-    return False
+    # Keep the legacy "skip" behavior for non-assignee exclusions only.
+    assignee_only_codes = {"missing_manager_assignee", "non_manager_assignee"}
+    return any(reason.code not in assignee_only_codes for reason in reasons)
 
 
 def clean_old_state_labels(

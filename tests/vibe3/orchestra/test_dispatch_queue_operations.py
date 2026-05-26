@@ -14,6 +14,49 @@ class TestQueueOperations:
     """Tests for GlobalDispatchCoordinator queue operations."""
 
     @pytest.mark.asyncio
+    async def test_collect_frozen_queue_uses_one_open_issue_call(
+        self, make_issue, make_capacity, make_coordinator
+    ) -> None:
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+        coordinator._github.list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Ready",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+            {
+                "number": 2,
+                "title": "Blocked",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+            {
+                "number": 3,
+                "title": "Epic",
+                "labels": [{"name": "state/ready"}, {"name": "roadmap/epic"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+        ]
+
+        queue = await coordinator._collect_frozen_queue()
+
+        coordinator._github.list_issues.assert_called_once()
+        _, kwargs = coordinator._github.list_issues.call_args
+        assert kwargs.get("label") is None
+        assert [entry.issue_number for entry in queue] == [1]
+
+    @pytest.mark.asyncio
     async def test_dispatch_all_when_capacity_available(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -263,48 +306,37 @@ class TestQueueOperations:
         assert call_count[0] == 1
 
     @pytest.mark.asyncio
-    async def test_collect_failure_does_not_affect_other_roles(
-        self,
-        make_issue,
-        make_capacity,
-        make_coordinator,
-        install_issue_loader,
-        make_issue_info,
+    async def test_collect_failure_returns_empty_queue(
+        self, make_capacity, make_coordinator, monkeypatch
     ) -> None:
-        """Test that polling failure for one state doesn't prevent others."""
-        issue_planner = make_issue(10)
+        """Collection failure should leave the frozen queue empty."""
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
             "planner",
-            [issue_planner],
+            [],
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.READY:
-                raise RuntimeError("API error")
-            elif state == IssueState.CLAIMED:
-                return [make_issue_info(10, IssueState.CLAIMED)]
-            return []
+        def fail_collect(self, limit: int = 100) -> list:
+            raise RuntimeError("API error")
 
-        coordinator._poll_issues_by_state = mock_poll
-
-        install_issue_loader(coordinator, {10: IssueState.CLAIMED})
+        monkeypatch.setattr(
+            "vibe3.services.issue_collection_service.IssueCollectionService.collect_open_issues",
+            fail_collect,
+        )
 
         emit_calls = []
         coordinator._emit_dispatch_intent = (
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
-        # First tick: collects entries (CLAIMED state works, READY fails)
         await coordinator.coordinate()
-        # Second tick: dispatches collected CLAIMED entries
         await coordinator.coordinate()
 
-        assert len(emit_calls) == 1
+        assert len(emit_calls) == 0
 
     @pytest.mark.asyncio
     async def test_empty_queue_does_nothing(
@@ -331,85 +363,3 @@ class TestQueueOperations:
         await coordinator.coordinate()
 
         assert len(emit_calls) == 0
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "test_case,expected_count,expected_numbers",
-        [
-            ("normal", 2, {100, 101}),
-            ("supervisor_only", 0, set()),
-        ],
-    )
-    async def test_blocked_issues_collection_filtering(
-        self,
-        make_capacity,
-        make_coordinator,
-        test_case,
-        expected_count,
-        expected_numbers,
-    ) -> None:
-        """BLOCKED issues bypass qualify gate; supervisor-labeled issues excluded."""
-        capacity = make_capacity(remaining=2)
-
-        coordinator = make_coordinator(
-            "manager",
-            [],
-            capacity=capacity,
-            mock_health_check=True,
-        )
-
-        # Create raw payloads based on test case
-        if test_case == "normal":
-            raw_payloads = [
-                {
-                    "number": 100,
-                    "title": "Issue 100",
-                    "labels": [{"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/100",
-                },
-                {
-                    "number": 101,
-                    "title": "Issue 101",
-                    "labels": [{"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/101",
-                },
-                # Supervisor-labeled issue should be filtered out
-                {
-                    "number": 102,
-                    "title": "Issue 102",
-                    "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/102",
-                },
-            ]
-        else:  # supervisor_only
-            raw_payloads = [
-                {
-                    "number": 102,
-                    "title": "Issue 102",
-                    "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/102",
-                }
-            ]
-
-        # Mock GitHub API to return raw payloads for BLOCKED state
-        def mock_list_issues(**kwargs):
-            if kwargs.get("label") == "state/blocked":
-                return raw_payloads
-            return []
-
-        coordinator._github.list_issues = mock_list_issues
-
-        # Directly test _poll_issues_by_state for BLOCKED state
-        blocked_issues = await coordinator._poll_issues_by_state(IssueState.BLOCKED)
-
-        # Verify filtering behavior
-        assert len(blocked_issues) == expected_count
-        assert {issue.number for issue in blocked_issues} == expected_numbers
-
-        # Verify all returned issues have BLOCKED state
-        for issue in blocked_issues:
-            assert issue.state == IssueState.BLOCKED

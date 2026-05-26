@@ -220,9 +220,9 @@ def render_supervisor_issues(supervisor_items: list[dict[str, object]]) -> None:
         for item in supervisor_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
-            state = cast(IssueState, item["state"])
+            state = cast(IssueState | None, item["state"])
             display_title = title[:52] + "..." if len(title) > 52 else title
-            state_str = state.value.upper()
+            state_str = state.value.upper() if state else "NO STATE"
             console.print(f"  #{number:4}  [{state_str}]  {display_title}")
     else:
         console.print("  [dim](none)[/]")
@@ -287,10 +287,10 @@ def render_rfc_items(rfc_items: list[dict[str, object]]) -> None:
         for item in rfc_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
-            state = cast(IssueState, item["state"])
+            state = cast(IssueState | None, item["state"])
             flow = cast(FlowStatusResponse | None, item["flow"])
 
-            state_str = state.value.upper()
+            state_str = state.value.upper() if state else "NO STATE"
             display_title = title[:60] + ("..." if len(title) > 60 else "")
             console.print(f"  #{number:4}  [yellow]{state_str:10}[/]  {display_title}")
 
@@ -307,10 +307,10 @@ def render_epic_items(epic_items: list[dict[str, object]]) -> None:
         for item in epic_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
-            state = cast(IssueState, item["state"])
+            state = cast(IssueState | None, item["state"])
             flow = cast(FlowStatusResponse | None, item["flow"])
 
-            state_str = state.value.upper()
+            state_str = state.value.upper() if state else "NO STATE"
             display_title = title[:60] + ("..." if len(title) > 60 else "")
             console.print(f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}")
 
@@ -334,6 +334,24 @@ def render_completed_flows(completed_flows: list[FlowStatusResponse]) -> None:
                 f"[dim]task:[/] {task:10} "
                 f"[dim]status:[/] {flow_status}"
             )
+    else:
+        console.print("  [dim](none)[/]")
+
+
+def render_missing_state_items(
+    missing_state_items: list[dict[str, object]],
+) -> None:
+    """Render issues that are relevant to the dashboard but have no state label."""
+    console.print("\n[bold cyan]Missing State Label:[/]")
+    if missing_state_items:
+        for item in missing_state_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            display_title = title[:60] + ("..." if len(title) > 60 else "")
+            reasons = cast(list[str], item.get("dispatch_exclusion_messages", []))
+            console.print(f"  #{number:4}  [yellow]NO STATE  [/]  {display_title}")
+            if reasons:
+                console.print(f"         [yellow]reason:[/] {', '.join(reasons)}")
     else:
         console.print("  [dim](none)[/]")
 

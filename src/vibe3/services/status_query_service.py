@@ -20,6 +20,8 @@ from vibe3.orchestra.queue_ordering import (
     resolve_roadmap_rank,
     sort_ready_issues,
 )
+from vibe3.services.issue_collection_service import IssueCollectionService
+from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
@@ -74,8 +76,10 @@ def extract_queue_metadata(
     return labels, milestone, priority, roadmap
 
 
-def issue_priority(state: IssueState) -> tuple[int, str]:
+def issue_priority(state: IssueState | None) -> tuple[int, str]:
     """Sort orchestration issues by operational urgency."""
+    if state is None:
+        return (4, "")
     if state in {
         IssueState.IN_PROGRESS,
         IssueState.REVIEW,
@@ -216,6 +220,7 @@ class StatusQueryService:
         queued_set: set[int],
         stale_flows: list[FlowStatusResponse] | None = None,
         manager_usernames: tuple[str, ...] | None = None,
+        supervisor_label: str | None = None,
     ) -> list[dict[str, object]]:
         """Fetch GitHub issues and cross-reference with flow state.
 
@@ -224,6 +229,7 @@ class StatusQueryService:
             queued_set: Set of issue numbers in the queue
             stale_flows: Stale flow status responses
             manager_usernames: Tuple of manager usernames for remote task detection
+            supervisor_label: Supervisor label for dispatch exclusion reporting
 
         Returns:
             Sorted list of issue dicts with number, title, state, flow, queued, remote
@@ -244,17 +250,19 @@ class StatusQueryService:
                     f,
                 )
 
-        orchestrated_issues: list[dict[str, object]] = []
         try:
-            raw_issues = self.github.list_issues(
-                limit=100,
-                state="open",
-                assignee=None,
+            collected_issues = IssueCollectionService(
+                self.github,
                 repo=self.repo,
-            )
+            ).collect_open_issues(limit=100)
         except Exception as exc:
             logger.bind(domain="status").warning(f"Failed to fetch issues: {exc}")
-            raw_issues = []
+            collected_issues = []
+
+        dispatch_policy = IssueDispatchPolicy(
+            supervisor_label=supervisor_label or "",
+            manager_usernames=manager_usernames or (),
+        )
 
         # Collect all branches from flows for cache lookup
         branches = [flow.branch for flow in flows if flow.branch]
@@ -275,13 +283,10 @@ class StatusQueryService:
             logger.bind(domain="status").warning(f"Failed to fetch PRs: {exc}")
             branch_to_pr = {}
 
-        for item in raw_issues:
-            number = item.get("number")
-            if not isinstance(number, int):
-                continue
-            state = _state_from_labels(item.get("labels"))
-            if state is None:
-                continue
+        orchestrated_issues: list[dict[str, object]] = []
+        for issue in collected_issues:
+            number = issue.number
+            state = issue.state
             # Note: IssueState.DONE is no longer skipped here.
             # It will be filtered at the UI layer or grouped into PR section.
             flow = issue_to_flow.get(number)
@@ -299,18 +304,21 @@ class StatusQueryService:
                     blocked_by = (blocked_by_issue,)
                 blocked_reason = getattr(flow, "blocked_reason", None)
 
-            labels, milestone, priority, roadmap = extract_queue_metadata(
-                item.get("labels"),
-                item.get("milestone"),
-            )
-            assignee = extract_primary_assignee_login(item.get("assignees"))
+            labels = list(issue.labels)
+            milestone = issue.milestone
+            priority = resolve_priority(labels)
+            _, roadmap = resolve_roadmap_rank(labels)
+            assignee = issue.assignees[0] if issue.assignees else None
+            exclusion_reasons = dispatch_policy.exclusion_reasons(issue)
+            exclusion_codes = [reason.code for reason in exclusion_reasons]
+            exclusion_messages = [reason.message for reason in exclusion_reasons]
 
             # Get title from cache (using branch) or fall back to API title
             if flow:
-                title = branch_titles.get(flow.branch) or str(item.get("title") or "")
+                title = branch_titles.get(flow.branch) or issue.title
             else:
-                # Fallback to API title
-                title = str(item.get("title") or "")
+                # Fallback to the collected issue title
+                title = issue.title
 
             # Get PR data from batch query
             pr_number = None
@@ -355,6 +363,8 @@ class StatusQueryService:
                     "roadmap": roadmap,
                     "priority": priority,
                     "labels": labels,
+                    "dispatch_exclusion_codes": exclusion_codes,
+                    "dispatch_exclusion_messages": exclusion_messages,
                     # Remote task flag
                     "remote": is_remote,
                 }
@@ -375,7 +385,7 @@ class StatusQueryService:
         # Sort other issues by operational urgency
         other_issues.sort(
             key=lambda item: (
-                *issue_priority(cast(IssueState, item["state"])),
+                *issue_priority(cast(IssueState | None, item["state"])),
                 cast(int, item["number"]),
             )
         )

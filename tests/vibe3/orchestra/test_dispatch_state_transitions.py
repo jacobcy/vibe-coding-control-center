@@ -18,7 +18,6 @@ class TestStateTransitions:
         make_capacity,
         make_coordinator,
         install_issue_loader,
-        make_issue_info,
     ) -> None:
         """Test that issues are collected in priority order."""
         _ = make_issue(1)
@@ -29,14 +28,13 @@ class TestStateTransitions:
             "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.READY:
-                return [make_issue_info(1, IssueState.READY)]
-            elif state == IssueState.CLAIMED:
-                return [make_issue_info(2, IssueState.CLAIMED)]
-            return []
+        async def mock_collect() -> list[QueueEntry]:
+            return [
+                QueueEntry(issue_number=2, collected_state="claimed"),
+                QueueEntry(issue_number=1, collected_state="ready"),
+            ]
 
-        coordinator._poll_issues_by_state = mock_poll
+        coordinator._collect_frozen_queue = mock_collect
 
         install_issue_loader(
             coordinator,
@@ -66,7 +64,6 @@ class TestStateTransitions:
         make_capacity,
         make_coordinator,
         install_issue_loader,
-        make_issue_info,
     ) -> None:
         """Test that capacity limit stops dispatch after limit reached."""
         _ = make_issue(304)
@@ -78,16 +75,14 @@ class TestStateTransitions:
             "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.REVIEW:
-                return [make_issue_info(304, IssueState.REVIEW)]
-            elif state == IssueState.CLAIMED:
-                return [make_issue_info(303, IssueState.CLAIMED)]
-            elif state == IssueState.READY:
-                return [make_issue_info(372, IssueState.READY)]
-            return []
+        async def mock_collect() -> list[QueueEntry]:
+            return [
+                QueueEntry(issue_number=304, collected_state="review"),
+                QueueEntry(issue_number=303, collected_state="claimed"),
+                QueueEntry(issue_number=372, collected_state="ready"),
+            ]
 
-        coordinator._poll_issues_by_state = mock_poll
+        coordinator._collect_frozen_queue = mock_collect
 
         install_issue_loader(
             coordinator,
@@ -121,7 +116,6 @@ class TestStateTransitions:
         make_capacity,
         make_coordinator,
         install_issue_loader,
-        make_issue_info,
     ) -> None:
         """Test that issue with state change gets promoted to front of queue."""
         _ = make_issue(1)
@@ -132,15 +126,13 @@ class TestStateTransitions:
             "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.READY:
-                return [
-                    make_issue_info(1, IssueState.READY),
-                    make_issue_info(2, IssueState.READY),
-                ]
-            return []
+        async def mock_collect() -> list[QueueEntry]:
+            return [
+                QueueEntry(issue_number=1, collected_state="ready"),
+                QueueEntry(issue_number=2, collected_state="ready"),
+            ]
 
-        coordinator._poll_issues_by_state = mock_poll
+        coordinator._collect_frozen_queue = mock_collect
 
         states = {
             1: IssueState.READY,
@@ -162,13 +154,6 @@ class TestStateTransitions:
 
         states[1] = IssueState.CLAIMED
 
-        async def mock_poll_claimed(state: IssueState) -> list:
-            if state == IssueState.CLAIMED:
-                return [make_issue_info(1, IssueState.CLAIMED)]
-            return []
-
-        coordinator._poll_issues_by_state = mock_poll_claimed
-
         await coordinator.coordinate()
 
         assert len(emit_calls) == 2
@@ -183,7 +168,7 @@ class TestStateTransitions:
         install_issue_loader,
         make_issue_info,
     ) -> None:
-        """Test that BLOCKED issues are removed from queue."""
+        """Blocked issues are removed when qualification keeps them blocked."""
         manager_issue = make_issue(1)
         capacity = make_capacity(remaining=1)
 
@@ -191,12 +176,10 @@ class TestStateTransitions:
             "manager", [manager_issue], capacity=capacity, mock_health_check=True
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.READY:
-                return [make_issue_info(1, IssueState.READY)]
-            return []
+        async def mock_collect() -> list[QueueEntry]:
+            return [QueueEntry(issue_number=1, collected_state="ready")]
 
-        coordinator._poll_issues_by_state = mock_poll
+        coordinator._collect_frozen_queue = mock_collect
 
         states = {1: IssueState.READY}
         install_issue_loader(coordinator, states)
@@ -217,6 +200,7 @@ class TestStateTransitions:
             issue_number,
             IssueState.BLOCKED,
         )
+        coordinator._qualify_gate.qualify_blocked_issue = lambda issue: None
 
         await coordinator.coordinate()
         await coordinator.coordinate()
@@ -230,7 +214,7 @@ class TestStateTransitions:
         make_coordinator,
         make_issue_info,
     ) -> None:
-        """Falsely-blocked issue is dispatched after qualify_blocked_issue (#1125)."""
+        """Blocked issues stay out of dispatch and are removed from the queue."""
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
@@ -240,29 +224,10 @@ class TestStateTransitions:
             mock_health_check=True,
         )
 
-        # Create raw payload for falsely-blocked issue
-        # (label says blocked, but qualify gate determines it should be ready)
-        raw_payload = {
-            "number": 100,
-            "title": "Falsely Blocked Issue",
-            "labels": [{"name": "state/blocked"}],
-            "assignees": [{"login": "manager-bot"}],
-            "html_url": "https://github.com/owner/repo/issues/100",
-        }
+        async def mock_collect() -> list[QueueEntry]:
+            return [QueueEntry(issue_number=100, collected_state="blocked")]
 
-        def mock_list_issues(**kwargs):
-            if kwargs.get("label") == "state/blocked":
-                return [raw_payload]
-            return []
-
-        coordinator._github.list_issues = mock_list_issues
-
-        # Mock qualify_blocked_issue to return READY (unblocked)
-        def mock_qualify(issue) -> IssueState | None:
-            assert issue.number == 100
-            return IssueState.READY
-
-        coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+        coordinator._collect_frozen_queue = mock_collect
 
         # Mock _load_issue to return the issue with BLOCKED label
         coordinator._load_issue = lambda issue_number: make_issue_info(
@@ -276,15 +241,13 @@ class TestStateTransitions:
             lambda role, issue, tick_id=0: emit_calls.append((role, issue))
         )
 
-        # First tick: collects BLOCKED issue (bypassing qualify gate)
+        # First tick: collects BLOCKED issue
         await coordinator.coordinate()
-        # Second tick: dispatches the falsely-blocked issue (qualify returns READY)
+        # Second tick: blocked issue is skipped and removed from queue
         await coordinator.coordinate()
 
-        # Falsely-blocked issue should be dispatched to manager role
-        assert len(emit_calls) == 1
-        assert emit_calls[0][1].number == 100
-        assert emit_calls[0][0].registry_role == "manager"
+        assert len(emit_calls) == 0
+        assert coordinator._frozen_queue == []
 
 
 class TestLoggingBehavior:

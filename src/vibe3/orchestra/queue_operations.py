@@ -16,7 +16,7 @@ from vibe3.orchestra.issue_loader import (
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.services.label_utils import normalize_labels, should_skip_from_queue
+from vibe3.services.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -25,37 +25,8 @@ if TYPE_CHECKING:
     from vibe3.orchestra.flow_dispatch import FlowManager
 
 
-def collect_raw_issues_without_qualify(
-    raw_issues: list[dict[str, object]],
-) -> list[IssueInfo]:
-    """Apply collection-time filters without running the qualify gate.
-
-    Performs the shared 3-step filtering chain:
-    1. normalize_labels
-    2. state/ label presence check
-    3. IssueInfo.from_github_payload
-
-    Skips the qualify gate so callers can defer qualification (e.g. BLOCKED
-    bypass path) or apply it selectively.
-
-    Note: should_skip_from_queue is NOT applied here to preserve original
-    behavior where issues flow through qualify gate first for side effects
-    (blocked-label alignment, auto-resume).
-    """
-    selected: list[IssueInfo] = []
-    for item in raw_issues:
-        labels = normalize_labels(item.get("labels"))
-        if not any(lbl.startswith("state/") for lbl in labels):
-            continue
-        issue = IssueInfo.from_github_payload(item)
-        if issue is None:
-            continue
-        selected.append(issue)
-    return selected
-
-
-def select_ready_issues(
-    raw_issues: list[dict[str, object]],
+def select_ready_issues_from_collected_issues(
+    issues: list[IssueInfo],
     trigger_state: IssueState,
     config: OrchestraConfig,
     github: "GitHubClient",
@@ -64,29 +35,15 @@ def select_ready_issues(
     qualify_gate: QualifyGateService,
     supervisor_label: str,
 ) -> list[IssueInfo]:
-    """Select ready issues by filtering through qualify gate and other checks.
-
-    Args:
-        raw_issues: Raw issue payloads from GitHub
-        trigger_state: The trigger state being collected
-        config: Orchestra configuration
-        github: GitHub client
-        store: SQLite client
-        flow_manager: Flow manager
-        qualify_gate: Qualify gate service
-        supervisor_label: Supervisor label to check
-
-    Returns:
-        Filtered and sorted ready issues
-    """
+    """Select ready issues from already-collected IssueInfo objects."""
     selected: list[IssueInfo] = []
     role = find_role_for_state(trigger_state)
     if role is None:
         return selected
 
-    raw_selected = collect_raw_issues_without_qualify(raw_issues)
-
-    for issue in raw_selected:
+    for issue in issues:
+        if issue.state != trigger_state:
+            continue
         # Verify assignee/supervisor filters
         # Always require manager assignee for all dispatch stages
         if should_skip_from_queue(

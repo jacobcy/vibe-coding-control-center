@@ -110,50 +110,14 @@ def make_coordinator() -> callable:
         if mock_health_check:
             coordinator._health_check_before_dispatch = MagicMock(return_value=True)
 
-        if ready_issues:
-            role_map = {
-                "manager": IssueState.READY,
-                "handoff-manager": IssueState.HANDOFF,
-                "planner": IssueState.CLAIMED,
-                "plan": IssueState.CLAIMED,
-                "executor": IssueState.IN_PROGRESS,
-                "run": IssueState.IN_PROGRESS,
-                "reviewer": IssueState.REVIEW,
-                "review": IssueState.REVIEW,
-            }
-            target_state = role_map.get(role, IssueState.READY)
+        _ = ready_issues
 
-            async def mock_poll(state: IssueState) -> list[IssueInfo]:
-                if state == target_state:
-                    return [
-                        IssueInfo(
-                            number=issue.number,
-                            title=issue.title,
-                            state=target_state,
-                            labels=[
-                                *[
-                                    lb
-                                    for lb in issue.labels
-                                    if not lb.startswith("state/")
-                                ],
-                                target_state.to_label(),
-                            ],
-                            milestone=issue.milestone,
-                            url=issue.url,
-                            assignees=issue.assignees or ["manager-bot"],
-                        )
-                        for issue in ready_issues
-                    ]
-                return []
+        if with_branches and role != "manager":
 
-            coordinator._poll_issues_by_state = mock_poll
+            def mock_flow_context(issue_number: int) -> tuple[str, dict | None]:
+                return (f"task/issue-{issue_number}", None)
 
-            if with_branches and role != "manager":
-
-                def mock_flow_context(issue_number: int) -> tuple[str, dict | None]:
-                    return (f"task/issue-{issue_number}", None)
-
-                coordinator._flow_context = mock_flow_context
+            coordinator._flow_context = mock_flow_context
 
         return coordinator
 

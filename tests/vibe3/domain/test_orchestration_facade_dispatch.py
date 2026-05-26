@@ -92,8 +92,8 @@ class TestOrchestrationFacadeDispatchServices:
     ) -> None:
         """on_tick() should handle exceptions from GlobalDispatchCoordinator gracefully.
 
-        GlobalDispatchCoordinator handles errors from _poll_issues_by_state internally,
-        so facade's on_tick() should complete without raising exceptions.
+        GlobalDispatchCoordinator handles collection errors internally, so
+        facade's on_tick() should complete without raising exceptions.
         """
         mock_config_cls.return_value = MagicMock(
             polling_interval=1,
