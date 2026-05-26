@@ -13,10 +13,15 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 **核心职责:**
 
+- **审查纠正 governance 决策**：审查 pool 层的 `roadmap/rfc`、`state/blocked` 决策，可覆盖纠正
+- **确认未 reviewed 的 issue**：所有无 `roadmap-reviewed` 标签的 issue 都需要审查
+- **治理漏网检查**：检测有 assignee 但缺 state 标签的 issue（隐含 rfc）、state/done 但未自动关闭的 issue
+- 判断 issue 属于哪个版本窗口或是否暂缓
 - 判断 issue 属于哪个版本窗口或是否暂缓
 - 为有效 issue 设定规划层 metadata：milestone、`roadmap/*`、必要时的 `priority/[0-9]`
 - 管理版本目标与版本窗口边界
 - 输出规划层候选集，供后续执行 skill 使用
+- **审查完打 `roadmap-reviewed` 标签，结果写入 memory.md**
 
 intake gate 约束：
 
@@ -262,6 +267,35 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 | `roadmap/future` | 未来考虑         | 长期规划           |
 | `roadmap/rfc`    | RFC/设计阶段     | agent 无法判断目标、架构方向或拆分形态 |
 
+#### 治理闭环标签
+
+三层标签各自闭环，由不同角色在不同阶段打上：
+
+| 标签名称 | 角色 | 打标签时机 | 语义 |
+| -------- | ---- | ---------- | ---- |
+| `orchestra-scanned` | roadmap-intake（入口层） | intake 审查后**跳过**时 | "已审查，不纳入"——下次 intake 自动跳过 |
+| `orchestra-governed` | assignee-pool（池内层） | pool 决策完成后 | "已决策"——下次 pool 扫描自动跳过 |
+| `roadmap-reviewed` | vibe-roadmap（审查层） | roadmap 审查完成后 | "已审查"——下次 Step 0 自动跳过 |
+
+**闭环流程（三层）**：
+```
+broader repo ──→ intake 扫描 ──→ 接受(assignee) ──→ pool 扫描 ──→ 决策(rfc/epic/ready)
+                     │ 跳过                               │
+                     ▼                                    ▼
+              orchestra-scanned                   orchestra-governed
+              (下次 intake 跳过)                  (下次 pool 跳过)
+                                                        │
+                                                        ▼
+                                        vibe-roadmap Step 0 ──→ 审查
+                                                                    │
+                                                                    ▼
+                                                            roadmap-reviewed
+                                                            (下次 roadmap 跳过)
+                                                                    │
+                                                                    ▼
+                                                              memory.md 缓存
+```
+
 ### Milestone 管理
 
 - Milestone 用于标识版本目标，如 "Phase 1: 基础设施"、"Phase 2: 核心功能" 等
@@ -276,33 +310,43 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 1. **找到上次决策锚点**：
    ```bash
-   # 方式 A: 针对单个 issue 查询最近 [roadmap decision] 评论
-   gh issue view <N> --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt'
-   
-   # 方式 B: 跨 issue 搜索（使用 GraphQL 或 REST API）
-   # 注: gh issue list 不支持 --json comments，需用 gh api 或 GraphQL
-   gh api search/issues?q='comment:"[roadmap decision]"' --jq '.items[].comments_url' \
-     | xargs -I {} gh api {} --jq '.[] | select(.body | startswith("[roadmap decision]")) | .createdAt' \
-     | sort | tail -1
+   # 搜索最近的 [roadmap decision] 评论（跨 issue）
+   # 注意：gh search 默认全局搜索，需要加 repo 限定
+   REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+   gh search issues "repo:$REPO [roadmap decision]" --match comments --limit 20 --json number,updatedAt --jq 'sort_by(.updatedAt) | reverse | .[0] | {number, updatedAt}'
    ```
    若无历史 `[roadmap decision]` 评论（首次运行），锚点设为 7 天前。
 
-2. **列出锚点之后所有未消化的 `[governance suggest]`**：
+2. **列出锚点之后所有未消化的 `[governance suggest]`（过滤已决策）**：
    ```bash
-   # 列出锚点之后带 [governance suggest] 评论的 issues
-   # 注: 需在本地过滤锚点时间（gh search 不支持 updated:> 按评论时间过滤）
-   gh api search/issues?q='comment:"[governance suggest]"' --jq '.items[] | .number' \
+   # 方式 A: 使用标签过滤（推荐）
+   # 搜索带 [governance suggest] 但没有 roadmap-reviewed 标签的 issues
+   # 同时排除带 roadmap/rfc 的 issue（rfc 表示需要人类决策，未完成决策）
+   REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+   gh search issues "repo:$REPO [governance suggest]" --match comments --limit 50 --json number,labels,title \
+     --jq '.[] | select(.labels | map(.name) | index("roadmap-reviewed") | not) | select(.labels | map(.name) | index("roadmap/rfc") | not) | {number, title, has_suggest: true}'
+   
+   # 方式 B: 时间戳比对（fallback）
+   # 若 issue 有 roadmap-reviewed 标签但标签添加时间早于最新 suggest → 仍需处理
+   anchor_time=$(date -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
+   gh search issues '[governance suggest]' --match comments --limit 50 --json number --jq '.[].number' \
      | while read num; do
          last_decision=$(gh issue view $num --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt // "1970-01-01"')
-         if [[ "$last_decision" > "$anchor_time" ]]; then
-           echo "#$num"
+         if [[ "$last_decision" < "$anchor_time" ]]; then
+           echo "#$num needs new decision"
          fi
        done
    ```
+   
+   **优先使用方式 A（标签过滤）**，效率更高；方式 B 仅用于验证或 fallback。
 
 3. **按 issue × suggest 类型分组展示**：
    - 格式：`#N: [governance suggest] <type> — <summary>`
    - 类型：`needs split` / `Recommend Close` / `Skipped (needs human)` / `waiting on #X`
+   - 时间权重：
+     - 7 天内的 suggest → 高优先级
+     - 30 天内的 → 正常优先级
+     - 30 天外的 → 低优先级（可能已过时）
 
 4. **决策优先级**：
    - 先处理 `[governance suggest] needs split`（拆分或继续，产出最大）
@@ -310,7 +354,60 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
    - 再处理 `[governance suggest] waiting on #X`（依赖校验）
    - 最后处理 `[governance suggest] Skipped (needs human)`（判断是 `rfc` 还是可继续）
 
-5. **闭环要求**：处理完每个 suggest 后必须写 `[roadmap decision]` 评论关闭闭环。
+5. **闭环要求**：处理完每个 suggest 后必须：
+   - 写 `[roadmap decision]` 评论关闭闭环
+   - 如果 decision 不是 `rfc`：**打 `roadmap-reviewed` 标签**：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
+     ```
+   - 如果 decision 是 `rfc`：**不打 `roadmap-reviewed`**，保留 `roadmap/rfc` 标签等待人类决策。人类移除 `roadmap/rfc` 后，下次 roadmap 扫描会重新捡起该 issue。
+
+### Step 0.5: 治理漏网检查
+
+Step 0 处理完 governance suggest 后，检查两类"漏网" issue：
+
+**类型 A：有 assignee 但缺 state 标签（隐含 rfc）**
+
+这些 issue 通过了 intake（有 assignee）但 pool 还没处理（无 state 标签），等于卡在两层之间。
+
+```bash
+# 搜索有 assignee 但无 state/* 标签的 open issues
+gh issue list --assignee vibe-manager-agent --limit 50 --json number,title,labels \
+  --jq '.[] | select(.state == "OPEN") | select([.labels[].name] | map(select(startswith("state/"))) | length == 0) | {number, title}'
+```
+
+对每个漏网 issue 判断：
+- **应执行**（范围明确、有 priority、有 roadmap）→ 补 `state/ready`
+- **应关闭**（过时、冲突、不适用、无价值）→ 写 `[roadmap decision] close` + 打 `roadmap-reviewed`
+
+**类型 B：state/done 但 issue 仍 OPEN（系统未自动关闭）**
+
+```bash
+# 搜索 state/done 但 issue 仍 open
+gh issue list --label "state/done" --limit 30 --json number,title,labels \
+  --jq '.[] | select(.state == "OPEN") | {number, title}'
+```
+
+对每个漏网 issue：
+1. 检查是否有关联 PR 且已 merged：
+   ```bash
+   gh pr list --search "issue:<number>" --state merged --json number,state,mergedAt
+   ```
+2. **代码实际验证（强制）**：不是只看 PR 状态。必须检查代码实际：
+   - PR merged → 检查目标文件/模块是否确实包含了 issue 要求的改动
+   - 无 PR → 检查代码库中是否已经以其他方式完成了改动（`git log --grep`、`inspect files`）
+   ```bash
+   git log --oneline -10 --all --grep="<issue 关键词>"
+   uv run python src/vibe3/cli.py inspect files <相关路径>
+   ```
+3. **完成了**（代码实际包含改动）→ 关闭 issue，comment 说明关闭原因和代码证据
+4. **没完成**（代码中无对应改动）→ 关闭当前 issue（已过时或范围不清）+ 创建新 issue（范围更明确，引用原 issue）
+
+**关键原则**：roadmap 处理的都是"悬浮状态"——issue 标签和代码实际脱节。不能用形式审查（看标签、看 PR 状态）代替实质判断（看代码）。必须确认改动是否真实存在于代码库中。
+
+处理完所有漏网 issue 后，打 `roadmap-reviewed`，写入 memory.md 缓存。
+
+---
 
 ### Step 1: 检查版本目标
 
@@ -410,11 +507,15 @@ gh issue list -l "roadmap/p0"
 - 执行动作：
   1. 分配 assignee（两步骤）：
      - 读取配置：`uv run python -c "..."`
-     - 执行分配：`gh issue edit <number> --assignee <manager_bot_name>`
+     - 执行分配：`gh issue edit <number> --add-assignee <manager_bot_name>`
   2. 写 intake comment：
      ```bash
      gh issue comment <number> --body "[roadmap decision] assign to @{manager_bot} (manager-pool); scope=bugfix."
      # scope 可选值：bugfix, feature, refactor
+     ```
+  3. **打 `roadmap-reviewed` 标签**（标记已决策）：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
      ```
 
 **场景 B: 需要人类讨论**
@@ -430,6 +531,7 @@ gh issue list -l "roadmap/p0"
      ```bash
      gh issue edit <number> --add-label "roadmap/rfc"
      ```
+  4. **不打 `roadmap-reviewed`**：rfc 表示未完成决策，只有人类移除 `roadmap/rfc` 后，下次 roadmap 才会重新审查并打 `roadmap-reviewed`。
 
 **场景 C: 建议关闭**
 - 检查：Level 2 或 Level 3 不通过（依赖已移除、API 已废弃、重复）
@@ -440,6 +542,10 @@ gh issue list -l "roadmap/p0"
      gh issue comment <number> --body "[roadmap decision] close: dependency removed in #<PR>, API deprecated, duplicate of #<issue>."
      ```
   2. 建议人类关闭 issue（不自动关闭）
+  3. **打 `roadmap-reviewed` 标签**（标记已决策）：
+     ```bash
+     gh issue edit <number> --add-label "roadmap-reviewed"
+     ```
 
 ### Step 3: 应用标签和 Milestone
 
@@ -584,7 +690,11 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 1. vibe-roadmap 的**所有**决策动作必须写 `[roadmap decision] <动作>: <理由>` comment
 2. **禁止** vibe-roadmap 写 `[governance suggest]`（marker 必须区分 observer / decider）
 3. `[roadmap decision]` marker 同时作为 cron-supervisor / 下次 vibe-roadmap 自身判断"上次审查时间"的锚点
-4. 格式：
+4. **自动打 `roadmap-reviewed` 标签**：
+   - 每个 `[roadmap decision]` 评论后必须立即打 `roadmap-reviewed` 标签
+   - 目的：标记已决策，避免 Step 0 重复扫描
+   - 命令：`gh issue edit <number> --add-label "roadmap-reviewed"`
+5. 格式：
    ```text
    [roadmap decision] <动作动词>: <简要理由>
    ```
@@ -598,6 +708,17 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 [roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
 [roadmap decision] hold #55 until #56 completes; reason: #56 provides core infrastructure #55 depends on.
 [roadmap decision] rfc #77; reason: needs human decision on architecture direction.
+```
+
+**执行流程示例**：
+```bash
+# 1. 写决策评论
+gh issue comment 78 --body "[roadmap decision] continue #78; reason: bounded enough for manager."
+
+# 2. 自动打标签（必须）
+gh issue edit 78 --add-label "roadmap-reviewed"
+
+# ✅ 闭环完成，下次 Step 0 不再扫描此 issue
 ```
 
 ## Reference Documents

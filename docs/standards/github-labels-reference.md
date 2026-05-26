@@ -77,14 +77,23 @@
 
 | 标签名称 | 描述 | 使用场景 |
 |---------|------|----------|
-| `orchestra` | Governance reviewed marker | governance 扫描后的"已审查"标记，下次扫描自动跳过 |
+| `orchestra-scanned` | intake 层已审查，不纳入 | roadmap-intake 跳过 issue 时打标签，下次扫描自动跳过 |
+| `orchestra-governed` | assignee-pool 层已决策 | assignee-pool 决策完成后打标签，下次扫描自动跳过 |
+| `roadmap-reviewed` | 已通过 roadmap decider 审查 | roadmap 写完 `[roadmap decision]` 后打标签，Step 0 自动跳过 |
+| `orchestra` | [Legacy] Orchestra 治理标记 | 已拆分为 `orchestra-scanned` 和 `orchestra-governed`，保留兼容 |
 | `supervisor` | Supervisor-governed orchestration issue | 标记需要 Supervisor 治理的编排问题 |
 | `tech-debt` | Technical debt tracking | 追踪技术债务和需要优化的代码 |
 | `improvement` | Non-urgent improvements | 非紧急的改进和增强项 |
 
 **说明**：
-- 这些标签用于特定的治理和追踪场景
+- `orchestra` 标签已拆分为 `orchestra-scanned`（intake 层跳过标记）和 `orchestra-governed`（pool 层决策标记）
+- `roadmap-reviewed` 与 `[roadmap decision]` 评论配合，实现治理闭环
+- 三层标签各自闭环：intake 看 scanned，pool 看 governed，roadmap 看 reviewed
 - 可以与 `type/*`、`scope/*` 等标签组合使用
+
+**迁移说明**：
+- 现有 `orchestra` 标签逐步替换
+- 迁移期间，`orchestra` 作为兼容标签保留
 
 ### 2.3 路线图标签 (roadmap/*)
 
@@ -97,6 +106,11 @@
 | `roadmap/future` | 未来考虑 | `gh issue edit 123 --add-label "roadmap/future"` |
 | `roadmap/rfc` | RFC/设计阶段（agent 无法判断目标/拆分形态） | `gh issue edit 123 --add-label "roadmap/rfc"` |
 | `roadmap/epic` | Epic 主 issue（有 Sub-issues，主 issue 作为治理容器） | `gh issue edit 123 --add-label "roadmap/epic"` |
+
+**说明**：
+- `roadmap-reviewed` 是审查层闭环标签，虽不以 `roadmap/` 为前缀，但与 roadmap 审查流程紧密配合。定义见 §2.2 特殊用途标签
+- `roadmap-reviewed` 标签在 `[roadmap decision]` 评论后自动添加
+- 用于实现治理闭环，避免 Step 0 重复扫描已决策的 issues
 
 ### 2.4 关系镜像标签
 

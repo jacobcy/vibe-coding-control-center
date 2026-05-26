@@ -20,7 +20,7 @@
 - broader repo issue pool 中只要存在边界明确、依赖就绪、可由 manager 继续收敛的 issue，就应尽量纳入 assignee issue pool
 - 不要把“尚有若干实现选项”误判成“必须人类拍板”
 - scope 较大但拆分形态清楚时，交给 roadmap decider / manager 拆分；拆分只是保留主 issue 的治理容器并显式化执行环节
-- 只有当 issue 的目标本身不明确、会改变架构/产品方向，或连如何拆分都无法判断时，才用 `roadmap/rfc` / `needs human decision` 跳过
+- 只有当 issue 的目标本身不明确、会改变架构/产品方向，或连如何拆分都无法判断时，在 suggest 中标记不确定，跳过并打 scanned，由 pool 或 roadmap 进一步决策
 
 ## 职责
 
@@ -82,47 +82,23 @@
 - 架构已变更 → 建议更新内容
 - 依赖未就绪 → 建议等依赖完成后重新提出
 
-### RFC / Epic 识别与标记
+### 不接受的情况处理
 
-在三级审查过程中，识别不应直接进入执行链的 issue 类型，并**打上对应 label**。
+intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 scanned）**。
 
-**RFC（人类讨论）**：
+对于不适合纳入的 issue，intake 在 `[governance suggest]` 评论中说明原因，由后续层（assignee-pool 或 vibe-roadmap）做进一步决策：
 
-识别特征：
-- 验收口径不明确，无法确定"做完算什么"
-- 需要先决定架构方向、产品策略或跨团队边界
-- 尚无明确实现方案，讨论多于执行描述
-- 标题/body 语气偏向"讨论/探索/要不要做"
+- 范围过大、需拆分 → suggest 中建议拆分，交给 assignee-pool 或 roadmap 处理
+- 目标不明确、需人类讨论 → suggest 中说明不确定，但不设 `roadmap/rfc`（属于 pool 决策范围）
+- 明确冲突或重复 → suggest 中建议关闭
+- 依赖未就绪 → suggest 中说明等待依赖
 
-动作：
-```bash
-gh issue edit <issue-number> --add-label "roadmap/rfc"
-```
+**intake 不设以下标签**（属于 assignee-pool 层决策范围）：
+- `roadmap/rfc`、`roadmap/epic`
+- `roadmap/p0`、`roadmap/p1`、`roadmap/p2`
+- `priority/*`
 
-**Epic（范围过大需拆解）**：
-
-识别特征：
-- 范围横跨多个模块，单次执行无法覆盖
-- body 中包含 `## Sub-issues` 或明确的子任务列表
-- 标题包含 `[Meta]`、`Epic`、`总览`、`整体` 等关键词
-- 已有 `roadmap/epic` 标签，或 issue 本身就是拆解容器
-
-动作：
-```bash
-gh issue edit <issue-number> --add-label "roadmap/epic"
-```
-
-**跳过后处理**：
-- RFC 和 Epic 不进入 assignee issue pool
-- 在 `Skipped` 中分别记录 `rfc` 或 `epic`，注明原因
-- 不要强行 assign manager 给 RFC/Epic issue
-
-**跳过（其他）**：
-- 目标/验收口径不明确但又不到 RFC 级别时保守等待
-- 不确定是否过时
-- Epic 主 issue 已有 `roadmap/epic` 标签且 body 包含 `## Sub-issues`：主 issue 是治理容器，不直接纳入；优先检查 sub-issues 是否完整
-
-**不要误判为 `needs human decision` 的情况**：
+### 不要误判为需要跳过的情况
 - 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
 - manager 可以先读代码再决定采用哪种小范围实现
 - 描述里列了若干候选方案，但这些方案不会改变系统边界，只影响落地细节
@@ -130,30 +106,22 @@ gh issue edit <issue-number> --add-label "roadmap/epic"
 
 ### 与 Assignee Pool 的职责边界
 
-**Roadmap Intake（第一道观察 / observer）**：
-- 重点：**是否应该存在** + **架构一致性**
+**Roadmap Intake（入口层）**：
+- 决策范围：**只决定 accept（分配 assignee）或 skip（打 scanned）**
 - 检查：生命周期、依赖、API、模块
-- 输出：`[governance suggest]` 建议纳入 / 拆分 / 关闭 / RFC
-- 边界：Roadmap Intake 不自称最终 decider；真正的规划决策由 `vibe-roadmap`（roadmap decider）或 manager 在接手前执行
+- 输出：`[governance suggest]` 建议纳入或跳过，附带原因
+- 不设 `roadmap/*`、`priority/*` 标签
+- 边界：intake 不自称 decider；跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
 
-**Vibe Roadmap / Manager（两道决策闸门）**：
-- 重点：**优先级** + **可执行性**
-- 检查：实质范围、验收标准、代码缺口
-- 决策：接受 / 拆分 / 继续单 issue / RFC
+**Assignee Pool（池内决策层）**：
+- 决策范围：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复）、`roadmap/rfc`（不确定）、resume（明确可恢复）、split（清晰分界）
+- 所有决策完成后打 `orchestra-governed`
+- 边界：pool 是 assignee pool 内的决策 OWNER
 
-**协同示例**：
-```
-Issue: #556 清理事件系统向后兼容别名
-
-Roadmap Intake（observer）：
-  ├─ 检查：事件系统旧别名是否还存在？
-  ├─ 若已移除：写 [governance suggest] 建议关闭（原因：依赖已在 #XYZ 移除）
-  └─ 若存在：建议纳入 pool
-
-Vibe Roadmap / Manager（decider）：
-  ├─ 检查：范围、验收、代码缺口
-  └─ 决策：接受为重构任务 / 拆分 / RFC / 不执行
-```
+**Vibe Roadmap（审查纠正层）**：
+- 审查范围：`roadmap/rfc`、`state/blocked`、未 reviewed 的 issue
+- 可覆盖 pool 的决策（rfc → continue、epic → split 等）
+- 审查完打 `roadmap-reviewed`，写 memory.md
 
 ### Supervisor Issue Intake
 
@@ -202,7 +170,7 @@ Vibe Roadmap / Manager（decider）：
     ```
   - 在 Actions 中记录：`Supervisor #YYY: suggest close (duplicate with #ZZZ)`
 - **不确定**：
-  - 等待或建议 `roadmap/rfc`，不修改 state
+  - 等待或写 suggest 说明不确定，不修改 state
   - 在 Actions 中记录：`Supervisor #ZZZ: rfc/waiting (unclear scope, needs human review)`
 
 **输出要求**：
@@ -225,7 +193,7 @@ Why: ...
 - **架构检查优先于标签分类**：不只是看 bug/feature 标签，要看代码架构是否仍相关
 - **关闭优于等待**：明确过时的 issue 应关闭，不要留在 pool 中悬而不决
 - **调整优于拒绝**：有问题的 issue 建议调整内容，而不是保守等待
-- **RFC 兜底**：无法判断目标、架构方向或拆分形态时，建议 `roadmap/rfc`，避免误纳入或误关闭
+- **无法判断时写 suggest**：目标、架构方向或拆分形态无法判断时，写 suggest 说明不确定，由 pool 或 roadmap 进一步决策。intake 不设 `roadmap/rfc` 标签。
 - **纳入优于空转**：如果当前 ready queue 很浅，且候选 issue 满足三级审查，不要因为“可能有别的实现写法”而空转
 
 ## Assignee Selection Rule
@@ -274,7 +242,7 @@ Allowed:
 - `issue`: read
 - `issue.assignee.write`: allowed（仅用于把适合自动化推进的 issue 纳入 assignee issue pool）
 - `labels.read`: read
-- `labels.write`: allowed（仅最小必要的 routing / priority / roadmap 类调整；包括 `roadmap/rfc`、`roadmap/epic` 识别标记；避免扩大动作）
+- `labels.write`: allowed（仅最小必要的 routing 调整；只设 `orchestra-scanned`（跳过时）；不设 `roadmap/*`、`priority/*` 标签）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
 - `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）
@@ -308,7 +276,10 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
+2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee 且无 `orchestra-scanned` 标签的 issue：
+   - 有 assignee → 跳过（已在 pool 中，由 assignee-pool 负责）
+   - 有 `orchestra-scanned` 标签 → 跳过（已审查过，不重复扫描）
+3. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
    ```bash
    uv run python src/vibe3/cli.py task status
    ```
@@ -340,7 +311,7 @@ Forbidden:
      ```bash
      gh issue close <issue-number> --comment "关闭理由：<具体理由>"
      ```
-   - 不确定：等待或建议 `roadmap/rfc`，记录到 Actions
+   - 不确定：写 suggest 说明不确定，记录到 Actions
 10. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
    - 还是因为当前材料把”实现选择”误当成了”人类拍板”
@@ -358,7 +329,7 @@ Forbidden:
 合规示例：
 ```
 [governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
-[governance suggest] Skipped: recommend roadmap/rfc; needs human scope confirmation before automation.
+[governance suggest] Skipped: scope unclear, needs pool or roadmap review before automation.
 ```
 
 ## Output Contract
@@ -403,6 +374,39 @@ Supervisor issues:
   - #ZZZ: waiting (<reason>)
 ```
 
+## 治理闭环标签
+
+**两种结果，不同处理**：
+
+**接受（分配 assignee）**：不设标签。assignee 本身就是信号——issue 进入 pool，由 assignee-pool 层接手。
+
+**跳过（不接受）**：打 `orchestra-scanned` 标签，表示"已审查，不纳入"：
+
+```bash
+gh issue edit <issue-number> --add-label "orchestra-scanned"
+```
+
+**目的**：
+- `orchestra-scanned`：intake 层已审查，决定不接受 → 下次扫描自动跳过
+- 接受进入 pool 的 issue 不打 scanned，靠 assignee 信号自然流入 assignee-pool 层
+
+**三层标签协作**：
+- `orchestra-scanned`：intake 层审查通过但**不接**（跳过）
+- `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
+- `roadmap-reviewed`：roadmap decider 已审查
+
 ## Stop Point
 
 完成 intake 判断、supervisor issue 审查与最小纳入动作后停止。不要进入具体实现或单 flow 管理。
+
+**Stop Point Checklist（强制）**：
+
+- **接受（分配 assignee）**：写完 `[governance suggest]` 评论即可，不打 scanned 标签
+- **跳过（不接受）**：写完评论后必须打 `orchestra-scanned` 标签
+
+完成以下动作后才能停止：
+- [ ] 写完 `[governance suggest]` 评论
+- [ ] 如果是跳过：打上 `orchestra-scanned` 标签
+- [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
+
+**缺少标签的后果**：跳过的 issue 会被下次扫描重复处理，造成资源浪费。
