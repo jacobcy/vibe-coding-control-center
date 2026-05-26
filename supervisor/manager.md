@@ -418,7 +418,12 @@ Steps:
      - **若有未完成工作**：
        - 创建 follow-up issue 记录剩余工作：
          ```bash
-         gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "原 issue #<number> 关闭时的未完成工作：\n\n<未完成任务清单>"
+         gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "$(cat <<'EOF'
+         原 issue #<number> 关闭时的未完成工作：
+
+         <未完成任务清单>
+         EOF
+         )"
          ```
        - 在原 issue 关闭评论中引用 follow-up issue
        - 将 follow-up issue 链接写入原 issue 评论

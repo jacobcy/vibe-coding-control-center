@@ -188,7 +188,12 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
     - **若有未完成工作**：
       - 创建 follow-up issue 记录剩余任务：
         ```bash
-        gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "原 issue #<number> 关闭时的未完成工作：\n\n<未完成任务清单>"
+        gh issue create --title "Follow-up: <原 issue 标题> (剩余工作)" --body "$(cat <<'EOF'
+        原 issue #<number> 关闭时的未完成工作：
+
+        <未完成任务清单>
+        EOF
+        )"
         ```
       - 在关闭评论中引用 follow-up issue
     - **若无未完成工作**：
@@ -281,7 +286,7 @@ Allowed:
 Forbidden:
 
 - 修改代码
-- 创建或关闭 issue
+- 创建或关闭 issue（**例外**：supervisor issues 高置信度场景，见 Allowed）
 - 进入 plan/run/review 执行链
 - 执行 `state/*` label 变更（除 supervisor issues 移除 ready 并补 handoff 外，必须同时操作两个 label 确保单一 state）
 - 对不确定是否适合自动化的 issue 强行纳入 assignee issue pool

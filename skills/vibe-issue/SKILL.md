@@ -49,7 +49,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ### Step 3: 本地 Flow 检查（轻量级）
 
 - 使用 `vibe3 flow status` 检查是否已有活跃 flow 绑定到相关 issue
-- 该命令只读取本地状态，不触发 GitHub API 调用
+- 该命令优先读取本地状态，必要时会批量获取远端信息（issue titles、PR 映射等），并支持降级处理
 - 如果发现已绑定的 flow，记录上下文供后续参考，不阻止 issue 创建
 
 ### Step 3.5: 依赖识别

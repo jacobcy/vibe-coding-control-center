@@ -513,7 +513,7 @@ Exit:
   ```
 - **PR 检查**：是否有 draft PR 或 open PR
   ```bash
-  gh pr list --search "<issue-number>" --state all
+  gh pr list --search "issue:<issue-number>" --state all
   ```
 - **子任务检查**：issue body 中是否有部分完成的子任务清单
 - **Refs 检查**：是否已有 plan/report/audit refs（说明已投入工作）
