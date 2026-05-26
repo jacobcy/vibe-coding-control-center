@@ -29,6 +29,7 @@ from vibe3.roles.run_helpers import (
     publish_run_command_success,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 
 def resolve_skill_path(
@@ -73,7 +74,7 @@ def dispatch_run_command_async(
     # Resolve repo path from git common dir (main repo root)
     repo_root = resolve_orchestra_repo_root()
 
-    ExecutionCoordinator(
+    launch = ExecutionCoordinator(
         load_orchestra_config(),
         SQLiteClient(),
     ).dispatch_execution(
@@ -91,6 +92,12 @@ def dispatch_run_command_async(
             actor="agent:run",
             mode="async",
         )
+    )
+    record_dispatch_failure_if_unexpected(
+        result=launch,
+        role="executor",
+        issue_number=issue_number,
+        branch=branch,
     )
 
 

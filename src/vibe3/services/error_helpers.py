@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.exceptions.error_severity import ErrorSeverity
+    from vibe3.execution.contracts import ExecutionLaunchResult
 
 
 def record_error(
@@ -43,3 +46,46 @@ def record_error(
         branch=branch,
         severity=severity,
     )
+
+
+def record_dispatch_failure_if_unexpected(
+    result: "ExecutionLaunchResult",
+    role: str,
+    issue_number: int | None,
+    branch: str,
+) -> None:
+    """Record dispatch failure if it's unexpected (not normal throttling).
+
+    Args:
+        result: Execution launch result
+        role: Role name (planner/executor/reviewer)
+        issue_number: Associated issue number
+        branch: Associated branch name
+    """
+    if result.launched or result.skipped:
+        return
+
+    reason_code = result.reason_code or "unknown"
+
+    if reason_code in ("capacity_full", "duplicate_dispatch"):
+        return
+
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    # Include manual marker and reason_code for disambiguation
+    reason_detail = result.reason or "(no detail)"
+    error_message = f"manual {role} dispatch failed [{reason_code}]: {reason_detail}"
+    try:
+        record_error(
+            error_code="E_DISPATCH_FAILURE",
+            error_message=error_message,
+            tick_id=0,  # Manual dispatch marker
+            issue_number=issue_number or 0,  # Coerce None to 0 for manual dispatch
+            branch=branch,
+            store=SQLiteClient(),
+        )
+    except Exception as exc:
+        logger.bind(
+            domain=f"{role}_dispatch",
+            issue_number=issue_number,
+        ).warning(f"Failed to record dispatch error: {exc}")

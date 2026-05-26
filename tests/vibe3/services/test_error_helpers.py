@@ -1,0 +1,243 @@
+"""Tests for error_helpers.py convenience functions."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+from vibe3.execution.contracts import ExecutionLaunchResult
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+
+
+class TestRecordDispatchFailureIfUnexpected:
+    """Tests for record_dispatch_failure_if_unexpected()."""
+
+    def test_success_launch_not_recorded(self) -> None:
+        """Verify successful launch is not recorded."""
+        result = ExecutionLaunchResult(
+            launched=True,
+            skipped=False,
+            reason="Session started",
+            reason_code=None,
+        )
+
+        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="planner",
+                issue_number=123,
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_not_called()
+
+    def test_normal_throttling_not_recorded(self) -> None:
+        """Verify capacity_full and duplicate_dispatch are not recorded."""
+        # Test capacity_full
+        result1 = ExecutionLaunchResult(
+            launched=False,
+            skipped=True,
+            reason="Capacity limit reached",
+            reason_code="capacity_full",
+        )
+
+        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+            record_dispatch_failure_if_unexpected(
+                result=result1,
+                role="executor",
+                issue_number=456,
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_not_called()
+
+        # Test duplicate_dispatch
+        result2 = ExecutionLaunchResult(
+            launched=False,
+            skipped=True,
+            reason="Session already exists",
+            reason_code="duplicate_dispatch",
+        )
+
+        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+            record_dispatch_failure_if_unexpected(
+                result=result2,
+                role="reviewer",
+                issue_number=789,
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_not_called()
+
+    def test_unexpected_failure_recorded(self) -> None:
+        """Verify launch_failed and worktree_unavailable are recorded."""
+        # Test launch_failed
+        result1 = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Failed to start session",
+            reason_code="launch_failed",
+        )
+
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                result=result1,
+                role="planner",
+                issue_number=123,
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_called_once_with(
+            error_code="E_DISPATCH_FAILURE",
+            error_message=(
+                "manual planner dispatch failed [launch_failed]: "
+                "Failed to start session"
+            ),
+            tick_id=0,  # Manual dispatch marker
+            issue_number=123,
+            branch="dev/test",
+            store=mock_store,
+        )
+
+        # Test worktree_unavailable
+        result2 = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Worktree not found",
+            reason_code="worktree_unavailable",
+        )
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                result=result2,
+                role="executor",
+                issue_number=456,
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_called_once_with(
+            error_code="E_DISPATCH_FAILURE",
+            error_message=(
+                "manual executor dispatch failed [worktree_unavailable]: "
+                "Worktree not found"
+            ),
+            tick_id=0,  # Manual dispatch marker
+            issue_number=456,
+            branch="dev/test",
+            store=mock_store,
+        )
+
+    def test_error_message_format(self) -> None:
+        """Verify error message format is correct."""
+        result = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Unexpected error occurred",
+            reason_code="unknown",
+        )
+
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="reviewer",
+                issue_number=999,
+                branch="feature/test",
+            )
+
+        # Verify the call was made with correct parameters
+        call_args = mock_record_error.call_args
+        assert call_args[1]["error_code"] == "E_DISPATCH_FAILURE"
+        assert (
+            call_args[1]["error_message"]
+            == "manual reviewer dispatch failed [unknown]: Unexpected error occurred"
+        )
+        assert call_args[1]["tick_id"] == 0  # Manual dispatch marker
+        assert call_args[1]["issue_number"] == 999
+        assert call_args[1]["branch"] == "feature/test"
+
+    def test_none_issue_number_coerced_to_zero(self) -> None:
+        """Verify None issue_number is coerced to 0 for manual dispatch."""
+        result = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Worktree resolution failed",
+            reason_code="worktree_unavailable",
+        )
+
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="reviewer",
+                issue_number=None,  # Base review without issue
+                branch="dev/test",
+            )
+
+        mock_record_error.assert_called_once_with(
+            error_code="E_DISPATCH_FAILURE",
+            error_message=(
+                "manual reviewer dispatch failed [worktree_unavailable]: "
+                "Worktree resolution failed"
+            ),
+            tick_id=0,  # Manual dispatch marker
+            issue_number=0,  # Coerced from None
+            branch="dev/test",
+            store=mock_store,
+        )
+
+    def test_tick_id_always_zero_for_manual_dispatch(self) -> None:
+        """Verify tick_id is always 0 for manual dispatch (not heartbeat)."""
+        result = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Unexpected failure",
+            reason_code="launch_failed",
+        )
+
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="planner",
+                issue_number=123,
+                branch="dev/test",
+            )
+
+        # Verify tick_id is explicitly 0, not default
+        call_args = mock_record_error.call_args
+        assert call_args[1]["tick_id"] == 0

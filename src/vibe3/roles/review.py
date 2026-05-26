@@ -41,6 +41,7 @@ from vibe3.roles.review_helpers import (
     finalize_review_output,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
 
@@ -336,12 +337,26 @@ def execute_manual_review_async(
         pr_number=pr_number,
         instructions=instructions,
     )
+    record_dispatch_failure_if_unexpected(
+        result=launch,
+        role="reviewer",
+        issue_number=issue_number,
+        branch=branch,
+    )
     if not launch.launched:
-        logger.bind(domain="review").warning(
-            "Async review launch skipped",
-            reason=launch.reason,
-            reason_code=launch.reason_code,
-        )
+        reason_code = launch.reason_code or "unknown"
+        if reason_code in ("capacity_full", "duplicate_dispatch"):
+            # Normal throttling/dedup - log at info level
+            logger.bind(domain="review").info(
+                f"Review dispatch throttled: {launch.reason}",
+                reason_code=reason_code,
+            )
+        else:
+            # Unexpected failure - log at warning level
+            logger.bind(domain="review").warning(
+                f"Review dispatch failed unexpectedly: {launch.reason}",
+                reason_code=reason_code,
+            )
         return ReviewRunResult("ERROR", None, issue_number)
     return ReviewRunResult("ASYNC", None, issue_number)
 

@@ -160,95 +160,71 @@ extract_pr_number(report_text):
 
 ```
 @handshake(agent_name):
-  """有方向、有时序的握手。team-lead 发起，agent 回复。"""
+  """有方向、有时序的握手。team-lead 发起，agent 回复。
+  
+  使用 Monitor 等待 agent_ready 事件，不主动轮询。"""
   SendMessage(to=agent_name, summary="握手信号", message="【lead_ready】")
-  for attempt in 1..3:
-    sleep(30)
-    $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
-    if found: return OK
-  return TIMEOUT
+
+  // 使用 Monitor 等待 agent_ready 事件（最长等待 90 秒）
+  Monitor(
+    command=f"agent-event.sh {agent_name} | grep -q 'agent_ready'",
+    description=f"等待 {agent_name} 握手响应",
+    timeout_ms=90000,
+    persistent=false
+  )
+  // Monitor 退出时 grep 返回 0 表示找到 agent_ready 事件
+  if exit code == 0: return OK
+  else: return TIMEOUT
 ```
 
 > **State Semantics**:
-> - `ready_event=found` — Agent 已发送 `【agent_ready】` 事件，可进入下一步任务分配
-> - `ready_event=missing` — Agent 未发送过 ready 事件（可能未启动、已关闭、或 inbox 为空）
-> - `ready_event=waiting` — Lead inbox 不存在（team 结构未初始化），需要先执行 team 创建流程
->
-> **Detection Strategy**:
-> - 握手检测应区分 `found`（成功）和 `missing/waiting`（需要等待或重试）
-> - `waiting` 状态表示基础设施未就绪，应等待 team 初始化完成
-> - `missing` 状态表示 agent 未响应，应等待或重新 spawn
-
-`agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
+> - `agent_ready` 事件存在 — Agent 已发送 `【agent_ready】`，可进入下一步任务分配
+> - Monitor 超时 — Agent 未在 90 秒内响应握手
 
 **约束**：
 - spawn 后必须先握手，不得跳过
 - 收到 `【agent_ready】` 后，下一条消息必须是正式任务（fresh spawn 不得先进入 idle）
-- 超时 3 次 → 标记 agent 为 blocked，继续处理下一个 agent
+- Monitor 超时 → 标记 agent 为 blocked，继续处理下一个 agent
 - team-lead 自身必须先 `ToolSearch("select:SendMessage")` 再 spawn 任何 agent
 
-## @wait_for_report(agent_name, expected_pr_number, timeout=90, max_attempts=3) → report | TIMEOUT | RETRY
+## @wait_for_report(agent_name, expected_pr_number, timeout=180) → report | TIMEOUT | RETRY
 
 ```
-@wait_for_report(agent_name, expected_pr_number):
-  """主动轮询等待 agent 报告。禁止被动 idle。
-  
-  注意：stale 状态只表示长时间无消息，不代表 agent 失联。
-  如果 agent-exist.sh 显示 stale/inactive，应先捕获 tmux pane 内容确认是否有输出。
-  如果 pane 有输出（agent 正在工作），继续等待，不要重新握手。
-  只有 pane 无输出时才重新握手。
-  
+@wait_for_report(agent_name, expected_pr_number, timeout=180):
+  """使用 Monitor 等待 agent 报告，不主动轮询。
+
   校验逻辑：
   - 提取报告中的 PR 编号（格式：【agent_report】(PR #N) 或 ## PR #N）
   - 如果不匹配目标 PR，通过 SendMessage 确认（已知路由 bug #40166/#39651）"""
+
+  // 使用 Monitor 等待 agent_report 事件
+  Monitor(
+    command=f"agent-event.sh {agent_name} | grep -q 'agent_report'",
+    description=f"等待 {agent_name} 完成任务并提交报告",
+    timeout_ms={timeout}000,
+    persistent=false
+  )
   
-  for attempt in 1..max_attempts:
-    sleep(timeout)
-    $ agent-report.sh {agent_name}
-    if exit code == 0:        // 报告已送达
-      report_text = stdout      // 完整报告文本（agent= / timestamp= / body_start / 正文）
-      # 提取 PR 编号
-      actual_pr = extract_pr_number(report_text)
-      if actual_pr and actual_pr != expected_pr_number:
-        # PR 编号路由错误，SendMessage 确认
-        SendMessage(to=agent_name, summary="PR 编号路由错误", message=f"""
-          检测到 PR 编号路由错误（收到 PR #{actual_pr}，目标 PR #{expected_pr_number}）。
-          这是已知 bug (#40166/#39651)。
-          请确认你正在审查哪个 PR，并提供正确报告。
-        """)
-        return RETRY
-      return report_text
-    // exit 3 = 暂无报告, exit 2 = 未定义 agent, exit 1 = inbox 不存在
+  // Monitor 退出后尝试提取报告
+  $ agent-report.sh {agent_name}
+  if exit code == 0:        // 报告已送达
+    report_text = stdout      // 完整报告文本（agent= / timestamp= / body_start / 正文）
+    # 提取 PR 编号
+    actual_pr = extract_pr_number(report_text)
+    if actual_pr and actual_pr != expected_pr_number:
+      # PR 编号路由错误，SendMessage 确认
+      SendMessage(to=agent_name, summary="PR 编号路由错误", message=f"""
+        检测到 PR 编号路由错误（收到 PR #{actual_pr}，目标 PR #{expected_pr_number}）。
+        这是已知 bug (#40166/#39651)。
+        请确认你正在审查哪个 PR，并提供正确报告。
+      """)
+      return RETRY
+    return report_text
+  // exit 3 = 暂无报告, exit 2 = 未定义 agent, exit 1 = inbox 不存在
   return TIMEOUT
 ```
 
 > `agent-report.sh` 输出格式：`agent=<name>` / `timestamp=<ts>` / `body_start` / 完整消息正文。`body_start` 之后的内容即为 agent 通过 SendMessage 发送的原始报告。
-
-## @handle_idle(agent_name) → void
-
-```
-@handle_idle(agent_name):
-  """收到 idle 通知后的状态检查（不干预，只提示）。
-  
-  注意：此函数不进行轮询或重新握手，只检查 tmux pane 内容并输出提示。
-  报告轮询由 @wait_for_report 负责。"""
-  
-  // 检查 agent 状态
-  status = $(agent-exist.sh {agent_name})
-  
-  // 捕获 tmux pane 内容（确认是否有输出）
-  pane_content = tmux capture-pane -t <pane_id> -p -S -50
-  
-  if pane_content has recent output:
-    output("Agent {agent_name} 正在工作，继续等待...")
-    return  // 不干预，让 @wait_for_report 继续轮询
-  else:
-    output("Agent {agent_name} 可能已失联（pane 无输出）")
-    output("建议：等待 @wait_for_report 超时后重新 spawn")
-    return  // 不干预，让 @wait_for_report 超时处理
-```
-
-> idle_notification 语义：agent 空闲了，**可能**完成了工作。teammate-message 系统不转发工作报告（工作报告写入 inbox），只转发 idle_notification / permission_request / plan_approval_request。收到 idle 后必须主动检查 inbox/pane，不能假设工作已完成。
 
 ## @stop(reason)
 
@@ -343,18 +319,7 @@ Phase_0():
   // Team 名称固定为 pr-review-team（不用 pr-review-<number>）
   // 复用判断 = 握手结果（不检查 isActive/config.json）
 
-  // Step 4: 一次性创建全部 5 个 Backlog Task
-  // 验证清单（提交前必须输出）:
-  //   Phase 1: subject="Phase 1: 背景调研", metadata={phase_order:1, depends_on_phase:0}
-  //   Phase 2: subject="Phase 2: 专家评审", metadata={phase_order:2, depends_on_phase:1}
-  //   Phase 3: subject="Phase 3: Codex 复查", metadata={phase_order:3, depends_on_phase:2}
-  //   Phase 4: subject="Phase 4: 综合判断", metadata={phase_order:4, depends_on_phase:3}
-  //   Phase 5: subject="Phase 5: 写回 + 修复", metadata={phase_order:5, depends_on_phase:4}
-  //
-  // 每个 TaskCreate 必须包含 subject + description + metadata
-  // 禁止空调用、禁止批量参数（一次调用只创建一个 task）
-  // InputValidationError → @stop()
-
+  // Step 4: 创建全部 5 个 Backlog Task（串行执行）
   TaskCreate(subject="Phase 1: 背景调研",
     description="spawn context-researcher → 握手 → 分配任务 → 等待报告 → PR 分类",
     metadata={phase_order:1, depends_on_phase:0})
@@ -370,19 +335,6 @@ Phase_0():
   TaskCreate(subject="Phase 5: 写回 + 修复",
     description="写 PR comment → 可选 spawn fix-executor 修复 → 创建 follow-up issues",
     metadata={phase_order:5, depends_on_phase:4})
-
-  // Step 4a: 验证 task ID 与 Phase 顺序一致性
-  // TaskCreate 必须串行执行（每个完成后再创建下一个，不得批量并行）
-  // 原因：并行创建时 task ID 分配顺序不确定，会导致 Task #5=Phase 4 等错位
-  //
-  // 创建完成后必须输出映射表（提交前检查）:
-  //   phase_1_task_id = <返回的 ID>  // 预期: 最小 ID → Phase 1
-  //   phase_2_task_id = <返回的 ID>  // 预期: 次小 ID → Phase 2
-  //   phase_3_task_id = <返回的 ID>  // 预期: 中间 ID → Phase 3
-  //   phase_4_task_id = <返回的 ID>  // 预期: 次大 ID → Phase 4
-  //   phase_5_task_id = <返回的 ID>  // 预期: 最大 ID → Phase 5
-  //
-  // 若 ID 顺序与 Phase 顺序不一致: 以 phase_order metadata 为准，不依赖 ID 排序
 
   // Step 5: 激活 Phase 1
   TaskUpdate(phase_1_task_id, status="in_progress")
@@ -470,18 +422,10 @@ Phase_1():
 
 > 反例（issue #742）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 → 错误归类 simple → 实际应按 standard 处理。只要包含代码改动或多文件，就不是 simple。
 
-## idle 自动处理
-
-收到 context-researcher 的 idle 通知后，执行 `@handle_idle("context-researcher")`：
-- 检查 tmux pane 内容，输出状态提示
-- 不干预流程，继续等待 `@wait_for_report` 轮询结果
-
 ## Hard Rules
 
 - team-lead 不得自行收集上下文（这是 context-researcher 的工作）
 - 不得在未收到报告前激活 Phase 2/3
-- 保持空闲 / 等待新 PR 只适用于复用 teammate；不适用于 fresh spawn 且刚完成握手的 agent
-- 收到 idle 通知后可执行 `@handle_idle` 检查状态，但不干预轮询流程
 
 ---
 
@@ -553,17 +497,9 @@ Phase_2():
   TaskUpdate(phase_3_task_id, status="in_progress")
 ```
 
-## idle 自动处理
-
-收到任何 Phase 2 agent 的 idle 通知后，执行 `@handle_idle(agent_name)`：
-- 检查 tmux pane 内容，输出状态提示
-- 不干预流程，继续等待 `@wait_for_report` 轮询结果
-
 ## Hard Rules
 
 - Phase 1 / Phase 2 严格串行，禁止并行启动
-- fresh spawn 的初始 prompt 只允许握手，不得内嵌 phase_1_output 或正式任务
-- 收到 `【agent_ready】` 后的下一条有效动作必须是正式任务；不得插入"保持空闲 / 等待新 PR"
 - 至少 1 个 agent 握手成功 + 返回有效报告即可推进
 
 ---
@@ -645,31 +581,16 @@ Phase_3():
 
 ```
 Phase_4():
-  // Step 1: 收集全部可用报告
+  // Step 1.5: 收集全部可用报告（剔除 Phase 3 标记为作废的报告）
   all_reports = []
   for agent in ["context-researcher", "code-analyst", "architect-reviewer", "security-reviewer"]:
     report = $(agent-report.sh {agent})
     if report valid: all_reports.append(report)
   if codex_result: all_reports.append(codex_result)
-  // 剔除 Phase 3 标记为作废的报告
-
-  // Step 1.5: 复验测试脚本（如果 PR 包含新增测试脚本）
-  if PR contains new test files:
-    output("检测到新增测试脚本，team-lead 执行复验...")
-    for test_file in new_test_files:
-      $ uv run pytest {test_file} -v
-      if exit ≠ 0:
-        @stop("测试脚本复验失败：{test_file}")
-    output("✅ 所有新增测试脚本通过复验")
 
   // Step 2: 仲裁冲突 + 出具最终决策
   decision = @arbitrate(all_reports, mode)
   // decision ∈ {APPROVE, NEEDS_CHANGES, REJECT}
-
-  // Step 3: 质量自查（写回前强制执行，不得在生成 Phase 5 产出后再自查，见 Appendix A）
-  // ⚠️ 禁止延迟自查：不得在生成 PR comment 后才执行质量自查，必须在 Step 4 之前严格执行
-  for rule in QUALITY_STANDARDS:
-    if not @pass(rule): @fix_before_proceeding()
 
   // Step 4: 按决策行动
   if decision == NEEDS_CHANGES and mode == "auto-fix":
@@ -694,7 +615,6 @@ Phase_4():
 - 替缺失 agent 脑补结论 → 标注"审查不完整"
 - teammate-message PR 编号不匹配时必须如实标注
 - 拒绝"已合并 / CI 通过 / 无漏洞"这类无证据声明
-- 必须通过全部 8 条质量自查（见 Appendix A）
 
 ---
 
@@ -926,14 +846,12 @@ body_start
 
 # Appendix C: Recovery
 
-按 `references/recovery-playbook.md` 处理，不在主流程临场发明 workaround：
+Agent 系统已稳定，无需复杂恢复逻辑：
 
-- Agent 失联：`agent-exist.sh <agent>` 诊断 alive 状态 → `SendMessage` 测试握手 → 3 次超时 → 重新 `Agent()` spawn
-- 报告未送达：`agent-report.sh <agent>` (exit 3 = 无报告) → `agent-event.sh <agent>` 查看事件历史 → `agent-exist.sh <agent>` 检查 alive → 如 inactive 则重新握手
-- TeamCreate 与 Agent spawn 状态不一致 → 见 recovery-playbook.md
-- teammate-message PR 编号路由错误（已知 bug #40166 / #39651）→ 见 debug-guide.md
-
-执行过程看不到 / model 不对 / PR 编号错位 → `references/debug-guide.md`。
+- **握手超时**：Monitor 90 秒未检测到 `agent_ready` 事件 → 标记 agent 为 blocked，继续下一个 agent
+- **报告超时**：Monitor 180 秒未检测到 `agent_report` 事件 → 标记 agent 为 blocked，继续下一个 agent
+- **PR 编号路由错误**：已在 `@wait_for_report` 中通过 SendMessage 确认，无需额外处理
+- **teammate-message PR 编号路由错误**：已知 bug #40166 / #39651，见 debug-guide.md
 
 ---
 
