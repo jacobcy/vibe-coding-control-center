@@ -117,6 +117,8 @@ Forbidden:
 - `priority/[0-9]` labels（兼容 legacy priority labels，仅用于 assignee issue pool 内排序）
 - dependency information（如 `blocked_by`、issue body 中的依赖引用）
 - orchestra heartbeat status
+- epic issues（有 `roadmap/epic` 标签的 open issue，用于收口检查）
+- epic sub-issues 状态（通过 `gh issue view <number> --json state,stateReason,labels` 查询）
 
 ## Issue Intake 策略
 
@@ -168,6 +170,7 @@ pool 扫描有 assignee 的 issue →
   ├─ 目标/架构/拆分形态无法判断 → 设 roadmap/rfc + 写 suggest → 打 governed
   ├─ 范围过大，分界清晰 → 写 suggest 建议 split → 打 governed
   ├─ 范围过大，已有 Sub-issues → 设 roadmap/epic + 写 suggest → 打 governed
+  ├─ roadmap/epic + all sub-issues closed → 写 suggest 建议关闭 epic → 打 governed
   ├─ 明确冲突或重复（高置信度）→ 检查未完成工作 → 创建 follow-up（如有）+ 关闭 → 打 governed
   ├─ 不明确冲突或重复（低置信度）→ 写 suggest 建议关闭 → 打 governed
   ├─ blocked_reason == "state unchanged" + ref 存在 → resume → 打 governed
@@ -311,7 +314,30 @@ Steps:
           - 写 `[governance suggest]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
         - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
-6. 输出治理结论
+6. **Epic 收口检查**（新增）：
+   - 独立查询所有 `roadmap/epic` 标签的 open issues（不受 assignee/governed 过滤限制）：
+     ```bash
+     gh issue list --label "roadmap/epic" --state open --json number,title,body,labels --limit 20
+     ```
+   - 对每个 epic issue：
+     a. 检查 body 中是否有 `## Sub-issues` section
+     b. 若无 `## Sub-issues` section → 跳过（epic 结构不完整，不执行关闭检查）
+     c. 解析 sub-issue 编号列表（从 `- [ ] #<id>` 或 `- [x] #<id>` 格式提取）
+     d. 对每个 sub-issue 调用 `gh issue view <number> --json state,stateReason,labels` 检查状态
+     e. 判断完成状态：
+        - `state == "CLOSED"` → 已完成
+        - labels 包含 `state/done` → 已完成
+        - 其他 → 未完成
+     f. **所有 sub-issues 已完成**：
+        - 写 `[governance suggest] 建议关闭此 Epic`
+        - 打 `orchestra-governed` 标签（标记为已决策）
+        - 去重：写评论前检查是否已有相同"建议关闭此 Epic"评论（按 Comment Contract 去重规则）
+     g. **部分 sub-issues 未完成**：
+        - 跳过（等待下次 governance scan 重新检查）
+        - 不写评论，不修改标签
+     h. **无 sub-issues**（`## Sub-issues` 为空或解析出 0 个有效编号）：
+        - 跳过（epic 拆分尚未完成，不执行关闭检查）
+7. 输出治理结论
 
 输出时额外检查：
 - 如果你写出“already in assignee pool”，必须同时回答这些 issue 当前是否仍有 assignee、state、ready queue 资格
@@ -414,6 +440,7 @@ Exit:
 - `Suggested issues`
 - `Label actions`（仅非 state labels）
 - `Why`
+- `Epic closure suggestions`（新增，独立于 assignee pool）
 
 如果当前没有合适的建议 issue，明确写无，并说明原因。
 
@@ -441,6 +468,7 @@ Exit:
   - `[governance suggest] 入池评估` → 检查是否已有"入池评估"
   - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
   - `[governance auto-recover]` → 检查是否已有相同恢复动作
+  - `[governance suggest] 建议关闭此 Epic` → 检查是否已有"建议关闭此 Epic"
 - **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
 - **目的**：避免重复刷屏，保持 issue 讨论清洁
 
@@ -590,6 +618,28 @@ Exit:
 关注原因：<具体说明>
 建议后续动作：<manager 应检查什么>
 ```
+
+### `suggest_close_epic()`
+
+当 `roadmap/epic` issue 的所有 sub-issues 已完成时：
+
+```
+[governance suggest] 建议关闭此 Epic
+
+Epic 编号：#<epic-number>
+Sub-issues 状态：
+- #<sub1> — <简短描述> — CLOSED
+- #<sub2> — <简短描述> — CLOSED
+...
+关闭理由：所有 sub-issues 已完成，Epic 治理目标已达成。
+```
+
+判断条件：
+- issue 有 `roadmap/epic` 标签
+- issue body 包含 `## Sub-issues` section
+- 所有 sub-issues 状态为 CLOSED 或带有 `state/done` label
+
+注意：只建议关闭，由 Manager 或人类执行实际关闭。
 
 ## Stop Point
 
