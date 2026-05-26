@@ -106,7 +106,7 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 - 依赖未就绪 → suggest 中说明等待依赖
 
 **intake 不设以下标签**（属于 assignee-pool 层决策范围）：
-- `roadmap/rfc`、`roadmap/epic`
+- `roadmap/rfc`、`roadmap/epic`（**例外**：Level 0 检查阻塞时，intake 需要添加 `roadmap/rfc` 标签以路由该 issue）
 - `roadmap/p0`、`roadmap/p1`、`roadmap/p2`
 - `priority/*`
 

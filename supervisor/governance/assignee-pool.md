@@ -232,7 +232,7 @@ pool 扫描有 assignee 的 issue →
 
 - **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
 - **不负责决定哪些 issue 应进入 assignee issue pool（属于 `governance/roadmap-intake` 职责）**
-- **不接手涉及 `.claude/` 目录的 issue**（见下方 `.claude` 目录阻塞规则）
+- **不接手涉及 `.claude/` 或 `.codex/` 目录的 issue**（见下方阻塞规则）
 - 不负责 task registry 或 task 数据质量审计
 - 不负责 runtime 绑定修复
 - 不负责 roadmap 规划或版本目标
