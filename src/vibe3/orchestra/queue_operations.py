@@ -14,6 +14,7 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import FlowManagerPort
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.services.label_utils import normalize_labels, should_skip_from_queue
@@ -22,7 +23,6 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.orchestra.flow_dispatch import FlowManager
 
 
 def collect_raw_issues_without_qualify(
@@ -60,7 +60,7 @@ def select_ready_issues(
     config: OrchestraConfig,
     github: "GitHubClient",
     store: "SQLiteClient",
-    flow_manager: "FlowManager",
+    flow_manager: FlowManagerPort,
     qualify_gate: QualifyGateService,
     supervisor_label: str,
 ) -> list[IssueInfo]:

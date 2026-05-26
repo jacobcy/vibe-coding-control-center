@@ -16,13 +16,13 @@ from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import FlowManagerPort
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.orchestra.flow_dispatch import FlowManager
 
 
 class QualifyGateService:
@@ -37,7 +37,7 @@ class QualifyGateService:
         config: OrchestraConfig,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: "FlowManager",
+        flow_manager: FlowManagerPort,
     ) -> None:
         """Initialize qualify gate service.
 

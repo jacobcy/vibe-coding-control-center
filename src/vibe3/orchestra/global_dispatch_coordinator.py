@@ -23,19 +23,18 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
-from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import FlowManagerPort, QueuePersistencePort
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import (
     collect_raw_issues_without_qualify,
     select_ready_issues,
 )
-from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
@@ -62,15 +61,16 @@ class GlobalDispatchCoordinator:
         capacity: CapacityService,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: FlowManager,
+        flow_manager: FlowManagerPort,
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
+        queue_persistence: QueuePersistencePort | None = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
         self._github = github
         self._store = store
-        self._flow_manager = flow_manager
+        self._flow_manager: FlowManagerPort = flow_manager
         self._registry = registry
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows
@@ -83,14 +83,23 @@ class GlobalDispatchCoordinator:
         self._supervisor_label = config.supervisor_handoff.issue_label
 
         # Initialize queue persistence service
-        self._queue_persistence = QueuePersistenceService(
-            store=store,
-            config=config,
-            github=github,
-            registry=registry,
-            supervisor_label=self._supervisor_label,
-            load_issue=self._load_issue,
-        )
+        # Allow injection for testability; default to concrete implementation
+        if queue_persistence is None:
+            # Import concrete implementation only when needed
+            from vibe3.orchestra.queue_persistence_service import (
+                QueuePersistenceService,
+            )
+
+            self._queue_persistence: QueuePersistencePort = QueuePersistenceService(
+                store=store,
+                config=config,
+                github=github,
+                registry=registry,
+                supervisor_label=self._supervisor_label,
+                load_issue=self._load_issue,
+            )
+        else:
+            self._queue_persistence = queue_persistence
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -597,7 +606,10 @@ class GlobalDispatchCoordinator:
         # Step 1: Restore queue from persistence if None
         if self._frozen_queue is None:
             self._queue_persistence.frozen_queue = None
-            self._queue_persistence.load_issue = self._load_issue
+            # load_issue is set on construction for Protocol instances
+            # Only reassign for concrete QueuePersistenceService
+            if hasattr(self._queue_persistence, "load_issue"):
+                self._queue_persistence.load_issue = self._load_issue  # type: ignore[attr-defined]
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
@@ -605,7 +617,10 @@ class GlobalDispatchCoordinator:
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
-        self._queue_persistence.load_issue = self._load_issue
+        # load_issue is set on construction for Protocol instances
+        # Only reassign for concrete QueuePersistenceService
+        if hasattr(self._queue_persistence, "load_issue"):
+            self._queue_persistence.load_issue = self._load_issue  # type: ignore[attr-defined]
         cleared_all = self._queue_persistence.promote()
         if cleared_all:
             self._check_service = None  # Invalidate when queue is cleared

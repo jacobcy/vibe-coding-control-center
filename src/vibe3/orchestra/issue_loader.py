@@ -8,13 +8,13 @@ from loguru import logger
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.protocols import FlowManagerPort
 from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.models.orchestration import IssueInfo
-    from vibe3.orchestra.flow_dispatch import FlowManager
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
@@ -45,7 +45,7 @@ def get_flow_context(
     config: OrchestraConfig,
     github: "GitHubClient",
     store: "SQLiteClient",
-    flow_manager: "FlowManager",
+    flow_manager: FlowManagerPort,
 ) -> tuple[str, dict[str, object] | None]:
     """Get flow context (branch and state) for an issue.
 

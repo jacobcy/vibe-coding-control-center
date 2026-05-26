@@ -7,8 +7,11 @@ Primary entry point: HeartbeatServer (vibe3 serve start)
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.protocols import FlowManagerPort, QueuePersistencePort
 
 __all__ = [
     "OrchestraConfig",
     "IssueInfo",
+    "FlowManagerPort",
+    "QueuePersistencePort",
 ]
