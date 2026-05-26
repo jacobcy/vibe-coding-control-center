@@ -12,8 +12,15 @@ PATTERNS=(
   "rm\s+-rf\s+.*\s+(/|~)"
   "git\s+commit\s+.*--no-verify"
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
-  "task\s+resume\s+(?!.*--label).*(-y\b|--yes\b)"
 )
+
+# Block task resume -y without --label (grep -E lacks lookahead)
+if echo "$CMD" | grep -qiE "task\s+resume\s+.*(-y\b|--yes\b)" && \
+   ! echo "$CMD" | grep -qiE "task\s+resume\s+.*--label"; then
+  echo "[security] BLOCKED: unsafe task resume without --label" >&2
+  echo "[security] Command: $CMD" >&2
+  exit 2
+fi
 
 for pattern in "${PATTERNS[@]}"; do
   if echo "$CMD" | grep -qiE "$pattern"; then
