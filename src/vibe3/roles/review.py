@@ -41,6 +41,7 @@ from vibe3.roles.review_helpers import (
     finalize_review_output,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
 
@@ -335,6 +336,12 @@ def execute_manual_review_async(
         issue_number=issue_number,
         pr_number=pr_number,
         instructions=instructions,
+    )
+    record_dispatch_failure_if_unexpected(
+        result=launch,
+        role="reviewer",
+        issue_number=issue_number,
+        branch=branch,
     )
     if not launch.launched:
         logger.bind(domain="review").warning(

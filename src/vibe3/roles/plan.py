@@ -35,6 +35,7 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import fail_planner_issue
 
 PLANNER_ROLE = TriggerableRoleDefinition(
@@ -387,6 +388,12 @@ def execute_spec_plan_async(
             actor="agent:plan",
             mode="async",
         )
+    )
+    record_dispatch_failure_if_unexpected(
+        result=launch,
+        role="planner",
+        issue_number=issue_number,
+        branch=branch,
     )
     return CodeagentResult(
         success=launch.launched,
