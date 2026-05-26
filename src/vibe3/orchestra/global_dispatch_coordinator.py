@@ -149,7 +149,7 @@ class GlobalDispatchCoordinator:
         except Exception as exc:
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: collect_ready_issues failed: {exc}",
+                f"GlobalDispatchCoordinator: collect_open_issues failed: {exc}",
             )
             logger.bind(domain="global_dispatch").error(
                 f"collect_open_issues failed: {exc}"
@@ -360,6 +360,24 @@ class GlobalDispatchCoordinator:
                 for entry in self._frozen_queue
             )
         )
+
+    def _has_qualifiable_blocked_entries(self) -> bool:
+        """Whether any blocked queue entry would pass the qualify gate right now.
+
+        Short-circuits on first qualifiable entry. Only called when already in
+        paused state, so the per-entry qualify calls are cheaper than a full
+        GitHub collection.
+        """
+        if not self._frozen_queue:
+            return False
+        for entry in self._frozen_queue:
+            if entry.waiting_state is None and entry.collected_state == "blocked":
+                issue = self._load_issue(entry.issue_number)
+                if issue is None:
+                    continue
+                if self._qualify_gate.qualify_blocked_issue(issue) is not None:
+                    return True
+        return False
 
     def _should_collect_after_dispatch(self, dispatched_count: int) -> bool:
         """Whether this tick should rebuild active queue candidates."""
@@ -575,7 +593,11 @@ class GlobalDispatchCoordinator:
             if self._has_actionable_entries():
                 self._dispatch_paused = False
             elif self._has_pending_blocked_entries():
-                paused_with_pending_blocked = True
+                if self._has_qualifiable_blocked_entries():
+                    # A blocked entry can be dispatched now — unpause to let it through
+                    self._dispatch_paused = False
+                else:
+                    paused_with_pending_blocked = True
 
         # Step 4: Dispatch actionable entries FIRST
         # Note: dispatch event logging is handled by _dispatch_loop internally
@@ -589,6 +611,18 @@ class GlobalDispatchCoordinator:
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._queue_persistence.persist()
 
+        # Step 5b: Early-exit when paused with only non-qualifiable blocked entries.
+        # Skip collection — it would fetch the same all-blocked result again and
+        # immediately re-enter the paused state, wasting GitHub API quota.
+        if paused_with_pending_blocked:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: dispatch paused "
+                "(blocked entries pending, no qualifiable candidates"
+                " — skipping collection)",
+            )
+            return
+
         # Step 6: Rebuild active candidates once active queue is exhausted.
         need_collect = self._should_collect_after_dispatch(dispatched_count)
         if need_collect:
@@ -596,16 +630,7 @@ class GlobalDispatchCoordinator:
             self._check_service = None  # Invalidate cache
             if fresh and all(entry.collected_state == "blocked" for entry in fresh):
                 self._dispatch_paused = True
-                if paused_with_pending_blocked:
-                    append_orchestra_event(
-                        "dispatcher",
-                        "GlobalDispatchCoordinator: dispatch paused "
-                        "(blocked candidates unchanged after qualify)",
-                    )
-                else:
-                    self._frozen_queue = self._merge_queue(
-                        self._frozen_queue or [], fresh
-                    )
+                self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
                 append_orchestra_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "

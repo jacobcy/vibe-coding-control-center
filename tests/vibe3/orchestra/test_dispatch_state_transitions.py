@@ -25,7 +25,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_collect() -> list[QueueEntry]:
@@ -72,7 +72,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_collect() -> list[QueueEntry]:
@@ -123,7 +123,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_collect() -> list[QueueEntry]:
@@ -169,11 +169,11 @@ class TestStateTransitions:
         make_issue_info,
     ) -> None:
         """Blocked issues are removed when qualification keeps them blocked."""
-        manager_issue = make_issue(1)
+        _ = make_issue(1)
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "manager", [manager_issue], capacity=capacity, mock_health_check=True
+            "manager", capacity=capacity, mock_health_check=True
         )
 
         async def mock_collect() -> list[QueueEntry]:
@@ -208,18 +208,17 @@ class TestStateTransitions:
         assert len(emit_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_falsely_blocked_issue_dispatches_after_qualify(
+    async def test_blocked_issue_removed_from_queue_when_qualify_gate_fails(
         self,
         make_capacity,
         make_coordinator,
         make_issue_info,
     ) -> None:
-        """Blocked issues stay out of dispatch and are removed from the queue."""
+        """Blocked issues are removed from queue when qualify gate finds no target."""
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
             "manager",
-            [],
             capacity=capacity,
             mock_health_check=True,
         )
@@ -260,12 +259,11 @@ class TestLoggingBehavior:
         install_issue_loader,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        planner_issue = make_issue(303)
+        _ = make_issue(303)
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
             "planner",
-            [planner_issue],
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -314,12 +312,11 @@ class TestLoggingBehavior:
         install_issue_loader,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        planner_issue = make_issue(467)
+        _ = make_issue(467)
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
             "planner",
-            [planner_issue],
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,

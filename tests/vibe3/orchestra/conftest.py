@@ -63,7 +63,6 @@ def make_coordinator() -> callable:
 
     def _make_coordinator(
         role: str = "manager",
-        ready_issues: list[IssueInfo] | None = None,
         config: OrchestraConfig | None = None,
         capacity: MagicMock | None = None,
         with_branches: bool = False,
@@ -109,8 +108,6 @@ def make_coordinator() -> callable:
         # Mock health check to bypass CheckService for queue operation tests
         if mock_health_check:
             coordinator._health_check_before_dispatch = MagicMock(return_value=True)
-
-        _ = ready_issues
 
         if with_branches and role != "manager":
 

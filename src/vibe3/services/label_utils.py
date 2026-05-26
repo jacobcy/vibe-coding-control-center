@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -54,6 +55,19 @@ def has_manager_assignee(
     return any(assignee in manager_usernames for assignee in assignees)
 
 
+@functools.lru_cache(maxsize=8)
+def _make_dispatch_policy(
+    supervisor_label: str,
+    manager_usernames: tuple[str, ...],
+) -> "object":
+    from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
+
+    return IssueDispatchPolicy(
+        supervisor_label=supervisor_label,
+        manager_usernames=manager_usernames,
+    )
+
+
 def should_skip_from_queue(
     issue: IssueInfo,
     *,
@@ -82,9 +96,8 @@ def should_skip_from_queue(
     """
     from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 
-    policy = IssueDispatchPolicy(
-        supervisor_label=supervisor_label,
-        manager_usernames=tuple(manager_usernames),
+    policy: IssueDispatchPolicy = _make_dispatch_policy(  # type: ignore[assignment]
+        supervisor_label, tuple(manager_usernames)
     )
     reasons = policy.exclusion_reasons(issue)
     if require_manager_assignee:

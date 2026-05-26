@@ -316,6 +316,7 @@ def status(
         if cast(IssueState, item["state"]) == IssueState.BLOCKED
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and cast(int, item["number"]) not in supervisor_numbers
     ]
 
     render_missing_state_items(missing_state_items)

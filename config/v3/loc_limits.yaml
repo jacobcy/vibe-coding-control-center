@@ -210,6 +210,9 @@ code_limits:
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
+      - path: "src/vibe3/commands/status_render.py"
+        limit: 450
+        reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
 
 
   total_file_loc:

@@ -60,12 +60,10 @@ class TestQueueOperations:
     async def test_dispatch_all_when_capacity_available(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
-        issues = [make_issue(1), make_issue(2)]
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
             "planner",
-            issues,
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -136,12 +134,10 @@ class TestQueueOperations:
         assignees,
     ) -> None:
         """Issues violating queue criteria are removed (supervisor, no assignee)."""
-        issue = make_issue(issue_num)
+        _ = make_issue(issue_num)
         capacity = make_capacity(remaining=1)
 
-        coordinator = make_coordinator(
-            role, [issue], capacity=capacity, mock_health_check=True
-        )
+        coordinator = make_coordinator(role, capacity=capacity, mock_health_check=True)
         coordinator._frozen_queue = [
             QueueEntry(
                 issue_number=issue_num,
@@ -172,12 +168,10 @@ class TestQueueOperations:
     async def test_skip_when_capacity_full(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
-        issues = [make_issue(1), make_issue(2), make_issue(3)]
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
             "planner",
-            issues,
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -217,12 +211,10 @@ class TestQueueOperations:
     async def test_frozen_queue_prevents_duplicate_dispatch_without_state_change(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
-        issues = [make_issue(1), make_issue(2)]
         capacity = make_capacity(remaining=3)
 
         coordinator = make_coordinator(
             "planner",
-            issues,
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -258,13 +250,10 @@ class TestQueueOperations:
     async def test_emit_failure_handled_gracefully(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
-        issue1 = make_issue(1)
-        issue2 = make_issue(2)
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
             "planner",
-            [issue1, issue2],
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -314,7 +303,6 @@ class TestQueueOperations:
 
         coordinator = make_coordinator(
             "planner",
-            [],
             capacity=capacity,
             with_branches=True,
             mock_health_check=True,
@@ -345,7 +333,7 @@ class TestQueueOperations:
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_collect() -> list[QueueEntry]:
