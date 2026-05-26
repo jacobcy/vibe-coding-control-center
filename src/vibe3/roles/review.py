@@ -344,11 +344,19 @@ def execute_manual_review_async(
         branch=branch,
     )
     if not launch.launched:
-        logger.bind(domain="review").warning(
-            "Async review launch skipped",
-            reason=launch.reason,
-            reason_code=launch.reason_code,
-        )
+        reason_code = launch.reason_code or "unknown"
+        if reason_code in ("capacity_full", "duplicate_dispatch"):
+            # Normal throttling/dedup - log at info level
+            logger.bind(domain="review").info(
+                f"Review dispatch throttled: {launch.reason}",
+                reason_code=reason_code,
+            )
+        else:
+            # Unexpected failure - log at warning level
+            logger.bind(domain="review").warning(
+                f"Review dispatch failed unexpectedly: {launch.reason}",
+                reason_code=reason_code,
+            )
         return ReviewRunResult("ERROR", None, issue_number)
     return ReviewRunResult("ASYNC", None, issue_number)
 
