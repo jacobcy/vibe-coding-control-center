@@ -24,6 +24,28 @@ description: Use when checking whether a new vibe3 serve debugging round is read
 - 所有状态写入只通过真实 `vibe3` 命令完成，不直接改 `.git/vibe3/` 底层文件。
 - `debug/*` 只是临时调试分支，不是 canonical flow 分支，不替代 `dev/issue-*` 或 `task/issue-*` 的正式语义。
 
+## Dispatch 故障模型
+
+serve 派发链路按这个顺序排查：
+
+1. frozen queue 保留跨 tick 候选
+2. health check 处理结构性和 terminal 条件
+3. qualify gate 对齐远程 body truth 与本地 blocked cache
+4. role handler 构造 execution request
+5. ExecutionCoordinator 解析 worktree 并启动角色执行
+6. FailedGate / error_log 控制系统性错误后的全局派发
+
+可见性规则：
+
+- 业务 block 写 blocked reason，应该在 `task status` 可见。
+- 系统 error 写 error_log，应该在 `serve status` / FailedGate 可见。
+- `temp/logs/orchestra/events.log` 是 tick、queue、dispatch 的时间线证据。
+
+先判断故障是单点历史残留还是全局机制问题：
+
+- 单点残留：优先做最小防御或 cleanup，不扩展状态机。
+- 全局重复：再提高 dispatch / health check / error tracking 的容错度。
+
 ## 调试分支规则
 
 当当前工作树已经是 `task/issue-*` 自动化分支，且该分支上已有活跃 PR 时：

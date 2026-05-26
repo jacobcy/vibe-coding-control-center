@@ -157,10 +157,6 @@ class QualifyGateService:
 
         return result
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
     def _align_blocked_state(
         self,
         issue_number: int,
@@ -177,6 +173,7 @@ class QualifyGateService:
         from vibe3.services.blocked_state_service import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
+        label_blocked = blocked_label in labels
 
         if not flow_state or flow_state.get("flow_status") != "blocked":
             service = BlockedStateService(
@@ -206,16 +203,19 @@ class QualifyGateService:
                     actor="orchestra:qualify_gate",
                     force=True,
                 )
+                label_blocked = True
             except Exception as exc:
                 logger.bind(domain="orchestra").warning(
                     f"Failed to add {blocked_label} during alignment: {exc}"
                 )
 
-        append_orchestra_event(
-            "dispatcher",
-            f"qualify_gate skip #{issue_number}: "
-            "blocked per body truth (projection state or payload)",
+        event = self._format_blocked_skip_event(
+            issue_number=issue_number,
+            truth=truth,
+            flow_state=flow_state,
+            label_blocked=label_blocked,
         )
+        append_orchestra_event("dispatcher", event)
 
     def _has_stale_blocked_state(
         self,
@@ -241,6 +241,36 @@ class QualifyGateService:
         )
 
         return label_blocked or local_blocked
+
+    @staticmethod
+    def _source_value(source: object | None) -> str:
+        return str(value) if (value := getattr(source, "value", None)) else "none"
+
+    @classmethod
+    def _format_blocked_skip_event(
+        cls,
+        *,
+        issue_number: int,
+        truth: CoordinationTruth,
+        flow_state: dict[str, object] | None,
+        label_blocked: bool,
+    ) -> str:
+        blocked_by = f"#{truth.blocked_by_issue}" if truth.blocked_by_issue else "none"
+        local_flow_status = (
+            str(flow_state.get("flow_status") or "none") if flow_state else "none"
+        )
+        return (
+            f"qualify_gate skip #{issue_number}: blocked per body truth "
+            f"(projection_state={truth.projection_state or 'none'}, "
+            f"projection_source={cls._source_value(truth.projection_state_source)}, "
+            f"blocked_reason={truth.blocked_reason or 'none'}, "
+            f"blocked_reason_source={cls._source_value(truth.blocked_reason_source)}, "
+            f"blocked_by_issue={blocked_by}, "
+            "blocked_by_issue_source="
+            f"{cls._source_value(truth.blocked_by_issue_source)}, "
+            f"local_flow_status={local_flow_status}, "
+            f"label_blocked={label_blocked})"
+        )
 
     def _auto_resume_blocked(
         self,
