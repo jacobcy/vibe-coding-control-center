@@ -88,3 +88,6 @@ def record_dispatch_failure_if_unexpected(
             domain=f"{role}_dispatch",
             issue_number=issue_number,
         ).warning(f"Failed to record dispatch error: {exc}")
+
+
+# PR #1498 - Manual CLI dispatch error tracking
