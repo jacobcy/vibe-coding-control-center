@@ -393,8 +393,17 @@ gh issue list --label "state/done" --limit 30 --json number,title,labels \
    ```bash
    gh pr list --search "issue:<number>" --state merged --json number,state,mergedAt
    ```
-2. **完成了**（有 merged PR）→ 关闭 issue，comment 说明关闭原因
-3. **没完成**（无 PR 或无 merged PR）→ 关闭当前 issue + 创建新 issue（范围更明确），新 issue 引用原 issue
+2. **代码实际验证（强制）**：不是只看 PR 状态。必须检查代码实际：
+   - PR merged → 检查目标文件/模块是否确实包含了 issue 要求的改动
+   - 无 PR → 检查代码库中是否已经以其他方式完成了改动（`git log --grep`、`inspect files`）
+   ```bash
+   git log --oneline -10 --all --grep="<issue 关键词>"
+   uv run python src/vibe3/cli.py inspect files <相关路径>
+   ```
+3. **完成了**（代码实际包含改动）→ 关闭 issue，comment 说明关闭原因和代码证据
+4. **没完成**（代码中无对应改动）→ 关闭当前 issue（已过时或范围不清）+ 创建新 issue（范围更明确，引用原 issue）
+
+**关键原则**：roadmap 处理的都是"悬浮状态"——issue 标签和代码实际脱节。不能用形式审查（看标签、看 PR 状态）代替实质判断（看代码）。必须确认改动是否真实存在于代码库中。
 
 处理完所有漏网 issue 后，打 `roadmap-reviewed`，写入 memory.md 缓存。
 
