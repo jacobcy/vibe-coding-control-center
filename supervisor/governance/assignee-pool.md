@@ -493,3 +493,12 @@ Exit:
 ## Stop Point
 
 完成治理建议后停止。不要进入执行分配、实现方案、代码修改或单 flow 管理。
+
+**Stop Point Checklist（强制）**：
+
+完成以下动作后才能停止：
+- [ ] 写完 `[governance suggest]` 或 `[governance auto-recover]` 评论
+- [ ] 打上 `orchestra-scanned` 标签
+- [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
+
+**缺少标签的后果**：下次 governance 扫描会重复处理同一 issue，造成资源浪费。
