@@ -280,6 +280,46 @@ def render_blocked_items(blocked_items: list[dict[str, object]]) -> None:
         console.print("  [dim](none)[/]")
 
 
+def render_rfc_items(rfc_items: list[dict[str, object]]) -> None:
+    """Render Roadmap RFC section (issues needing human design input)."""
+    console.print("\n[bold cyan]Roadmap RFC:[/]")
+    if rfc_items:
+        for item in rfc_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            flow = cast(FlowStatusResponse | None, item["flow"])
+
+            state_str = state.value.upper()
+            display_title = title[:60] + ("..." if len(title) > 60 else "")
+            console.print(f"  #{number:4}  [yellow]{state_str:10}[/]  {display_title}")
+
+            if flow:
+                console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+    else:
+        console.print("  [dim](none)[/]")
+
+
+def render_epic_items(epic_items: list[dict[str, object]]) -> None:
+    """Render Roadmap Epic section (parent governance containers)."""
+    console.print("\n[bold cyan]Roadmap Epic:[/]")
+    if epic_items:
+        for item in epic_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            flow = cast(FlowStatusResponse | None, item["flow"])
+
+            state_str = state.value.upper()
+            display_title = title[:60] + ("..." if len(title) > 60 else "")
+            console.print(f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}")
+
+            if flow:
+                console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+    else:
+        console.print("  [dim](none)[/]")
+
+
 def render_completed_flows(completed_flows: list[FlowStatusResponse]) -> None:
     """Render Completed/Aborted Flows section."""
     console.print("\n[bold cyan]Completed/Aborted Flows:[/]")
