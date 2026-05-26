@@ -156,3 +156,6 @@ MagicMock/
 alias
 
 .claude/settings.local.json
+
+# Roadmap analysis cache (local only)
+.agent/context/memory.md
