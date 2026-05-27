@@ -87,6 +87,9 @@ code_limits:
       - path: "src/vibe3/services/expired_resource_cleanup_service.py"
         limit: 540
         reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑，新增 quiet 模式和颜色高亮输出后略微超标"
+      - path: "src/vibe3/services/flow_cleanup_service.py"
+        limit: 420
+        reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤"
       - path: "src/vibe3/services/check_cleanup_service.py"
         limit: 540
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑"

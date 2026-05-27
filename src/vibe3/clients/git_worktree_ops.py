@@ -256,3 +256,32 @@ def remove_worktree(wt_path: Path, force: bool = False) -> None:
         action="remove_worktree",
         path=str(wt_path),
     ).info("Removed worktree")
+
+
+def prune_worktrees() -> None:
+    """Prune stale worktree metadata for worktrees whose directories no longer exist.
+
+    When a worktree directory is removed externally (e.g. rm -rf) but
+    .git/worktrees/<name>/ metadata remains, git worktree remove fails.
+    This prunes those orphan metadata entries so subsequent worktree
+    operations succeed.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "worktree", "prune"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        logger.bind(
+            domain="git",
+            action="prune_worktrees",
+            stderr=result.stderr,
+        ).warning("Failed to prune worktrees")
+    else:
+        logger.bind(
+            domain="git",
+            action="prune_worktrees",
+        ).info("Pruned stale worktree metadata")

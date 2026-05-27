@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import GitError
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_cleanup_service import (
     FlowCleanupService,
@@ -95,3 +96,30 @@ def test_delete_remote_branch_skips_when_open_pr_exists() -> None:
 
     service.git_client.delete_remote_branch.assert_not_called()
     assert results["remote_branch"] is True
+
+
+def test_remove_worktree_falls_back_to_prune_on_failure() -> None:
+    """When remove_worktree raises GitError, _remove_worktree must try prune."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    # Simulate: find_worktree_path_for_branch returns a path,
+    # but remove_worktree raises GitError (orphan metadata)
+    service.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/stale-worktree"
+    )
+    service.git_client.remove_worktree.side_effect = GitError(
+        "worktree remove", "fatal: validation failed"
+    )
+
+    with patch("vibe3.clients.git_worktree_ops.prune_worktrees") as mock_prune:
+        results: dict[str, bool] = {"worktree": True}
+        service._remove_worktree("task/issue-123", results)
+
+        # Prune must be called as fallback
+        mock_prune.assert_called_once()
+        # Worktree step should still be marked as failed
+        assert results["worktree"] is False

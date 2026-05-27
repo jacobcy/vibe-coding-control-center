@@ -107,6 +107,137 @@ def test_soft_delete_flow_clears_refs_from_active_flow() -> None:
         assert deleted["audit_ref"] is None
 
 
+def test_soft_delete_flow_cascades_to_runtime_session() -> None:
+    """soft_delete_flow must delete runtime_session rows for the branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("task/issue-123", flow_slug="issue_123")
+
+        # Insert a runtime_session row
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO runtime_session "
+            "(role, target_type, target_id, branch, session_name, status, "
+            "created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+            ("planner", "issue", "123", "task/issue-123", "vibe3-plan-123", "running"),
+        )
+        conn.commit()
+
+        # Verify session exists before soft delete
+        cursor.execute(
+            "SELECT COUNT(*) FROM runtime_session WHERE branch = ?",
+            ("task/issue-123",),
+        )
+        assert cursor.fetchone()[0] == 1
+
+        store.soft_delete_flow("task/issue-123")
+
+        # Verify session is deleted
+        cursor.execute(
+            "SELECT COUNT(*) FROM runtime_session WHERE branch = ?",
+            ("task/issue-123",),
+        )
+        assert cursor.fetchone()[0] == 0
+
+
+def test_soft_delete_flow_cascades_to_flow_issue_links() -> None:
+    """soft_delete_flow must delete flow_issue_links rows for the branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("task/issue-456", flow_slug="issue_456")
+
+        # Insert a flow_issue_links row
+        store.add_issue_link("task/issue-456", 456, "task")
+
+        # Verify link exists before soft delete
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_issue_links WHERE branch = ?",
+            ("task/issue-456",),
+        )
+        assert cursor.fetchone()[0] == 1
+
+        store.soft_delete_flow("task/issue-456")
+
+        # Verify link is deleted
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_issue_links WHERE branch = ?",
+            ("task/issue-456",),
+        )
+        assert cursor.fetchone()[0] == 0
+
+
+def test_soft_delete_flow_cascades_to_flow_context_cache() -> None:
+    """soft_delete_flow must delete flow_context_cache rows for the branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("task/issue-789", flow_slug="issue_789")
+
+        # Insert a flow_context_cache row
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_context_cache (branch, task_issue_number, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            ("task/issue-789", 789),
+        )
+        conn.commit()
+
+        # Verify cache exists before soft delete
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_context_cache WHERE branch = ?",
+            ("task/issue-789",),
+        )
+        assert cursor.fetchone()[0] == 1
+
+        store.soft_delete_flow("task/issue-789")
+
+        # Verify cache is deleted
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_context_cache WHERE branch = ?",
+            ("task/issue-789",),
+        )
+        assert cursor.fetchone()[0] == 0
+
+
+def test_soft_delete_flow_preserves_flow_events() -> None:
+    """soft_delete_flow must NOT delete flow_events (audit trail)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("task/issue-999", flow_slug="issue_999")
+
+        # Insert a flow_events row
+        store.add_event("task/issue-999", "flow_created", "test-actor", "created")
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_events WHERE branch = ?",
+            ("task/issue-999",),
+        )
+        assert cursor.fetchone()[0] == 1
+
+        store.soft_delete_flow("task/issue-999")
+
+        # Verify events are preserved
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_events WHERE branch = ?",
+            ("task/issue-999",),
+        )
+        assert cursor.fetchone()[0] == 1
+
+
 def test_get_task_issue_number_returns_int_when_link_exists() -> None:
     """Test get_task_issue_number returns int when flow_issue_links has task."""
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -255,6 +255,11 @@ class SQLiteFlowStateRepo(_HasConnection):
 
         The flow_status is normalized to 'aborted' (terminal state) to
         distinguish tombstones from active flows in audits/debugging.
+
+        Also cascade-deletes non-audit associated records (runtime_session,
+        flow_issue_links, flow_context_cache) to prevent zombie state from
+        polluting subsequent orchestra dispatch. flow_events is preserved
+        as audit trail.
         """
         now = datetime.datetime.now().isoformat()
         conn = self._get_connection()
@@ -291,6 +296,9 @@ class SQLiteFlowStateRepo(_HasConnection):
                 WHERE branch = ?""",
                 (now, now, branch),
             )
+            cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_issue_links WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
         logger.bind(
             external="sqlite",
             operation="soft_delete_flow",

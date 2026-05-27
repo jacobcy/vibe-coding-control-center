@@ -85,26 +85,45 @@ class FlowWriteMixin(FlowReadMixin):
                 "Switch to a feature branch first."
             )
 
-        # Idempotency: if flow already exists, return existing
-        existing_state = self.store.get_flow_state(branch)
-        if existing_state:
-            existing_slug = existing_state.get("flow_slug", slug)
+        # Handle soft-deleted tombstone: restore and reactivate before
+        # idempotency check. Without this, INSERT OR IGNORE in
+        # update_flow_state silently fails on the existing tombstone row and
+        # create_flow leaves a zombie with deleted_at set.
+        tombstone = self.store.get_flow_state_include_deleted(branch)
+        was_tombstone = tombstone and tombstone.get("deleted_at") is not None
+        if was_tombstone:
             logger.bind(
                 domain="flow",
                 action="create",
                 branch=branch,
-                source=source,
-                existing_slug=existing_slug,
-            ).warning(
-                f"Flow already exists for '{branch}' "
-                f"(slug={existing_slug}, source={source}). "
-                f"Returning existing — use reactivate_flow to reset."
-            )
-            existing = self.get_flow_status(branch)
-            if existing is not None:
-                return existing
-            # get_flow_state found a row but get_flow_status returned None;
-            # fall through to recreate (should not happen in practice).
+            ).info("Restoring soft-deleted tombstone before flow creation")
+            self.store.restore_flow(branch)
+            self.store.update_flow_state(branch, flow_status="active")
+
+        # Idempotency: if flow already exists, return existing.
+        # Skip when we just restored from a tombstone so the normal create
+        # path updates slug/initiated_by/latest_actor and records a
+        # flow_created event.
+        if not was_tombstone:
+            existing_state = self.store.get_flow_state(branch)
+            if existing_state:
+                existing_slug = existing_state.get("flow_slug", slug)
+                logger.bind(
+                    domain="flow",
+                    action="create",
+                    branch=branch,
+                    source=source,
+                    existing_slug=existing_slug,
+                ).warning(
+                    f"Flow already exists for '{branch}' "
+                    f"(slug={existing_slug}, source={source}). "
+                    f"Returning existing — use reactivate_flow to reset."
+                )
+                existing = self.get_flow_status(branch)
+                if existing is not None:
+                    return existing
+                # get_flow_state found a row but get_flow_status returned None;
+                # fall through to recreate (should not happen in practice).
 
         logger.bind(
             domain="flow",
