@@ -136,6 +136,7 @@ class FlowTimelineService:
             "flow_failed": "Flow failed",
             "flow_aborted": "Flow aborted",
             "resumed": "Flow resumed",
+            "handoff_append": "Handoff update",
             "milestone_recorded": "Milestone recorded",
             "user_notification": "User notification",
         }
@@ -185,6 +186,7 @@ class FlowTimelineService:
                 "flow_failed": "Flow failed",
                 "flow_aborted": "Flow aborted",
                 "resumed": "Flow resumed",
+                "handoff_append": "Handoff update",
                 "milestone_recorded": "Milestone recorded",
                 "user_notification": "User notification",
             }

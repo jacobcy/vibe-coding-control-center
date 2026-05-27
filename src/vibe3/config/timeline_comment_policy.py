@@ -41,8 +41,9 @@ class TimelineCommentPolicy(BaseModel):
 
     # Milestone events - WRITE COMMENTS (important progress markers)
     # NOTE: Must be routed through FlowTimelineService.record_timeline_event()
-    # Future events will be added here when producers migrate to FlowTimelineService
+    # handoff_append is now routed through HandoffService.append_current_handoff()
     milestone_events: list[str] = [
+        "handoff_append",  # Important milestone records (routed via HandoffService)
         "milestone_recorded",  # Example: Future milestone event (placeholder)
     ]
 
@@ -57,8 +58,9 @@ class TimelineCommentPolicy(BaseModel):
     # These events are recorded directly with store.add_event() and bypass policy:
     # - pr_created: PRService creates PR (pr_service.py:310-315)
     # - handoff_verdict: VerdictService records verdict (verdict_service.py:140-146)
-    # - handoff_append: BootstrapContextService action (bootstrap_context_service.py)
     # - state_transitioned: NoopGate state transition (noop_gate.py:406-424)
+    #
+    # handoff_append is NOW routed through FlowTimelineService via HandoffService
     # To enable policy filtering, route through FlowTimelineService first
 
     def should_write_comment(self, event_type: str) -> bool:
