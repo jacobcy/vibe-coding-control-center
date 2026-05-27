@@ -104,3 +104,72 @@ def test_reset_task_scene_with_remote_keeps_remote_branch() -> None:
             terminate_sessions=True,
             keep_flow_record=False,
         )
+
+
+def test_soft_delete_then_create_flow_produces_clean_state() -> None:
+    """Full cycle: soft_delete -> create_flow must produce a clean active flow.
+
+    Simulates the orchestra dispatch after PR-closed reset:
+    1. Soft-delete the flow (as cleanup does)
+    2. Create a new flow (as orchestra dispatch does)
+    3. Verify: deleted_at is NULL, flow_status is 'active', no zombie links
+    """
+    import tempfile
+    from pathlib import Path
+
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Setup: create flow with links and session
+        store.update_flow_state(
+            "task/issue-100",
+            flow_slug="issue-100",
+            flow_status="active",
+        )
+        store.add_issue_link("task/issue-100", 100, "task")
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO runtime_session "
+            "(role, target_type, target_id, branch, session_name, status, "
+            "created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+            ("planner", "issue", "100", "task/issue-100", "sess-1", "running"),
+        )
+        conn.commit()
+
+        # Step 1: Soft delete (as cleanup does)
+        store.soft_delete_flow("task/issue-100")
+
+        # Verify tombstone
+        tombstone = store.get_flow_state_include_deleted("task/issue-100")
+        assert tombstone is not None
+        assert tombstone["deleted_at"] is not None
+        assert tombstone["flow_status"] == "aborted"
+
+        # Verify cascade: runtime_session and flow_issue_links are gone
+        cursor.execute(
+            "SELECT COUNT(*) FROM runtime_session WHERE branch = ?",
+            ("task/issue-100",),
+        )
+        assert cursor.fetchone()[0] == 0
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_issue_links WHERE branch = ?",
+            ("task/issue-100",),
+        )
+        assert cursor.fetchone()[0] == 0
+
+        # Step 2: Simulate what create_flow does with tombstone
+        store.restore_flow("task/issue-100")
+        store.update_flow_state("task/issue-100", flow_status="active")
+
+        # Step 3: Verify clean state
+        active = store.get_flow_state("task/issue-100")
+        assert active is not None, "get_flow_state must find the restored flow"
+        assert active["deleted_at"] is None
+        assert active["flow_status"] == "active"
