@@ -115,6 +115,7 @@ def render_issue_progress(
     assignee_items = bucketed_items[TaskStatusBucket.ASSIGNEE_INTAKE]
     ready_items = bucketed_items[TaskStatusBucket.READY_QUEUE]
     ready_anomalies = bucketed_items[TaskStatusBucket.READY_ANOMALY]
+    active_anomalies = bucketed_items[TaskStatusBucket.ACTIVE_ANOMALY]
 
     console.print("[bold cyan]Issue Progress:[/]")
     console.print("  [bold]Assignee Intake:[/]")
@@ -188,6 +189,25 @@ def render_issue_progress(
                     "             [yellow]missing assignee:[/] "
                     "ready queue historical debt"
                 )
+    else:
+        console.print("  [dim](none)[/]")
+
+    console.print("\n  [bold]Active Exceptions:[/]")
+    if active_anomalies:
+        for item in active_anomalies:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            flow = cast(FlowStatusResponse | None, item["flow"])
+
+            state_str = state.value.upper()
+            display_title = title[:48] + "..." if len(title) > 48 else title
+            console.print(f"  #{number:4}  [red]{state_str:10}[/]  {display_title}")
+            _render_task_item_details(flow, config)
+            console.print(
+                "             [yellow]missing assignee:[/] active state"
+                " but no assignee (rule 2)"
+            )
     else:
         console.print("  [dim](none)[/]")
 

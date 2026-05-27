@@ -14,6 +14,7 @@ class TaskStatusBucket(str, Enum):
     ASSIGNEE_INTAKE = "assignee-intake"
     READY_QUEUE = "ready-queue"
     READY_ANOMALY = "ready-anomaly"
+    ACTIVE_ANOMALY = "active-anomaly"
     OTHER = "other"
 
 
@@ -29,9 +30,8 @@ def classify_task_status(
     - state/ready with non-manager assignee is an anomaly
     - state/ready without assignee is an anomaly / historical debt
     - blocked has dedicated section in status dashboard
-    - non-ready states stay in intake view even if assignee is missing, because
-      runtime only treats missing assignee on READY as a governance boundary
-      violation
+    - active states (claimed/in-progress/etc) without assignee are anomalies:
+      state exists but no one is responsible
     """
     if state == IssueState.READY:
         # Missing assignee is always an anomaly, regardless of manager_usernames
@@ -56,6 +56,9 @@ def classify_task_status(
         IssueState.IN_PROGRESS,
         IssueState.REVIEW,
     }:
+        # Active state without assignee is an anomaly (rule 2)
+        if not assignee or not assignee.strip():
+            return TaskStatusBucket.ACTIVE_ANOMALY
         return TaskStatusBucket.ASSIGNEE_INTAKE
 
     return TaskStatusBucket.OTHER

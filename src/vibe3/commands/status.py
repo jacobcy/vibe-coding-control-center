@@ -254,10 +254,14 @@ def status(
     # Split missing state items into two categories:
     # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
     # 2. Governed but anomaly (has orchestra-governed label) - needs attention
+    manager_usernames = get_manager_usernames(config)
+
     waiting_for_pool_items = [
         item
         for item in orchestrated_issues
         if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
         and supervisor_label not in cast(list[str], item.get("labels", []))
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
@@ -299,6 +303,7 @@ def status(
         TaskStatusBucket.ASSIGNEE_INTAKE: [],
         TaskStatusBucket.READY_QUEUE: [],
         TaskStatusBucket.READY_ANOMALY: [],
+        TaskStatusBucket.ACTIVE_ANOMALY: [],
         TaskStatusBucket.OTHER: [],
     }
     for item in non_remote_items:

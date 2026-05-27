@@ -262,7 +262,7 @@ def test_task_status_shows_missing_state_label_section(
             "number": 901,
             "title": "Missing state label issue",
             "state": None,
-            "assignee": None,
+            "assignee": "manager-bot",
             "flow": None,
             "queued": False,
             "blocked_by": None,
