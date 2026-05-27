@@ -9,6 +9,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.github_client import GitHubClient
+    from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
 
 
 class FlowTimelineService:
@@ -46,28 +47,46 @@ class FlowTimelineService:
         detail: str,
         issue_number: int | None = None,
         repo: str | None = None,
+        policy: TimelineCommentPolicy | None = None,
     ) -> None:
-        """Record timeline event and optionally add GitHub comment.
+        """Record timeline event with configurable comment policy.
 
         Args:
             branch: Flow branch
             event_type: Event type (flow_blocked, flow_failed, resumed, etc.)
             actor: Actor performing the action
             detail: Event detail/reason
-            issue_number: GitHub issue number (optional, skips comment if None)
+            issue_number: GitHub issue number (optional)
             repo: Repository (owner/repo format, optional)
+            policy: Comment policy configuration (default: DEFAULT_COMMENT_POLICY)
         """
         # Always record event in SQLite
         self.store.add_event(branch, event_type, actor, detail)
 
-        # Skip comment if no issue linked
+        # Use default policy if not provided
+        if policy is None:
+            from vibe3.config.timeline_comment_policy import DEFAULT_COMMENT_POLICY
+
+            policy = DEFAULT_COMMENT_POLICY
+
+        # Check policy - should this event write comment?
+        if not policy.should_write_comment(event_type):
+            logger.bind(
+                domain="flow",
+                action="timeline",
+                branch=branch,
+                event_type=event_type,
+            ).debug("Timeline event recorded (SQLite only, policy=no_comment)")
+            return
+
+        # Skip if no issue_number (required for comment)
         if issue_number is None:
             logger.bind(
                 domain="flow",
                 action="timeline",
                 branch=branch,
                 event_type=event_type,
-            ).debug("Timeline event recorded without comment (no issue)")
+            ).debug("Timeline event recorded (SQLite only, no issue_number)")
             return
 
         # Check dedupe: skip if latest timeline comment has same event_type
@@ -80,10 +99,9 @@ class FlowTimelineService:
             ).info("Timeline comment skipped (duplicate event_type)")
             return
 
-        # Build timeline comment
+        # Build and write comment (only for events allowed by policy)
         comment_body = self._build_timeline_comment(event_type, detail)
 
-        # Add comment to GitHub issue
         try:
             self.github_client.add_comment(issue_number, comment_body, repo=repo)
             logger.bind(
@@ -91,7 +109,7 @@ class FlowTimelineService:
                 action="timeline",
                 issue_number=issue_number,
                 event_type=event_type,
-            ).success("Timeline comment added")
+            ).success("Timeline comment added (policy=allowed)")
         except Exception as e:
             logger.bind(
                 domain="flow",
@@ -111,12 +129,15 @@ class FlowTimelineService:
             Formatted comment body
         """
         # Event type to display text mapping
+        # Only includes events that may write comments (per policy)
+        # NOTE: Must be reversible by timeline_parser.py reverse_map
         display_map = {
             "flow_blocked": "Flow blocked",
             "flow_failed": "Flow failed",
             "flow_aborted": "Flow aborted",
             "resumed": "Flow resumed",
-            "state_transitioned": "State transitioned",
+            "milestone_recorded": "Milestone recorded",
+            "user_notification": "User notification",
         }
 
         display_text = display_map.get(event_type, event_type.replace("_", " ").title())
@@ -158,12 +179,14 @@ class FlowTimelineService:
                 return False
 
             # Get display text mapping (same as _build_timeline_comment)
+            # NOTE: Must be reversible by timeline_parser.py reverse_map
             display_map = {
                 "flow_blocked": "Flow blocked",
                 "flow_failed": "Flow failed",
                 "flow_aborted": "Flow aborted",
                 "resumed": "Flow resumed",
-                "state_transitioned": "State transitioned",
+                "milestone_recorded": "Milestone recorded",
+                "user_notification": "User notification",
             }
 
             # Reverse map: display text -> event_type
