@@ -89,8 +89,8 @@ if TYPE_CHECKING:
 def find_repo_root() -> Path:
     """Resolve the main repository root deterministically.
 
-    Never returns Path.cwd() — that would be the current worktree path,
-    causing nested-worktree creation and wrong-directory DB access.
+    Never returns a linked worktree root as the main repo — that would cause
+    nested-worktree creation and wrong-directory DB access.
 
     This is the single source of truth for repo root resolution.
     All callers that need the repository root for worktree operations,
@@ -119,7 +119,10 @@ def find_repo_root() -> Path:
         try:
             content = git_path.read_text().strip()
             if content.startswith("gitdir: "):
-                gitdir = Path(content[len("gitdir: ") :])
+                raw = content[len("gitdir: ") :]
+                gitdir = Path(raw)
+                if not gitdir.is_absolute():
+                    gitdir = (cwd / gitdir).resolve()
                 return gitdir.parent.parent.parent
         except Exception:
             pass

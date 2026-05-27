@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_client import GitClient, find_repo_root
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,
@@ -236,3 +236,86 @@ class TestCheckMergeConflicts:
             ],
         ):
             assert client.check_merge_conflicts("origin/main") is True
+
+
+class TestFindRepoRoot:
+    """Tests for the shared repo-root resolution function."""
+
+    def test_git_common_dir_success(self):
+        """Primary path: git common dir resolves to main repo."""
+        with patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir",
+            return_value="/repos/main/.git",
+        ):
+            root = find_repo_root()
+        assert root == Path("/repos/main")
+
+    def test_worktree_git_file_absolute_gitdir(self):
+        """Fallback: absolute gitdir in .git file from worktree."""
+        git_common_fail = GitError("rev-parse", "failed")
+        with (
+            patch(
+                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                side_effect=git_common_fail,
+            ),
+            patch.object(Path, "cwd", return_value=Path("/worktrees/wt-dev")),
+            patch.object(Path, "is_file", return_value=True),
+            patch.object(
+                Path,
+                "read_text",
+                return_value="gitdir: /repos/main/.git/worktrees/wt-dev\n",
+            ),
+        ):
+            root = find_repo_root()
+        assert root == Path("/repos/main")
+
+    def test_worktree_git_file_relative_gitdir(self):
+        """Fallback: relative gitdir resolved against cwd."""
+        git_common_fail = GitError("rev-parse", "failed")
+        with (
+            patch(
+                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                side_effect=git_common_fail,
+            ),
+            patch.object(Path, "cwd", return_value=Path("/worktrees/wt-dev")),
+            patch.object(Path, "is_file", return_value=True),
+            patch.object(
+                Path,
+                "read_text",
+                return_value="gitdir: ../.git/worktrees/wt-dev\n",
+            ),
+        ):
+            root = find_repo_root()
+        # ../.git/worktrees/wt-dev → /worktrees/.git/worktrees/wt-dev
+        # parent.parent.parent → /worktrees
+        assert root == Path("/worktrees")
+
+    def test_main_repo_returns_cwd(self):
+        """When .git is a directory, cwd IS the main repo."""
+        git_common_fail = GitError("rev-parse", "failed")
+        with (
+            patch(
+                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                side_effect=git_common_fail,
+            ),
+            patch.object(Path, "cwd", return_value=Path("/repos/main")),
+            patch.object(Path, "is_file", return_value=False),
+            patch.object(Path, "is_dir", return_value=True),
+        ):
+            root = find_repo_root()
+        assert root == Path("/repos/main")
+
+    def test_not_in_git_repo_raises(self):
+        """Not in a git repo should raise SystemError."""
+        git_common_fail = GitError("rev-parse", "failed")
+        with (
+            patch(
+                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                side_effect=git_common_fail,
+            ),
+            patch.object(Path, "cwd", return_value=Path("/some/random/dir")),
+            patch.object(Path, "is_file", return_value=False),
+            patch.object(Path, "is_dir", return_value=False),
+        ):
+            with pytest.raises(SystemError, match="Cannot resolve repository root"):
+                find_repo_root()

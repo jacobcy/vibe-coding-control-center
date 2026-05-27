@@ -93,25 +93,28 @@ done
 
 ### 0.4 验证 worktree 解析路径（关键！）
 
-`_resolve_repo_path` 在 `get_git_common_dir()` 失败时会 fallback 到 `Path.cwd()`。
-在 worktree 中运行时，`Path.cwd()` 返回 worktree 路径而非主仓库，导致：
-- WorktreeManager 在错误目录下创建/查找 worktree（嵌套 worktree）
-- DB 访问指向错误的 `.git/vibe3/` 目录
-- plan_ref/report_ref 在错误目录中查找
+Repo 根目录解析由 `vibe3.clients.git_client.find_repo_root()` 统一提供。
+解析链：`git-common-dir` → `.git` 文件指针 → 向上遍历 → 抛出 SystemError。
+在 worktree 中运行时，该函数正确返回主仓库路径而非 worktree 路径。
+
+异常场景：
+- `git rev-parse --git-common-dir` 失败 → 尝试解析 `.git` 文件中的 `gitdir:` 指针
+- `.git` 文件中的 `gitdir:` 为相对路径 → 相对于 cwd 解析
+- 所有回退都失败 → 抛出 SystemError（不在 git 仓库中）
 
 验证方法：
 
 ```bash
 uv run python -c "
-from vibe3.execution.coordinator import ExecutionCoordinator
-print('Resolved repo root:', ExecutionCoordinator._find_repo_root())
+from vibe3.clients.git_client import find_repo_root
+print('Resolved repo root:', find_repo_root())
 "
 # 应返回主仓库路径，例如 /Users/.../vibe-coding-control-center
 # 不应返回 worktree 路径
 ```
 
 诊断错误关键字："Failed to resolve permanent worktree for planner" 或
-"plan_ref not found" → 意味着 worktree 解析使用了错误的 repo_path。
+"plan_ref not found" → 意味着 repo 根目录解析失败或 worktree 使用了错误路径。
 
 ### 0.5 搜索历史解决方案
 

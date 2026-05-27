@@ -147,7 +147,7 @@ class ExecutionCoordinator:
         """Resolve the repository root used for worktree operations.
 
         Delegates to :meth:`_find_repo_root` for deterministic resolution
-        that never falls back to Path.cwd().
+        that never returns a linked worktree root as the main repo.
         """
         if request.repo_path:
             return Path(request.repo_path)
