@@ -312,11 +312,11 @@ class SessionRegistryService:
             return
 
         try:
+            from vibe3.clients.git_client import find_repo_root
             from vibe3.environment.worktree import WorktreeManager
             from vibe3.environment.worktree_context import WorktreeContext
-            from vibe3.execution.coordinator import ExecutionCoordinator
 
-            repo_root = ExecutionCoordinator._find_repo_root()
+            repo_root = find_repo_root()
             from vibe3.config.orchestra_settings import load_orchestra_config
 
             config = load_orchestra_config()

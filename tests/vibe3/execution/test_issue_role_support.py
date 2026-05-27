@@ -18,7 +18,7 @@ WORKTREE_REPO = Path("/test/repos/vibe-center/main/.worktrees/wt-dev")
 
 def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent() -> None:
     """Normal orchestra operations should anchor to the main repository root."""
-    with patch("vibe3.execution.issue_role_support.GitClient") as mock_git:
+    with patch("vibe3.clients.git_client.GitClient") as mock_git:
         mock_git.return_value.get_git_common_dir.return_value = f"{MAIN_REPO}/.git"
 
         root = resolve_orchestra_repo_root()

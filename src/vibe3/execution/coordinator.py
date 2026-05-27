@@ -157,43 +157,11 @@ class ExecutionCoordinator:
     def _find_repo_root() -> Path:
         """Resolve the main repository root deterministically.
 
-        Never returns Path.cwd() — that would be the current worktree path,
-        causing nested-worktree creation and wrong-directory DB access.
+        Delegates to the single-source-of-truth function in git_client.
         """
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients.git_client import find_repo_root
 
-        # Primary: git common dir (works in both main repo and worktrees)
-        try:
-            git_common = GitClient().get_git_common_dir()
-            return Path(git_common).parent
-        except Exception:
-            pass
-
-        # Fallback: parse .git file to find main repo from worktree pointer
-        # In a worktree, .git is a file containing "gitdir: /path/.git/worktrees/name"
-        cwd = Path.cwd()
-        git_path = cwd / ".git"
-        if git_path.is_file():
-            try:
-                content = git_path.read_text().strip()
-                if content.startswith("gitdir: "):
-                    gitdir = Path(content[len("gitdir: ") :])
-                    return gitdir.parent.parent.parent
-            except Exception:
-                pass
-
-        # If .git is a directory, cwd IS the main repo
-        if git_path.is_dir():
-            return cwd
-
-        # Last resort: walk up to find .git directory
-        for parent in cwd.parents:
-            if (parent / ".git").is_dir():
-                return parent
-
-        raise SystemError(
-            "Cannot resolve repository root — not inside a git repository"
-        )
+        return find_repo_root()
 
     def _acquire_temporary_worktree(self, issue_number: int) -> Path:
         """Acquire a temporary worktree for supervisor apply execution.

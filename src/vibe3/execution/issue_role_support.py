@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
@@ -20,45 +19,11 @@ from vibe3.roles.definitions import IssueRoleSyncSpec as IssueRoleSyncSpecImpl
 def resolve_orchestra_repo_root() -> Path:
     """Resolve the main repository root for orchestra operations.
 
-    Prioritize git common dir to ensure:
-    1. Worktrees are created under main repo's .worktrees (not nested)
-    2. Shared state (.git/vibe3/) is consistently accessed from main repo
-    3. All orchestra operations reference the canonical repository root
-
-    Never falls back to Path.cwd() or worktree root — those would cause
-    nested-worktree creation and wrong-directory DB access.
+    Delegates to find_repo_root() — the single source of truth in git_client.
     """
-    # Primary: git common dir (works in both main repo and worktrees)
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
+    from vibe3.clients.git_client import find_repo_root
 
-    # Fallback: parse .git file to find main repo from worktree pointer
-    # In a worktree, .git is a file containing "gitdir: /path/.git/worktrees/name"
-    cwd = Path.cwd()
-    git_path = cwd / ".git"
-    if git_path.is_file():
-        try:
-            content = git_path.read_text().strip()
-            if content.startswith("gitdir: "):
-                gitdir = Path(content[len("gitdir: ") :])
-                return gitdir.parent.parent.parent
-        except Exception:
-            pass
-
-    # If .git is a directory, cwd IS the main repo
-    if git_path.is_dir():
-        return cwd
-
-    # Last resort: walk up to find .git directory
-    for parent in cwd.parents:
-        if (parent / ".git").is_dir():
-            return parent
-
-    raise SystemError("Cannot resolve repository root — not inside a git repository")
+    return find_repo_root()
 
 
 def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:
