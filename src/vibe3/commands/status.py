@@ -108,7 +108,6 @@ def status(
         render_pr_ref_items,
         render_remote_items,
         render_rfc_items,
-        render_scene_sections,
         render_supervisor_issues,
     )
 
@@ -251,15 +250,32 @@ def status(
         and supervisor_label not in cast(list[str], item.get("labels", []))
     ]
     roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
-    missing_state_items = [
+
+    # Split missing state items into two categories:
+    # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
+    # 2. Governed but anomaly (has orchestra-governed label) - needs attention
+    waiting_for_pool_items = [
         item
         for item in orchestrated_issues
         if item.get("state") is None
         and supervisor_label not in cast(list[str], item.get("labels", []))
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" not in cast(list[str], item.get("labels", []))
     ]
-    missing_state_numbers = {cast(int, item["number"]) for item in missing_state_items}
+    governed_anomaly_items = [
+        item
+        for item in orchestrated_issues
+        if item.get("state") is None
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" in cast(list[str], item.get("labels", []))
+    ]
+    missing_state_numbers = {
+        cast(int, item["number"])
+        for item in waiting_for_pool_items + governed_anomaly_items
+    }
 
     task_progress_items = [
         item
@@ -322,7 +338,7 @@ def status(
         and cast(int, item["number"]) not in supervisor_numbers
     ]
 
-    render_missing_state_items(missing_state_items)
+    render_missing_state_items(waiting_for_pool_items, governed_anomaly_items)
     render_rfc_items(roadmap_rfc_items)
     render_epic_items(roadmap_epic_items)
     render_blocked_items(blocked_items)
@@ -334,8 +350,3 @@ def status(
             if getattr(flow, "flow_status", "active") in {"done", "aborted", "merged"}
         ]
         render_completed_flows(completed_flows)
-
-    worktree_map = query_service.fetch_worktree_map()
-
-    if flows:
-        render_scene_sections(flows, worktree_map)

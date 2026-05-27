@@ -299,7 +299,7 @@ def test_task_status_shows_missing_state_label_section(
 
     assert result.exit_code == 0
     output = result.output
-    assert "Missing State Label:" in output
+    assert "Missing State Label - Waiting for Assignee Pool:" in output
     assert "# 901" in output
     assert "Missing state label issue" in output
     assert "Roadmap Epic:" in output

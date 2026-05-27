@@ -339,19 +339,48 @@ def render_completed_flows(completed_flows: list[FlowStatusResponse]) -> None:
 
 
 def render_missing_state_items(
-    missing_state_items: list[dict[str, object]],
+    waiting_for_pool_items: list[dict[str, object]],
+    governed_anomaly_items: list[dict[str, object]],
 ) -> None:
-    """Render issues that are relevant to the dashboard but have no state label."""
-    console.print("\n[bold cyan]Missing State Label:[/]")
-    if missing_state_items:
-        for item in missing_state_items:
+    """Render issues that are relevant to the dashboard but have no state label.
+
+    Splits into two categories:
+    1. Waiting for Assignee Pool: Issues with manager assignee
+       but no orchestra-governed label
+    2. Governed but Anomaly: Issues with orchestra-governed label
+       but still missing state
+    """
+    # Render waiting for assignee pool (normal)
+    console.print("\n[bold cyan]Missing State Label - Waiting for Assignee Pool:[/]")
+    if waiting_for_pool_items:
+        for item in waiting_for_pool_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
+            assignee = cast(str | None, item.get("assignee"))
             display_title = title[:60] + ("..." if len(title) > 60 else "")
-            reasons = cast(list[str], item.get("dispatch_exclusion_messages", []))
-            console.print(f"  #{number:4}  [yellow]NO STATE  [/]  {display_title}")
-            if reasons:
-                console.print(f"         [yellow]reason:[/] {', '.join(reasons)}")
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            console.print(
+                f"  #{number:4}  [yellow]NO STATE  [/]  {display_title}{assignee_str}"
+            )
+    else:
+        console.print("  [dim](none)[/]")
+
+    # Render governed but anomaly (needs attention)
+    console.print("\n[bold cyan]Missing State Label - Governed but Anomaly:[/]")
+    if governed_anomaly_items:
+        for item in governed_anomaly_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            assignee = cast(str | None, item.get("assignee"))
+            display_title = title[:60] + ("..." if len(title) > 60 else "")
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            console.print(
+                f"  #{number:4}  [red]NO STATE  [/]  {display_title}{assignee_str}"
+            )
+            console.print(
+                "         [yellow]⚠️  orchestra-governed label present"
+                " but state missing[/]"
+            )
     else:
         console.print("  [dim](none)[/]")
 
