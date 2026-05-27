@@ -213,6 +213,42 @@ class TestRemoteField:
         assert result[0]["remote"] is False
         assert result[0]["state"] == IssueState.BLOCKED
 
+    def test_keeps_no_state_items_with_dispatch_exclusion_reasons(self) -> None:
+        """Issues without state/* should still be returned for dashboard
+        classification."""
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "Missing state epic",
+                "labels": [{"name": "roadmap/epic"}],
+                "assignees": [],
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "Ready queue item",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+            },
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=[],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        assert [item["number"] for item in result] == [202, 201]
+        assert result[0]["dispatch_exclusion_codes"] == []
+        assert result[1]["state"] is None
+        assert result[1]["dispatch_exclusion_codes"] == [
+            "missing_state_label",
+            "roadmap_epic",
+            "missing_manager_assignee",
+        ]
+
     def test_handoff_state_remote(self) -> None:
         """HANDOFF state with manager assignee and no flow should be remote."""
         service = self._make_mock_service()

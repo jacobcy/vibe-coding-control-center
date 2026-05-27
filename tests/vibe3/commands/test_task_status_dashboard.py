@@ -221,6 +221,89 @@ def test_task_status_hides_missing_blocked_issue_number(
     assert "#None" not in result.output
 
 
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_task_status_shows_missing_state_label_section(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """task status should show issues without state/* in a dedicated section."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 901,
+            "title": "Missing state label issue",
+            "state": None,
+            "assignee": None,
+            "flow": None,
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "dispatch_exclusion_codes": ["missing_state_label"],
+            "dispatch_exclusion_messages": ["missing state/* label"],
+            "remote": False,
+        },
+        {
+            "number": 902,
+            "title": "Roadmap epic without state",
+            "state": None,
+            "assignee": None,
+            "flow": None,
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": "epic",
+            "priority": 0,
+            "labels": ["roadmap/epic"],
+            "dispatch_exclusion_codes": ["missing_state_label", "roadmap_epic"],
+            "dispatch_exclusion_messages": ["missing state/* label", "roadmap epic"],
+            "remote": False,
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Missing State Label:" in output
+    assert "# 901" in output
+    assert "Missing state label issue" in output
+    assert "Roadmap Epic:" in output
+    assert "Roadmap epic without state" in output
+    assert output.count("Roadmap epic without state") == 1
+
+
 class TestResolveServerLabel:
     """Tests for _resolve_server_label covering all branches."""
 

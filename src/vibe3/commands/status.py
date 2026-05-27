@@ -103,6 +103,7 @@ def status(
         render_completed_flows,
         render_epic_items,
         render_issue_progress,
+        render_missing_state_items,
         render_pr_ref_items,
         render_remote_items,
         render_rfc_items,
@@ -162,6 +163,7 @@ def status(
             queued_set,
             stale_flows=[],
             manager_usernames=config.get_manager_usernames(),
+            supervisor_label=config.supervisor_handoff.issue_label,
         )
 
         output_data = {
@@ -223,6 +225,7 @@ def status(
         queued_set,
         stale_flows=stale_flows,
         manager_usernames=config.get_manager_usernames(),
+        supervisor_label=config.supervisor_handoff.issue_label,
     )
 
     supervisor_label = config.supervisor_handoff.issue_label
@@ -233,11 +236,38 @@ def status(
     ]
     supervisor_numbers = {cast(int, item["number"]) for item in supervisor_items}
 
+    roadmap_rfc_items = [
+        item
+        for item in orchestrated_issues
+        if "roadmap/rfc" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+    ]
+    roadmap_rfc_numbers = {cast(int, item["number"]) for item in roadmap_rfc_items}
+    roadmap_epic_items = [
+        item
+        for item in orchestrated_issues
+        if "roadmap/epic" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+    ]
+    roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
+    missing_state_items = [
+        item
+        for item in orchestrated_issues
+        if item.get("state") is None
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+    ]
+    missing_state_numbers = {cast(int, item["number"]) for item in missing_state_items}
+
     task_progress_items = [
         item
         for item in orchestrated_issues
         if _include_issue_in_task_progress(item)
         and cast(int, item["number"]) not in supervisor_numbers
+        and cast(int, item["number"]) not in roadmap_rfc_numbers
+        and cast(int, item["number"]) not in roadmap_epic_numbers
+        and cast(int, item["number"]) not in missing_state_numbers
     ]
 
     # Separate remote and non-remote items for rendering
@@ -282,28 +312,18 @@ def status(
     ]
     render_pr_ref_items(pr_ref_items)
 
-    # Separate RFC/Epic items from regular blocked items
-    rfc_items = [
-        item
-        for item in task_progress_items
-        if "roadmap/rfc" in cast(list[str], item.get("labels", []))
-    ]
-    epic_items = [
-        item
-        for item in task_progress_items
-        if "roadmap/epic" in cast(list[str], item.get("labels", []))
-    ]
-
     blocked_items = [
         item
-        for item in task_progress_items
+        for item in orchestrated_issues
         if cast(IssueState, item["state"]) == IssueState.BLOCKED
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and cast(int, item["number"]) not in supervisor_numbers
     ]
 
-    render_rfc_items(rfc_items)
-    render_epic_items(epic_items)
+    render_missing_state_items(missing_state_items)
+    render_rfc_items(roadmap_rfc_items)
+    render_epic_items(roadmap_epic_items)
     render_blocked_items(blocked_items)
 
     if all_flows:
