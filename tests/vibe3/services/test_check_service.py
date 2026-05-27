@@ -46,11 +46,30 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         "state": "open",
     }
 
-    with patch(
-        "vibe3.services.task_resume_operations.TaskResumeOperations"
-    ) as mock_resume_ops_cls:
+    with (
+        patch(
+            "vibe3.services.task_resume_operations.TaskResumeOperations"
+        ) as mock_resume_ops_cls,
+        patch(
+            "vibe3.services.flow_orchestrator_service.FlowOrchestratorService"
+        ) as mock_orchestrator_cls,
+        patch("vibe3.services.handoff_service.HandoffService") as mock_handoff_cls,
+        patch("vibe3.services.issue_context_loader.load_issue_info") as mock_load_issue,
+    ):
         mock_resume_ops = MagicMock()
         mock_resume_ops_cls.return_value = mock_resume_ops
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator_cls.return_value = mock_orchestrator
+
+        mock_handoff = MagicMock()
+        mock_handoff_cls.return_value = mock_handoff
+
+        # Mock issue info
+        from vibe3.models.orchestration import IssueInfo
+
+        mock_issue_info = IssueInfo(number=456, title="Test Issue", labels=[])
+        mock_load_issue.return_value = mock_issue_info
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
@@ -59,6 +78,12 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         call_kwargs = mock_resume_ops.reset_issue_to_ready.call_args[1]
         assert call_kwargs["issue_number"] == 456
         assert call_kwargs["resume_kind"] == "pr_closed"
+
+        # Verify flow rebuild was attempted
+        mock_orchestrator.bootstrap_issue_flow.assert_called_once()
+
+        # Verify handoff milestone was recorded
+        mock_handoff.append_current_handoff.assert_called_once()
 
         # Verify result is valid and handled
         assert handled is True
