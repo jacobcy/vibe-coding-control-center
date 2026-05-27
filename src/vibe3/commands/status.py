@@ -164,6 +164,7 @@ def status(
             queued_set,
             stale_flows=[],
             manager_usernames=get_manager_usernames(config),
+            supervisor_label=config.supervisor_handoff.issue_label,
         )
 
         output_data = {
@@ -225,6 +226,7 @@ def status(
         queued_set,
         stale_flows=stale_flows,
         manager_usernames=get_manager_usernames(config),
+        supervisor_label=config.supervisor_handoff.issue_label,
     )
 
     supervisor_label = config.supervisor_handoff.issue_label
