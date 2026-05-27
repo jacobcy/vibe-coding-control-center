@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
 
@@ -21,6 +21,9 @@ from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.handoff_validation import validate_authoritative_ref
 from vibe3.services.path_helpers import _SHARED_HANDOFF_PREFIX
 from vibe3.services.signature_service import SignatureService
+
+if TYPE_CHECKING:
+    from vibe3.clients.github_client import GitHubClient
 
 
 class HandoffService:
@@ -90,9 +93,20 @@ class HandoffService:
         self,
         store: SQLiteClient | None = None,
         git_client: GitPathProtocol | None = None,
+        github_client: "GitHubClient | None" = None,
     ) -> None:
+        """Initialize handoff service.
+
+        Args:
+            store: SQLite client for database operations
+            git_client: Git client for branch/worktree operations
+            github_client: GitHub client for API operations (optional)
+        """
+        from vibe3.clients.github_client import GitHubClient
+
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
+        self.github_client = github_client or GitHubClient()
         self.storage = HandoffStorage(self.git_client)
         self.external_recorder = ExternalEventRecorder(
             self.store,
@@ -181,9 +195,48 @@ class HandoffService:
             target_branch,
             explicit_actor=actor,
         )
-        return self.storage.append_current_handoff(
+
+        # 1. Write to handoff file
+        handoff_path = self.storage.append_current_handoff(
             message, effective_actor, kind, branch
         )
+
+        # 2. Record timeline event for milestone handoff updates
+        # Query issue_number from branch → issue link
+        issue_links = self.store.get_issue_links(target_branch)
+        issue_number: int | None = None
+        for link in issue_links:
+            if link.get("issue_role") == "task":
+                issue_number = link.get("issue_number")
+                if isinstance(issue_number, int):
+                    break
+
+        # 3. Call FlowTimelineService to record event and optionally write comment
+        if issue_number:
+            from vibe3.services.flow_timeline_service import FlowTimelineService
+
+            timeline_service = FlowTimelineService(
+                store=self.store,
+                github_client=self.github_client,
+            )
+
+            timeline_service.record_timeline_event(
+                branch=target_branch,
+                event_type="handoff_append",
+                actor=effective_actor,
+                detail=message,
+                issue_number=issue_number,
+            )
+        else:
+            # No issue_number → only record SQLite event, skip comment
+            self.store.add_event(
+                target_branch,
+                "handoff_append",
+                effective_actor,
+                detail=message,
+            )
+
+        return handoff_path
 
     def _resolve_branch_worktree_root(self, branch: str) -> Path:
         worktree_root = self.git_client.find_worktree_path_for_branch(branch)
