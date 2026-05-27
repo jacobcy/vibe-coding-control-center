@@ -530,8 +530,8 @@ gh issue edit 123 --add-label "supervisor" --add-label "priority/7" --add-label 
 
 **示例**：
 ```bash
-# 标记 Orchestra 谘度问题
-gh issue edit 124 --add-label "orchestra" --add-label "type/feature" --add-label "roadmap/p1"
+# 标记 Orchestra 谘度问题（已由 intake 层审查）
+gh issue edit 124 --add-label "orchestra-scanned" --add-label "type/feature" --add-label "roadmap/p1"
 ```
 
 #### tech-debt 标签

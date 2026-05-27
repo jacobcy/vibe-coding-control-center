@@ -105,7 +105,11 @@ def build_broader_repo_entries(
             continue
 
         labels = normalize_labels(item.get("labels"))
-        if "supervisor" in labels or "orchestra" in labels:
+        if (
+            "supervisor" in labels
+            or "orchestra-scanned" in labels
+            or "orchestra-governed" in labels
+        ):
             continue
 
         assignees = normalize_assignees(item.get("assignees"))
@@ -141,23 +145,23 @@ def build_broader_repo_entries(
 def get_orchestra_labeled_issue_numbers(
     github: GitHubClient, config: OrchestraConfig
 ) -> set[int]:
-    """Fetch issue numbers that have the orchestra label.
+    """Fetch issue numbers that have the orchestra-governed label.
 
-    The orchestra label marks issues that have been reviewed by governance
-    and should be skipped in future governance scans.
+    The orchestra-governed label marks issues that have been decided by the
+    assignee-pool layer and should be skipped in future pool scans.
 
     Args:
         github: GitHubClient instance for API calls
         config: OrchestraConfig with repo information
 
     Returns:
-        Set of issue numbers that have orchestra label
+        Set of issue numbers that have orchestra-governed label
     """
     orchestra_issues = github.list_issues(
-        label="orchestra",
+        label="orchestra-governed",
         state="open",
         repo=config.repo,
-        limit=5000,  # Fetch all orchestra-labeled issues to avoid truncation
+        limit=5000,  # Fetch all governed issues to avoid truncation
     )
     numbers: set[int] = set()
     for item in orchestra_issues:

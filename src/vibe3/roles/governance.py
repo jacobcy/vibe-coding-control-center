@@ -181,7 +181,7 @@ def build_governance_snapshot_context(
     skipped_count = len(active_entries) - len(filtered_entries)
     if skipped_count > 0:
         logger.bind(domain="governance").info(
-            f"Filtered {skipped_count} orchestra-labeled issues from governance scan"
+            f"Filtered {skipped_count} orchestra-governed issues from pool scan"
         )
 
     return build_issue_context(
