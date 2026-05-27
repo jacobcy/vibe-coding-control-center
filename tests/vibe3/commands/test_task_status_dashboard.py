@@ -25,6 +25,7 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
     )
 
 
+@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -34,6 +35,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
+    mock_get_manager_usernames,
 ) -> None:
     """task status should keep intake, ready queue, and ready anomalies separate."""
     config_mock = MagicMock()
@@ -42,7 +44,6 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     config_mock.port = 1234
     config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
     config_mock.manager_usernames = ["manager-bot"]
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -121,6 +122,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     assert "non-manager assignee" in output
 
 
+@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -130,6 +132,7 @@ def test_task_status_shows_flows_with_prs(
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
+    mock_get_manager_usernames,
 ) -> None:
     """task status should show flows that have a PR reference."""
     config_mock = MagicMock()
@@ -138,7 +141,6 @@ def test_task_status_shows_flows_with_prs(
     config_mock.port = 1234
     config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
     config_mock.manager_usernames = ["manager-bot"]
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -176,6 +178,7 @@ def test_task_status_shows_flows_with_prs(
     assert "PR: https://github.com/openai/vibe-center/pull/1" in result.output
 
 
+@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -185,6 +188,7 @@ def test_task_status_hides_missing_blocked_issue_number(
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
+    mock_get_manager_usernames,
 ) -> None:
     """task status should not render '#None' when failed gate has no issue number."""
     config_mock = MagicMock()
@@ -193,7 +197,6 @@ def test_task_status_hides_missing_blocked_issue_number(
     config_mock.port = 1234
     config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
     config_mock.manager_usernames = ["manager-bot"]
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -363,6 +366,7 @@ class TestComputeEffectiveServerRunning:
         assert self._call(snapshot_running=False, pid_valid=False) is False
 
 
+@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -372,6 +376,7 @@ def test_task_status_shows_remote_tasks_section(
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
+    mock_get_manager_usernames,
 ) -> None:
     """task status should show remote tasks in a separate section."""
     config_mock = MagicMock()
@@ -380,7 +385,6 @@ def test_task_status_shows_remote_tasks_section(
     config_mock.port = 1234
     config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
     config_mock.manager_usernames = ["manager-bot"]
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,

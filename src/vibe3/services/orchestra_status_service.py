@@ -12,6 +12,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_reader import FlowReader
@@ -456,7 +457,7 @@ class OrchestraStatusService:
         seen_numbers: set[int] = set()
         issues: list[dict] = []
 
-        for username in self.config.get_manager_usernames():
+        for username in get_manager_usernames(self.config):
             try:
                 result = self._github.list_issues(
                     state="open",

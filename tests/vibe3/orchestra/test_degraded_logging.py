@@ -24,7 +24,11 @@ def reset_degraded_manager():
     DegradedModeManager.reset()
 
 
-def test_dispatch_logs_degraded_mode():
+@patch(
+    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
     """Test that dispatch logs when degraded mode is entered during qualification."""
     # Setup mocks
     mock_github = MagicMock()
@@ -38,7 +42,7 @@ def test_dispatch_logs_degraded_mode():
     mock_config.repo = "test/repo"
     mock_config.max_concurrent_flows = 1
     mock_config.max_retry_budget = 3
-    mock_config.get_manager_usernames.return_value = ["manager-bot"]
+    mock_config.manager_usernames = ["manager-bot"]
     # Mock supervisor_handoff with issue_label
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"
@@ -135,7 +139,11 @@ def test_dispatch_logs_degraded_mode():
                     assert any_call_has_issue_123
 
 
-def test_dispatch_no_log_when_not_degraded():
+@patch(
+    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
     """Test that dispatch does not log degraded mode when not entered."""
     # Setup mocks
     mock_github = MagicMock()
@@ -149,7 +157,7 @@ def test_dispatch_no_log_when_not_degraded():
     mock_config.repo = "test/repo"
     mock_config.max_concurrent_flows = 1
     mock_config.max_retry_budget = 3
-    mock_config.get_manager_usernames.return_value = ["manager-bot"]
+    mock_config.manager_usernames = ["manager-bot"]
     # Mock supervisor_handoff with issue_label
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"

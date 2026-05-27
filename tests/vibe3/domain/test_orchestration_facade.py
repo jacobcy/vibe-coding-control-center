@@ -158,6 +158,9 @@ class TestOrchestrationFacade:
         assert "dispatch blocked by failed gate" in mock_append_event.call_args.args[1]
 
     @pytest.mark.asyncio
+    @patch(
+        "vibe3.roles.supervisor.get_handoff_state_label", return_value="state/handoff"
+    )
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.clients.github_client.GitHubClient.list_issues")
     @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
@@ -166,6 +169,7 @@ class TestOrchestrationFacade:
         mock_load_config: MagicMock,
         mock_list_issues: MagicMock,
         mock_publish: MagicMock,
+        mock_get_handoff_state_label: MagicMock,
     ) -> None:
         """Test that on_supervisor_scan publishes SupervisorIssueIdentified events."""
         mock_load_config.return_value = MagicMock(
@@ -174,7 +178,6 @@ class TestOrchestrationFacade:
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
                 interval_ticks=1,
-                get_handoff_state_label=MagicMock(return_value="state/handoff"),
             ),
         )
         mock_list_issues.return_value = [

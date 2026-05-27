@@ -18,6 +18,7 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -162,7 +163,7 @@ def status(
             flows,
             queued_set,
             stale_flows=[],
-            manager_usernames=config.get_manager_usernames(),
+            manager_usernames=get_manager_usernames(config),
             supervisor_label=config.supervisor_handoff.issue_label,
         )
 
@@ -224,7 +225,7 @@ def status(
         flows,
         queued_set,
         stale_flows=stale_flows,
-        manager_usernames=config.get_manager_usernames(),
+        manager_usernames=get_manager_usernames(config),
         supervisor_label=config.supervisor_handoff.issue_label,
     )
 
@@ -292,7 +293,7 @@ def status(
         bucket = classify_task_status(
             state,
             cast(str | None, item.get("assignee")),
-            config.get_manager_usernames(),
+            get_manager_usernames(config),
         )
         bucketed_items[bucket].append(item)
 
