@@ -37,9 +37,3 @@ _keys_load() {
     return 0
 }
 _keys_load "${HOME}/.vibe/config/keys.env"
-
-# ---------- UV_PROJECT_ENVIRONMENT ----------
-# Fallback so `uv run` from external project dirs doesn't create .venv in $PWD.
-if [[ -z "$UV_PROJECT_ENVIRONMENT" && -d "$HOME/.venvs/vibe-center" ]]; then
-    export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"
-fi

@@ -46,6 +46,16 @@ _append_to_rc() {
     fi
 }
 
+_write_file_if_changed() {
+    local path="$1"
+    local content="$2"
+    local current=""
+    [[ -f "$path" ]] && current="$(<"$path")"
+    if [[ "$current" != "$content" ]]; then
+        printf '%s\n' "$content" > "$path"
+    fi
+}
+
 _get_shell_rc() {
     case "$SHELL" in
         */zsh) echo "$HOME/.zshrc" ;;
@@ -232,24 +242,43 @@ log_info "Updating $RC_FILE..."
 if [[ -f "$RC_FILE" ]]; then
     # 兼容macOS和Linux的sed语法
     if [[ "$(uname)" == "Darwin" ]]; then
-        sed -i '' '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/# Vibe Center - codeagent-wrapper PATH/,+1 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/# Load Vibe keys/,+5 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/# Vibe Coding Control Center - Loader/d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '' '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '' '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '' '/Vibe Local Bin/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/^export VIBE_ROOT=/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/# Vibe Local Bin/,+1 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/# Vibe Direnv Hook/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/direnv hook /d' "$RC_FILE" 2>/dev/null || true
     else
-        sed -i '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/# Vibe Center - codeagent-wrapper PATH/,+1 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/# Load Vibe keys/,+5 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/# Vibe Coding Control Center - Loader/d' "$RC_FILE" 2>/dev/null || true
         sed -i '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '/Vibe Local Bin/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/^export VIBE_ROOT=/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/# Vibe Local Bin/,+1 d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/# Vibe Direnv Hook/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/direnv hook /d' "$RC_FILE" 2>/dev/null || true
     fi
 fi
 
 # 添加环境变量
-_append_to_rc "$RC_FILE" "export VIBE_ROOT=\"$SOURCE_ROOT\"" "Vibe Coding Control Center - Root"
+_append_to_rc "$RC_FILE" 'export PATH="$HOME/.claude/bin:$PATH"' "Vibe Center - codeagent-wrapper PATH"
+_append_to_rc "$RC_FILE" $'if [[ -f ~/.vibe/config/keys.env ]]; then\n    set -a\n    source ~/.vibe/config/keys.env 2>/dev/null || true\n    set +a\nfi' "Load Vibe keys"
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center - Loader"
 _append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
+if [[ "$SHELL" == */bash ]]; then
+    _append_to_rc "$RC_FILE" 'command -v direnv >/dev/null 2>&1 && eval "$(direnv hook bash)"' "Vibe Direnv Hook"
+else
+    _append_to_rc "$RC_FILE" 'command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"' "Vibe Direnv Hook"
+fi
+
+if command -v gh >/dev/null 2>&1; then
+    gh config set prompt disabled >/dev/null 2>&1 || true
+    gh config set pager cat >/dev/null 2>&1 || true
+fi
 
 # 7. uv环境与Python依赖安装
 _setup_uv_environment() {
@@ -269,9 +298,16 @@ _setup_uv_environment() {
         log_info "Global venv already exists at $venv_path"
     fi
 
-    local uv_env_export='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
-    _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
     export UV_PROJECT_ENVIRONMENT="$venv_path"
+
+    local envrc_content='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
+    _write_file_if_changed "$SOURCE_ROOT/.envrc" "$envrc_content"
+    if command -v direnv >/dev/null 2>&1; then
+        (
+            cd "$SOURCE_ROOT" &&
+                direnv allow . >/dev/null 2>&1 || true
+        )
+    fi
 
     # 安装项目依赖
     log_info "Installing Python dependencies..."
@@ -281,7 +317,7 @@ _setup_uv_environment() {
 
     # 安装项目本身
     log_info "Installing Vibe CLI package..."
-    "$VIBE_UV_BIN" pip install -e .
+    "$VIBE_UV_BIN" tool install --editable .
     log_success "Vibe CLI installed successfully"
 }
 
