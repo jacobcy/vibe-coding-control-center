@@ -172,12 +172,24 @@ class FlowCleanupService:
         return results
 
     def _remove_worktree(self, branch: str, results: dict[str, bool]) -> None:
-        """Remove worktree if exists."""
+        """Remove worktree if exists, with prune fallback for orphan metadata."""
         try:
             worktree_path = self.git_client.find_worktree_path_for_branch(branch)
             if worktree_path:
-                self.git_client.remove_worktree(str(worktree_path), force=True)
-                logger.bind(domain="cleanup", branch=branch).debug("Removed worktree")
+                try:
+                    self.git_client.remove_worktree(str(worktree_path), force=True)
+                    logger.bind(domain="cleanup", branch=branch).debug(
+                        "Removed worktree"
+                    )
+                except Exception as exc:
+                    logger.bind(domain="cleanup", branch=branch).warning(
+                        f"Failed to remove worktree, trying prune: {exc}"
+                    )
+                    from vibe3.clients.git_worktree_ops import prune_worktrees
+
+                    prune_worktrees()
+                    # Mark as failed even after prune - prune is just cleanup
+                    results["worktree"] = False
         except Exception as exc:
             logger.bind(domain="cleanup", branch=branch).warning(
                 f"Failed to remove worktree: {exc}"
