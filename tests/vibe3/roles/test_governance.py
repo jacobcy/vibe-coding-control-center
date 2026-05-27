@@ -468,19 +468,19 @@ class TestBuildSnapshotContext:
     def test_orchestra_labeled_issues_filtered_from_assignee_pool(
         self, mock_github_cls
     ):
-        """Issues with orchestra label should be filtered from assignee pool."""
+        """Issues with orchestra-governed should be filtered from pool scan."""
         snapshot = _make_snapshot()
         config = _make_config()
         mock_github = MagicMock()
 
-        # Mock orchestra-labeled issues (should be filtered)
+        # Mock orchestra-governed issues (should be filtered from pool scan)
         mock_github.list_issues.return_value = [
             {
                 "number": 100,
-                "title": "Already reviewed",
+                "title": "Already decided",
                 "body": "",
                 "assignees": [],
-                "labels": [{"name": "orchestra"}],
+                "labels": [{"name": "orchestra-governed"}],
                 "milestone": None,
             },
         ]
@@ -524,7 +524,15 @@ class TestBuildSnapshotContext:
 
     @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_broader_repo_filters_orchestra_labeled(self, mock_github_cls):
-        """Broader repo candidates should filter orchestra-labeled issues."""
+        """Broader repo candidates should filter all governance-labeled issues.
+
+        Covers the three-layer filter + legacy compat alias:
+        - orchestra-scanned: intake self-closure
+        - orchestra-governed: pool defensive filter (close/rfc with assignee
+          removed)
+        - orchestra: legacy umbrella alias (historical issues; sync-labels.sh
+          is non-destructive)
+        """
         snapshot = _make_snapshot()
         config = _make_config()
         mock_github = MagicMock()
@@ -534,7 +542,7 @@ class TestBuildSnapshotContext:
                 "title": "Fix bug",
                 "body": "Clear scope",
                 "assignees": [],
-                "labels": [{"name": "orchestra"}],  # Should be filtered
+                "labels": [{"name": "orchestra-scanned"}],  # Should be filtered
                 "milestone": None,
             },
             {
@@ -543,6 +551,22 @@ class TestBuildSnapshotContext:
                 "body": "Clear scope",
                 "assignees": [],
                 "labels": [{"name": "type/fix"}],  # Should pass through
+                "milestone": None,
+            },
+            {
+                "number": 203,
+                "title": "Already governed",
+                "body": "Pool decided",
+                "assignees": [],
+                "labels": [{"name": "orchestra-governed"}],  # Should be filtered
+                "milestone": None,
+            },
+            {
+                "number": 204,
+                "title": "Legacy labeled",
+                "body": "Historical issue",
+                "assignees": [],
+                "labels": [{"name": "orchestra"}],  # Legacy alias — should be filtered
                 "milestone": None,
             },
         ]
@@ -555,6 +579,8 @@ class TestBuildSnapshotContext:
         assert ctx["active_count"] == 1
         assert "#202" in ctx["suggested_issue_details"]
         assert "#201" not in ctx["suggested_issue_details"]
+        assert "#203" not in ctx["suggested_issue_details"]
+        assert "#204" not in ctx["suggested_issue_details"]
 
     def test_no_orchestra_labeled_issues_no_filtering(self):
         """When no orchestra-labeled issues exist, all candidates pass through."""

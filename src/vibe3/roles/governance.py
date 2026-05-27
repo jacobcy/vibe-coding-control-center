@@ -38,7 +38,7 @@ from vibe3.roles.governance_utils import (
     build_broader_repo_entries,
     build_issue_context,
     find_material_in_catalog,
-    get_orchestra_labeled_issue_numbers,
+    get_governed_issue_numbers,
 )
 
 GOVERNANCE_ROLE = RoleDefinition(
@@ -168,20 +168,18 @@ def build_governance_snapshot_context(
 
     # Default: assignee-pool path
     github = github or GitHubClient()
-    orchestra_labeled_numbers = get_orchestra_labeled_issue_numbers(github, config)
+    governed_numbers = get_governed_issue_numbers(github, config)
 
-    # Filter out orchestra-labeled issues from the active issues
+    # Filter out orchestra-governed issues from the active issues
     active_entries = tuple(snapshot.active_issues)
     filtered_entries = tuple(
-        entry
-        for entry in active_entries
-        if entry.number not in orchestra_labeled_numbers
+        entry for entry in active_entries if entry.number not in governed_numbers
     )
 
     skipped_count = len(active_entries) - len(filtered_entries)
     if skipped_count > 0:
         logger.bind(domain="governance").info(
-            f"Filtered {skipped_count} orchestra-labeled issues from governance scan"
+            f"Filtered {skipped_count} orchestra-governed issues from pool scan"
         )
 
     return build_issue_context(
