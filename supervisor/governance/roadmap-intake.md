@@ -124,22 +124,12 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 
 ### 与 Assignee Pool 的职责边界
 
-**Roadmap Intake（入口层）**：
-- 决策范围：**只决定 accept（分配 assignee）或 skip（打 scanned）**
-- 检查：生命周期、依赖、API、模块
-- 输出：`[governance suggest]` 建议纳入或跳过，附带原因
-- 不设 `roadmap/*`、`priority/*` 标签
-- 边界：intake 不自称 decider；跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
+> 三层决策范围边界见 [supervisor/roadmap-common.md](../roadmap-common.md#三层决策范围边界)。
+> 本节补充 intake 层特有规则。
 
-**Assignee Pool（池内决策层）**：
-- 决策范围：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复）、`roadmap/rfc`（不确定）、resume（明确可恢复）、split（清晰分界）
-- 所有决策完成后打 `orchestra-governed`
-- 边界：pool 是 assignee pool 内的决策 OWNER
-
-**Vibe Roadmap（审查纠正层）**：
-- 审查范围：`roadmap/rfc`、`state/blocked`、未 reviewed 的 issue
-- 可覆盖 pool 的决策（rfc → continue、epic → split 等）
-- 审查完打 `roadmap-reviewed`，写 memory.md
+**Roadmap Intake（入口层）特有约束**：
+- 不设 `roadmap/*`、`priority/*` 标签（属于 pool 层决策范围）
+- Level 0 检查阻塞时，intake 需要添加 `roadmap/rfc` 标签以路由该 issue
 
 ### Supervisor Issue Intake
 
@@ -356,9 +346,11 @@ Forbidden:
 
 ## Comment Contract
 
-任何 intake 类 routing 评论必须遵循 marker 规则：
+> Comment marker 通用规范见 [supervisor/roadmap-common.md](../roadmap-common.md#comment-marker-规范)。
+> 本节补充 intake 特有 marker 用法。
 
-- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
+**intake 特有规则**：
+- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`
 - intake 决策建议用 `[governance suggest]`，因为本材料只产出 routing 信号、不做强制结论
 - 不要把 intake 说明嵌入到自由文本中而不带 marker；缺失 marker 会被人类指令解析器误读为人类指令
 
@@ -412,6 +404,9 @@ Supervisor issues:
 
 ## 治理闭环标签
 
+> 标签定义、过滤逻辑和闭环机制见 [supervisor/roadmap-common.md](../roadmap-common.md)。
+> 本节补充 intake 层特有规则。
+
 **两种结果，不同处理**：
 
 **接受（分配 assignee）**：不设标签。assignee 本身就是信号——issue 进入 pool，由 assignee-pool 层接手。
@@ -425,11 +420,6 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 **目的**：
 - `orchestra-scanned`：intake 层已审查，决定不接受 → 下次扫描自动跳过
 - 接受进入 pool 的 issue 不打 scanned，靠 assignee 信号自然流入 assignee-pool 层
-
-**三层标签协作**：
-- `orchestra-scanned`：intake 层审查通过但**不接**（跳过）
-- `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
-- `roadmap-reviewed`：roadmap decider 已审查
 
 ## Stop Point
 

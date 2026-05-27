@@ -269,32 +269,14 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 #### 治理闭环标签
 
-三层标签各自闭环，由不同角色在不同阶段打上：
+> 三层标签的完整定义、过滤逻辑和闭环机制见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md)。
 
-| 标签名称 | 角色 | 打标签时机 | 语义 |
-| -------- | ---- | ---------- | ---- |
-| `orchestra-scanned` | roadmap-intake（入口层） | intake 审查后**跳过**时 | "已审查，不纳入"——下次 intake 自动跳过 |
-| `orchestra-governed` | assignee-pool（池内层） | pool 决策完成后 | "已决策"——下次 pool 扫描自动跳过 |
-| `roadmap-reviewed` | vibe-roadmap（审查层） | roadmap 审查完成后 | "已审查"——下次 Step 0 自动跳过 |
+本节补充 roadmap 层特有规则：
 
-**闭环流程（三层）**：
-```
-broader repo ──→ intake 扫描 ──→ 接受(assignee) ──→ pool 扫描 ──→ 决策(rfc/epic/ready)
-                     │ 跳过                               │
-                     ▼                                    ▼
-              orchestra-scanned                   orchestra-governed
-              (下次 intake 跳过)                  (下次 pool 跳过)
-                                                        │
-                                                        ▼
-                                        vibe-roadmap Step 0 ──→ 审查
-                                                                    │
-                                                                    ▼
-                                                            roadmap-reviewed
-                                                            (下次 roadmap 跳过)
-                                                                    │
-                                                                    ▼
-                                                              memory.md 缓存
-```
+**roadmap-reviewed 标签使用**：
+- 在写完 `[roadmap decision]` 评论后，如果 decision 不是 `rfc`，**必须**打 `roadmap-reviewed` 标签
+- 如果 decision 是 `rfc`，**不打** `roadmap-reviewed`（保留 `roadmap/rfc` 标签等待人类决策）
+- 命令：`gh issue edit <issue-number> --add-label "roadmap-reviewed"`
 
 ### Milestone 管理
 
@@ -675,6 +657,9 @@ Agent 应通过以下方式使用标签触发机制：
 - 不要自行 fallback 到直接修改数据库
 
 ## Comment Marker Contract
+
+> Comment marker 通用规范见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#comment-marker-规范)。
+> 本节补充 roadmap-decider 特有规则。
 
 ### 角色定位
 

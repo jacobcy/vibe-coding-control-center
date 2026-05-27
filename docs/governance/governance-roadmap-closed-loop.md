@@ -6,6 +6,11 @@
 
 ---
 
+> **真源指针**: 三层架构、标签语义、过滤逻辑和 comment marker 的权威定义位于 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md)。
+> 本文档是面向人类的说明性文档，供理解整体机制使用。agent 治理材料应优先读取 supervisor/roadmap-common.md。
+
+---
+
 ## 概述
 
 Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有独立的标签实现闭环，防止重复处理。

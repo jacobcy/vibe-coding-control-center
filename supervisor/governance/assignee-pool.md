@@ -449,15 +449,17 @@ Exit:
 如果当前没有合适的建议 issue，明确写无，并说明原因。
 
 **orchestra-governed 标签要求**：
+
+> 三层标签的完整定义和过滤逻辑见 [supervisor/roadmap-common.md](../roadmap-common.md)。
+
 - 完成 issue 决策后（不管结论是 rfc/epic/ready/close），**必须**立即添加 `orchestra-governed` 标签
 - `orchestra-governed` 标签表示该 issue 已经过 assignee-pool 层决策，作为"已决策"标记
 - 如果需要重新决策某个 issue，应先移除 `orchestra-governed` 标签（人类也可以手动移除）
-- 与三层标签配合实现治理闭环：
-  - `orchestra-scanned`：intake 层已审查，不接受（跳过）
-  - `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
-  - `roadmap-reviewed`：roadmap decider 已审查
 
 ## Comment Contract
+
+> Comment marker 通用规范见 [supervisor/roadmap-common.md](../roadmap-common.md#comment-marker-规范)。
+> 本节补充 pool 层特有的 suggest 类型定义。
 
 治理建议以 `[governance suggest]` 署名写入 issue comment。
 
