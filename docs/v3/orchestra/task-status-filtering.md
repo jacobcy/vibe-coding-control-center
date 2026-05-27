@@ -10,41 +10,54 @@
 ## 完整决策树
 
 ```
-orchestrated_issues (所有 open issue)
-│
-├── [规则0] state == BLOCKED ──────────► Blocked Issues（独立展示，不管谁做的）
-│
-├── [规则0] flow.pr_ref 存在 ──────────► Flows with PRs（已完成/待合入）
-│
-├── [规则1] roadmap/rfc ───────────────► RFC（人类决策，始终展示）
-├── [规则1] roadmap/epic ──────────────► Epic（umbrella issue，始终展示）
-│
-├── supervisor label ──────────────────► Supervisor Issues（独立展示）
-│
-└── 剩余 issue 进入主流程过滤:
-    │
-    ├── 无 state 标签（没进过主流程）
-    │   │
-    │   ├── [规则4] 无 assignee ────────────► SKIP 不展示
-    │   │                                      roadmap-intake 没收进来
-    │   │
-    │   └── assignee 是本机 manager:
-    │       ├── [规则7] 有 orchestra-governed ─► State Missing 异常
-    │       └── [规则5] 无 orchestra-governed ─► Waiting Governance
-    │
-    └── 有 state 标签（进过主流程）
-        │
-        ├── state == READY
-        │   ├── [规则2] 无 assignee ────────────► Ready Exception
-        │   ├── [规则2] assignee ≠ 本机 manager ─► Ready Exception
-        │   └── [规则8+9] assignee = 本机 manager
-        │       ├── 有 governed ──► Ready Queue（等 manager 启动）
-        │       └── 无 governed ──► Ready Queue（等 manager 启动）
-        │
-        └── state ∈ {CLAIMED, HANDOFF, IN_PROGRESS, REVIEW}
-            ├── [规则2] 无 assignee ────────────► Active Exception
-            ├── [规则3] assignee ≠ 本机 manager ─► Remote Tasks
-            └── [规则9] assignee = 本机 manager ─► Assigned Intake
+orchestrated_issues (all open issues)
+
+[Rule 0] state == BLOCKED
+  --> Blocked Issues (standalone, regardless of assignee)
+
+[Rule 0] flow.pr_ref exists
+  --> Flows with PRs (completed / ready to merge)
+
+[Rule 1] roadmap/rfc label
+  --> RFC (human decision needed, always shown)
+
+[Rule 1] roadmap/epic label
+  --> Epic (umbrella issue, always shown)
+
+supervisor label
+  --> Supervisor Issues (standalone)
+
+--- Main flow filtering for remaining issues ---
+
+No state label (never entered main flow):
+
+  No assignee [Rule 4]
+    --> SKIP (roadmap-intake never picked up)
+
+  Local manager assignee:
+    Has orchestra-governed [Rule 7]
+      --> State Missing anomaly
+    No orchestra-governed [Rule 5]
+      --> Waiting Governance (awaiting assignee-pool)
+
+Has state label (entered main flow):
+
+  state == READY:
+    No assignee or assignee not local manager [Rule 2]
+      --> Ready Exception
+    Local manager assignee [Rule 8 + 9]
+      --> Ready Queue (awaiting manager dispatch)
+
+  state in {CLAIMED, HANDOFF, IN_PROGRESS, REVIEW}:
+    No assignee [Rule 2]
+      --> Active Exception
+    Assignee not local manager [Rule 3]
+      --> Remote Tasks
+    Local manager assignee [Rule 9]
+      --> Assigned Intake
+
+  state == MERGE_READY / DONE:
+    --> Completed (may appear in PR section)
 ```
 
 ## 规则详解

@@ -51,6 +51,9 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
             IssueState.HANDOFF,
             IssueState.BLOCKED,
             IssueState.DONE,
+            IssueState.CLAIMED,
+            IssueState.IN_PROGRESS,
+            IssueState.REVIEW,
         }
     return is_auto_task_branch(flow.branch)
 
@@ -230,7 +233,7 @@ def status(
 
     supervisor_label = config.supervisor_handoff.issue_label
 
-    # ── Filtering decision tree (see docs/v3/orchestra/task-status-filtering.md) ──
+    # -- Filtering decision tree (see docs/v3/orchestra/task-status-filtering.md) --
     # Rules 0-9: state label is the gate to main flow.
     # No state = never entered main flow; has state = entered main flow.
     # Then branch by assignee (rule 2/3/4) and governed status (rule 5/7/8).
@@ -277,6 +280,8 @@ def status(
         item
         for item in orchestrated_issues
         if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
         and supervisor_label not in cast(list[str], item.get("labels", []))
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))

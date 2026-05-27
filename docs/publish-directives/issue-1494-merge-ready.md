@@ -8,56 +8,55 @@ Execute commit and PR creation for issue #1494.
 - Base: `main`
 
 ## Changes Summary
-- **File**: `src/vibe3/commands/status_render.py`
-- **Scope**: Remove "Auto Task Scenes" section from status display
-- **Lines**: -36/+4
-- **Commit**: Ready for commit (tests passed, type/lint clean)
+- **Files**: `src/vibe3/commands/status.py`, `src/vibe3/commands/status_render.py`, `src/vibe3/services/task_status_classifier.py`, `tests/vibe3/commands/test_task_status_dashboard.py`, `docs/v3/orchestra/task-status-filtering.md`
+- **Scope**: Fix Missing State Label classification, complete filtering logic per governance rules, remove Auto Task Scenes
+- **Commits**: 3 commits ready for PR
 
-## Commit Message
+## Commit Messages
 ```
-refactor(cli): remove Auto Task Scenes from task status display
+refactor(cli): fix Missing State Label classification logic and remove Auto Task Scenes
 
-Simplify status output by consolidating Auto Task Scenes and Manual Scenes
-into a single "Active Scenes" section. All active flows now display uniformly
-regardless of branch type.
+fix(cli): complete task status filtering logic per governance rules
 
-- Remove lazy imports of is_auto_task_branch and is_canonical_task_branch
-- Remove split between auto-flows and manual-flows
-- Unify rendering under single "Active Scenes" header
-- Net reduction: -32 LOC
-
-Closes #1494
+docs: add task status filtering decision tree doc and code references
 ```
 
 ## PR Title
 ```
-refactor(cli): remove Auto Task Scenes from task status display
+fix(cli): split Missing State Label by governed status, complete filtering rules, remove Auto Task Scenes
 ```
 
 ## PR Description
 ````markdown
 ## Summary
-- Remove "Auto Task Scenes" section from `vibe3 task status` output
-- Consolidate display into single "Active Scenes" section
-- Clean refactor with -32 net LOC reduction
+- Split "Missing State Label" into two sections: Waiting Governance vs Governed Anomaly
+- Complete filtering logic: add assignee checks (rules 2/4/5), add Active Exception section
+- Remove redundant "Auto Task Scenes" section
+- Add decision tree documentation
 
 ## Changes
-- Removed lazy imports and rendering logic for auto-task-specific flows
-- All active flows now display uniformly under "Active Scenes"
-- RFC/Epic/Blocked/Completed sections unchanged (from #1462)
+- status.py: Split missing_state into waiting_for_pool and governed_anomaly with assignee filters
+- status_render.py: Two-section Missing State rendering + Active Exceptions section
+- task_status_classifier.py: New ACTIVE_ANOMALY bucket for active states without assignee
+- tests: Updated test fixtures for new output format
+- docs/v3/orchestra/task-status-filtering.md: Complete filtering decision tree
+
+## Decision Tree
+State label = gate to main flow. No state = never entered. Has state = entered.
+Then branch by assignee (rules 2/3/4) and governed status (rules 5/7/8).
+Full details: docs/v3/orchestra/task-status-filtering.md
 
 ## Verification
-- ✅ All 903 tests passed
-- ✅ Type check: 0 errors
-- ✅ Lint check: 0 errors
-- ✅ Manual verification: `vibe3 task status` output correct
+- 12/12 task status dashboard tests pass
+- mypy strict: no issues
+- ruff + black: clean
 
 ## Related
-- Implements #1494
-- Scope limited to Auto Task Scenes removal only
-- RFC/Epic sections from #1462 remain intact
+- Closes #1494
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Contributors:
+- Yi Chen
+- Claude Sonnet 4.5
 ````
 
 ## PR Options
@@ -66,10 +65,10 @@ refactor(cli): remove Auto Task Scenes from task status display
 - Labels: Keep existing labels (type/refactor, scope/python, component/cli)
 
 ## Pre-Commit Checklist
-- ✅ All tests passed (903 tests)
-- ✅ Type check clean
-- ✅ Lint check clean
-- ✅ Manual verification successful
+- 12/12 tests passed
+- Type check clean
+- Lint check clean
+- Copilot review addressed
 
 ## Post-PR Actions
 - Monitor CI checks
@@ -77,6 +76,6 @@ refactor(cli): remove Auto Task Scenes from task status display
 - Issue will transition to `state/handoff` after PR creation
 
 ## Notes
-- Low-risk refactor with minimal impact
-- Single file changed, no cross-module dependencies
-- Ready for immediate merge after CI passes
+- Medium-risk: changes filtering logic and rendering
+- Multiple files changed, includes test updates
+- Governance rules documented for future reference
