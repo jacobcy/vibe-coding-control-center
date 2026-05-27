@@ -86,6 +86,59 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
 
 
+def find_repo_root() -> Path:
+    """Resolve the main repository root deterministically.
+
+    Never returns a linked worktree root as the main repo — that would cause
+    nested-worktree creation and wrong-directory DB access.
+
+    This is the single source of truth for repo root resolution.
+    All callers that need the repository root for worktree operations,
+    database access, or git command execution must use this function.
+
+    Resolution chain:
+    1. git rev-parse --git-common-dir (works in main repo and worktrees)
+    2. Parse .git file pointer (worktree: gitdir: /path/.git/worktrees/name)
+    3. .git is a directory → cwd IS main repo
+    4. Walk up directory tree to find .git directory
+    5. Raise SystemError if not in a git repository
+    """
+    # Primary: git common dir (works in both main repo and worktrees)
+    try:
+        git_common = GitClient().get_git_common_dir()
+        if git_common:
+            return Path(git_common).parent
+    except Exception:
+        pass
+
+    # Fallback: parse .git file to find main repo from worktree pointer
+    # In a worktree, .git is a file containing "gitdir: /path/.git/worktrees/name"
+    cwd = Path.cwd()
+    git_path = cwd / ".git"
+    if git_path.is_file():
+        try:
+            content = git_path.read_text().strip()
+            if content.startswith("gitdir: "):
+                raw = content[len("gitdir: ") :]
+                gitdir = Path(raw)
+                if not gitdir.is_absolute():
+                    gitdir = (cwd / gitdir).resolve()
+                return gitdir.parent.parent.parent
+        except Exception:
+            pass
+
+    # If .git is a directory, cwd IS the main repo
+    if git_path.is_dir():
+        return cwd
+
+    # Last resort: walk up to find .git directory
+    for parent in cwd.parents:
+        if (parent / ".git").is_dir():
+            return parent
+
+    raise SystemError("Cannot resolve repository root — not inside a git repository")
+
+
 class GitClientProtocol(Protocol):
     """Git client 协议定义."""
 

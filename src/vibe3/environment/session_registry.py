@@ -1,7 +1,6 @@
 """Session registry service: reserve, track, and reconcile runtime sessions."""
 
 import datetime
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -313,12 +312,11 @@ class SessionRegistryService:
             return
 
         try:
-            from vibe3.clients.git_client import GitClient
+            from vibe3.clients.git_client import find_repo_root
             from vibe3.environment.worktree import WorktreeManager
             from vibe3.environment.worktree_context import WorktreeContext
 
-            git_common_dir = GitClient().get_git_common_dir()
-            repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+            repo_root = find_repo_root()
             from vibe3.config.orchestra_settings import load_orchestra_config
 
             config = load_orchestra_config()

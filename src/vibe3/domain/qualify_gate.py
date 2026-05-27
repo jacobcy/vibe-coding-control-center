@@ -134,12 +134,31 @@ class QualifyGateService:
 
         Called by GlobalDispatchCoordinator instead of collection-time scanning.
 
+        Returns None when the issue remains blocked or should be skipped entirely
+        (already closed on GitHub — terminalized and skipped).
+
         Args:
             issue: Issue to qualify
 
         Returns:
             Target IssueState to dispatch to, or None if still blocked.
         """
+        # Guard: if the GitHub issue is closed, terminalize the flow and skip.
+        # Closed issues with lingering state/blocked labels should be cleaned up,
+        # not dispatched. Without this check, the qualify gate may attempt to
+        # dispatch a closed issue with stale flow_state and produce errors.
+        if issue.github_state and issue.github_state.upper() == "CLOSED":
+            flow = self._flow_manager.get_flow_for_issue(issue.number)
+            branch = str(flow.get("branch") or "").strip() if flow else ""
+            if branch:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"qualify_gate skip_blocked (#{issue.number}): "
+                    "issue closed on GitHub — terminalizing local flow",
+                )
+                self._store.soft_delete_flow(branch)
+            return None
+
         flow = self._flow_manager.get_flow_for_issue(issue.number)
         branch = str(flow.get("branch") or "").strip() if flow else ""
         if not branch:

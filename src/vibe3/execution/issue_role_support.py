@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
@@ -20,27 +19,11 @@ from vibe3.roles.definitions import IssueRoleSyncSpec as IssueRoleSyncSpecImpl
 def resolve_orchestra_repo_root() -> Path:
     """Resolve the main repository root for orchestra operations.
 
-    Prioritize git common dir to ensure:
-    1. Worktrees are created under main repo's .worktrees (not nested)
-    2. Shared state (.git/vibe3/) is consistently accessed from main repo
-    3. All orchestra operations reference the canonical repository root
-
-    Fallback to current worktree root only when git common dir is unavailable,
-    and finally to cwd if all git resolution fails.
+    Delegates to find_repo_root() — the single source of truth in git_client.
     """
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
-    try:
-        worktree_root = GitClient().get_worktree_root()
-        if worktree_root:
-            return Path(worktree_root)
-    except Exception:
-        pass
-    return Path.cwd()
+    from vibe3.clients.git_client import find_repo_root
+
+    return find_repo_root()
 
 
 def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:

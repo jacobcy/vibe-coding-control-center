@@ -464,3 +464,39 @@ class TestIsDependencySatisfied:
         result = qualify_gate_service._is_dependency_satisfied(456)
 
         assert result is False
+
+    def test_qualify_blocked_closed_issue_terminalizes_flow(
+        self, qualify_gate_service, mock_store, mock_flow_manager
+    ):
+        """Blocked issue closed on GitHub should terminalize flow and skip."""
+        closed_issue = IssueInfo(
+            number=999,
+            title="Closed Blocked Issue",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+            github_state="CLOSED",
+        )
+        mock_flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-999"}
+
+        result = qualify_gate_service.qualify_blocked_issue(closed_issue)
+
+        assert result is None
+        mock_store.soft_delete_flow.assert_called_once_with("task/issue-999")
+
+    def test_qualify_blocked_closed_no_flow_skips(
+        self, qualify_gate_service, mock_store, mock_flow_manager
+    ):
+        """Closed issue without local flow should skip without error."""
+        closed_issue = IssueInfo(
+            number=998,
+            title="Closed No Flow",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+            github_state="CLOSED",
+        )
+        mock_flow_manager.get_flow_for_issue.return_value = None
+
+        result = qualify_gate_service.qualify_blocked_issue(closed_issue)
+
+        assert result is None
+        mock_store.soft_delete_flow.assert_not_called()

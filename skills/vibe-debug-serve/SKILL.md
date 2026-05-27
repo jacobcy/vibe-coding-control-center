@@ -46,6 +46,90 @@ serve 派发链路按这个顺序排查：
 - 单点残留：优先做最小防御或 cleanup，不扩展状态机。
 - 全局重复：再提高 dispatch / health check / error tracking 的容错度。
 
+## Step 0: Serve 错误快速诊断（必做）
+
+当 `serve status` 显示 FailedGate ACTIVE 或 dispatch FROZEN 时，按以下顺序诊断：
+
+### 0.1 查询系统错误
+
+```bash
+# 系统错误在 serve status 中直接展示
+uv run python src/vibe3/cli.py serve status
+
+# 查询详细错误日志（数据库在主仓库共享目录）
+sqlite3 <main_repo>/.git/vibe3/handoff.db \
+  "SELECT id, tick_id, issue_number, severity, error_code, error_message, created_at
+   FROM error_log ORDER BY id DESC LIMIT 10"
+```
+
+**数据库路径**：handoff.db 位于主仓库共用 `.git/vibe3/` 目录（不是当前 worktree 的 `.git`），
+可通过 `cat .git` 找到 `gitdir:` 指针定位主仓库路径。
+
+### 0.2 查询业务阻塞
+
+```bash
+# flow 被 blocked 的原因在 task status 中展示
+uv run python src/vibe3/cli.py task status
+
+# 查询所有 BLOCKED 的 flow
+sqlite3 <main_repo>/.git/vibe3/handoff.db \
+  "SELECT branch, flow_status, blocked_reason FROM flow_state WHERE flow_status = 'blocked'"
+```
+
+### 0.3 交叉验证 BLOCKED+CLOSED（关键！）
+
+BLOCKED 但 GitHub 已 CLOSED 的 issue 是常见的问题源。qualify gate
+可能尝试 dispatch 已关闭的 issue，导致错误。
+
+```bash
+# 对每个 BLOCKED 的 flow，检查 GitHub issue 状态
+for issue in <issue_numbers>; do
+  gh issue view $issue --json state,title -R <owner>/<repo>
+done
+```
+
+若发现 `github_state=CLOSED` 但本地 `flow_status=blocked` 的 issue，
+需要在 qualify gate 中 terminalize 或手动 `vibe3 check --clean-branch`。
+
+### 0.4 验证 worktree 解析路径（关键！）
+
+Repo 根目录解析由 `vibe3.clients.git_client.find_repo_root()` 统一提供。
+解析链：`git-common-dir` → `.git` 文件指针 → 向上遍历 → 抛出 SystemError。
+在 worktree 中运行时，该函数正确返回主仓库路径而非 worktree 路径。
+
+异常场景：
+- `git rev-parse --git-common-dir` 失败 → 尝试解析 `.git` 文件中的 `gitdir:` 指针
+- `.git` 文件中的 `gitdir:` 为相对路径 → 相对于 cwd 解析
+- 所有回退都失败 → 抛出 SystemError（不在 git 仓库中）
+
+验证方法：
+
+```bash
+uv run python -c "
+from vibe3.clients.git_client import find_repo_root
+print('Resolved repo root:', find_repo_root())
+"
+# 应返回主仓库路径，例如 /Users/.../vibe-coding-control-center
+# 不应返回 worktree 路径
+```
+
+诊断错误关键字："Failed to resolve permanent worktree for planner" 或
+"plan_ref not found" → 意味着 repo 根目录解析失败或 worktree 使用了错误路径。
+
+### 0.5 搜索历史解决方案
+
+```bash
+# 使用 mem-search 查找之前是否解决过类似问题
+# 搜索关键字：worktree resolve, FailedGate, planner dispatch, BLOCKED+CLOSED
+```
+
+### 0.6 检查 handoff 上下文
+
+```bash
+# 对问题 issue 关联的 branch，查看 plan_ref 和 handoff 记录
+uv run python src/vibe3/cli.py handoff show @plan --branch <branch>
+```
+
 ## 调试分支规则
 
 当当前工作树已经是 `task/issue-*` 自动化分支，且该分支上已有活跃 PR 时：
@@ -333,3 +417,15 @@ tail -f temp/logs/issues/issue-{n}/manager.async.log
 - `docs/standards/vibe3-orchestra-runtime-standard.md` — Orchestra 运行时架构
 - `docs/standards/vibe3-state-sync-standard.md` — state labels 与状态迁移语义
 - `docs/standards/v3/command-standard.md` — Shell 命令边界与共享状态规范
+
+## 关键源文件速查
+
+| 文件 | 作用 |
+|------|------|
+| `src/vibe3/execution/coordinator.py:_resolve_repo_path` | worktree 解析入口，Path.cwd() fallback 是错误根源 |
+| `src/vibe3/domain/qualify_gate.py:qualify_blocked_issue` | BLOCKED issue dispatch 前的 qualify gate |
+| `src/vibe3/environment/worktree.py:resolve_manager_cwd` | worktree 查找/创建的核心方法 |
+| `src/vibe3/environment/worktree_lifecycle.py:find_or_create_worktree_for_branch` | 4 步优先级查询 worktree |
+| `src/vibe3/domain/handlers/dispatch.py` | Planner/Executor/Reviewer dispatch handler |
+| `src/vibe3/domain/handlers/issue_state_dispatch.py` | Manager dispatch handler |
+| `src/vibe3/services/check_pr_service.py:_reset_issue_after_pr_closed` | PR 关闭后 issue 重置逻辑 |
