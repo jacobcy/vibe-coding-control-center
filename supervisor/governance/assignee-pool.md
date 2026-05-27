@@ -172,14 +172,16 @@ pool 扫描有 assignee 的 issue →
   ├─ 目标/架构/拆分形态无法判断 → 设 roadmap/rfc + 写 suggest → 打 governed
   ├─ 范围过大，分界清晰 → 写 suggest 建议 split → 打 governed
   ├─ 范围过大，已有 Sub-issues → 设 roadmap/epic + 写 suggest → 打 governed
-  ├─ roadmap/epic + all sub-issues closed → 写 suggest 建议关闭 epic → 打 governed
-  ├─ roadmap/epic + partial sub-issues closed → 打 governed（标记已检查）→ 下次 scan 重新检查
+  ├─ roadmap/epic + all sub-issues completed → 写 suggest 建议关闭 epic → 打 governed
+  ├─ roadmap/epic + partial sub-issues completed → 打 governed（标记已检查）→ 下次 scan 重新检查
   ├─ 明确冲突或重复（高置信度）→ 检查未完成工作 → 创建 follow-up（如有）+ 关闭 → 打 governed
   ├─ 不明确冲突或重复（低置信度）→ 写 suggest 建议关闭 → 打 governed
   ├─ blocked_reason == "state unchanged" + ref 存在 → resume → 打 governed
   ├─ 明确范围 + 清晰验收 + 无阻塞 → 设 roadmap/p0~p2 + priority/* + state/ready → 打 governed
   └─ 不确定 → 设 roadmap/rfc + 写 suggest → 打 governed
 ```
+
+**注意**："completed" 包含 `state == CLOSED` 或带有 `state/done` label 的 sub-issues。
 
 **关键原则**：所有决策完成后一律打 `orchestra-governed`，不管结论是什么。
 
@@ -478,7 +480,9 @@ Exit:
 
 **去重规则（强制）**：
 
-- **orchestra-governed 标签检查**：如果 issue 已有 `orchestra-governed` 标签，直接跳过（已决策过）
+- **orchestra-governed 标签检查**：
+  - **普通 issue**：如果已有 `orchestra-governed` 标签，直接跳过（已决策过）
+  - **Epic issue（例外）**：不受此规则限制，每次 scan 都检查（见 Step 6 Epic 收口检查）
 - **写评论前必须检查**：读取该 issue 的现有 comments
 - **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
