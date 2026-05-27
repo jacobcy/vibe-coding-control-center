@@ -360,48 +360,16 @@ def render_scene_sections(
     flows: list[FlowStatusResponse],
     worktree_map: dict[str, str],
 ) -> None:
-    """Render Auto Task Scenes and Manual Scenes sections."""
-    from vibe3.services.status_query_service import (
-        is_auto_task_branch,
-        is_canonical_task_branch,
-    )
-
+    """Render active flow scenes."""
     active_flows = [
         flow
         for flow in flows
         if getattr(flow, "flow_status", "active") not in {"done", "aborted", "merged"}
     ]
-    auto_flows = [
-        flow
-        for flow in active_flows
-        if is_auto_task_branch(flow.branch) and flow.branch in worktree_map
-    ]
-    manual_flows = [
-        flow for flow in active_flows if not is_auto_task_branch(flow.branch)
-    ]
 
-    console.print("\n[bold cyan]Auto Task Scenes:[/]")
-    if auto_flows:
-        for flow in auto_flows:
-            wt = worktree_map.get(flow.branch, "(no worktree)")
-            if is_canonical_task_branch(flow.branch, flow.task_issue_number):
-                console.print(f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}")
-            else:
-                task = (
-                    f"#{flow.task_issue_number}"
-                    if flow.task_issue_number
-                    else "(no task)"
-                )
-                console.print(
-                    f"  [cyan]{flow.branch:30}[/] "
-                    f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
-                )
-    else:
-        console.print("  [dim](none)[/]")
-
-    console.print("\n[bold cyan]Manual Scenes:[/]")
-    if manual_flows:
-        for flow in manual_flows:
+    console.print("\n[bold cyan]Active Scenes:[/]")
+    if active_flows:
+        for flow in active_flows:
             wt = worktree_map.get(flow.branch, "(no worktree)")
             task = (
                 f"#{flow.task_issue_number}" if flow.task_issue_number else "(no task)"
