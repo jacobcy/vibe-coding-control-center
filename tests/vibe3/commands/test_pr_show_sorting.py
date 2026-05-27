@@ -245,3 +245,96 @@ class TestPRShowCommentSorting:
         assert result.output.find("None review", r_start) > result.output.find(
             "Valid review", r_start
         )
+
+    def test_missing_timestamp_sorted_to_end(self, mock_pr_svc_for_sorting) -> None:
+        """Missing timestamp keys are sorted consistently with None (to end)."""
+        mock_pr_svc = mock_pr_svc_for_sorting(
+            pr_number=130,
+            title="Test PR with missing timestamps",
+            comments=[
+                {
+                    "user": {"login": "user_a"},
+                    "body": "Valid comment",
+                    "createdAt": "2026-05-06T10:00:00Z",
+                },
+                {
+                    "user": {"login": "user_b"},
+                    "body": "Missing timestamp",
+                    # No createdAt key at all
+                },
+            ],
+            reviews=[
+                {
+                    "user": {"login": "reviewer_a"},
+                    "body": "Valid review",
+                    "state": "APPROVED",
+                    "submitted_at": "2026-05-06T10:00:00Z",
+                },
+                {
+                    "user": {"login": "reviewer_b"},
+                    "body": "Missing timestamp",
+                    "state": "COMMENTED",
+                    # No submitted_at key at all
+                },
+            ],
+        )
+
+        result = _invoke_pr_show(130, mock_pr_svc)
+
+        assert result.exit_code == 0
+        # Verify missing timestamp entries sort to end
+        gc_start = result.output.find("### General Comments")
+        assert result.output.find("Missing timestamp", gc_start) > result.output.find(
+            "Valid comment", gc_start
+        )
+        r_start = result.output.find("### Reviews")
+        assert result.output.find("Missing timestamp", r_start) > result.output.find(
+            "Valid review", r_start
+        )
+
+    def test_mixed_none_and_missing_timestamps(self, mock_pr_svc_for_sorting) -> None:
+        """Both None and missing timestamps should sort consistently to end."""
+        mock_pr_svc = mock_pr_svc_for_sorting(
+            pr_number=131,
+            title="Test PR with mixed None/missing timestamps",
+            reviews=[
+                {
+                    "user": {"login": "reviewer_a"},
+                    "body": "Valid 10:00",
+                    "state": "APPROVED",
+                    "submitted_at": "2026-05-06T10:00:00Z",
+                },
+                {
+                    "user": {"login": "reviewer_b"},
+                    "body": "None timestamp",
+                    "state": "COMMENTED",
+                    "submitted_at": None,  # Explicit None
+                },
+                {
+                    "user": {"login": "reviewer_c"},
+                    "body": "Missing timestamp",
+                    "state": "COMMENTED",
+                    # No submitted_at key
+                },
+                {
+                    "user": {"login": "reviewer_d"},
+                    "body": "Valid 12:00",
+                    "state": "APPROVED",
+                    "submitted_at": "2026-05-06T12:00:00Z",
+                },
+            ],
+        )
+
+        result = _invoke_pr_show(131, mock_pr_svc)
+
+        assert result.exit_code == 0
+        # Verify valid timestamps sort chronologically
+        assert result.output.find("Valid 10:00") < result.output.find("Valid 12:00")
+        # Verify None/missing timestamps sort to end (after all valid timestamps)
+        r_start = result.output.find("### Reviews")
+        valid_12_pos = result.output.find("Valid 12:00", r_start)
+        none_pos = result.output.find("None timestamp", r_start)
+        missing_pos = result.output.find("Missing timestamp", r_start)
+        # Both None and missing should be after valid timestamps
+        assert valid_12_pos < none_pos
+        assert valid_12_pos < missing_pos

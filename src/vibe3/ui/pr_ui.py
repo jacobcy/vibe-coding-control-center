@@ -128,10 +128,10 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.review_comments:
         console.print("\n[bold cyan]### Review Comments[/]")
-        # Sort chronologically
+        # Sort chronologically, None/missing timestamps sort to end
         sorted_reviews = sorted(
             pr.review_comments,
-            key=lambda x: str(x.get("created_at", "")),
+            key=lambda x: x.get("created_at") or "9999-99-99T99:99:99Z",
         )
         for comment in sorted_reviews:
             user = comment.get("user", {}).get("login", "unknown")
@@ -146,10 +146,10 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.reviews:
         console.print("\n[bold cyan]### Reviews[/]")
-        # Sort chronologically
+        # Sort chronologically, None/missing timestamps sort to end
         sorted_reviews_list = sorted(
             pr.reviews,
-            key=lambda x: str(x.get("submitted_at", "")),
+            key=lambda x: x.get("submitted_at") or "9999-99-99T99:99:99Z",
         )
         for review in sorted_reviews_list:
             user = review.get("user", {}).get("login", "unknown")
@@ -170,10 +170,10 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.comments:
         console.print("\n[bold cyan]### General Comments[/]")
-        # Sort chronologically
+        # Sort chronologically, None/missing timestamps sort to end
         sorted_comments = sorted(
             pr.comments,
-            key=lambda x: str(x.get("createdAt", "")),
+            key=lambda x: x.get("createdAt") or "9999-99-99T99:99:99Z",
         )
         for comment in sorted_comments:
             # GitHub API returns "user.login" not "author.login"
