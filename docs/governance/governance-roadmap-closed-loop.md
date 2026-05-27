@@ -209,6 +209,29 @@ Issue 创建（无 assignee，无标签）
 - [x] Step 0 过滤：跳过有 `roadmap-reviewed` 标签的 issue
 - [x] 审查完成：写 `[roadmap decision]` + 打 `roadmap-reviewed` 标签
 - [x] 结果写入 memory.md 缓存
+- [x] **推翻 intake skip 时**：移除 `orchestra-scanned` + 分配 assignee + 打 `roadmap-reviewed`（明示规则见 [`skills/vibe-roadmap/SKILL.md`](../../skills/vibe-roadmap/SKILL.md) Step 0 闭环要求第 6 项）
+
+---
+
+## 异常兜底机制
+
+三层闭环并不能覆盖所有情况，**`vibe3 task status` 命令充当异常监控兜底**。
+详细规则见 [task-status-filtering.md](../v3/orchestra/task-status-filtering.md) 的 Rule 5/7。
+
+### 兜底覆盖的场景
+
+| 场景 | 标签状态 | task status 显示 | 应对 |
+|------|---------|-----------------|------|
+| pool 决策 rfc，人类移除 `roadmap/rfc` 后未触发 pool 重新评估 | 有 assignee + 无 state + 有 `orchestra-governed` + 无 `roadmap/rfc` | **State Missing anomaly**（Rule 7） | 人类按提示介入：手动移除 `orchestra-governed` 让 pool 重评，或直接补 `state/ready` |
+| pool 建议 close 但 issue 仍 OPEN（只写 suggest 未关闭） | 有 assignee + 无 state + 有 `orchestra-governed` | **State Missing anomaly**（Rule 7） | 人类决定真关闭，或修正决策 |
+| pool 真的关闭了 issue | issue closed | 不显示（CLOSED 不在 orchestrated_issues） | 等用户重新发 issue |
+| intake 接受但 pool 尚未扫描 | 有 manager assignee + 无 state + 无 `orchestra-governed` | **Waiting Governance**（Rule 5） | 等下次 pool scan 自然消化 |
+
+### 兜底设计原则
+
+- 三层 agent 负责**正常路径闭环**（打标签、写决策）
+- `task status` 异常区负责**反常路径监控**（标签漂移、决策半完成）
+- 不要求 agent 主动捕获所有边缘 case；让 status dashboard 充当人类视野的一部分
 
 ---
 
