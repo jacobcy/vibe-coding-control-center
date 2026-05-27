@@ -52,6 +52,7 @@ def apply_unified_noop_gate(
     required_ref_key: str | None = None,
     flow_state: dict | None = None,
     tick_id: int = 0,
+    before_issue_is_closed: bool = False,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -343,6 +344,43 @@ def apply_unified_noop_gate(
                 actor=actor,
             )
             return
+
+    # If the issue was open before agent execution but is now closed,
+    # treat this as a meaningful terminal transition regardless of state label.
+    if not before_issue_is_closed:
+        try:
+            from vibe3.clients.github_client import GitHubClient
+
+            after_payload = GitHubClient().view_issue(issue_number, repo=repo)
+            if (
+                isinstance(after_payload, dict)
+                and str(after_payload.get("state", "")).upper() == "CLOSED"
+            ):
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).info(
+                    f"No-op gate PASS: issue #{issue_number} closed by {role} "
+                    "(terminal transition)"
+                )
+                store.add_event(
+                    branch,
+                    EVENT_STATE_TRANSITIONED,
+                    actor,
+                    detail=(
+                        f"Issue #{issue_number} closed by {role} "
+                        "(terminal transition)"
+                    ),
+                    refs={
+                        "before_state": str(before_state_label or ""),
+                        "issue": str(issue_number),
+                    },
+                )
+                return
+        except Exception:
+            pass  # Fail-open: fall through to normal no-op gate logic
 
     if before_state_label == after_state_label:
         state_desc = before_state_label or "(no state)"

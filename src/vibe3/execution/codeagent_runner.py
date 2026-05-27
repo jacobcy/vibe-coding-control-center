@@ -54,6 +54,7 @@ class SyncExecutionContext:
     before_state_label: str | None
     execution_cwd: Path
     commit_count_before: int | None = None
+    before_issue_is_closed: bool = False
 
 
 class CodeagentExecutionService:
@@ -244,6 +245,22 @@ class CodeagentExecutionService:
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
+        # Capture whether the issue is closed before agent execution
+        before_issue_is_closed = False
+        if command.issue_number is not None:
+            try:
+                from vibe3.clients.github_client import GitHubClient
+
+                issue_payload = GitHubClient().view_issue(
+                    command.issue_number,
+                    repo=getattr(self.config, "repo", None),
+                )
+                if isinstance(issue_payload, dict):
+                    if str(issue_payload.get("state", "")).upper() == "CLOSED":
+                        before_issue_is_closed = True
+            except Exception as exc:
+                log.warning(f"Cannot read issue state for closed detection: {exc}")
+
         execution_cwd = self._resolve_command_cwd(command.cwd)
 
         # Record commit count before execution (for planner commit detection)
@@ -266,6 +283,7 @@ class CodeagentExecutionService:
             before_state_label=before_state_label,
             execution_cwd=execution_cwd,
             commit_count_before=commit_count_before,
+            before_issue_is_closed=before_issue_is_closed,
         )
 
     def _finalize_sync_execution(
@@ -329,6 +347,7 @@ class CodeagentExecutionService:
                     required_ref_key=required_ref_key,
                     flow_state=flow_state,
                     tick_id=command.tick_id,
+                    before_issue_is_closed=ctx.before_issue_is_closed,
                 )
 
                 # Persist transition_count after gate call

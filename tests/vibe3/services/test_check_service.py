@@ -123,8 +123,8 @@ def test_handle_closed_pr_reports_reset_failure() -> None:
     ]
 
 
-def test_handle_closed_pr_skips_already_closed_issue() -> None:
-    """When issue already closed, skip reset."""
+def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
+    """When PR closed and issue already closed, mark flow as aborted and cleanup."""
     service = _make_check_pr_service()
 
     mock_pr = MagicMock()
@@ -142,14 +142,37 @@ def test_handle_closed_pr_skips_already_closed_issue() -> None:
     }
 
     with patch(
-        "vibe3.services.task_resume_operations.TaskResumeOperations"
-    ) as mock_resume_ops_cls:
-        mock_resume_ops = MagicMock()
-        mock_resume_ops_cls.return_value = mock_resume_ops
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        # Mock cleanup result
+        mock_cleanup.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": False,
+            "flow_record": True,
+        }
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-        # Should not try to reset closed issue
-        mock_resume_ops.reset_issue_to_ready.assert_not_called()
+        # Verify flow was marked as aborted
+        service._flow_status_service.mark_flow_aborted.assert_called_once()
+        call_args = service._flow_status_service.mark_flow_aborted.call_args
+        assert call_args[0][0] == "task/issue-456"
+        assert "Issue #456 already closed" in call_args[0][1]
+        assert "PR #123 closed without merge" in call_args[0][1]
+
+        # Verify cleanup was called
+        mock_cleanup.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-456",
+            include_remote=True,
+            keep_flow_record=False,
+        )
+
+        # Verify result includes warning about cleanup
         assert handled is True
         assert len(issues) == 0
+        assert len(warnings) == 1
+        assert "marked aborted" in warnings[0]
+        assert "issue #456 closed" in warnings[0]

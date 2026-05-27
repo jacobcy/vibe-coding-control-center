@@ -207,8 +207,72 @@ class CheckPRService:
                     action="reset_pr_closed",
                     branch=branch,
                     issue_number=task_issue_number,
-                ).info(f"Issue #{task_issue_number} already closed, skip reset")
-                return (None, [])
+                ).info(
+                    f"Issue #{task_issue_number} already closed, "
+                    "marking flow as aborted"
+                )
+
+                # Issue already closed → mark flow as aborted and clean up
+                self._flow_status_service.mark_flow_aborted(
+                    branch,
+                    (
+                        f"Issue #{task_issue_number} already closed; "
+                        f"PR #{pr_number} closed without merge"
+                    ),
+                )
+
+                # Clean up physical resources (worktree, branches, flow record)
+                from vibe3.services.flow_cleanup_service import (
+                    FlowCleanupService,
+                    LiveSessionsDetectedError,
+                )
+
+                cleanup_service = FlowCleanupService(
+                    store=self.store,
+                    git_client=self.git_client,
+                )
+
+                try:
+                    cleanup_result = cleanup_service.cleanup_flow_scene(
+                        branch, include_remote=True, keep_flow_record=False
+                    )
+
+                    # Build warning message from cleanup results
+                    cleaned_items = []
+                    if cleanup_result.get("worktree") is True:
+                        cleaned_items.append("worktree")
+                    if cleanup_result.get("local_branch") is True:
+                        cleaned_items.append("local branch")
+                    if cleanup_result.get("remote_branch") is True:
+                        cleaned_items.append("remote branch")
+                    if cleanup_result.get("flow_record") is True:
+                        cleaned_items.append("flow record")
+
+                    warning_msg = (
+                        f"Flow '{branch}' marked aborted "
+                        f"(issue #{task_issue_number} closed); "
+                        f"cleaned: {', '.join(cleaned_items)}"
+                        if cleaned_items
+                        else (
+                            f"Flow '{branch}' marked aborted "
+                            f"(issue #{task_issue_number} closed, "
+                            "no cleanup needed)"
+                        )
+                    )
+                    return (None, [warning_msg])
+
+                except LiveSessionsDetectedError as exc:
+                    warning_msg = (
+                        f"Flow '{branch}' marked aborted "
+                        f"(issue #{task_issue_number} closed); "
+                        f"cleanup skipped: {exc}"
+                    )
+                    logger.bind(
+                        domain="check",
+                        action="reset_pr_closed",
+                        branch=branch,
+                    ).warning(warning_msg)
+                    return (None, [warning_msg])
 
         # Build minimal FlowStatusResponse for task resume
         flow = FlowStatusResponse(
