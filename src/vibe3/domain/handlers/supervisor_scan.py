@@ -16,6 +16,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models.orchestration import IssueInfo
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.execution.coordinator import ExecutionCoordinator
@@ -72,7 +73,19 @@ def handle_supervisor_issue_identified(
 
             try:
                 result = coordinator.dispatch_execution(request)
+                record_dispatch_failure_if_unexpected(
+                    result=result,
+                    role="supervisor",
+                    issue_number=event.issue_number,
+                    branch=f"issue-{event.issue_number}",
+                )
             except Exception as exc:
+                record_dispatch_failure_if_unexpected(
+                    role="supervisor",
+                    issue_number=event.issue_number,
+                    branch=f"issue-{event.issue_number}",
+                    exception=exc,
+                )
                 logger.bind(
                     domain="supervisor_handler",
                     issue_number=event.issue_number,
@@ -81,7 +94,19 @@ def handle_supervisor_issue_identified(
     else:
         try:
             result = coordinator.dispatch_execution(request)
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="supervisor",
+                issue_number=event.issue_number,
+                branch=f"issue-{event.issue_number}",
+            )
         except Exception as exc:
+            record_dispatch_failure_if_unexpected(
+                role="supervisor",
+                issue_number=event.issue_number,
+                branch=f"issue-{event.issue_number}",
+                exception=exc,
+            )
             logger.bind(
                 domain="supervisor_handler",
                 issue_number=event.issue_number,

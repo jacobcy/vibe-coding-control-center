@@ -19,6 +19,7 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -163,7 +164,19 @@ def handle_governance_scan_started(
 
         try:
             result = coordinator.dispatch_execution(request)
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role="governance",
+                issue_number=None,
+                branch="governance",
+            )
         except Exception as exc:
+            record_dispatch_failure_if_unexpected(
+                role="governance",
+                issue_number=None,
+                branch="governance",
+                exception=exc,
+            )
             logger.bind(
                 domain="governance_handler",
                 tick=event.tick_count,

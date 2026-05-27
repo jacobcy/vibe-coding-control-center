@@ -49,19 +49,47 @@ def record_error(
 
 
 def record_dispatch_failure_if_unexpected(
-    result: "ExecutionLaunchResult",
-    role: str,
-    issue_number: int | None,
-    branch: str,
+    result: "ExecutionLaunchResult | None" = None,
+    role: str = "",
+    issue_number: int | None = None,
+    branch: str = "",
+    *,
+    exception: Exception | None = None,
 ) -> None:
     """Record dispatch failure if it's unexpected (not normal throttling).
 
     Args:
-        result: Execution launch result
+        result: Execution launch result (optional if exception provided)
         role: Role name (planner/executor/reviewer)
         issue_number: Associated issue number
         branch: Associated branch name
+        exception: Exception that was raised during dispatch (keyword-only)
     """
+    # Handle exception-level failures
+    if exception is not None:
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        error_message = f"manual {role} dispatch failed [exception]: {exception}"
+        try:
+            record_error(
+                error_code="E_DISPATCH_FAILURE",
+                error_message=error_message,
+                tick_id=0,
+                issue_number=issue_number or 0,
+                branch=branch,
+                store=SQLiteClient(),
+            )
+        except Exception as exc:
+            logger.bind(
+                domain=f"{role}_dispatch",
+                issue_number=issue_number,
+            ).warning(f"Failed to record dispatch error: {exc}")
+        return
+
+    # Handle result-level failures
+    if result is None:
+        return
+
     if result.launched or result.skipped:
         return
 
