@@ -10,6 +10,8 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.config.settings import AIConfig
+from vibe3.models.pr import UpdatePRRequest
+from vibe3.utils.branch_compare import BranchBehindInfo
 
 
 @pytest.fixture
@@ -219,3 +221,96 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 1
         assert "requires commits to generate suggestions" in result.output
         assert "Commit your changes first" in result.output
+
+
+class TestPRCreateBranchBehind:
+    """Tests for branch-behind PR body update path."""
+
+    def test_pr_create_branch_behind_updates_body(self, runner: CliRunner) -> None:
+        """When branch is behind base, PR body should be updated with warning."""
+        with (
+            patch(
+                "vibe3.commands.pr_create.FlowService.get_current_branch",
+                return_value="task/demo",
+            ),
+            patch(
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
+                return_value="main",
+            ),
+            patch("vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"),
+            patch("vibe3.commands.pr_create.PRService") as mock_service,
+            patch("vibe3.commands.pr_create.check_branch_behind") as mock_check_behind,
+            patch(
+                "vibe3.commands.pr_create.format_branch_behind_body"
+            ) as mock_format_body,
+        ):
+            # Mock branch behind check to return behind info
+            behind_info = BranchBehindInfo(
+                head_branch="task/demo", base_branch="main", behind_count=3
+            )
+            mock_check_behind.return_value = behind_info
+
+            # Mock format function to return predictable warning
+            mock_format_body.return_value = "__WARNING_PREFIX__"
+
+            # Mock PR service
+            pr_service = mock_service.return_value
+            pr_service.get_open_pr_for_branch.return_value = None
+
+            # Mock created PR
+            created_pr = MagicMock(
+                number=123,
+                title="Test PR",
+                body="Test body",
+                head_branch="task/demo",
+                base_branch="main",
+                model_dump=lambda: {
+                    "number": 123,
+                    "title": "Test PR",
+                    "body": "__WARNING_PREFIX__\n\n---\n\nTest body",
+                },
+            )
+            pr_service.create_pr.return_value = created_pr
+
+            # Mock updated PR
+            updated_pr = MagicMock(
+                number=123,
+                title="Test PR",
+                body="__WARNING_PREFIX__\n\n---\n\nTest body",
+                head_branch="task/demo",
+                base_branch="main",
+                model_dump=lambda: {
+                    "number": 123,
+                    "title": "Test PR",
+                    "body": "__WARNING_PREFIX__\n\n---\n\nTest body",
+                },
+            )
+            pr_service.github_client.update_pr.return_value = updated_pr
+
+            result = runner.invoke(
+                app, ["pr", "create", "-t", "Test PR", "--json", "--yes"]
+            )
+
+        # Verify exit code
+        assert result.exit_code == 0
+
+        # Verify format_branch_behind_body was called with correct info
+        mock_format_body.assert_called_once_with(behind_info)
+
+        # Verify update_pr was called with updated body
+        pr_service.github_client.update_pr.assert_called_once()
+        call_args = pr_service.github_client.update_pr.call_args[0][0]
+        assert isinstance(call_args, UpdatePRRequest)
+        assert call_args.number == 123
+        assert call_args.title is None
+        assert call_args.body == "__WARNING_PREFIX__\n\n---\n\nTest body"
+        assert call_args.draft is None
+        assert call_args.base_branch is None
+
+        # Verify create_pr was called (PR created before body update)
+        pr_service.create_pr.assert_called_once()
+
+        # Verify JSON output contains updated body
+        output = json.loads(result.output)
+        assert output["number"] == 123
+        assert output["body"] == "__WARNING_PREFIX__\n\n---\n\nTest body"
