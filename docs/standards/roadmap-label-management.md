@@ -518,19 +518,22 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 gh issue edit 123 --add-label "supervisor" --add-label "priority/7" --add-label "roadmap/p0"
 ```
 
-#### orchestra 标签
+#### orchestra 三层治理标签
 
-**用途**：标记 Orchestra 谘度和自动化相关 issue
+> 历史的 `orchestra` 单一标签已被三层标签替代（详见 [docs/governance/governance-roadmap-closed-loop.md](../governance/governance-roadmap-closed-loop.md)）。
+> 各层 agent 自己写入，**人类一般不应手动添加**这三个标签——下表是参考，便于在异常排查时识别状态。
 
-**使用场景**：
-- Orchestra 谘度逻辑改进
-- 分诊和 dispatch 机制
-- Queue ordering 优化
-- 自动化流程改进
+| 标签 | 由谁打 | 何时打 | 语义 |
+|------|--------|-------|------|
+| `orchestra-scanned` | roadmap-intake | 审查后**跳过**（不分配 assignee）时 | "intake 已审查，不纳入"——下次 intake 自动跳过 |
+| `orchestra-governed` | assignee-pool | 完成决策后（close/split/rfc/epic/ready/resume 均打） | "pool 已决策"——下次 pool 自动跳过 |
+| `roadmap-reviewed` | vibe-roadmap | 写完 `[roadmap decision]` 评论后（rfc 例外） | "roadmap 已审查"——Step 0 自动跳过 |
 
-**示例**：
+**legacy 兼容**：旧的 `orchestra` 单一标签（无后缀）仍由代码 `build_broader_repo_entries` 防御性过滤，便于历史 issue 平滑迁移。但 `sync-labels.sh` 已不再 sync 该标签，新 issue 不应再添加。
+
+**示例**（仅在异常修复/手动迁移时使用）：
 ```bash
-# 标记 Orchestra 谘度问题（已由 intake 层审查）
+# 手动标记 issue 已由 intake 层审查（一般由 agent 自动添加）
 gh issue edit 124 --add-label "orchestra-scanned" --add-label "type/feature" --add-label "roadmap/p1"
 ```
 

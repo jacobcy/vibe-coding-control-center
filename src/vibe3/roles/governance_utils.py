@@ -105,10 +105,18 @@ def build_broader_repo_entries(
             continue
 
         labels = normalize_labels(item.get("labels"))
+        # Three-layer governance filter + legacy compat:
+        # - orchestra-scanned: intake skipped (self-closure)
+        # - orchestra-governed: pool decided (defensive filter, e.g. close/rfc
+        #   after assignee removed)
+        # - orchestra (legacy umbrella): kept as compatibility alias because
+        #   sync-labels.sh is non-destructive and historical issues may still
+        #   carry it
         if (
             "supervisor" in labels
             or "orchestra-scanned" in labels
             or "orchestra-governed" in labels
+            or "orchestra" in labels
         ):
             continue
 
@@ -142,7 +150,7 @@ def build_broader_repo_entries(
     return tuple(entries)
 
 
-def get_orchestra_labeled_issue_numbers(
+def get_governed_issue_numbers(
     github: GitHubClient, config: OrchestraConfig
 ) -> set[int]:
     """Fetch issue numbers that have the orchestra-governed label.
@@ -157,14 +165,14 @@ def get_orchestra_labeled_issue_numbers(
     Returns:
         Set of issue numbers that have orchestra-governed label
     """
-    orchestra_issues = github.list_issues(
+    governed_issues = github.list_issues(
         label="orchestra-governed",
         state="open",
         repo=config.repo,
         limit=5000,  # Fetch all governed issues to avoid truncation
     )
     numbers: set[int] = set()
-    for item in orchestra_issues:
+    for item in governed_issues:
         number = item.get("number")
         if isinstance(number, int):
             numbers.add(number)
