@@ -154,7 +154,7 @@ EOF
   grep -q 'export PATH="\$HOME/.claude/bin:\$PATH"' "$rc_file"
   grep -q '# Load Vibe keys' "$rc_file"
   grep -q '\[ -f "'"$home_dir"'/.vibe/loader.sh" \] && source "'"$home_dir"'/.vibe/loader.sh"' "$rc_file"
-  grep -q 'direnv hook zsh' "$rc_file"
+  grep -q 'command -v direnv >/dev/null 2>&1 && eval "\$(direnv hook zsh)"' "$rc_file"
 }
 
 @test "install bootstraps uv into ~/.local/bin and remains idempotent" {
@@ -173,6 +173,11 @@ EOF
   cp -R "$VIBE_ROOT/lib" "$source_root/lib"
   cp -R "$VIBE_ROOT/config" "$source_root/config"
   cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cat > "$rc_file" <<'EOF'
+export VIBE_ROOT_CUSTOM="/tmp/keep-me"
+# mention UV_PROJECT_ENVIRONMENT but keep this comment
+export UV_PROJECT_ENVIRONMENT_CUSTOM="/tmp/keep-me"
+EOF
 
   cat > "$bin_dir/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -193,6 +198,8 @@ EOF
   [ "$(grep -c '# Load Vibe keys' "$rc_file")" -eq 1 ]
   [ "$(grep -c 'Vibe Coding Control Center - Loader' "$rc_file")" -eq 1 ]
   [ "$(grep -c 'Vibe Direnv Hook' "$rc_file")" -eq 1 ]
+  grep -q '^export VIBE_ROOT_CUSTOM="/tmp/keep-me"$' "$rc_file"
+  grep -q '^export UV_PROJECT_ENVIRONMENT_CUSTOM="/tmp/keep-me"$' "$rc_file"
 
   run env HOME="$home_dir" SHELL="/bin/zsh" TEST_UV_LOG="$uv_log" PATH="$bin_dir:$PATH" zsh "$install_script"
   [ "$status" -eq 0 ]
@@ -202,6 +209,8 @@ EOF
   [ "$(grep -c 'Vibe Coding Control Center - Loader' "$rc_file")" -eq 1 ]
   [ "$(grep -c 'Vibe Direnv Hook' "$rc_file")" -eq 1 ]
   [ "$(grep -c '^tool install --editable \.$' "$uv_log")" -eq 2 ]
+  grep -q '^export VIBE_ROOT_CUSTOM="/tmp/keep-me"$' "$rc_file"
+  grep -q '^export UV_PROJECT_ENVIRONMENT_CUSTOM="/tmp/keep-me"$' "$rc_file"
 }
 
 @test "install writes bash direnv hook when current shell is bash" {
@@ -249,6 +258,6 @@ EOF
   run env HOME="$home_dir" SHELL="/bin/bash" PATH="$bin_dir:$PATH" zsh "$install_script"
 
   [ "$status" -eq 0 ]
-  grep -q 'direnv hook bash' "$rc_file"
+  grep -q 'command -v direnv >/dev/null 2>&1 && eval "\$(direnv hook bash)"' "$rc_file"
   ! grep -q 'direnv hook zsh' "$rc_file"
 }

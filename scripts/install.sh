@@ -246,8 +246,8 @@ if [[ -f "$RC_FILE" ]]; then
         sed -i '' '/# Load Vibe keys/,+5 d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/# Vibe Coding Control Center - Loader/d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '' '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '' '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/^export VIBE_ROOT=/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/# Vibe Local Bin/,+1 d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/# Vibe Direnv Hook/d' "$RC_FILE" 2>/dev/null || true
         sed -i '' '/direnv hook /d' "$RC_FILE" 2>/dev/null || true
@@ -256,8 +256,8 @@ if [[ -f "$RC_FILE" ]]; then
         sed -i '/# Load Vibe keys/,+5 d' "$RC_FILE" 2>/dev/null || true
         sed -i '/# Vibe Coding Control Center - Loader/d' "$RC_FILE" 2>/dev/null || true
         sed -i '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
-        sed -i '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/^export VIBE_ROOT=/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$RC_FILE" 2>/dev/null || true
         sed -i '/# Vibe Local Bin/,+1 d' "$RC_FILE" 2>/dev/null || true
         sed -i '/# Vibe Direnv Hook/d' "$RC_FILE" 2>/dev/null || true
         sed -i '/direnv hook /d' "$RC_FILE" 2>/dev/null || true
@@ -270,9 +270,9 @@ _append_to_rc "$RC_FILE" $'if [[ -f ~/.vibe/config/keys.env ]]; then\n    set -a
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center - Loader"
 _append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
 if [[ "$SHELL" == */bash ]]; then
-    _append_to_rc "$RC_FILE" 'eval "$(direnv hook bash)"' "Vibe Direnv Hook"
+    _append_to_rc "$RC_FILE" 'command -v direnv >/dev/null 2>&1 && eval "$(direnv hook bash)"' "Vibe Direnv Hook"
 else
-    _append_to_rc "$RC_FILE" 'eval "$(direnv hook zsh)"' "Vibe Direnv Hook"
+    _append_to_rc "$RC_FILE" 'command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"' "Vibe Direnv Hook"
 fi
 
 if command -v gh >/dev/null 2>&1; then
