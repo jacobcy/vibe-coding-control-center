@@ -51,6 +51,9 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
             IssueState.HANDOFF,
             IssueState.BLOCKED,
             IssueState.DONE,
+            IssueState.CLAIMED,
+            IssueState.IN_PROGRESS,
+            IssueState.REVIEW,
         }
     return is_auto_task_branch(flow.branch)
 
@@ -108,7 +111,6 @@ def status(
         render_pr_ref_items,
         render_remote_items,
         render_rfc_items,
-        render_scene_sections,
         render_supervisor_issues,
     )
 
@@ -230,6 +232,12 @@ def status(
     )
 
     supervisor_label = config.supervisor_handoff.issue_label
+
+    # -- Filtering decision tree (see docs/v3/orchestra/task-status-filtering.md) --
+    # Rules 0-9: state label is the gate to main flow.
+    # No state = never entered main flow; has state = entered main flow.
+    # Then branch by assignee (rule 2/3/4) and governed status (rule 5/7/8).
+
     supervisor_items = [
         item
         for item in orchestrated_issues
@@ -251,15 +259,38 @@ def status(
         and supervisor_label not in cast(list[str], item.get("labels", []))
     ]
     roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
-    missing_state_items = [
+
+    # Split missing state items into two categories:
+    # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
+    # 2. Governed but anomaly (has orchestra-governed label) - needs attention
+    manager_usernames = get_manager_usernames(config)
+
+    waiting_for_pool_items = [
         item
         for item in orchestrated_issues
         if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
         and supervisor_label not in cast(list[str], item.get("labels", []))
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" not in cast(list[str], item.get("labels", []))
     ]
-    missing_state_numbers = {cast(int, item["number"]) for item in missing_state_items}
+    governed_anomaly_items = [
+        item
+        for item in orchestrated_issues
+        if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" in cast(list[str], item.get("labels", []))
+    ]
+    missing_state_numbers = {
+        cast(int, item["number"])
+        for item in waiting_for_pool_items + governed_anomaly_items
+    }
 
     task_progress_items = [
         item
@@ -283,6 +314,7 @@ def status(
         TaskStatusBucket.ASSIGNEE_INTAKE: [],
         TaskStatusBucket.READY_QUEUE: [],
         TaskStatusBucket.READY_ANOMALY: [],
+        TaskStatusBucket.ACTIVE_ANOMALY: [],
         TaskStatusBucket.OTHER: [],
     }
     for item in non_remote_items:
@@ -322,7 +354,7 @@ def status(
         and cast(int, item["number"]) not in supervisor_numbers
     ]
 
-    render_missing_state_items(missing_state_items)
+    render_missing_state_items(waiting_for_pool_items, governed_anomaly_items)
     render_rfc_items(roadmap_rfc_items)
     render_epic_items(roadmap_epic_items)
     render_blocked_items(blocked_items)
@@ -334,8 +366,3 @@ def status(
             if getattr(flow, "flow_status", "active") in {"done", "aborted", "merged"}
         ]
         render_completed_flows(completed_flows)
-
-    worktree_map = query_service.fetch_worktree_map()
-
-    if flows:
-        render_scene_sections(flows, worktree_map)

@@ -1,4 +1,7 @@
-"""Status dashboard UI rendering functions."""
+"""Status dashboard UI rendering functions.
+
+Filtering rules: docs/v3/orchestra/task-status-filtering.md
+"""
 
 from typing import cast
 
@@ -115,6 +118,7 @@ def render_issue_progress(
     assignee_items = bucketed_items[TaskStatusBucket.ASSIGNEE_INTAKE]
     ready_items = bucketed_items[TaskStatusBucket.READY_QUEUE]
     ready_anomalies = bucketed_items[TaskStatusBucket.READY_ANOMALY]
+    active_anomalies = bucketed_items[TaskStatusBucket.ACTIVE_ANOMALY]
 
     console.print("[bold cyan]Issue Progress:[/]")
     console.print("  [bold]Assignee Intake:[/]")
@@ -188,6 +192,25 @@ def render_issue_progress(
                     "             [yellow]missing assignee:[/] "
                     "ready queue historical debt"
                 )
+    else:
+        console.print("  [dim](none)[/]")
+
+    console.print("\n  [bold]Active Exceptions:[/]")
+    if active_anomalies:
+        for item in active_anomalies:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            flow = cast(FlowStatusResponse | None, item["flow"])
+
+            state_str = state.value.upper()
+            display_title = title[:48] + "..." if len(title) > 48 else title
+            console.print(f"  #{number:4}  [red]{state_str:10}[/]  {display_title}")
+            _render_task_item_details(flow, config)
+            console.print(
+                "             [yellow]missing assignee:[/] active state"
+                " but no assignee (rule 2)"
+            )
     else:
         console.print("  [dim](none)[/]")
 
@@ -339,19 +362,48 @@ def render_completed_flows(completed_flows: list[FlowStatusResponse]) -> None:
 
 
 def render_missing_state_items(
-    missing_state_items: list[dict[str, object]],
+    waiting_for_pool_items: list[dict[str, object]],
+    governed_anomaly_items: list[dict[str, object]],
 ) -> None:
-    """Render issues that are relevant to the dashboard but have no state label."""
-    console.print("\n[bold cyan]Missing State Label:[/]")
-    if missing_state_items:
-        for item in missing_state_items:
+    """Render issues that are relevant to the dashboard but have no state label.
+
+    Splits into two categories:
+    1. Waiting for Assignee Pool: Issues with manager assignee
+       but no orchestra-governed label
+    2. Governed but Anomaly: Issues with orchestra-governed label
+       but still missing state
+    """
+    # Render waiting for assignee pool (normal)
+    console.print("\n[bold cyan]Missing State Label - Waiting for Assignee Pool:[/]")
+    if waiting_for_pool_items:
+        for item in waiting_for_pool_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
+            assignee = cast(str | None, item.get("assignee"))
             display_title = title[:60] + ("..." if len(title) > 60 else "")
-            reasons = cast(list[str], item.get("dispatch_exclusion_messages", []))
-            console.print(f"  #{number:4}  [yellow]NO STATE  [/]  {display_title}")
-            if reasons:
-                console.print(f"         [yellow]reason:[/] {', '.join(reasons)}")
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            console.print(
+                f"  #{number:4}  [yellow]NO STATE  [/]  {display_title}{assignee_str}"
+            )
+    else:
+        console.print("  [dim](none)[/]")
+
+    # Render governed but anomaly (needs attention)
+    console.print("\n[bold cyan]Missing State Label - Governed but Anomaly:[/]")
+    if governed_anomaly_items:
+        for item in governed_anomaly_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            assignee = cast(str | None, item.get("assignee"))
+            display_title = title[:60] + ("..." if len(title) > 60 else "")
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            console.print(
+                f"  #{number:4}  [red]NO STATE  [/]  {display_title}{assignee_str}"
+            )
+            console.print(
+                "         [yellow]⚠️  orchestra-governed label present"
+                " but state missing[/]"
+            )
     else:
         console.print("  [dim](none)[/]")
 
@@ -360,48 +412,16 @@ def render_scene_sections(
     flows: list[FlowStatusResponse],
     worktree_map: dict[str, str],
 ) -> None:
-    """Render Auto Task Scenes and Manual Scenes sections."""
-    from vibe3.services.status_query_service import (
-        is_auto_task_branch,
-        is_canonical_task_branch,
-    )
-
+    """Render active flow scenes."""
     active_flows = [
         flow
         for flow in flows
         if getattr(flow, "flow_status", "active") not in {"done", "aborted", "merged"}
     ]
-    auto_flows = [
-        flow
-        for flow in active_flows
-        if is_auto_task_branch(flow.branch) and flow.branch in worktree_map
-    ]
-    manual_flows = [
-        flow for flow in active_flows if not is_auto_task_branch(flow.branch)
-    ]
 
-    console.print("\n[bold cyan]Auto Task Scenes:[/]")
-    if auto_flows:
-        for flow in auto_flows:
-            wt = worktree_map.get(flow.branch, "(no worktree)")
-            if is_canonical_task_branch(flow.branch, flow.task_issue_number):
-                console.print(f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}")
-            else:
-                task = (
-                    f"#{flow.task_issue_number}"
-                    if flow.task_issue_number
-                    else "(no task)"
-                )
-                console.print(
-                    f"  [cyan]{flow.branch:30}[/] "
-                    f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
-                )
-    else:
-        console.print("  [dim](none)[/]")
-
-    console.print("\n[bold cyan]Manual Scenes:[/]")
-    if manual_flows:
-        for flow in manual_flows:
+    console.print("\n[bold cyan]Active Scenes:[/]")
+    if active_flows:
+        for flow in active_flows:
             wt = worktree_map.get(flow.branch, "(no worktree)")
             task = (
                 f"#{flow.task_issue_number}" if flow.task_issue_number else "(no task)"

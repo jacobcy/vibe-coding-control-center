@@ -262,7 +262,7 @@ def test_task_status_shows_missing_state_label_section(
             "number": 901,
             "title": "Missing state label issue",
             "state": None,
-            "assignee": None,
+            "assignee": "manager-bot",
             "flow": None,
             "queued": False,
             "blocked_by": None,
@@ -299,12 +299,144 @@ def test_task_status_shows_missing_state_label_section(
 
     assert result.exit_code == 0
     output = result.output
-    assert "Missing State Label:" in output
+    assert "Missing State Label - Waiting for Assignee Pool:" in output
     assert "# 901" in output
     assert "Missing state label issue" in output
     assert "Roadmap Epic:" in output
     assert "Roadmap epic without state" in output
     assert output.count("Roadmap epic without state") == 1
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_task_status_shows_active_exception_for_missing_assignee(
+    mock_status_service_cls: MagicMock,
+    mock_flow_service_cls: MagicMock,
+    mock_fetch_live_snapshot: MagicMock,
+    mock_load_orchestra_config: MagicMock,
+) -> None:
+    """Active-state issue with missing assignee appears in Active Exceptions."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 903,
+            "title": "Active state but no assignee",
+            "state": IssueState.IN_PROGRESS,
+            "assignee": None,
+            "flow": None,
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "dispatch_exclusion_codes": [],
+            "dispatch_exclusion_messages": [],
+            "remote": False,
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Active Exceptions:" in output
+    assert "# 903" in output
+    assert "Active state but no assignee" in output
+    assert "missing assignee" in output
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_task_status_shows_governed_anomaly_section(
+    mock_status_service_cls: MagicMock,
+    mock_flow_service_cls: MagicMock,
+    mock_fetch_live_snapshot: MagicMock,
+    mock_load_orchestra_config: MagicMock,
+) -> None:
+    """Issue with governed label but no state appears in Governed but Anomaly."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 904,
+            "title": "Governed but state missing",
+            "state": None,
+            "assignee": "manager-bot",
+            "flow": None,
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": ["orchestra-governed", "priority/3", "roadmap/p2"],
+            "dispatch_exclusion_codes": ["missing_state_label"],
+            "dispatch_exclusion_messages": ["missing state/* label"],
+            "remote": False,
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Missing State Label - Governed but Anomaly:" in output
+    assert "# 904" in output
+    assert "Governed but state missing" in output
+    assert "orchestra-governed label present" in output
+    # Must not appear in Waiting section
+    assert "Waiting for Assignee Pool" in output
+    governed_section = output[output.find("Governed but Anomaly:") :]
+    assert "# 904" in governed_section
 
 
 class TestResolveServerLabel:
