@@ -55,12 +55,17 @@ class TestFlowServiceCreate:
         assert kwargs["flow_slug"] == "test-flow"
 
     def test_create_flow_restores_tombstone_row(self, mock_store, mock_git):
-        """create_flow must restore and reactivate a soft-deleted tombstone row."""
+        """create_flow must restore and reactivate a soft-deleted tombstone row.
+
+        After restoration, the idempotency check is skipped so the normal
+        create path runs: update_flow_state with slug/actor/initiated_by,
+        add_event for flow_created, and get_flow_status for the return value.
+        """
         service = FlowService(store=mock_store, git_client=mock_git)
         mock_git.get_current_branch.return_value = "task/issue-123"
 
-        # Simulate tombstone: get_flow_state returns None (deleted_at filter),
-        # but get_flow_state_include_deleted finds the tombstone.
+        # Simulate tombstone: get_flow_state_include_deleted finds the
+        # soft-deleted row with deleted_at set.
         tombstone = {
             "branch": "task/issue-123",
             "flow_slug": "issue-123",
@@ -68,21 +73,19 @@ class TestFlowServiceCreate:
             "deleted_at": "2026-05-27T00:00:00",
             "updated_at": "2026-05-27T00:00:00",
         }
-        mock_store.get_flow_state.return_value = None
         mock_store.get_flow_state_include_deleted.return_value = tombstone
-        mock_store.get_issue_links.return_value = []
 
-        # After restore, get_flow_state returns the active flow (idempotency check)
-        mock_store.get_flow_state.side_effect = [
-            None,  # First call: idempotency check -> None (tombstone not visible)
-            {  # Second call (after restore+reactivate): returns active flow
-                "branch": "task/issue-123",
-                "flow_slug": "issue-123",
-                "flow_status": "active",
-                "updated_at": "2026-05-27T18:00:00",
-                "initiated_by": "manual",
-            },
-        ]
+        # Normal create path calls get_flow_status which internally calls
+        # get_flow_state. Return the active flow for that chain.
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-123",
+            "flow_slug": "issue-123",
+            "flow_status": "active",
+            "updated_at": "2026-05-27T18:00:00",
+            "initiated_by": "manual",
+        }
+        mock_store.get_issue_links.return_value = []
+        mock_git.find_worktree_path_for_branch.return_value = None
 
         with patch("vibe3.services.flow_read_mixin.GitHubClient") as mock_gh:
             mock_gh.return_value.get_pr.return_value = None
@@ -94,12 +97,17 @@ class TestFlowServiceCreate:
         assert status is not None
         # Must have called restore_flow
         mock_store.restore_flow.assert_called_once_with("task/issue-123")
-        # Must have reset flow_status to 'active'
+        # Must have reset flow_status to 'active' (tombstone reactivation)
         update_calls = mock_store.update_flow_state.call_args_list
         status_updates = [
             c for c in update_calls if c.kwargs.get("flow_status") == "active"
         ]
         assert len(status_updates) >= 1
+        # Normal create path must record flow_created event
+        mock_store.add_event.assert_called_once()
+        add_event_args = mock_store.add_event.call_args[0]
+        assert add_event_args[0] == "task/issue-123"
+        assert add_event_args[1] == "flow_created"
 
 
 class TestFlowServiceAbort:
