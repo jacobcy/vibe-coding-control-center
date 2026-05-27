@@ -29,8 +29,8 @@ code_limits:
 
       # Exceptions 聚合 —— 允许 480-590
       - path: "src/vibe3/domain/qualify_gate.py"
-        limit: 480
-        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查等紧密耦合逻辑"
+        limit: 500
+        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard 等紧密耦合逻辑"
       - path: "src/vibe3/services/handoff_service.py"
         limit: 590
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）"
@@ -40,8 +40,8 @@ code_limits:
         limit: 540
         reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
-        limit: 520
-        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理"
+        limit: 535
+        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析"
       - path: "src/vibe3/clients/github_pr_read_ops.py"
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
