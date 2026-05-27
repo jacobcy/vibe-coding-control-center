@@ -1,7 +1,10 @@
 # Task Status 过滤逻辑
 
-> 本文档定义 `vibe3 task status` 的完整 issue 过滤决策树。
+> 本文档定义 `vibe3 task status` 的完整 issue 过滤决策树（**展示侧/读取侧**）。
 > 代码位置：`src/vibe3/commands/status.py`（过滤逻辑）、`src/vibe3/commands/status_render.py`（渲染逻辑）、`src/vibe3/services/task_status_classifier.py`（状态分类）。
+>
+> **写入侧治理流程**（谁/何时打 `orchestra-scanned` / `orchestra-governed` / `roadmap-reviewed`）：参见
+> [docs/governance/governance-roadmap-closed-loop.md](../../governance/governance-roadmap-closed-loop.md)。
 
 ## 核心原则
 

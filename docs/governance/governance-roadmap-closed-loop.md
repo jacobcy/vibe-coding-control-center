@@ -17,7 +17,8 @@ Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有
 ```
 broader repo --> Layer 1: roadmap-intake (入口层)
                     扫描范围: 无 assignee 的 issue
-                    过滤: 无 orchestra-scanned
+                    过滤: 无 orchestra-scanned（自闭环）
+                          + 无 orchestra-governed（防御：pool 已决策的不该回头）
                     接受 -> 分配 assignee -> 流入 Layer 2
                     跳过 -> 打 orchestra-scanned -> 不再看
                           |
@@ -25,12 +26,13 @@ broader repo --> Layer 1: roadmap-intake (入口层)
                  Layer 2: assignee-pool (池内决策层)
                     扫描范围: 有 assignee 的 issue
                     过滤: 无 orchestra-governed
-                    决策(rfc/epic/ready) -> 打 orchestra-governed -> 不再看
+                    例外: roadmap/epic 收口检查每次独立扫描，不受 governed 过滤
+                    决策(close/split/rfc/epic/ready/resume) -> 打 orchestra-governed -> 不再看
                           |
                           v
-                 Layer 3: vibe-roadmap (上层审查层)
+                 Layer 3: vibe-roadmap (上层审查/纠偏层)
                     扫描范围: 所有 [governance suggest] 评论
-                    过滤: 无 roadmap-reviewed
+                    过滤: 无 roadmap-reviewed 且无 roadmap/rfc
                     审查 -> 打 roadmap-reviewed -> 写入 memory.md
 ```
 
@@ -65,9 +67,15 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 **过滤逻辑**：
 ```
-intake 扫描 -> 跳过有 orchestra-scanned 的 issue
+intake 扫描 -> 跳过有 orchestra-scanned 的 issue（自闭环）
+intake 扫描 -> 跳过有 orchestra-governed 的 issue（防御性过滤）
 intake 扫描 -> 跳过有 assignee 的 issue（已在 pool 中）
 ```
+
+**防御性过滤说明**：
+代码 `build_broader_repo_entries` 同时过滤 `orchestra-scanned` 和 `orchestra-governed`。
+原因：broader repo 默认查询无 assignee 的 issue，但如果一个 issue 曾被 pool 决策（带 `orchestra-governed`）后 assignee 被移除，或 pool 决策 `close`/`rfc` 后 issue 仍 OPEN 但无 assignee，
+不该让 intake 再次评估它——它已经过更上层的决策了。
 
 ---
 
@@ -159,9 +167,10 @@ Issue 创建（无 assignee，无标签）
 | | roadmap-intake | assignee-pool |
 |---|---|---|
 | **扫描范围** | broader repo（无 assignee） | assignee pool（有 assignee） |
-| **跳过条件** | 有 assignee 或 有 `orchestra-scanned` | 无 assignee 或 有 `orchestra-governed` |
+| **跳过条件** | 有 assignee / 有 `orchestra-scanned` / 有 `orchestra-governed`（防御） | 无 assignee 或 有 `orchestra-governed` |
 | **打标签** | 只对跳过的打 `orchestra-scanned` | 对所有决策完的打 `orchestra-governed` |
 | **不打的含义** | 接受 -> assignee 是信号 -> 流入 pool | 无——所有决策完都打 |
+| **过滤例外** | 无 | `roadmap/epic` 收口检查独立扫描所有 epic，不受 governed 过滤 |
 
 ---
 
@@ -183,7 +192,7 @@ Issue 创建（无 assignee，无标签）
 
 ### Layer 1: roadmap-intake
 
-- [x] 扫描前过滤：跳过有 `orchestra-scanned` 或有 assignee 的 issue
+- [x] 扫描前过滤：跳过有 `orchestra-scanned`、`orchestra-governed`（防御）或有 assignee 的 issue
 - [x] 接受（分配 assignee）：不设 scanned 标签，自然流入 pool
 - [x] 跳过（不接受）：打 `orchestra-scanned` 标签
 - [x] Stop Point Checklist 区分接受/跳过两种情况
@@ -218,5 +227,16 @@ gh issue view <N> --json labels --jq '.labels | map(.name)'
 
 ---
 
+## 相关文档
+
+- **写入侧（本文档）**：定义谁/何时打什么标签，三层 agent 的闭环责任
+- **[docs/v3/orchestra/task-status-filtering.md](../v3/orchestra/task-status-filtering.md)**：定义 `vibe3 task status` 的 UI 展示过滤规则（读取侧）
+- **[docs/standards/github-labels-reference.md](../standards/github-labels-reference.md)**：标签参考手册
+- **[supervisor/governance/roadmap-intake.md](../../supervisor/governance/roadmap-intake.md)**：intake 角色 prompt
+- **[supervisor/governance/assignee-pool.md](../../supervisor/governance/assignee-pool.md)**：pool 角色 prompt
+- **[skills/vibe-roadmap/SKILL.md](../../skills/vibe-roadmap/SKILL.md)**：roadmap 审查 skill
+
+---
+
 **维护者**: Vibe Team  
-**最后更新**: 2026-05-26
+**最后更新**: 2026-05-28

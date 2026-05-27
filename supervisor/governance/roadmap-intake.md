@@ -312,9 +312,10 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee 且无 `orchestra-scanned` 标签的 issue：
+2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee、无 `orchestra-scanned` 且无 `orchestra-governed` 的 issue：
    - 有 assignee → 跳过（已在 pool 中，由 assignee-pool 负责）
-   - 有 `orchestra-scanned` 标签 → 跳过（已审查过，不重复扫描）
+   - 有 `orchestra-scanned` 标签 → 跳过（intake 已审查过，不重复扫描）
+   - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不该回到 intake；如 `suggest_close`/`rfc` 后 assignee 被移除的情况）
 3. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
    ```bash
    uv run python src/vibe3/cli.py task status
