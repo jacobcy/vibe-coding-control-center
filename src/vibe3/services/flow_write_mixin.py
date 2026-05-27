@@ -85,6 +85,20 @@ class FlowWriteMixin(FlowReadMixin):
                 "Switch to a feature branch first."
             )
 
+        # Handle soft-deleted tombstone: restore and reactivate before
+        # idempotency check. Without this, INSERT OR IGNORE in
+        # update_flow_state silently fails on the existing tombstone row and
+        # create_flow leaves a zombie with deleted_at set.
+        tombstone = self.store.get_flow_state_include_deleted(branch)
+        if tombstone and tombstone.get("deleted_at") is not None:
+            logger.bind(
+                domain="flow",
+                action="create",
+                branch=branch,
+            ).info("Restoring soft-deleted tombstone before flow creation")
+            self.store.restore_flow(branch)
+            self.store.update_flow_state(branch, flow_status="active")
+
         # Idempotency: if flow already exists, return existing
         existing_state = self.store.get_flow_state(branch)
         if existing_state:
