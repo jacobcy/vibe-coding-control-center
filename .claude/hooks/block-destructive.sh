@@ -8,8 +8,9 @@ if [ -z "$CMD" ]; then
 fi
 
 PATTERNS=(
-  "rm\s+-rf\s+(/|~|\$HOME)"
-  "rm\s+-rf\s+.*\s+(/|~)"
+  "^rm\s+(-\w*[rf]\w*\s+)+(/|~|\$HOME)\s*$"
+  "^rm\s+(-\w*[rf]\w*\s+)+(\.?venv|\.?node_modules|\.?env|\.?virtualenv)"
+  "^rm\s+(-\w*[rf]\w*\s+)+.*/(\.?venv|\.?node_modules|\.?env|\.?virtualenv)"
   "git\s+commit\s+.*--no-verify"
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
 )
