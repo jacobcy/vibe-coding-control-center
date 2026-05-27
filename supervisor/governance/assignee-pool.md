@@ -22,7 +22,7 @@
 
 **supervisor issues 由 roadmap-intake 层处理**，不在 assignee-pool 观察范围内。
 
-**例外**：Epic 收口检查（Step 6）允许独立查询所有 `roadmap/epic` issues 以检查 sub-issues 完成状态，但仅限于建议关闭，不做 triage。
+**例外**：Epic 收口检查（Step 6）独立查询所有 `roadmap/epic` issues 以检查 sub-issues 完成状态，不受 Step 1 的 `orchestra-governed` 过滤限制，每次 scan 都会执行。
 
 ## Role
 
@@ -172,13 +172,16 @@ pool 扫描有 assignee 的 issue →
   ├─ 目标/架构/拆分形态无法判断 → 设 roadmap/rfc + 写 suggest → 打 governed
   ├─ 范围过大，分界清晰 → 写 suggest 建议 split → 打 governed
   ├─ 范围过大，已有 Sub-issues → 设 roadmap/epic + 写 suggest → 打 governed
-  ├─ roadmap/epic + all sub-issues closed → 写 suggest 建议关闭 epic → 打 governed
+  ├─ roadmap/epic + all sub-issues completed → 写 suggest 建议关闭 epic → 打 governed
+  ├─ roadmap/epic + partial sub-issues completed → 打 governed（标记已检查）→ 下次 scan 重新检查
   ├─ 明确冲突或重复（高置信度）→ 检查未完成工作 → 创建 follow-up（如有）+ 关闭 → 打 governed
   ├─ 不明确冲突或重复（低置信度）→ 写 suggest 建议关闭 → 打 governed
   ├─ blocked_reason == "state unchanged" + ref 存在 → resume → 打 governed
   ├─ 明确范围 + 清晰验收 + 无阻塞 → 设 roadmap/p0~p2 + priority/* + state/ready → 打 governed
   └─ 不确定 → 设 roadmap/rfc + 写 suggest → 打 governed
 ```
+
+**注意**："completed" 包含 `state == CLOSED` 或带有 `state/done` label 的 sub-issues。
 
 **关键原则**：所有决策完成后一律打 `orchestra-governed`，不管结论是什么。
 
@@ -242,7 +245,7 @@ pool 扫描有 assignee 的 issue →
 ## Hard Boundary
 
 - **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
-  **例外**：Step 6 (Epic 收口检查) 独立查询所有 `roadmap/epic` issues，不在此限制范围内
+  **例外**：Step 6 (Epic 收口检查) 独立查询所有 `roadmap/epic` issues，不受 Step 1 的 `orchestra-governed` 过滤限制，每次 scan 都会执行
 - **不负责决定哪些 issue 应进入 assignee issue pool（属于 `governance/roadmap-intake` 职责）**
 - **不接手涉及 `.claude/` 或 `.codex/` 目录的 issue**（见下方阻塞规则）
 - 不负责 task registry 或 task 数据质量审计
@@ -257,6 +260,12 @@ pool 扫描有 assignee 的 issue →
 - **允许两项 state 动作**：
   1. **入池评估与标签补齐**：有 manager assignee 但缺少 state label → 先评 priority/roadmap，再设 `state/ready`
   2. **漏改 blocked 恢复**：`state/blocked` + `blocked_reason == "state unchanged"` + authoritative ref 已存在 → 自动恢复
+- **Epic 收口检查的特殊性**：
+  - Epic 检查不受 Step 1 的 `orchestra-governed` 过滤限制
+  - 每次 scan 都会检查所有 `roadmap/epic` issues 的进度
+  - 对于未完成的 Epic，添加 `orchestra-governed` 标签标记已检查
+  - 对于已完成的 Epic，建议关闭并添加 `orchestra-governed` 标签
+  - **关键**：assignee-pool 是 Epic 进度的最后守门员，必须每次检查并更新进度
 
 ### `.claude/` 和 `.codex/` 目录阻塞规则
 
@@ -317,7 +326,8 @@ Steps:
           - 写 `[governance suggest]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
         - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
-6. **Epic 收口检查**（新增）：
+6. **Epic 收口检查**（新增，独立于 Step 1 过滤）：
+   - **注意**：此步骤独立于 Step 1 的 `orchestra-governed` 过滤，每次 scan 都会执行
    - 独立查询所有 `roadmap/epic` 标签的 open issues（不受 assignee/governed 过滤限制）：
      ```bash
      gh issue list --label "roadmap/epic" --state open --json number,title,body,labels --limit 200
@@ -335,10 +345,11 @@ Steps:
      f. **所有 sub-issues 已完成**：
         - 写 `[governance suggest] 建议关闭此 Epic`
         - 去重：写评论前检查是否已有相同"建议关闭此 Epic"评论（按 Comment Contract 去重规则）
-        - **禁止**：添加 `orchestra-governed` 标签（epic 可能不在 assignee pool 中；只建议关闭，不做决策标记）
+        - 添加 `orchestra-governed` 标签（标记 Epic 已完成收口检查，建议关闭）
      g. **部分 sub-issues 未完成**：
-        - 跳过（等待下次 governance scan 重新检查）
-        - 不写评论，不修改标签
+        - 添加 `orchestra-governed` 标签（标记 Epic 已检查，进度已记录）
+        - 不写评论，等待下次 governance scan 重新检查
+        - **关键**：assignee-pool 是 Epic 进度的最后守门员，必须每次检查并更新进度
      h. **无 sub-issues**（`## Sub-issues` 为空或解析出 0 个有效编号）：
         - 跳过（epic 拆分尚未完成，不执行关闭检查）
 7. 输出治理结论
@@ -444,18 +455,24 @@ Exit:
 - `Suggested issues`
 - `Label actions`（仅非 state labels）
 - `Why`
-- `Epic closure suggestions`（新增，独立于 assignee pool）
+- `Epic closure suggestions`（独立于 assignee pool）
+- `Epic progress checked`（新增：记录已检查但未完成的 Epic）
 
 如果当前没有合适的建议 issue，明确写无，并说明原因。
 
 **orchestra-governed 标签要求**：
 - 完成 issue 决策后（不管结论是 rfc/epic/ready/close），**必须**立即添加 `orchestra-governed` 标签
-- `orchestra-governed` 标签表示该 issue 已经过 assignee-pool 层决策，作为"已决策"标记
+- `orchestra-governed` 标签表示该 issue 已经过 assignee-pool 层决策或检查，作为"已决策/已检查"标记
 - 如果需要重新决策某个 issue，应先移除 `orchestra-governed` 标签（人类也可以手动移除）
 - 与三层标签配合实现治理闭环：
   - `orchestra-scanned`：intake 层已审查，不接受（跳过）
-  - `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
+  - `orchestra-governed`：assignee-pool 层已决策或已检查（不管 rfc/epic/ready/epic-progress）
   - `roadmap-reviewed`：roadmap decider 已审查
+- **Epic 特殊处理**：
+  - Epic 检查不受 Step 1 的 `orchestra-governed` 过滤限制
+  - 对于已完成的 Epic：建议关闭 + 添加 `orchestra-governed` 标签
+  - 对于未完成的 Epic：添加 `orchestra-governed` 标签（标记已检查）+ 下次 scan 重新检查
+  - **关键**：assignee-pool 是 Epic 进度的最后守门员，必须每次检查并更新进度
 
 ## Comment Contract
 
@@ -463,7 +480,9 @@ Exit:
 
 **去重规则（强制）**：
 
-- **orchestra-governed 标签检查**：如果 issue 已有 `orchestra-governed` 标签，直接跳过（已决策过）
+- **orchestra-governed 标签检查**：
+  - **普通 issue**：如果已有 `orchestra-governed` 标签，直接跳过（已决策过）
+  - **Epic issue（例外）**：不受此规则限制，每次 scan 都检查（见 Step 6 Epic 收口检查）
 - **写评论前必须检查**：读取该 issue 的现有 comments
 - **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
@@ -643,7 +662,32 @@ Sub-issues 状态：
 - issue body 包含 `## Sub-issues` section
 - 所有 sub-issues 状态为 CLOSED 或带有 `state/done` label
 
+执行动作：
+- 写建议评论
+- 添加 `orchestra-governed` 标签（标记 Epic 已完成收口检查）
+- 由 Manager 或人类执行实际关闭
+
 注意：只建议关闭，由 Manager 或人类执行实际关闭。
+
+### `epic_progress_checked()`
+
+当 `roadmap/epic` issue 的部分 sub-issues 未完成时：
+
+```
+（不写评论）
+```
+
+执行动作：
+- 添加 `orchestra-governed` 标签（标记 Epic 已检查，进度已记录）
+- 不写评论，等待下次 governance scan 重新检查
+- **关键**：assignee-pool 是 Epic 进度的最后守门员，必须每次检查并更新进度
+
+判断条件：
+- issue 有 `roadmap/epic` 标签
+- issue body 包含 `## Sub-issues` section
+- 部分 sub-issues 状态未完成（非 CLOSED 且无 `state/done` label）
+
+注意：此场景不写评论，避免刷屏，但必须添加 `orchestra-governed` 标签标记已检查。
 
 ## Stop Point
 
@@ -655,5 +699,13 @@ Sub-issues 状态：
 - [ ] 写完 `[governance suggest]` 或 `[governance auto-recover]` 评论
 - [ ] 打上 `orchestra-governed` 标签
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
+- [ ] **Epic 检查**：完成所有 `roadmap/epic` issues 的检查（Step 6）
 
 **缺少标签的后果**：下次 pool 扫描会重复决策同一 issue，造成资源浪费。
+
+**Epic 检查的特殊性**：
+- Epic 检查不受 Step 1 的 `orchestra-governed` 过滤限制
+- 每次 scan 都会检查所有 `roadmap/epic` issues 的进度
+- 对于未完成的 Epic，添加 `orchestra-governed` 标签标记已检查
+- 对于已完成的 Epic，建议关闭并添加 `orchestra-governed` 标签
+- **关键**：assignee-pool 是 Epic 进度的最后守门员，必须每次检查并更新进度
