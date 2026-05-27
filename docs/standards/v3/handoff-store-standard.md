@@ -49,7 +49,7 @@ Vibe 3.0 handoff system 固定采用两层：
 - SQLite 单文件，适合本地最小状态与唯一键约束
 - Markdown 更适合 agent 直接编辑 handoff 内容
 - 两层组合可以传递上下文，又不会自然膨胀成第二真源
-- 便于 `vibe check` 做一致性校验
+- 便于 `vibe3 check` 做一致性校验
 
 当前不采用：
 
@@ -331,7 +331,7 @@ CREATE TABLE flow_events (
 
 ## 7. Read Rules
 
-`flow show` / `flow status` / `vibe check` 固定按这个顺序重建：
+`vibe3 flow show` / `vibe3 flow status` / `vibe3 check` 固定按这个顺序重建：
 
 1. `git` 现场
 2. GitHub `issue / PR / Project`
@@ -382,7 +382,7 @@ CREATE TABLE flow_events (
 - 若兼容性命令触发本地 event 回写，这些 event 只是本地补充，不应反向定义远端业务事实
 
 **检查与修复**：
-- `vibe check --fix` - 自动修复问题
+- `vibe3 check --fix` - 自动修复问题
 
 写入原则：
 
@@ -401,9 +401,9 @@ CREATE TABLE flow_events (
   - `handoff_audit`：agent 主动写入并登记
   - `audit_recorded`：系统被动写入并登记
 
-## 9. `vibe check` Contract
+## 9. `vibe3 check` Contract
 
-`vibe check` 在 V3 至少要做这些检查：
+`vibe3 check` 在 V3 至少要做这些检查：
 
 - 当前 branch 是否在 `flow_state` 中存在
 - `flow_state.task_issue_number` 是否在远端仍存在
