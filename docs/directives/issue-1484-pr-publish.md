@@ -6,20 +6,16 @@
 
 **Status**: MINOR fix completed and verified, ready for PR creation
 
-**Commits**:
-- `aa3735f4` - feat(governance): add Epic lifecycle check to assignee-pool governance
-- `78fb1a39` - docs(governance): 明确 epic 收口检查的边界例外
+**Branch**: task/issue-1484
 
 ## PR Creation Instructions
 
 ### 1. Commit Verification
 
-Ensure both commits are present on the branch:
+Ensure commits are present on the branch:
 ```bash
 git log --oneline -3
-# Should show:
-# 78fb1a39 docs(governance): 明确 epic 收口检查的边界例外
-# aa3735f4 feat(governance): add Epic lifecycle check to assignee-pool governance
+# Should show commits related to Epic lifecycle check
 ```
 
 ### 2. Push to Remote
@@ -53,14 +49,11 @@ Add Epic lifecycle check to assignee-pool governance to automatically detect com
 - Epic is considered complete when all sub-issues are closed
 - Uses existing `gh issue view` and `gh issue list` commands
 - Adds `[governance suggest]` marker to comment for filtering
-- No triage or label changes, only suggestion comments
+- Suggests epic closure without triage or label changes
 
 **Files Changed**:
-- `supervisor/governance/assignee-pool.md` (54 insertions, 1 deletion)
-
-**Commits**:
-- `aa3735f4` - feat(governance): add Epic lifecycle check to assignee-pool governance
-- `78fb1a39` - docs(governance): 明确 epic 收口检查的边界例外
+- `supervisor/governance/assignee-pool.md` (documentation updates)
+- `docs/directives/issue-1484-*.md` (process documentation)
 
 ## Test Plan
 

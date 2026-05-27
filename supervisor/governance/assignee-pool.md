@@ -108,7 +108,7 @@ Forbidden:
 
 ## What It Reads
 
-以下所有观察面均以 **assignee issue pool** 为前提：
+以下所有观察面均以 **assignee issue pool** 为前提（**例外**：epic issues 及其 sub-issues 状态独立查询所有 `roadmap/epic`，用于收口检查）：
 
 - running issues（assignee issue pool 中当前正在执行的 issue 列表）
 - assignee issue pool 中尚未启动但可被考虑的候选 issues（backfill candidates）
@@ -320,8 +320,9 @@ Steps:
 6. **Epic 收口检查**（新增）：
    - 独立查询所有 `roadmap/epic` 标签的 open issues（不受 assignee/governed 过滤限制）：
      ```bash
-     gh issue list --label "roadmap/epic" --state open --json number,title,body,labels --limit 20
+     gh issue list --label "roadmap/epic" --state open --json number,title,body,labels --limit 200
      ```
+     **注意**：使用 `--limit 200` 覆盖预期数量；若实际 epic 数量接近或超过此限制，应考虑分页或提高 limit
    - 对每个 epic issue：
      a. 检查 body 中是否有 `## Sub-issues` section
      b. 若无 `## Sub-issues` section → 跳过（epic 结构不完整，不执行关闭检查）
@@ -333,8 +334,8 @@ Steps:
         - 其他 → 未完成
      f. **所有 sub-issues 已完成**：
         - 写 `[governance suggest] 建议关闭此 Epic`
-        - 打 `orchestra-governed` 标签（标记为已决策）
         - 去重：写评论前检查是否已有相同"建议关闭此 Epic"评论（按 Comment Contract 去重规则）
+        - **禁止**：添加 `orchestra-governed` 标签（epic 可能不在 assignee pool 中；只建议关闭，不做决策标记）
      g. **部分 sub-issues 未完成**：
         - 跳过（等待下次 governance scan 重新检查）
         - 不写评论，不修改标签

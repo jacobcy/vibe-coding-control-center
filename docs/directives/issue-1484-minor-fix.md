@@ -4,21 +4,21 @@
 MINOR
 
 ## Problem
-Step 6 (Epic 收口检查, line 300) queries ALL `roadmap/epic` issues regardless of assignee filter ("不受 assignee/governed 过滤限制"). This deliberately bypasses the hard boundary at line 236 ("只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池").
+Step 6 (Epic 收口检查, in the "governance_scan() Steps" section) queries ALL `roadmap/epic` issues regardless of assignee filter ("不受 assignee/governed 过滤限制"). This deliberately bypasses the hard boundary rule (in the "Hard Boundary" section: "只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池").
 
 The exception is narrow and well-defined (only for `roadmap/epic` completion checking), but the hard boundary rule should be updated to explicitly acknowledge this exception to prevent future confusion.
 
 ## Fix Required
 Update hard boundary documentation in `supervisor/governance/assignee-pool.md`:
 
-### Location 1: Line 21 (Hard Boundaries section)
+### Location 1: "Hard Boundary" section (near the top of the file)
 Add exception note after the assignee pool boundary rule:
 ```markdown
 **例外**：Epic 收口检查（Step 6）允许独立查询所有 `roadmap/epic` issues 以检查 sub-issues 完成状态，但仅限于建议关闭，不做 triage。
 ```
 
-### Location 2: Line 236 (Boundary rule in governance_scan)
-Add clarifying note:
+### Location 2: Boundary rule in "governance_scan() Steps" section
+Add clarifying note in Step 6 preamble:
 ```markdown
 只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池
 **例外**：Step 6 (Epic 收口检查) 独立查询所有 `roadmap/epic` issues，不在此限制范围内
