@@ -240,12 +240,14 @@ def status(
         item
         for item in orchestrated_issues
         if "roadmap/rfc" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
     ]
     roadmap_rfc_numbers = {cast(int, item["number"]) for item in roadmap_rfc_items}
     roadmap_epic_items = [
         item
         for item in orchestrated_issues
         if "roadmap/epic" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
     ]
     roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
     missing_state_items = [
