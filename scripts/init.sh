@@ -82,8 +82,8 @@ if [[ -z "$UV_PROJECT_ENVIRONMENT" ]]; then
   echo -e "\033[1;33m⚠️  Warning: UV_PROJECT_ENVIRONMENT is not set\033[0m"
   echo "   Vibe Center uses a shared virtual environment at: ~/.venvs/vibe-center"
   echo ""
-  echo "   Please add the following to your shell config (~/.zshrc or ~/.bashrc):"
-  echo "   export UV_PROJECT_ENVIRONMENT=\"\$HOME/.venvs/vibe-center\""
+  echo "   Please enter the repo directory through direnv, or run:"
+  echo "   direnv allow"
   echo ""
   echo "   Or run: scripts/install.sh to set it up automatically"
 elif [[ ! -d "$UV_PROJECT_ENVIRONMENT" ]]; then

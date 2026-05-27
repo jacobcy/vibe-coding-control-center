@@ -4,6 +4,57 @@ setup() {
   export VIBE_ROOT="$BATS_TEST_DIRNAME/../../.."
 }
 
+_write_common_noninteractive_stubs() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/curl" <<'EOF'
+#!/usr/bin/env bash
+cat <<'INSTALLER'
+#!/usr/bin/env sh
+set -e
+mkdir -p "${UV_INSTALL_DIR:?}"
+cat > "${UV_INSTALL_DIR}/uv" <<'UVEOF'
+#!/usr/bin/env sh
+if [ "$1" = "venv" ]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  [ -n "${TEST_UV_LOG:-}" ] && echo "$*" >> "${TEST_UV_LOG}"
+  exit 0
+fi
+if [ "$1" = "sync" ] || [ "$1" = "tool" ]; then
+  [ -n "${TEST_UV_LOG:-}" ] && echo "$*" >> "${TEST_UV_LOG}"
+  exit 0
+fi
+[ -n "${TEST_UV_LOG:-}" ] && echo "$*" >> "${TEST_UV_LOG}"
+exit 0
+UVEOF
+chmod +x "${UV_INSTALL_DIR}/uv"
+INSTALLER
+EOF
+
+  cat > "$bin_dir/npx" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/pre-commit" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/openspec" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/jq" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+
+  chmod +x "$bin_dir/curl" "$bin_dir/npx" "$bin_dir/pre-commit" "$bin_dir/openspec" "$bin_dir/jq"
+}
+
 @test "install configures gh non-interactive defaults when gh is available" {
   local fixture home_dir bin_dir gh_log
 
@@ -38,6 +89,7 @@ exit 0
 EOF
 
   chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
 
   run env HOME="$home_dir" SHELL="/bin/zsh" TEST_GH_LOG="$gh_log" PATH="$bin_dir:$PATH" zsh "$VIBE_ROOT/scripts/install.sh"
 
@@ -48,7 +100,7 @@ EOF
 }
 
 @test "install writes stable envrc path and installs alias loader assets" {
-  local fixture home_dir bin_dir source_root install_script envrc_path
+  local fixture home_dir bin_dir source_root install_script envrc_path rc_file
 
   fixture="$(mktemp -d)"
   home_dir="$fixture/home"
@@ -56,6 +108,7 @@ EOF
   source_root="$fixture/source"
   install_script="$source_root/scripts/install.sh"
   envrc_path="$source_root/.envrc"
+  rc_file="$home_dir/.zshrc"
 
   mkdir -p "$home_dir" "$bin_dir" "$source_root"
   cp -R "$VIBE_ROOT/bin" "$source_root/bin"
@@ -87,18 +140,25 @@ exit 0
 EOF
 
   chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
 
   run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
 
   [ "$status" -eq 0 ]
   [ -f "$envrc_path" ]
   [ -f "$home_dir/.vibe/lib/alias/loader.sh" ]
-  grep -Fx 'source "$HOME/.venvs/vibe-center/bin/activate"' "$envrc_path"
+  grep -Fx 'export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"' "$envrc_path"
   [[ "$(cat "$envrc_path")" != *"$fixture"* ]]
+  ! grep -q '^export UV_PROJECT_ENVIRONMENT=' "$rc_file"
+  grep -q 'Vibe Center - codeagent-wrapper PATH' "$rc_file"
+  grep -q 'export PATH="\$HOME/.claude/bin:\$PATH"' "$rc_file"
+  grep -q '# Load Vibe keys' "$rc_file"
+  grep -q '\[ -f "'"$home_dir"'/.vibe/loader.sh" \] && source "'"$home_dir"'/.vibe/loader.sh"' "$rc_file"
+  grep -q 'direnv hook zsh' "$rc_file"
 }
 
 @test "install bootstraps uv into ~/.local/bin and remains idempotent" {
-  local fixture home_dir bin_dir source_root install_script rc_file
+  local fixture home_dir bin_dir source_root install_script rc_file uv_log
 
   fixture="$(mktemp -d)"
   home_dir="$fixture/home"
@@ -106,6 +166,7 @@ EOF
   source_root="$fixture/source"
   install_script="$source_root/scripts/install.sh"
   rc_file="$home_dir/.zshrc"
+  uv_log="$fixture/uv.log"
 
   mkdir -p "$home_dir" "$bin_dir" "$source_root"
   cp -R "$VIBE_ROOT/bin" "$source_root/bin"
@@ -118,38 +179,29 @@ EOF
 exit 0
 EOF
 
-  cat > "$bin_dir/curl" <<'EOF'
-#!/usr/bin/env bash
-cat <<'INSTALLER'
-#!/usr/bin/env sh
-set -e
-mkdir -p "${UV_INSTALL_DIR:?}"
-cat > "${UV_INSTALL_DIR}/uv" <<'UVEOF'
-#!/usr/bin/env sh
-if [ "$1" = "venv" ]; then
-  mkdir -p "$2/bin"
-  touch "$2/bin/activate"
-  exit 0
-fi
-exit 0
-UVEOF
-chmod +x "${UV_INSTALL_DIR}/uv"
-INSTALLER
-EOF
+  chmod +x "$bin_dir/gh"
+  _write_common_noninteractive_stubs "$bin_dir"
 
-  chmod +x "$bin_dir/gh" "$bin_dir/curl"
-
-  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+  run env HOME="$home_dir" SHELL="/bin/zsh" TEST_UV_LOG="$uv_log" PATH="$bin_dir:$PATH" zsh "$install_script"
   [ "$status" -eq 0 ]
   [ -x "$home_dir/.local/bin/uv" ]
   [ -d "$home_dir/.venvs/vibe-center" ]
   grep -q 'Vibe Local Bin' "$rc_file"
-  grep -q '^export UV_PROJECT_ENVIRONMENT=' "$rc_file"
+  ! grep -q '^export UV_PROJECT_ENVIRONMENT=' "$rc_file"
+  grep -q '^tool install --editable \.$' "$uv_log"
+  [ "$(grep -c 'Vibe Center - codeagent-wrapper PATH' "$rc_file")" -eq 1 ]
+  [ "$(grep -c '# Load Vibe keys' "$rc_file")" -eq 1 ]
+  [ "$(grep -c 'Vibe Coding Control Center - Loader' "$rc_file")" -eq 1 ]
+  [ "$(grep -c 'Vibe Direnv Hook' "$rc_file")" -eq 1 ]
 
-  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+  run env HOME="$home_dir" SHELL="/bin/zsh" TEST_UV_LOG="$uv_log" PATH="$bin_dir:$PATH" zsh "$install_script"
   [ "$status" -eq 0 ]
   [ "$(grep -c 'Vibe Local Bin' "$rc_file")" -eq 1 ]
-  [ "$(grep -c '^export UV_PROJECT_ENVIRONMENT=' "$rc_file")" -eq 1 ]
+  [ "$(grep -c 'Vibe Center - codeagent-wrapper PATH' "$rc_file")" -eq 1 ]
+  [ "$(grep -c '# Load Vibe keys' "$rc_file")" -eq 1 ]
+  [ "$(grep -c 'Vibe Coding Control Center - Loader' "$rc_file")" -eq 1 ]
+  [ "$(grep -c 'Vibe Direnv Hook' "$rc_file")" -eq 1 ]
+  [ "$(grep -c '^tool install --editable \.$' "$uv_log")" -eq 2 ]
 }
 
 @test "install writes bash direnv hook when current shell is bash" {
@@ -192,6 +244,7 @@ exit 0
 EOF
 
   chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
 
   run env HOME="$home_dir" SHELL="/bin/bash" PATH="$bin_dir:$PATH" zsh "$install_script"
 
