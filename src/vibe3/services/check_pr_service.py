@@ -300,6 +300,7 @@ class CheckPRService:
             handoff_service = HandoffService(
                 store=self.store,
                 git_client=self.git_client,
+                github_client=self.github_client,
             )
 
             handoff_service.append_current_handoff(
