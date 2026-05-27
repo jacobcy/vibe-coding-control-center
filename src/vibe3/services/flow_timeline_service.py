@@ -12,6 +12,20 @@ if TYPE_CHECKING:
     from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
 
 
+# Event type to display text mapping
+# Only includes events that may write comments (per policy)
+# NOTE: Must be reversible by timeline_parser.py reverse_map
+TIMELINE_DISPLAY_MAP: dict[str, str] = {
+    "flow_blocked": "Flow blocked",
+    "flow_failed": "Flow failed",
+    "flow_aborted": "Flow aborted",
+    "resumed": "Flow resumed",
+    "handoff_append": "Handoff update",
+    "milestone_recorded": "Milestone recorded",
+    "user_notification": "User notification",
+}
+
+
 class FlowTimelineService:
     """Unified service for recording flow timeline events.
 
@@ -128,20 +142,9 @@ class FlowTimelineService:
         Returns:
             Formatted comment body
         """
-        # Event type to display text mapping
-        # Only includes events that may write comments (per policy)
-        # NOTE: Must be reversible by timeline_parser.py reverse_map
-        display_map = {
-            "flow_blocked": "Flow blocked",
-            "flow_failed": "Flow failed",
-            "flow_aborted": "Flow aborted",
-            "resumed": "Flow resumed",
-            "handoff_append": "Handoff update",
-            "milestone_recorded": "Milestone recorded",
-            "user_notification": "User notification",
-        }
-
-        display_text = display_map.get(event_type, event_type.replace("_", " ").title())
+        display_text = TIMELINE_DISPLAY_MAP.get(
+            event_type, event_type.replace("_", " ").title()
+        )
 
         return f"[flow] {display_text}\n\n{detail}"
 
@@ -179,20 +182,8 @@ class FlowTimelineService:
             if not body.startswith("[flow]"):
                 return False
 
-            # Get display text mapping (same as _build_timeline_comment)
-            # NOTE: Must be reversible by timeline_parser.py reverse_map
-            display_map = {
-                "flow_blocked": "Flow blocked",
-                "flow_failed": "Flow failed",
-                "flow_aborted": "Flow aborted",
-                "resumed": "Flow resumed",
-                "handoff_append": "Handoff update",
-                "milestone_recorded": "Milestone recorded",
-                "user_notification": "User notification",
-            }
-
             # Reverse map: display text -> event_type
-            reverse_map = {v: k for k, v in display_map.items()}
+            reverse_map = {v: k for k, v in TIMELINE_DISPLAY_MAP.items()}
 
             # Extract display text from comment
             # Pattern: "[flow] {display_text}"

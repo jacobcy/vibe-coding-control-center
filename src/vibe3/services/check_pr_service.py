@@ -43,6 +43,33 @@ class CheckPRService:
         self.github_client = github_client
         self._flow_status_service = flow_status_service
 
+    def _already_handled_pr_closed(self, branch: str, pr: "PRResponse") -> bool:
+        """Check if PR closed event was already handled.
+
+        Idempotency guard to prevent duplicate handling on periodic checks.
+
+        Args:
+            branch: Branch name
+            pr: PR response object
+
+        Returns:
+            True if already handled (should skip), False if should handle
+        """
+        flow_state = self.store.get_flow_state(branch)
+        if not flow_state:
+            return False
+
+        initiated_by = str(flow_state.get("initiated_by") or "")
+        if initiated_by != "check:pr_closed":
+            return False
+
+        if pr.closed_at is None:
+            # No closed_at available — assume already handled to avoid flooding
+            return True
+
+        flow_updated = str(flow_state.get("updated_at") or "")
+        return flow_updated >= pr.closed_at.isoformat()
+
     def handle_closed_pr(
         self,
         branch: str,
@@ -64,6 +91,8 @@ class CheckPRService:
             return self._handle_merged_pr(branch, pr)
 
         if pr.state == PRState.CLOSED:
+            if self._already_handled_pr_closed(branch, pr):
+                return (False, [], [])
             return self._handle_closed_pr(branch, pr)
 
         # PR still open, nothing to handle
@@ -280,6 +309,7 @@ class CheckPRService:
                 branch=branch,
                 slug=f"issue-{task_issue_number}",
                 source="check:pr_closed",
+                initiated_by="check:pr_closed",
                 ensure_worktree=False,
                 reactivate_existing=False,
             )

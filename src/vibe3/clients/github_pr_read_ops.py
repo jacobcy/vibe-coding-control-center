@@ -177,7 +177,7 @@ class PRReadMixin:
                     target,
                     "--json",
                     "number,title,body,state,headRefName,baseRefName,"
-                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup,"
+                    "url,isDraft,createdAt,updatedAt,mergedAt,closedAt,mergeable,statusCheckRollup,"
                     "closingIssuesReferences",
                 ],
                 capture_output=True,
@@ -311,6 +311,7 @@ class PRReadMixin:
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
+            closed_at=data.get("closedAt"),
             metadata=metadata,
             ci_checks=ci_checks,
         )
@@ -348,7 +349,7 @@ class PRReadMixin:
             "--limit",
             str(limit),
             "--json",
-            "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt",
+            "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt,closedAt",
         ]
         if repo:
             cmd.extend(["--repo", repo])
@@ -397,6 +398,7 @@ class PRReadMixin:
                     created_at=None,
                     updated_at=None,
                     merged_at=pr_data.get("mergedAt"),
+                    closed_at=pr_data.get("closedAt"),
                     metadata=None,
                 )
             )
@@ -439,7 +441,7 @@ class PRReadMixin:
             "--head",
             branch,
             "--json",
-            "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt",
+            "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt,closedAt",
         ]
         if state:
             cmd.extend(["--state", state])
@@ -491,6 +493,7 @@ class PRReadMixin:
                     created_at=None,
                     updated_at=None,
                     merged_at=pr_data.get("mergedAt"),
+                    closed_at=pr_data.get("closedAt"),
                     metadata=None,
                 )
             )

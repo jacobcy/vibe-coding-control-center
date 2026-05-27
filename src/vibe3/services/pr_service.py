@@ -81,12 +81,18 @@ class PRService:
         """Convert cached JSON data back to PRResponse."""
         try:
             merged_at_raw = data.get("merged_at")
+            closed_at_raw = data.get("closed_at")
             number_raw = data.get("number")
             if not isinstance(number_raw, int | str):
                 return None
             merged_at = (
                 datetime.fromisoformat(merged_at_raw)
                 if isinstance(merged_at_raw, str) and merged_at_raw
+                else None
+            )
+            closed_at = (
+                datetime.fromisoformat(closed_at_raw)
+                if isinstance(closed_at_raw, str) and closed_at_raw
                 else None
             )
             state_value = str(data.get("state") or PRState.CLOSED.value)
@@ -105,6 +111,7 @@ class PRService:
                 created_at=None,
                 updated_at=None,
                 merged_at=merged_at,
+                closed_at=closed_at,
                 metadata=None,
             )
         except (KeyError, ValueError, TypeError):
@@ -221,6 +228,11 @@ class PRService:
                         pr.merged_at.isoformat()
                         if isinstance(pr.merged_at, datetime)
                         else pr.merged_at
+                    ),
+                    "closed_at": (
+                        pr.closed_at.isoformat()
+                        if isinstance(pr.closed_at, datetime)
+                        else pr.closed_at
                     ),
                 },
             )

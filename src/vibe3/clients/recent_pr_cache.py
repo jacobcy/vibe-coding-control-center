@@ -116,6 +116,7 @@ class RecentPRCache:
             if not isinstance(branch, str) or not branch:
                 continue
             merged_at = getattr(pr, "merged_at", None)
+            closed_at = getattr(pr, "closed_at", None)
             branch_map[branch] = {
                 "number": getattr(pr, "number", None),
                 "title": getattr(pr, "title", ""),
@@ -128,6 +129,11 @@ class RecentPRCache:
                     merged_at.isoformat()
                     if isinstance(merged_at, datetime)
                     else merged_at
+                ),
+                "closed_at": (
+                    closed_at.isoformat()
+                    if isinstance(closed_at, datetime)
+                    else closed_at
                 ),
             }
 

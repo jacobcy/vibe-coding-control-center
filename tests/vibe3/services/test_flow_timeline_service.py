@@ -96,6 +96,34 @@ def test_record_timeline_event_dedupe_skips_same_event_type():
     mock_github.add_comment.assert_not_called()
 
 
+def test_record_timeline_event_dedupe_handoff_append():
+    """Test that duplicate handoff_append comments are skipped."""
+    mock_store = Mock()
+    mock_github = Mock()
+
+    # Mock existing comments with [flow] Handoff update comment
+    mock_github.view_issue.return_value = {
+        "comments": [{"body": "[flow] Handoff update\n\nPR #42 closed"}]
+    }
+
+    service = FlowTimelineService(store=mock_store, github_client=mock_github)
+
+    # Try to record another handoff_append event
+    service.record_timeline_event(
+        branch="dev/issue-123",
+        event_type="handoff_append",
+        actor="claude/sonnet-4.6",
+        detail="Another update",  # Different detail but same event_type
+        issue_number=123,
+    )
+
+    # Verify event recorded (event always recorded)
+    mock_store.add_event.assert_called_once()
+
+    # Verify comment NOT added (dedupe)
+    mock_github.add_comment.assert_not_called()
+
+
 def test_record_timeline_event_policy_blocks_state_sync_events():
     """Test that policy blocks state_sync events from writing comments.
 

@@ -15,6 +15,7 @@ from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
+from vibe3.services.check_lock import check_lock
 from vibe3.services.check_pr_service import CheckPRService
 from vibe3.services.check_remote import (
     CheckRemote,
@@ -129,18 +130,28 @@ class CheckService(CheckRemote):
         Returns:
             CheckResult with validation status and issues.
         """
-        # Validate branch is not protected or remote
-        if branch in self.protected_branches or branch.startswith("origin/"):
-            return CheckResult(
-                is_valid=False,
-                issues=[f"Branch '{branch}' is a protected or remote branch"],
-                branch=branch,
-            )
+        with check_lock(branch, self.git_client) as acquired:
+            if not acquired:
+                return CheckResult(
+                    is_valid=False,
+                    issues=[
+                        f"Check skipped for '{branch}' (lock held by another process)"
+                    ],
+                    branch=branch,
+                )
 
-        # Batch fetch all PRs (optimization: 1 call instead of N)
-        self._initialize_pr_cache()
+            # Validate branch is not protected or remote
+            if branch in self.protected_branches or branch.startswith("origin/"):
+                return CheckResult(
+                    is_valid=False,
+                    issues=[f"Branch '{branch}' is a protected or remote branch"],
+                    branch=branch,
+                )
 
-        return self._check_branch(branch)
+            # Batch fetch all PRs (optimization: 1 call instead of N)
+            self._initialize_pr_cache()
+
+            return self._check_branch(branch)
 
     def _has_worktree(self, branch: str) -> bool:
         try:

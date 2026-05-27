@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from vibe3.models.flow import TimelineEvent
+from vibe3.services.flow_timeline_service import TIMELINE_DISPLAY_MAP
 
 
 def parse_timeline_from_comments(
@@ -22,15 +23,8 @@ def parse_timeline_from_comments(
     """
     events: list[TimelineEvent] = []
 
-    # Display text to event_type mapping (reverse of _build_timeline_comment)
-    display_map = {
-        "flow_blocked": "Flow blocked",
-        "flow_failed": "Flow failed",
-        "flow_aborted": "Flow aborted",
-        "resumed": "Flow resumed",
-        "state_transitioned": "State transitioned",
-    }
-    reverse_map = {v: k for k, v in display_map.items()}
+    # Reverse map: display text -> event_type
+    reverse_map = {v: k for k, v in TIMELINE_DISPLAY_MAP.items()}
 
     # Pattern to match [flow] display_text
     marker_pattern = re.compile(r"^\[flow\]\s+([^\n]+)", re.MULTILINE)
