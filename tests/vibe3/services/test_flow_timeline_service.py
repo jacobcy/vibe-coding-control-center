@@ -8,7 +8,7 @@ from vibe3.services.flow_timeline_service import FlowTimelineService
 def test_record_timeline_event_creates_event_and_comment():
     """Test that record_timeline_event calls both add_event and add_comment.
 
-    Uses state_transitioned event which is allowed by policy.
+    Uses milestone_recorded event which is allowed by policy (future placeholder).
     """
     mock_store = Mock()
     mock_github = Mock()
@@ -17,18 +17,18 @@ def test_record_timeline_event_creates_event_and_comment():
 
     service.record_timeline_event(
         branch="dev/issue-123",
-        event_type="state_transitioned",  # Policy allows comment for this
+        event_type="milestone_recorded",  # Policy allows comment for this
         actor="claude/sonnet-4.6",
-        detail="Transitioned from ready to claimed",
+        detail="Important milestone reached",
         issue_number=123,
     )
 
     # Verify event recorded
     mock_store.add_event.assert_called_once_with(
         "dev/issue-123",
-        "state_transitioned",
+        "milestone_recorded",
         "claude/sonnet-4.6",
-        "Transitioned from ready to claimed",
+        "Important milestone reached",
     )
 
     # Verify comment added
@@ -37,8 +37,8 @@ def test_record_timeline_event_creates_event_and_comment():
     assert call_args[0][0] == 123  # issue_number
     body = call_args[0][1]  # comment body
     assert body.startswith("[flow]")
-    assert "state" in body.lower()
-    assert "transitioned" in body.lower()
+    assert "milestone" in body.lower()
+    assert "recorded" in body.lower()
 
 
 def test_record_timeline_event_skips_comment_if_no_issue():
@@ -66,28 +66,26 @@ def test_record_timeline_event_skips_comment_if_no_issue():
 def test_record_timeline_event_dedupe_skips_same_event_type():
     """Test that duplicate event_type comments are skipped.
 
-    Uses state_transitioned event which is allowed by policy.
+    Uses milestone_recorded event which is allowed by policy.
     """
     mock_store = Mock()
     mock_github = Mock()
 
-    # Mock existing comments with [flow] state transitioned comment
+    # Mock existing comments with [flow] milestone_recorded comment
     mock_github.view_issue.return_value = {
         "comments": [
-            {"body": "[flow] State transitioned\n\nTransitioned from ready to claimed"}
+            {"body": "[flow] Milestone recorded\n\nImportant milestone reached"}
         ]
     }
 
     service = FlowTimelineService(store=mock_store, github_client=mock_github)
 
-    # Try to record another state_transitioned event
+    # Try to record another milestone_recorded event
     service.record_timeline_event(
         branch="dev/issue-123",
-        event_type="state_transitioned",
+        event_type="milestone_recorded",
         actor="claude/sonnet-4.6",
-        detail=(
-            "Transitioned from claimed to in-progress"
-        ),  # Different detail but same event_type
+        detail=("Another milestone reached"),  # Different detail but same event_type
         issue_number=123,
     )
 
@@ -127,24 +125,24 @@ def test_record_timeline_event_policy_blocks_state_sync_events():
 def test_record_timeline_event_allows_different_event_type():
     """Test that different event_type comments are added.
 
-    Uses handoff_append and verdict_recorded which are both allowed by policy.
+    Uses milestone_recorded and user_notification which are both allowed by policy.
     """
     mock_store = Mock()
     mock_github = Mock()
 
-    # Mock existing comments with [flow] handoff_append comment
+    # Mock existing comments with [flow] milestone_recorded comment
     mock_github.view_issue.return_value = {
-        "comments": [{"body": "[flow] Handoff update\n\nPlan recorded"}]
+        "comments": [{"body": "[flow] Milestone recorded\n\nFirst milestone"}]
     }
 
     service = FlowTimelineService(store=mock_store, github_client=mock_github)
 
-    # Record verdict_recorded event (different event_type)
+    # Record user_notification event (different event_type)
     service.record_timeline_event(
         branch="dev/issue-123",
-        event_type="verdict_recorded",
-        actor="agent:review",
-        detail="Verdict: PASS",
+        event_type="user_notification",
+        actor="claude/sonnet-4.6",
+        detail="User notification sent",
         issue_number=123,
     )
 

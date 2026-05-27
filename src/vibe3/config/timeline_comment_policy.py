@@ -40,16 +40,26 @@ class TimelineCommentPolicy(BaseModel):
     ]
 
     # Milestone events - WRITE COMMENTS (important progress markers)
+    # NOTE: Must be routed through FlowTimelineService.record_timeline_event()
+    # Future events will be added here when producers migrate to FlowTimelineService
     milestone_events: list[str] = [
-        "handoff_append",  # Important milestone records
-        "verdict_recorded",  # Review verdict completed
-        "pr_created",  # PR created
+        "milestone_recorded",  # Example: Future milestone event (placeholder)
     ]
 
     # Human-readable events - WRITE COMMENTS (visible state changes)
+    # NOTE: Must be routed through FlowTimelineService.record_timeline_event()
+    # Future events will be added here when producers migrate to FlowTimelineService
     human_readable_events: list[str] = [
-        "state_transitioned",  # Issue label state changes (user wants to see)
+        "user_notification",  # Example: Future user-visible event (placeholder)
     ]
+
+    # Events NOT routed through FlowTimelineService (for documentation)
+    # These events are recorded directly with store.add_event() and bypass policy:
+    # - pr_created: PRService creates PR (pr_service.py:310-315)
+    # - handoff_verdict: VerdictService records verdict (verdict_service.py:140-146)
+    # - handoff_append: BootstrapContextService action (bootstrap_context_service.py)
+    # - state_transitioned: NoopGate state transition (noop_gate.py:406-424)
+    # To enable policy filtering, route through FlowTimelineService first
 
     def should_write_comment(self, event_type: str) -> bool:
         """Check if event type should write GitHub comment.
