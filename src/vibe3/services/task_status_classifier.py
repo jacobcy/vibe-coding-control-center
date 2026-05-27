@@ -1,4 +1,7 @@
-"""Pure task status classification helpers for status dashboards."""
+"""Pure task status classification helpers for status dashboards.
+
+Filtering rules: docs/v3/orchestra/task-status-filtering.md
+"""
 
 from __future__ import annotations
 

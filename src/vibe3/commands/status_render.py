@@ -1,4 +1,7 @@
-"""Status dashboard UI rendering functions."""
+"""Status dashboard UI rendering functions.
+
+Filtering rules: docs/v3/orchestra/task-status-filtering.md
+"""
 
 from typing import cast
 

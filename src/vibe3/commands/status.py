@@ -229,6 +229,12 @@ def status(
     )
 
     supervisor_label = config.supervisor_handoff.issue_label
+
+    # ── Filtering decision tree (see docs/v3/orchestra/task-status-filtering.md) ──
+    # Rules 0-9: state label is the gate to main flow.
+    # No state = never entered main flow; has state = entered main flow.
+    # Then branch by assignee (rule 2/3/4) and governed status (rule 5/7/8).
+
     supervisor_items = [
         item
         for item in orchestrated_issues
