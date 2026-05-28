@@ -36,6 +36,11 @@ related_docs:
 - 记录 events 与 handoff 上下文
 - 在 `git` / `gh` 没有覆盖的本地绑定场景下提供补充能力
 
+**Hybrid Architecture:**
+支持两种调用模式：
+1. **项目局部调用**：使用 `uv run python src/vibe3/cli.py` (通常被 alias 包装为 `vibe3`)。
+2. **全局安装调用**：使用 `uv tool install -e .` 安装后的全局 `vibe3` 命令。
+
 `vibe3` 不应重新包装以下能力：
 
 - branch 的创建、切换、删除、merge

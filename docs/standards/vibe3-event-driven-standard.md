@@ -162,13 +162,13 @@ Apply agent executes
 
 | 事件 | 触发时机 | 关键字段 | 说明 |
 |------|---------|---------|------|
-| `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state` | 标签变迁 |
-| `IssueFailed` | 发生运行时错误 | `reason`, `severity` | **ERROR 系统**：记录错误日志，不改变 Flow 状态 |
-| `IssueBlocked` | Flow 进入阻塞态 | `reason`, `blocked_by` | **BLOCK 系统**：改变 flow_status 为 blocked |
-| `ManagerDispatchIntent` | Manager 调度意图 | `issue_number`, `branch` | 管理分发意图 |
-| `PlannerDispatchIntent` | Planner 调度意图 | `issue_number`, `branch` | 计划分发意图 |
-| `ExecutorDispatchIntent` | Executor 调度意图 | `issue_number`, `branch` | 执行分发意图 |
-| `ReviewerDispatchIntent` | Reviewer 调度意图 | `issue_number`, `branch` | 审查分发意图 |
+| `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state`, `tick_id` | 标签变迁 |
+| `IssueFailed` | 发生运行时错误 | `reason`, `severity`, `tick_id` | **ERROR 系统**：记录错误日志，不改变 Flow 状态 |
+| `IssueBlocked` | Flow 进入阻塞态 | `reason`, `blocked_by`, `tick_id` | **BLOCK 系统**：改变 flow_status 为 blocked |
+| `ManagerDispatchIntent` | Manager 调度意图 | `issue_number`, `branch`, `tick_id` | 管理分发意图 |
+| `PlannerDispatchIntent` | Planner 调度意图 | `issue_number`, `branch`, `tick_id` | 计划分发意图 |
+| `ExecutorDispatchIntent` | Executor 调度意图 | `issue_number`, `branch`, `tick_id` | 执行分发意图 |
+| `ReviewerDispatchIntent` | Reviewer 调度意图 | `issue_number`, `branch`, `tick_id` | 审查分发意图 |
 
 **处理器** (`src/vibe3/domain/handlers/`):
 - `flow_lifecycle.py` — 记录状态变迁日志（纯观察），不执行业务判断
