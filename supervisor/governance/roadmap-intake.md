@@ -46,21 +46,7 @@
 - **禁止**纳入 assignee issue pool
 - 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
 
-**Level 1: 基础条件**
-- 问题边界明确、验收口径清楚、无需额外产品讨论
-- 改动范围可控、依赖关系简单
-- 允许存在若干实现选项；只要目标清楚、边界稳定、可由 manager 在执行中收敛，就不算人类阻塞
-
-**Level 2: 架构一致性**（新增）
-- 依赖的模块/函数仍存在
-- 引用的 API 未废弃
-- 涉及的配置/架构未变更
-- 有明确的代码执行路径
-
-**Level 3: 生命周期检查**（新增）
-- Issue 未过时（非依赖已移除）
-- 非重复已关闭 issue
-- 不需要先关闭其他依赖 issue
+**Level 1-3 审查框架详见 [../../supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三级审查框架)**。
 
 ### 决策逻辑
 
@@ -122,24 +108,7 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 - 描述里列了若干候选方案，但这些方案不会改变系统边界，只影响落地细节
 - 范围偏大但可以自然拆成独立执行环节；这种情况应建议拆分或交给 manager 拆分
 
-### 与 Assignee Pool 的职责边界
-
-**Roadmap Intake（入口层）**：
-- 决策范围：**只决定 accept（分配 assignee）或 skip（打 scanned）**
-- 检查：生命周期、依赖、API、模块
-- 输出：`[governance suggest]` 建议纳入或跳过，附带原因
-- 不设 `roadmap/*`、`priority/*` 标签
-- 边界：intake 不自称 decider；跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
-
-**Assignee Pool（池内决策层）**：
-- 决策范围：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复）、`roadmap/rfc`（不确定）、resume（明确可恢复）、split（清晰分界）
-- 所有决策完成后打 `orchestra-governed`
-- 边界：pool 是 assignee pool 内的决策 OWNER
-
-**Vibe Roadmap（审查纠正层）**：
-- 审查范围：`roadmap/rfc`、`state/blocked`、未 reviewed 的 issue
-- 可覆盖 pool 的决策（rfc → continue、epic → split 等）
-- 审查完打 `roadmap-reviewed`，写 memory.md
+**各层职责边界详见 [../../supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#各层职责边界)**。
 
 ### Supervisor Issue Intake
 
