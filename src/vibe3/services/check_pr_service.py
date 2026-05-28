@@ -67,8 +67,33 @@ class CheckPRService:
             # No closed_at available — assume already handled to avoid flooding
             return True
 
-        flow_updated = str(flow_state.get("updated_at") or "")
-        return flow_updated >= pr.closed_at.isoformat()
+        # Normalize both timestamps to UTC-aware datetime for accurate comparison
+        from datetime import datetime, timezone
+
+        flow_updated_str = str(flow_state.get("updated_at") or "")
+        if not flow_updated_str:
+            return False
+
+        try:
+            # Parse flow_updated (local time without timezone, assume UTC)
+            flow_updated = datetime.fromisoformat(flow_updated_str)
+            if flow_updated.tzinfo is None:
+                flow_updated = flow_updated.replace(tzinfo=timezone.utc)
+
+            # pr.closed_at is already a datetime, ensure UTC
+            pr_closed_at = pr.closed_at
+            if pr_closed_at.tzinfo is None:
+                pr_closed_at = pr_closed_at.replace(tzinfo=timezone.utc)
+
+            return flow_updated >= pr_closed_at
+        except (ValueError, TypeError):
+            # Fallback to string comparison if datetime parsing fails
+            logger.bind(
+                domain="check",
+                action="idempotency_guard",
+                branch=branch,
+            ).warning("Failed to parse timestamps, falling back to string comparison")
+            return flow_updated_str >= pr.closed_at.isoformat()
 
     def _abort_and_cleanup(
         self,

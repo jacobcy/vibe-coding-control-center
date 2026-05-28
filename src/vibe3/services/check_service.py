@@ -130,28 +130,18 @@ class CheckService(CheckRemote):
         Returns:
             CheckResult with validation status and issues.
         """
-        with check_lock(branch, self.git_client) as acquired:
-            if not acquired:
-                return CheckResult(
-                    is_valid=False,
-                    issues=[
-                        f"Check skipped for '{branch}' (lock held by another process)"
-                    ],
-                    branch=branch,
-                )
+        # Validate branch is not protected or remote
+        if branch in self.protected_branches or branch.startswith("origin/"):
+            return CheckResult(
+                is_valid=False,
+                issues=[f"Branch '{branch}' is a protected or remote branch"],
+                branch=branch,
+            )
 
-            # Validate branch is not protected or remote
-            if branch in self.protected_branches or branch.startswith("origin/"):
-                return CheckResult(
-                    is_valid=False,
-                    issues=[f"Branch '{branch}' is a protected or remote branch"],
-                    branch=branch,
-                )
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        self._initialize_pr_cache()
 
-            # Batch fetch all PRs (optimization: 1 call instead of N)
-            self._initialize_pr_cache()
-
-            return self._check_branch(branch)
+        return self._check_branch(branch)
 
     def _has_worktree(self, branch: str) -> bool:
         try:
@@ -272,16 +262,27 @@ class CheckService(CheckRemote):
 
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
-        issues: list[str] = []
-        warnings: list[str] = []
+        # Acquire branch-level lock to prevent concurrent checks
+        with check_lock(branch, self.git_client) as acquired:
+            if not acquired:
+                return CheckResult(
+                    is_valid=False,
+                    issues=[
+                        f"Check skipped for '{branch}' (lock held by another process)"
+                    ],
+                    branch=branch,
+                )
 
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            return CheckResult(
-                is_valid=False,
-                issues=[f"No flow record for branch '{branch}'"],
-                branch=branch,
-            )
+            issues: list[str] = []
+            warnings: list[str] = []
+
+            flow_data = self.store.get_flow_state(branch)
+            if not flow_data:
+                return CheckResult(
+                    is_valid=False,
+                    issues=[f"No flow record for branch '{branch}'"],
+                    branch=branch,
+                )
 
         # Check if local branch still exists
         branch_missing = False
