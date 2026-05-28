@@ -1,57 +1,83 @@
 # Claude Code Hooks
 
-本项目提供 Claude Code hooks，用于增强安全性，阻止真正危险的系统级命令。
+这个目录包含项目级 Claude Code hooks，用于增强安全性和防止误操作。
 
-## 配置
+## Hooks 清单
 
-Hooks 自动通过项目级 `.claude/settings.json` 启用，无需手动安装。
+### 1. block-destructive.sh
 
-如需禁用特定 hook，编辑 `.claude/settings.json`，移除对应的 hook 配置。
+**触发器**: `PreToolUse → Bash`
 
-## Hooks 说明
+**作用**: 阻止破坏性命令执行
 
-### protect-files.sh
+**保护范围**:
+- ✅ `rm -rf /`、`rm -rf ~`、`rm -rf $HOME`（系统级目录）
+- ✅ `rm -rf .venv`、`rm -rf .node_modules`、`rm -rf .env`（虚拟环境）
+- ✅ `rm -rf venv`、`rm -rf node_modules`（无点前缀版本）
+- ✅ `rm -rf path/to/.venv`（路径中的虚拟环境）
+- ✅ `git commit --no-verify`（绕过质量门禁）
+- ✅ `DROP TABLE`、`TRUNCATE DATABASE`（数据库破坏）
+- ✅ `vibe3 task resume -y`（无标签任务恢复）
 
-**作用**：防止编辑敏感文件（密钥、证书等）
+**安全命令**:
+- ✅ `rm -rf /tmp/*`（临时文件）
+- ✅ `rm -rf build/*`（构建产物）
+- ✅ 其他非保护目录
 
-**保护范围**：
-- `.env` 系列文件（`.env.local`, `.env.production`, `.env.staging`）
-- `secrets/` 目录
-- `credentials` 相关文件
-- `.ssh/` 目录下的私钥文件（`id_rsa`, `id_ed25519`）
+### 2. protect-files.sh
 
-**例外**：
-- ✅ 允许编辑模板文件（`*.template.*`, `*.example*`）
+**触发器**: `PreToolUse → Edit|Write`
 
-**示例**：
-- ❌ 阻止：编辑 `config/.env`（真实密钥文件）
-- ✅ 允许：编辑 `config/keys.template.env`（模板文件）
+**作用**: 防止编辑敏感文件
 
-### detect-secrets.sh
+**保护范围**:
+- `.env`、`.env.local`、`.env.production`（环境变量）
+- `secrets/`、`credentials/`（密钥目录）
+- `.ssh/`、`id_rsa`、`id_ed25519`（SSH 密钥）
 
-**作用**：检测硬编码的密钥（警告但不阻塞）
+**例外**: 允许编辑 `*.template.*`、`*.example*` 模板文件
 
-**检测模式**：
+**行为**: 阻塞操作（exit 2）
+
+### 3. detect-secrets.sh
+
+**触发器**: `PreToolUse → Edit|Write`
+
+**作用**: 检测硬编码密钥（只警告不阻塞）
+
+**检测模式**:
 - `API_KEY="..."`（16+ 字符）
 - `SECRET=...`
 - `TOKEN="..."`
 - `PASSWORD='...'`
 - `PRIVATE_KEY=...`
 
-**例外**：
-- ✅ 跳过测试文件（`*.test.*`, `*.spec.*`）
+**例外**:
+- ✅ 跳过测试文件（`*.test.*`、`*.spec.*`）
 - ✅ 跳过示例文件（`*.example*`）
 
-**行为**：发出警告，但不阻塞操作（exit 0）
+**行为**: 警告但不阻塞（exit 0）
 
-### block-destructive.sh
+## 测试
 
-**作用**：阻止破坏性系统命令和绕过质量检查的操作
+测试 hook 是否正常工作：
 
-**阻止范围**：
-- `rm -rf /` 或 `rm -rf ~`
-- `rm -rf ... /` 或 `rm -rf ... ~`
-- `git commit --no-verify`（禁止绕过 pre-commit hooks）
-- `DROP TABLE` 或 `TRUNCATE TABLE`
+```bash
+# 应该被阻止
+echo '{"tool_input": {"command": "rm -rf .venv"}}' | bash .claude/hooks/block-destructive.sh
 
-**行为**：阻塞操作（exit 2）
+# 应该被允许
+echo '{"tool_input": {"command": "rm -rf /tmp/test"}}' | bash .claude/hooks/block-destructive.sh
+```
+
+## 更新日志
+
+### 2026-05-27
+- ✅ 添加 `.venv`、`node_modules`、`env`、`virtualenv` 保护
+- ✅ 添加无点前缀版本（`venv`、`node_modules`）保护
+- ✅ 注册到项目级 `.claude/settings.json`
+- ✅ 测试通过所有保护场景
+
+## 参考资料
+
+- [Claude Code Hooks 官方文档](https://docs.anthropic.com/claude-code/hooks)
