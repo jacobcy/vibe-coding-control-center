@@ -27,6 +27,55 @@ _generate_claude_md() {
     fi
 }
 
+_copy_claude_asset_if_missing() {
+    local source_root="$1"
+    local repo_root="$2"
+    local asset_path="$3"
+
+    local source_path="$source_root/.claude/$asset_path"
+    local target_path="$repo_root/.claude/$asset_path"
+
+    [[ -e "$source_path" ]] || return 0
+
+    if [[ -d "$source_path" ]]; then
+        mkdir -p "$target_path"
+        local copied_any=false
+        local item
+        for item in "$source_path"/*(N); do
+            local item_name
+            item_name="$(basename "$item")"
+            if [[ ! -e "$target_path/$item_name" ]]; then
+                cp -R "$item" "$target_path/$item_name"
+                copied_any=true
+            fi
+        done
+        [[ "$copied_any" == true ]] && _log_success "Seeded: .claude/$asset_path"
+        return 0
+    fi
+
+    if [[ ! -e "$target_path" ]]; then
+        mkdir -p "$(dirname "$target_path")"
+        cp "$source_path" "$target_path"
+        _log_success "Seeded: .claude/$asset_path"
+    fi
+}
+
+_seed_claude_assets() {
+    local profile_name="$1"
+    local repo_root="$2"
+
+    case "$profile_name" in
+        github-flow|vibe-center)
+            local source_root="${VIBE_ROOT:-}"
+            [[ -n "$source_root" && -d "$source_root/.claude" ]] || return 0
+            _copy_claude_asset_if_missing "$source_root" "$repo_root" "settings.json"
+            _copy_claude_asset_if_missing "$source_root" "$repo_root" "hooks"
+            _copy_claude_asset_if_missing "$source_root" "$repo_root" "agents"
+            mkdir -p "$repo_root/.claude/rules"
+            ;;
+    esac
+}
+
 # --- Main Function ---
 vibe_init() {
     # Enable strict mode for this function only
@@ -218,6 +267,8 @@ vibe_init() {
         mkdir -p "$REPO_ROOT/.agent/supervisor"
         _log_success "Created: .agent/supervisor/ directory"
     fi
+
+    _seed_claude_assets "$PROFILE_NAME" "$REPO_ROOT"
 
     _log_success "Directory structure created"
 
