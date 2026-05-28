@@ -110,7 +110,7 @@ vibe update run --verbose # Detailed output
 | Change Location | Effect | How to Apply |
 |----------------|--------|--------------|
 | `src/vibe3/*.py` in current worktree | **Immediate** (local src resolution) | N/A |
-| `src/vibe3/*.py` globally | N/A (not synced) | Code is always local |
+| `src/vibe3/*.py` globally | Synced as fallback (local code takes precedence) | `vibe update` |
 | `pyproject.toml` dependencies | Requires reinstall | `uv sync --all-extras` or `vibe update` |
 
 ### Configuration Changes
@@ -125,19 +125,19 @@ vibe update run --verbose # Detailed output
 
 ```
 Source (Repo/Worktree)         Target (Global)
-├─ bin/vibe                 →  ~/.vibe/bin/vibe
-├─ bin/vibe3                →  ~/.vibe/bin/vibe3
-├─ lib/*.sh                 →  ~/.vibe/lib/
-├─ lib3/vibe.sh             →  ~/.vibe/lib3/vibe.sh
-├─ src/vibe3/*.py           →  ~/.vibe/src/vibe3/
-├─ config/shell/loader.sh   →  ~/.vibe/config/shell/loader.sh
-├─ config/keys.template.env →  ~/.vibe/config/keys.env (first time only)
-├─ pyproject.toml           →  ~/.vibe/pyproject.toml
-└─ uv.lock                   →  ~/.vibe/uv.lock
++-- bin/vibe                 ->  ~/.vibe/bin/vibe
++-- bin/vibe3                ->  ~/.vibe/bin/vibe3
++-- lib/*.sh                 ->  ~/.vibe/lib/
++-- lib3/vibe.sh             ->  ~/.vibe/lib3/vibe.sh
++-- src/vibe3/*.py           ->  ~/.vibe/src/vibe3/
++-- config/shell/loader.sh   ->  ~/.vibe/config/shell/loader.sh
++-- config/keys.template.env ->  ~/.vibe/config/keys.env (first time only)
++-- pyproject.toml           ->  ~/.vibe/pyproject.toml
+`-- uv.lock                  ->  ~/.vibe/uv.lock
 
 Preserved (not overwritten):
-├─ ~/.vibe/config/keys.env
-└─ ~/.vibe/settings.yaml
++-- ~/.vibe/config/keys.env
+`-- ~/.vibe/settings.yaml
 ```
 
 ## Troubleshooting

@@ -32,7 +32,7 @@ _usage() {
     echo "Usage: ${CYAN}vibe update run${NC} [options]"
     echo ""
     echo "Synchronizes Vibe distribution from current repo to ${CYAN}~/.vibe${NC}:"
-    echo "  • Syncs: bin, lib, lib3, config, scripts, alias, src, skills"
+    echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills"
     echo "  • Cleans: stale files not in source"
     echo "  • Preserves: config/keys.env, settings.yaml"
     echo "  • Idempotent: safe to run multiple times"
@@ -89,7 +89,7 @@ _update_run() {
     log_success "Pre-flight checks passed"
 
     # Sync core components
-    for dir in bin lib lib3 config scripts alias src skills; do
+    for dir in bin lib lib3 config scripts src skills; do
         _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
             log_error "Failed to sync $dir"
             exit 1
@@ -110,13 +110,17 @@ _update_run() {
 
     # Sync Python dependencies
     if [[ -f "$SOURCE_ROOT/pyproject.toml" ]]; then
-        log_info "Syncing Python dependencies..."
-        cd "$SOURCE_ROOT"
-        if command -v uv >/dev/null 2>&1; then
-            uv sync --all-extras
-            log_success "Python dependencies synced"
+        if [[ "$dry_run" == "true" ]]; then
+            log_info "[DRY-RUN] Would sync Python dependencies: uv sync --all-extras"
         else
-            log_warn "uv not found, skipping dependency sync"
+            log_info "Syncing Python dependencies..."
+            cd "$SOURCE_ROOT"
+            if command -v uv >/dev/null 2>&1; then
+                uv sync --all-extras
+                log_success "Python dependencies synced"
+            else
+                log_warn "uv not found, skipping dependency sync"
+            fi
         fi
     fi
 
@@ -167,7 +171,7 @@ _clean_stale_files() {
                 log_warn "Removing stale: $rel_path"
             fi
             rm -f "$file"
-            ((cleaned++))
+            cleaned=$((cleaned + 1)) || true
         fi
     done < <(find "$dst_dir" -type f -print0 2>/dev/null)
 

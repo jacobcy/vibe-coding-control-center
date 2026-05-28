@@ -166,10 +166,10 @@ if command -v direnv >/dev/null 2>&1; then
   if direnv allow . 2>/dev/null; then
     echo "✅ direnv allowed"
   else
-    echo -e "\033[1;33m⚠️  Warning: direnv allow failed. Please run manually: direnv allow${NC:-}"
+    echo -e "\033[1;33m⚠️  Warning: direnv allow failed. Please run manually: direnv allow\033[0m"
   fi
 else
-  echo -e "\033[1;33m⚠️  Warning: direnv not found. Skipping (non-blocking).${NC:-}"
+  echo -e "\033[1;33m⚠️  Warning: direnv not found. Skipping (non-blocking).\033[0m"
 fi
 
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────
