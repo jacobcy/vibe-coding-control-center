@@ -71,13 +71,47 @@ vibe update run --verbose # Detailed output
 | `config/shell/loader.sh` | Requires reload | `source ~/.zshrc` or restart shell |
 | `config/shell/aliases.sh` | Requires reload | `vibe alias` or restart shell |
 
-### V3 Python Changes
+### V3 Python Changes (Deps-Only Model)
+
+**Architecture: Shared Dependencies + Local Code**
+
+- **Global venv** (`~/.venvs/vibe-center`):
+  - Contains only third-party dependencies (via `uv sync`)
+  - **No vibe3 package** (no editable install)
+  - Shared across all worktrees
+
+- **Local code** (each worktree's `src/`):
+  - `import vibe3` always resolves to current worktree
+  - Ensured by `cli.py` bootstrap (`sys.path.insert(0, src_dir)`)
+  - Works even with `python -I` (isolation mode)
+
+- **Committed `.envrc`**:
+  - `UV_PROJECT_ENVIRONMENT=~/.venvs/vibe-center` (shared venv)
+  - `PYTHONPATH=$PWD/src` (local code)
+  - Non-secret, committed to repo
+  - Auto-activated on entering worktree (direnv)
+
+**Key Files:**
+
+- `pyproject.toml`:
+  - `[tool.uv] package = false` — prevents `.pth` generation
+  - `[tool.pytest.ini_options] pythonpath = ["src"]` — test resolution
+
+- `src/vibe3/cli.py`:
+  - Bootstrap code before imports
+  - Ensures local resolution even with `python -I`
+
+- `.envrc`:
+  - Committed to repo (non-secret)
+  - Keys remain in `config/keys.env` (gitignored)
+
+**Effect Semantics:**
 
 | Change Location | Effect | How to Apply |
 |----------------|--------|--------------|
-| `src/vibe3/*.py` in current worktree | **Immediate** (editable install) | `uv run python src/vibe3/cli.py` |
-| `src/vibe3/*.py` globally | Requires sync | Run `vibe update` |
-| `pyproject.toml` dependencies | Requires reinstall | `uv sync --all-extras` |
+| `src/vibe3/*.py` in current worktree | **Immediate** (local src resolution) | N/A |
+| `src/vibe3/*.py` globally | N/A (not synced) | Code is always local |
+| `pyproject.toml` dependencies | Requires reinstall | `uv sync --all-extras` or `vibe update` |
 
 ### Configuration Changes
 
@@ -131,12 +165,18 @@ source ~/.zshrc
 vibe update run  # Cleanup is automatic
 ```
 
-### Editable install confusion
+### Cross-worktree code resolution
 
-**Symptom:** Not sure if Python changes are effective
+**Symptom:** Not sure which worktree's code is running
 
-**Explanation:** V3 uses editable install for repo-local runs:
-- Worktree: `uv run python src/vibe3/cli.py` → immediate effect
-- Global: `~/.vibe/bin/vibe3` → requires `vibe update`
+**Explanation:** V3 uses deps-only venv model with local resolution:
+- Each worktree's `import vibe3` resolves to its own `src/`
+- Ensured by `cli.py` bootstrap (works with `python -I`)
+- `.envrc` PYTHONPATH provides additional support
+- No global editable install `.pth` hijacking
 
-**Recommendation:** Use worktree-local `bin/vibe3` for development
+**Verification:**
+```bash
+python -I -c "import vibe3; print(vibe3.__file__)"
+# Should show: /path/to/current/worktree/src/vibe3/__init__.py
+```
