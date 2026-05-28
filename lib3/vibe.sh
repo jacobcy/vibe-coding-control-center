@@ -47,12 +47,11 @@ local global_keys="$HOME/.vibe/config/keys.env"
 if _vibe3_load_keys "$project_keys"; then :; \
 else _vibe3_load_keys "$global_keys"; fi
 
-cd "$VIBE3_ROOT"
 export VIBE3_PROG_NAME="vibe3"
 
 if [[ "${1:-}" == "--version" || "${1:-}" == "-v" ]]; then
     shift 1 2>/dev/null || true
-    exec uv run python src/vibe3/cli.py version "$@"
+    exec uv run --project "$VIBE3_ROOT" python -I "$VIBE3_PYTHON_CORE" version "$@"
 fi
 
-exec uv run python src/vibe3/cli.py "$@"
+exec uv run --project "$VIBE3_ROOT" python -I "$VIBE3_PYTHON_CORE" "$@"
