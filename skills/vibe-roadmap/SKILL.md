@@ -733,7 +733,8 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 2. **禁止** vibe-roadmap 写 `[governance suggest]`（marker 必须区分 observer / decider）
 3. `[roadmap decision]` marker 同时作为 cron-supervisor / 下次 vibe-roadmap 自身判断"上次审查时间"的锚点
 4. **自动打 `roadmap-reviewed` 标签**：
-   - 每个 `[roadmap decision]` 评论后必须立即打 `roadmap-reviewed` 标签
+   - 写完 `[roadmap decision]` 评论后，如果 decision 不是 `rfc`，**必须**打 `roadmap-reviewed` 标签
+   - 如果 decision 是 `rfc`，**不打** `roadmap-reviewed`（保留 `roadmap/rfc` 标签等待人类决策）
    - 目的：标记已决策，避免 Step 0 重复扫描
    - 命令：`gh issue edit <number> --add-label "roadmap-reviewed"`
 5. 格式：
