@@ -50,6 +50,8 @@ class StateVerificationService:
             repo: Repository (defaults to current repo)
             branch: Branch for retry counter persistence
             flow_state: Flow state dict for retry counter
+            tick_id: Current heartbeat tick, preserved when retry-limit failures
+                are recorded to error_log
 
         Returns:
             State label string (e.g., "state/in-progress") or None
