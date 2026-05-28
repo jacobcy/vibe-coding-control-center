@@ -36,6 +36,7 @@ def _dispatch_role_intent(
     issue_number: int,
     request_builder: _RequestBuilder,
     actor: str,
+    tick_id: int = 0,
     **builder_kwargs: object,
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
@@ -112,6 +113,7 @@ def _dispatch_role_intent(
                 record_error(
                     error_code="E_DISPATCH_FAILURE",
                     error_message=error_message,
+                    tick_id=tick_id,
                     issue_number=issue_number,
                     branch=branch,
                     store=store,

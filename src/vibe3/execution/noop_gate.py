@@ -51,6 +51,7 @@ def apply_unified_noop_gate(
     repo: str | None = None,
     required_ref_key: str | None = None,
     flow_state: dict | None = None,
+    tick_id: int = 0,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -85,6 +86,7 @@ def apply_unified_noop_gate(
         repo=repo,
         branch=branch,
         flow_state=flow_state,
+        tick_id=tick_id,
     )
 
     if flow_state is not None:
