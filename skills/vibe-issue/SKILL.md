@@ -76,7 +76,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - 引导用户补充模板中缺失的关键信息。
 - 基于 AI 建议合适的 Labels。
-- 为保证后续 intake 链路可识别该 Issue，按当前仓库约定补充最小必要标签；`bug`、`enhancement`、`vibe-task` 等标签按模板和场景决定。
+- 按当前仓库约定补充最小必要类型标签（`bug`、`enhancement` 等），以及优先级标签（如 `priority/*`）。
+- **禁止添加 `vibe-task` 标签**：该标签是 `vibe3 flow bind` 成功后的自动镜像，不应在 issue 创建时手动添加。
 - intake 标签不等于已完成 roadmap placement；是否进入版本窗口、如何排序，仍由 `vibe-roadmap` / `vibe-orchestra` 在后续阶段处理。
 
 ### Step 4.5: Scope 自检与主/子 Issue 结构判断
