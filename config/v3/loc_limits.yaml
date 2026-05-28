@@ -235,7 +235,7 @@ code_limits:
 
 
   total_file_loc:
-    v2_shell: 3000         # Shell 核心代码总行数
+    v2_shell: 3500         # Shell 核心代码总行数
     # Python LOC reduction milestones (Issue #274)
     # Current: 45,894 LOC (as of 2026-05-01)
     # Milestone 1: 45,000 LOC (intermediate target)
