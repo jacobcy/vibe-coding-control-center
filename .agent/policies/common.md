@@ -166,23 +166,20 @@ uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor
 
 Issue / PR 评论和 handoff 是两条互补但不可替换的通道。
 
-### 何时用 issue / PR comment
+**关键事实**：`handoff append` 会自动同步到 GitHub comment，兼具内外可见性。
 
-适合需要**外部可见性**的内容：
-- 阶段性里程碑通报（plan 完成、run 完成、review 裁决）
-- 需要人类介入的 blocker（凭证缺失、依赖未就绪、范围争议）
-- 跨角色协作公告（人类、其他 agent、PR reviewer 都可能看到）
-- 与 GitHub issue / PR 状态机直接相关的事件
+### 统一规则
 
-### 何时用 handoff append
+| 场景 | 使用方式 | 原因 |
+|------|---------|------|
+| **执行过程记录** | `handoff append` | 自动同步到 comment |
+| **状态切换中间过程** | `handoff append` | 自动同步到 comment |
+| **finding/观察记录** | `handoff append` | 自动同步到 comment |
+| **关键里程碑** | 独立 comment + handoff | claim/block/close/done 等关键节点 |
+| **人类介入 blocker** | 独立 comment + handoff | 明确请求人类决策或行动 |
+| **响应人类指令** | 独立 comment | 正式回复人类明确要求 |
 
-适合 **agent 之间的内部交接**：
-- 执行过程中的 finding、临时观察、调试线索
-- 仅供下一步 agent 消费的上下文
-- 不需要人类即刻知晓的次要信息
-- 与当前 flow 主体输出无直接关联但需要留痕的事项
-
-判断准则：**看一眼 issue 评论区就需要知道的事 → comment；只有同 flow 内的下一个 agent 需要的事 → handoff append**。
+判断准则：**大部分情况用 handoff append，只有关键决策点和人类介入才写独立 comment**。
 
 ### 强制 marker 格式
 
