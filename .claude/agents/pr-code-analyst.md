@@ -243,6 +243,26 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 - 是否绕过 `uv run` 直接用 python/pip？
 - 是否在已有 PR 的工作流上继续扩新目标？
 
+### 5. 状态边界保护（高风险）
+
+> **背景**：Phase 2 agent 曾因缺乏此视角而漏判 PR #892 中的 phantom flow 创建、数据一致性等实质性问题。
+
+**必须检查**：
+
+| 检查项 | 说明 | 验证方式 |
+|--------|------|----------|
+| Phantom flow 创建 | 是否允许对不存在的 flow 写入状态（如 `INSERT OR IGNORE` 生成 phantom flow 行） | 检查涉及 `--branch` 参数的写入命令是否先验证 flow 存在性 |
+| 跨分支/flow 越权 | 是否允许一个 flow 修改另一个 flow 的共享状态，且缺少权限校验 | 检查写入路径是否有 `get_flow_status` 或等价的存在性校验 |
+| 数据一致性 | 写入与读取路径是否一致（写入了事件类型，但读取路径是否识别） | 检查 `_SUCCESS_HANDOFF_EVENT_TYPES` 等枚举是否覆盖所有写入类型 |
+| 共享状态通道安全 | 是否绕过 `vibe3 handoff` 直接操作 `.git/vibe3/` | 检查是否有直接文件 I/O 而非通过 Shell API |
+| Worktree 假设验证 | 是否假设当前目录是特定 worktree，而无验证 | 检查是否有 `cwd` 或 `git rev-parse --show-toplevel` 验证 |
+
+**常见问题模式**：
+- `INSERT OR IGNORE` + `--branch` 参数 → 可能创建 phantom flow
+- 跨 `--branch` 写入状态 → 可能越权修改
+- 写入事件类型但读取白名单不匹配 → 数据不一致
+- 直接操作 `.git/vibe3/handoff.db` → 绕过状态通道
+
 ## 输出格式
 
 ```markdown

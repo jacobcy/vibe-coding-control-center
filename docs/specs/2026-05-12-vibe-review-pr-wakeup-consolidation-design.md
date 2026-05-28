@@ -133,5 +133,5 @@ phase_2:
 
 ## 关联文件
 
-- `skills/vibe-review-pr/SKILL.md` — 新增协议规范章节，精简 Backlog metadata
+- `skills/vibe-team-review/SKILL.md` — 新增协议规范章节，精简 Backlog metadata
 - `.claude/team-templates/pr-review-team.yaml` — Phase 2 新增 handshake_protocol，精简 verify 步骤

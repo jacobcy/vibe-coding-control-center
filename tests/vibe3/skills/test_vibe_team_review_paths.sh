@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Test that all script paths in vibe-review-pr skill markdown files exist
+# Test that all script paths in vibe-team-review skill markdown files exist
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-SKILL_DIR="${PROJECT_ROOT}/skills/vibe-review-pr"
+SKILL_DIR="${PROJECT_ROOT}/skills/vibe-team-review"
 
 echo "Testing script paths in ${SKILL_DIR}"
 echo
@@ -22,7 +22,7 @@ for md_file in $md_files; do
   echo "Checking: $rel_file"
 
   # Extract all script references from this file
-  extracted_paths=$(grep -oE '(skills/vibe-review-pr/scripts/[a-z-]+\.sh|\.claude/skills/vibe-review-pr/scripts/[a-z-]+\.sh)' "$md_file" 2>/dev/null | sort -u || true)
+  extracted_paths=$(grep -oE '(skills/vibe-team-review/scripts/[a-z-]+\.sh|\.claude/skills/vibe-team-review/scripts/[a-z-]+\.sh)' "$md_file" 2>/dev/null | sort -u || true)
 
   # Check each path found in this file
   file_errors=0

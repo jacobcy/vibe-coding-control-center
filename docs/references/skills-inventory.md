@@ -81,7 +81,7 @@ Rules:
 |-------|---------|
 | `vibe-review-code` | 源码实现结构化评审 |
 | `vibe-review-docs` | 文档质量、变更日志与语义一致性评审 |
-| `vibe-review-pr` | 综合 PR 评审（支持多代理协作模式） |
+| `vibe-team-review` | 多 agent 协作审查（支持 PR、代码、架构等） |
 | `vibe-onboard` | 安装后的入门引导与系统检查 |
 
 ### 调试与监控 (3 个)

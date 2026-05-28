@@ -5,8 +5,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-SKILL_FILE="${PROJECT_ROOT}/skills/vibe-review-pr/SKILL.md"
-SCRIPT_FILE="${PROJECT_ROOT}/skills/vibe-review-pr/scripts/agent-exist.sh"
+SKILL_FILE="${PROJECT_ROOT}/skills/vibe-team-review/SKILL.md"
+SCRIPT_FILE="${PROJECT_ROOT}/skills/vibe-team-review/scripts/agent-exist.sh"
 
 echo "Testing handshake protocol state documentation"
 
