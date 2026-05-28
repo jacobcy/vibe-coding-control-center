@@ -33,6 +33,10 @@ teardown() {
     echo "new" > "$TEST_REPO/bin/new.sh"
     chmod +x "$TEST_REPO/bin/new.sh"
 
+    # Initialize TEST_REPO as a git repo so update.sh can detect it
+    cd "$TEST_REPO"
+    git init >/dev/null 2>&1
+
     # Copy necessary files for update
     cp "$VIBE_ROOT/bin/vibe" "$TEST_REPO/bin/"
     cp "$VIBE_ROOT/lib/config.sh" "$TEST_REPO/lib/"
@@ -44,7 +48,8 @@ teardown() {
     # Create mock target directory
     mkdir -p "$HOME/.vibe"/{bin,lib,config}
 
-    # Run update
+    # Run update from TEST_REPO directory
+    cd "$TEST_REPO"
     run "$VIBE_TEST_ROOT/bin/vibe" update run
     [ "$status" -eq 0 ]
 
