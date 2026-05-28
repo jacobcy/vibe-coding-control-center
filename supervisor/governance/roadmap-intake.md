@@ -41,10 +41,10 @@
 **触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
 
 **处理动作**：
-- 写 `[governance suggest]` comment：涉及 agent 权限配置目录，无法自动化执行
-- 添加 `roadmap/rfc` 标签
+- 写 `[governance suggest]` comment：建议标记 `roadmap/rfc`（涉及 agent 权限配置目录，无法自动化执行）
 - **禁止**纳入 assignee issue pool
 - 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
+- **注意**：intake 只负责建议，标签实际添加由 roadmap decider 或 assignee-pool 执行
 
 **Level 1-3 审查框架详见 [../../supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三级审查框架)**。
 
@@ -247,7 +247,7 @@ Allowed:
 - `issue.close`: allowed（仅限 supervisor issues 高置信度场景，见 Supervisor Issue Intake）
 - `issue.create`: allowed（仅限 supervisor issues 关闭前创建 follow-up issue，处理未完成工作）
 - `labels.read`: read
-- `labels.write`: allowed（仅最小必要的 routing 调整；只设 `orchestra-scanned`（跳过时）；不设 `roadmap/*`、`priority/*` 标签）
+- `labels.write`: allowed（仅最小必要的 routing 调整；只设 `orchestra-scanned`（跳过时）；**禁止设置 `roadmap/*`、`priority/*` 标签**，这些由 assignee-pool 或 roadmap decider 决策执行）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
 - `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）

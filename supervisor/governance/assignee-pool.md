@@ -62,7 +62,9 @@ Allowed:
 - `issue.close`: 允许直接关闭 issue（仅限高置信度场景，见下方说明）
 - `issue.create`: 允许创建 follow-up issue（处理未完成工作）
 - `labels.read`: 读取所有 labels
-- `labels.write`: 仅限非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`）
+- `labels.write`: 允许设置和移除非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`、`orchestra-scanned`）
+  - **设置**：决策后的标签添加（如 `roadmap/rfc`、`roadmap/epic`、`priority/*`、`orchestra-governed`）
+  - **移除**：标签验证失败时的清理（如移除过时的 `orchestra-governed`、`roadmap/rfc`）
 - `flow`: read（读取 flow/worktree 现场信息）
 - `task`: read（读取 task 状态）
 - `handoff`: read（读取交接上下文）
@@ -121,6 +123,76 @@ Forbidden:
 - orchestra heartbeat status
 - epic issues（有 `roadmap/epic` 标签的 open issue，用于收口检查）
 - epic sub-issues 状态（通过 `gh issue view <number> --json state,stateReason,labels` 查询）
+
+## 标签验证与清理（强制执行）
+
+**每次 scan 时必须先执行标签验证，确保治理标签的正确性**。
+
+### `orchestra-governed` 标签验证
+
+**验证条件**（必须同时满足）：
+- Issue 有 assignee
+- Assignee 在 `manager_usernames` 配置列表中
+- Issue 是 open 状态
+
+**验证失败处理**：
+```bash
+# 移除不合理的标签
+gh issue edit <issue-number> --remove-label "orchestra-governed"
+
+# 写清理评论
+gh issue comment <issue-number> --body "[governance auto-cleanup] 移除 orchestra-governed 标签：issue 不再满足持有条件（原因：无 assignee / assignee 非 manager / issue 已关闭）"
+```
+
+**记录到 Actions**：
+```
+Cleanup: #XXX removed orchestra-governed (no manager assignee)
+```
+
+### `roadmap/rfc` 标签验证
+
+**验证条件**（任一满足即应保留）：
+- Issue 涉及 `.claude/` 或 `.codex/` 目录（Level 0 阻塞）
+- Issue 需要人类讨论决定架构/产品方向（通过 issue 内容判断）
+
+**验证失败处理**：
+```bash
+# 移除过时的 RFC 标签
+gh issue edit <issue-number> --remove-label "roadmap/rfc"
+
+# 写清理评论
+gh issue comment <issue-number> --body "[governance auto-cleanup] 移除 roadmap/rfc 标签：issue 不再需要 RFC 讨论（原因：已不再涉及受限目录 / 架构决策已完成）"
+```
+
+**记录到 Actions**：
+```
+Cleanup: #XXX removed roadmap/rfc (restriction resolved)
+```
+
+### 执行时机
+
+**在 Step 1 过滤前必须先执行标签验证**：
+
+```bash
+# 伪代码流程
+for issue in all_open_issues:
+    if has_label(issue, "orchestra-governed"):
+        if not verify_governed_label(issue):
+            cleanup_governed_label(issue)
+    
+    if has_label(issue, "roadmap/rfc"):
+        if not verify_rfc_label(issue):
+            cleanup_rfc_label(issue)
+
+# 然后继续正常的过滤逻辑
+issues = filter_by_assignee_and_labels(issues)
+...
+```
+
+**目的**：
+- 防止标签永久残留导致过滤失效
+- 确保治理标签反映真实状态
+- 让过时 issue 能被重新处理
 
 ## Issue Intake 策略
 
