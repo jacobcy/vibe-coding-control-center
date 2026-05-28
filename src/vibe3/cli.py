@@ -4,17 +4,24 @@ Vibe 3.0 CLI Entry Point
 Thin wrapper that sets up Typer app and registers subcommands.
 """
 
-import os
+# Bootstrap: ensure local src/ is on sys.path (even with python -I)
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
 
-import typer
-import typer.rich_utils as _ru
-from loguru import logger
-from rich import box as _box
+_SRC = str(Path(__file__).resolve().parent.parent)
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+del _SRC
 
-from vibe3.commands import (
+import os  # noqa: E402
+from typing import Annotated, Optional  # noqa: E402
+
+import typer  # noqa: E402
+import typer.rich_utils as _ru  # noqa: E402
+from loguru import logger  # noqa: E402
+from rich import box as _box  # noqa: E402
+
+from vibe3.commands import (  # noqa: E402
     ask,
     check,
     flow,
@@ -31,10 +38,10 @@ from vibe3.commands import (
     status,
     task,
 )
-from vibe3.commands.command_options import FormatOption
-from vibe3.exceptions import SystemError, UserError
-from vibe3.observability import setup_logging
-from vibe3.server import app as serve
+from vibe3.commands.command_options import FormatOption  # noqa: E402
+from vibe3.exceptions import SystemError, UserError  # noqa: E402
+from vibe3.observability import setup_logging  # noqa: E402
+from vibe3.server import app as serve  # noqa: E402
 
 
 # -- Remove help panel borders, keep colors --
