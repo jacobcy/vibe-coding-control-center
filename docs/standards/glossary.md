@@ -478,7 +478,7 @@ related_docs:
 - 正式术语：`shell 命令`
 - 别称：`vibe3 shell`, `vibe shell`
 - 定义：通过 CLI 直接执行的命令能力。
-  - **主命令 (V3)**：`uv run python src/vibe3/cli.py <subcommand>` (通常别名为 `vibe3`)
+  - **主命令 (V3)**：`vibe3 <subcommand>`。支持通过 `uv tool install -e .` 全局安装，或在项目内通过 `uv run python src/vibe3/cli.py` 调用。
   - **辅助命令 (V2)**：`vibe <domain> <subcommand>` (原 V2 shell 命令)
 - 边界：
   - `shell 命令` 不是 skill
