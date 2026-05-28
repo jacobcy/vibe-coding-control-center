@@ -109,13 +109,15 @@ Forbidden:
 规则：
 
 - 如果某个动作没有被明确允许，视为 forbidden
-- 如果需要反馈给人类，写 **issue comment**
-- 如果需要交给后续 agent：
-  - **结构化指令文件**（plan/audit/PR directive）：写 **handoff indicate**（`vibe3 handoff indicate <path>`）
-  - **轻量级记录**（状态更新、发现问题、注意事项）：写 **handoff append**（`vibe3 handoff append "message"`）
-  - **查看交接记录**：用 **handoff show**（`vibe3 handoff show @current` 查看当前 flow 的完整交接链路）
-- handoff 不代替 issue comment
-- **使用原则**：大部分情况用 `handoff append`，只有在需要传递完整指令文件给下游 agent 时才用 `handoff indicate`
+- **Comment vs Handoff 统一规则**：
+  - **大部分场景**：使用 `handoff append`，它会自动同步到 GitHub comment，兼具内外可见性
+  - **关键里程碑**（claim/block/close/done）：独立 comment + handoff append
+  - **人类介入 blocker**：独立 comment + handoff append
+  - **响应人类指令**：独立 comment
+- **Handoff 使用原则**：
+  - **handoff append**：轻量级记录（状态更新、发现问题、注意事项）
+  - **handoff indicate**：传递完整指令文件给下游 agent（plan/audit/PR directive）
+  - **handoff show**：查看交接记录（`vibe3 handoff show @current`）
 
 ## Setting Blocked State
 
@@ -580,10 +582,10 @@ Steps:
        git log HEAD..origin/main --oneline -- src/vibe3/<target-module>/
        ```
      - **若 main 分支存在架构变化**：
+       - 写 handoff append：说明架构冲突风险、main 分支变化详情、建议人工判断是否需要 rebase 或调整 scope
        - comment: `[manager] main 分支架构已演进，目标模块有新提交。建议先同步再规划。`
        - 列出具体变化文件和 commit 数量
        - 进入 `state/blocked`
-       - 写 handoff append: 说明架构冲突风险，建议人工判断是否需要 rebase 或调整 scope
        - `exit()`
 3. 复述当前已进入 claimed
 4. 明确记录：拆分窗口已关闭，后续 plan/run/review 不得再改变为 sub-issue 拆分；若 plan agent 发现 scope 无法执行，应 blocked 回 manager/人类，而不是自行拆分
@@ -685,8 +687,7 @@ Decision sketch:
   - 进入 `state/in-progress`
 - 已有 `spec_ref`，无 `plan_ref`：
   - 将当前 issue 调整回 `state/claimed`
-  - 写 issue comment：plan 产物缺失，需重新进入 planning
-  - 写 handoff append：等待 plan agent 重新接手
+  - 写 handoff append：说明 plan 产物缺失，需重新进入 planning，等待 plan agent 重新接手
   - `exit()`
 - 已有 `report_ref`，无 `audit_ref`：
   - **实质审查执行结果**: 读 report_ref，判断代码质量是否达标
