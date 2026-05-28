@@ -1,90 +1,113 @@
 ---
 name: vibe-orchestra
-description: Use when the user wants to inspect running issues in assignee pool, or judge which issue to start next. Do not use for RFC/blocked issues or roadmap triage.
+description: Use when the user wants to check orchestra service health, view serve status, or report errors. Do not use for issue pool governance or roadmap planning.
 ---
 
-# /vibe-orchestra - Assignee Issue Pool 管理
+# /vibe-orchestra - Orchestra Service 监控
 
-查看 assignee issue pool 中运行中的 issues，建议下一个值得处理的 issue。
+监控 orchestra service 的运行状态和健康度。
 
 ## 核心原则
 
-- **只管 assignee pool**：运行中的 issues
-- **只做建议**：不强制调度
-- **基于真源**：只读 shell 和 supervisor materials
+- **只管 service 健康状态**：不处理 issue pool 或 roadmap
+- **基于真源**：只读 `vibe3 serve status` 输出
+- **报告错误**：识别 FailedGate、error_log、系统错误
 
 ## Scope
 
-**只看 assignee issue pool**：
-- 已分配给 manager 的 issues
-- 正在运行或 ready 的 issues
-- pool 中下一个值得处理的 issue
+**只看 orchestra service 状态**：
+- serve 运行状态（running/stopped）
+- FailedGate 检查
+- error_log 分析
+- heartbeat 状态
+- dispatcher 状态
+- 最近活动和事件
 
 **不看**：
-- RFC issues（由 `vibe-task` 管理）
-- Blocked issues（由 `vibe-task` 管理）
-- Backlog triage（由 `vibe-roadmap` 管理）
+- Issue pool 管理（由 roadmap decider 负责）
+- RFC issues（由 `vibe-task` 负责）
+- Blocked issues（由 `vibe-task` 负责）
+- 版本规划（由 `vibe-roadmap` 负责）
 
 ## Workflow
 
-### Step 1: 查看运行状态
-
-```bash
-vibe3 task status
-```
-
-必要时查看 serve status：
+### Step 1: 查看 serve 状态
 
 ```bash
 vibe3 serve status
 ```
 
-### Step 2: 过滤 assignee pool
+### Step 2: 解析状态
 
-找出已分配给 manager 的 issues：
+从输出中提炼：
 
-```bash
-gh issue list --assignee <manager-username> --limit 20
-```
+**运行状态**：
+- Service 状态（running/stopped）
+- PID 信息
+- Port 绑定
+- Uptime
 
-### Step 3: 判断优先级
+**错误检查**：
+- FailedGate 是否存在
+- error_log 内容
+- 系统错误
 
-参考 `supervisor/governance/assignee-pool.md`，按以下顺序排序：
+**最近活动**：
+- Heartbeat 时间
+- Dispatcher 状态
+- 最近事件
 
-`milestone -> roadmap/* -> priority/[0-9] -> issue number`
-
-结合当前人工上下文：
-- 是否有人已明确接手某个 issue
-- 是否有活跃 PR 或 review follow-up
-
-### Step 4: 提出建议
+### Step 3: 报告问题
 
 ```text
-📋 Assignee Issue Pool 状态
+📋 Orchestra Service 状态
 
-Running Issues
-- #123: in_progress, wt-foo
-- #456: ready, no worktree
+运行状态
+- Status: running
+- PID: 12345
+- Port: 8765
+- Uptime: 2 hours
 
-Next Issue
-- 建议处理 #456
-- 原因：pool 中唯一 ready 且无阻塞
+健康检查
+- FailedGate: None ✅
+- Error Log: Empty ✅
+- Heartbeat: Normal ✅
 
-Reason
-- milestone: Phase 1
-- roadmap: p1
-- priority: 5
+最近活动
+- Last Heartbeat: 2026-05-28 23:20:00
+- Dispatcher: Active
+- Recent Events: 3 (last hour)
+
+建议
+- Service 运行正常，无错误
 ```
+
+## 常见问题诊断
+
+**FailedGate 存在**：
+```bash
+vibe3 serve resume --yes
+```
+
+**Service stopped**：
+```bash
+vibe3 serve start
+```
+
+**Heartbeat 异常**：
+- 检查进程是否存活
+- 检查端口是否被占用
 
 ## 与其他 Skills 的区别
 
-- **vibe-orchestra**: 管理运行中的 assignee issues
-- **vibe-task**: 看 RFC 和 blocked issues（问题 issue）
+- **vibe-orchestra**: 监控 service 运行状态
+- **vibe-task**: 查看 RFC 和 blocked issues
 - **vibe-roadmap**: 版本规划和 backlog triage
+- **vibe-debug-serve**: 深度调试 service 问题
 
 ## Restrictions
 
-- 不看 RFC 或 blocked issues
+- 不处理 issue pool 管理
 - 不做 roadmap triage
-- 不写代码
-- 不替代人类做最终决策
+- 不看 RFC 或 blocked issues
+- 只报告 service 状态，不深入调试（转给 `vibe-debug-serve`）
