@@ -83,40 +83,32 @@ gh issue view <issue-number> --json labels,body
 - `openspec:ff`
 - repo-native `vibe3 plan/run/review`
 
-## 5. 自动解析依赖关系
+## 5. 确认依赖关系
 
-在 bootstrap 前，自动解析依赖关系：
+在 bootstrap 前，确认依赖关系：
 
-1. 读取目标 issue body（已在 Step 1 获取，或重新获取）：
+1. 读取目标 issue body（已在 Epic 检查时获取，或重新获取）：
    ```bash
    gh issue view <issue-number> --json body
    ```
 
-2. 解析 `## Dependencies` 或 `## 依赖` section
+2. 检查是否有 `## Dependencies` 或 `## 依赖` section
 
-3. 提取依赖关系（匹配以下任一格式）：
-   - `Depends on #<id>`
-   - `依赖 #<id>`
-   - `blocked by #<id>`
-   
-   对每个匹配项，提取 issue number
-
-4. 检查依赖状态：
-   ```bash
-   gh issue view <dep-id> --json state
-   ```
-   
+3. 如果存在依赖：
+   - 提取依赖 issue 编号（格式：`Depends on #<id>`、`依赖 #<id>`、`blocked by #<id>`）
+   - **验证依赖状态**：
+     ```bash
+     gh issue view <dep-id> --json state
+     ```
    - 如果依赖状态为 `open`：
-     - 添加 `--dependency <id>` 参数到 bootstrap 命令
-     - 警告用户："当前 issue 存在未关闭的依赖 #<id>，bootstrap 后 flow 将立即进入 blocked 状态。是否继续？"
-     - 等待用户确认
+     - 提示用户："该 issue 存在未关闭的依赖 #<id>，bootstrap 后 flow 将进入 blocked 状态"
+     - 等待用户确认是否继续
+     - 添加 `--dependency <id>` 参数
    - 如果依赖状态为 `closed`：
-     - **不添加** `--dependency` 参数（依赖已满足）
      - 提示用户："依赖 #<id> 已关闭，无需阻塞"
-   - 如果无依赖：继续
+     - **不添加** `--dependency` 参数
 
-5. 组装 bootstrap 命令：
-   - **只对未关闭（open）的依赖**添加 `--dependency <id>` 参数
+4. 如果无依赖：继续
 
 ## 6. Bootstrap flow scene
 
