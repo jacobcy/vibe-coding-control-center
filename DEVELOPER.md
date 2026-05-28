@@ -40,25 +40,31 @@
 2. 在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
 
+**Hybrid Architecture Setup (Recommended):**
+为了在任何目录下都能直接使用 `vibe3` 命令，建议安装全局可执行文件：
+```bash
+uv tool install -e .
+```
+
 如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `./scripts/init.sh`。
 
 ### 2.3 验证环境
 ```bash
 bin/vibe check       # 环境诊断（V2）
-uv run python src/vibe3/cli.py check  # V3 一致性与共享状态审计
+vibe3 check          # V3 一致性与共享状态审计 (或 uv run python src/vibe3/cli.py check)
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
 
 ### 2.4 V3 开发入口
 
-V3 相关工作优先用 Python 入口和 V3 标准来校准语义：
+V3 相关工作优先用 Python 入口和 V3 标准来校准语义。支持通过 `uv tool install -e .` 安装全局 `vibe3` 命令：
 
 ```bash
-uv run python src/vibe3/cli.py check
-uv run python src/vibe3/cli.py status
-uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py handoff show
+vibe3 check
+vibe3 status
+vibe3 flow show
+vibe3 handoff show
 uv run pytest tests/vibe3
 ```
 
@@ -335,13 +341,13 @@ bin/vibe clean                 # 清理临时文件
 ### V3 (Python)
 
 ```bash
-uv run python src/vibe3/cli.py flow show    # 查看 flow 上下文
-uv run python src/vibe3/cli.py flow update  # 注册/更新 flow
-uv run python src/vibe3/cli.py flow bind    # 绑定 issue-flow 关系
-uv run python src/vibe3/cli.py handoff show # 查看 handoff 链路
-uv run python src/vibe3/cli.py handoff append # 追加 handoff
-uv run python src/vibe3/cli.py task status  # 总览活跃 flow 与 orchestra 状态
-uv run python src/vibe3/cli.py check        # 共享状态审计
+vibe3 flow show    # 查看 flow 上下文 (或 uv run python src/vibe3/cli.py flow show)
+vibe3 flow update  # 注册/更新 flow
+vibe3 flow bind    # 绑定 issue-flow 关系
+vibe3 handoff show # 查看 handoff 链路
+vibe3 handoff append # 追加 handoff
+vibe3 task status  # 总览活跃 flow 与 orchestra 状态
+vibe3 check        # 共享状态审计
 ```
 
 ---

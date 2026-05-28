@@ -60,7 +60,7 @@ This project has **two parallel implementations**:
 ## 📍 Workspace Structure
 
 - **V2 (Shell)**: `bin/`, `lib/`, `config/shell/`
-- **V3 (Python)**: `src/vibe3/` (see [.claude/rules/python-standards.md](.claude/rules/python-standards.md))
+- **V3 (Python)**: `src/vibe3/` (Support global `vibe3` command via `uv tool install -e .`)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
 - **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
@@ -68,8 +68,8 @@ This project has **two parallel implementations**:
 ## 🚀 Quick Start
 
 1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
-2. **检查当前 flow**: 运行 `uv run python src/vibe3/cli.py flow show`
-3. **查看全局状态**: 运行 `uv run python src/vibe3/cli.py status`
+2. **检查当前 flow**: 运行 `vibe3 flow show` (或 `uv run python src/vibe3/cli.py flow show`)
+3. **查看全局状态**: 运行 `vibe3 status` (或 `uv run python src/vibe3/cli.py status`)
 4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
 
 ## 🔁 Handoff 命令约定
