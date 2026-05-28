@@ -124,6 +124,7 @@ class PRResponse(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Created at")
     updated_at: Optional[datetime] = Field(None, description="Updated at")
     merged_at: Optional[datetime] = Field(None, description="Merged at")
+    closed_at: Optional[datetime] = Field(None, description="Closed at")
     metadata: Optional[PRMetadata] = Field(None, description="PR metadata")
     ci_checks: list[CICheck] = Field(
         default_factory=list, description="CI check details"

@@ -69,7 +69,10 @@ class SQLiteFlowStateRepo(_HasConnection):
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
         """Update flow state fields. Raises ValueError for invalid fields."""
         if "updated_at" not in kwargs:
-            kwargs["updated_at"] = datetime.datetime.now().isoformat()
+            # Use UTC-aware datetime to ensure timezone consistency
+            kwargs["updated_at"] = datetime.datetime.now(
+                datetime.timezone.utc
+            ).isoformat()
 
         invalid_fields = set(kwargs.keys()) - self.VALID_FLOW_STATE_FIELDS
         if invalid_fields:
@@ -100,7 +103,8 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Updated flow state")
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
-        now = datetime.datetime.now().isoformat()
+        # Use UTC-aware datetime for consistency
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()

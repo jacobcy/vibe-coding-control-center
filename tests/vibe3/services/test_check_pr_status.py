@@ -283,3 +283,189 @@ class TestMergedPRCacheIntegration:
                 assert result["number"] == 100
                 # Sync should have been called (via list_merged_prs)
                 mock_client.list_merged_prs.assert_called()
+
+
+class TestClosedPRIdempotency:
+    """Test idempotency guard for closed PR handling."""
+
+    def test_handle_closed_pr_idempotency_skips_second_call(self, tmp_path):
+        """Should skip handling if already handled with same closed_at."""
+        from datetime import datetime, timezone
+
+        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.flow_status_service import FlowStatusService
+
+        # ARRANGE: Flow state with initiated_by="check:pr_closed"
+        # and updated_at after closed_at
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        closed_at = datetime(2026, 5, 28, 10, 0, 0, tzinfo=timezone.utc)
+        updated_at = datetime(2026, 5, 28, 11, 0, 0, tzinfo=timezone.utc)
+
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+            initiated_by="check:pr_closed",
+            updated_at=updated_at.isoformat(),
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create closed PR
+        closed_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.CLOSED,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            closed_at=closed_at,
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_closed_pr
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+            handled, issues, warnings = service.handle_closed_pr(
+                "task/my-feature", closed_pr
+            )
+
+            # ASSERT: Should skip handling (no-op)
+            assert handled is False
+            assert issues == []
+            assert warnings == []
+            mock_reset.assert_not_called()
+
+    def test_handle_closed_pr_retriggers_after_reclose(self, tmp_path):
+        """Should handle again if PR was closed again (updated_at before closed_at)."""
+        from datetime import datetime, timezone
+
+        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.flow_status_service import FlowStatusService
+
+        # ARRANGE: Flow state with initiated_by="check:pr_closed"
+        # but updated_at BEFORE closed_at
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        closed_at = datetime(2026, 5, 28, 11, 0, 0, tzinfo=timezone.utc)
+        updated_at = datetime(2026, 5, 28, 10, 0, 0, tzinfo=timezone.utc)
+
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+            initiated_by="check:pr_closed",
+            updated_at=updated_at.isoformat(),
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create closed PR
+        closed_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.CLOSED,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            closed_at=closed_at,
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_closed_pr
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+            mock_reset.return_value = (None, [])
+            handled, issues, warnings = service.handle_closed_pr(
+                "task/my-feature", closed_pr
+            )
+
+            # ASSERT: Should handle (retrigger)
+            assert handled is True
+            mock_reset.assert_called_once()
+
+    def test_handle_closed_pr_no_initiated_by_triggers_reset(self, tmp_path):
+        """Should handle if initiated_by is not 'check:pr_closed'."""
+        from datetime import datetime, timezone
+
+        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.flow_status_service import FlowStatusService
+
+        # ARRANGE: Flow state with different initiated_by
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        closed_at = datetime(2026, 5, 28, 10, 0, 0, tzinfo=timezone.utc)
+
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+            initiated_by="dispatch",
+            updated_at=datetime(2026, 5, 28, 11, 0, 0, tzinfo=timezone.utc).isoformat(),
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create closed PR
+        closed_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.CLOSED,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            closed_at=closed_at,
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_closed_pr
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+            mock_reset.return_value = (None, [])
+            handled, issues, warnings = service.handle_closed_pr(
+                "task/my-feature", closed_pr
+            )
+
+            # ASSERT: Should handle
+            assert handled is True
+            mock_reset.assert_called_once()
