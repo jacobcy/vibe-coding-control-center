@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -37,6 +38,7 @@ class TestIndependentImport:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                env={**os.environ, "PYTHONPATH": str(Path("src").resolve())},
             )
 
             if result.returncode != 0:
@@ -111,6 +113,7 @@ else:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                env={**os.environ, "PYTHONPATH": str(Path("src").resolve())},
             )
 
             if result.returncode != 0:
@@ -194,6 +197,7 @@ except Exception as e:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                env={**os.environ, "PYTHONPATH": str(Path("src").resolve())},
             )
 
             if result.returncode != 0:
