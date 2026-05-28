@@ -131,6 +131,10 @@ class GlobalDispatchCoordinator:
         """Load issue snapshot (backward compatibility)."""
         return load_issue(issue_number, self._config, self._github)
 
+    def _ensure_load_issue_attribute(self) -> None:
+        """Ensure persistence service has current _load_issue reference."""
+        self._queue_persistence.load_issue = self._load_issue
+
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
@@ -565,7 +569,7 @@ class GlobalDispatchCoordinator:
         # Step 1: Restore queue from persistence if None
         if self._frozen_queue is None:
             self._queue_persistence.frozen_queue = None
-            self._queue_persistence.load_issue = self._load_issue
+            self._ensure_load_issue_attribute()
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
@@ -573,7 +577,7 @@ class GlobalDispatchCoordinator:
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
-        self._queue_persistence.load_issue = self._load_issue
+        self._ensure_load_issue_attribute()
         cleared_all = self._queue_persistence.promote()
         if cleared_all:
             self._check_service = None  # Invalidate when queue is cleared
