@@ -1,13 +1,13 @@
 ---
-name: vibe-review-pr
+name: vibe-team-review
 description: |
-  Use only in Claude Code environments with Agent Teams enabled when the user wants
-  a comprehensive PR review using the multi-agent team workflow.
+  Use when the user wants a comprehensive review using the multi-agent team workflow.
+  Applies to PRs, code changes, architecture decisions, and any task requiring team-based analysis.
 ---
 
-# Vibe PR Review
+# Vibe Team Review
 
-`vibe-review-pr` 是 Claude Code Agent Teams 专用 PR 审查入口。Phase 0 完成环境和 Team 准备，Phase 1-5 各是一个 Backlog Task。下游 agent 通过 prompt 注入获取前序报告。
+`vibe-team-review` 是 Claude Code Agent Teams 多 agent 协作审查入口。Phase 0 完成环境和 Team 准备，Phase 1-5 各是一个 Backlog Task。下游 agent 通过 prompt 注入获取前序报告。
 
 ## When to Use
 

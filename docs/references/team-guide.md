@@ -5,12 +5,12 @@ status: historical-reference
 scope: external-plugin-system
 author: Vibe Team
 related_docs:
-  - ../skills/vibe-review-pr/SKILL.md
+  - ../skills/vibe-team-review/SKILL.md
 ---
 
 # Team 多代理协作指南
 
-> **说明**：本文档描述早期的 Team 协作实验方案，部分内容已过时。当前 PR 审查架构以 `.claude/team-templates/pr-review-team.yaml` 和 `skills/vibe-review-pr/SKILL.md` 为准。
+> **说明**：本文档描述早期的 Team 协作实验方案，部分内容已过时。当前 PR 审查架构以 `.claude/team-templates/pr-review-team.yaml` 和 `skills/vibe-team-review/SKILL.md` 为准。
 
 **过时内容**：
 - Codex 不再作为 teammate（通过 Agent tool 调用），而是作为外部 plugin 通过 `codex:rescue` skill 调用

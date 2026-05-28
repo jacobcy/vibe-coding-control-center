@@ -1,14 +1,14 @@
-# vibe-review-pr 运行时参考
+# vibe-team-review 运行时参考
 
-这份文档定义 vibe-review-pr 的运行约束和事件规范。执行流程（Phase 0-5）以 `SKILL.md` 为准。
+这份文档定义 vibe-team-review 的运行约束和事件规范。执行流程（Phase 0-5）以 `SKILL.md` 为准。
 
 ## 真源文件
 
-- agent 清单：`.claude/skills/vibe-review-pr/runtime/agents.sh`
-- 公共函数：`skills/vibe-review-pr/scripts/lib.sh`
-- 存在性检查：`skills/vibe-review-pr/scripts/agent-exist.sh`
-- 事件列表：`skills/vibe-review-pr/scripts/agent-event.sh`
-- 报告提取：`skills/vibe-review-pr/scripts/agent-report.sh`
+- agent 清单：`.claude/skills/vibe-team-review/runtime/agents.sh`
+- 公共函数：`skills/vibe-team-review/scripts/lib.sh`
+- 存在性检查：`skills/vibe-team-review/scripts/agent-exist.sh`
+- 事件列表：`skills/vibe-team-review/scripts/agent-event.sh`
+- 报告提取：`skills/vibe-team-review/scripts/agent-report.sh`
 
 ## 定义约束
 
@@ -59,10 +59,10 @@
 
 ```bash
 # 列出所有 agent 状态
-skills/vibe-review-pr/scripts/agent-exist.sh
+skills/vibe-team-review/scripts/agent-exist.sh
 
 # 检查单个 agent
-skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
+skills/vibe-team-review/scripts/agent-exist.sh context-researcher
 ```
 
 输出包含：agent、type、definition、inbox、pane、alive、suggestion。
@@ -73,10 +73,10 @@ skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
 
 ```bash
 # 列出所有 agent 的最新事件
-skills/vibe-review-pr/scripts/agent-event.sh
+skills/vibe-team-review/scripts/agent-event.sh
 
 # 列出某个 agent 的所有事件
-skills/vibe-review-pr/scripts/agent-event.sh context-researcher
+skills/vibe-team-review/scripts/agent-event.sh context-researcher
 ```
 
 查看完整内容直接读 inbox JSON 文件。
@@ -87,10 +87,10 @@ skills/vibe-review-pr/scripts/agent-event.sh context-researcher
 
 ```bash
 # 列出所有 agent 的报告状态
-skills/vibe-review-pr/scripts/agent-report.sh
+skills/vibe-team-review/scripts/agent-report.sh
 
 # 提取单个 agent 的报告
-skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+skills/vibe-team-review/scripts/agent-report.sh context-researcher
 ```
 
 输出：agent 名 + timestamp + 完整报告正文。
@@ -119,7 +119,7 @@ Phase 5: fix-executor       → lead 写入 Phase 4 修复指令到 prompt（不
 ```
 
 **读取方式**：
-- Phase 2 agent：prompt 中告知 `skills/vibe-review-pr/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
+- Phase 2 agent：prompt 中告知 `skills/vibe-team-review/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
 - Phase 3 codex：prompt 中告知各 `agent-report.sh` 命令，codex 自行执行脚本读取（能跑脚本，不能收 SendMessage）
 - Phase 5 fix-executor：lead 将 Phase 4 结论中的修复指令直接写入 prompt，fix-executor 不跑任何 agent-report.sh
 

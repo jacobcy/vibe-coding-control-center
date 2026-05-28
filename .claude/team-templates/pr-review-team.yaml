@@ -1,9 +1,9 @@
 # PR Review Team Template
-# 用于 vibe-review-pr skill 加载团队配置
+# 用于 vibe-team-review skill 加载团队配置
 # 详细执行流程以 SKILL.md 为准
 
 name: pr-review-team
-description: 多 agent 协作的 PR 审查团队
+description: 多 agent 协作的审查团队
 
 # 执行模式配置
 execution_mode:

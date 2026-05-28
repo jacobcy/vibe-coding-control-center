@@ -1,6 +1,6 @@
-# vibe-review-pr
+# vibe-team-review
 
-PR 审查 skill，基于 Claude Code Agent Teams 多 agent 协作。
+多 agent 协作审查 skill，支持 PR 审查、代码审查、架构决策等多种场景。
 
 ## 结构
 
