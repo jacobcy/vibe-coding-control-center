@@ -19,8 +19,8 @@ Move PR scoring functions (calculate_risk_score, determine_risk_level,
 generate_score_report) from services.pr_scoring_service to
 analysis.pr_scoring to eliminate upward imports.
 
-Fixes two analysis→services violations:
-- analysis.inspect_query_service imports services.pr_scoring_service
+Fixes two analysis->services violations:
+- analysis.inspect_query_service imports services.base_resolution_usecase
 - analysis.pre_push_scope imports services.pr_scoring_service
 
 Maintains backward compatibility via re-exports in services layer.
@@ -28,19 +28,21 @@ Maintains backward compatibility via re-exports in services layer.
 Verification:
 - 177 tests passed in targeted regression suite
 - mypy clean on analysis/ and services/
-- Zero analysis→services imports remain (rg verified)
+- Zero analysis->services imports remain (rg verified)
 
 Closes #1516
 Completes #1256
 ```
 
 ### Files to Commit
-All modified files in the working tree (5 files total):
+All modified files in the working tree (7 files total):
 - src/vibe3/analysis/pr_scoring.py
 - src/vibe3/services/pr_scoring_service.py
 - src/vibe3/analysis/inspect_query_service.py
 - src/vibe3/analysis/pre_push_scope.py
 - src/vibe3/analysis/__init__.py
+- tests/vibe3/services/test_pr_scoring_service.py
+- docs/directives/issue-1516-publish.md (this file)
 
 ## PR Requirements
 
@@ -52,7 +54,7 @@ refactor(v3/analysis): eliminate circular imports with services layer
 ### PR Body
 ```markdown
 ## Summary
-Eliminates the last two analysis→services circular import violations by moving PR scoring functions to their canonical location in the analysis layer.
+Eliminates the last two analysis->services circular import violations by moving PR scoring functions to their canonical location in the analysis layer.
 
 ## Changes
 - **Move scoring logic**: `calculate_risk_score`, `determine_risk_level`, `generate_score_report` moved from `services.pr_scoring_service` to `analysis.pr_scoring`
@@ -61,11 +63,11 @@ Eliminates the last two analysis→services circular import violations by moving
 - **Update tests**: All test imports updated to reflect new module structure
 
 ## Verification
-- ✅ 177 tests passed in targeted regression suite (2.41s)
-- ✅ mypy clean on analysis/ and services/ (101 source files)
-- ✅ ruff/black passed via pre-commit hooks
-- ✅ Zero analysis→services imports remain (rg verified)
-- ✅ Backward compatibility maintained (all callers verified)
+- [PASS] 177 tests passed in targeted regression suite (2.41s)
+- [PASS] mypy clean on analysis/ and services/ (101 source files)
+- [PASS] ruff/black passed via pre-commit hooks
+- [PASS] Zero analysis->services imports remain (rg verified)
+- [PASS] Backward compatibility maintained (all callers verified)
 
 ## Impact
 - **Files changed**: 5

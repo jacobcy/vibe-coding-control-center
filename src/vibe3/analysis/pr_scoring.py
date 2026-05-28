@@ -35,7 +35,9 @@ class PRDimensions(BaseModel):
     critical_path_touch: bool = False
     public_api_touch: bool = False
     cross_module_symbol_change: bool = False
-    codex_verdict: str | None = None  # "MAJOR" | "CRITICAL" | None
+    codex_verdict: str | None = (
+        None  # "MAJOR" | "CRITICAL" | "BLOCK" | "MINOR" | "REFUSE" | None
+    )
 
 
 class RiskScore(BaseModel):
