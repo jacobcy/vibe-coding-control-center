@@ -53,7 +53,7 @@ description: Use when the user wants to assess, unblock, and merge PRs. This is 
 
 ```bash
 vibe3 flow show
-vibe3 flow status
+vibe3 task status
 ```
 
 确认：

@@ -129,19 +129,24 @@ gh issue close <issue-number-or-ref>
 - `primary_issue_ref` 若存在，它指向的 GitHub issue 在当前 flow 中被关联为 task issue，应作为主闭环 issue 优先确认
 - 其余 `issue_refs` 只表示关联来源，不等于都应由当前收口动作负责关闭
 
-### Step 4: 记录 closeout 与一致性审计
+### Step 4: 记录 closeout 证据
 
 执行：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-done: flow reached terminal state" --actor vibe-done --kind milestone
+```
+
+必要时补充一致性审计：
+
+```bash
 uv run python src/vibe3/cli.py check
 ```
 
 这些动作负责：
 
 - 记录当前 flow 的 terminal 证据
-- 对 shared-state 做最小一致性审计
+- 必要时对 shared-state 做最小一致性审计
 
 它们不会负责：
 

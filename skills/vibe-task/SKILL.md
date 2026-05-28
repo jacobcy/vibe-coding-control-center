@@ -62,15 +62,14 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 **通用原则:**
 
-- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py task status --all --check` / `flow show` 命令获取数据
-- Audit 模式只允许基于 `task status --all --check`、`flow show` 与 `gh` / `git` 现场做诊断；若缺少原子修复能力，明确报告 Capability Gap
+- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py task status` / `flow show` 命令获取数据
+- Audit 模式只允许基于 `task status`、`flow show` 与 `gh` / `git` 现场做诊断；若缺少原子修复能力，明确报告 Capability Gap
 - 不得直接读取或修改底层 JSON / SQLite 真源
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
 - **Task Overview 模式:**
 
-- 必须先运行 `uv run python src/vibe3/cli.py task status --all --check`
-- 不得补充 CLI 未提供的字段
+- 必须先运行 `uv run python src/vibe3/cli.py task status`
 - 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
@@ -98,7 +97,12 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 ### Step 1: 运行 CLI
 
 ```bash
-uv run python src/vibe3/cli.py task status --all --check
+uv run python src/vibe3/cli.py task status
+```
+
+必要时补充当前现场：
+
+```bash
 uv run python src/vibe3/cli.py flow show
 ```
 
@@ -186,7 +190,7 @@ Recommendation
 
 ```bash
 # 当前全局总览
-uv run python src/vibe3/cli.py task status --all --check
+uv run python src/vibe3/cli.py task status
 
 # 必要时补当前现场
 uv run python src/vibe3/cli.py flow show
@@ -252,7 +256,7 @@ uv run python src/vibe3/cli.py check
 
 ```bash
 # 再次运行核对，确认问题已重新投影到总览中
-uv run python src/vibe3/cli.py task status --all --check
+uv run python src/vibe3/cli.py task status
 ```
 
 ## Step 6: 输出修复报告
