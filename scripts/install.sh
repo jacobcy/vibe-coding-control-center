@@ -300,7 +300,11 @@ _setup_uv_environment() {
             log_info "Global venv already exists at $venv_path"
         else
             log_warn "Global venv at $venv_path is invalid; removing and recreating..."
-            rm -rf "$venv_path"
+            if ! rm -rf "$venv_path" 2>/dev/null; then
+                log_error "Failed to remove invalid venv at $venv_path"
+                log_error "Please manually remove it with: rm -rf $venv_path"
+                exit 1
+            fi
         fi
     fi
     if [[ ! -d "$venv_path" ]]; then

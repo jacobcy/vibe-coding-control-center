@@ -19,6 +19,8 @@ if [ "$1" = "venv" ]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
   touch "$2/pyvenv.cfg"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   [ -n "${TEST_UV_LOG:-}" ] && echo "$*" >> "${TEST_UV_LOG}"
   exit 0
 fi
@@ -83,7 +85,10 @@ EOF
   cat > "$bin_dir/uv" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "venv" ]]; then
-  mkdir -p "$2"
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -135,6 +140,8 @@ EOF
 if [[ "$1" == "venv" ]]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -248,6 +255,8 @@ EOF
 if [[ "$1" == "venv" ]]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -300,6 +309,8 @@ EOF
 if [[ "$1" == "venv" ]]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   touch "$2/pyvenv.cfg"
   exit 0
 fi
@@ -317,4 +328,6 @@ EOF
   # Check venv was properly recreated
   [ -f "$venv_dir/bin/activate" ]
   [ -f "$venv_dir/pyvenv.cfg" ]
+  [ -f "$venv_dir/bin/python" ]
+  [ -x "$venv_dir/bin/python" ]
 }
