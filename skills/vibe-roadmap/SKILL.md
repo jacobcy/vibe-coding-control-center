@@ -128,23 +128,7 @@ print(usernames[0] if usernames else 'vibe-manager-agent')
 
 ## Intake Gate 机制
 
-### 三级审查
-
-**Level 1: 基础条件**
-- 问题边界明确、验收口径清楚、无需额外产品讨论
-- 改动范围可控、依赖关系简单
-- 允许存在若干实现选项；只要目标清楚、边界稳定、可由 manager 在执行中收敛，就不算人类阻塞
-
-**Level 2: 架构一致性**
-- 依赖的模块/函数仍存在
-- 引用的 API 未废弃
-- 涉及的配置/架构未变更
-- 有明确的代码执行路径
-
-**Level 3: 生命周期检查**
-- Issue 未过时（非依赖已移除）
-- 非重复已关闭 issue
-- 不需要先关闭其他依赖 issue
+**三级审查框架详见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三级审查框架)**。
 
 ### 决策逻辑（决策矩阵）
 
@@ -288,32 +272,7 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 #### 治理闭环标签
 
-三层标签各自闭环，由不同角色在不同阶段打上：
-
-| 标签名称 | 角色 | 打标签时机 | 语义 |
-| -------- | ---- | ---------- | ---- |
-| `orchestra-scanned` | roadmap-intake（入口层） | intake 审查后**跳过**时 | "已审查，不纳入"——下次 intake 自动跳过 |
-| `orchestra-governed` | assignee-pool（池内层） | pool 决策完成后 | "已决策"——下次 pool 扫描自动跳过 |
-| `roadmap-reviewed` | vibe-roadmap（审查层） | roadmap 审查完成后 | "已审查"——下次 Step 0 自动跳过 |
-
-**闭环流程（三层）**：
-```
-broader repo ──→ intake 扫描 ──→ 接受(assignee) ──→ pool 扫描 ──→ 决策(rfc/epic/ready)
-                     │ 跳过                               │
-                     ▼                                    ▼
-              orchestra-scanned                   orchestra-governed
-              (下次 intake 跳过)                  (下次 pool 跳过)
-                                                        │
-                                                        ▼
-                                        vibe-roadmap Step 0 ──→ 审查
-                                                                    │
-                                                                    ▼
-                                                            roadmap-reviewed
-                                                            (下次 roadmap 跳过)
-                                                                    │
-                                                                    ▼
-                                                              memory.md 缓存
-```
+**三层标签语义和闭环流程详见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三标签语义)**。
 
 ### Milestone 管理
 
@@ -718,51 +677,7 @@ Agent 应通过以下方式使用标签触发机制：
 
 ## Comment Marker Contract
 
-### 角色定位
-
-vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marker 必须明确区分：
-
-| 角色 | Marker | 性质 |
-|---|---|---|
-| roadmap-intake / assignee-pool（observer） | `[governance suggest]` | 观察者意见，无强制力 |
-| **vibe-roadmap（decider）** | `[roadmap decision]` | 决策者结论，覆盖 governance 建议 |
-
-### 强制规则
-
-1. vibe-roadmap 的**所有**决策动作必须写 `[roadmap decision] <动作>: <理由>` comment
-2. **禁止** vibe-roadmap 写 `[governance suggest]`（marker 必须区分 observer / decider）
-3. `[roadmap decision]` marker 同时作为 cron-supervisor / 下次 vibe-roadmap 自身判断"上次审查时间"的锚点
-4. **自动打 `roadmap-reviewed` 标签**：
-   - 写完 `[roadmap decision]` 评论后，如果 decision 不是 `rfc`，**必须**打 `roadmap-reviewed` 标签
-   - 如果 decision 是 `rfc`，**不打** `roadmap-reviewed`（保留 `roadmap/rfc` 标签等待人类决策）
-   - 目的：标记已决策，避免 Step 0 重复扫描
-   - 命令：`gh issue edit <number> --add-label "roadmap-reviewed"`
-5. 格式：
-   ```text
-   [roadmap decision] <动作动词>: <简要理由>
-   ```
-   动作动词统一使用：`split`, `continue`, `close`, `hold`, `rfc`, `assign`, `unblock`
-
-### 示例
-
-```
-[roadmap decision] split epic into #42, #43, #44; reason: 3 modules, ~800 LOC, exceeds single-iteration threshold.
-[roadmap decision] continue #78; reason: bounded to one module and manager can plan within the existing issue.
-[roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
-[roadmap decision] hold #55 until #56 completes; reason: #56 provides core infrastructure #55 depends on.
-[roadmap decision] rfc #77; reason: needs human decision on architecture direction.
-```
-
-**执行流程示例**：
-```bash
-# 1. 写决策评论
-gh issue comment 78 --body "[roadmap decision] continue #78; reason: bounded enough for manager."
-
-# 2. 自动打标签（必须）
-gh issue edit 78 --add-label "roadmap-reviewed"
-
-# ✅ 闭环完成，下次 Step 0 不再扫描此 issue
-```
+**Comment Marker 规范和格式详见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#comment-marker-contract)**。
 
 ## Reference Documents
 
