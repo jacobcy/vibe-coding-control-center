@@ -67,7 +67,15 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 **何时打**：审查后**决定不接受**（不分配 assignee）时
 **不打的情况**：接受并分配 assignee 时——assignee 本身就是信号，issue 自然流入 assignee-pool
 
-**语义**："已审查，不纳入"
+**语义**："已审查，不纳入"（intake 层的结论，后续层可推翻）
+
+**被后续层推翻时的处理**：
+vibe-roadmap 审查时如果决定推翻 intake 的 skip 判断（见角色分工表中的"上层审查者：纠正和补全"），应同时：
+- 移除 `orchestra-scanned` 标签
+- 分配 assignee
+- 打 `roadmap-reviewed` 标签
+
+**当前共识**：`orchestra-scanned` 与 assignee 共存是遗留痕迹（roadmap 推翻了 intake 但未清理标签），不影响功能（intake 扫描会同时过滤 assignee 和 scanned 标签），但长期应清理。
 
 **命令**：
 ```bash
