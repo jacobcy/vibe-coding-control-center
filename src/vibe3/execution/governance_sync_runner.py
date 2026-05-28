@@ -242,6 +242,8 @@ def run_governance_async(
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+    # Force logs to be written to the target project, not the vibe repo
+    env["VIBE3_ASYNC_LOG_DIR"] = str(root / "temp" / "logs")
 
     request = ExecutionRequest(
         role="governance",
@@ -286,7 +288,11 @@ def run_governance_async(
             f"governance agent launched: tick={tick_count} "
             f"session={result.tmux_session}",
         )
-        echo(f"Governance scan dispatched in tmux session: {result.tmux_session}")
+        log_info = f"Log: {result.log_path}" if result.log_path else ""
+        message = f"Governance scan dispatched in tmux session: {result.tmux_session}"
+        if log_info:
+            message += f"\n{log_info}"
+        echo(message)
     elif result:
         append_governance_event(
             f"governance dispatch skipped: tick={tick_count} "
