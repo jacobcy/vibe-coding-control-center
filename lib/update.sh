@@ -63,8 +63,23 @@ _update_run() {
 
     log_step "Global update starting..."
 
-    local SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
     local INSTALL_DIR="$HOME/.vibe"
+    local SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+    local CURRENT_REPO_ROOT=""
+    local REAL_SOURCE_ROOT="$(cd "$SOURCE_ROOT" && pwd -P 2>/dev/null || echo "$SOURCE_ROOT")"
+    local REAL_INSTALL_DIR="$INSTALL_DIR"
+
+    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        CURRENT_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        if [[ -n "$CURRENT_REPO_ROOT" && -f "$CURRENT_REPO_ROOT/lib/utils.sh" && -f "$CURRENT_REPO_ROOT/bin/vibe" ]]; then
+            SOURCE_ROOT="$CURRENT_REPO_ROOT"
+            REAL_SOURCE_ROOT="$(cd "$SOURCE_ROOT" && pwd -P 2>/dev/null || echo "$SOURCE_ROOT")"
+        fi
+    fi
+
+    if [[ -d "$INSTALL_DIR" ]]; then
+        REAL_INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd -P 2>/dev/null || echo "$INSTALL_DIR")"
+    fi
 
     log_info "Source: $SOURCE_ROOT"
     log_info "Target: $INSTALL_DIR"
@@ -83,6 +98,16 @@ _update_run() {
     if [[ ! -d "$INSTALL_DIR" ]]; then
         log_error "Global install directory not found: $INSTALL_DIR"
         log_error "Please run 'scripts/install.sh' first"
+        exit 1
+    fi
+
+    if [[ "$REAL_SOURCE_ROOT" == "$REAL_INSTALL_DIR" ]]; then
+        if [[ -n "$CURRENT_REPO_ROOT" ]]; then
+            log_error "Current repo is not a Vibe Center repository: $CURRENT_REPO_ROOT"
+        else
+            log_error "vibe update must run from a Vibe Center repository or worktree"
+        fi
+        log_error "Open your vibe-center checkout and run 'vibe update run' there"
         exit 1
     fi
 
