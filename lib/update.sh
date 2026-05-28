@@ -63,8 +63,152 @@ _update_run() {
 
     log_step "Global update starting..."
 
-    # TODO: Implement sync logic in next tasks
-    log_info "Sync logic will be implemented in Task 3-6"
+    local SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+    local INSTALL_DIR="$HOME/.vibe"
 
-    log_success "Update complete!"
+    log_info "Source: $SOURCE_ROOT"
+    log_info "Target: $INSTALL_DIR"
+
+    # Pre-flight checks
+    log_step "Running pre-flight checks..."
+
+    # Check we're in a Vibe repo
+    if [[ ! -f "$SOURCE_ROOT/lib/utils.sh" ]]; then
+        log_error "Not in a Vibe Center repository: $SOURCE_ROOT"
+        log_error "Please run 'vibe update' from a Vibe repo or worktree"
+        exit 1
+    fi
+
+    # Check target directory exists (should exist if install.sh ran)
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        log_error "Global install directory not found: $INSTALL_DIR"
+        log_error "Please run 'scripts/install.sh' first"
+        exit 1
+    fi
+
+    log_success "Pre-flight checks passed"
+
+    # Sync core components
+    for dir in bin lib lib3 config scripts alias src skills; do
+        _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
+            log_error "Failed to sync $dir"
+            exit 1
+        }
+    done
+
+    # Sync Python project files
+    for file in pyproject.toml uv.lock; do
+        if [[ -f "$SOURCE_ROOT/$file" ]]; then
+            if [[ "$dry_run" == "true" ]]; then
+                log_info "[DRY-RUN] Would copy: $file"
+            else
+                cp "$SOURCE_ROOT/$file" "$INSTALL_DIR/"
+                [[ "$verbose" == "true" ]] && log_success "Copied: $file"
+            fi
+        fi
+    done
+
+    log_success "Global update complete!"
+    echo ""
+    echo "${BOLD}What changed:${NC}"
+    echo "  • V2/V3 core components synced to ${CYAN}~/.vibe${NC}"
+    echo "  • Stale files cleaned up"
+    echo "  • User configs preserved (keys.env, settings.yaml)"
+    echo ""
+    echo "${BOLD}Effect semantics:${NC}"
+    echo "  • Shell loader changes → ${CYAN}source ~/.zshrc${NC}"
+    echo "  • Python package changes → already effective (editable install)"
+    echo "  • Alias changes → ${CYAN}vibe alias${NC} or restart shell"
+    echo ""
+    echo "${BOLD}Next steps:${NC}"
+    echo "  • Run ${CYAN}vibe doctor${NC} to verify environment"
+    echo "  • Run ${CYAN}vibe keys check${NC} to verify API keys"
+}
+
+_clean_stale_files() {
+    local dst_dir="$1"
+    local src_dir="$2"
+    local component_name="$3"
+
+    if [[ ! -d "$dst_dir" ]]; then
+        return 0
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        log_info "[DRY-RUN] Would clean stale files in $dst_dir"
+        return 0
+    fi
+
+    local cleaned=0
+    while IFS= read -r -d '' file; do
+        local rel_path="${file#$dst_dir/}"
+        local src_path="$src_dir/$rel_path"
+
+        # Skip preserved files
+        if [[ "$component_name" == "config" && "$rel_path" == "keys.env" ]]; then
+            continue
+        fi
+
+        if [[ ! -e "$src_path" ]]; then
+            if [[ "$verbose" == "true" ]]; then
+                log_warn "Removing stale: $rel_path"
+            fi
+            rm -f "$file"
+            ((cleaned++))
+        fi
+    done < <(find "$dst_dir" -type f -print0 2>/dev/null)
+
+    if [[ $cleaned -gt 0 ]]; then
+        log_info "Cleaned $cleaned stale file(s) in $component_name"
+    fi
+}
+
+_sync_component() {
+    local src_dir="$1"
+    local dst_dir="$2"
+    local component_name="$3"
+
+    if [[ ! -d "$src_dir" ]]; then
+        log_warn "Source directory $src_dir not found, skipping $component_name"
+        return 0
+    fi
+
+    # Clean stale files first
+    _clean_stale_files "$dst_dir" "$src_dir" "$component_name"
+
+    if [[ "$dry_run" == "true" ]]; then
+        log_info "[DRY-RUN] Would sync: $src_dir → $dst_dir"
+        return 0
+    fi
+
+    mkdir -p "$dst_dir"
+
+    # Special handling for config/ to preserve keys.env
+    if [[ "$component_name" == "config" ]]; then
+        # Sync everything except keys.env
+        for item in "$src_dir"/*; do
+            local name=$(basename "$item")
+            if [[ "$name" == "keys.env" ]]; then
+                continue
+            fi
+            cp -R "$item" "$dst_dir/" 2>/dev/null || {
+                log_error "Failed to sync: $component_name/$name"
+                return 1
+            }
+        done
+        log_info "Synced: $component_name (preserved keys.env)"
+        return 0
+    fi
+
+    # Normal sync for other components
+    if cp -R "$src_dir/." "$dst_dir/" 2>/dev/null; then
+        if [[ "$verbose" == "true" ]]; then
+            log_success "Synced: $component_name"
+        else
+            log_info "Synced: $component_name"
+        fi
+    else
+        log_error "Failed to sync: $component_name"
+        return 1
+    fi
 }

@@ -298,6 +298,75 @@ related_docs:
   - 讨论过程、阶段、交付路径时使用 `workflow`
   - 讨论运行时容器时不要用 `workflow` 代替 `flow`
 
+### 4.4 Installation Lifecycle
+
+- 正式术语：`installation lifecycle`
+- 别称：`安装生命周期`
+- 定义：首次安装、全局更新、项目初始化的职责分离：
+  - **First-time setup** (`scripts/install.sh`): 引导全局目录、安装依赖、配置 shell
+  - **Global update** (`vibe update`): 同步 repo 到 `~/.vibe`、清理陈旧文件
+  - **Project initialization** (`scripts/init.sh`): worktree 特定设置、skills 安装
+- 边界：
+  - `install.sh` 不负责后续更新同步
+  - `vibe update` 不负责首次环境引导
+  - `scripts/init.sh` 不负责全局安装
+- 落点：
+  - 效果语义见 [../references/global-install-model.md](../references/global-install-model.md)
+- 使用规则：
+  - 讨论首次安装、环境引导时使用 `install.sh`
+  - 讨论全局同步、更新分发时使用 `vibe update`
+  - 讨论 worktree 初始化时使用 `scripts/init.sh`
+
+### 4.5 Global Distribution
+
+- 正式术语：`global distribution`
+- 别称：`全局分发`
+- 定义：位于 `~/.vibe` 的共享 Vibe 安装，供所有项目和工作树使用。包含：
+  - V2 shell scripts (`bin/vibe`, `lib/`)
+  - V3 Python code (`src/vibe3/`)
+  - Configuration (`config/`)
+  - User data (preserved: `keys.env`, `settings.yaml`)
+- 边界：
+  - `global distribution` 不等于 repo-local source
+  - `global distribution` 不等于单个 worktree
+- 使用规则：
+  - 讨论全局安装位置、跨项目共享时使用 `global distribution`
+  - 指定路径时写作 `~/.vibe`
+
+### 4.6 Update Command
+
+- 正式术语：`update command`
+- 别称：`更新命令`
+- 定义：V2 命令，用于幂等全局同步：
+  - 同步核心组件从 repo 到 `~/.vibe`
+  - 清理陈旧文件
+  - 保留用户配置文件
+  - 可安全多次运行
+- 用法：`vibe update run [--dry-run] [--verbose]`
+- 边界：
+  - `update command` 不执行首次安装
+  - `update command` 不修改 repo-local 源码
+- 落点：
+  - 命令实现见 `lib/update.sh`
+- 使用规则：
+  - 讨论全局同步、更新分发时使用 `update command`
+
+### 4.7 Effect Semantics
+
+- 正式术语：`effect semantics`
+- 别称：`效果语义`
+- 定义：决定变更何时生效的规则：
+  - **Repo-local changes**: 当前 worktree 立即生效
+  - **Global changes**: 需要 `vibe update`
+  - **Shell loader changes**: 需要 `source ~/.zshrc`
+  - **Python changes**: worktree 立即生效（editable install），全局需要 `vibe update`
+- 边界：
+  - 效果语义不决定变更是否发生，只决定何时生效
+- 落点：
+  - 详细语义见 [../references/global-install-model.md](../references/global-install-model.md)
+- 使用规则：
+  - 讨论变更生效时机、同步需求时使用 `effect semantics`
+
 ## 5. System Responsibility Terms
 
 ### 5.1 Server 层

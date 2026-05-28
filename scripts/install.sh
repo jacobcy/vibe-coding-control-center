@@ -172,6 +172,10 @@ for file in pyproject.toml uv.lock; do
 done
 log_success "Core modules synced"
 
+# NOTE: install.sh only handles first-time setup (bootstrap).
+# Subsequent global updates use: vibe update
+# Project/worktree initialization uses: scripts/init.sh
+
 # 4. Handle Key Template
 if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
     log_info "Initializing keys.env from template..."
@@ -324,16 +328,14 @@ _setup_uv_environment() {
         )
     fi
 
-    # 安装项目依赖
+    # 安装项目依赖（NOT editable install）
     log_info "Installing Python dependencies..."
     cd "$SOURCE_ROOT"
     "$VIBE_UV_BIN" sync --all-extras
     log_success "Python dependencies installed"
 
-    # 安装项目本身
-    log_info "Installing Vibe CLI package..."
-    "$VIBE_UV_BIN" tool install --editable .
-    log_success "Vibe CLI installed successfully"
+    # Note: editable install removed - global sync handled by `vibe update`
+    log_info "Python environment ready (editable install handled by 'vibe update')"
 }
 
 _setup_uv_environment
