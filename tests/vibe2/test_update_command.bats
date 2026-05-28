@@ -7,10 +7,12 @@ setup() {
     # Create temp directories
     TEST_REPO=$(mktemp -d)
     TEST_HOME=$(mktemp -d)
+    EXTERNAL_REPO=$(mktemp -d)
 
     # Mock minimal Vibe repo structure
     mkdir -p "$TEST_REPO"/{bin,lib,lib3,config,config/shell,scripts,src,skills}
     mkdir -p "$TEST_HOME/.vibe"/{bin,lib,config}
+    mkdir -p "$EXTERNAL_REPO/.git"
 
     # Copy necessary files from real repo
     cp "$VIBE_ROOT/bin/vibe" "$TEST_REPO/bin/"
@@ -32,7 +34,7 @@ setup() {
 }
 
 teardown() {
-    rm -rf "$TEST_REPO" "$TEST_HOME"
+    rm -rf "$TEST_REPO" "$TEST_HOME" "$EXTERNAL_REPO"
 }
 
 @test "vibe update help shows usage" {
@@ -45,7 +47,7 @@ teardown() {
 
 @test "vibe update run syncs files" {
     # Run update
-    run "$VIBE_TEST_ROOT/bin/vibe" update run
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run'
     [ "$status" -eq 0 ]
 
     # Check files were synced
@@ -55,7 +57,7 @@ teardown() {
 
 @test "vibe update preserves config/keys.env" {
     # Run update
-    run "$VIBE_TEST_ROOT/bin/vibe" update run
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run'
     [ "$status" -eq 0 ]
 
     # Check keys.env preserved
@@ -65,7 +67,7 @@ teardown() {
 
 @test "vibe update --dry-run does not modify files" {
     # Run dry-run
-    run "$VIBE_TEST_ROOT/bin/vibe" update run --dry-run
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run --dry-run'
     [ "$status" -eq 0 ]
 
     # Check no files created
@@ -79,9 +81,22 @@ teardown() {
     echo "stale" > "$TEST_HOME/.vibe/lib/stale_file.sh"
 
     # Run update
-    run "$VIBE_TEST_ROOT/bin/vibe" update run
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run'
     [ "$status" -eq 0 ]
 
     # Check stale file removed
     [ ! -f "$TEST_HOME/.vibe/lib/stale_file.sh" ]
+}
+
+@test "global vibe update from external repo fails before self-syncing ~/.vibe" {
+    cp "$VIBE_ROOT/bin/vibe" "$TEST_HOME/.vibe/bin/"
+    cp "$VIBE_ROOT/lib/config.sh" "$VIBE_ROOT/lib/utils.sh" "$VIBE_ROOT/lib/update.sh" \
+        "$TEST_HOME/.vibe/lib/"
+
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$EXTERNAL_REPO"'" && "$HOME/.vibe/bin/vibe" update run'
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not a Vibe Center repository"* ]] || \
+        [[ "$output" == *"must run from a Vibe Center repository or worktree"* ]]
+    [[ ! "$output" =~ "Pre-flight checks passed" ]]
+    [[ ! "$output" =~ "Failed to sync: bin" ]]
 }

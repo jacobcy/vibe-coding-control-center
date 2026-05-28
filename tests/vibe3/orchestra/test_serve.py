@@ -167,6 +167,27 @@ def test_build_async_serve_command_forces_sync_child_process() -> None:
     assert "--no-async" in cmd
 
 
+def test_build_async_serve_command_sets_code_root_override_only_in_debug() -> None:
+    debug_root = Path("/tmp/debug-wt").resolve()
+    cmd = _build_async_serve_command(
+        OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=True),
+        verbose=0,
+        launch_cwd=Path("/tmp/debug-wt"),
+    )
+
+    assert f"VIBE3_ASYNC_CLI_PROJECT_ROOT={debug_root}" in cmd
+
+    normal_cmd = _build_async_serve_command(
+        OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=False),
+        verbose=0,
+        launch_cwd=Path("/tmp/external-repo"),
+    )
+
+    # Normal mode must explicitly clear VIBE3_ASYNC_CLI_PROJECT_ROOT
+    # to prevent parent environment hijacking
+    assert "VIBE3_ASYNC_CLI_PROJECT_ROOT=" in normal_cmd
+
+
 def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
     monkeypatch.setattr(
         "vibe3.config.orchestra_settings.load_orchestra_config",

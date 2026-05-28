@@ -14,6 +14,7 @@ from vibe3.models.orchestration import IssueInfo
 
 MAIN_REPO = Path("/test/repos/vibe-center/main")
 WORKTREE_REPO = Path("/test/repos/vibe-center/main/.worktrees/wt-dev")
+MODULE_REPO = Path(__file__).resolve().parents[3]
 
 
 def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent() -> None:
@@ -27,22 +28,33 @@ def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent() -> None:
 
 
 def test_resolve_async_cli_project_root_defaults_to_repo_root() -> None:
-    """Without debug override, async child should run main-repo code."""
+    """Without override, async child should run the installed/source vibe3 code."""
     root = resolve_async_cli_project_root(MAIN_REPO)
-    assert root == MAIN_REPO
+    assert root == Path(__file__).resolve().parents[3]
 
 
 def test_resolve_async_cli_project_root_uses_debug_override(monkeypatch) -> None:
     """Debug mode should run async child from the current worktree code root."""
-    monkeypatch.setenv("VIBE3_REPO_MODELS_ROOT", str(WORKTREE_REPO))
+    monkeypatch.setenv("VIBE3_ASYNC_CLI_PROJECT_ROOT", str(WORKTREE_REPO))
 
     root = resolve_async_cli_project_root(MAIN_REPO)
 
     assert root == WORKTREE_REPO
 
 
+def test_resolve_async_cli_project_root_ignores_models_root_override(
+    monkeypatch,
+) -> None:
+    """Cross-project models root must not hijack async child code resolution."""
+    monkeypatch.setenv("VIBE3_REPO_MODELS_ROOT", "/tmp/external-repo")
+
+    root = resolve_async_cli_project_root(MAIN_REPO)
+
+    assert root == Path(__file__).resolve().parents[3]
+
+
 def test_build_issue_async_cli_request_uses_main_repo_by_default() -> None:
-    """Async issue self-invocation should target main repo code in normal mode."""
+    """Async issue self-invocation should target installed/source vibe3 code."""
     issue = IssueInfo(number=431, title="Test issue", labels=[])
 
     request = build_issue_async_cli_request(
@@ -58,8 +70,8 @@ def test_build_issue_async_cli_request_uses_main_repo_by_default() -> None:
     )
 
     assert request.cmd is not None
-    assert request.cmd[3] == str(MAIN_REPO)
-    assert request.cmd[6] == str(MAIN_REPO / "src/vibe3/cli.py")
+    assert request.cmd[3] == str(MODULE_REPO)
+    assert request.cmd[6] == str(MODULE_REPO / "src/vibe3/cli.py")
     assert request.repo_path == str(MAIN_REPO)
 
 
@@ -67,7 +79,7 @@ def test_build_issue_async_cli_request_uses_debug_code_root_override(
     monkeypatch,
 ) -> None:
     """Debug serve mode should only override the code root, not orchestration repo."""
-    monkeypatch.setenv("VIBE3_REPO_MODELS_ROOT", str(WORKTREE_REPO))
+    monkeypatch.setenv("VIBE3_ASYNC_CLI_PROJECT_ROOT", str(WORKTREE_REPO))
     issue = IssueInfo(number=431, title="Test issue", labels=[])
 
     request = build_issue_async_cli_request(

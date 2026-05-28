@@ -30,14 +30,23 @@ def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:
     """Resolve the code/project root used by async child self-invocation.
 
     Rules:
-    - If `VIBE3_REPO_MODELS_ROOT` is set, use it. This is the debug-mode override
-      from `vibe3 serve start --debug`, and points at the current worktree code.
-    - Otherwise, use the provided repo_path / orchestra root, which defaults to
-      the main repository root in normal serve mode.
+    - If `VIBE3_ASYNC_CLI_PROJECT_ROOT` is set, use it. This is the debug-mode
+      override from `vibe3 serve start --debug`, and points at the current
+      worktree code.
+    - Otherwise, derive the installed/source project root from this module's
+      own location. This keeps cross-project execution pinned to the real
+      vibe3 code instead of the caller repository.
+    - As a final fallback, use the provided repo_path / orchestra root.
     """
-    override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
+    override_root = os.environ.get("VIBE3_ASYNC_CLI_PROJECT_ROOT", "").strip()
     if override_root:
         return Path(override_root).expanduser().resolve()
+
+    module_root = Path(__file__).resolve().parents[3]
+    cli_path = module_root / "src" / "vibe3" / "cli.py"
+    if cli_path.exists():
+        return module_root
+
     return (repo_path or resolve_orchestra_repo_root()).resolve()
 
 
