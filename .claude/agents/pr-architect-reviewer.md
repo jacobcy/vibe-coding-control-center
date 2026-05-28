@@ -290,6 +290,25 @@ Tier 1: Shell Commands / git / gh
 - 是否遵循项目命名规范？
 - 是否与现有代码风格一致？
 
+### 6. 状态完整性检查（高风险）
+
+> **背景**：Phase 2 agent 曾因缺乏此视角而漏判 PR #892 中的 phantom flow 创建、数据一致性等实质性问题。
+
+**必须检查**：
+
+| 检查项 | 说明 | 验证方式 |
+|--------|------|----------|
+| State Mutation Safety | 是否允许未经授权的状态修改（如跨 flow 写入、缺少存在性校验的写入） | 检查写入路径是否有 `get_flow_status` 或等价的存在性校验 |
+| Cross-Boundary Access | 是否允许一个 flow 修改另一个 flow 的共享状态，且缺少权限校验 | 检查涉及 `--branch` 参数的写入命令是否先验证 flow 存在性 |
+| Flow Lifecycle Validation | 是否允许对不存在的 flow 写入状态（如 `INSERT OR IGNORE` 生成 phantom flow 行） | 检查数据库写入是否有前置存在性验证 |
+| Single Source of Truth | 写入与读取路径是否一致（写入了事件类型，但读取路径是否识别） | 检查 `_SUCCESS_HANDOFF_EVENT_TYPES` 等枚举是否覆盖所有写入类型 |
+
+**常见问题模式**：
+- `INSERT OR IGNORE` + `--branch` 参数 → 可能创建 phantom flow
+- 跨 `--branch` 写入状态 → 可能越权修改
+- 写入事件类型但读取白名单不匹配 → 数据不一致
+- 直接操作 `.git/vibe3/handoff.db` → 绕过状态通道
+
 ## 项目架构分层（强制）
 
 ```
