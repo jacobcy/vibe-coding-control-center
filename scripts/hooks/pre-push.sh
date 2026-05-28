@@ -17,7 +17,7 @@ detect_rebase() {
 echo "Running pre-push checks..."
 PUSH_STDIN=$(cat)
 
-SCOPE_JSON=$(printf '%s' "$PUSH_STDIN" | uv run python -m vibe3.analysis.pre_push_scope) || {
+SCOPE_JSON=$(printf '%s' "$PUSH_STDIN" | PYTHONPATH="$PWD/src" uv run python -m vibe3.analysis.pre_push_scope) || {
     echo "ERROR: Failed to resolve pre-push review scope"
     exit 1
 }
@@ -76,7 +76,7 @@ if [ "${VIBE_PREPUSH_FULL:-0}" != "1" ]; then
         CHANGED_FILES=""
     }
 
-    TEST_PLAN_JSON=$(printf '%s\n' "$CHANGED_FILES" | uv run python -m vibe3.analysis.pre_push_test_selector) || {
+    TEST_PLAN_JSON=$(printf '%s\n' "$CHANGED_FILES" | PYTHONPATH="$PWD/src" uv run python -m vibe3.analysis.pre_push_test_selector) || {
         echo "  -> Failed to resolve incremental test targets, fallback to full suite"
         TEST_PLAN_JSON=""
     }

@@ -22,7 +22,7 @@ Desktop.ini
 *.env
 !config/keys.template.env
 config/keys.env
-.envrc
+.envrc.local
 
 # =============================================================================
 # Logs & Temporary Files

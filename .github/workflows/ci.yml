@@ -69,4 +69,9 @@ jobs:
         run: uv run mypy src
 
       - name: Run Python tests (pytest)
+        # deps-only venv (package=false): no editable install, so subprocess-based
+        # imports (e.g. module independence tests) need src on PYTHONPATH, mirroring
+        # the committed .envrc used in dev worktrees.
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: uv run pytest tests/vibe3 -v

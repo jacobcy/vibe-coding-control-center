@@ -17,7 +17,8 @@ _usage() {
     echo "  1. 建立分发轨道：同步核心组件到 ${CYAN}~/.vibe${NC}"
     echo "  2. 密钥托管：从模板初始化全局 ${CYAN}keys.env${NC} 配置文件"
     echo "  3. 依赖安装：安装 uv 与基础 Python 环境"
-    echo "  4. 注入加载器：在 shell 配置文件中建立全量加载链路"
+    echo "  4. 提交 .envrc：共享 venv + 本地 src 配置（已提交到仓库）"
+    echo "  5. 注入加载器：在 shell 配置文件中建立全量加载链路"
     echo ""
     echo "Usage: ${CYAN}scripts/install.sh${NC} [options]"
     echo ""
@@ -172,6 +173,10 @@ for file in pyproject.toml uv.lock; do
 done
 log_success "Core modules synced"
 
+# NOTE: install.sh only handles first-time setup (bootstrap).
+# Subsequent global updates use: vibe update
+# Project/worktree initialization uses: scripts/init.sh
+
 # 4. Handle Key Template
 if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
     log_info "Initializing keys.env from template..."
@@ -315,8 +320,7 @@ _setup_uv_environment() {
 
     export UV_PROJECT_ENVIRONMENT="$venv_path"
 
-    local envrc_content='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
-    _write_file_if_changed "$SOURCE_ROOT/.envrc" "$envrc_content"
+    # .envrc is now committed in the repo - just ensure direnv allow
     if command -v direnv >/dev/null 2>&1; then
         (
             cd "$SOURCE_ROOT" &&
@@ -324,16 +328,14 @@ _setup_uv_environment() {
         )
     fi
 
-    # 安装项目依赖
+    # 安装项目依赖（NOT editable install）
     log_info "Installing Python dependencies..."
     cd "$SOURCE_ROOT"
     "$VIBE_UV_BIN" sync --all-extras
     log_success "Python dependencies installed"
 
-    # 安装项目本身
-    log_info "Installing Vibe CLI package..."
-    "$VIBE_UV_BIN" tool install --editable .
-    log_success "Vibe CLI installed successfully"
+    # Note: deps-only venv, no editable install
+    log_info "Python environment ready (deps-only venv, local src resolution via cli.py bootstrap)"
 }
 
 _setup_uv_environment
