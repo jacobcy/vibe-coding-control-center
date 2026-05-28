@@ -18,9 +18,9 @@ alias v3-fmt='uv run black src tests && uv run ruff check src tests --fix'
 # @desc Run pre-commit checks
 alias v3-check='uv run pre-commit run --all-files'
 
-# @desc Run vibe3 CLI
+# @desc Run vibe3 CLI (uses wrapper with local src resolution)
 # @featured
-alias v3='uv run vibe3'
+alias v3='vibe3'
 
 # @desc Run all development checks (format, type-check, test)
 v3-dev() {
