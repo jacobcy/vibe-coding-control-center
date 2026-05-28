@@ -67,8 +67,13 @@ description: Use when the user wants to inspect the current runtime scene with v
 优先运行：
 
 ```bash
-uv run python src/vibe3/cli.py task status --all
 uv run python src/vibe3/cli.py flow status
+```
+
+如果需要看全局 task 现场，再补：
+
+```bash
+uv run python src/vibe3/cli.py task status --all
 ```
 
 如果是当前分支现场，再补：

@@ -56,13 +56,6 @@ vibe3 flow show
 vibe3 flow status
 ```
 
-必要时补充：
-
-```bash
-vibe3 task status --all --check
-vibe3 handoff show
-```
-
 确认：
 - 当前要处理哪些 PR
 - 哪些 PR 是独立的，哪些是 stacked

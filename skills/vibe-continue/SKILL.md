@@ -61,7 +61,6 @@ description: Use when the user wants to resume work on an existing branch or flo
 
 ```bash
 vibe3 flow show
-vibe3 handoff status
 vibe3 handoff show @current
 ```
 
