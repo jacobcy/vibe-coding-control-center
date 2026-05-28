@@ -12,6 +12,7 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
 from vibe3.services.actor_support import format_agent_actor
+from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_context_loader import load_issue_info
 
 
@@ -57,6 +58,12 @@ def run_issue_role_async(
 
         try:
             result = coordinator.dispatch_execution(request)
+            record_dispatch_failure_if_unexpected(
+                result=result,
+                role=spec.role_name,
+                issue_number=issue_number,
+                branch=branch,
+            )
             if not result.launched:
                 typer.echo(
                     f"{spec.role_name} dispatch queued/throttled: {result.reason}"
@@ -67,7 +74,13 @@ def run_issue_role_async(
             typer.echo(f"Tmux session: {result.tmux_session}")
             typer.echo(f"Session log: {result.log_path}")
             return
-        except BaseException as exc:
+        except Exception as exc:
+            record_dispatch_failure_if_unexpected(
+                role=spec.role_name,
+                issue_number=issue_number,
+                branch=branch,
+                exception=exc,
+            )
             store.add_event(
                 branch,
                 f"{spec.role_name}_failed",
@@ -131,6 +144,12 @@ def run_issue_role_sync(
         show_prompt,
     )
     sync_result = coordinator.dispatch_execution(sync_request)
+    record_dispatch_failure_if_unexpected(
+        result=sync_result,
+        role=spec.role_name,
+        issue_number=issue_number,
+        branch=branch,
+    )
 
     if dry_run:
         typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (dry-run)")

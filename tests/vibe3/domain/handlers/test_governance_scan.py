@@ -226,3 +226,107 @@ class TestGovernanceScanHandler:
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
 
         mock_coordinator.dispatch_execution.assert_called_once()
+
+    @patch(
+        "vibe3.domain.handlers.governance_scan.record_dispatch_failure_if_unexpected"
+    )
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
+    @patch("vibe3.orchestra.flow_dispatch.FlowManager")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
+    def test_record_dispatch_failure_called_on_result(
+        self,
+        mock_from_settings: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+        mock_record_failure: MagicMock,
+    ) -> None:
+        """Verify record_dispatch_failure_if_unexpected called on dispatch result."""
+        from vibe3.domain.handlers.governance_scan import (
+            handle_governance_scan_started,
+        )
+
+        mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
+        mock_from_settings.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
+
+        result = ExecutionLaunchResult(
+            launched=False, reason="capacity full", reason_code="capacity_full"
+        )
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = result
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        mock_status = MagicMock()
+        mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
+        mock_status_cls.return_value = mock_status
+
+        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        mock_record_failure.assert_called_once_with(
+            result=result,
+            role="governance",
+            issue_number=None,
+            branch="governance",
+            tick_id=5,
+            dispatch_source="automatic",
+        )
+
+    @patch(
+        "vibe3.domain.handlers.governance_scan.record_dispatch_failure_if_unexpected"
+    )
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
+    @patch("vibe3.orchestra.flow_dispatch.FlowManager")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
+    def test_record_dispatch_failure_called_on_exception(
+        self,
+        mock_from_settings: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+        mock_record_failure: MagicMock,
+    ) -> None:
+        """Verify record_dispatch_failure_if_unexpected called on dispatch exception."""
+        from vibe3.domain.handlers.governance_scan import (
+            handle_governance_scan_started,
+        )
+
+        mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
+        mock_from_settings.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
+
+        exc = RuntimeError("dispatch failed")
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.side_effect = exc
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        mock_status = MagicMock()
+        mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
+        mock_status_cls.return_value = mock_status
+
+        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        mock_record_failure.assert_called_once()
+        call_kwargs = mock_record_failure.call_args.kwargs
+        assert call_kwargs["role"] == "governance"
+        assert call_kwargs["issue_number"] is None
+        assert call_kwargs["branch"] == "governance"
+        assert call_kwargs["exception"] is exc
+        assert call_kwargs["tick_id"] == 5
+        assert call_kwargs["dispatch_source"] == "automatic"
