@@ -274,6 +274,18 @@ def _build_async_serve_command(
     """Build self-invocation command for async tmux startup."""
     models_root = _resolve_dispatcher_models_root(config, launch_cwd)
     log_dir = _resolve_orchestra_log_dir(launch_cwd)
+
+    # Resolve the absolute path to vibe3 project root via module location.
+    # This works correctly in both:
+    # - Local development: points to source repo
+    # - Global install: points to ~/.vibe
+    # Important: Do NOT use resolve_orchestra_repo_root() which returns
+    # the current working project root, not the vibe3 tool's source root.
+    import vibe3.server.registry as this_module
+
+    repo_root = (Path(this_module.__file__).parent.parent.parent.parent).resolve()
+    cli_path = repo_root / "src" / "vibe3" / "cli.py"
+
     cmd = [
         "env",
         "VIBE3_ORCHESTRA_EVENT_LOG=1",
@@ -281,8 +293,10 @@ def _build_async_serve_command(
         f"VIBE3_ASYNC_LOG_DIR={log_dir}",
         "uv",
         "run",
+        "--project",
+        str(repo_root),
         "python",
-        "src/vibe3/cli.py",
+        str(cli_path),
         "serve",
         "start",
         "--no-async",
