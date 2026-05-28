@@ -41,6 +41,7 @@ class StateVerificationService:
         repo: str | None = None,
         branch: str | None = None,
         flow_state: dict | None = None,
+        tick_id: int = 0,
     ) -> str | None:
         """Get current state label from GitHub issue.
 
@@ -61,17 +62,19 @@ class StateVerificationService:
         try:
             issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
         except Exception as exc:
-            self._handle_github_api_failure(exc, issue_number, branch, flow_state)
+            self._handle_github_api_failure(
+                exc, issue_number, branch, flow_state, tick_id
+            )
 
         if not isinstance(issue_payload, dict):
             self._handle_malformed_response(
-                issue_payload, issue_number, branch, flow_state
+                issue_payload, issue_number, branch, flow_state, tick_id
             )
 
         labels = issue_payload.get("labels", [])
         if not isinstance(labels, list):
             self._handle_malformed_response(
-                issue_payload, issue_number, branch, flow_state
+                issue_payload, issue_number, branch, flow_state, tick_id
             )
 
         for label in labels:
@@ -92,6 +95,7 @@ class StateVerificationService:
         issue_number: int,
         branch: str | None,
         flow_state: dict | None,
+        tick_id: int,
     ) -> NoReturn:
         retry_count = (
             flow_state.get("noop_gate_github_retry_count", 0) if flow_state else 0
@@ -103,6 +107,7 @@ class StateVerificationService:
                 branch,
                 f"GitHub API failed after {retry_count} retries: {exc}",
                 retry_count,
+                tick_id,
             )
             raise GitHubAPIError(
                 f"Cannot verify remote state for #{issue_number} "
@@ -127,6 +132,7 @@ class StateVerificationService:
         issue_number: int,
         branch: str | None,
         flow_state: dict | None,
+        tick_id: int,
     ) -> NoReturn:
         retry_count = (
             flow_state.get("noop_gate_malformed_retry_count", 0) if flow_state else 0
@@ -138,6 +144,7 @@ class StateVerificationService:
                 branch,
                 f"Malformed GitHub response after {retry_count} retries",
                 retry_count,
+                tick_id,
             )
             raise GitHubAPIError(
                 f"Malformed GitHub response for #{issue_number} "
@@ -173,6 +180,7 @@ class StateVerificationService:
         branch: str | None,
         error_message: str,
         retry_count: int,
+        tick_id: int,
     ) -> None:
         """Record API error to error_log."""
         if not self.store:
@@ -184,6 +192,7 @@ class StateVerificationService:
             record_error(
                 error_code="E_API_UNAVAILABLE",
                 error_message=error_message,
+                tick_id=tick_id,
                 issue_number=issue_number,
                 branch=branch,
                 store=self.store,

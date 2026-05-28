@@ -5,6 +5,7 @@ Verifies that retry counters are persisted to database correctly:
 - Success path: retry count is cleared to 0 immediately
 """
 
+import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -177,3 +178,40 @@ class TestRetryCounterPersistence:
         # Verify: error recorded to error_log (FailedGate will control dispatch)
         # Note: error_log verification requires ErrorTrackingService query
         # which is tested in test_error_tracking.py
+
+    def test_retry_limit_records_current_tick_id(self, temp_db):
+        """Retry-limit error should preserve the heartbeat tick id in error_log."""
+        branch = "test-branch"
+        issue_number = 123
+
+        temp_db.update_flow_state(
+            branch, flow_slug="test", noop_gate_github_retry_count=3
+        )
+        flow_state = temp_db.get_flow_state(branch)
+
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+            mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
+
+            with pytest.raises(
+                GitHubAPIError, match="Cannot verify remote state.*after 3 retries"
+            ):
+                apply_unified_noop_gate(
+                    store=temp_db,
+                    issue_number=issue_number,
+                    branch=branch,
+                    actor="test",
+                    role="executor",
+                    before_state_label="state/running",
+                    repo="owner/repo",
+                    flow_state=flow_state,
+                    tick_id=9,
+                )
+
+        with sqlite3.connect(temp_db.db_path) as conn:
+            rows = conn.execute("""
+                SELECT tick_id, error_code
+                FROM error_log
+                ORDER BY id DESC
+                LIMIT 1
+                """).fetchall()
+        assert rows == [(9, "E_API_UNAVAILABLE")]

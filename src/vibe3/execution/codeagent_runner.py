@@ -328,6 +328,7 @@ class CodeagentExecutionService:
                     repo=getattr(self.config, "repo", None),
                     required_ref_key=required_ref_key,
                     flow_state=flow_state,
+                    tick_id=command.tick_id,
                 )
 
                 # Persist transition_count after gate call
