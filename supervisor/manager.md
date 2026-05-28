@@ -388,6 +388,21 @@ Forbidden:
 Steps:
 
 1. 调用 `read_context()`
+1.5. **权限目录检查（优先执行）**：
+   - 检查 issue 的 title 和 body 中是否描述了对 `.claude/` 或 `.codex/` 目录下文件的修改
+   - 触发条件：issue 描述中明确涉及 `.claude/` 或 `.codex/` 目录路径
+   - 若涉及：
+     a. 写 issue comment：`[manager] 涉及 agent 权限配置目录，无法自动化执行`
+     b. 调用：
+        ```bash
+        uv run python src/vibe3/cli.py flow blocked --reason "涉及 .claude/.codex 目录，权限问题"
+        ```
+     c. 添加 `roadmap/rfc` 标签：
+        ```bash
+        gh issue edit <issue-number> --add-label "roadmap/rfc"
+        ```
+     d. `exit()`
+   - 若不涉及：继续后续流程（步骤 2）
 2. **过时判断（预审阶段）**：结合 issue 文本与代码实际，检查 Issue 是否已过时或实质不需要执行：
    - **Governance 建议判断**：检查最新评论中是否有 `[governance suggest] 建议关闭此 Issue`
      - 若存在 governance 建议，直接采纳并执行关闭流程（步骤 3）
