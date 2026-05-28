@@ -95,9 +95,18 @@ gh issue view <issue-number> --json labels,body
 2. 检查是否有 `## Dependencies` 或 `## 依赖` section
 
 3. 如果存在依赖：
-   - 提示用户："该 issue 存在依赖关系，bootstrap 时需要添加 --dependency 参数"
-   - 让用户确认依赖是否已满足（已关闭的依赖不需要添加）
-   - **只对未关闭（open）的依赖**添加 `--dependency <id>` 参数
+   - 提取依赖 issue 编号（格式：`Depends on #<id>`、`依赖 #<id>`、`blocked by #<id>`）
+   - **验证依赖状态**：
+     ```bash
+     gh issue view <dep-id> --json state
+     ```
+   - 如果依赖状态为 `open`：
+     - 提示用户："该 issue 存在未关闭的依赖 #<id>，bootstrap 后 flow 将进入 blocked 状态"
+     - 等待用户确认是否继续
+     - 添加 `--dependency <id>` 参数
+   - 如果依赖状态为 `closed`：
+     - 提示用户："依赖 #<id> 已关闭，无需阻塞"
+     - **不添加** `--dependency` 参数
 
 4. 如果无依赖：继续
 

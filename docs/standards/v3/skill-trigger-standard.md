@@ -68,13 +68,13 @@ related_docs:
 
 ## 3. 核心 Skill 触发矩阵
 
-| Skill | 对象层级 | 介入时机 | 不该介入的场景 | 常见触发语句 |
+| `vibe-orchestra` | Orchestra service health | 用户要监控 orchestra service 状态、检查 FailedGate、serve status | Issue pool 管理、RFC/blocked issues、版本规划 | "检查 serve status", "orchestra 健康状态", "FailedGate 检查" |
 |---|---|---|---|---|
 | `vibe-issue` | Issue intake | 用户要创建、补全、查重、润色、落 GitHub issue | 已经在讨论版本归类、task 映射、runtime 修复 | "创建 issue", "提 issue", "查重", "补 issue 模板" |
 | `vibe-roadmap` | Roadmap planning | 用户要排版本、定目标、做 backlog triage、决定 issue 放哪版 | 只是在看当前 flow 该去哪，或修 runtime/registry | "版本规划", "下一个版本做什么", "这个 issue 放哪一版" |
 | `vibe-new` | Flow transition | 用户要开始新任务、确认目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft | 已经进入实现、跨 worktree 调度 | "开始新任务", "进入新 flow", "切主 issue", "vibe-new" |
 | `vibe-continue` | Execution resume | 用户要恢复已有分支的工作、重新加载当前 flow 上下文 | 创建新 issue、创建新 branch、新任务启动 | "恢复执行", "继续工作", "加载上下文", "vibe-continue" |
-| `vibe-task` | Task registry / roadmap-task mapping | 用户要看跨 worktree 的 flow/task 大盘，或核对 `roadmap <-> task`、task registry | 项目级版本规划、Issue intake、runtime stale repair | "现在该回哪个 flow", "任务总览", "修复 roadmap 和 task 对应关系" |
+| `vibe-task` | RFC & Blocked issues | 用户要检查 RFC issues、blocked issues、问题 issue 状态 | 项目级版本规划、Issue intake、runtime stale repair、正常运行 issues | "检查 RFC issues", "看 blocked issues", "问题 issue 检查" |
 | `vibe-check` | Runtime / task-flow binding | 用户要解释或修复 `task <-> flow` / worktree runtime 不一致 | roadmap 归类、task registry 审计、Issue 治理 | "binding 不对", "runtime stale", "check runtime", "当前 worktree 状态不对" |
 | `vibe-review-code` | Code review | 用户要对 source changes 做 pre-PR 审查、复核 PR review feedback、检查实现风险与测试覆盖 | docs-only review、standards/changelog 审查 | "review 这段代码", "代码审查", "PR 前 review", "根据 review feedback 修代码" |
 | `vibe-review-docs` | Documentation review | 用户要审查 docs/、入口文件、standards、changelog，或检查概念漂移与文档治理问题 | source-code implementation review | "review docs", "文档审查", "审一下 CLAUDE.md", "检查标准文档" |
@@ -91,7 +91,7 @@ related_docs:
 ### 4.2 `vibe-roadmap` vs `vibe-task`
 
 - 用户问"项目层面下一步做什么""当前版本该装什么内容"：优先 `vibe-roadmap`。
-- 用户问"现有现场里我该回哪个 task / worktree""这个 task 为什么没挂到 roadmap"：优先 `vibe-task`。
+- 用户问"有哪些 RFC issues 需要讨论""有哪些 blocked issues 需要解除"：优先 `vibe-task`。
 
 ### 4.3 `vibe-task` vs `vibe-check`
 
@@ -103,10 +103,10 @@ related_docs:
 - 目标是 repo 内 `skills/vibe-*` 的创建、审查、收敛：优先 `vibe-skill-audit`。
 - 目标是已安装 skill 的同步、inventory、推荐、删除：优先 `vibe-skills-manager`。
 
-### 4.5 `vibe-orchestra` vs `vibe-manager`
+### 4.5 `vibe-orchestra` vs `vibe-task`
 
-- 视角是"大盘有什么""接下来该让谁动"：优先 `vibe-orchestra`。
-- 视角是"我正在管这一个 issue，我要派发它、盯它到 PR 结束"：优先 `vibe-manager`。
+- 视角是"orchestra service 健康状态""FailedGate 检查""serve status 监控"：优先 `vibe-orchestra`。
+- 视角是"RFC issues""blocked issues""问题 issue 状态检查"：优先 `vibe-task`。
 
 ### 4.6 `vibe-review-code` vs `vibe-review-docs`
 

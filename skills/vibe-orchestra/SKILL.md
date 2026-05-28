@@ -86,7 +86,7 @@ vibe3 serve status
 
 **FailedGate 存在**：
 ```bash
-vibe3 serve resume --yes
+vibe3 serve resume --reason "clear FailedGate"
 ```
 
 **Service stopped**：
