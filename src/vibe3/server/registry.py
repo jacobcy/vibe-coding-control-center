@@ -302,14 +302,20 @@ def _build_async_serve_command(
     repo_root = (Path(this_module.__file__).parent.parent.parent.parent).resolve()
     cli_path = repo_root / "src" / "vibe3" / "cli.py"
 
+    # Always explicitly set VIBE3_ASYNC_CLI_PROJECT_ROOT to prevent
+    # parent environment hijacking the async child's code-root resolution
+    async_cli_root_env = (
+        f"VIBE3_ASYNC_CLI_PROJECT_ROOT={async_cli_root}"
+        if async_cli_root is not None
+        else "VIBE3_ASYNC_CLI_PROJECT_ROOT="
+    )
     cmd = [
         "env",
         "VIBE3_ORCHESTRA_EVENT_LOG=1",
         f"VIBE3_REPO_MODELS_ROOT={models_root}",
         f"VIBE3_ASYNC_LOG_DIR={log_dir}",
+        async_cli_root_env,
     ]
-    if async_cli_root is not None:
-        cmd.append(f"VIBE3_ASYNC_CLI_PROJECT_ROOT={async_cli_root}")
     cmd.extend(
         [
             "uv",

@@ -183,9 +183,9 @@ def test_build_async_serve_command_sets_code_root_override_only_in_debug() -> No
         launch_cwd=Path("/tmp/external-repo"),
     )
 
-    assert not any(
-        part.startswith("VIBE3_ASYNC_CLI_PROJECT_ROOT=") for part in normal_cmd
-    )
+    # Normal mode must explicitly clear VIBE3_ASYNC_CLI_PROJECT_ROOT
+    # to prevent parent environment hijacking
+    assert "VIBE3_ASYNC_CLI_PROJECT_ROOT=" in normal_cmd
 
 
 def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
