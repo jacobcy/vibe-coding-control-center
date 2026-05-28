@@ -20,6 +20,7 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
     Markers that indicate automated comments
     (see vibe3.utils.constants.AUTOMATED_MARKERS):
     - [manager]: Manager agent reports
+    - [flow]: Unified flow timeline marker
     - [resume]: Task resume operations
     - [plan]: Plan phase completion / scope clarification
     - [run]: Run phase completion / blocker
@@ -29,6 +30,7 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
     - [handoff]: Handoff operations
     - [governance], [governance suggest], [governance auto-recover],
       [governance apply]: Governance routing
+    - [roadmap decision]: Roadmap decisions / mandatory split / dependency orchestration
     - [agent], [agent:<role>]: Generic agent fallback markers
 
     These markers prevent automated systems from interpreting their own
