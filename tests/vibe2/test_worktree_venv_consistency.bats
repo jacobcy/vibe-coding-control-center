@@ -1,24 +1,31 @@
 #!/usr/bin/env bats
 # Test cross-worktree venv consistency (deps-only model)
+# Behavioral cross-worktree resolution is covered by
+# tests/vibe3/test_cli_bootstrap.py; these are the shell/config-side guards.
 
 setup() {
     export VIBE_ROOT="$BATS_TEST_DIRNAME/../.."
-    TEST_HOME=$(mktemp -d)
-    export HOME="$TEST_HOME"
 }
 
-teardown() {
-    rm -rf "$TEST_HOME"
-}
-
-@test "shared venv does not contain editable .pth file" {
-    # Skip if venv doesn't exist (CI environment)
-    if [[ ! -d "$HOME/.venvs/vibe-center" ]]; then
-        skip "Global venv not found (expected in CI environment)"
+# Resolve the venv that `uv run` would actually use, in priority order:
+#   UV_PROJECT_ENVIRONMENT (set by .envrc) > global shared venv > repo-local .venv
+_resolve_venv() {
+    if [[ -n "${UV_PROJECT_ENVIRONMENT:-}" && -d "$UV_PROJECT_ENVIRONMENT" ]]; then
+        echo "$UV_PROJECT_ENVIRONMENT"
+    elif [[ -d "$HOME/.venvs/vibe-center" ]]; then
+        echo "$HOME/.venvs/vibe-center"
+    elif [[ -d "$VIBE_ROOT/.venv" ]]; then
+        echo "$VIBE_ROOT/.venv"
     fi
+}
 
-    # Check that no editable .pth file exists
-    ! ls "$HOME/.venvs/vibe-center/lib/python"*/site-packages/__editable__.vibe3*.pth 2>/dev/null
+@test "active venv has no editable vibe3 .pth (deps-only model)" {
+    local venv
+    venv="$(_resolve_venv)"
+    [[ -n "$venv" ]] || skip "no venv found (fresh checkout / CI before sync)"
+    # ls succeeds (status 0) iff an editable .pth exists -> that's the failure case.
+    run bash -c "ls \"$venv\"/lib/python*/site-packages/__editable__.vibe3*.pth 2>/dev/null"
+    [ "$status" -ne 0 ]
 }
 
 @test "pyproject.toml has package=false" {
@@ -46,11 +53,16 @@ teardown() {
     grep -q '^\.envrc\.local$' "$VIBE_ROOT/.gitignore"
 }
 
-@test "cli.py has src bootstrap code" {
-    # Check that cli.py has bootstrap before imports
-    grep -q 'import sys' "$VIBE_ROOT/src/vibe3/cli.py"
-    grep -q 'from pathlib import Path' "$VIBE_ROOT/src/vibe3/cli.py"
-    grep -q 'sys.path.insert(0, _SRC)' "$VIBE_ROOT/src/vibe3/cli.py"
+@test "cli.py has src bootstrap before any vibe3 import" {
+    # The bootstrap must run before `import vibe3` / `from vibe3 ...`,
+    # otherwise the isolated interpreter can't resolve the local package.
+    local cli="$VIBE_ROOT/src/vibe3/cli.py"
+    local boot_line import_line
+    boot_line="$(grep -n 'sys.path.insert(0, _SRC)' "$cli" | head -1 | cut -d: -f1)"
+    import_line="$(grep -nE '^(from|import) vibe3' "$cli" | head -1 | cut -d: -f1)"
+    [[ -n "$boot_line" ]]
+    [[ -n "$import_line" ]]
+    [ "$boot_line" -lt "$import_line" ]
 }
 
 @test "install.sh does not write .envrc" {

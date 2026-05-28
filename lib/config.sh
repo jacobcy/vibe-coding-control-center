@@ -48,7 +48,8 @@ if [[ "${VIBE_KEYS_DETECT:-}" != "1" ]]; then
     }
 
     if ! _vibe_load_keys "$VIBE_CONFIG/keys.env"; then
-        _vibe_load_keys "${HOME}/.vibe/config/keys.env"
+        # Missing keys.env is not fatal (fresh install / detached env); keep going.
+        _vibe_load_keys "${HOME}/.vibe/config/keys.env" || true
     fi
 fi
 

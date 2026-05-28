@@ -359,13 +359,30 @@ related_docs:
   - **Repo-local changes**: 当前 worktree 立即生效
   - **Global changes**: 需要 `vibe update`
   - **Shell loader changes**: 需要 `source ~/.zshrc`
-  - **Python changes**: worktree 立即生效（editable install），全局需要 `vibe update`
+  - **Python changes**: 当前 worktree 立即生效（cli.py 按 `__file__` 解析本地 `src/`，共享 venv 只装依赖），全局需要 `vibe update`
 - 边界：
   - 效果语义不决定变更是否发生，只决定何时生效
 - 落点：
   - 详细语义见 [../references/global-install-model.md](../references/global-install-model.md)
 - 使用规则：
   - 讨论变更生效时机、同步需求时使用 `effect semantics`
+
+### 4.8 Shared Venv
+
+- 正式术语：`shared venv`
+- 别称：`共享虚拟环境`
+- 定义：位于 `~/.venvs/vibe-center` 的单一虚拟环境，由整个项目的所有 worktree 共用，**只安装第三方依赖**（`pyproject.toml` 设 `[tool.uv] package = false`，不安装 vibe3 包本身、无 editable `.pth`）。
+- 代码解析：Python 代码按当前 worktree 本地解析，不依赖共享 venv：
+  - `vibe3` wrapper 经 `cli.py` 的 `__file__` bootstrap 把本地 `src/` 置于 `sys.path` 首位（即使 `python -I`）
+  - `uv run python -m ...` 等经提交的 `.envrc` 导出的 `PYTHONPATH=$PWD/src` 解析
+- 边界：
+  - `shared venv` 只提供依赖，不决定运行哪份代码
+  - 不使用 per-worktree 独立 venv 或硬链接
+- 落点：
+  - 模型说明见 [../references/global-install-model.md](../references/global-install-model.md)
+  - 回归测试见 `tests/vibe3/test_cli_bootstrap.py`
+- 使用规则：
+  - 讨论依赖隔离、跨 worktree venv 共享时使用 `shared venv`
 
 ## 5. System Responsibility Terms
 
