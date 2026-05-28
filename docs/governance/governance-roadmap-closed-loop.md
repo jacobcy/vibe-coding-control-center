@@ -1,8 +1,8 @@
 # 治理闭环机制说明
 
-**维护者**: Vibe Team  
-**创建时间**: 2026-05-26  
-**状态**: Active  
+**维护者**: Vibe Team
+**创建时间**: 2026-05-26
+**状态**: Active
 
 ---
 
@@ -10,122 +10,7 @@
 
 Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有独立的标签实现闭环，防止重复处理。
 
----
-
-## 三层架构
-
-```
-broader repo --> Layer 1: roadmap-intake (入口层)
-                    扫描范围: 无 assignee 的 issue
-                    过滤: 无 orchestra-scanned（自闭环）
-                          + 无 orchestra-governed（防御：pool 已决策的不该回头）
-                    接受 -> 分配 assignee -> 流入 Layer 2
-                    跳过 -> 打 orchestra-scanned -> 不再看
-                          |
-                          v
-                 Layer 2: assignee-pool (池内决策层)
-                    扫描范围: 有 assignee 的 issue
-                    过滤: 无 orchestra-governed
-                    例外: roadmap/epic 收口检查每次独立扫描，不受 governed 过滤
-                    决策(close/split/rfc/epic/ready/resume) -> 打 orchestra-governed -> 不再看
-                          |
-                          v
-                 Layer 3: vibe-roadmap (上层审查/纠偏层)
-                    扫描范围: 所有 [governance suggest] 评论
-                    过滤: 无 roadmap-reviewed 且无 roadmap/rfc
-                    审查 -> 打 roadmap-reviewed -> 写入 memory.md
-```
-
----
-
-## 角色分工
-
-| 角色 | 文件 | Marker | 职责 | 标签 |
-|------|------|--------|------|------|
-| **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
-| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest]` | 池内决策者：对 pool 中 issue 做 rfc/epic/ready 决策 | 决策后打 `orchestra-governed` |
-| **vibe-roadmap** | skills/vibe-roadmap/SKILL.md | `[roadmap decision]` | 上层审查者：审查 governance 决策，纠正和补全 | 审查后打 `roadmap-reviewed` |
-
----
-
-## 三标签详解
-
-### 1. orchestra-scanned（入口层闭环）
-
-**谁打**：roadmap-intake  
-**何时打**：审查后**决定不接受**（不分配 assignee）时  
-**不打的情况**：接受并分配 assignee 时——assignee 本身就是信号，issue 自然流入 assignee-pool  
-
-**语义**："已审查，不纳入"  
-
-**命令**：
-```bash
-gh issue edit <issue-number> --add-label "orchestra-scanned"
-```
-
-**颜色**：FF9933（橙色）
-
-**过滤逻辑**：
-```
-intake 扫描 -> 跳过有 orchestra-scanned 的 issue（自闭环）
-intake 扫描 -> 跳过有 orchestra-governed 的 issue（防御性过滤）
-intake 扫描 -> 跳过有 assignee 的 issue（已在 pool 中）
-```
-
-**防御性过滤说明**：
-代码 `build_broader_repo_entries` 同时过滤 `orchestra-scanned` 和 `orchestra-governed`。
-原因：broader repo 默认查询无 assignee 的 issue，但如果一个 issue 曾被 pool 决策（带 `orchestra-governed`）后 assignee 被移除，或 pool 决策 `close`/`rfc` 后 issue 仍 OPEN 但无 assignee，
-不该让 intake 再次评估它——它已经过更上层的决策了。
-
----
-
-### 2. orchestra-governed（池内层闭环）
-
-**谁打**：assignee-pool  
-**何时打**：完成决策后（不管结论是 rfc、epic、ready、建议关闭）  
-
-**语义**："已决策，不再重复检查"  
-
-**命令**：
-```bash
-gh issue edit <issue-number> --add-label "orchestra-governed"
-```
-
-**颜色**：9933FF（蓝紫色）
-
-**过滤逻辑**：
-```
-pool 扫描 -> 跳过有 orchestra-governed 的 issue
-pool 扫描 -> 跳过无 assignee 的 issue（不在 pool 中，由 intake 负责）
-```
-
----
-
-### 3. roadmap-reviewed（审查层闭环）
-
-**谁打**：vibe-roadmap  
-**何时打**：写完 `[roadmap decision]` 评论后，**但 decision 不是 `rfc` 时**  
-**不打的情况**：decision 是 `rfc` 时——rfc 表示需要人类决策，未完成决策闭环  
-
-**语义**："已审查，下次 Step 0 跳过"  
-
-**与 `roadmap/rfc` 的互斥规则**：
-- `roadmap/rfc` 和 `roadmap-reviewed` **不能共存**
-- 带 `roadmap/rfc` 的 issue 表示"未完成决策"，不应打 `roadmap-reviewed`
-- 人类移除 `roadmap/rfc` 后，下次 roadmap 扫描会重新捡起该 issue，完成审查后打 `roadmap-reviewed`
-
-**命令**：
-```bash
-gh issue edit <issue-number> --add-label "roadmap-reviewed"
-```
-
-**过滤逻辑**：
-```
-Step 0 搜索 -> 过滤掉有 roadmap-reviewed 的 issue
-Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
-```
-
-**颜色**：CC99FF（淡紫色）
+**三层架构、标签语义和角色分工详见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md)**。
 
 ---
 
@@ -253,6 +138,7 @@ gh issue view <N> --json labels --jq '.labels | map(.name)'
 ## 相关文档
 
 - **写入侧（本文档）**：定义谁/何时打什么标签，三层 agent 的闭环责任
+- **[supervisor/roadmap-common.md](../../supervisor/roadmap-common.md)**：三层架构、标签语义和三级审查框架的公共定义
 - **[docs/v3/orchestra/task-status-filtering.md](../v3/orchestra/task-status-filtering.md)**：定义 `vibe3 task status` 的 UI 展示过滤规则（读取侧）
 - **[docs/standards/github-labels-reference.md](../standards/github-labels-reference.md)**：标签参考手册
 - **[supervisor/governance/roadmap-intake.md](../../supervisor/governance/roadmap-intake.md)**：intake 角色 prompt
@@ -261,5 +147,5 @@ gh issue view <N> --json labels --jq '.labels | map(.name)'
 
 ---
 
-**维护者**: Vibe Team  
+**维护者**: Vibe Team
 **最后更新**: 2026-05-28
