@@ -7,7 +7,7 @@ description: Use when the user wants to inspect the current runtime scene with v
 
 现场观察与修复分三类命令：
 
-- `uv run python src/vibe3/cli.py task status` / `--all`：看 orchestra 与 task 现场
+- `vibe3 task status`：看 orchestra 与 task 现场
 - `uv run python src/vibe3/cli.py flow status` / `flow show`：看当前或全局 flow 现场
 - `uv run python src/vibe3/cli.py check`：只检查 flow 与 task 是否同步
 - `uv run python src/vibe3/cli.py task resume ...`：把其他 auto task flow 的 worktree / runtime 现场回退到可恢复状态
@@ -73,7 +73,7 @@ uv run python src/vibe3/cli.py flow status
 如果需要看全局 task 现场，再补：
 
 ```bash
-uv run python src/vibe3/cli.py task status --all
+vibe3 task status
 ```
 
 如果是当前分支现场，再补：
@@ -192,9 +192,9 @@ uv run python src/vibe3/cli.py task resume --all --yes
 修复后必须重新运行：
 
 ```bash
-uv run python src/vibe3/cli.py task status --all
-uv run python src/vibe3/cli.py flow status
-uv run python src/vibe3/cli.py check
+vibe3 task status
+vibe3 flow status
+vibe3 check
 ```
 
 ## Step 6: 报告
@@ -226,7 +226,7 @@ uv run python src/vibe3/cli.py check
 
 ## 与其他命令的关系
 
-- `uv run python src/vibe3/cli.py task status --all`：主现场看板，优先用于看 orchestra / task runtime
+- `vibe3 task status`：主现场看板，优先用于看 orchestra / task runtime
 - `uv run python src/vibe3/cli.py flow status` / `flow show`：flow 现场读取
 - `uv run python src/vibe3/cli.py check`：只负责检查 flow 和 task 是否同步
 - `uv run python src/vibe3/cli.py task resume`：把其他 auto-task flow 的 worktree / runtime 现场回退

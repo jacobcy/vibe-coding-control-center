@@ -318,8 +318,8 @@ cat config/v3/settings.yaml
 **C. 状态迁移问题**（state labels / flow 不一致）
 
 ```bash
-uv run python src/vibe3/cli.py task status --all
-uv run python src/vibe3/cli.py flow show
+vibe3 task status
+vibe3 flow show
 gh issue view {n} --json labels,state
 ```
 
