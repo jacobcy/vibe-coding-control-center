@@ -43,6 +43,21 @@ def _resolve_dispatcher_models_root(
     return resolve_orchestra_repo_root().resolve()
 
 
+def _resolve_async_cli_override_root(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> Path | None:
+    """Resolve optional async child code-root override.
+
+    Only debug mode should override the async child code root. Normal mode must
+    keep using the installed/source vibe3 project root so cross-project scans
+    do not treat the caller repository as the vibe3 source tree.
+    """
+    if not config.debug:
+        return None
+    return (launch_cwd or Path.cwd()).resolve()
+
+
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
     """Resolve the shared orchestra log root anchored to the launch cwd."""
     return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
@@ -274,6 +289,7 @@ def _build_async_serve_command(
     """Build self-invocation command for async tmux startup."""
     models_root = _resolve_dispatcher_models_root(config, launch_cwd)
     log_dir = _resolve_orchestra_log_dir(launch_cwd)
+    async_cli_root = _resolve_async_cli_override_root(config, launch_cwd)
 
     # Resolve the absolute path to vibe3 project root via module location.
     # This works correctly in both:
@@ -291,20 +307,26 @@ def _build_async_serve_command(
         "VIBE3_ORCHESTRA_EVENT_LOG=1",
         f"VIBE3_REPO_MODELS_ROOT={models_root}",
         f"VIBE3_ASYNC_LOG_DIR={log_dir}",
-        "uv",
-        "run",
-        "--project",
-        str(repo_root),
-        "python",
-        str(cli_path),
-        "serve",
-        "start",
-        "--no-async",
-        "--interval",
-        str(config.polling_interval),
-        "--port",
-        str(config.port),
     ]
+    if async_cli_root is not None:
+        cmd.append(f"VIBE3_ASYNC_CLI_PROJECT_ROOT={async_cli_root}")
+    cmd.extend(
+        [
+            "uv",
+            "run",
+            "--project",
+            str(repo_root),
+            "python",
+            str(cli_path),
+            "serve",
+            "start",
+            "--no-async",
+            "--interval",
+            str(config.polling_interval),
+            "--port",
+            str(config.port),
+        ]
+    )
     if config.repo:
         cmd.extend(["--repo", config.repo])
     if config.dry_run:
