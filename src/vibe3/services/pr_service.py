@@ -30,6 +30,15 @@ from vibe3.services.signature_service import SignatureService
 from vibe3.services.version_service import VersionService
 
 
+def _format_datetime_iso(dt: datetime | None) -> str | None:
+    """Format datetime to ISO string, pass through None and str."""
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        return dt
+    return dt.isoformat()
+
+
 class PRService:
     """Service for managing pull requests."""
 
@@ -181,11 +190,9 @@ class PRService:
         repo: str | None = None,
         sync_context_cache: bool = True,
     ) -> PRResponse | None:
-        """Return branch PR status from recent cache, with direct fallback on miss.
+        """Return branch PR status from recent cache with fallback on miss.
 
-        When repo is provided, bypass cache entirely since the local cache
-        is scoped to the current git checkout and may return PRs from the
-        wrong repository for the same branch name.
+        Bypasses cache when repo is provided to avoid wrong-repo hits.
         """
         # Cross-repo queries bypass cache entirely to avoid wrong-repo hits
         if repo is None:
@@ -224,16 +231,8 @@ class PRService:
                     "url": pr.url,
                     "head_branch": pr.head_branch,
                     "base_branch": pr.base_branch,
-                    "merged_at": (
-                        pr.merged_at.isoformat()
-                        if isinstance(pr.merged_at, datetime)
-                        else pr.merged_at
-                    ),
-                    "closed_at": (
-                        pr.closed_at.isoformat()
-                        if isinstance(pr.closed_at, datetime)
-                        else pr.closed_at
-                    ),
+                    "merged_at": _format_datetime_iso(pr.merged_at),
+                    "closed_at": _format_datetime_iso(pr.closed_at),
                 },
             )
             self._recent_pr_cache_map[branch] = pr
@@ -532,14 +531,9 @@ class PRService:
         return self.version_service.calculate_bump(group)
 
     def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
-        """Close a pull request.
+        """Close a pull request with optional comment.
 
-        Args:
-            pr_number: PR number to close
-            comment: Optional comment to add before closing
-
-        Returns:
-            True if PR was closed successfully
+        Returns True if PR was closed successfully.
         """
         logger.bind(
             domain="pr",
@@ -557,12 +551,7 @@ class PRService:
     ) -> int | None:
         """Close open PR for a flow branch if one exists.
 
-        Args:
-            branch: Branch name to check for open PR
-            comment: Optional comment to add before closing
-
-        Returns:
-            PR number if a PR was closed, None otherwise
+        Returns PR number if closed, None otherwise.
         """
         logger.bind(
             domain="pr",
