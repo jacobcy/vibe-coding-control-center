@@ -54,6 +54,7 @@ class SyncExecutionContext:
     before_state_label: str | None
     execution_cwd: Path
     commit_count_before: int | None = None
+    before_issue_is_closed: bool = False
 
 
 class CodeagentExecutionService:
@@ -223,7 +224,9 @@ class CodeagentExecutionService:
 
         # Capture before_state_label from GitHub for unified no-op gate.
         # Remote source of truth: GitHub issue labels, not local SQLite cache.
+        # Also capture whether the issue is closed before agent execution.
         before_state_label: str | None = None
+        before_issue_is_closed = False
         if command.issue_number is not None:
             try:
                 from vibe3.clients.github_client import GitHubClient
@@ -233,6 +236,7 @@ class CodeagentExecutionService:
                     repo=getattr(self.config, "repo", None),
                 )
                 if isinstance(issue_payload, dict):
+                    # Extract state label
                     labels = issue_payload.get("labels", [])
                     if isinstance(labels, list):
                         for label in labels:
@@ -241,6 +245,9 @@ class CodeagentExecutionService:
                                 if isinstance(name, str) and name.startswith("state/"):
                                     before_state_label = name
                                     break
+                    # Check if issue is closed
+                    if str(issue_payload.get("state", "")).upper() == "CLOSED":
+                        before_issue_is_closed = True
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
@@ -266,6 +273,7 @@ class CodeagentExecutionService:
             before_state_label=before_state_label,
             execution_cwd=execution_cwd,
             commit_count_before=commit_count_before,
+            before_issue_is_closed=before_issue_is_closed,
         )
 
     def _finalize_sync_execution(
@@ -329,6 +337,7 @@ class CodeagentExecutionService:
                     required_ref_key=required_ref_key,
                     flow_state=flow_state,
                     tick_id=command.tick_id,
+                    before_issue_is_closed=ctx.before_issue_is_closed,
                 )
 
                 # Persist transition_count after gate call

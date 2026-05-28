@@ -390,3 +390,44 @@ class TestApplyUnifiedNoopGate:
         # Gate should skip, not block
         mock_block.assert_not_called()
         store.add_event.assert_not_called()
+
+    def test_issue_closed_during_execution_bypasses_state_unchanged_block(
+        self,
+    ) -> None:
+        """Issue closed during execution is a terminal transition.
+
+        Bypasses state unchanged block even when state label is unchanged.
+        """
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            # Single call: check issue closed state (returns closed)
+            # Also extracts after_state_label from same payload
+            # (not used since issue closed)
+            mock_gh.return_value.view_issue.return_value = {
+                "state": "CLOSED",
+                "labels": [{"name": "state/plan"}],  # State label unchanged
+            }
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                before_issue_is_closed=False,  # Issue was open before execution
+            )
+
+        # Should NOT block, even though state label is unchanged
+        mock_block.assert_not_called()
+        # Should record terminal transition event
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+        assert "closed" in event_args[1]["detail"]
+        assert "terminal transition" in event_args[1]["detail"]
