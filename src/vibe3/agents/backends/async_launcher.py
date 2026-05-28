@@ -271,7 +271,13 @@ def spawn_tmux_command(
 
     project_root = cwd or Path.cwd()
 
-    log_dir = default_log_dir()
+    # Determine log directory: check env first (for cross-project execution),
+    # then fall back to default_log_dir (which checks VIBE3_ASYNC_LOG_DIR env var)
+    if env and "VIBE3_ASYNC_LOG_DIR" in env:
+        log_dir = Path(env["VIBE3_ASYNC_LOG_DIR"]).expanduser().resolve()
+    else:
+        log_dir = default_log_dir()
+
     prefix = execution_name.replace("/", "-")[:50]
 
     # Rule: L3 agent roles (manager/plan/run/review) MUST NOT auto-increment
