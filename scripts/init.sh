@@ -76,24 +76,6 @@ if ! command -v uv &> /dev/null; then
   fi
 fi
 
-# ── 0. Check UV_PROJECT_ENVIRONMENT ───────────────────────────────────────
-# Verify that UV_PROJECT_ENVIRONMENT is set and points to global venv
-if [[ -z "$UV_PROJECT_ENVIRONMENT" ]]; then
-  echo -e "\033[1;33m⚠️  Warning: UV_PROJECT_ENVIRONMENT is not set\033[0m"
-  echo "   Vibe Center uses a shared virtual environment at: ~/.venvs/vibe-center"
-  echo ""
-  echo "   Please enter the repo directory through direnv, or run:"
-  echo "   direnv allow"
-  echo ""
-  echo "   Or run: scripts/install.sh to set it up automatically"
-elif [[ ! -d "$UV_PROJECT_ENVIRONMENT" ]]; then
-  echo -e "\033[1;33m⚠️  Warning: UV_PROJECT_ENVIRONMENT directory does not exist: $UV_PROJECT_ENVIRONMENT\033[0m"
-  echo "   Please create it with: uv venv $UV_PROJECT_ENVIRONMENT"
-  echo "   Or run: scripts/install.sh to set it up automatically"
-else
-  echo "✅ UV_PROJECT_ENVIRONMENT is set: $UV_PROJECT_ENVIRONMENT"
-fi
-
 # ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
 # IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
@@ -176,6 +158,18 @@ else
   echo "   Install via: uv pip install pre-commit"
   echo "   Then run: pre-commit install && pre-commit install --hook-type pre-push"
   echo "   Run 'vibe doctor' to check optional tools status"
+fi
+
+# ── 4.5 Ensure direnv allow ─────────────────────────────────────────────
+echo "🔓 Ensuring direnv is allowed..."
+if command -v direnv >/dev/null 2>&1; then
+  if direnv allow . 2>/dev/null; then
+    echo "✅ direnv allowed"
+  else
+    echo -e "\033[1;33m⚠️  Warning: direnv allow failed. Please run manually: direnv allow${NC:-}"
+  fi
+else
+  echo -e "\033[1;33m⚠️  Warning: direnv not found. Skipping (non-blocking).${NC:-}"
 fi
 
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────
