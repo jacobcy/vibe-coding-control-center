@@ -188,10 +188,28 @@ def block_manager_noop_issue(
         # Find any flow for this issue
         flows = store.get_flows_by_issue(issue_number, role="task")
         if not flows:
+            logger.bind(
+                domain="flow",
+                action="block_manager_noop",
+                issue_number=issue_number,
+                reason=reason,
+            ).warning(
+                f"No flow found for issue #{issue_number},"
+                " cannot block — possible flow creation failure"
+            )
             return
 
         branch = str(flows[0].get("branch") or "").strip()
         if not branch:
+            logger.bind(
+                domain="flow",
+                action="block_manager_noop",
+                issue_number=issue_number,
+                reason=reason,
+            ).warning(
+                f"Flow has no branch for issue #{issue_number},"
+                " cannot block — possible flow creation failure"
+            )
             return
 
         # Reuse block_flow() - eliminates ALL duplication
