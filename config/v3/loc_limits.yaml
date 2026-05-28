@@ -137,11 +137,14 @@ code_limits:
         limit: 650
         reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 560
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化等紧密耦合的执行生命周期逻辑"
+        limit: 580
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 520
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑，职责单一但方法较多"
+      - path: "src/vibe3/services/check_pr_service.py"
+        limit: 450
+        reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断等紧密耦合逻辑，rebase 后新增 before_issue_is_closed 参数支持"
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
@@ -216,6 +219,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_task_status_dashboard.py"
         limit: 600
         reason: "Task status dashboard 测试集，覆盖 assignee intake/ready queue/ready anomalies/active anomalies 分段、PR flows 显示、missing state label 分类（waiting-for-pool vs governed-anomaly）、server label resolution、remote tasks 显示等多个场景，共享 mock setup，拆分收益低；新增 ACTIVE_ANOMALY bucket 与 governed anomaly 测试后略微超标"
+      - path: "tests/vibe3/services/test_check_pr_status.py"
+        limit: 500
+        reason: "Check PR 状态测试集，覆盖 PR closed 检测、terminal 状态判断、duplicate handling 等紧密耦合场景，新增 before_issue_is_closed 测试后略微超标"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
