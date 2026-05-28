@@ -18,6 +18,9 @@ cat > "${UV_INSTALL_DIR}/uv" <<'UVEOF'
 if [ "$1" = "venv" ]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/pyvenv.cfg"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   [ -n "${TEST_UV_LOG:-}" ] && echo "$*" >> "${TEST_UV_LOG}"
   exit 0
 fi
@@ -82,7 +85,10 @@ EOF
   cat > "$bin_dir/uv" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == "venv" ]]; then
-  mkdir -p "$2"
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -134,6 +140,8 @@ EOF
 if [[ "$1" == "venv" ]]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -247,6 +255,8 @@ EOF
 if [[ "$1" == "venv" ]]; then
   mkdir -p "$2/bin"
   touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
   exit 0
 fi
 exit 0
@@ -260,4 +270,64 @@ EOF
   [ "$status" -eq 0 ]
   grep -q 'command -v direnv >/dev/null 2>&1 && eval "\$(direnv hook bash)"' "$rc_file"
   ! grep -q 'direnv hook zsh' "$rc_file"
+}
+
+@test "install recovers from invalid venv by removing and recreating" {
+  local fixture home_dir bin_dir source_root install_script venv_dir
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  venv_dir="$home_dir/.venvs/vibe-center"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+
+  # Pre-create an invalid venv (empty directory, no pyvenv.cfg or bin/python)
+  mkdir -p "$venv_dir"
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  touch "$2/pyvenv.cfg"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  # Check stderr contains the warning message
+  [[ "$output" == *"Global venv at $venv_dir is invalid; removing and recreating..."* ]]
+  # Check venv was properly recreated
+  [ -f "$venv_dir/bin/activate" ]
+  [ -f "$venv_dir/pyvenv.cfg" ]
+  [ -f "$venv_dir/bin/python" ]
+  [ -x "$venv_dir/bin/python" ]
 }

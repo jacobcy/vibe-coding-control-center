@@ -68,6 +68,11 @@ _get_shell_rc() {
     esac
 }
 
+_validate_venv() {
+    local venv_path="$1"
+    [[ -f "$venv_path/pyvenv.cfg" ]] && [[ -x "$venv_path/bin/python" ]]
+}
+
 VIBE_UV_BIN=""
 
 _ensure_uv_cli() {
@@ -290,12 +295,22 @@ _setup_uv_environment() {
     fi
 
     local venv_path="$HOME/.venvs/vibe-center"
+    if [[ -d "$venv_path" ]]; then
+        if _validate_venv "$venv_path"; then
+            log_info "Global venv already exists at $venv_path"
+        else
+            log_warn "Global venv at $venv_path is invalid; removing and recreating..."
+            if ! rm -rf "$venv_path" 2>/dev/null; then
+                log_error "Failed to remove invalid venv at $venv_path"
+                log_error "Please manually remove it with: rm -rf $venv_path"
+                exit 1
+            fi
+        fi
+    fi
     if [[ ! -d "$venv_path" ]]; then
         log_info "Creating global venv at $venv_path..."
         mkdir -p "$HOME/.venvs"
         "$VIBE_UV_BIN" venv "$venv_path"
-    else
-        log_info "Global venv already exists at $venv_path"
     fi
 
     export UV_PROJECT_ENVIRONMENT="$venv_path"
