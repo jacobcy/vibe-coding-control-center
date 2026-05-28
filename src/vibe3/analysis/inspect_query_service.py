@@ -18,7 +18,7 @@ from vibe3.analysis.change_scope_service import (
     collect_changed_symbols,
     count_changed_lines,
 )
-from vibe3.analysis.pr_scoring import PRDimensions
+from vibe3.analysis.pr_scoring import PRDimensions, generate_score_report
 from vibe3.analysis.serena_service import SerenaService
 from vibe3.config.loader import get_config
 from vibe3.models.change_source import (
@@ -27,7 +27,6 @@ from vibe3.models.change_source import (
     PRSource,
     UncommittedSource,
 )
-from vibe3.services.pr_scoring_service import generate_score_report
 
 
 def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:

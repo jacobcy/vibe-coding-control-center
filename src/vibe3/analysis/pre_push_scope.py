@@ -6,8 +6,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 
-from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
-
+MAIN_BRANCH_REF = "origin/main"
 ZERO_SHA = "0" * 40
 DEFAULT_BASE_REF = MAIN_BRANCH_REF
 
