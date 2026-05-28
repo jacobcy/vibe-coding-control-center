@@ -31,7 +31,6 @@ __all__ = [
     "_default_pid_file",
     "get_handoff_state_label",
     "get_manager_usernames",
-    "get_supervisor_prompt",
 ]
 
 
@@ -79,26 +78,3 @@ def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
     resolver = ConventionResolver.from_repo()
     convention = resolver.resolve()
     return convention.manager_usernames
-
-
-def get_supervisor_prompt(config: OrchestraConfig) -> str:
-    """Resolve supervisor prompt template with fallback to ConventionResolver.
-
-    Args:
-        config: OrchestraConfig instance
-
-    Returns:
-        Dotted prompt template path (e.g., 'orchestra.supervisor.apply').
-
-    Example:
-        >>> config = OrchestraConfig()
-        >>> get_supervisor_prompt(config)
-        'orchestra.supervisor.apply'
-    """
-    if config.supervisor_handoff.prompt_template:
-        return config.supervisor_handoff.prompt_template
-    from vibe3.services.convention_resolver import ConventionResolver
-
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
-    return convention.supervisor_prompt
