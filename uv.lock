@@ -2349,7 +2349,7 @@ wheels = [
 [[package]]
 name = "vibe3"
 version = "3.0.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "litellm" },

@@ -20,6 +20,9 @@ mcp = ["mcp>=1.0.0"]
 [project.scripts]
 vibe3 = "vibe3.cli:main"
 
+[tool.uv]
+package = false
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -69,4 +72,17 @@ dev = [
     "httpx>=0.24.0",
     "radon>=6.0.1",
     "vulture>=2.16",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
+markers = [
+    "regression: Regression tests for specific issues (e.g., @pytest.mark.regression(\"issue-123\"))",
+    "integration: Integration tests requiring external services (gh auth, network, etc.)",
+    "slow: Slow tests (e.g., subprocess isolation tests)",
 ]
