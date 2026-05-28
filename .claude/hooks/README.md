@@ -64,10 +64,10 @@
 
 ```bash
 # 应该被阻止
-echo '{"tool_input": {"command": "rm -rf .venv"}}' | bash ~/.claude/hooks/block-destructive.sh
+echo '{"tool_input": {"command": "rm -rf .venv"}}' | bash .claude/hooks/block-destructive.sh
 
 # 应该被允许
-echo '{"tool_input": {"command": "rm -rf /tmp/test"}}' | bash ~/.claude/hooks/block-destructive.sh
+echo '{"tool_input": {"command": "rm -rf /tmp/test"}}' | bash .claude/hooks/block-destructive.sh
 ```
 
 ## 更新日志
@@ -75,10 +75,9 @@ echo '{"tool_input": {"command": "rm -rf /tmp/test"}}' | bash ~/.claude/hooks/bl
 ### 2026-05-27
 - ✅ 添加 `.venv`、`node_modules`、`env`、`virtualenv` 保护
 - ✅ 添加无点前缀版本（`venv`、`node_modules`）保护
-- ✅ 注册到全局 settings.json
+- ✅ 注册到项目级 `.claude/settings.json`
 - ✅ 测试通过所有保护场景
 
 ## 参考资料
 
 - [Claude Code Hooks 官方文档](https://docs.anthropic.com/claude-code/hooks)
-- [项目安全规范](../../docs/standards/security-standards.md)
