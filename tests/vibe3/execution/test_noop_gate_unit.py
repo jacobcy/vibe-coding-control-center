@@ -406,12 +406,13 @@ class TestApplyUnifiedNoopGate:
                 "vibe3.services.issue_failure_service.block_planner_noop_issue"
             ) as mock_block,
         ):
-            # First call: for after_state_label (returns same state)
-            # Second call: for issue closed check (returns closed state)
-            mock_gh.return_value.view_issue.side_effect = [
-                _make_github_issue_payload("state/plan"),  # after_state_label check
-                {"state": "CLOSED"},  # issue closed check
-            ]
+            # Single call: check issue closed state (returns closed)
+            # Also extracts after_state_label from same payload
+            # (not used since issue closed)
+            mock_gh.return_value.view_issue.return_value = {
+                "state": "CLOSED",
+                "labels": [{"name": "state/plan"}],  # State label unchanged
+            }
             apply_unified_noop_gate(
                 store=store,
                 issue_number=42,

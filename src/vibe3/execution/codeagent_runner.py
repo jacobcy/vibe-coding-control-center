@@ -224,28 +224,8 @@ class CodeagentExecutionService:
 
         # Capture before_state_label from GitHub for unified no-op gate.
         # Remote source of truth: GitHub issue labels, not local SQLite cache.
+        # Also capture whether the issue is closed before agent execution.
         before_state_label: str | None = None
-        if command.issue_number is not None:
-            try:
-                from vibe3.clients.github_client import GitHubClient
-
-                issue_payload = GitHubClient().view_issue(
-                    command.issue_number,
-                    repo=getattr(self.config, "repo", None),
-                )
-                if isinstance(issue_payload, dict):
-                    labels = issue_payload.get("labels", [])
-                    if isinstance(labels, list):
-                        for label in labels:
-                            if isinstance(label, dict):
-                                name = label.get("name")
-                                if isinstance(name, str) and name.startswith("state/"):
-                                    before_state_label = name
-                                    break
-            except Exception as exc:
-                log.warning(f"Cannot read issue state for no-op gate: {exc}")
-
-        # Capture whether the issue is closed before agent execution
         before_issue_is_closed = False
         if command.issue_number is not None:
             try:
@@ -256,10 +236,20 @@ class CodeagentExecutionService:
                     repo=getattr(self.config, "repo", None),
                 )
                 if isinstance(issue_payload, dict):
+                    # Extract state label
+                    labels = issue_payload.get("labels", [])
+                    if isinstance(labels, list):
+                        for label in labels:
+                            if isinstance(label, dict):
+                                name = label.get("name")
+                                if isinstance(name, str) and name.startswith("state/"):
+                                    before_state_label = name
+                                    break
+                    # Check if issue is closed
                     if str(issue_payload.get("state", "")).upper() == "CLOSED":
                         before_issue_is_closed = True
             except Exception as exc:
-                log.warning(f"Cannot read issue state for closed detection: {exc}")
+                log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
         execution_cwd = self._resolve_command_cwd(command.cwd)
 

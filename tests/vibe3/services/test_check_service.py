@@ -175,4 +175,4 @@ def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
         assert len(issues) == 0
         assert len(warnings) == 1
         assert "marked aborted" in warnings[0]
-        assert "issue #456 closed" in warnings[0]
+        assert "Issue #456 already closed" in warnings[0]

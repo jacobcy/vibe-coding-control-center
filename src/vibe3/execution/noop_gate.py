@@ -81,14 +81,73 @@ def apply_unified_noop_gate(
         ).info("No-op gate SKIP: issue has no state/ label")
         return
 
-    verifier = StateVerificationService(store=store)
-    after_state_label = verifier.get_issue_state_label(
-        issue_number=issue_number,
-        repo=repo,
-        branch=branch,
-        flow_state=flow_state,
-        tick_id=tick_id,
-    )
+    # If the issue was open before agent execution but is now closed,
+    # treat this as a meaningful terminal transition regardless of state label.
+    # Also fetch after_state_label from the same payload to avoid redundant API call.
+    after_state_label: str | None = None
+    if not before_issue_is_closed:
+        try:
+            from vibe3.clients.github_client import GitHubClient
+
+            after_payload = GitHubClient().view_issue(issue_number, repo=repo)
+            if isinstance(after_payload, dict):
+                # Check if issue is now closed (terminal transition)
+                if str(after_payload.get("state", "")).upper() == "CLOSED":
+                    logger.bind(
+                        domain="codeagent",
+                        role=role,
+                        issue_number=issue_number,
+                        branch=branch,
+                    ).info(
+                        f"No-op gate PASS: issue #{issue_number} closed by {role} "
+                        "(terminal transition)"
+                    )
+                    store.add_event(
+                        branch,
+                        EVENT_STATE_TRANSITIONED,
+                        actor,
+                        detail=(
+                            f"Issue #{issue_number} closed by {role} "
+                            "(terminal transition)"
+                        ),
+                        refs={
+                            "before_state": str(before_state_label or ""),
+                            "issue": str(issue_number),
+                        },
+                    )
+                    return
+                # Extract after_state_label from the same payload
+                labels = after_payload.get("labels", [])
+                if isinstance(labels, list):
+                    for label in labels:
+                        if isinstance(label, dict):
+                            name = label.get("name")
+                            if isinstance(name, str) and name.startswith("state/"):
+                                after_state_label = name
+                                break
+        except Exception as exc:
+            # Log warning instead of silent pass for diagnose
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"Failed to check issue closed state: {exc}; "
+                "falling through to normal no-op gate logic"
+            )
+
+    # If we didn't fetch after_state_label above (issue was already closed before
+    # or the API call failed), use StateVerificationService
+    if after_state_label is None:
+        verifier = StateVerificationService(store=store)
+        after_state_label = verifier.get_issue_state_label(
+            issue_number=issue_number,
+            repo=repo,
+            branch=branch,
+            flow_state=flow_state,
+            tick_id=tick_id,
+        )
 
     if flow_state is not None:
         store.update_flow_state(
@@ -344,43 +403,6 @@ def apply_unified_noop_gate(
                 actor=actor,
             )
             return
-
-    # If the issue was open before agent execution but is now closed,
-    # treat this as a meaningful terminal transition regardless of state label.
-    if not before_issue_is_closed:
-        try:
-            from vibe3.clients.github_client import GitHubClient
-
-            after_payload = GitHubClient().view_issue(issue_number, repo=repo)
-            if (
-                isinstance(after_payload, dict)
-                and str(after_payload.get("state", "")).upper() == "CLOSED"
-            ):
-                logger.bind(
-                    domain="codeagent",
-                    role=role,
-                    issue_number=issue_number,
-                    branch=branch,
-                ).info(
-                    f"No-op gate PASS: issue #{issue_number} closed by {role} "
-                    "(terminal transition)"
-                )
-                store.add_event(
-                    branch,
-                    EVENT_STATE_TRANSITIONED,
-                    actor,
-                    detail=(
-                        f"Issue #{issue_number} closed by {role} "
-                        "(terminal transition)"
-                    ),
-                    refs={
-                        "before_state": str(before_state_label or ""),
-                        "issue": str(issue_number),
-                    },
-                )
-                return
-        except Exception:
-            pass  # Fail-open: fall through to normal no-op gate logic
 
     if before_state_label == after_state_label:
         state_desc = before_state_label or "(no state)"
