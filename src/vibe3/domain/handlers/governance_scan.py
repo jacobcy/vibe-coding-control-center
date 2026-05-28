@@ -169,6 +169,8 @@ def handle_governance_scan_started(
                 role="governance",
                 issue_number=None,
                 branch="governance",
+                tick_id=event.tick_count,
+                dispatch_source="automatic",
             )
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
@@ -176,6 +178,8 @@ def handle_governance_scan_started(
                 issue_number=None,
                 branch="governance",
                 exception=exc,
+                tick_id=event.tick_count,
+                dispatch_source="automatic",
             )
             logger.bind(
                 domain="governance_handler",

@@ -188,6 +188,8 @@ def handle_manager_dispatch_intent(
                 role="manager",
                 issue_number=event.issue_number,
                 branch=event.branch,
+                tick_id=event.tick_id,
+                dispatch_source="automatic",
             )
 
             if result.launched:
@@ -215,6 +217,8 @@ def handle_manager_dispatch_intent(
                 issue_number=event.issue_number,
                 branch=event.branch,
                 exception=exc,
+                tick_id=event.tick_id,
+                dispatch_source="automatic",
             )
             logger.bind(
                 domain="issue_state_dispatch_handler",

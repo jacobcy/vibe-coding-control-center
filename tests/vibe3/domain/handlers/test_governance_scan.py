@@ -276,6 +276,8 @@ class TestGovernanceScanHandler:
             role="governance",
             issue_number=None,
             branch="governance",
+            tick_id=5,
+            dispatch_source="automatic",
         )
 
     @patch(
@@ -326,3 +328,5 @@ class TestGovernanceScanHandler:
         assert call_kwargs["issue_number"] is None
         assert call_kwargs["branch"] == "governance"
         assert call_kwargs["exception"] is exc
+        assert call_kwargs["tick_id"] == 5
+        assert call_kwargs["dispatch_source"] == "automatic"

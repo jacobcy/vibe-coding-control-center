@@ -268,6 +268,7 @@ def run_governance_async(
                 role="governance",
                 issue_number=None,
                 branch="governance",
+                tick_id=tick_count,
             )
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
@@ -275,6 +276,7 @@ def run_governance_async(
                 issue_number=None,
                 branch="governance",
                 exception=exc,
+                tick_id=tick_count,
             )
             logger.exception(f"Governance scan dispatch failed: {exc}")
             raise

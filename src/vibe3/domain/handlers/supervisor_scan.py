@@ -78,6 +78,7 @@ def handle_supervisor_issue_identified(
                     role="supervisor",
                     issue_number=event.issue_number,
                     branch=f"issue-{event.issue_number}",
+                    dispatch_source="automatic",
                 )
             except Exception as exc:
                 record_dispatch_failure_if_unexpected(
@@ -85,6 +86,7 @@ def handle_supervisor_issue_identified(
                     issue_number=event.issue_number,
                     branch=f"issue-{event.issue_number}",
                     exception=exc,
+                    dispatch_source="automatic",
                 )
                 logger.bind(
                     domain="supervisor_handler",
@@ -99,6 +101,7 @@ def handle_supervisor_issue_identified(
                 role="supervisor",
                 issue_number=event.issue_number,
                 branch=f"issue-{event.issue_number}",
+                dispatch_source="automatic",
             )
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
@@ -106,6 +109,7 @@ def handle_supervisor_issue_identified(
                 issue_number=event.issue_number,
                 branch=f"issue-{event.issue_number}",
                 exception=exc,
+                dispatch_source="automatic",
             )
             logger.bind(
                 domain="supervisor_handler",

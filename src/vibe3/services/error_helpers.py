@@ -55,27 +55,38 @@ def record_dispatch_failure_if_unexpected(
     branch: str = "",
     *,
     exception: Exception | None = None,
+    tick_id: int | None = None,
+    dispatch_source: str = "manual",
 ) -> None:
     """Record dispatch failure if it's unexpected (not normal throttling).
 
     Args:
         result: Execution launch result (optional if exception provided)
-        role: Role name (planner/executor/reviewer)
-        issue_number: Associated issue number
+        role: Role name (planner/executor/reviewer/governance/supervisor)
+        issue_number: Associated issue number (None for governance-scoped dispatches)
         branch: Associated branch name
         exception: Exception that was raised during dispatch (keyword-only)
+        tick_id: Heartbeat tick ID for automatic dispatches (keyword-only)
+        dispatch_source: Source of dispatch - "manual" or "automatic" (keyword-only)
     """
+    # Preserve None for governance, coerce to 0 for other roles
+    effective_issue_number = (
+        issue_number if role == "governance" else (issue_number or 0)
+    )
+
     # Handle exception-level failures
     if exception is not None:
         from vibe3.clients.sqlite_client import SQLiteClient
 
-        error_message = f"manual {role} dispatch failed [exception]: {exception}"
+        error_message = (
+            f"{dispatch_source} {role} dispatch failed [exception]: {exception}"
+        )
         try:
             record_error(
                 error_code="E_DISPATCH_FAILURE",
                 error_message=error_message,
-                tick_id=0,
-                issue_number=issue_number or 0,
+                tick_id=tick_id or 0,
+                issue_number=effective_issue_number,
                 branch=branch,
                 store=SQLiteClient(),
             )
@@ -100,15 +111,17 @@ def record_dispatch_failure_if_unexpected(
 
     from vibe3.clients.sqlite_client import SQLiteClient
 
-    # Include manual marker and reason_code for disambiguation
+    # Include dispatch_source marker and reason_code for disambiguation
     reason_detail = result.reason or "(no detail)"
-    error_message = f"manual {role} dispatch failed [{reason_code}]: {reason_detail}"
+    error_message = (
+        f"{dispatch_source} {role} dispatch failed [{reason_code}]: {reason_detail}"
+    )
     try:
         record_error(
             error_code="E_DISPATCH_FAILURE",
             error_message=error_message,
-            tick_id=0,  # Manual dispatch marker
-            issue_number=issue_number or 0,  # Coerce None to 0 for manual dispatch
+            tick_id=tick_id or 0,
+            issue_number=effective_issue_number,
             branch=branch,
             store=SQLiteClient(),
         )
