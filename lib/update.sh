@@ -108,6 +108,18 @@ _update_run() {
         fi
     done
 
+    # Sync Python dependencies
+    if [[ -f "$SOURCE_ROOT/pyproject.toml" ]]; then
+        log_info "Syncing Python dependencies..."
+        cd "$SOURCE_ROOT"
+        if command -v uv >/dev/null 2>&1; then
+            uv sync --all-extras
+            log_success "Python dependencies synced"
+        else
+            log_warn "uv not found, skipping dependency sync"
+        fi
+    fi
+
     log_success "Global update complete!"
     echo ""
     echo "${BOLD}What changed:${NC}"
@@ -117,7 +129,8 @@ _update_run() {
     echo ""
     echo "${BOLD}Effect semantics:${NC}"
     echo "  • Shell loader changes → ${CYAN}source ~/.zshrc${NC}"
-    echo "  • Python package changes → already effective (editable install)"
+    echo "  • Python dependencies → synced via ${CYAN}uv sync${NC}"
+    echo "  • Python code changes → effective immediately (local src resolution)"
     echo "  • Alias changes → ${CYAN}vibe alias${NC} or restart shell"
     echo ""
     echo "${BOLD}Next steps:${NC}"
