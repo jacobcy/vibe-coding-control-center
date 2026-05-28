@@ -1,29 +1,29 @@
 ---
 name: vibe-orchestra
-description: Use when the user wants heartbeat-style governance over the issue pool. inspect running issues, judge which issue is worth starting next, backfill assignee-triggered candidates, and propose non-state label or routing actions. Do not use for single-flow execution governance, coding, or implementation work.
+description: Use when the user wants to inspect running issues in assignee pool, or judge which issue to start next. Do not use for RFC/blocked issues or roadmap triage.
 ---
 
-# /vibe-orchestra - Orchestra Issue Pool Governance
+# /vibe-orchestra - Assignee Issue Pool 管理
 
-Orchestra 心跳层的 assignee issue pool 治理：查看运行中的 issues，建议下一个值得处理的 issue。
+查看 assignee issue pool 中运行中的 issues，建议下一个值得处理的 issue。
 
 ## 核心原则
 
-- **只管 assignee pool**：不处理 broader repo backlog
-- **只做建议**：不强制调度，结合人工上下文判断
-- **基于真源**：只读 shell 输出和 supervisor materials
+- **只管 assignee pool**：运行中的 issues
+- **只做建议**：不强制调度
+- **基于真源**：只读 shell 和 supervisor materials
 
 ## Scope
 
-只回答两类问题（均以 assignee issue pool 为前提）：
+**只看 assignee issue pool**：
+- 已分配给 manager 的 issues
+- 正在运行或 ready 的 issues
+- pool 中下一个值得处理的 issue
 
-1. pool 中现在有哪些 issue 正在运行
-2. pool 中接下来哪个 issue 值得优先处理
-
-**不处理**：
-- supervisor issue
-- broader repo backlog triage
-- 单 flow 执行
+**不看**：
+- RFC issues（由 `vibe-task` 管理）
+- Blocked issues（由 `vibe-task` 管理）
+- Backlog triage（由 `vibe-roadmap` 管理）
 
 ## Workflow
 
@@ -33,18 +33,18 @@ Orchestra 心跳层的 assignee issue pool 治理：查看运行中的 issues，
 vibe3 task status
 ```
 
-必要时查看 orchestra heartbeat：
+必要时查看 serve status：
 
 ```bash
 vibe3 serve status
 ```
 
-### Step 2: 补捞候选
+### Step 2: 过滤 assignee pool
 
-找出 assignee pool 中已满足启动条件但尚未调度的 issue：
+找出已分配给 manager 的 issues：
 
 ```bash
-gh issue list --assignee <manager-username> --label "state/ready"
+gh issue list --assignee <manager-username> --limit 20
 ```
 
 ### Step 3: 判断优先级
@@ -56,42 +56,35 @@ gh issue list --assignee <manager-username> --label "state/ready"
 结合当前人工上下文：
 - 是否有人已明确接手某个 issue
 - 是否有活跃 PR 或 review follow-up
-- 是否有收口需求
 
 ### Step 4: 提出建议
 
-输出包含：
-
 ```text
+📋 Assignee Issue Pool 状态
+
 Running Issues
 - #123: in_progress, wt-foo
-- #456: blocked, depends on #123
-
-Backfill Candidates
-- #789: state/ready, no flow yet
+- #456: ready, no worktree
 
 Next Issue
-- 建议处理 #789
+- 建议处理 #456
 - 原因：pool 中唯一 ready 且无阻塞
 
-Label Actions (如有必要)
-- 建议给 #456 加 dependency label
-- 原因：明确依赖关系
+Reason
+- milestone: Phase 1
+- roadmap: p1
+- priority: 5
 ```
 
-## Hard Boundary
+## 与其他 Skills 的区别
 
-不负责：
-- task registry 审计
-- runtime 绑定修复
-- roadmap 规划
-- issue intake
-- 单 flow plan/run/review
-- 写代码
-- 替代人类做最终业务优先级拍板
+- **vibe-orchestra**: 管理运行中的 assignee issues
+- **vibe-task**: 看 RFC 和 blocked issues（问题 issue）
+- **vibe-roadmap**: 版本规划和 backlog triage
 
-## Stop Point
+## Restrictions
 
-完成治理建议后停止。
-
-不进入执行分配、实现方案或代码修改。
+- 不看 RFC 或 blocked issues
+- 不做 roadmap triage
+- 不写代码
+- 不替代人类做最终决策

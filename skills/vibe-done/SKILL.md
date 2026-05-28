@@ -1,22 +1,17 @@
 ---
 name: vibe-done
-description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout. Confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
+description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout. Confirm PR outcome, close owned issues, check for follow-up needs, delete resources, and switch back to main. Do not use for code changes or abandoned work.
 ---
 
 # /vibe-done - 终态收口
 
-PR 合并后的收口流程：关闭 issue → 清理 branch → 回主分支。
+PR 合并后的完整收口流程。
 
 ## 核心原则
 
 - **只做收口**：不修业务代码，不做 review follow-up
 - **PR 先决**：必须 PR 已 merged 或明确终态
-- **最小操作**：只关 issue、清理 branch、写 handoff
-
-## 前提条件
-
-- PR 已 merged（或明确进入 closed/aborted 终态）
-- 若 PR 未终态 → 回 `/vibe-integrate`
+- **完整清理**：关 issue → 删 branch → 删 worktree → 回 main
 
 ## Workflow
 
@@ -27,54 +22,92 @@ gh pr view <pr-number> --json state,mergedAt
 ```
 
 - 若未合并或非终态 → 停止，返回 `/vibe-integrate`
-- 若已合并或终态 → 继续
+- 若已合并 → 继续
 
-### Step 2: 关闭 issue
+### Step 2: 检查 issue 状态
+
+检查当前 flow 负责的 issue 是否已关闭：
+
+```bash
+gh issue view <issue-number> --json state
+```
+
+- 若已关闭 → 记录状态
+- 若未关闭 → 继续后续关闭操作
+
+### Step 3: 检查 follow-up needs
+
+判断是否需要创建 follow-up issue：
+
+检查点：
+- PR review 中是否有未完全解决的系统性问题
+- 是否有明确标记的 future work
+- 是否有遗留的技术债需要新 issue 追踪
+
+若需要 follow-up：
+```bash
+gh issue create --title "Follow-up: <主题>" --body "来源: #<原 issue>, PR #<pr-number>"
+```
+
+### Step 4: 关闭 issue（如未关闭）
 
 只关闭当前 flow 负责的主 issue：
 
 ```bash
-gh issue close <primary-issue-number>
+gh issue close <issue-number> --comment "已完成 in PR #<pr-number>"
 ```
 
-不关闭关联 issue（它们由各自 flow 负责）。
+不关闭关联 issue（由各自 flow 负责）。
 
-### Step 3: 清理 branch（可选）
+### Step 5: 删除 branch
 
-询问用户是否需要删除 branch：
+删除本地和远程 branch：
 
 ```bash
 # 删除本地 branch
-git branch -d <branch-name>
+git branch -D <branch-name>
 
-# 删除远程 branch（如需要）
+# 删除远程 branch
 git push origin --delete <branch-name>
 ```
 
-**不删除 worktree**：worktree 是核心资源，生命周期由用户控制。
+### Step 6: 删除 worktree
 
-### Step 4: 回到主分支
+删除当前 worktree（资源清理）：
+
+```bash
+# 先确认不在要删除的 worktree 中
+pwd
+
+# 删除 worktree
+git worktree remove <worktree-path>
+```
+
+### Step 7: 切换回 main 并拉取
 
 ```bash
 git checkout main
 git pull origin main
 ```
 
-### Step 5: 记录 handoff
+### Step 8: 记录 handoff
+
+在当前 flow 的 handoff 链中记录终态：
 
 ```bash
 vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
 ```
 
-格式示例：
-
+格式：
 ```markdown
 ## Flow Closure
 
 - flow: <flow-name>
 - status: completed
-- pr: <pr-link>
+- pr: <pr-link> (merged)
 - issues_closed: <issue-links>
+- follow_up: <issue-link or none>
+- resources_cleaned: branch + worktree
 - completed_at: <ISO-8601>
 ```
 
@@ -82,14 +115,18 @@ vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
 
 完成后输出：
 
-- ✅ issue 已关闭
-- ✅ branch 已清理（如选择删除）
-- ✅ 已回到 main
+- ✅ PR 已合并
+- ✅ issue 已关闭（或已确认关闭）
+- ✅ follow-up issue 已创建（如需要）
+- ✅ branch 已删除（本地 + 远程）
+- ✅ worktree 已删除
+- ✅ 已切换到 main
 - ✅ handoff 已记录
 
 ## Restrictions
 
 - 不得修改业务代码
-- 不得删除 worktree
 - 不得在 PR 合并前收口
 - 不得关闭非当前 flow 负责的 issue
+- 必须删除 worktree（完整清理）
+- 必须切换回 main 并拉取最新代码
