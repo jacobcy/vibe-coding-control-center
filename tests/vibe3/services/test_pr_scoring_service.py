@@ -1,6 +1,6 @@
 """PRScoringService 单元测试."""
 
-from vibe3.services.pr_scoring_service import (
+from vibe3.analysis.pr_scoring import (
     PRDimensions,
     RiskLevel,
     calculate_risk_score,

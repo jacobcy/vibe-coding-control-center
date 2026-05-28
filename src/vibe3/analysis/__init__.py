@@ -5,7 +5,7 @@ This module provides a unified public API for the analysis layer, including:
 - Change analysis pipeline (build_change_analysis)
 - DAG impact analysis (ImpactGraph, expand_impacted_modules)
 - Change scope classification (classify_changed_files, is_test_file)
-- PR scoring models (PRDimensions, RiskLevel, generate_score_report)
+- PR scoring (PRDimensions, RiskLevel, calculate_risk_score, generate_score_report)
 - Output adapters (as_list, as_mapping, score, impact, dag)
 - Snapshot diff (compute_diff)
 """
@@ -38,7 +38,13 @@ from vibe3.analysis.inspect_output_adapter import (
     score,
 )
 from vibe3.analysis.inspect_query_service import build_change_analysis
-from vibe3.analysis.pr_scoring import PRDimensions, RiskLevel
+from vibe3.analysis.pr_scoring import (
+    PRDimensions,
+    RiskLevel,
+    calculate_risk_score,
+    determine_risk_level,
+    generate_score_report,
+)
 from vibe3.analysis.serena_service import SerenaService
 
 # Snapshot diff
@@ -59,9 +65,12 @@ __all__ = [
     "count_changed_lines",
     "collect_changed_symbols",
     "is_test_file",
-    # PR scoring models
+    # PR scoring
     "PRDimensions",
     "RiskLevel",
+    "calculate_risk_score",
+    "determine_risk_level",
+    "generate_score_report",
     # Output adapters
     "as_list",
     "as_mapping",
