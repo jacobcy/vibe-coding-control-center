@@ -42,8 +42,8 @@ class StateVerificationService:
         branch: str | None = None,
         flow_state: dict | None = None,
         tick_id: int = 0,
-    ) -> str | None:
-        """Get current state label from GitHub issue.
+    ) -> tuple[str | None, bool]:
+        """Get current state label and closed status from GitHub issue.
 
         Args:
             issue_number: Issue number to query
@@ -54,7 +54,9 @@ class StateVerificationService:
                 are recorded to error_log
 
         Returns:
-            State label string (e.g., "state/in-progress") or None
+            Tuple of (state_label, is_closed) where:
+            - state_label: State label string (e.g., "state/in-progress") or None
+            - is_closed: True if issue state is "CLOSED", False otherwise
 
         Raises:
             GitHubAPIError: If GitHub API fails after max retries
@@ -73,6 +75,9 @@ class StateVerificationService:
                 issue_payload, issue_number, branch, flow_state, tick_id
             )
 
+        # Extract is_closed from the issue payload
+        is_closed = str(issue_payload.get("state", "")).upper() == "CLOSED"
+
         labels = issue_payload.get("labels", [])
         if not isinstance(labels, list):
             self._handle_malformed_response(
@@ -87,9 +92,9 @@ class StateVerificationService:
             else:
                 label_name = str(label)
             if label_name.startswith("state/"):
-                return label_name
+                return label_name, is_closed
 
-        return None
+        return None, is_closed
 
     def _handle_github_api_failure(
         self,
