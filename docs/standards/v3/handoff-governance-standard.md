@@ -153,7 +153,7 @@ V2 到 V3 handoff 系统的关键变化：
 |------|------------|-------------|
 | 存储 | `.agent/context/task.md` | SQLite + Markdown buffer |
 | 路径 | `.git/vibe/` | `.git/vibe3/` |
-| 命令 | `vibe flow` | `vibe3` Python CLI |
+| 命令 | `vibe2 flow` | `vibe3` Python CLI |
 | 主键 | worktree name | branch name |
 | 关系 | issue links 内嵌 | 独立表 `flow_issue_links` |
 

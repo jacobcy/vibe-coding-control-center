@@ -150,7 +150,7 @@ related_docs:
 
 closeout 约束：
 
-- PR merged 后，`vibe check` 自动检测 PR 状态并将 flow 标记为 `done`。对 `task/issue-N` 分支，对应 issue 会自动关闭。
+- PR merged 后，`vibe3 check` 自动检测 PR 状态并将 flow 标记为 `done`。对 `task/issue-N` 分支，对应 issue 会自动关闭。
 - closeout 完成后，同一物理目录可直接进入下一条 `flow`；"继续开发"默认是新的 `branch` / 新的 `flow`，不是继续占用旧 branch
 
 内部桥接链：
