@@ -39,7 +39,7 @@ class TestCheckBranchBehind:
 
     def test_origin_head_not_exists_returns_none(self) -> None:
         """When origin/{head} doesn't exist, return None (git error)."""
-        from vibe3.clients.git_client import GitError
+        from vibe3.exceptions import GitError
 
         mock_git = MagicMock()
         # First call (fetch) succeeds, second call (rev-list) fails
@@ -54,7 +54,7 @@ class TestCheckBranchBehind:
 
     def test_fetch_failure_continues_with_warning(self) -> None:
         """When fetch fails, continue with stale refs (log warning)."""
-        from vibe3.clients.git_client import GitError
+        from vibe3.exceptions import GitError
 
         mock_git = MagicMock()
         # First call (fetch) fails, second call (rev-list) succeeds
