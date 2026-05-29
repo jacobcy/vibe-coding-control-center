@@ -9,6 +9,7 @@ import typer
 
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
+from vibe3.commands.task_manage import register_manage_commands
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
@@ -38,6 +39,9 @@ For more details: vibe3 task <command> --help
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+# Register command groups
+register_manage_commands(app)
 
 
 @contextmanager

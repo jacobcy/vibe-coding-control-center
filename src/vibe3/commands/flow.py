@@ -3,6 +3,7 @@
 
 import typer
 
+from vibe3.commands.flow_analysis import register_analysis_commands
 from vibe3.commands.flow_lifecycle import register_lifecycle_commands
 from vibe3.commands.flow_manage import register_manage_commands
 from vibe3.commands.flow_status import register_status_commands
@@ -29,3 +30,4 @@ For more details on each command: vibe3 flow <command> --help
 register_lifecycle_commands(app)
 register_status_commands(app)
 register_manage_commands(app)
+register_analysis_commands(app)

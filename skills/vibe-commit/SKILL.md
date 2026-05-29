@@ -130,23 +130,23 @@ uv run python src/vibe3/cli.py handoff status
 在提交前必须检查 `origin/main` 是否有新提交，避免提交过时代码：
 
 ```bash
-# 获取远程最新状态
-git fetch origin main
-
-# 检查是否有新提交
-git log HEAD..origin/main --oneline
+vibe3 flow sync-status
 ```
+
+该命令会自动：
+- 获取远程最新状态（`git fetch origin main`）
+- 显示落后/领先提交数
+- 列出新的提交内容
 
 **处理策略**：
 
-- 若有新提交：
-  1. 先 `git rebase origin/main` 或 `git merge origin/main`
-  2. 处理冲突（如有）
-  3. 运行测试验证
-  4. 再继续提交流程
-- 若无新提交：直接继续
+| 状态 | 处理方式 |
+|------|---------|
+| 有新提交 + 无冲突 | 先 rebase/merge → 运行测试 → 继续 |
+| 有新提交 + 有冲突 | 解决冲突 → 运行测试 → 继续 |
+| 无新提交 | 直接继续 |
 
-**Hard Block**：冲突未解决前禁止提交。
+**Hard Block**：冲突未解决前禁止提交。使用 `vibe3 flow sync-status --check-conflicts` 可提前检测冲突。
 
 ### Step 3: 判断是否仍需提交
 
@@ -165,7 +165,7 @@ git log HEAD..origin/main --oneline
 uv run python src/vibe3/cli.py handoff append "vibe-commit: 不再需要提交，理由：<具体原因>" --kind note
 
 # 更新 issue 标签为 state/handoff
-gh issue edit <issue-number> --add-label "state/handoff"
+vibe3 task update <issue-number> --add-label "state/handoff"
 
 # 停止，等待 manager 决定
 ```
@@ -177,27 +177,21 @@ gh issue edit <issue-number> --add-label "state/handoff"
 先运行：
 
 ```bash
-git status --short
-git diff --stat
-git diff --cached --stat
+vibe3 flow changes
 ```
 
-必要时再读精确 diff。把未提交内容明确分成三类：
+该命令会自动：
+- 显示文件状态（staged / unstaged / untracked）
+- 显示 diff 统计信息
+- 检查临时调试文件（`debug_*.py`、`debug_*.sh`、`tmp_*.py`）
+
+把未提交内容明确分成三类：
 
 - `commit now`
 - `stash`
 - `discard`
 
-**检查临时调试文件**：
-
-在审计工作区时，需要检查根目录下是否有临时调试文件：
-
-```bash
-# 检查根目录下的临时调试文件
-ls debug_*.py debug_*.sh tmp_*.py 2>/dev/null || echo "No debug files found"
-```
-
-若发现临时调试文件（如 `debug_*.py`、`debug_*.sh`、`tmp_*.py`），应归类为 `discard`（删除），不进入 commit：
+若发现临时调试文件，应归类为 `discard`（删除），不进入 commit：
 
 - **自动删除**：使用 `rm debug_*.py debug_*.sh tmp_*.py` 清理
 - **说明原因**：向用户说明这些是临时调试文件，不应随功能代码提交
@@ -468,8 +462,7 @@ uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind n
   - 格式化流程：对所有改动统一格式化 → 提交临时 commit → 软重置（检查是否为临时 commit）→ 分组提交
   - 不得保留单独的格式化 commit，格式化修改必须分散到各功能 commit 中
 - **主分支同步**：
-  - 提交前必须检查 `origin/main` 是否有新提交
-  - 冲突未解决前禁止提交
+  - 冲突未解决前禁止提交（可通过 `vibe3 flow sync-status --check-conflicts` 检测）
 - **提交必要性检查**：
   - 若改动已不需要提交，必须用 `handoff append` 说明理由
   - 必须更新 issue 标签为 `state/handoff`，等待 manager 决定
