@@ -1,10 +1,30 @@
 """Regression tests for orphan flow dispatch health checks."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 from vibe3.orchestra.queue_entry import QueueEntry
+
+if TYPE_CHECKING:
+    pass
+
+
+def _setup_health_check_service(
+    coordinator: "GlobalDispatchCoordinator",
+    check_service: MagicMock,
+    store: MagicMock,
+) -> None:
+    """Helper to re-create health check service with mocked dependencies."""
+    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+
+    coordinator._health_check_service = DispatchHealthCheckService(
+        check_service=check_service,
+        flow_blocker=coordinator._flow_blocker,
+        store=store,
+        flow_context_resolver=coordinator._flow_context,
+    )
 
 
 def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
@@ -28,8 +48,12 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     )
     coordinator._flow_context = MagicMock(return_value=("", None))
 
+    # Re-create health check service with mocked flow_context
+    mock_check_service = MagicMock()
+    _setup_health_check_service(coordinator, mock_check_service, store)
+
     with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event"
+        "vibe3.orchestra.dispatch_health_check.append_orchestra_event"
     ) as append_event:
         result = coordinator._health_check_service.check_issue_health(issue)
 
@@ -70,8 +94,12 @@ def test_dispatch_loop_logs_missing_flow_context_once(
     )
     coordinator._flow_context = MagicMock(return_value=("", None))
 
+    # Re-create health check service with mocked flow_context
+    mock_check_service = MagicMock()
+    _setup_health_check_service(coordinator, mock_check_service, coordinator._store)
+
     with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event"
+        "vibe3.orchestra.dispatch_health_check.append_orchestra_event"
     ) as append_event:
         dispatched = coordinator._dispatch_loop()
 
