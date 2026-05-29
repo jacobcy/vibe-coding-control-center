@@ -128,7 +128,7 @@ class TestOrchestrationFacade:
         assert "Manual review required" in call_args.args[1]
 
     @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.append_orchestra_event")
+    @patch("vibe3.orchestra.logging.append_orchestra_event")
     async def test_on_tick_blocks_dispatch_when_failed_gate_is_closed(
         self,
         mock_append_event: MagicMock,

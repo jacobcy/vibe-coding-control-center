@@ -15,7 +15,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
@@ -143,6 +142,8 @@ class QualifyGateService:
         Returns:
             Target IssueState to dispatch to, or None if still blocked.
         """
+        from vibe3.orchestra.logging import append_orchestra_event
+
         # Guard: if the GitHub issue is closed, terminalize the flow and skip.
         # Closed issues with lingering state/blocked labels should be cleaned up,
         # not dispatched. Without this check, the qualify gate may attempt to
@@ -189,6 +190,7 @@ class QualifyGateService:
         Ensures local flow_state has flow_status='blocked' and blocked fields
         match the remote truth. Adds state/blocked label if missing.
         """
+        from vibe3.orchestra.logging import append_orchestra_event
         from vibe3.services.blocked_state_service import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
@@ -303,6 +305,7 @@ class QualifyGateService:
         Clears local blocked cache and removes state/blocked label.
         """
         from vibe3.models.flow import FlowState
+        from vibe3.orchestra.logging import append_orchestra_event
         from vibe3.services.blocked_state_service import BlockedStateService
         from vibe3.services.label_service import LabelService
 
@@ -343,6 +346,8 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
+        from vibe3.orchestra.logging import append_orchestra_event
+
         worktree_path = truth.worktree_path
         if not worktree_path or not isinstance(worktree_path, str):
             return True
