@@ -1,6 +1,7 @@
 """Models package."""
 
 from vibe3.models.inspection import CallNode, CommandInspection
+from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.snapshot import (
     DependencyChange,
     DependencyEdge,
@@ -30,6 +31,7 @@ __all__: list[str] = [
     "FunctionSnapshot",
     "ModuleChange",
     "ModuleSnapshot",
+    "PromptContextMode",
     "StructureDiff",
     "StructureMetrics",
     "StructureSnapshot",
