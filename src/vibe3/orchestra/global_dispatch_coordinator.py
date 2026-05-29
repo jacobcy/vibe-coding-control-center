@@ -23,6 +23,7 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
+from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
@@ -108,21 +109,20 @@ class GlobalDispatchCoordinator:
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
 
         # Optional dependency injection with backward-compatible fallback
-        if check_service is None:
-            # Fallback: create CheckService for backward compatibility
-            self._check_service = CheckService(
-                store=store,
-                git_client=flow_manager.git,
-                github_client=github,
-            )
-        else:
-            self._check_service = check_service
+        self._check_service = check_service or CheckService(
+            store=store, git_client=flow_manager.git, github_client=github
+        )
+        self._flow_blocker = flow_blocker or FlowService(
+            store=store, git_client=flow_manager.git
+        )
 
-        if flow_blocker is None:
-            # Fallback: create FlowService for backward compatibility
-            self._flow_blocker = FlowService(store=store, git_client=flow_manager.git)
-        else:
-            self._flow_blocker = flow_blocker
+        # Initialize health check service with flow context resolver
+        self._health_check_service = DispatchHealthCheckService(
+            check_service=self._check_service,
+            flow_blocker=self._flow_blocker,
+            store=store,
+            flow_context_resolver=self._flow_context,
+        )
 
         if issue_collector_factory is None:
             # Fallback: create default factory
@@ -273,112 +273,6 @@ class GlobalDispatchCoordinator:
             f"total={len(queue)} issues",
         )
         return queue
-
-    def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
-        """Check structural health before dispatch.
-
-        SCOPE: Structural validity only. This method does NOT make blocked
-        semantic decisions — those belong in qualify-gate. It only validates:
-        - Issue closed / PR merged (terminal)
-        - Missing worktree / invalid refs
-        - Transient fail-open (network/auth errors, missing flow records)
-        - Terminal flow states (done/aborted/stale)
-
-        Blocked/unblocked truth reconciliation is handled by qualify-gate,
-        not by health check. There is no second unblock path here.
-
-        Returns:
-            True if issue can be dispatched (healthy or transient error)
-            False if issue should be skipped (genuine failure or terminal state)
-        """
-        # Get the canonical branch for this issue
-        branch, _ = self._flow_context(issue.number)
-
-        # If no branch exists, fail open only for manager entry states that
-        # can create a fresh task scene. Worker states require an existing flow
-        # context; otherwise role builders fall back to a canonical branch that
-        # may not exist, causing invalid worktree dispatch.
-        if not branch:
-            issue_state = issue.state
-            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
-                state_value = issue_state.value if issue_state else "unknown"
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                    f"(missing flow context for {state_value})",
-                )
-                return False
-            return True
-
-        # Use CheckService for unified health check
-        result = self._check_service.verify_branch(branch)
-
-        # Get flow status to determine if dispatch should proceed
-        flow_state = self._store.get_flow_state(branch)
-        flow_status = (
-            flow_state.get("flow_status", "active") if flow_state else "active"
-        )
-
-        # Determine dispatch eligibility:
-        # - Fail-open for transient errors (network/auth) and missing flow records
-        # - Return False for genuine consistency failures (issue closed, PR merged)
-        # - Return False if flow is done/aborted (terminal state)
-        # - Return True if flow is healthy and active
-        if not result.is_valid:
-            # Check if this is a transient/expected error that should fail-open
-            transient_errors = [
-                "Cannot verify",  # Network/auth errors
-                "No flow record",  # Missing flow_state (new issues)
-            ]
-            is_transient = any(
-                any(err.startswith(prefix) for err in result.issues)
-                for prefix in transient_errors
-            )
-
-            if is_transient:
-                # Fail-open: allow dispatch despite transient errors
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
-                    f"(transient error: {', '.join(result.issues)})",
-                )
-                return True
-
-            # Genuine consistency failure - block and skip dispatch
-            reason = f"Health check failed: {', '.join(result.issues)}"
-            block_succeeded = False
-            try:
-                self._flow_blocker.block_flow(
-                    branch=branch, reason=reason, actor="orchestra:dispatcher"
-                )
-                block_succeeded = True
-            except Exception as exc:
-                logger.bind(domain="orchestra", action="health_check").warning(
-                    f"Failed to block flow for #{issue.number}: {exc}"
-                )
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
-                    f"(error: {exc}, health check: {reason})",
-                )
-
-            if block_succeeded:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
-                    f"(health check failed: {reason})",
-                )
-            return False
-
-        if flow_status in ("done", "aborted", "stale"):
-            append_orchestra_event(
-                "dispatcher",
-                f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(flow is {flow_status})",
-            )
-            return False
-
-        return True
 
     def _merge_queue(
         self,
@@ -576,11 +470,10 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
 
-            # === NEW: Pre-dispatch health check ===
-            if not self._health_check_before_dispatch(issue):
+            # === Pre-dispatch health check ===
+            if not self._health_check_service.check_issue_health(issue):
                 self._frozen_queue.pop(index)
                 continue
-            # === END health check ===
 
             green = "\033[32m"
             reset = "\033[0m"
