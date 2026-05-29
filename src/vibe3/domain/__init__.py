@@ -28,6 +28,9 @@ from vibe3.domain.events import (
     SupervisorPromptRendered,
 )
 
+# Import orchestration components
+from vibe3.domain.flow_manager import FlowManager
+
 if TYPE_CHECKING:
     from vibe3.domain.publisher import EventPublisher
 
@@ -78,6 +81,8 @@ __all__ = [
     "SupervisorApplyStarted",
     "SupervisorApplyCompleted",
     "SupervisorApplyDelegated",
+    # Orchestration
+    "FlowManager",
     # Publisher
     "get_publisher",
     "publish",
