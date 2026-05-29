@@ -167,8 +167,8 @@ code_limits:
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/roles/test_governance.py"
-        limit: 650
-        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景；拆分 registry 测试后包含 8 个类、30 个测试，共享 fixture"
+        limit: 700
+        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景；包含 8 个类、30+ 个测试，共享 fixture；runtime_assets 重构后新增 3 个测试（resolve_supervisor_asset_*），略微超标"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 480
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"

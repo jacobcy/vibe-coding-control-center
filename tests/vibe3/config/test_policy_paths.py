@@ -7,21 +7,20 @@ from vibe3.services.convention_resolver import ConventionResolver
 
 
 def test_convention_resolver_vibe_center_policy_path() -> None:
-    """ConventionResolver returns repo-local policy path for vibe-center profile."""
+    """ConventionResolver returns standard supervisor policy paths."""
     resolver = ConventionResolver(profile="vibe-center")
 
-    # Should return repo-local paths for vibe-center
     plan_path = resolver.get_policy_path("plan")
-    assert plan_path == ".agent/policies/plan.md"
+    assert plan_path == "supervisor/policies/plan.md"
 
     run_path = resolver.get_policy_path("run")
-    assert run_path == ".agent/policies/run.md"
+    assert run_path == "supervisor/policies/run.md"
 
     review_path = resolver.get_policy_path("review")
-    assert review_path == ".agent/policies/review.md"
+    assert review_path == "supervisor/policies/review.md"
 
     common_path = resolver.get_policy_path("common")
-    assert common_path == ".agent/policies/common.md"
+    assert common_path == "supervisor/policies/common.md"
 
 
 def test_convention_resolver_minimal_policy_path_none() -> None:
@@ -48,11 +47,11 @@ def test_plan_config_get_policy_file_with_explicit_value() -> None:
 def test_plan_config_get_policy_file_with_none_uses_resolver() -> None:
     """PlanConfig.get_policy_file() uses ConventionResolver when policy_file is None."""
     # This test requires setting profile context
-    # For vibe-center profile, should get repo-local path
+    # For vibe-center profile, should get the standard supervisor policy path
     config = PlanConfig(policy_file=None)
 
     # Note: This test will use the current repo's profile
-    # In a Vibe Center repo, should return ".agent/policies/plan.md"
+    # In a Vibe Center repo, should return "supervisor/policies/plan.md"
     # In minimal profile, should return None
     path = config.get_policy_file()
     # Just verify it returns a string or None, actual value depends on repo

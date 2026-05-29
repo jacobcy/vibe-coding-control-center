@@ -10,10 +10,10 @@ def test_vibe_center_profile_has_policies():
     # Policy paths are defined in VibeConfig defaults
     # For vibe-center, these should be accessible in the repo
     policy_files = [
-        ".agent/policies/plan.md",
-        ".agent/policies/run.md",
-        ".agent/policies/review.md",
-        ".agent/policies/common.md",
+        "supervisor/policies/plan.md",
+        "supervisor/policies/run.md",
+        "supervisor/policies/review.md",
+        "supervisor/policies/common.md",
     ]
 
     for policy_file in policy_files:

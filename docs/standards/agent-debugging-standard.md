@@ -2,7 +2,7 @@
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
-> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义与 authoritative ref 定义以 [v3/command-standard.md](v3/command-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`supervisor/policies/` 为准；编排状态语义与 authoritative ref 定义以 [v3/command-standard.md](v3/command-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
 > **实践入口**：快速上手请参考 [vibe3-serve-debugging-guide.md](vibe3-serve-debugging-guide.md)。
 
 ---
@@ -42,7 +42,7 @@
 
 - `skills/`：人机协作入口
 - `supervisor/`：自动化治理与角色材料
-- `.agent/policies/`：plan/run/review mode policy
+- `supervisor/policies/`：plan/run/review mode policy
 
 ### 2.2 先 dry-run，再单步 apply
 
@@ -246,7 +246,7 @@ uv run python src/vibe3/cli.py flow show <target-branch>
    - 开发链：issue + branch + flow + worktree
    - 治理链：issue + labels + comments
 2. **确认 prompt 材料**
-   - 先确认 `skills/`、`supervisor/`、`.agent/policies/` 是否在正确层级
+   - 先确认 `skills/`、`supervisor/`、`supervisor/policies/` 是否在正确层级
 3. **dry-run 验证**
    - 确认建议、计划或目标 issue 是否正确
    - 查看 `temp/logs/orchestra/governance/dry-run/` 输出
@@ -593,9 +593,9 @@ ls temp/logs/*issue-420*.async.log
 | `supervisor/manager.md` | Manager 角色材料：Permission Contract、Pseudo Functions、Stop Conditions |
 | `supervisor/governance/assignee-pool.md` | Governance supervisor material（原 orchestra.md）；governance agent 的角色材料，不是 runtime orchestra 本体 |
 | `supervisor/apply.md` | Governance issue apply 角色材料 |
-| `.agent/policies/plan.md` | Plan mode policy |
-| `.agent/policies/run.md` | Run mode policy |
-| `.agent/policies/review.md` | Review mode policy |
+| `supervisor/policies/plan.md` | Plan mode policy |
+| `supervisor/policies/run.md` | Run mode policy |
+| `supervisor/policies/review.md` | Review mode policy |
 | `config/settings.yaml` | 运行时配置：agent preset、interval、governance、state_label_dispatch |
 
 ---

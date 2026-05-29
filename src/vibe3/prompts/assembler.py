@@ -18,8 +18,8 @@ from vibe3.prompts.models import (
 )
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import (
-    DEFAULT_PROMPTS_PATH,
     resolve_prompt_template,
+    resolve_prompts_path,
 )
 
 # Matches {variable_name} in Python format strings (single braces, not {{ or }})
@@ -46,7 +46,7 @@ class PromptAssembler:
         registry: ProviderRegistry | None = None,
         skill_path_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
+        self._prompts_path = prompts_path or resolve_prompts_path()
         self._registry = registry or ProviderRegistry()
         self._skill_path_resolver = skill_path_resolver
 

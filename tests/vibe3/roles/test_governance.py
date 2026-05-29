@@ -59,19 +59,14 @@ class TestBuildGovernanceRecipe:
         assert "supervisor_name" in recipe.variables
         assert "server_status" in recipe.variables
 
-    def test_supervisor_content_literal_with_read_instruction(self):
+    def test_supervisor_content_uses_file_source(self):
         config = _make_config()
         recipe = build_governance_recipe(config)
         from vibe3.prompts.models import VariableSourceKind
 
         src = recipe.variables["supervisor_content"]
-        # 修复：不再注入完整 40KB+ supervisor 文件
-        # 改为 literal + Read instruction（参考 manager.default 配置）
-        assert src.kind == VariableSourceKind.LITERAL
-        assert "Read tool" in src.value
-        assert "supervisor/governance/assignee-pool.md" in src.value
-        assert "Governance 执行指南" in src.value
-        assert len(src.value) < 1000  # 轻量级指令应小于 1000 字符
+        assert src.kind == VariableSourceKind.FILE
+        assert src.path == "supervisor/governance/assignee-pool.md"
 
     def test_missing_material_catalog_fails_instead_of_using_python_fallback(
         self, tmp_path, monkeypatch
@@ -130,6 +125,46 @@ class TestRenderGovernancePrompt:
         result = render_governance_prompt(config, ctx, prompts_path)
 
         assert "Assignee Pool 治理材料" not in result.rendered_text
+
+    def test_governance_material_renders_from_global_assets_in_external_repo(
+        self, tmp_path, monkeypatch
+    ):
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            textwrap.dedent("""\
+                orchestra:
+                  governance:
+                    plan: |
+                      Supervisor={supervisor_name}
+                      Material={supervisor_content}
+            """),
+            encoding="utf-8",
+        )
+        material_path = tmp_path / "supervisor/governance/roadmap-intake.md"
+        material_path.parent.mkdir(parents=True)
+        material_path.write_text("GLOBAL ROADMAP INTAKE MATERIAL", encoding="utf-8")
+        external_repo = tmp_path / "agent-mesh"
+        external_repo.mkdir()
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+        monkeypatch.chdir(external_repo)
+
+        config = _make_config()
+        ctx = build_governance_snapshot_context(
+            _make_snapshot(),
+            config=config,
+            tick_count=1,
+        )
+        result = render_governance_prompt(
+            config,
+            ctx,
+            prompts_path,
+            tick_count=1,
+        )
+
+        assert (
+            "Supervisor=supervisor/governance/roadmap-intake.md" in result.rendered_text
+        )
+        assert "GLOBAL ROADMAP INTAKE MATERIAL" in result.rendered_text
 
 
 class TestBuildGovernanceRequest:

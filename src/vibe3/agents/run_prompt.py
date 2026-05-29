@@ -17,6 +17,7 @@ from vibe3.config.settings import VibeConfig
 from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.resources.runtime_assets import resolve_runtime_asset
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -97,8 +98,10 @@ def _build_run_prompt_providers(
         if not run_config or not hasattr(run_config, "get_policy_file"):
             return None
         policy_path = run_config.get_policy_file()
-        if policy_path and Path(policy_path).exists():
-            return Path(policy_path).read_text(encoding="utf-8")
+        if policy_path:
+            path = resolve_runtime_asset(policy_path)
+            if path.exists():
+                return path.read_text(encoding="utf-8")
         return None
 
     def mode_task(selected_mode: RunPromptMode) -> str | None:

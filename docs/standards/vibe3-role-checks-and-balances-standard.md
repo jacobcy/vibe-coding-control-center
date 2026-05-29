@@ -15,9 +15,9 @@
 - `supervisor/governance/assignee-pool.md` — Governance 角色材料
 - `supervisor/apply.md` — Apply 角色材料
 - `supervisor/manager.md` — Manager 角色材料
-- `.agent/policies/plan.md` — Plan 模式策略
-- `.agent/policies/run.md` — Run 模式策略
-- `.agent/policies/review.md` — Review 模式策略
+- `supervisor/policies/plan.md` — Plan 模式策略
+- `supervisor/policies/run.md` — Run 模式策略
+- `supervisor/policies/review.md` — Review 模式策略
 
 角色层级与 worktree 分配/runtime session 语义见 `vibe3-worktree-ownership-standard.md`。
 事件驱动语义见 `vibe3-event-driven-standard.md`。
@@ -179,9 +179,9 @@ vibe3-role-checks-and-balances-standard.md (本文件)
         +-- supervisor/governance/assignee-pool.md (Governance 角色)
         +-- supervisor/apply.md                     (Apply 角色)
         +-- supervisor/manager.md                   (Manager 角色)
-        +-- .agent/policies/plan.md                 (Plan 策略)
-        +-- .agent/policies/run.md                  (Run 策略)
-        +-- .agent/policies/review.md               (Review 策略)
+        +-- supervisor/policies/plan.md             (Plan 策略)
+        +-- supervisor/policies/run.md              (Run 策略)
+        +-- supervisor/policies/review.md           (Review 策略)
 ```
 
 ## 7. 修订历史

@@ -39,7 +39,8 @@ def test_prompt_manifest_resolves_migrated_default_path() -> None:
 
     resolved = _resolve_repo_path(DEFAULT_PROMPT_RECIPES_PATH)
 
-    assert resolved == Path.cwd() / "config/prompts/prompt-recipes.yaml"
+    assert resolved.name == "prompt-recipes.yaml"
+    assert resolved.parts[-3:] == ("config", "prompts", "prompt-recipes.yaml")
 
 
 def test_prompt_manifest_renders_configured_sections(tmp_path: Path) -> None:

@@ -20,6 +20,7 @@ from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.plan import PlanRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.resources.runtime_assets import resolve_runtime_asset
 
 PlanPromptMode = Literal["first", "retry"]
 
@@ -37,7 +38,7 @@ def build_plan_policy_section(policy_path: str | None) -> str | None:
         return None
 
     log = logger.bind(domain="plan_context_builder", action="build_plan_policy_section")
-    path = Path(policy_path)
+    path = resolve_runtime_asset(policy_path)
     if not path.exists():
         return None
 

@@ -18,6 +18,7 @@ from vibe3.prompts.models import (
     PromptVariableSource,
     VariableSourceKind,
 )
+from vibe3.resources.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 
@@ -218,15 +219,8 @@ class PromptManifest:
 
 
 def _resolve_repo_path(relative_path: Path) -> Path:
-    """Resolve a config path against repo root, falling back to cwd."""
-    try:
-        repo_root = Path(__file__).resolve().parent.parent.parent.parent
-        repo_path = repo_root / relative_path
-        if repo_path.exists():
-            return repo_path
-    except Exception:  # pragma: no cover
-        pass
-    return relative_path
+    """Resolve a config path through the standard runtime asset root."""
+    return resolve_prompt_config(relative_path)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
