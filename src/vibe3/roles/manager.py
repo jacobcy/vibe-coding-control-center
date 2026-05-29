@@ -12,7 +12,7 @@ from loguru import logger
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import CapacityDeferredError
-from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,

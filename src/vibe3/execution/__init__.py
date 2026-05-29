@@ -1,5 +1,10 @@
-"""Execution control plane package.
+"""Execution control plane public interface."""
 
-Import concrete modules directly from ``vibe3.execution.*`` to keep package
-boundaries explicit and avoid re-export compatibility layers.
-"""
+from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+
+__all__ = [
+    "CapacityService",
+    "ExecutionLaunchResult",
+    "ExecutionRequest",
+]
