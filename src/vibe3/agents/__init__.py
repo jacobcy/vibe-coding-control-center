@@ -49,7 +49,7 @@ from vibe3.agents.run_prompt import (
     make_run_context_builder,
     make_skill_context_builder,
 )
-from vibe3.execution.prompt_meta import PromptContextMode
+from vibe3.models.prompt_meta import PromptContextMode
 
 __all__ = [
     # Protocols & Models
