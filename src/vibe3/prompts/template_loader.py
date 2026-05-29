@@ -13,7 +13,7 @@ from vibe3.resources.runtime_assets import resolve_prompt_config
 DEFAULT_PROMPTS_PATH = Path("config/prompts/prompts.yaml")
 
 
-def _resolve_prompts_path() -> Path:
+def resolve_prompts_path() -> Path:
     """Resolve prompts.yaml from the standard runtime distribution."""
     path = resolve_prompt_config(DEFAULT_PROMPTS_PATH)
     if path.exists():
@@ -128,7 +128,7 @@ Be concise and factual. If uncertain, say so.
 def load_prompt_templates(prompts_path: Path | None = None) -> dict[str, Any]:
     """Load prompt templates from config/prompts/prompts.yaml with defaults."""
     path = (
-        resolve_prompt_config(prompts_path) if prompts_path else _resolve_prompts_path()
+        resolve_prompt_config(prompts_path) if prompts_path else resolve_prompts_path()
     )
     loaded: dict[str, Any] = {}
     if path.exists():

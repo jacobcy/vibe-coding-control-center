@@ -25,7 +25,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.prompts.template_loader import _resolve_prompts_path
+from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
@@ -256,7 +256,7 @@ def build_manager_sync_request(
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
     # Load prompts.yaml for static sections
-    prompts_path = _resolve_prompts_path()
+    prompts_path = resolve_prompts_path()
     with open(prompts_path) as f:
         prompts_data = yaml.safe_load(f)
     manager_sections = prompts_data.get("manager", {})
