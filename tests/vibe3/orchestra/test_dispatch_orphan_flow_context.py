@@ -31,7 +31,7 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     with patch(
         "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event"
     ) as append_event:
-        result = coordinator._health_check_before_dispatch(issue)
+        result = coordinator._health_check_service.check_issue_health(issue)
 
     assert result is False
     append_event.assert_called_once()

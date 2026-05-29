@@ -104,8 +104,10 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
                 # Mock qualify_gate
                 coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
-                # Mock _health_check_before_dispatch to pass
-                coordinator._health_check_before_dispatch = lambda issue: True
+                # Mock health check to pass
+                coordinator._health_check_service.check_issue_health = (
+                    lambda issue: True
+                )
 
                 # Run coordination with log capture
                 import asyncio
@@ -217,8 +219,10 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
                 # Mock qualify_gate
                 coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
-                # Mock _health_check_before_dispatch to pass
-                coordinator._health_check_before_dispatch = lambda issue: True
+                # Mock health check to pass
+                coordinator._health_check_service.check_issue_health = (
+                    lambda issue: True
+                )
 
                 # Run coordination with log capture
                 import asyncio
