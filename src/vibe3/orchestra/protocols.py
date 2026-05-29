@@ -41,6 +41,16 @@ class CheckServiceProtocol(Protocol):
         """
         ...
 
+    def invalidate_pr_cache(self) -> None:
+        """Invalidate PR cache to force refresh on next check.
+
+        Should be called when:
+        - Queue is restored from persistence
+        - Queue is cleared after promote()
+        - Fresh queue collection occurs
+        """
+        ...
+
 
 class FlowServiceProtocol(Protocol):
     """Protocol for flow service lifecycle operations."""

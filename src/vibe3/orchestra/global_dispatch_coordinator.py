@@ -631,11 +631,16 @@ class GlobalDispatchCoordinator:
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
+            # Invalidate PR cache on restore to ensure fresh PR state
+            self._check_service.invalidate_pr_cache()
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._ensure_load_issue_attribute()
-        self._queue_persistence.promote()
+        cleared_all = self._queue_persistence.promote()
+        if cleared_all:
+            # Invalidate PR cache when queue is cleared
+            self._check_service.invalidate_pr_cache()
         self._frozen_queue = self._queue_persistence.frozen_queue
 
         # Normalize after promotion: promote() may set
@@ -687,6 +692,8 @@ class GlobalDispatchCoordinator:
         need_collect = self._should_collect_after_dispatch(dispatched_count)
         if need_collect:
             fresh = await self._collect_frozen_queue()
+            # Invalidate PR cache after fresh collection
+            self._check_service.invalidate_pr_cache()
             if fresh and all(entry.collected_state == "blocked" for entry in fresh):
                 self._dispatch_paused = True
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
