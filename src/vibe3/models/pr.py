@@ -1,5 +1,6 @@
 """PR data models."""
 
+import subprocess
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
@@ -80,14 +81,20 @@ class PRMetadata(BaseModel):
 
         # Fallback to worktree user.name if all actors are placeholders
         if not backend_map:
-            from vibe3.clients.git_client import GitClient
-
             try:
-                worktree_actor = GitClient().get_config("user.name")
-                if worktree_actor:
-                    normalized = normalize_actor(worktree_actor)
-                    if normalized:
-                        return [normalized]
+                result = subprocess.run(
+                    ["git", "config", "user.name"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    worktree_actor = result.stdout.strip()
+                    if worktree_actor:
+                        normalized = normalize_actor(worktree_actor)
+                        if normalized:
+                            return [normalized]
             except Exception:
                 pass
             # Ultimate fallback if git config unavailable
