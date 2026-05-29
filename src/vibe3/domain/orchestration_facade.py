@@ -19,14 +19,13 @@ from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.flow_dispatch import FlowManager
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.orchestra.flow_dispatch import FlowManager
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 
 
@@ -86,6 +85,8 @@ class OrchestrationFacade(ServiceBase):
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._failed_gate = failed_gate
         self._github = github or GitHubClient()
+        from vibe3.orchestra.flow_dispatch import FlowManager
+
         self._flow_manager = flow_manager or FlowManager(self._config)
         self._registry: SessionRegistryService | None = registry
 
@@ -131,6 +132,7 @@ class OrchestrationFacade(ServiceBase):
         Args:
             tick_id: Current tick number from HeartbeatServer (default: 0)
         """
+        from vibe3.orchestra.logging import append_orchestra_event
 
         self.on_heartbeat_tick()
 
