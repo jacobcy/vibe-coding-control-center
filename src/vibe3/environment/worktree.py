@@ -20,7 +20,6 @@ from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
     from vibe3.models.orchestra_config import OrchestraConfig
-    from vibe3.orchestra.flow_dispatch import FlowManager
 
 
 class WorktreeManager(WorktreePRMixin):
@@ -40,18 +39,15 @@ class WorktreeManager(WorktreePRMixin):
         self,
         config: "OrchestraConfig",
         repo_path: Path,
-        flow_manager: Optional["FlowManager"] = None,
     ):
         """Initialize WorktreeManager.
 
         Args:
             config: Orchestra configuration
             repo_path: Path to the main repository
-            flow_manager: Optional FlowManager for flow state binding
         """
         self.config = config
         self.repo_path = repo_path
-        self.flow_manager = flow_manager
         self.lifecycle = WorktreeLifecycle(config, repo_path)
 
     # --- Issue Worktree Methods (L3) ---
