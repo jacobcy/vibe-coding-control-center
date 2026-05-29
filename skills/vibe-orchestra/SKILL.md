@@ -1,257 +1,113 @@
 ---
 name: vibe-orchestra
-description: Use when the user wants to manually review issues, assign issues to managers, or check orchestra service status. Human-collaboration entrypoint for issue pool governance and service monitoring.
+description: Use when the user wants heartbeat-style governance over the issue pool. inspect running issues, judge which issue is worth starting next, backfill assignee-triggered candidates, and propose non-state label or routing actions. Do not use for single-flow execution governance, coding, or implementation work.
 ---
 
-# /vibe-orchestra - Orchestra 服务监控与 Issue 治理入口
+# Vibe Orchestra
 
-人机协作的 orchestra 服务监控和 issue pool 治理入口。
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
-## 核心原则
+`vibe-orchestra` 负责 orchestra 心跳层的 **assignee issue pool** 治理。它关心的范围仅限于 assignee issue pool：现在有哪些 issue 正在运行、哪些已满足 assignee 触发条件但尚未进入调度，以及在人机协作环节接下来哪个 assignee issue 值得优先处理。它不负责单 flow 执行，也不负责 broader repo backlog 的 triage。
 
-- **人机协作**：提供交互式 issue 治理，不自动执行
-- **基于真源**：只读 `vibe3 serve status` 和 `vibe3 task status` 输出
-- **手动决策**：用户决定是否分配 assignee 或添加标签
+## 概念区别
+
+- **governance**：无临时 worktree 的 scan agent，只观察和建议，不执行代码修改。
+- **supervisor/apply**：有临时 worktree 的治理执行 agent，负责实际治理执行动作。
+- **`supervisor/governance/assignee-pool.md`（原 orchestra.md）**：governance supervisor material，是 governance agent 的角色材料，不是 runtime orchestra 本体。
+- **runtime orchestra / governance supervisor material / supervisor apply 是三个独立概念，不可混淆。**
+
+优先级判断口径必须对齐 `supervisor/governance/assignee-pool.md`。可以把 `vibe-orchestra` 视为自动治理 supervisor 在人机协作环节的落地判断器：它不发明另一套优先级规则，只读取当前现场并按 supervisor 已定义的排序模型，指导人类如何找到下一个需要处理的 issue。
+
+术语、对象边界与触发分流以以下标准为准：
+
+- `docs/standards/glossary.md`
+- `docs/standards/action-verbs.md`
+- `docs/standards/v3/skill-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/python-capability-design.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
+- `docs/standards/v3/skill-trigger-standard.md`
 
 ## Scope
 
-**两大职责**：
+`vibe-orchestra` 只回答两类问题，且均以 **assignee issue pool** 为前提：
 
-### 1. Service 监控
-- serve 运行状态（running/stopped）
-- FailedGate 检查
-- error_log 分析
-- heartbeat 状态
-- dispatcher 状态
-- 最近活动和事件
+- assignee issue pool 中现在有哪些 issue 正在运行
+- 在当前现场下，assignee issue pool 中接下来哪个 issue 值得建议优先处理
 
-### 2. Issue Pool 治理（手动）
-- 查看 assignee issue pool 状态
-- 扫描候选 issue（无 assignee 的 open issues）
-- 手动分配 issue 给 manager bot
-- 添加治理标签（如 `orchestra-scanned`）
-- 关闭明显过时的 issue
+这里的"建议 issue"只是参考，不是强制调度结果；最终仍需结合 flow / PR / 人类当前上下文判断。
 
-**不做**：
-- 自动化 issue triage（由 `vibe scan governance -r roadmap-intake` 负责）
-- 版本规划（由 `vibe-roadmap` 负责）
-- RFC issues 处理（由 `vibe-task` 负责）
+补充说明：
 
-## Workflow
+- assignee 是启动事实源
+- `state/*` label 只反映 flow 实际状态，不是主触发源
+- 常驻 server 与定时巡检只是运行模式差异，不改变本 skill 的职责边界
+- 自动 ready queue 的建议顺序按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解，仅作用于 assignee issue pool 内部
+- 人机协作时，若某个 assignee issue 已被人类明确接手、已有活跃 PR、或当前上下文要求先收口 follow-up，可临时覆盖自动顺序，但必须说明理由
+- **不处理 supervisor issue，也不对 broader repo backlog 做 triage**
 
-### Part 1: Service 监控
+## What It Reads
 
-#### Step 1: 查看 serve 状态
+以下观察面均以 **assignee issue pool** 为范围：
 
-```bash
-vibe3 serve status
-```
+- running issues（assignee issue pool 中正在运行的 issue）
+- assignee issue pool 中尚未启动但可被考虑的候选 issues
+- `uv run python src/vibe3/cli.py task status` 中 assignee issue 的 active / ready / blocked 现场与 ready queue rank
+- 当前是否已有人工明确接手的 assignee issue / PR follow-up / review 收口上下文
+- assignee 与 queue / flow 现场事实
+- assignee issue pool 中 issue 的 state labels
+- dependency information such as blocked_by
+- orchestra heartbeat status 与相关文档
+- `supervisor/governance/assignee-pool.md` 中的 queue guidance 与治理边界
 
-#### Step 2: 解析状态
+## What It Produces
 
-从输出中提炼：
+- running issues summary
+- backfill candidates summary
+- next-issue recommendation
+- ready queue ordering judgment
+- 最小 non-state label actions 或 routing suggestions
+- start / wait / defer recommendations with short reasons
 
-**运行状态**：
-- Service 状态（running/stopped）
-- PID 信息
-- Port 绑定
-- Uptime
+## Hard Boundary
 
-**错误检查**：
-- FailedGate 是否存在
-- error_log 内容
-- 系统错误
+- 不负责 task registry 或 task 数据质量审计
+- 不负责 runtime 绑定修复
+- 不负责 roadmap 规划或版本目标
+- 不负责 GitHub issue intake、模板补全或查重
+- 不负责单个 flow 的 plan / run / review
+- 不负责决定单个 issue 一定要先 plan、run、review 还是直接人工操作
+- 不负责把 `state/*` label 当作启动执行的主驱动
+- 不负责写代码
+- 不负责替代人类做最终业务优先级拍板；它只给出基于 supervisor 语义和当前现场的建议
+- 不负责 orchestra service 运行健康监控（转给 `vibe-debug-serve`）
 
-**最近活动**：
-- Heartbeat 时间
-- Dispatcher 状态
-- 最近事件
+当请求跨出这些边界时，按 `docs/standards/v3/skill-trigger-standard.md` 分流，不在本 skill 中重写职责矩阵。
 
-#### Step 3: 报告问题
+## Execution Pattern
 
-```text
-📋 Orchestra Service 状态
+1. 查看当前 assignee issue pool 中的 running issues 与 queue / flow 现场
+2. 补捞 assignee issue pool 中已满足 assignee 条件但尚未进入调度的候选 issue
+3. 判断 assignee issue pool 中是否已经存在足够明确的执行现场
+4. 参考 `supervisor/governance/assignee-pool.md`，按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对 assignee issue pool 的自动 ready queue 做人机治理判断
+5. 结合当前人工上下文，识别 assignee issue pool 中哪些 issue 虽然不在自动顺位最前，但更适合现在先处理
+6. 如有必要，提出最小 non-state label 调整建议（仅作用于 assignee issue pool 内）
+7. 在治理结论处停止
 
-运行状态
-- Status: running
-- PID: 12345
-- Port: 8765
-- Uptime: 2 hours
+## Output Contract
 
-健康检查
-- FailedGate: None ✅
-- Error Log: Empty ✅
-- Heartbeat: Normal ✅
+输出至少包含：
 
-最近活动
-- Last Heartbeat: 2026-05-28 23:20:00
-- Dispatcher: Active
-- Recent Events: 3 (last hour)
+- `Running issues`
+- `Backfill candidates`
+- `Next issue`
+- `Why this one now`
+- `Label actions`
+- `Why`
 
-建议
-- Service 运行正常，无错误
-```
-
-**常见问题处理**：
-
-**FailedGate 存在**：
-```bash
-vibe3 serve resume --reason "clear FailedGate"
-```
-
-**Service stopped**：
-```bash
-vibe3 serve start
-```
-
-### Part 2: Issue Pool 治理（手动）
-
-#### Step 4: 查看 assignee pool 状态
-
-```bash
-vibe3 task status
-```
-
-解析输出：
-- Ready queue: 待执行 issues
-- Blocked queue: 阻塞 issues
-- Active flows: 活跃开发流程
-- Remote tasks: 远端仓库任务
-
-#### Step 5: 扫描候选 issues
-
-**查询候选**（无 assignee 的 open issues）：
-```bash
-gh issue list --state open --json number,title,assignee,labels --jq '.[] | select(.assignee == null) | select(.labels | any(.name == "orchestra-scanned") | not)'
-```
-
-**逐个审查**：
-```bash
-vibe3 task show <issue-number>
-```
-
-审查要点（参考 roadmap-intake 三级框架）：
-- Level 0: 是否涉及 `.claude/` 或 `.codex/`（权限问题）→ 跳过并打 `roadmap/rfc`（机械阻塞，需人类；与自动 intake 一致，见 Step 6）
-- Level 1: 问题是否明确？范围是否可控？
-- Level 2: 架构是否仍相关？引用的代码/文档是否存在？
-- Level 3: 是否过时/重复？是否有未完成工作？
-
-#### Step 6: 手动分配 assignee
-
-**接受 issue**：
-```bash
-# 分配给 manager bot
-gh issue edit <issue-number> --add-assignee "@vibe-manager-agent"
-
-# 写简短 intake 说明
-gh issue comment <issue-number> --body "[governance] Intake: assigned to @vibe-manager-agent (manager-pool); scope=<bugfix/feature/refactor>."
-```
-
-**跳过 issue**：
-```bash
-# 打 orchestra-scanned 标签
-gh issue edit <issue-number> --add-label "orchestra-scanned"
-
-# 写跳过原因
-gh issue comment <issue-number> --body "[governance suggest] Skipped: <原因>"
-```
-
-**跳过 Level 0（`.claude/`/`.codex/` 机械阻塞）**：除 `orchestra-scanned` 外**直接打 `roadmap/rfc`**（与 roadmap-intake 的机械例外一致）。Level 0 issue 无 assignee，pool 扫不到；只有 `roadmap/rfc` 能命中 task-status Rule 1 被 `/vibe-task` surface，否则永久隐藏。
-```bash
-gh issue edit <issue-number> --add-label "orchestra-scanned" --add-label "roadmap/rfc"
-gh issue comment <issue-number> --body "[governance suggest] Skipped: 涉及 .claude/.codex 权限配置，机械阻塞需人类决策（已打 roadmap/rfc 供 /vibe-task surface）"
-```
-
-**关闭过时 issue**：
-```bash
-gh issue close <issue-number> --comment "关闭理由：<具体理由>"
-```
-
-## 交互式决策流程
-
-**用户主导**：
-1. 用户询问："帮我看看有哪些 issue 可以分配"
-2. Agent 扫描候选 issues 并展示
-3. 用户选择："issue #123 看起来可以分配"
-4. Agent 执行三级审查并报告："issue #123 通过三级审查，建议分配给 vibe-manager-agent"
-5. 用户确认："好的，分配吧"
-6. Agent 执行分配并写 comment
-
-**不自动执行**：
-- ❌ 不主动触发 governance scan
-- ❌ 不批量处理所有 issues
-- ❌ 不绕过用户确认直接分配
-
-## 与其他 Skills 的区别
-
-| Skill | 职责 | 触发方式 | 自动化程度 |
-|-------|------|---------|-----------|
-| **vibe-orchestra** | Service 监控 + 手动 issue 治理 | 交互式 | 人机协作 |
-| **vibe scan governance -r roadmap-intake** | 自动化 issue triage | 定时/手动触发 | 全自动 |
-| **vibe-task** | Task/flow 状态查看 | 只读查询 | - |
-| **vibe-roadmap** | 版本规划和 backlog triage | 交互式 | 人机协作 |
-| **vibe-debug-serve** | 深度调试 service 问题 | 交互式 | 人机协作 |
-
-**与 roadmap-intake 的关键区别**：
-- `roadmap-intake`：自动化扫描 + 批量处理 + 最小动作
-- `vibe-orchestra`：手动扫描 + 单个处理 + 用户确认
-
-## 使用场景
-
-### 场景 1: 检查 serve 健康状态
-```
-用户: vibe-orchestra
-Agent: 
-  1. 运行 vibe3 serve status
-  2. 解析并展示运行状态、错误、活动
-  3. 如有 FailedGate，建议清除方法
-```
-
-### 场景 2: 手动分配 issue
-```
-用户: 帮我看看 issue pool 里有哪些可以分配的 issue
-Agent:
-  1. 运行 vibe3 task status 查看 pool 状态
-  2. 扫描无 assignee 的 open issues
-  3. 展示候选列表（标题、简要描述）
-  4. 等待用户选择
-
-用户: issue #123 看起来不错，帮我审查一下
-Agent:
-  1. 运行 vibe3 task show 123
-  2. 执行三级审查（Level 0-3）
-  3. 报告审查结果："通过三级审查，建议分配"
-
-用户: 好的，分配吧
-Agent:
-  1. 执行 gh issue edit 123 --add-assignee "@vibe-manager-agent"
-  2. 写 [governance] comment
-  3. 确认完成
-```
-
-### 场景 3: 跳过不适合的 issue
-```
-用户: issue #456 看起来有问题
-Agent:
-  1. 运行 vibe3 task show 456
-  2. 发现 Level 0 检查失败（涉及 .claude/ 目录）
-  3. 建议："跳过，涉及权限配置，打 orchestra-scanned + roadmap/rfc（机械阻塞，需人类）"
-
-用户: 确认跳过
-Agent:
-  1. 执行 gh issue edit 456 --add-label "orchestra-scanned" --add-label "roadmap/rfc"
-  2. 写 [governance suggest] comment 说明原因
-  3. 确认完成（roadmap/rfc 让 /vibe-task 后续可 surface 给人类）
-```
+如果当前没有合适的建议 issue，明确写无，并说明原因。
 
 ## Stop Point
 
-完成以下之一后停止：
-- Service 状态报告完成
-- Issue 分配或跳过完成
-- 用户明确结束对话
-
-**不进入**：
-- 自动化批量处理
-- Plan/run/review 执行链
-- Roadmap 版本规划
+完成治理建议后停止。
+不要进入执行分配、实现方案、代码修改或单 flow 管理。

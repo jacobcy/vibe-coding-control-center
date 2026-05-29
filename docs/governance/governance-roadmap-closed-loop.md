@@ -120,7 +120,7 @@ intake 检测 Level 0 -> 打 orchestra-scanned + roadmap/rfc（无 assignee）
 - [x] Step 0 过滤：跳过有 `roadmap-reviewed` 标签的 issue
 - [x] 审查完成：写 `[roadmap decision]` + 打 `roadmap-reviewed` 标签
 - [x] 结果写入 memory.md 缓存
-- [x] **推翻 intake skip 时**：移除 `orchestra-scanned` + 分配 assignee + 打 `roadmap-reviewed`（明示规则见 [`skills/vibe-roadmap/SKILL.md`](../../skills/vibe-roadmap/SKILL.md) Step 0 闭环要求第 6 项）
+- [x] **推翻 intake skip 时**：移除 `orchestra-scanned` + 分配 assignee + 打 `roadmap-reviewed`（明示规则见 [`skills/vibe-roadmap/SKILL.md`](../../skills/vibe-roadmap/SKILL.md) Step 0 第 5 步）
 
 ---
 

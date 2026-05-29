@@ -1,6 +1,6 @@
 ---
 name: vibe-debug-serve
-description: Use when checking whether a new vibe3 serve debugging round is ready, debugging vibe3 serve (orchestra server), inspecting agent execution logs in temp/logs/, diagnosing governance or manager chain failures, or identifying bugs in the heartbeat/dispatch pipeline. Do not use for flow/task metadata repair (use vibe-check) or issue pool governance (use vibe-orchestra).
+description: Use when checking orchestra service health, viewing serve running status, debugging vibe3 serve (orchestra server), checking whether a new serve debugging round is ready, inspecting agent execution logs in temp/logs/, diagnosing governance or manager chain failures, or identifying bugs in the heartbeat/dispatch pipeline. Triggered by "serve status", "orchestra service running", "FailedGate", "heartbeat", "serve health". Do not use for flow/task metadata repair (use vibe-check) or issue pool governance (use vibe-orchestra).
 ---
 
 # /vibe-debug-serve - vibe3 serve 自动化调试
