@@ -124,19 +124,14 @@ class GlobalDispatchCoordinator:
             flow_context_resolver=self._flow_context,
         )
 
-        if issue_collector_factory is None:
-            # Fallback: create default factory
-            self._issue_collector_factory: Callable[
-                [], IssueCollectionServiceProtocol
-            ] = lambda: IssueCollectionService(github, config.repo)
-        else:
-            self._issue_collector_factory = issue_collector_factory
-
-        if label_dispatcher is None:
-            # Fallback: use default dispatcher
-            self._label_dispatcher: LabelDispatchCallable = build_label_dispatch_event  # type: ignore[assignment]
-        else:
-            self._label_dispatcher = label_dispatcher
+        # Fallback: create default factory or use default dispatcher
+        self._issue_collector_factory: Callable[[], IssueCollectionServiceProtocol] = (
+            issue_collector_factory
+            or (lambda: IssueCollectionService(github, config.repo))
+        )
+        self._label_dispatcher: LabelDispatchCallable = (
+            label_dispatcher or build_label_dispatch_event  # type: ignore[assignment]
+        )
 
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
