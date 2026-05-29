@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.orchestra.protocols import FlowManagerProtocol
 
 
 def select_ready_issues_from_collected_issues(
@@ -32,7 +32,7 @@ def select_ready_issues_from_collected_issues(
     config: OrchestraConfig,
     github: "GitHubClient",
     store: "SQLiteClient",
-    flow_manager: "FlowManager",
+    flow_manager: "FlowManagerProtocol",
     qualify_gate: QualifyGateService,
     supervisor_label: str,
 ) -> list[IssueInfo]:

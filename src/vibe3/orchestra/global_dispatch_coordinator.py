@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, cast
 
 from loguru import logger
 
@@ -20,17 +20,23 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
-from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import (
+    CapacityServiceProtocol,
+    CheckServiceProtocol,
+    FlowManagerProtocol,
+    FlowServiceProtocol,
+    IssueCollectionServiceProtocol,
+    LabelDispatchCallable,
+)
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
@@ -55,15 +61,38 @@ MAX_INTENTS_PER_TICK = 10
 class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
 
+    _config: OrchestraConfig
+    _capacity: CapacityServiceProtocol
+    _github: GitHubClient
+    _store: "SQLiteClient"
+    _flow_manager: FlowManagerProtocol
+    _registry: "SessionRegistryService | None"
+    _executor: ThreadPoolExecutor
+    _owns_executor: bool
+    _frozen_queue: list[QueueEntry] | None
+    _check_service: CheckServiceProtocol
+    _flow_blocker: FlowServiceProtocol
+    _issue_collector_factory: Callable[[], IssueCollectionServiceProtocol]
+    _label_dispatcher: LabelDispatchCallable
+    _dispatch_paused: bool
+    _supervisor_label: str
+
     def __init__(
         self,
         config: OrchestraConfig,
-        capacity: CapacityService,
+        capacity: CapacityServiceProtocol,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: FlowManager,
+        flow_manager: FlowManagerProtocol,
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
+        *,
+        check_service: CheckServiceProtocol | None = None,
+        flow_blocker: FlowServiceProtocol | None = None,
+        issue_collector_factory: (
+            Callable[[], IssueCollectionServiceProtocol] | None
+        ) = None,
+        label_dispatcher: LabelDispatchCallable | None = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -77,7 +106,38 @@ class GlobalDispatchCoordinator:
         self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
-        self._check_service: CheckService | None = None
+
+        # Optional dependency injection with backward-compatible fallback
+        if check_service is None:
+            # Fallback: create CheckService for backward compatibility
+            self._check_service = CheckService(
+                store=store,
+                git_client=flow_manager.git,
+                github_client=github,
+            )
+        else:
+            self._check_service = check_service
+
+        if flow_blocker is None:
+            # Fallback: create FlowService for backward compatibility
+            self._flow_blocker = FlowService(store=store, git_client=flow_manager.git)
+        else:
+            self._flow_blocker = flow_blocker
+
+        if issue_collector_factory is None:
+            # Fallback: create default factory
+            self._issue_collector_factory: Callable[
+                [], IssueCollectionServiceProtocol
+            ] = lambda: IssueCollectionService(github, config.repo)
+        else:
+            self._issue_collector_factory = issue_collector_factory
+
+        if label_dispatcher is None:
+            # Fallback: use default dispatcher
+            self._label_dispatcher: LabelDispatchCallable = build_label_dispatch_event  # type: ignore[assignment]
+        else:
+            self._label_dispatcher = label_dispatcher
+
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
 
@@ -119,7 +179,14 @@ class GlobalDispatchCoordinator:
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
+        from vibe3.domain.events import DomainEvent
+
+        publish(
+            cast(
+                DomainEvent,
+                self._label_dispatcher(role, issue, branch=branch, tick_id=tick_id),
+            )
+        )
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
         """Get flow context for an issue (backward compatibility)."""
@@ -146,10 +213,7 @@ class GlobalDispatchCoordinator:
         try:
             collected_issues = await asyncio.get_running_loop().run_in_executor(
                 self._executor,
-                IssueCollectionService(
-                    self._github,
-                    self._config.repo,
-                ).collect_open_issues,
+                self._issue_collector_factory().collect_open_issues,
             )
         except Exception as exc:
             append_orchestra_event(
@@ -247,12 +311,6 @@ class GlobalDispatchCoordinator:
             return True
 
         # Use CheckService for unified health check
-        if self._check_service is None:
-            self._check_service = CheckService(
-                store=self._store,
-                git_client=self._flow_manager.git,
-                github_client=self._github,
-            )
         result = self._check_service.verify_branch(branch)
 
         # Get flow status to determine if dispatch should proceed
@@ -290,9 +348,9 @@ class GlobalDispatchCoordinator:
             reason = f"Health check failed: {', '.join(result.issues)}"
             block_succeeded = False
             try:
-                FlowService(
-                    store=self._store, git_client=self._flow_manager.git
-                ).block_flow(branch=branch, reason=reason, actor="orchestra:dispatcher")
+                self._flow_blocker.block_flow(
+                    branch=branch, reason=reason, actor="orchestra:dispatcher"
+                )
                 block_succeeded = True
             except Exception as exc:
                 logger.bind(domain="orchestra", action="health_check").warning(
@@ -573,14 +631,11 @@ class GlobalDispatchCoordinator:
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
-            self._check_service = None  # Invalidate cache on restore
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._ensure_load_issue_attribute()
-        cleared_all = self._queue_persistence.promote()
-        if cleared_all:
-            self._check_service = None  # Invalidate when queue is cleared
+        self._queue_persistence.promote()
         self._frozen_queue = self._queue_persistence.frozen_queue
 
         # Normalize after promotion: promote() may set
@@ -632,7 +687,6 @@ class GlobalDispatchCoordinator:
         need_collect = self._should_collect_after_dispatch(dispatched_count)
         if need_collect:
             fresh = await self._collect_frozen_queue()
-            self._check_service = None  # Invalidate cache
             if fresh and all(entry.collected_state == "blocked" for entry in fresh):
                 self._dispatch_paused = True
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)

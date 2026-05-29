@@ -59,16 +59,15 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid result (non-transient)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=False,
-                issues=["Branch 'task/issue-42' no longer exists locally"],
-                branch="task/issue-42",
-            )
-            result = coordinator._health_check_before_dispatch(issue)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=["Branch 'task/issue-42' no longer exists locally"],
+            branch="task/issue-42",
+        )
+        coordinator._check_service = mock_check_service
+
+        result = coordinator._health_check_before_dispatch(issue)
 
         # Assert - genuine consistency failure should skip dispatch
         assert (
@@ -178,16 +177,14 @@ class TestPreDispatchHealthChecks:
 
         # Mock CheckService to return valid (CheckService handles PR check
         # internally and marks flow as done, then returns valid)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=True,
-                issues=[],
-                branch="task/issue-44",
-            )
-            result = coordinator._health_check_before_dispatch(issue)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=True,
+            issues=[],
+            branch="task/issue-44",
+        )
+        coordinator._check_service = mock_check_service
+        result = coordinator._health_check_before_dispatch(issue)
 
         # Assert - flow is done, should skip dispatch
         assert result is False, "Health check should fail for done flow"
@@ -354,38 +351,29 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with genuine error (no worktree)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=False,
-                issues=[
-                    "plan_ref cannot be verified: "
-                    "no worktree for branch 'task/issue-993'"
-                ],
-                branch="task/issue-993",
-            )
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=[
+                "plan_ref cannot be verified: "
+                "no worktree for branch 'task/issue-993'"
+            ],
+            branch="task/issue-993",
+        )
+        coordinator._check_service = mock_check_service
 
-            # Mock FlowService to verify constructor and block_flow call
-            with patch(
-                "vibe3.orchestra.global_dispatch_coordinator.FlowService"
-            ) as mock_flow_service:
-                mock_flow = mock_flow_service.return_value
-                result = coordinator._health_check_before_dispatch(issue)
+        # Mock FlowService to verify block_flow call
+        mock_flow_blocker = MagicMock()
+        coordinator._flow_blocker = mock_flow_blocker
 
-                # Assert - FlowService constructed with coordinator's dependencies
-                mock_flow_service.assert_called_once()
-                constructor_args = mock_flow_service.call_args
-                assert constructor_args[1]["store"] is store
-                assert constructor_args[1]["git_client"] is git_client
+        result = coordinator._health_check_before_dispatch(issue)
 
-                # Assert - block_flow should be called with correct parameters
-                mock_flow.block_flow.assert_called_once()
-                call_args = mock_flow.block_flow.call_args
-                assert call_args[1]["branch"] == "task/issue-993"
-                assert "Health check failed" in call_args[1]["reason"]
-                assert call_args[1]["actor"] == "orchestra:dispatcher"
+        # Assert - block_flow should be called with correct parameters
+        mock_flow_blocker.block_flow.assert_called_once()
+        call_args = mock_flow_blocker.block_flow.call_args
+        assert call_args[1]["branch"] == "task/issue-993"
+        assert "Health check failed" in call_args[1]["reason"]
+        assert call_args[1]["actor"] == "orchestra:dispatcher"
 
         # Assert - should return False (skip dispatch)
         assert result is False, "Health check should return False for genuine failure"

@@ -21,7 +21,7 @@ from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.orchestra.protocols import FlowManagerProtocol
 
 
 class QualifyGateService:
@@ -36,7 +36,7 @@ class QualifyGateService:
         config: OrchestraConfig,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: "FlowManager",
+        flow_manager: "FlowManagerProtocol",
     ) -> None:
         """Initialize qualify gate service.
 

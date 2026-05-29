@@ -49,7 +49,7 @@ class OrchestrationFacade(ServiceBase):
         failed_gate: "FailedGate | None" = None,
         store: "SQLiteClient | None" = None,
         github: "GitHubClient | None" = None,
-        flow_manager: "FlowManager | None" = None,
+        flow_manager: "FlowManagerProtocol | None" = None,
         registry: "SessionRegistryService | None" = None,
     ) -> None:
         """Initialize facade with tick counter.
@@ -95,11 +95,25 @@ class OrchestrationFacade(ServiceBase):
             from vibe3.orchestra.global_dispatch_coordinator import (
                 GlobalDispatchCoordinator,
             )
+            from vibe3.services.check_service import CheckService
+            from vibe3.services.flow_service import FlowService
 
             actual_store = store or SQLiteClient()
             self._registry = registry or SessionRegistryService(
                 actual_store, self._capacity._backend
             )
+
+            # Inject concrete service instances
+            check_service = CheckService(
+                store=actual_store,
+                git_client=self._flow_manager.git,
+                github_client=self._github,
+            )
+            flow_blocker = FlowService(
+                store=actual_store,
+                git_client=self._flow_manager.git,
+            )
+
             self._coordinator = GlobalDispatchCoordinator(
                 config=self._config,
                 capacity=self._capacity,
@@ -107,6 +121,8 @@ class OrchestrationFacade(ServiceBase):
                 store=actual_store,
                 flow_manager=self._flow_manager,
                 registry=self._registry,
+                check_service=check_service,
+                flow_blocker=flow_blocker,
             )
 
     def shutdown(self) -> None:
