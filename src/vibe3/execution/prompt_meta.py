@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from typing import Mapping
 
-PromptContextMode = Literal["bootstrap", "resume"]
+from vibe3.models.prompt_meta import PromptContextMode
 
 
 @dataclass(frozen=True)
