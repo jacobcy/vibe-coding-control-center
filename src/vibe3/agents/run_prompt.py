@@ -18,6 +18,7 @@ from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
+from vibe3.services.convention_resolver import ConventionResolver
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -88,6 +89,7 @@ def _build_run_prompt_providers(
     from vibe3.agents.review_prompt import build_tools_guide_section
 
     run_config = getattr(config, "run", None)
+    resolver = ConventionResolver.from_repo()
 
     def plan_ref() -> str | None:
         if not plan_content:
@@ -95,9 +97,9 @@ def _build_run_prompt_providers(
         return f"## Implementation Plan\n\n{plan_content}"
 
     def run_policy() -> str | None:
-        if not run_config or not hasattr(run_config, "get_policy_file"):
+        if not run_config:
             return None
-        policy_path = run_config.get_policy_file()
+        policy_path = run_config.policy_file or resolver.get_policy_path("run")
         if policy_path:
             path = resolve_runtime_asset(policy_path)
             if path.exists():
@@ -120,9 +122,9 @@ def _build_run_prompt_providers(
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
         "common.rules": lambda: build_tools_guide_section(
-            run_config.get_common_rules()
-            if run_config and hasattr(run_config, "get_common_rules")
-            else None
+            (run_config.common_rules or resolver.get_policy_path("common"))
+            if run_config
+            else resolver.get_policy_path("common")
         ),
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None

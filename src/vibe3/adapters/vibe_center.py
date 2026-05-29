@@ -8,7 +8,7 @@ distribution, making it an explicit adapter instead of implicit
 from pathlib import Path
 
 from vibe3.adapters import register_adapter
-from vibe3.config.adapter_manifest import AdapterManifest, AdapterResource
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
 
 def _build_vibe_center_manifest() -> AdapterManifest:

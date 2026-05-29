@@ -21,6 +21,7 @@ from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
+from vibe3.services.convention_resolver import ConventionResolver
 
 PlanPromptMode = Literal["first", "retry"]
 
@@ -153,11 +154,12 @@ def _build_plan_prompt_providers(
     task_request = (
         request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
     )
+    resolver = ConventionResolver.from_repo()
 
     def plan_policy() -> str | None:
-        if not plan_config or not hasattr(plan_config, "get_policy_file"):
+        if not plan_config:
             return None
-        policy_path = plan_config.get_policy_file()
+        policy_path = plan_config.policy_file or resolver.get_policy_path("plan")
         if policy_path:
             return build_plan_policy_section(policy_path)
         return None
@@ -180,9 +182,9 @@ def _build_plan_prompt_providers(
     return {
         "plan.policy": plan_policy,
         "common.rules": lambda: build_tools_guide_section(
-            plan_config.get_common_rules()
-            if plan_config and hasattr(plan_config, "get_common_rules")
-            else None
+            (plan_config.common_rules or resolver.get_policy_path("common"))
+            if plan_config
+            else resolver.get_policy_path("common")
         ),
         "plan.output_format": plan_output_format,
         "plan.retry_task": plan_retry_task,

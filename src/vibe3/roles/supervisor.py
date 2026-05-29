@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from vibe3.config.orchestra_config import get_handoff_state_label
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
@@ -20,6 +19,7 @@ from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.orchestra_helpers import get_handoff_state_label
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",

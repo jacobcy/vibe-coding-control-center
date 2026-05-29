@@ -126,7 +126,7 @@ def _make_recipes_yaml(materials: list[dict]) -> str:
 
 def _make_adapter(supervisor_resources: list[dict]):
     """Build a minimal AdapterManifest with given supervisor resources."""
-    from vibe3.config.adapter_manifest import AdapterManifest, AdapterResource
+    from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
     resources = [
         AdapterResource(type="supervisor", name=r["name"], path=r["path"])

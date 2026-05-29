@@ -4,10 +4,7 @@ This module provides a single source of truth for role-specific policies,
 eliminating scattered mappings across multiple modules.
 """
 
-from typing import TYPE_CHECKING, Callable, Literal
-
-if TYPE_CHECKING:
-    from vibe3.agents.models import ExecutionRole
+from typing import Literal
 
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
@@ -20,9 +17,7 @@ ROLE_TO_SECTION: dict[str, Literal["manager", "plan", "run", "review"]] = {
 }
 
 
-def get_role_section(
-    role: "ExecutionRole | str",
-) -> Literal["manager", "plan", "run", "review"]:
+def get_role_section(role: str) -> Literal["manager", "plan", "run", "review"]:
     """Get the config section for a given role."""
     return ROLE_TO_SECTION[role]
 
@@ -37,32 +32,9 @@ ROLE_TO_REQUIRED_REF_KEY: dict[str, str | None] = {
 }
 
 
-def get_role_required_ref_key(role: "ExecutionRole | str") -> str | None:
+def get_role_required_ref_key(role: str) -> str | None:
     """Get the required ref key for a given role's no-op gate check.
 
     Returns None for roles that should skip the ref check (e.g., manager).
     """
     return ROLE_TO_REQUIRED_REF_KEY.get(role)
-
-
-# Lazy import to avoid circular dependencies
-def _get_block_functions() -> dict[str, Callable[..., None]]:
-    """Get role-specific block functions (lazy import to avoid cycles)."""
-    from vibe3.services.issue_failure_service import (
-        block_executor_noop_issue,
-        block_manager_noop_issue,
-        block_planner_noop_issue,
-        block_reviewer_noop_issue,
-    )
-
-    return {
-        "manager": block_manager_noop_issue,
-        "planner": block_planner_noop_issue,
-        "executor": block_executor_noop_issue,
-        "reviewer": block_reviewer_noop_issue,
-    }
-
-
-def get_role_block_function(role: "ExecutionRole | str") -> Callable[..., None]:
-    """Get the block function for a given role."""
-    return _get_block_functions()[role]

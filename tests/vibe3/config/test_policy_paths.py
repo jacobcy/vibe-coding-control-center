@@ -35,55 +35,6 @@ def test_convention_resolver_minimal_policy_path_none() -> None:
     assert common_path is None
 
 
-def test_plan_config_get_policy_file_with_explicit_value() -> None:
-    """PlanConfig.get_policy_file() returns explicit value when set."""
-    config = PlanConfig(policy_file="custom/policy.md")
-
-    # Should return explicit value
-    path = config.get_policy_file()
-    assert path == "custom/policy.md"
-
-
-def test_plan_config_get_policy_file_with_none_uses_resolver() -> None:
-    """PlanConfig.get_policy_file() uses ConventionResolver when policy_file is None."""
-    # This test requires setting profile context
-    # For vibe-center profile, should get the standard supervisor policy path
-    config = PlanConfig(policy_file=None)
-
-    # Note: This test will use the current repo's profile
-    # In a Vibe Center repo, should return "supervisor/policies/plan.md"
-    # In minimal profile, should return None
-    path = config.get_policy_file()
-    # Just verify it returns a string or None, actual value depends on repo
-    assert path is None or isinstance(path, str)
-
-
-def test_review_config_get_policy_file_uses_resolver() -> None:
-    """ReviewConfig.get_policy_file() uses ConventionResolver when policy_file
-    is None."""
-    config = ReviewConfig(policy_file=None)
-
-    path = config.get_policy_file()
-    assert path is None or isinstance(path, str)
-
-
-def test_run_config_get_policy_file_uses_resolver() -> None:
-    """RunConfig.get_policy_file() uses ConventionResolver when policy_file is None."""
-    config = RunConfig(policy_file=None)
-
-    path = config.get_policy_file()
-    assert path is None or isinstance(path, str)
-
-
-def test_plan_config_get_common_rules_uses_resolver() -> None:
-    """PlanConfig.get_common_rules() uses ConventionResolver when common_rules
-    is None."""
-    config = PlanConfig(common_rules=None)
-
-    path = config.get_common_rules()
-    assert path is None or isinstance(path, str)
-
-
 def test_plan_config_fields_default_to_none() -> None:
     """PlanConfig policy_file and common_rules default to None."""
     config = PlanConfig()

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from vibe3.config.adapter_manifest import AdapterManifest
+    from vibe3.models.adapter_manifest import AdapterManifest
 
 AdapterResolver = Callable[[str], "AdapterManifest | None"]
 
@@ -48,7 +48,7 @@ class ProfileConfig(BaseModel):
         adapter_name = adapter_map.get(self.profile)
         if adapter_name:
             result = self.adapter_resolver(adapter_name)
-            from vibe3.config.adapter_manifest import AdapterManifest
+            from vibe3.models.adapter_manifest import AdapterManifest
 
             return result if isinstance(result, AdapterManifest) else None
         return None

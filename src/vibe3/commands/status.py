@@ -18,13 +18,13 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
-from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.server.registry import _validate_pid_file
 from vibe3.services.flow_service import FlowService
+from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
 from vibe3.services.task_status_classifier import (
