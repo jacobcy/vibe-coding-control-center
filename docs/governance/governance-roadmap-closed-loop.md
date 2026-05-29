@@ -34,8 +34,8 @@ Issue 创建（无 assignee，无标签）
   |- 无 assignee? -> 跳过（不在 pool）
   |- 有 orchestra-governed? -> 跳过
   |- 有 assignee、无 governed -> 决策
-       |- roadmap/rfc -> 跳过执行，等人类决策
-       |- roadmap/epic -> 跳过执行，需拆分
+       |- roadmap/rfc -> 不进 ready，等人类决策（标签是信号，非执行门禁）
+       |- roadmap/epic -> 不进 ready，需拆分
        |- state/ready -> 可执行
        |- 建议关闭
        打完标签后 -> 打 orchestra-governed --> 不再看
@@ -56,6 +56,31 @@ Issue 创建（无 assignee，无标签）
 | **打标签** | 只对跳过的打 `orchestra-scanned` | 对所有决策完的打 `orchestra-governed` |
 | **不打的含义** | 接受 -> assignee 是信号 -> 流入 pool | 无——所有决策完都打 |
 | **过滤例外** | 无 | `roadmap/epic` 收口检查独立扫描所有 epic，不受 governed 过滤 |
+
+---
+
+## roadmap/rfc 语义与 Level 0 闭环
+
+### roadmap/rfc 是人类规划信号，不是执行门禁
+
+自动执行的真正门禁是 **manager assignee + `state/ready`**：orchestra 派发队列恒定 `require_manager_assignee=True`（见 `src/vibe3/orchestra/queue_operations.py`），并要求 state 进入 ready。`roadmap/rfc` 本身**不被派发队列消费**，它是给人类规划层和治理 scan 过滤用的可见性信号，语义为"需要人类设计决策"。
+
+推论：一个 issue 只要没有 manager assignee + ready，就不会被自动执行，无论是否带 `roadmap/rfc`。因此对**人类 assignee** 的 issue 而言，`roadmap/rfc` 不充当门禁，但仍作为"需设计讨论"的可查询规划信号保留其价值。
+
+### Level 0 闭环：intake 直接打 roadmap/rfc
+
+`.claude/` / `.codex/` 目录改动（Level 0）是**机械可判定**的硬阻塞，自动化无法修改这些目录。intake 在 skip 该类 issue 时，除打 `orchestra-scanned` 外，**直接打 `roadmap/rfc`**——这是 intake 唯一允许设置 `roadmap/*` 的机械例外（非 intake 自称 decider，而是路由一个确定性硬阻塞）。
+
+闭环路径（不经过 pool，因为 Level 0 issue 无 assignee，pool 只扫 has-assignee）：
+
+```
+intake 检测 Level 0 -> 打 orchestra-scanned + roadmap/rfc（无 assignee）
+   -> task status Rule 1（roadmap/rfc「始终展示」，不管 assignee）
+   -> /vibe-task surface 给人类
+   -> 人类决策（分配 assignee / 移除 roadmap/rfc / 关闭）
+```
+
+**为什么必须由 intake 打**：[task-status-filtering.md](../v3/orchestra/task-status-filtering.md) 的 Rule 4 会把"无 state + 无 assignee"的 issue 隐藏（SKIP）。若 intake 只写 suggest 而不打 `roadmap/rfc`，Level 0 issue 会落入 Rule 4 被永久隐藏；pool 又只扫 has-assignee，永远看不到它。只有 intake 直接打 `roadmap/rfc` 命中 Rule 1 才能让它可见、被 vibe-task 捡起。`roadmap/rfc` 的后续清理由 vibe-roadmap（Layer 3，两个群体都可见）或人类（经 vibe-task）负责；**pool 不清理 `roadmap/rfc`**——pool 只清理自己域内的 `orchestra-governed`。
 
 ---
 
@@ -80,6 +105,7 @@ Issue 创建（无 assignee，无标签）
 - [x] 扫描前过滤：跳过有 `orchestra-scanned`、`orchestra-governed`（防御）或有 assignee 的 issue
 - [x] 接受（分配 assignee）：不设 scanned 标签，自然流入 pool
 - [x] 跳过（不接受）：打 `orchestra-scanned` 标签
+- [x] Level 0（`.claude/`/`.codex/`）skip：除 `orchestra-scanned` 外**直接打 `roadmap/rfc`**（机械例外），让 task-status Rule 1 始终展示、vibe-task 可捡起
 - [x] Stop Point Checklist 区分接受/跳过两种情况
 
 ### Layer 2: assignee-pool

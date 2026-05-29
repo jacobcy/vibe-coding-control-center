@@ -62,7 +62,10 @@ Allowed:
 - `issue.close`: 允许直接关闭 issue（仅限高置信度场景，见下方说明）
 - `issue.create`: 允许创建 follow-up issue（处理未完成工作）
 - `labels.read`: 读取所有 labels
-- `labels.write`: 仅限非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`）
+- `labels.write`: 非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`）
+  - **设置**：决策后打标签（如 `roadmap/rfc`、`roadmap/epic`、`priority/*`、`orchestra-governed`）
+  - **移除**：仅限 `orchestra-governed` 的验证清理（见「标签验证与清理」）
+  - **不移除 `roadmap/rfc`**：rfc 的清理是人类/vibe-roadmap 职责，不在 pool
 - `flow`: read（读取 flow/worktree 现场信息）
 - `task`: read（读取 task 状态）
 - `handoff`: read（读取交接上下文）
@@ -121,6 +124,46 @@ Forbidden:
 - orchestra heartbeat status
 - epic issues（有 `roadmap/epic` 标签的 open issue，用于收口检查）
 - epic sub-issues 状态（通过 `gh issue view <number> --json state,stateReason,labels` 查询）
+
+## 标签验证与清理（强制执行）
+
+**每次 scan 时，在 Step 1 过滤前，必须先验证 `orchestra-governed` 标签的正确性**，防止标签永久残留导致 issue 被过滤后无法被重新处理。
+
+### `orchestra-governed` 标签验证
+
+**验证条件**（必须全部满足，否则标签过时）：
+- Issue 有 assignee
+- Assignee 在 `manager_usernames` 配置列表中
+- Issue 是 open 状态
+
+**验证失败处理**：
+
+```bash
+gh issue edit <issue-number> --remove-label "orchestra-governed"
+gh issue comment <issue-number> --body "[governance auto-cleanup] 移除 orchestra-governed：issue 不再满足持有条件（无 assignee / assignee 非 manager / 已关闭），允许重新进入评估"
+```
+
+记录到 Actions：`Cleanup: #XXX removed orchestra-governed (no manager assignee)`
+
+### pool 不清理 `roadmap/rfc`
+
+pool **不**验证或移除 `roadmap/rfc`。原因：
+- pool 只扫 has-assignee；Level 0 的 no-assignee rfc 它根本看不到。
+- 移除 `roadmap/rfc` 是"该 issue 不再需要人类设计决策"的判断，属 vibe-roadmap（Layer 3，两个群体都可见）或人类（经 /vibe-task），不是 pool 的自动动作。
+- pool 误删 rfc 会把真正需要人类的 issue 重新放回自动流。
+
+### 执行时机
+
+在 Execution Pattern 的 Step 1（标签过滤）**之前**先跑本验证：
+
+```
+for issue in all_open_issues_with_orchestra_governed:
+    if not (has_assignee and assignee in manager_usernames and is_open):
+        remove orchestra-governed + write [governance auto-cleanup] comment
+# 然后才进入 Step 1 的正常过滤
+```
+
+**目的**：防止标签永久残留导致过滤失效；让 assignee 漂移/决策半完成的 issue 能被重新处理。
 
 ## Issue Intake 策略
 
@@ -284,6 +327,7 @@ pool 扫描有 assignee 的 issue →
 
 Steps:
 
+0. **标签验证（强制，先于过滤）**：先执行「标签验证与清理」段——校验所有带 `orchestra-governed` 的 open issue 是否仍满足持有条件，不满足则移除并写 cleanup comment。然后才进入下面的标签过滤。
 1. **标签过滤（强制）**：只处理有 manager assignee 但无 `orchestra-governed` 标签的 issue：
    - 无 assignee → 跳过（不在 pool 中，由 roadmap-intake 负责）
    - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不重复检查）

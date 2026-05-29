@@ -46,6 +46,8 @@
 - **禁止**纳入 assignee issue pool
 - 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
 
+**为什么 intake 直接打 `roadmap/rfc`**：Level 0 issue 被 skip 后无 assignee，assignee-pool 只扫 has-assignee 永远看不到它。只有 intake 此刻打 `roadmap/rfc` 才能命中 task-status Rule 1（始终展示）被 /vibe-task surface；否则落入 Rule 4（无 state 无 assignee）被永久隐藏。这是 intake 唯一允许设 `roadmap/*` 的机械例外。
+
 **Level 1-3 审查框架详见 [../../supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三级审查框架)**。
 
 ### 决策逻辑
@@ -98,7 +100,7 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 - 依赖未就绪 → suggest 中说明等待依赖
 
 **intake 不设以下标签**（属于 assignee-pool 层决策范围）：
-- `roadmap/rfc`、`roadmap/epic`（**例外**：Level 0 检查阻塞时，intake 需要添加 `roadmap/rfc` 标签以路由该 issue）
+- `roadmap/rfc`、`roadmap/epic`（**唯一例外**：Level 0 机械阻塞时 intake 直接打 `roadmap/rfc` 路由该 issue；其余 rfc 判断属 pool）
 - `roadmap/p0`、`roadmap/p1`、`roadmap/p2`
 - `priority/*`
 
@@ -247,7 +249,10 @@ Allowed:
 - `issue.close`: allowed（仅限 supervisor issues 高置信度场景，见 Supervisor Issue Intake）
 - `issue.create`: allowed（仅限 supervisor issues 关闭前创建 follow-up issue，处理未完成工作）
 - `labels.read`: read
-- `labels.write`: allowed（仅最小必要的 routing 调整；只设 `orchestra-scanned`（跳过时）；不设 `roadmap/*`、`priority/*` 标签）
+- `labels.write`: allowed（routing 标签）：
+  - 跳过时设 `orchestra-scanned`
+  - **唯一 `roadmap/*` 例外**：Level 0（`.claude/`/`.codex/`）机械阻塞 skip 时，**直接打 `roadmap/rfc`**（路由确定性硬阻塞，使其命中 task-status Rule 1 被 /vibe-task surface）
+  - 除该例外外，**禁止**设置 `roadmap/*`、`priority/*` 标签（由 assignee-pool 或 roadmap decider 决策执行）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
 - `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）

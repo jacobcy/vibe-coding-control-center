@@ -131,7 +131,7 @@ vibe3 task show <issue-number>
 ```
 
 审查要点（参考 roadmap-intake 三级框架）：
-- Level 0: 是否涉及 `.claude/` 或 `.codex/`（权限问题）→ 跳过
+- Level 0: 是否涉及 `.claude/` 或 `.codex/`（权限问题）→ 跳过并打 `roadmap/rfc`（机械阻塞，需人类；与自动 intake 一致，见 Step 6）
 - Level 1: 问题是否明确？范围是否可控？
 - Level 2: 架构是否仍相关？引用的代码/文档是否存在？
 - Level 3: 是否过时/重复？是否有未完成工作？
@@ -154,6 +154,12 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 # 写跳过原因
 gh issue comment <issue-number> --body "[governance suggest] Skipped: <原因>"
+```
+
+**跳过 Level 0（`.claude/`/`.codex/` 机械阻塞）**：除 `orchestra-scanned` 外**直接打 `roadmap/rfc`**（与 roadmap-intake 的机械例外一致）。Level 0 issue 无 assignee，pool 扫不到；只有 `roadmap/rfc` 能命中 task-status Rule 1 被 `/vibe-task` surface，否则永久隐藏。
+```bash
+gh issue edit <issue-number> --add-label "orchestra-scanned" --add-label "roadmap/rfc"
+gh issue comment <issue-number> --body "[governance suggest] Skipped: 涉及 .claude/.codex 权限配置，机械阻塞需人类决策（已打 roadmap/rfc 供 /vibe-task surface）"
 ```
 
 **关闭过时 issue**：
@@ -229,13 +235,13 @@ Agent:
 Agent:
   1. 运行 vibe3 task show 456
   2. 发现 Level 0 检查失败（涉及 .claude/ 目录）
-  3. 建议："跳过，涉及权限配置，打 orchestra-scanned"
+  3. 建议："跳过，涉及权限配置，打 orchestra-scanned + roadmap/rfc（机械阻塞，需人类）"
 
 用户: 确认跳过
 Agent:
-  1. 执行 gh issue edit 456 --add-label "orchestra-scanned"
+  1. 执行 gh issue edit 456 --add-label "orchestra-scanned" --add-label "roadmap/rfc"
   2. 写 [governance suggest] comment 说明原因
-  3. 确认完成
+  3. 确认完成（roadmap/rfc 让 /vibe-task 后续可 surface 给人类）
 ```
 
 ## Stop Point

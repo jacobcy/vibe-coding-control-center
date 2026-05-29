@@ -66,6 +66,7 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 **谁打**：roadmap-intake
 **何时打**：审查后**决定不接受**（不分配 assignee）时
 **不打的情况**：接受并分配 assignee 时——assignee 本身就是信号，issue 自然流入 assignee-pool
+**Level 0 联动**：`.claude/`/`.codex/` 机械阻塞 skip 时，除 `orchestra-scanned` 外**同时打 `roadmap/rfc`**，使其命中 task-status Rule 1 被 `/vibe-task` surface（详见 [governance-roadmap-closed-loop.md](../docs/governance/governance-roadmap-closed-loop.md) 的 "Level 0 闭环"）
 
 **语义**："已审查，不纳入"（intake 层的结论，后续层可推翻）
 
@@ -215,10 +216,10 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 ### Roadmap Intake（入口层）
 
 **决策范围**：**只决定 accept（分配 assignee）或 skip（打 scanned）**
-**检查**：生命周期、依赖、API、模块
+**检查**：生命周期、依赖、API、模块（含 Level 0：`.claude/`/`.codex/` 目录机械检查）
 **输出**：`[governance suggest]` 建议纳入或跳过，附带原因
-**标签**：不设 `roadmap/*`、`priority/*` 标签
-**边界**：intake 不自称 decider；跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
+**标签**：不设 `roadmap/*`、`priority/*` 标签。**唯一例外**——Level 0 机械阻塞 skip 时直接打 `roadmap/rfc`：这是路由一个确定性硬阻塞（diff 是否碰 `.claude/`/`.codex/`，yes/no 机械可判），不是 intake 自称 decider。理由：Level 0 issue 无 assignee，pool 永远扫不到；只有 intake 打 `roadmap/rfc` 才能命中 task-status Rule 1 被 `/vibe-task` surface（否则落入 Rule 4 永久隐藏）。
+**边界**：intake 不自称 decider；除 Level 0 机械例外外，跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
 
 ### Assignee Pool（池内决策层）
 
