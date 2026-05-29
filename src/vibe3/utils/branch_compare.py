@@ -1,12 +1,13 @@
 """Branch comparison utilities for PR operations."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from loguru import logger
 
-if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
+
+class _GitRunner(Protocol):
+    def _run(self, args: list[str]) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class BranchBehindInfo:
 
 
 def check_branch_behind(
-    git_client: "GitClient",
+    git_client: _GitRunner,
     head_branch: str,
     base_branch: str,
 ) -> BranchBehindInfo | None:
@@ -33,7 +34,7 @@ def check_branch_behind(
     Returns:
         BranchBehindInfo if behind, None if up-to-date or error
     """
-    from vibe3.clients.git_client import GitError
+    from vibe3.exceptions import GitError
 
     try:
         # Fetch base branch to ensure up-to-date refs
