@@ -12,7 +12,9 @@
 
 本文档是理解 Vibe3 角色体系的入口。各角色的具体 Permission Contract 以各自的角色材料为准:
 
-- `supervisor/governance/assignee-pool.md` — Governance 角色材料
+- `supervisor/governance/assignee-pool.md` — Governance (Assignee Pool) 角色材料
+- `supervisor/governance/roadmap-intake.md` — Governance (Roadmap Intake) 角色材料
+- `supervisor/governance/cron-supervisor.md` — Governance (Cron Supervisor) 角色材料
 - `supervisor/apply.md` — Apply 角色材料
 - `supervisor/manager.md` — Manager 角色材料
 - `supervisor/policies/plan.md` — Plan 模式策略

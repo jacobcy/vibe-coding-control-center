@@ -1,7 +1,7 @@
 ---
 document_type: standard
 title: Vibe3 Handoff Governance Standard
-status: proposed
+status: approved
 scope: handoff-governance
 authority:
   - handoff-boundary
@@ -41,7 +41,9 @@ related_docs:
 
 `.git/vibe3/handoff/<branch>/current.md` 是本地 handoff buffer，不是真源。
 
-它只用于在 agent、skill 或会话之间传递短期上下文，例如：
+**注意**：在 worktree 环境下，直接访问或编辑 `.git/vibe3/handoff/` 目录可能受限。所有 handoff 操作**必须优先通过 `vibe3` CLI 命令完成**（如 `vibe3 handoff append/show`），除非在特定离线或手动修复场景下。
+
+It only serves for passing short-term context between agents, skills, or sessions, for example:
 
 - 本轮已完成
 - blockers

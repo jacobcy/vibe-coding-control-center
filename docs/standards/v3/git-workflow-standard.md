@@ -28,7 +28,7 @@ related_docs:
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
 - 用户主视角 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done` 应如何推进
-- 内部桥接链 `GitHub issue -> roadmap item (deprecated, 仅作规划参考) -> task -> flow` 应如何配合
+- 内部桥接链 `GitHub issue` (直接真源) `-> task -> flow` 应如何配合
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
@@ -56,8 +56,8 @@ related_docs:
 
 默认交付模型如下：
 
-- `GitHub issue` 负责来源层需求与讨论事实，是当前治理与执行的**直接真源**
-- `roadmap item` 负责版本规划窗口的表达。状态：**历史兼容 / 规划参考语义**。不再作为执行层的强制中间层
+- **GitHub Issue**：负责来源层需求与讨论事实，是当前治理与执行的**唯一直接真源**。
+- **Roadmap Item**：负责版本规划窗口的表达。状态：**历史兼容 / 规划参考语义**。不再作为执行层的必经关口或强制中间层。
 - `task` 负责 execution record，是 flow 建立后的 execution bridge
 - `flow` 负责当前交付切片与 runtime 现场
 - `pr` 负责当前交付产物
