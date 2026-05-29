@@ -1,7 +1,7 @@
 ---
 document_type: standard
-title: Registry JSON Standard
-status: archived
+title: V2 to V3 Migration Reference
+status: approved
 scope: shared-state
 authority:
   - registry-json-schema
@@ -17,7 +17,7 @@ related_docs:
   - docs/standards/v3/command-standard.md
 ---
 
-# `registry.json` Standard (V3 Migration Guide)
+# V2 to V3 Migration Reference (Legacy `registry.json`)
 
 **⚠️ IMPORTANT**: In Vibe Center 3.0 (v3), the `registry.json` file has been **deprecated** and replaced with a SQLite database table `flow_issue_links`.
 

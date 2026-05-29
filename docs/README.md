@@ -11,18 +11,20 @@ docs/
 ├── README.md                        # 本文件：文档总览
 ├── standards/                       # 标准和规范文档
 │   ├── doc-organization.md          # 文档组织标准（必读）
-│   ├── cognition-spec-dominion.md  # 宪法大纲：Vibe Guard 流程定义
-│   ├── ...                         # 其他现行标准
-│   └── v3/                          # V3 命令、数据、技能与 handoff 标准
-├── specs/                           # 规范文档
-├── prds/                           # 产品需求文档（全局 PRD）
-│   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
-│   └── ...                         # 其他全局 PRD
-├── plans/                          # 执行计划
-├── reports/                        # 报告与总结
+│   ├── glossary.md                  # 术语真源（必读）
+│   ├── v3/                          # V3 核心标准 (handoff, git, models)
+│   └── ...                         # 其他现行标准
+├── v3/                              # V3 实施、架构、Orchestra 与 Prompt 参考
+├── specs/                           # 规范文档 (Issue/Feature 契约)
+├── prds/                           # 产品需求文档 (全局 PRD)
+├── plans/                          # 执行计划 (草稿于 .agent/plans/)
+├── reports/                        # 报告与总结 (草稿于 .agent/reports/)
+├── analysis/                        # 架构与逻辑分析报告
+├── governance/                      # 治理流程与审计记录
+├── handoff/                         # Handoff 链路存档
+├── migration/                       # 迁移设计与执行记录
 ├── references/                     # 外部参考资料
-│   └── ...                         # 收集的外部文档、论文、资料等
-├── archive/                        # 历史归档
+├── validation/                      # 验证报告与测试证据
 └── ...                             # 其他现行文档
 ```
 
@@ -34,14 +36,15 @@ docs/
 **必读文档**：
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
-- **[vibe3-architecture-convergence-standard.md](standards/vibe3-architecture-convergence-standard.md)** - Vibe3 目标架构总纲，解释最终分层、收敛方向与 domain-first 的取舍
-- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准，理解 Governance / Apply / Manager / Plan / Run / Review 的权力边界与制衡关系
-- **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准，统一 supervisor 与 manager 链调试方法
-- **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准，定义命名规范和使用指南
-- **[cognition-spec-dominion.md](standards/cognition-spec-dominion.md)** - 宪法大纲，定义 Vibe Guard 流程
+- **[vibe3-architecture-convergence-standard.md](standards/vibe3-architecture-convergence-standard.md)** - Vibe3 目标架构总纲
+- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
+- **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准
+- **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
+- **[vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)** - Worktree 所有权标准
 
 **V3 规范目录**：
-- **[standards/v3/](standards/v3/)** - V3 命令、数据、技能、handoff 与运行时标准真源目录
+- **[standards/v3/](standards/v3/)** - V3 核心标准（handoff, git, models, registry migration）
+- **[v3/](v3/)** - V3 实施参考、架构演进与 Prompt 定义
 ### 全局 PRD (`prds/`)
 存放不针对特定任务的全局性产品需求文档。
 
