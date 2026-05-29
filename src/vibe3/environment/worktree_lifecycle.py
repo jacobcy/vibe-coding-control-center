@@ -21,10 +21,14 @@ from vibe3.environment.worktree_support import (
     recycle_worktree_path,
 )
 from vibe3.exceptions import SystemError
-from vibe3.services.status_query_service import is_auto_task_branch
 
 if TYPE_CHECKING:
     from vibe3.models.orchestra_config import OrchestraConfig
+
+
+def _is_auto_task_branch(branch: str) -> bool:
+    """Check if branch follows auto-managed task naming convention."""
+    return branch.startswith("task/issue-")
 
 
 class WorktreeLifecycle:
@@ -403,7 +407,7 @@ class WorktreeLifecycle:
                 ).error("Existing worktree branch name does not match issue number")
                 return None
             # Record worktree path for auto task branches only
-            if check_recorded_path and is_auto_task_branch(flow_branch):
+            if check_recorded_path and _is_auto_task_branch(flow_branch):
                 self.record_worktree_path(flow_branch, str(existing))
             return WorktreeContext(
                 path=existing,
@@ -416,7 +420,7 @@ class WorktreeLifecycle:
         try:
             ctx = acquire_issue_worktree_func(issue_number, flow_branch)
             # Record worktree path for auto task branches only
-            if check_recorded_path and is_auto_task_branch(flow_branch):
+            if check_recorded_path and _is_auto_task_branch(flow_branch):
                 self.record_worktree_path(flow_branch, str(ctx.path))
             return ctx
         except Exception as exc:
