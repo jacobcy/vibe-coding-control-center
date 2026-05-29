@@ -75,9 +75,11 @@ Blocked Issues (有依赖阻塞)
 
 ## 与其他 Skills 的区别
 
-- **vibe-task**: 看 RFC 和 blocked issues（问题 issue）
-- **vibe-orchestra**: 管理 assignee issue pool（运行中的 issues）
-- **vibe-roadmap**: 版本规划和 backlog triage（规划）
+- **vibe-task**: 只读 surface RFC/blocked（提请人类关注，不做决策）
+- **vibe-orchestra**: 入口 intake（筛选打 assignee）+ serve 监控
+- **vibe-roadmap**: 版本规划 + 纠正 assignee-pool 决策（含 rfc 的 override）
+
+**职责分工**：vibe-task 只**发现并提请**（rfc/blocked）；真正的**决策/纠正**去 vibe-roadmap（rfc/roadmap）或 vibe-orchestra（assign/入池）。Level 0 issue 由 intake/vibe-orchestra 打上 `roadmap/rfc` 后，vibe-task 通过 task-status Rule 1 自动 surface。
 
 ## Restrictions
 
