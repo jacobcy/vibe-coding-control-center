@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, cast
 
 from loguru import logger
 
@@ -20,17 +20,24 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
-from vibe3.orchestra.flow_dispatch import FlowManager
+from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import (
+    CapacityServiceProtocol,
+    CheckServiceProtocol,
+    FlowManagerProtocol,
+    FlowServiceProtocol,
+    IssueCollectionServiceProtocol,
+    LabelDispatchCallable,
+)
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
@@ -55,15 +62,38 @@ MAX_INTENTS_PER_TICK = 10
 class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
 
+    _config: OrchestraConfig
+    _capacity: CapacityServiceProtocol
+    _github: GitHubClient
+    _store: "SQLiteClient"
+    _flow_manager: FlowManagerProtocol
+    _registry: "SessionRegistryService | None"
+    _executor: ThreadPoolExecutor
+    _owns_executor: bool
+    _frozen_queue: list[QueueEntry] | None
+    _check_service: CheckServiceProtocol
+    _flow_blocker: FlowServiceProtocol
+    _issue_collector_factory: Callable[[], IssueCollectionServiceProtocol]
+    _label_dispatcher: LabelDispatchCallable
+    _dispatch_paused: bool
+    _supervisor_label: str
+
     def __init__(
         self,
         config: OrchestraConfig,
-        capacity: CapacityService,
+        capacity: CapacityServiceProtocol,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: FlowManager,
+        flow_manager: FlowManagerProtocol,
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
+        *,
+        check_service: CheckServiceProtocol | None = None,
+        flow_blocker: FlowServiceProtocol | None = None,
+        issue_collector_factory: (
+            Callable[[], IssueCollectionServiceProtocol] | None
+        ) = None,
+        label_dispatcher: LabelDispatchCallable | None = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -77,7 +107,32 @@ class GlobalDispatchCoordinator:
         self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
-        self._check_service: CheckService | None = None
+
+        # Optional dependency injection with backward-compatible fallback
+        self._check_service = check_service or CheckService(
+            store=store, git_client=flow_manager.git, github_client=github
+        )
+        self._flow_blocker = flow_blocker or FlowService(
+            store=store, git_client=flow_manager.git
+        )
+
+        # Initialize health check service with flow context resolver
+        self._health_check_service = DispatchHealthCheckService(
+            check_service=self._check_service,
+            flow_blocker=self._flow_blocker,
+            store=store,
+            flow_context_resolver=self._flow_context,
+        )
+
+        # Fallback: create default factory or use default dispatcher
+        self._issue_collector_factory: Callable[[], IssueCollectionServiceProtocol] = (
+            issue_collector_factory
+            or (lambda: IssueCollectionService(github, config.repo))
+        )
+        self._label_dispatcher: LabelDispatchCallable = (
+            label_dispatcher or build_label_dispatch_event  # type: ignore[assignment]
+        )
+
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
 
@@ -119,7 +174,14 @@ class GlobalDispatchCoordinator:
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
+        from vibe3.domain.events import DomainEvent
+
+        publish(
+            cast(
+                DomainEvent,
+                self._label_dispatcher(role, issue, branch=branch, tick_id=tick_id),
+            )
+        )
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
         """Get flow context for an issue (backward compatibility)."""
@@ -146,10 +208,7 @@ class GlobalDispatchCoordinator:
         try:
             collected_issues = await asyncio.get_running_loop().run_in_executor(
                 self._executor,
-                IssueCollectionService(
-                    self._github,
-                    self._config.repo,
-                ).collect_open_issues,
+                self._issue_collector_factory().collect_open_issues,
             )
         except Exception as exc:
             append_orchestra_event(
@@ -209,118 +268,6 @@ class GlobalDispatchCoordinator:
             f"total={len(queue)} issues",
         )
         return queue
-
-    def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
-        """Check structural health before dispatch.
-
-        SCOPE: Structural validity only. This method does NOT make blocked
-        semantic decisions — those belong in qualify-gate. It only validates:
-        - Issue closed / PR merged (terminal)
-        - Missing worktree / invalid refs
-        - Transient fail-open (network/auth errors, missing flow records)
-        - Terminal flow states (done/aborted/stale)
-
-        Blocked/unblocked truth reconciliation is handled by qualify-gate,
-        not by health check. There is no second unblock path here.
-
-        Returns:
-            True if issue can be dispatched (healthy or transient error)
-            False if issue should be skipped (genuine failure or terminal state)
-        """
-        # Get the canonical branch for this issue
-        branch, _ = self._flow_context(issue.number)
-
-        # If no branch exists, fail open only for manager entry states that
-        # can create a fresh task scene. Worker states require an existing flow
-        # context; otherwise role builders fall back to a canonical branch that
-        # may not exist, causing invalid worktree dispatch.
-        if not branch:
-            issue_state = issue.state
-            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
-                state_value = issue_state.value if issue_state else "unknown"
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                    f"(missing flow context for {state_value})",
-                )
-                return False
-            return True
-
-        # Use CheckService for unified health check
-        if self._check_service is None:
-            self._check_service = CheckService(
-                store=self._store,
-                git_client=self._flow_manager.git,
-                github_client=self._github,
-            )
-        result = self._check_service.verify_branch(branch)
-
-        # Get flow status to determine if dispatch should proceed
-        flow_state = self._store.get_flow_state(branch)
-        flow_status = (
-            flow_state.get("flow_status", "active") if flow_state else "active"
-        )
-
-        # Determine dispatch eligibility:
-        # - Fail-open for transient errors (network/auth) and missing flow records
-        # - Return False for genuine consistency failures (issue closed, PR merged)
-        # - Return False if flow is done/aborted (terminal state)
-        # - Return True if flow is healthy and active
-        if not result.is_valid:
-            # Check if this is a transient/expected error that should fail-open
-            transient_errors = [
-                "Cannot verify",  # Network/auth errors
-                "No flow record",  # Missing flow_state (new issues)
-            ]
-            is_transient = any(
-                any(err.startswith(prefix) for err in result.issues)
-                for prefix in transient_errors
-            )
-
-            if is_transient:
-                # Fail-open: allow dispatch despite transient errors
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
-                    f"(transient error: {', '.join(result.issues)})",
-                )
-                return True
-
-            # Genuine consistency failure - block and skip dispatch
-            reason = f"Health check failed: {', '.join(result.issues)}"
-            block_succeeded = False
-            try:
-                FlowService(
-                    store=self._store, git_client=self._flow_manager.git
-                ).block_flow(branch=branch, reason=reason, actor="orchestra:dispatcher")
-                block_succeeded = True
-            except Exception as exc:
-                logger.bind(domain="orchestra", action="health_check").warning(
-                    f"Failed to block flow for #{issue.number}: {exc}"
-                )
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
-                    f"(error: {exc}, health check: {reason})",
-                )
-
-            if block_succeeded:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
-                    f"(health check failed: {reason})",
-                )
-            return False
-
-        if flow_status in ("done", "aborted", "stale"):
-            append_orchestra_event(
-                "dispatcher",
-                f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(flow is {flow_status})",
-            )
-            return False
-
-        return True
 
     def _merge_queue(
         self,
@@ -518,11 +465,10 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
 
-            # === NEW: Pre-dispatch health check ===
-            if not self._health_check_before_dispatch(issue):
+            # === Pre-dispatch health check ===
+            if not self._health_check_service.check_issue_health(issue):
                 self._frozen_queue.pop(index)
                 continue
-            # === END health check ===
 
             green = "\033[32m"
             reset = "\033[0m"
@@ -573,14 +519,16 @@ class GlobalDispatchCoordinator:
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
-            self._check_service = None  # Invalidate cache on restore
+            # Invalidate PR cache on restore to ensure fresh PR state
+            self._check_service.invalidate_pr_cache()
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._ensure_load_issue_attribute()
         cleared_all = self._queue_persistence.promote()
         if cleared_all:
-            self._check_service = None  # Invalidate when queue is cleared
+            # Invalidate PR cache when queue is cleared
+            self._check_service.invalidate_pr_cache()
         self._frozen_queue = self._queue_persistence.frozen_queue
 
         # Normalize after promotion: promote() may set
@@ -632,7 +580,8 @@ class GlobalDispatchCoordinator:
         need_collect = self._should_collect_after_dispatch(dispatched_count)
         if need_collect:
             fresh = await self._collect_frozen_queue()
-            self._check_service = None  # Invalidate cache
+            # Invalidate PR cache after fresh collection
+            self._check_service.invalidate_pr_cache()
             if fresh and all(entry.collected_state == "blocked" for entry in fresh):
                 self._dispatch_paused = True
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)

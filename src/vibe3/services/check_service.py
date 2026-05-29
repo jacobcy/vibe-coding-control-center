@@ -107,6 +107,14 @@ class CheckService(CheckRemote):
             logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
             self._branch_to_pr = {}
 
+    def invalidate_pr_cache(self) -> None:
+        """Invalidate PR cache to force refresh on next check.
+
+        Clears the cached PR data so that the next health check
+        will fetch fresh PR state from GitHub API.
+        """
+        self._branch_to_pr = {}
+
     # ------------------------------------------------------------------
     # Core Logic
     # ------------------------------------------------------------------

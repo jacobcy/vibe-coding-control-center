@@ -107,7 +107,9 @@ def make_coordinator() -> callable:
 
         # Mock health check to bypass CheckService for queue operation tests
         if mock_health_check:
-            coordinator._health_check_before_dispatch = MagicMock(return_value=True)
+            coordinator._health_check_service.check_issue_health = MagicMock(
+                return_value=True
+            )
 
         if with_branches and role != "manager":
 
