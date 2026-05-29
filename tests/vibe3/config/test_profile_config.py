@@ -9,8 +9,7 @@ def test_profile_config_vibe_center_loads_adapter() -> None:
     """Test vibe-center profile loads vibe-center adapter."""
     config = ProfileConfig(profile="vibe-center", adapter_resolver=get_adapter)
     policy_path = config.get_policy_path("plan")
-    # Should return repo-local path from adapter
-    assert policy_path == ".agent/policies/plan.md"
+    assert policy_path == "supervisor/policies/plan.md"
 
 
 def test_profile_config_minimal_returns_none() -> None:
@@ -25,7 +24,7 @@ def test_convention_resolver_gets_policy_path() -> None:
     """Test ConventionResolver can resolve policy paths."""
     resolver = ConventionResolver(profile="vibe-center")
     path = resolver.get_policy_path("common")
-    assert path == ".agent/policies/common.md"
+    assert path == "supervisor/policies/common.md"
 
 
 def test_convention_resolver_gets_skill_path() -> None:

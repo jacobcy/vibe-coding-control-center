@@ -38,12 +38,16 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     resources.extend(
         [
             AdapterResource(
-                type="policy", name="common", path=".agent/policies/common.md"
+                type="policy", name="common", path="supervisor/policies/common.md"
             ),
-            AdapterResource(type="policy", name="plan", path=".agent/policies/plan.md"),
-            AdapterResource(type="policy", name="run", path=".agent/policies/run.md"),
             AdapterResource(
-                type="policy", name="review", path=".agent/policies/review.md"
+                type="policy", name="plan", path="supervisor/policies/plan.md"
+            ),
+            AdapterResource(
+                type="policy", name="run", path="supervisor/policies/run.md"
+            ),
+            AdapterResource(
+                type="policy", name="review", path="supervisor/policies/review.md"
             ),
         ]
     )

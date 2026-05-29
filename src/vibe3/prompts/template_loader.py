@@ -8,32 +8,26 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.resources.runtime_assets import resolve_prompt_config
+
 DEFAULT_PROMPTS_PATH = Path("config/prompts/prompts.yaml")
 
 
 def _resolve_prompts_path() -> Path:
-    """Resolve prompts.yaml path, preferring repo root over cwd."""
-    # 1. Explicitly check if we are in a repo structure by traversing up from __file__
-    # src/vibe3/prompts/template_loader.py -> parent x4 -> root
-    try:
-        repo_root = Path(__file__).resolve().parent.parent.parent.parent
-        # Try new path first
-        new_repo_path = repo_root / "config" / "prompts" / "prompts.yaml"
-        if new_repo_path.exists():
-            return new_repo_path
-        # Fallback to old path with deprecation warning
-        old_repo_path = repo_root / "config" / "prompts.yaml"
-        if old_repo_path.exists():
-            logger.bind(domain="prompt_templates", path=str(old_repo_path)).warning(
-                "Using deprecated prompts path config/prompts.yaml. "
-                "Please migrate to config/prompts/prompts.yaml"
-            )
-            return old_repo_path
-    except Exception:  # pragma: no cover
-        pass
+    """Resolve prompts.yaml from the standard runtime distribution."""
+    path = resolve_prompt_config(DEFAULT_PROMPTS_PATH)
+    if path.exists():
+        return path
 
-    # 2. Fallback to CWD-relative path (already updated to new location)
-    return DEFAULT_PROMPTS_PATH
+    old_path = resolve_prompt_config(Path("config/prompts.yaml"))
+    if old_path.exists():
+        logger.bind(domain="prompt_templates", path=str(old_path)).warning(
+            "Using deprecated prompts path config/prompts.yaml. "
+            "Please migrate to config/prompts/prompts.yaml"
+        )
+        return old_path
+
+    return path
 
 
 DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
@@ -133,7 +127,9 @@ Be concise and factual. If uncertain, say so.
 
 def load_prompt_templates(prompts_path: Path | None = None) -> dict[str, Any]:
     """Load prompt templates from config/prompts/prompts.yaml with defaults."""
-    path = prompts_path or _resolve_prompts_path()
+    path = (
+        resolve_prompt_config(prompts_path) if prompts_path else _resolve_prompts_path()
+    )
     loaded: dict[str, Any] = {}
     if path.exists():
         try:

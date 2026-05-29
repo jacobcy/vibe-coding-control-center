@@ -32,7 +32,7 @@ _usage() {
     echo "Usage: ${CYAN}vibe update run${NC} [options]"
     echo ""
     echo "Synchronizes Vibe distribution from current repo to ${CYAN}~/.vibe${NC}:"
-    echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills"
+    echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills, supervisor"
     echo "  • Cleans: stale files not in source"
     echo "  • Preserves: config/keys.env, settings.yaml"
     echo "  • Idempotent: safe to run multiple times"
@@ -114,7 +114,7 @@ _update_run() {
     log_success "Pre-flight checks passed"
 
     # Sync core components
-    for dir in bin lib lib3 config scripts src skills; do
+    for dir in bin lib lib3 config scripts src skills supervisor; do
         _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
             log_error "Failed to sync $dir"
             exit 1

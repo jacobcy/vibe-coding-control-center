@@ -7,7 +7,7 @@
 # 安装时由 scripts/install.sh 生成 ~/.vibe/settings.yaml 覆盖全局路径
 paths:
   # Policies 目录（包含 plan/run/review 的策略文件）
-  policies_root: ".agent/policies"
+  policies_root: "supervisor/policies"
 
 # Flow 配置
 # 控制流程管理行为

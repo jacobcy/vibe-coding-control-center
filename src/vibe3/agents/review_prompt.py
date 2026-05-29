@@ -24,6 +24,7 @@ from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.review import ReviewRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.resources.runtime_assets import resolve_runtime_asset
 
 ReviewPromptMode = Literal["first", "retry"]
 
@@ -51,7 +52,7 @@ def build_policy_section(policy_path: str) -> str:
     """
     log = logger.bind(domain="context_builder", action="build_policy_section")
     try:
-        content = Path(policy_path).read_text(encoding="utf-8")
+        content = resolve_runtime_asset(policy_path).read_text(encoding="utf-8")
         log.success("Policy section built")
         return content
     except OSError as e:
@@ -73,7 +74,7 @@ def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
         return None
 
     log = logger.bind(domain="context_builder", action="build_tools_guide_section")
-    path = Path(tools_guide_path)
+    path = resolve_runtime_asset(tools_guide_path)
     if not path.exists():
         return None
 

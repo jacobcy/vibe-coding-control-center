@@ -52,7 +52,7 @@ Core runtime configuration:
 Prompt configuration has three separate sources of truth:
 
 - `config/v3/settings.yaml`: runtime selectors and execution configuration.
-  It owns agent presets, policy/common rule paths, and orchestra template keys
+  It owns agent presets, standard policy/common rule paths, and orchestra template keys
   such as `orchestra.governance.prompt_template`. It does NOT own supervisor
   material paths — those have migrated to `prompt-recipes.yaml`.
 - `config/prompts/prompts.yaml`: prompt text and template bodies. It owns
@@ -63,6 +63,10 @@ Prompt configuration has three separate sources of truth:
   sources. It owns which sections are assembled for each role variant, and where
   supervisor materials come from (`section_recipe` with source declarations or
   `template_recipe` with `material_catalog`).
+- `supervisor/`: standard runtime materials synced to `~/.vibe/supervisor/`
+  by `vibe update run`. Cross-project execution reads these mechanism-bound
+  assets from the global distribution; project-specific behavior belongs in
+  skills, not supervisor material overrides.
 
 Key changes after prompt config unification:
 - **manager**: supervisor content from `manager.default.first.bootstrap.sections[].source`

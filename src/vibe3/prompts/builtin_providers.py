@@ -12,6 +12,7 @@ from loguru import logger
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
+from vibe3.resources.runtime_assets import resolve_runtime_asset
 
 
 def resolve_skill_content(
@@ -59,7 +60,7 @@ def _resolve_literal(src: PromptVariableSource) -> str:
 def _resolve_file(src: PromptVariableSource) -> str:
     if not src.path:
         return ""
-    path = Path(src.path)
+    path = resolve_runtime_asset(src.path)
     if not path.exists():
         logger.bind(domain="prompt_assembly").warning(
             f"File source not found: {src.path}"
