@@ -1,6 +1,6 @@
 ---
 name: vibe-roadmap
-description: Use when the user wants project-level roadmap planning, version goals, or backlog triage. Do not use for assignee pool governance or single-flow execution.
+description: Use when the user wants project-level roadmap planning, version goals, backlog triage, or to review and correct assignee-pool's automated roadmap/priority/rfc decisions. Do not use for entry intake/assignment (use vibe-orchestra) or single-flow execution.
 ---
 
 # /vibe-roadmap - 版本规划与 Backlog Triage
@@ -20,11 +20,12 @@ description: Use when the user wants project-level roadmap planning, version goa
 - Issue 分类与 milestone 分配
 - Roadmap/priority labels 设置
 - Backlog triage（哪些 issue 进入规划）
+- **对标 assignee-pool**：审查并纠正其自动决策（`roadmap/*`、`priority/*`、rfc/split 的错漏），作为 pool 的人类纠偏层（可 override pool 的决策）
 
 **不做**：
-- 执行层管理（由 `vibe-orchestra` 负责）
-- RFC issues 处理（由 `vibe-task` 负责）
-- Blocked issues 处理（由 `vibe-task` 负责）
+- 入口 intake 与 serve 监控（由 `vibe-orchestra` 负责，对标 `roadmap-intake`）
+- 单 flow 执行
+- RFC/blocked 的只读 surface 提醒（由 `vibe-task` 负责）——但 vibe-roadmap **可纠正** pool 对 rfc 的决策（见上）
 
 ## Workflow
 
@@ -87,13 +88,13 @@ RFC (需讨论)
 
 ## 与其他 Skills 的区别
 
-- **vibe-roadmap**: 版本规划和 backlog triage
-- **vibe-orchestra**: assignee issue pool 管理（运行中的 issues）
-- **vibe-task**: RFC 和 blocked issues 检查（问题 issue）
+- **vibe-roadmap**: 版本规划 + 纠正 assignee-pool 的自动决策（pool 的人类对标）
+- **vibe-orchestra**: 入口 intake（筛 broader repo 打 assignee）+ serve 监控（roadmap-intake 的人类对标）
+- **vibe-task**: surface RFC/blocked，提请人类关注（只读，不做决策）
 
 ## Restrictions
 
-- 不处理执行层管理
-- 不看 RFC 或 blocked issues（转给 `vibe-task`）
+- 不处理入口 intake / serve 监控（由 `vibe-orchestra` 负责）
+- 不做 RFC/blocked 的只读 surface（由 `vibe-task` 负责）；但可纠正 pool 的 rfc/决策
 - 不根据当前 runtime 现场做即时抢占排序（由 `vibe-orchestra` 负责）
 - 所有操作通过 GitHub labels，不在本地存储
