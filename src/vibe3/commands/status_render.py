@@ -332,10 +332,52 @@ def render_epic_items(epic_items: list[dict[str, object]]) -> None:
             title = cast(str, item["title"])
             state = cast(IssueState | None, item["state"])
             flow = cast(FlowStatusResponse | None, item["flow"])
+            dep_status = cast(dict[str, object] | None, item.get("dep_status"))
 
-            state_str = state.value.upper() if state else "NO STATE"
             display_title = title[:60] + ("..." if len(title) > 60 else "")
-            console.print(f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}")
+
+            # Determine state display with dependency awareness
+            if dep_status:
+                total = cast(int, dep_status["total"])
+                is_ready = cast(bool, dep_status["is_ready"])
+                summary_text = cast(str, dep_status["summary_text"])
+                items = cast(list[dict[str, object]], dep_status["items"])
+
+                if total == 0:
+                    # No dependencies - show as OPEN (not BLOCKED)
+                    state_str = state.value.upper() if state else "NO STATE"
+                    console.print(
+                        f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}"
+                    )
+                elif is_ready:
+                    # All dependencies complete - show as READY
+                    console.print(
+                        f"  #{number:4}  [green]✓ READY    [/]  {display_title}"
+                    )
+                    # Show dependency summary
+                    console.print(f"         [dim]{summary_text}[/]")
+                else:
+                    # Some incomplete - show as WAITING
+                    console.print(
+                        f"  #{number:4}  [yellow]⏳ WAITING  [/]  {display_title}"
+                    )
+                    # Show dependency summary with per-issue status
+                    console.print(f"         [dim]{summary_text}[/]")
+                    # Show individual dependency status
+                    for dep_item in items:
+                        dep_num = cast(int, dep_item["number"])
+                        dep_state = cast(str, dep_item["state"])
+                        dep_completed = cast(bool, dep_item["completed"])
+                        status_icon = "✓" if dep_completed else "○"
+                        status_color = "green" if dep_completed else "dim"
+                        dep_line = f"         [{status_color}]{status_icon} #{dep_num}"
+                        console.print(f"{dep_line} ({dep_state})[/]")
+            else:
+                # No dependency status - use original behavior
+                state_str = state.value.upper() if state else "NO STATE"
+                console.print(
+                    f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}"
+                )
 
             if flow:
                 console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")

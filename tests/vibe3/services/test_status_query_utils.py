@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from vibe3.models.orchestration import IssueState
 from vibe3.services.status_query_service import (
     StatusQueryService,
+    _parse_dependencies_from_body,
     is_auto_task_branch,
     is_canonical_task_branch,
     issue_priority,
@@ -294,3 +295,207 @@ class TestRemoteField:
         assert len(result) == 1
         assert result[0]["remote"] is True
         assert result[0]["state"] == IssueState.MERGE_READY
+
+
+class TestParseDependenciesFromBody:
+    """Tests for _parse_dependencies_from_body function."""
+
+    def test_standard_dependencies_section(self) -> None:
+        """Should parse standard ## Dependencies section."""
+        body = """## Summary
+This is an epic.
+
+## Dependencies
+- Blocked by #123 (need API)
+- Blocked by #456 (need DB)
+
+## Notes
+Some notes.
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == [123, 456]
+
+    def test_mixed_format(self) -> None:
+        """Should handle various formats within dependencies section."""
+        body = """## Dependencies
+- Blocked by #100
+- #200 (another format)
+- Blocked by #300 (with description)
+"""
+        result = _parse_dependencies_from_body(body)
+        # Should find all issue numbers
+        assert 100 in result
+        assert 200 in result
+        assert 300 in result
+
+    def test_no_dependencies_section(self) -> None:
+        """Should return empty list if no ## Dependencies section."""
+        body = """## Summary
+This is an epic.
+
+## Notes
+Some notes.
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == []
+
+    def test_empty_dependencies_section(self) -> None:
+        """Should return empty list if dependencies section is empty."""
+        body = """## Dependencies
+
+## Notes
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == []
+
+    def test_ignores_references_outside_section(self) -> None:
+        """Should only parse issue numbers inside ## Dependencies section."""
+        body = """## Summary
+This references #999.
+
+## Dependencies
+- Blocked by #123
+
+## Notes
+Also references #888.
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == [123]
+        assert 999 not in result
+        assert 888 not in result
+
+    def test_empty_body(self) -> None:
+        """Should handle empty body."""
+        result = _parse_dependencies_from_body("")
+        assert result == []
+
+    def test_none_body(self) -> None:
+        """Should handle None body."""
+        result = _parse_dependencies_from_body(None)  # type: ignore
+        assert result == []
+
+    def test_deduplication(self) -> None:
+        """Should deduplicate issue numbers."""
+        body = """## Dependencies
+- Blocked by #123
+- Blocked by #123 (duplicate)
+- Blocked by #456
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == [123, 456]
+
+    def test_section_ended_by_next_header(self) -> None:
+        """Should stop parsing at next section header."""
+        body = """## Dependencies
+- Blocked by #100
+
+## Notes
+- Blocked by #200
+"""
+        result = _parse_dependencies_from_body(body)
+        assert result == [100]
+        assert 200 not in result
+
+
+class TestCheckEpicDependencyStatus:
+    """Tests for check_epic_dependency_status method."""
+
+    def _make_mock_service(self) -> StatusQueryService:
+        """Create a StatusQueryService with mocked dependencies."""
+        github_mock = MagicMock()
+        git_mock = MagicMock()
+        store_mock = MagicMock()
+        return StatusQueryService(
+            github_client=github_mock,
+            git_client=git_mock,
+            store=store_mock,
+        )
+
+    def test_all_dependencies_closed(self) -> None:
+        """All dependencies CLOSED -> completed == total, is_ready == True."""
+        service = self._make_mock_service()
+        service.github.get_issue_body.return_value = """## Dependencies
+- Blocked by #100
+- Blocked by #200
+"""
+        service.github.view_issue.side_effect = [
+            {"number": 100, "state": "CLOSED"},
+            {"number": 200, "state": "CLOSED"},
+        ]
+
+        result = service.check_epic_dependency_status(1)
+
+        assert result["total"] == 2
+        assert result["completed"] == 2
+        assert result["is_ready"] is True
+        assert "✓" in result["summary_text"]
+
+    def test_some_dependencies_open(self) -> None:
+        """Some OPEN dependencies -> completed < total, is_ready == False."""
+        service = self._make_mock_service()
+        service.github.get_issue_body.return_value = """## Dependencies
+- Blocked by #100
+- Blocked by #200
+"""
+        service.github.view_issue.side_effect = [
+            {"number": 100, "state": "CLOSED"},
+            {"number": 200, "state": "OPEN"},
+        ]
+
+        result = service.check_epic_dependency_status(1)
+
+        assert result["total"] == 2
+        assert result["completed"] == 1
+        assert result["is_ready"] is False
+        assert "⏳" in result["summary_text"]
+
+    def test_no_dependencies(self) -> None:
+        """No dependencies -> total == 0, is_ready == False."""
+        service = self._make_mock_service()
+        service.github.get_issue_body.return_value = """## Summary
+No dependencies here.
+"""
+
+        result = service.check_epic_dependency_status(1)
+
+        assert result["total"] == 0
+        assert result["completed"] == 0
+        assert result["is_ready"] is False
+        assert result["summary_text"] == "No dependencies"
+
+    def test_deleted_dependency(self) -> None:
+        """Deleted/inaccessible dependency should be skipped."""
+        service = self._make_mock_service()
+        service.github.get_issue_body.return_value = """## Dependencies
+- Blocked by #100
+- Blocked by #999 (deleted)
+"""
+        service.github.view_issue.side_effect = [
+            {"number": 100, "state": "CLOSED"},
+            None,  # Deleted issue
+        ]
+
+        result = service.check_epic_dependency_status(1)
+
+        assert result["total"] == 2
+        # Only #100 is completed, #999 is DELETED (not completed)
+        assert result["completed"] == 1
+        assert result["is_ready"] is False
+
+    def test_network_error_on_dependency(self) -> None:
+        """Network error should be treated as inaccessible."""
+        service = self._make_mock_service()
+        service.github.get_issue_body.return_value = """## Dependencies
+- Blocked by #100
+- Blocked by #200
+"""
+        service.github.view_issue.side_effect = [
+            {"number": 100, "state": "CLOSED"},
+            "network_error",
+        ]
+
+        result = service.check_epic_dependency_status(1)
+
+        assert result["total"] == 2
+        assert result["completed"] == 1
+        assert result["is_ready"] is False

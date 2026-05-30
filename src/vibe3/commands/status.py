@@ -260,6 +260,9 @@ def status(
     ]
     roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
 
+    # Enrich epic items with dependency completion status
+    roadmap_epic_items = query_service.enrich_epic_items(roadmap_epic_items)
+
     # Split missing state items into two categories:
     # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
     # 2. Governed but anomaly (has orchestra-governed label) - needs attention
