@@ -15,3 +15,15 @@ def test_vibe_center_repo_config():
 
     assert config["profile"] == "vibe-center"
     assert config["adapter"] == "vibe-center"
+
+
+def test_supplementary_loading_from_external_cwd(tmp_path: Path, monkeypatch) -> None:
+    """Verify that supplementary data is loaded when CWD is external."""
+    from vibe3.config.settings import VibeConfig
+
+    monkeypatch.chdir(tmp_path)
+    config = VibeConfig.get_defaults()
+    # Verify supplementary fields are populated
+    assert config.doc_limits, "doc_limits should be loaded from loc_limits.yaml"
+    assert config.review.review_task, "review_task should be loaded from prompts.yaml"
+    assert config.plan.plan_task, "plan_task should be loaded from prompts.yaml"

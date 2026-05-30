@@ -112,6 +112,13 @@ def test_get_defaults_prefers_v3_settings_path(tmp_path: Path, monkeypatch) -> N
     assert config.flow.protected_branches == ["v3-main"]
 
 
+def test_get_defaults_from_external_cwd(tmp_path: Path, monkeypatch) -> None:
+    """get_defaults() works when CWD has no config/v3/settings.yaml."""
+    monkeypatch.chdir(tmp_path)
+    config = VibeConfig.get_defaults()
+    assert config.plan.agent_config.agent is not None
+
+
 def test_dependencies_loader_reads_v3_path(tmp_path: Path, monkeypatch) -> None:
     """The dependencies helper should not require root config/dependencies.toml."""
     config_dir = tmp_path / "config" / "v3"

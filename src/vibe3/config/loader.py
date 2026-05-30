@@ -8,7 +8,7 @@ from typing import Any, cast
 import yaml
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config.settings import VibeConfig, _vibe3_config_root
 from vibe3.exceptions import ConfigError
 
 
@@ -129,7 +129,8 @@ def find_config_file() -> Path | None:
     1. .vibe/config.yaml (project-specific)
     2. config/v3/settings.yaml (new default config)
     3. config/settings.yaml (deprecated fallback)
-    4. ~/.vibe/config.yaml (global config)
+    4. config/v3/settings.yaml (vibe3 installation root fallback)
+    5. ~/.vibe/config.yaml (global config)
 
     Returns:
         Path to config file or None if not found
@@ -158,6 +159,15 @@ def find_config_file() -> Path | None:
             "Please migrate to config/v3/settings.yaml"
         )
         return old_config
+
+    # Check vibe3 installation root as fallback (for cross-project invocation)
+    import_root = _vibe3_config_root()
+    root_config = import_root / "config" / "v3" / "settings.yaml"
+    if root_config.exists() and root_config.resolve() != new_config.resolve():
+        logger.bind(domain="config", action="find", path=str(root_config)).debug(
+            "Found vibe3 installation config"
+        )
+        return root_config
 
     # Check global config
     global_config = Path.home() / ".vibe" / "config.yaml"
@@ -201,6 +211,8 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
         # If explicit config_path is provided, treat it as highest priority
         # Otherwise, use repo fallback as base
         repo_config_path = Path("config/v3/settings.yaml")
+        if not repo_config_path.exists():
+            repo_config_path = _vibe3_config_root() / "config" / "v3" / "settings.yaml"
 
         # Check if config_path is auto-detected or explicit
         auto_detected = find_config_file()
@@ -233,7 +245,8 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
 
         # Apply supplementary loading (loc_limits + prompts)
         # This ensures we don't bypass VibeConfig.from_yaml() semantics
-        config_data = VibeConfig._load_supplementary(config_data)
+        # Pass repo_config_path as base for resolving supplementary files
+        config_data = VibeConfig._load_supplementary(config_data, repo_config_path)
 
         try:
             config = VibeConfig(**config_data)

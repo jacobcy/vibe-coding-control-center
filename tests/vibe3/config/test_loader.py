@@ -237,3 +237,14 @@ class TestLoadConfig:
 
         with pytest.raises(ConfigError, match="Invalid YAML"):
             load_config()
+
+    def test_load_config_from_external_cwd(self, tmp_path: Path, monkeypatch) -> None:
+        """Config loading works when CWD has no vibe3 config files."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+        # tmp_path is empty — no .vibe/, no config/v3/ — simulating external project
+        config = load_config()
+        # Should have agent_config from vibe3 installation defaults
+        assert config.plan.agent_config.agent is not None
+        assert config.run.agent_config.agent is not None
+        assert config.review.agent_config.agent is not None
