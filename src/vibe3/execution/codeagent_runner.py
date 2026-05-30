@@ -1,5 +1,7 @@
 """Sync codeagent execution utilities for command-mode role entrypoints."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -7,18 +9,17 @@ from typing import TYPE_CHECKING, cast
 from loguru import logger
 from typer import echo
 
-from vibe3.agents.backends.codeagent import AgentResult, CodeagentBackend
-from vibe3.agents.models import (
-    CodeagentCommand,
-    CodeagentResult,
-    ExecutionRole,
-    create_codeagent_command,
-)
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 
 if TYPE_CHECKING:
     from loguru import Logger
+
+    from vibe3.agents.backends.codeagent import AgentResult
+    from vibe3.agents.models import (
+        CodeagentCommand,
+        CodeagentResult,
+    )
 from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
@@ -32,14 +33,6 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.actor_support import format_agent_actor
 from vibe3.services.handoff_service import HandoffService
-
-__all__ = [
-    "ExecutionRole",
-    "CodeagentCommand",
-    "CodeagentResult",
-    "create_codeagent_command",
-    "CodeagentExecutionService",
-]
 
 
 @dataclass
@@ -283,6 +276,7 @@ class CodeagentExecutionService:
         agent_result: AgentResult,
     ) -> Path | None:
         """Finalize sync execution: handoff, lifecycle, gate."""
+
         log = logger.bind(
             domain="codeagent",
             role=command.role,
@@ -381,6 +375,9 @@ class CodeagentExecutionService:
 
     def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
         """Execute codeagent synchronously."""
+        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents.models import CodeagentResult
+
         log = logger.bind(
             domain="codeagent",
             role=command.role,
@@ -538,6 +535,11 @@ class CodeagentExecutionService:
         cwd: Path | None = None,
     ) -> CodeagentResult:
         """Execute a sync worker request through the unified execution shell."""
+        from vibe3.agents.models import (
+            ExecutionRole,
+            create_codeagent_command,
+        )
+
         role = cast(ExecutionRole, request.role)
         command = create_codeagent_command(
             role=role,

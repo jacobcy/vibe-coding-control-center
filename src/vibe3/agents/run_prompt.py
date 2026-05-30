@@ -14,7 +14,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
-from vibe3.execution.prompt_meta import PromptContextMode
+from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
