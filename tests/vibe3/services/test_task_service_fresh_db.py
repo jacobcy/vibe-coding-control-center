@@ -79,10 +79,18 @@ def test_reclassify_issue_moves_task_link_to_related_on_fresh_db(tmp_path):
     assert status.task_issue_number is None
 
 
-def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
+def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path, monkeypatch):
     """Binding a new task flow should demote older task flows to related."""
     db_path = tmp_path / "fresh.db"
     store = SQLiteClient(db_path=str(db_path))
+
+    # Mock GitClient to return True for branch_exists (for vibe-task label auto-mirror)
+    monkeypatch.setattr(
+        "vibe3.clients.git_client.GitClient",
+        lambda: type(
+            "MockGitClient", (), {"branch_exists": lambda self, branch: True}
+        )(),
+    )
 
     store.update_flow_state("task/issue-467", flow_slug="issue-467", flow_status="done")
     store.add_issue_link("task/issue-467", 467, "task")
@@ -160,7 +168,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
         def add_issue_label(self, issue_number: int, label: str) -> bool:
             self.calls.append(("add", issue_number, label))
             assert issue_number == 467
-            assert label in {"supervisor", "state/handoff"}
+            assert label in {"supervisor", "state/handoff", "vibe-task"}
             return True
 
         def get_issue_labels(self, issue_number: int):
@@ -199,6 +207,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
     assert any(flow["branch"] == "task/issue-467" for flow in related_flows)
     assert ("add", 467, "supervisor") in label_port.calls
     assert ("add", 467, "state/handoff") in label_port.calls
+    assert ("add", 467, "vibe-task") in label_port.calls  # Auto-mirrored
     assert ("remove", 467, "state/claimed") in label_port.calls
 
 

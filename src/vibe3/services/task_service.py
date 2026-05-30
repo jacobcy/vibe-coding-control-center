@@ -149,6 +149,17 @@ class TaskService:
                 refs={"issue_number": issue_number, "role": role},
             )
 
+        # Auto-mirror vibe-task label for task role
+        # Only add label if the branch actually exists (true local flow)
+        if role == "task":
+            from vibe3.clients.git_client import GitClient
+
+            git = GitClient()
+            if git.branch_exists(normalized_branch):
+                self._get_label_service().confirm_vibe_task(
+                    issue_number, should_exist=True
+                )
+
         # Demote superseded flows AFTER successful link
         if role == "task" and superseded_flows:
             self._demote_superseded_flows(
@@ -385,6 +396,10 @@ class TaskService:
             config = self._get_orchestra_config()
             self._issue_label_port = GhIssueLabelPort(repo=config.repo)
         return self._issue_label_port
+
+    def _get_label_service(self) -> LabelService:
+        """Get or create LabelService instance."""
+        return LabelService(issue_port=self._get_issue_label_port())
 
     def get_task(self, branch: str) -> FlowStatusResponse | None:
         """Get task (flow) details."""
