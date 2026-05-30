@@ -147,7 +147,9 @@ skill 可以引用本文档，但不应各自重写一套 handoff 宪法。
 - 不得让 skill 通过自由文案发明新的 handoff 规则
 - 不得把"用户没要求更新 handoff"当作放弃修正过时 handoff 的理由
 
-## 9. Migration from V2
+## 9. Legacy (Migration from V2)
+
+以下内容仅供从 V2 迁移时参考，V3 原生开发可忽略。
 
 V2 到 V3 handoff 系统的关键变化：
 
