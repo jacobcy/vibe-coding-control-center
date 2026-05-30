@@ -40,7 +40,7 @@ class CoverageService:
         Returns:
             Dict of layer name -> threshold percentage
         """
-        from vibe3.config.loader import get_config
+        from vibe3.config import get_config
 
         config = get_config()
         tc = config.quality.test_coverage
