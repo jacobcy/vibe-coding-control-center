@@ -40,8 +40,8 @@ class TestRetryCounterPersistence:
 
         # Execute with mock
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch("vibe3.services.role_policy_helpers.block_executor_noop_issue"),
+            patch("vibe3.clients.GitHubClient") as mock_gh,
+            patch("vibe3.services.issue_failure_service.block_executor_noop_issue"),
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
@@ -75,8 +75,8 @@ class TestRetryCounterPersistence:
 
         # Execute with mock
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch("vibe3.services.role_policy_helpers.block_executor_noop_issue"),
+            patch("vibe3.clients.GitHubClient") as mock_gh,
+            patch("vibe3.services.issue_failure_service.block_executor_noop_issue"),
         ):
             mock_gh.return_value.view_issue.return_value = None  # Malformed response
 
@@ -114,7 +114,7 @@ class TestRetryCounterPersistence:
         flow_state = temp_db.get_flow_state(branch)
 
         # Execute with mock
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.return_value = {
                 "labels": [{"name": "state/done"}]  # State changed
             }
@@ -152,7 +152,7 @@ class TestRetryCounterPersistence:
         flow_state = temp_db.get_flow_state(branch)
 
         # Execute with mock
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
             with pytest.raises(
@@ -189,7 +189,7 @@ class TestRetryCounterPersistence:
         )
         flow_state = temp_db.get_flow_state(branch)
 
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
             with pytest.raises(

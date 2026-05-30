@@ -76,7 +76,7 @@ def test_single_step_limit_blocks_after_3_occurrences() -> None:
             "vibe3.execution.noop_gate.get_role_block_function",
             return_value=mock_block_fn,
         ),
-        patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+        patch("vibe3.clients.GitHubClient") as mock_gh,
         patch("sqlite3.connect", return_value=db_conn),
     ):
         mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -160,7 +160,7 @@ def test_single_step_limit_allows_2_occurrences() -> None:
             "vibe3.execution.noop_gate.get_role_block_function",
             return_value=mock_block_fn,
         ),
-        patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+        patch("vibe3.clients.GitHubClient") as mock_gh,
         patch("sqlite3.connect", return_value=db_conn),
     ):
         mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(

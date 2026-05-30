@@ -29,15 +29,11 @@ def mock_git_environment():
     """Ensure git environment is mocked for tests requiring it."""
     with (
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir",
+            "vibe3.clients.GitClient.get_git_common_dir",
             return_value="/tmp/.git",
         ),
-        patch(
-            "vibe3.clients.git_client.GitClient.get_worktree_root", return_value="/tmp"
-        ),
-        patch(
-            "vibe3.clients.git_client.GitClient.get_current_branch", return_value="main"
-        ),
+        patch("vibe3.clients.GitClient.get_worktree_root", return_value="/tmp"),
+        patch("vibe3.clients.GitClient.get_current_branch", return_value="main"),
     ):
         yield
 

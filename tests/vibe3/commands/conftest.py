@@ -20,14 +20,12 @@ def mock_git_client_base() -> Generator[None, None, None]:
     # Use a non-protected branch name to avoid flow protection errors
     with (
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir",
+            "vibe3.clients.GitClient.get_git_common_dir",
             return_value="/tmp/.git",
         ),
+        patch("vibe3.clients.GitClient.get_worktree_root", return_value="/tmp"),
         patch(
-            "vibe3.clients.git_client.GitClient.get_worktree_root", return_value="/tmp"
-        ),
-        patch(
-            "vibe3.clients.git_client.GitClient.get_current_branch",
+            "vibe3.clients.GitClient.get_current_branch",
             return_value="task/test-branch",
         ),
     ):

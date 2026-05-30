@@ -167,9 +167,7 @@ class TestFlowStatusResolver:
             resolver = FlowStatusResolver(store=store)
 
             # No flow in SQLite (deleted or remote machine)
-            with patch(
-                "vibe3.clients.github_client.GitHubClient"
-            ) as mock_github_client_class:
+            with patch("vibe3.clients.GitHubClient") as mock_github_client_class:
                 mock_github_client = MagicMock()
                 mock_github_client_class.return_value = mock_github_client
 

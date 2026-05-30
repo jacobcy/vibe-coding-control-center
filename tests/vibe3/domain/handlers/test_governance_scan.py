@@ -12,7 +12,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.agents.backends.codeagent.CodeagentBackend")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -52,7 +52,7 @@ class TestGovernanceScanHandler:
         )
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -105,7 +105,7 @@ class TestGovernanceScanHandler:
         assert "5" in call_args.cmd  # tick_count
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.orchestra.logging.append_governance_event")
@@ -141,7 +141,7 @@ class TestGovernanceScanHandler:
         assert "circuit breaker OPEN" in mock_append_governance_event.call_args.args[0]
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -185,7 +185,7 @@ class TestGovernanceScanHandler:
         mock_append_governance_event.assert_called()
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -231,7 +231,7 @@ class TestGovernanceScanHandler:
         "vibe3.domain.handlers.governance_scan.record_dispatch_failure_if_unexpected"
     )
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -284,7 +284,7 @@ class TestGovernanceScanHandler:
         "vibe3.domain.handlers.governance_scan.record_dispatch_failure_if_unexpected"
     )
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")

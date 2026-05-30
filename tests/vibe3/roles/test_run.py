@@ -185,7 +185,7 @@ class TestExecutorNoOpGate:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
@@ -216,7 +216,7 @@ class TestExecutorNoOpGate:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,

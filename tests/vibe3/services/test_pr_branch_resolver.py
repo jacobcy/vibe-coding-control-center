@@ -201,7 +201,7 @@ class TestCommandIntegration:
         runner = CliRunner()
 
         # Mock GitHub client
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_github_class:
+        with patch("vibe3.clients.GitHubClient") as mock_github_class:
             mock_client = Mock()
             mock_pr = Mock()
             mock_pr.head_branch = "dev/issue-476"

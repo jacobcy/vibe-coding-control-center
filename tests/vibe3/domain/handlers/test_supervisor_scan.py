@@ -10,7 +10,7 @@ class TestSupervisorScanHandler:
     """supervisor_scan handler dispatches supervisor apply via CLI self-invocation."""
 
     @patch("vibe3.orchestra.logging.append_orchestra_event")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     def test_normal_dispatch(
@@ -111,7 +111,7 @@ class TestSupervisorScanHandler:
         mock_get_store.assert_not_called()
 
     @patch("vibe3.orchestra.logging.append_orchestra_event")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     def test_dispatch_failure_logged(
@@ -145,7 +145,7 @@ class TestSupervisorScanHandler:
         mock_coordinator.dispatch_execution.assert_called_once()
 
     @patch("vibe3.orchestra.logging.append_orchestra_event")
-    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.clients.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     def test_exception_during_dispatch_logged(

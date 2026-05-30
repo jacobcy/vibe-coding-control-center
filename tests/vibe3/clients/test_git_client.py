@@ -244,7 +244,7 @@ class TestFindRepoRoot:
     def test_git_common_dir_success(self):
         """Primary path: git common dir resolves to main repo."""
         with patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir",
+            "vibe3.clients.GitClient.get_git_common_dir",
             return_value="/repos/main/.git",
         ):
             root = find_repo_root()
@@ -255,7 +255,7 @@ class TestFindRepoRoot:
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                "vibe3.clients.GitClient.get_git_common_dir",
                 side_effect=git_common_fail,
             ),
             patch.object(Path, "cwd", return_value=Path("/worktrees/wt-dev")),
@@ -274,7 +274,7 @@ class TestFindRepoRoot:
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                "vibe3.clients.GitClient.get_git_common_dir",
                 side_effect=git_common_fail,
             ),
             patch.object(Path, "cwd", return_value=Path("/worktrees/wt-dev")),
@@ -295,7 +295,7 @@ class TestFindRepoRoot:
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                "vibe3.clients.GitClient.get_git_common_dir",
                 side_effect=git_common_fail,
             ),
             patch.object(Path, "cwd", return_value=Path("/repos/main")),
@@ -310,7 +310,7 @@ class TestFindRepoRoot:
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                "vibe3.clients.GitClient.get_git_common_dir",
                 side_effect=git_common_fail,
             ),
             patch.object(Path, "cwd", return_value=Path("/some/random/dir")),

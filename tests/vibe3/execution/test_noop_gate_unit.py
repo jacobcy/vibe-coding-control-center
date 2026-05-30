@@ -28,7 +28,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -58,7 +58,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -85,7 +85,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -114,7 +114,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
@@ -138,7 +138,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_manager_noop_issue"
             ) as mock_block,
@@ -164,7 +164,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_reviewer_noop_issue"
             ) as mock_block,
@@ -191,7 +191,7 @@ class TestApplyUnifiedNoopGate:
         flow_state = {}  # Track retry count
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -225,7 +225,7 @@ class TestApplyUnifiedNoopGate:
         flow_state = {}  # Track retry count
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -259,7 +259,7 @@ class TestApplyUnifiedNoopGate:
         flow_state = {"noop_gate_github_retry_count": 3}  # Already at limit
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -295,7 +295,7 @@ class TestApplyUnifiedNoopGate:
         flow_state = {"noop_gate_malformed_retry_count": 3}  # Already at limit
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -325,7 +325,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
@@ -401,7 +401,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,

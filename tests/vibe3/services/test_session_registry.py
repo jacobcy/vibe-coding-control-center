@@ -239,7 +239,7 @@ def test_reconcile_live_state_releases_supervisor_temp_worktree(
         patch(
             "vibe3.config.orchestra_settings.load_orchestra_config",
         ) as mock_load_config,
-        patch("vibe3.clients.git_client.GitClient") as mock_git_cls,
+        patch("vibe3.clients.GitClient") as mock_git_cls,
         patch("vibe3.environment.worktree.WorktreeManager") as mock_wt_cls,
     ):
         mock_load_config.return_value = MagicMock()

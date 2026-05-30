@@ -83,7 +83,7 @@ class TestGitStateIndependence:
         mock_git = MagicMock()
         mock_git.get_changed_files.return_value = []
 
-        with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
+        with patch("vibe3.clients.GitClient", return_value=mock_git):
             with patch(
                 "vibe3.utils.git_helpers.get_current_branch", return_value="test-branch"
             ):

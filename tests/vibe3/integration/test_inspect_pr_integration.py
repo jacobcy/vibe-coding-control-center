@@ -207,7 +207,7 @@ def test_build_pr_analysis_commit_count_error():
             "vibe3.services.pr_analysis_service._calculate_risk_score",
             return_value={"score": 1},
         ),
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
         # Mock _fetch_pr_commit_shas to raise (called inside real _get_pr_commit_count)
         patch(
             "vibe3.services.pr_analysis_service._fetch_pr_commit_shas",
@@ -254,7 +254,7 @@ def test_build_pr_analysis_dataclass_fields():
         patch(
             "vibe3.services.pr_analysis_service._get_pr_commit_count", return_value=1
         ),
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
     ):
         mock_dag_result = MagicMock()
         mock_dag_result.impacted_modules = []

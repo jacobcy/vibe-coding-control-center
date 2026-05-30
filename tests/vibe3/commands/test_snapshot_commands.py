@@ -40,7 +40,7 @@ def test_snapshot_save_as_baseline_json_outputs_saved_baseline(monkeypatch):
 
     fake_git = MagicMock()
     fake_git.get_current_branch.return_value = "feature/test"
-    monkeypatch.setattr("vibe3.clients.git_client.GitClient", lambda: fake_git)
+    monkeypatch.setattr("vibe3.clients.GitClient", lambda: fake_git)
     monkeypatch.setattr(
         snapshot_command.snapshot_service,
         "save_branch_baseline",

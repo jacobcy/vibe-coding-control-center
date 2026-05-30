@@ -116,7 +116,7 @@ def _make_flow_state(
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.services.check_service.CheckService")
-@patch("vibe3.clients.git_client.GitClient")
+@patch("vibe3.clients.GitClient")
 def test_flow_status_default_filters_active(
     _mock_git_client,
     mock_check_service,
@@ -148,7 +148,7 @@ def test_flow_status_default_filters_active(
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.services.check_service.CheckService")
-@patch("vibe3.clients.git_client.GitClient")
+@patch("vibe3.clients.GitClient")
 def test_flow_status_all_includes_terminal_states(
     _mock_git_client,
     mock_check_service,
@@ -174,7 +174,7 @@ def test_flow_status_all_includes_terminal_states(
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.commands.common.execute_check_mode")
-@patch("vibe3.clients.git_client.GitClient")
+@patch("vibe3.clients.GitClient")
 def test_flow_status_check_runs_verification(
     _mock_git_client,
     mock_execute_check_mode,
@@ -208,7 +208,7 @@ def test_flow_status_check_runs_verification(
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.commands.common.execute_check_mode")
-@patch("vibe3.clients.git_client.GitClient")
+@patch("vibe3.clients.GitClient")
 def test_flow_status_check_surfaces_check_warning(
     _mock_git_client,
     mock_execute_check_mode,

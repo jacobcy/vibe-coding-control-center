@@ -45,7 +45,7 @@ class TestDatabaseErrorDoesNotTriggerBlock:
         temp_db.update_flow_state(branch, flow_slug="test")
         flow_state = temp_db.get_flow_state(branch)
 
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.return_value = {
                 "labels": [{"name": "state/running"}]
             }
@@ -100,7 +100,7 @@ class TestAgentNoopTriggersBlock:
         flow_state = temp_db.get_flow_state(branch)
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
@@ -138,7 +138,7 @@ class TestGitHubAPIFailureNoBlock:
         flow_state = temp_db.get_flow_state(branch)
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("vibe3.clients.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
@@ -169,7 +169,7 @@ class TestGitHubAPIFailureNoBlock:
         )
         flow_state = temp_db.get_flow_state(branch)
 
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub timeout")
 
             with pytest.raises(GitHubAPIError):

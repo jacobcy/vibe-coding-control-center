@@ -108,7 +108,7 @@ class TestOrchestrationFacade:
         assert isinstance(event, GovernanceScanStarted)
         assert event.tick_count == 1
 
-    @patch("vibe3.clients.github_client.GitHubClient.add_comment")
+    @patch("vibe3.clients.GitHubClient.add_comment")
     def test_on_governance_decision_posts_comment(
         self,
         mock_add_comment: MagicMock,
@@ -162,7 +162,7 @@ class TestOrchestrationFacade:
         "vibe3.roles.supervisor.get_handoff_state_label", return_value="state/handoff"
     )
     @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.clients.github_client.GitHubClient.list_issues")
+    @patch("vibe3.clients.GitHubClient.list_issues")
     @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     async def test_on_supervisor_scan_publishes_supervisor_issue_identified(
         self,
@@ -204,7 +204,7 @@ class TestOrchestrationFacade:
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.clients.github_client.GitHubClient.list_issues")
+    @patch("vibe3.clients.GitHubClient.list_issues")
     @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
     async def test_on_supervisor_scan_skips_missing_labels(
         self,

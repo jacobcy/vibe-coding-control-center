@@ -66,7 +66,7 @@ def test_run_pytest_cov_success(
         cov_file.write_text(json.dumps(sample_coverage_data))
         return mock_result
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+    with patch("vibe3.clients.GitClient") as mock_git:
         mock_git.return_value.get_current_branch.return_value = "test-branch"
         with patch("subprocess.run", side_effect=fake_subprocess_run):
             data = coverage_service._run_pytest_cov()
@@ -82,7 +82,7 @@ def test_run_pytest_cov_failure(
     """Test _run_pytest_cov when pytest fails."""
     coverage_service.project_root = mock_project_root
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+    with patch("vibe3.clients.GitClient") as mock_git:
         mock_git.return_value.get_current_branch.return_value = "test-branch"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="", stderr="error", returncode=1)
@@ -112,7 +112,7 @@ def test_subprocess_command_construction(
         cov_file.write_text(json.dumps(sample_coverage_data))
         return MagicMock(stdout="", stderr="", returncode=0)
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+    with patch("vibe3.clients.GitClient") as mock_git:
         mock_git.return_value.get_current_branch.return_value = "test-branch"
         with patch("subprocess.run", side_effect=fake_subprocess_run) as mock_run:
             coverage_service._run_pytest_cov()
@@ -208,7 +208,7 @@ class TestRunCoverageCheck:
             cov_file.write_text(json.dumps(sample_coverage_data))
             return mock_result
 
-        with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        with patch("vibe3.clients.GitClient") as mock_git:
             mock_git.return_value.get_current_branch.return_value = "test-branch"
             with patch("subprocess.run", side_effect=fake_subprocess_run):
                 report = coverage_service.run_coverage_check()
@@ -269,7 +269,7 @@ class TestRunCoverageCheck:
             cov_file.write_text(json.dumps(low_coverage_data))
             return mock_result
 
-        with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        with patch("vibe3.clients.GitClient") as mock_git:
             mock_git.return_value.get_current_branch.return_value = "test-branch"
             with patch("subprocess.run", side_effect=fake_subprocess_run):
                 report = coverage_service.run_coverage_check()
@@ -310,7 +310,7 @@ class TestRunCoverageCheck:
             cov_file.write_text(json.dumps(empty_data))
             return mock_result
 
-        with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        with patch("vibe3.clients.GitClient") as mock_git:
             mock_git.return_value.get_current_branch.return_value = "test-branch"
             with patch("subprocess.run", side_effect=fake_subprocess_run):
                 report = coverage_service.run_coverage_check()

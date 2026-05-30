@@ -115,7 +115,7 @@ def test_remove_worktree_falls_back_to_prune_on_failure() -> None:
         "worktree remove", "fatal: validation failed"
     )
 
-    with patch("vibe3.clients.git_worktree_ops.prune_worktrees") as mock_prune:
+    with patch("vibe3.clients.prune_worktrees") as mock_prune:
         results: dict[str, bool] = {"worktree": True}
         service._remove_worktree("task/issue-123", results)
 
