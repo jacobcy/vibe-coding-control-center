@@ -23,10 +23,10 @@ from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.domain.failed_gate import FailedGate
+    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-    from vibe3.orchestra.protocols import FlowManagerProtocol
 
 
 class OrchestrationFacade(ServiceBase):
