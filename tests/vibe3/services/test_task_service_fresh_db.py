@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.models.pr import PRResponse, PRState

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.exceptions import UserError
 from vibe3.services.handoff_storage import HandoffStorage
 

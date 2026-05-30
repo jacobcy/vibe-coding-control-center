@@ -4,7 +4,7 @@ Reuses issue_branch_resolver for numeric resolution with flow lookup,
 adds current-branch fallback for None input.
 """
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 

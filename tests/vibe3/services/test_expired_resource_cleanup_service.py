@@ -6,8 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.services.expired_resource_cleanup_service import (
     ExpiredResourceCleanupService,
 )

@@ -8,15 +8,17 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_issues_ops import parse_blocked_by
-from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients import (
+    GitClient,
+    GitHubClient,
+    GitHubClientProtocol,
+    parse_blocked_by,
+)
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
-from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.services.pr_service import PRService
 from vibe3.services.status_query_service import (
     extract_primary_assignee_login,

@@ -9,8 +9,7 @@ from loguru import logger
 from vibe3.models.orchestra_config import OrchestraConfig
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.models.orchestration import IssueInfo
     from vibe3.orchestra.protocols import FlowManagerProtocol
 

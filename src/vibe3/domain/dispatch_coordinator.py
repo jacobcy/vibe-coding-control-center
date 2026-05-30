@@ -19,7 +19,8 @@ from typing import TYPE_CHECKING, Callable, cast
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
+from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.protocols.dispatch_protocols import (
     IssueCollectionServiceProtocol,
@@ -56,10 +57,9 @@ from vibe3.services.label_utils import (
     clean_old_state_labels,
     should_skip_from_queue,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.roles.definitions import TriggerableRoleDefinition
 

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.blocked_state_io import BlockedStateIO
 from vibe3.services.blocked_state_types import BlockedState, ConsistencyReport
@@ -23,7 +23,7 @@ from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class BlockedStateService:

@@ -7,9 +7,7 @@ from vibe3.models.pr import PRState
 
 def _make_check_pr_service():
     """Create a CheckPRService instance with mocked dependencies."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.check_pr_service import CheckPRService
     from vibe3.services.flow_status_service import FlowStatusService
 

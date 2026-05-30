@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.execution.execution_lifecycle import (
     ExecutionLifecycleService,
     persist_execution_lifecycle_event,

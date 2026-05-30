@@ -3,8 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.services.flow_service import FlowService
 
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.exceptions.error_severity import ErrorSeverity
     from vibe3.execution.contracts import ExecutionLaunchResult
 
@@ -76,7 +76,7 @@ def record_dispatch_failure_if_unexpected(
 
     # Handle exception-level failures
     if exception is not None:
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         error_message = (
             f"{dispatch_source} {role} dispatch failed [exception]: {exception}"
@@ -109,7 +109,7 @@ def record_dispatch_failure_if_unexpected(
     if reason_code in ("capacity_full", "duplicate_dispatch"):
         return
 
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     # Include dispatch_source marker and reason_code for disambiguation
     reason_detail = result.reason or "(no detail)"

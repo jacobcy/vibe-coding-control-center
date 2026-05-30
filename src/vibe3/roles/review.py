@@ -245,7 +245,7 @@ def build_review_sync_request(
     dry_run: bool,
     show_prompt: bool,
 ) -> ExecutionRequest:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     return build_issue_review_request(
@@ -416,7 +416,7 @@ def _dispatch_async_manual_review(
         if issue_number is not None
         else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
     )
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 
     repo_root = resolve_orchestra_repo_root()

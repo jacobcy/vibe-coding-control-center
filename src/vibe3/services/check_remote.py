@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.clients import parse_linked_issues
 from vibe3.models.flow import IssueLink
 from vibe3.models.orchestration import IssueState
 
@@ -119,7 +119,7 @@ class CheckRemote:
         ).info("Remote index build done (Path A)")
 
         # Path B: rebuild merged PR cache
-        from vibe3.clients.merged_pr_cache import MergedPRCache
+        from vibe3.clients import MergedPRCache
 
         # Resolve repo path from git common dir
         git_common_dir = this.git_client.get_git_common_dir()

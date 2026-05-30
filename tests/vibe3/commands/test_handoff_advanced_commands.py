@@ -356,7 +356,7 @@ def test_handoff_audit_command_real_service_path(tmp_path, monkeypatch):
     (git_dir / "vibe3").mkdir()
 
     # Patch GitClient to return our temp paths
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     monkeypatch.setattr(GitClient, "get_git_common_dir", lambda self: str(git_dir))
     monkeypatch.setattr(GitClient, "get_current_branch", lambda self: "main")

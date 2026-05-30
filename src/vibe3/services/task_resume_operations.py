@@ -15,8 +15,7 @@ from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
     from vibe3.models.flow import FlowStatusResponse
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService

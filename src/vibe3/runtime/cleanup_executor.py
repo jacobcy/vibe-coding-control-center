@@ -20,9 +20,7 @@ async def execute_expired_resource_cleanup(
         tick_number: Current tick number (for logging)
     """
     # Delay imports to avoid circular dependencies
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.expired_resource_cleanup_service import (
         ExpiredResourceCleanupService,
     )

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.abandon_flow_service import AbandonFlowService
 

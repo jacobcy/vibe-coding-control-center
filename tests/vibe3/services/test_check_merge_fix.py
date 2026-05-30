@@ -6,9 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check_cleanup_service import CheckCleanupService

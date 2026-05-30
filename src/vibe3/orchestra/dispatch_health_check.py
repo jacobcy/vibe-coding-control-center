@@ -24,7 +24,7 @@ from vibe3.orchestra.protocols import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class DispatchHealthCheckService:

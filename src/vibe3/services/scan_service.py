@@ -220,7 +220,7 @@ def validate_governance_material_consistency(
             )
             return issues
     if repo_root is None:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git_client = GitClient()
         git_common_dir = git_client.get_git_common_dir()

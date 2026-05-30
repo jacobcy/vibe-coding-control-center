@@ -13,7 +13,7 @@ from vibe3.services.flow_service import FlowService
 def test_reactivate_flow_records_event():
     """Flow reactivation should record a 'flow_reactivated' event."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -52,7 +52,7 @@ def test_reactivate_flow_records_event():
 def test_reactivate_flow_resets_all_sessions():
     """Reactivation should clear all agent actors and refs."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -93,7 +93,7 @@ def test_reactivate_flow_resets_all_sessions():
 def test_reactivate_flow_preserves_initiator():
     """Reactivation should set initiated_by correctly."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -140,7 +140,7 @@ def test_flow_manager_uses_service_for_reactivation():
 def test_reactivate_flow_rejects_nonexistent_flow():
     """Reactivate should fail if flow doesn't exist."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))

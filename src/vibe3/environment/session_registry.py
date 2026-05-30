@@ -5,8 +5,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import BackendProtocol, SQLiteClient
 from vibe3.environment.session_naming import build_session_name
 from vibe3.utils.constants import STARTING_TIMEOUT_SECONDS
 
@@ -312,7 +311,7 @@ class SessionRegistryService:
             return
 
         try:
-            from vibe3.clients.git_client import find_repo_root
+            from vibe3.clients import find_repo_root
             from vibe3.environment.worktree import WorktreeManager
             from vibe3.environment.worktree_context import WorktreeContext
 

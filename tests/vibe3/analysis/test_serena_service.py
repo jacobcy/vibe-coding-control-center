@@ -221,7 +221,7 @@ class TestAnalyzeFilesSkipped:
         )
 
         # Use real GitClient but mock its get_untracked_files method
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git_client = GitClient()
         git_client.get_untracked_files = lambda: [str(new_file)]

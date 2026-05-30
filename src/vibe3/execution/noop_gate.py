@@ -6,10 +6,10 @@ from typing import cast
 from loguru import logger
 
 from vibe3.agents.models import ExecutionRole
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
+from vibe3.config.role_policy import get_role_block_function
 from vibe3.models.verdict import VerdictRecord
 from vibe3.models.verdict_types import VerdictValue
-from vibe3.services.role_policy_helpers import get_role_block_function
 from vibe3.services.verdict_policy import requires_audit_ref
 
 # Loop prevention constants

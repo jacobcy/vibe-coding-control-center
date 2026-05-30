@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.models.data_source import DataSource
 from vibe3.services.flow_service import FlowService
 from vibe3.services.flow_status_resolver import FlowStatusResolver

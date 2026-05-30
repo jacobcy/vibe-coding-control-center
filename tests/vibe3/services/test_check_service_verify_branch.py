@@ -5,8 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.sqlite_schema import init_schema
+from vibe3.clients import SQLiteClient, init_schema
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check_service import CheckService
 

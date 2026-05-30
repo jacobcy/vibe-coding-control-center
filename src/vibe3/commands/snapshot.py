@@ -107,7 +107,7 @@ def save(
         vibe3 snapshot save --as-baseline
         vibe3 snapshot save --json
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     if trace:
         enable_method_trace()
@@ -275,7 +275,7 @@ def diff(
         vibe3 snapshot diff <snapshot-id>    # Compare with specific snapshot
         vibe3 snapshot diff latest           # Compare with latest snapshot
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     if trace:
         enable_method_trace()

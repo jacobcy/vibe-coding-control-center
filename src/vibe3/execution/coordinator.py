@@ -9,8 +9,7 @@ from typing import Generator, Optional
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import BackendProtocol, SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
@@ -159,7 +158,7 @@ class ExecutionCoordinator:
 
         Delegates to the single-source-of-truth function in git_client.
         """
-        from vibe3.clients.git_client import find_repo_root
+        from vibe3.clients import find_repo_root
 
         return find_repo_root()
 

@@ -117,7 +117,7 @@ def test_soft_delete_then_create_flow_produces_clean_state() -> None:
     import tempfile
     from pathlib import Path
 
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"

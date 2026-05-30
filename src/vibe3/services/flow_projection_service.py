@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService

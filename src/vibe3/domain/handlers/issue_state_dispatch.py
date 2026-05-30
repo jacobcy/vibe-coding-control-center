@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.store_context import get_store
+from vibe3.clients import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
@@ -20,8 +20,7 @@ from vibe3.services.issue_failure_service import block_manager_noop_issue
 
 if TYPE_CHECKING:
     from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.config.orchestra_settings import OrchestraConfig
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
@@ -62,7 +61,7 @@ def build_dispatch_context(
 
 
 def _lazy_github_client() -> "GitHubClient":
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
 
     return GitHubClient()
 

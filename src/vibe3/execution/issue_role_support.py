@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
@@ -21,7 +21,7 @@ def resolve_orchestra_repo_root() -> Path:
 
     Delegates to find_repo_root() — the single source of truth in git_client.
     """
-    from vibe3.clients.git_client import find_repo_root
+    from vibe3.clients import find_repo_root
 
     return find_repo_root()
 

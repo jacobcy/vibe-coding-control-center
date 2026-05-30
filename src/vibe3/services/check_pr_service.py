@@ -14,9 +14,7 @@ from loguru import logger
 from vibe3.models.pr import PRState
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.models.pr import PRResponse
     from vibe3.services.flow_status_service import FlowStatusService
 

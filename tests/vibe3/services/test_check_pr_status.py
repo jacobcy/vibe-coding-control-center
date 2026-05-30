@@ -3,8 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitClient, GitHubClient, MergedPRCache, SQLiteClient
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check_service import CheckService
 
@@ -23,8 +22,6 @@ class TestPRStatusDetection:
         )
 
         # Mock git client
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
         # Return tmp_path/.git so that parent calculation gives tmp_path
@@ -75,8 +72,6 @@ class TestPRStatusDetection:
         )
 
         # Mock git client
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
         git_client.get_git_common_dir.return_value = tmp_path / ".git"
@@ -128,8 +123,6 @@ class TestPRStatusDetection:
         )
 
         # Mock git client
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
         # Return tmp_path/.git so that parent calculation gives tmp_path
@@ -178,8 +171,6 @@ class TestPRStatusDetection:
         )
 
         # Mock git client
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
         # Return tmp_path/.git so that parent calculation gives tmp_path
@@ -213,7 +204,6 @@ class TestMergedPRCacheIntegration:
 
     def test_cache_hit_skips_api_call(self, tmp_path: Path) -> None:
         """When cache hits, get_merged_pr_for_issue should skip API call."""
-        from vibe3.clients.merged_pr_cache import MergedPRCache
         from vibe3.services.pr_status_checker import get_merged_pr_for_issue
 
         cache = MergedPRCache(tmp_path)
@@ -310,8 +300,6 @@ class TestClosedPRIdempotency:
         )
 
         # Mock clients
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         github_client = MagicMock(spec=GitHubClient)
         flow_status_service = FlowStatusService(
@@ -372,8 +360,6 @@ class TestClosedPRIdempotency:
         )
 
         # Mock clients
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         github_client = MagicMock(spec=GitHubClient)
         flow_status_service = FlowStatusService(
@@ -431,8 +417,6 @@ class TestClosedPRIdempotency:
         )
 
         # Mock clients
-        from vibe3.clients.git_client import GitClient
-
         git_client = MagicMock(spec=GitClient)
         github_client = MagicMock(spec=GitHubClient)
         flow_status_service = FlowStatusService(

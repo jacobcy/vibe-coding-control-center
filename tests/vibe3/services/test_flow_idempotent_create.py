@@ -10,7 +10,7 @@ import tempfile
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.services.flow_service import FlowService
 
 

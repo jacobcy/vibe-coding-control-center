@@ -23,7 +23,7 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
     """Create a temporary SQLiteClient for testing."""
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     init_schema(conn)
     conn.close()

@@ -61,7 +61,7 @@ class StateVerificationService:
         Raises:
             GitHubAPIError: If GitHub API fails after max retries
         """
-        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients import GitHubClient
 
         try:
             issue_payload = GitHubClient().view_issue(issue_number, repo=repo)

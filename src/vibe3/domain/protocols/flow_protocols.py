@@ -6,7 +6,7 @@ Migrated from orchestra/protocols.py to establish domain-first architecture.
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
     from vibe3.models.orchestration import IssueInfo
 
 

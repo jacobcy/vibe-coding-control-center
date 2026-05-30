@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 

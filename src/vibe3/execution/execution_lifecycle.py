@@ -6,7 +6,7 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 
 ExecutionRole = Literal[
     "planner", "executor", "reviewer", "manager", "supervisor", "governance"

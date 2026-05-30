@@ -38,8 +38,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
     """
     log = logger.bind(domain="pr_analysis", action="analyze", pr_number=pr_number)
     log.info("Analyzing PR")
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
 
@@ -88,8 +87,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
 def _get_pr_changed_files(pr_number: int) -> list[str]:
     """Return changed file paths for a PR, including deleted files."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
     all_changed_files = git.get_changed_files(PRSource(pr_number=pr_number))
@@ -138,8 +136,7 @@ def _analyze_critical_files(
     pr_number: int,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Extract changed symbols and DAG impact for critical Python files."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
     svc = SerenaService(git_client=git)

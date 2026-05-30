@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -20,7 +20,7 @@ from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
 

@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from vibe3.clients.sqlite_schema import init_schema
+from vibe3.clients import init_schema
 from vibe3.clients.sqlite_transition_history_repo import (
     SQLiteTransitionHistoryRepo,
 )

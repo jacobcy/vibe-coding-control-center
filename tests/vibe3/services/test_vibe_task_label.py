@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.services.task_service import TaskService
 
 

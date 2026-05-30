@@ -17,7 +17,7 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     Uses GitClient to find repo root, ensuring correct resource discovery
     regardless of current working directory.
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     # Get repo root for stable path resolution
     try:

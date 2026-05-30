@@ -5,8 +5,7 @@ from __future__ import annotations
 import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec

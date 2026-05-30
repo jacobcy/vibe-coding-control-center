@@ -243,7 +243,7 @@ class TestMCPDispatchHistory:
         """
         SQLiteClient.get_events(branch=None) should return events from all branches.
         """
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_file = str(tmp_path / "test.db")
         store = SQLiteClient(db_path=db_file)
@@ -265,7 +265,7 @@ class TestMCPDispatchHistory:
 
     def test_get_events_with_branch_str_filters_correctly(self, tmp_path):
         """SQLiteClient.get_events(branch='...') should still filter by branch."""
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_file = str(tmp_path / "test.db")
         store = SQLiteClient(db_path=db_file)
@@ -279,7 +279,7 @@ class TestMCPDispatchHistory:
 
     def test_dispatch_history_branch_empty_string_queries_all(self, tmp_path):
         """branch='' should be normalized to query all branches (same as None)."""
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         db_file = str(tmp_path / "test.db")
         store = SQLiteClient(db_path=db_file)

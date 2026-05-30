@@ -13,9 +13,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.flow_cleanup_service import FlowCleanupService
 
 
@@ -334,7 +332,7 @@ class CheckCleanupService:
                 )
                 return
 
-            from vibe3.clients.github_client import GitHubClient
+            from vibe3.clients import GitHubClient
 
             gh = self._github_client or GitHubClient()
             gh_issue = gh.view_issue(issue_number)

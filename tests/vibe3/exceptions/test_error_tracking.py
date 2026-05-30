@@ -430,7 +430,7 @@ def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
 
 def test_migration_backfills_severity_column(tmp_path: Path) -> None:
     """Migration should add severity column and backfill from error registry."""
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     # Create database WITHOUT severity column
     db_path = tmp_path / "migration_test.db"

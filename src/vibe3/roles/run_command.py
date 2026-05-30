@@ -13,7 +13,7 @@ from vibe3.agents.run_prompt import (
     make_run_context_builder,
     make_skill_context_builder,
 )
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import SkillNotAvailableError
@@ -126,7 +126,7 @@ def execute_manual_run(
             raise SkillNotAvailableError(skill)
 
         # Resolve relative path against repo root for CWD-independent access
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         try:
             git_client = GitClient()

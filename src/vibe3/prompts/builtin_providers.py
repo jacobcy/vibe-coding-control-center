@@ -37,7 +37,7 @@ def resolve_skill_content(
         return None
 
     # Resolve relative path against repo root for CWD-independent access
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     try:
         git_client = GitClient()

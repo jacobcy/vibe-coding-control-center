@@ -5,8 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.recent_pr_cache import RecentPRCache
+from vibe3.clients import RecentPRCache, SQLiteClient
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 

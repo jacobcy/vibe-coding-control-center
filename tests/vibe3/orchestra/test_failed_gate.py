@@ -46,7 +46,7 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
     """Create a temporary SQLiteClient for testing."""
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     init_schema(conn)
     conn.close()
@@ -132,7 +132,7 @@ def test_per_db_path_instance_isolation(tmp_path: Path) -> None:
     db_path2 = tmp_path / "test2.db"
     for db_path in [db_path1, db_path2]:
         conn = sqlite3.connect(db_path)
-        from vibe3.clients.sqlite_schema import init_schema
+        from vibe3.clients import init_schema
 
         init_schema(conn)
         conn.close()
@@ -157,7 +157,7 @@ def test_clear_instance_specific_db_path(tmp_path: Path) -> None:
     db_path2 = tmp_path / "test2.db"
     for db_path in [db_path1, db_path2]:
         conn = sqlite3.connect(db_path)
-        from vibe3.clients.sqlite_schema import init_schema
+        from vibe3.clients import init_schema
 
         init_schema(conn)
         conn.close()
@@ -179,7 +179,7 @@ def test_clear_instance_with_db_path_clears_matching_singleton(tmp_path: Path) -
     """clear_instance(db_path) should also clear _instance if it matches."""
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     init_schema(conn)
     conn.close()
@@ -202,7 +202,7 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     assert default_instance is default_instance2
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     init_schema(conn)
     conn.close()

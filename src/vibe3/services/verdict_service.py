@@ -11,8 +11,7 @@ from datetime import UTC, datetime
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.models.verdict import VerdictRecord
 from vibe3.models.verdict_types import VerdictValue
 from vibe3.services.actor_support import extract_role_from_actor

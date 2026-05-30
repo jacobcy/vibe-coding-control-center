@@ -121,7 +121,7 @@ class TestIssueFlowServiceFlowLookup:
     def test_store_get_flows_by_issue_orders_active_canonical_first(self) -> None:
         """Should return active canonical flow before older done debug flows."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from vibe3.clients.sqlite_client import SQLiteClient
+            from vibe3.clients import SQLiteClient
 
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
@@ -155,7 +155,7 @@ class TestIssueFlowServiceFlowLookup:
     def test_find_active_flow_prefers_canonical(self) -> None:
         """Should prioritize active canonical flow."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from vibe3.clients.sqlite_client import SQLiteClient
+            from vibe3.clients import SQLiteClient
 
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
@@ -189,7 +189,7 @@ class TestIssueFlowServiceFlowLookup:
     def test_find_active_flow_falls_back_to_non_canonical(self) -> None:
         """Should return non-canonical active flow if canonical not active."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from vibe3.clients.sqlite_client import SQLiteClient
+            from vibe3.clients import SQLiteClient
 
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
@@ -223,7 +223,7 @@ class TestIssueFlowServiceFlowLookup:
     def test_find_active_flow_returns_none_if_no_flows(self) -> None:
         """Should return None if no flows linked to issue."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from vibe3.clients.sqlite_client import SQLiteClient
+            from vibe3.clients import SQLiteClient
 
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
@@ -235,7 +235,7 @@ class TestIssueFlowServiceFlowLookup:
     def test_find_active_flow_falls_back_to_first_available(self) -> None:
         """Should return first flow if no active flows."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from vibe3.clients.sqlite_client import SQLiteClient
+            from vibe3.clients import SQLiteClient
 
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))

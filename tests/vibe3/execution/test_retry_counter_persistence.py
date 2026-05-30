@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.exceptions.runtime_errors import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 

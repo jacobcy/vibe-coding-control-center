@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Callable, Literal
 
-from vibe3.clients.git_client import GitClient, GitClientProtocol
+from vibe3.clients import GitClient, GitClientProtocol
 from vibe3.exceptions import UserError
 from vibe3.models.change_source import BranchSource
 from vibe3.utils.branch_utils import find_parent_branch

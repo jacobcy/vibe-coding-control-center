@@ -12,7 +12,7 @@ from vibe3.agents.plan_prompt import (
     describe_plan_sections,
     make_plan_context_builder,
 )
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -206,7 +206,7 @@ def build_plan_sync_request(
     tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     (
@@ -357,7 +357,7 @@ def execute_spec_plan_async(
     or ``config`` here has no effect.
     """
     _ = request, config
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
     from vibe3.execution.issue_role_support import resolve_orchestra_repo_root

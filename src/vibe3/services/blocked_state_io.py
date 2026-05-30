@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.models.issue_body import FlowStateProjection
 from vibe3.models.orchestration import IssueState
 from vibe3.services.blocked_state_types import BlockedState
@@ -20,7 +20,7 @@ from vibe3.services.issue_body_service import merge_projection, parse_projection
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class BlockedStateIO:

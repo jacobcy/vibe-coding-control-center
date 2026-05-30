@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
 
 if TYPE_CHECKING:

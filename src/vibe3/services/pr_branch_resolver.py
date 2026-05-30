@@ -4,7 +4,7 @@ import shutil
 
 import typer
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input

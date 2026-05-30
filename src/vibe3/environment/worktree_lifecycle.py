@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_support import (
     find_worktree_by_path,

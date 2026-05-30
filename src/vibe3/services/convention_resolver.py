@@ -102,7 +102,7 @@ class ConventionResolver:
         try:
             from pathlib import Path
 
-            from vibe3.clients.git_client import GitClient
+            from vibe3.clients import GitClient
             from vibe3.exceptions import GitError
 
             # Resolve relative path against repo root for CWD-independent access

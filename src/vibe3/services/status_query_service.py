@@ -10,10 +10,7 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,

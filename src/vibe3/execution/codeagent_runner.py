@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, cast
 from loguru import logger
 from typer import echo
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitClient, SQLiteClient
 
 if TYPE_CHECKING:
     from loguru import Logger
@@ -68,9 +67,9 @@ class CodeagentExecutionService:
         (success or failure), we remove the handoff trigger label so
         the next tick does not re-dispatch the same issue.
         """
-        from vibe3.clients.github_labels import GhIssueLabelPort
+        from vibe3.clients import GhIssueLabelPort
+        from vibe3.config.orchestra_config import get_handoff_state_label
         from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.services.orchestra_helpers import get_handoff_state_label
 
         config = load_orchestra_config()
         handoff_label = get_handoff_state_label(config.supervisor_handoff)
@@ -222,7 +221,7 @@ class CodeagentExecutionService:
         before_issue_is_closed = False
         if command.issue_number is not None:
             try:
-                from vibe3.clients.github_client import GitHubClient
+                from vibe3.clients import GitHubClient
 
                 issue_payload = GitHubClient().view_issue(
                     command.issue_number,

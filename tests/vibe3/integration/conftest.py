@@ -13,7 +13,7 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
     """Create a temporary SQLiteClient for testing."""
     import sqlite3
 
-    from vibe3.clients.sqlite_schema import init_schema
+    from vibe3.clients import init_schema
 
     db_path = tmp_path / "handoff.db"
     conn = sqlite3.connect(db_path)

@@ -31,8 +31,7 @@ from vibe3.models.change_source import (
 
 def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:
     """Run change analysis pipeline and return impact/dag/score."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     log = logger.bind(
         domain="inspect", action="change_analysis", source_type=source_type

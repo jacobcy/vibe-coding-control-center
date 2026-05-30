@@ -113,7 +113,7 @@ def _fetch_worktree_map() -> dict[str, str]:
     """Fetch worktree mapping from git worktree list."""
     worktree_map: dict[str, str] = {}
     try:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git = GitClient()
         worktree_output = git._run(["worktree", "list", "--porcelain"])

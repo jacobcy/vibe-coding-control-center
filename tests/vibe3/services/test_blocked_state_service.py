@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.blocked_state_service import (
     BlockedStateService,
