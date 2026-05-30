@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from vibe3.analysis.snapshot_service import SnapshotError
-from vibe3.models.snapshot import (
+from vibe3.models import (
     DependencyChange,
     DiffSummary,
     DiffWarning,

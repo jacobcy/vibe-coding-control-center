@@ -14,7 +14,7 @@ from vibe3.analysis.command_analyzer_helpers import (
     should_show_in_tree,
 )
 from vibe3.exceptions import VibeError
-from vibe3.models.inspection import CallNode, CommandInspection
+from vibe3.models import CallNode, CommandInspection
 
 
 class CommandAnalyzerError(VibeError):

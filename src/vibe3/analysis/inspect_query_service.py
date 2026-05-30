@@ -20,7 +20,7 @@ from vibe3.analysis.change_scope_service import (
 )
 from vibe3.analysis.pr_scoring import PRDimensions, generate_score_report
 from vibe3.analysis.serena_service import SerenaService
-from vibe3.config.loader import get_config
+from vibe3.config import get_config
 from vibe3.models.change_source import (
     BranchSource,
     CommitSource,
