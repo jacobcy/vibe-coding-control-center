@@ -48,7 +48,7 @@ class GovernanceScanDependencies:
         Returns:
             GovernanceScanDependencies with registry and status_service
         """
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents import CodeagentBackend
         from vibe3.domain import FlowManager
         from vibe3.environment.session_registry import SessionRegistryService
         from vibe3.services.orchestra_status_service import OrchestraStatusService

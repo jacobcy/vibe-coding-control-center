@@ -5,7 +5,7 @@ from typing import cast
 
 from loguru import logger
 
-from vibe3.agents.models import ExecutionRole
+from vibe3.agents import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.verdict import VerdictRecord
 from vibe3.models.verdict_types import VerdictValue

@@ -152,7 +152,7 @@ class HandoffStatusService:
         Returns:
             List of session dicts that are truly live
         """
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents import CodeagentBackend
 
         if self.session_registry is None:
             with self._registry_lock:

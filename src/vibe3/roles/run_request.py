@@ -5,10 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from vibe3.agents.run_prompt import (
-    describe_run_plan_sections,
-    make_run_context_builder,
-)
+from vibe3.agents import describe_run_plan_sections, make_run_context_builder
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.contracts import ExecutionRequest

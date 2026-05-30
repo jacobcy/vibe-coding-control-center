@@ -12,7 +12,7 @@ from typing import Callable
 from loguru import logger
 from typer import echo
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents import CodeagentBackend
 from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest

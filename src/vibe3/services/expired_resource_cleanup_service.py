@@ -514,7 +514,7 @@ class ExpiredResourceCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()

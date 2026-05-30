@@ -2,10 +2,9 @@
 
 from pathlib import Path
 
-from vibe3.agents.plan_prompt import build_plan_prompt_body
+from vibe3.agents import build_plan_prompt_body, build_run_prompt_body
 from vibe3.agents.run_prompt import (
     build_run_output_contract_section,
-    build_run_prompt_body,
     build_run_task_section,
 )
 from vibe3.config.settings import VibeConfig

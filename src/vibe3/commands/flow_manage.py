@@ -118,7 +118,7 @@ def _ensure_branch_has_no_live_runtime_session(
     flow_service: FlowService, branch: str
 ) -> None:
     """Block flow mutations when branch has live runtime sessions."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.agents import CodeagentBackend
     from vibe3.environment.session_registry import SessionRegistryService
 
     backend = CodeagentBackend()

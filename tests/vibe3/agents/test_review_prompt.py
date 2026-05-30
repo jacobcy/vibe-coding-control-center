@@ -8,14 +8,13 @@ from unittest.mock import patch
 
 import pytest
 
+from vibe3.agents import build_review_prompt_body, build_tools_guide_section
 from vibe3.agents.review_prompt import (
     ContextBuilderError,
     build_ast_analysis_section,
     build_output_contract_section,
     build_policy_section,
-    build_review_prompt_body,
     build_review_task_section,
-    build_tools_guide_section,
 )
 from vibe3.models.review import ReviewRequest, ReviewScope
 

@@ -12,7 +12,7 @@ from typing import Annotated
 import typer
 import uvicorn
 
-from vibe3.agents.backends.codeagent_config import find_missing_backend_commands
+from vibe3.agents import find_missing_backend_commands
 from vibe3.clients.git_client import GitClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig

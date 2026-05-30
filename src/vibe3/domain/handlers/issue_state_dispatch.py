@@ -19,7 +19,7 @@ from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 
 if TYPE_CHECKING:
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.agents import CodeagentBackend
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.config.orchestra_settings import OrchestraConfig
@@ -45,7 +45,7 @@ def build_dispatch_context(
     store: "SQLiteClient",
 ) -> DispatchContext:
     """Construct all dispatch services from base dependencies."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.agents import CodeagentBackend
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.coordinator import ExecutionCoordinator

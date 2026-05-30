@@ -1,6 +1,6 @@
 """Shared actor formatting helpers for execution and handoff."""
 
-from vibe3.agents.backends.codeagent_config import resolve_effective_agent_options
+from vibe3.agents import resolve_effective_agent_options
 from vibe3.exceptions import AgentPresetNotFoundError
 from vibe3.models.review_runner import AgentOptions
 

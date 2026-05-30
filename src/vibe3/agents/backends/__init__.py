@@ -14,6 +14,7 @@ from vibe3.agents.backends.async_launcher import (
 )
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.backends.codeagent_config import (
+    find_missing_backend_commands,
     resolve_effective_agent_options,
     sync_models_json,
 )
@@ -24,4 +25,5 @@ __all__ = [
     "start_async_command",
     "resolve_effective_agent_options",
     "sync_models_json",
+    "find_missing_backend_commands",
 ]

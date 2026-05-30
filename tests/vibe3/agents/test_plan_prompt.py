@@ -1,8 +1,8 @@
 """Tests for issue/spec-aware plan context building."""
 
+from vibe3.agents import build_plan_prompt_body
 from vibe3.agents.plan_prompt import (
     build_plan_output_contract_section,
-    build_plan_prompt_body,
     build_plan_task_section,
 )
 from vibe3.models.plan import PlanRequest, PlanScope

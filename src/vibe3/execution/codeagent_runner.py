@@ -15,8 +15,8 @@ from vibe3.clients.sqlite_client import SQLiteClient
 if TYPE_CHECKING:
     from loguru import Logger
 
-    from vibe3.agents.backends.codeagent import AgentResult
-    from vibe3.agents.models import (
+    from vibe3.agents import (
+        AgentResult,
         CodeagentCommand,
         CodeagentResult,
     )
@@ -375,8 +375,7 @@ class CodeagentExecutionService:
 
     def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
         """Execute codeagent synchronously."""
-        from vibe3.agents.backends.codeagent import CodeagentBackend
-        from vibe3.agents.models import CodeagentResult
+        from vibe3.agents import CodeagentBackend, CodeagentResult
 
         log = logger.bind(
             domain="codeagent",
@@ -535,7 +534,7 @@ class CodeagentExecutionService:
         cwd: Path | None = None,
     ) -> CodeagentResult:
         """Execute a sync worker request through the unified execution shell."""
-        from vibe3.agents.models import (
+        from vibe3.agents import (
             ExecutionRole,
             create_codeagent_command,
         )

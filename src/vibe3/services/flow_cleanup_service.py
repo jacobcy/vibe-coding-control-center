@@ -328,7 +328,7 @@ class FlowCleanupService:
         # DEFENSIVE LAYER 2: Query runtime_session table for live sessions
         # This catches race conditions where sessions started after pre-filter
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()

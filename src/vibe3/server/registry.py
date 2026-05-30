@@ -86,7 +86,7 @@ def _build_server_with_launch_cwd(
     launch_cwd: Path | None = None,
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.agents import CodeagentBackend
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()

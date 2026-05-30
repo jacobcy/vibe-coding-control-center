@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Protocol
 from vibe3.execution.role_contracts import WorktreeRequirement
 
 if TYPE_CHECKING:
-    from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
+    from vibe3.agents import AsyncExecutionHandle
 
 
 class AsyncLauncherProtocol(Protocol):
