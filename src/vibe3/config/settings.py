@@ -228,7 +228,6 @@ class PolicyResolverMixin:
 class ReviewConfig(BaseModel, PolicyResolverMixin):
     """Review configuration."""
 
-    _policy_name = "review"
     policy_file: str | None = Field(
         default=None,
         description="Path to review policy (None = use profile resolution)",
@@ -246,7 +245,6 @@ class ReviewConfig(BaseModel, PolicyResolverMixin):
 class PlanConfig(BaseModel, PolicyResolverMixin):
     """Plan command configuration."""
 
-    _policy_name = "plan"
     policy_file: str | None = Field(
         default=None, description="Path to plan policy (None = use profile resolution)"
     )
@@ -263,7 +261,6 @@ class PlanConfig(BaseModel, PolicyResolverMixin):
 class RunConfig(BaseModel, PolicyResolverMixin):
     """Run command configuration."""
 
-    _policy_name = "run"
     policy_file: str | None = Field(
         default=None, description="Path to run policy (None = use profile resolution)"
     )
