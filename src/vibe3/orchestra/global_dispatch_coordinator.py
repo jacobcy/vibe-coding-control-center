@@ -1,9 +1,11 @@
 """Adapter shell for backward compatibility.
 
-Re-exports GlobalDispatchCoordinator from domain layer.
-Re-exports QueueEntry and MAX_INTENTS_PER_TICK for backward compatibility.
-This module will be deprecated in a future version.
+.. deprecated:: 3.0.0
+    Use vibe3.domain.GlobalDispatchCoordinator instead.
+    This module will be removed in a future version.
 """
+
+import warnings
 
 # Re-export GlobalDispatchCoordinator from domain
 from vibe3.domain.dispatch_coordinator import (
@@ -13,5 +15,14 @@ from vibe3.domain.dispatch_coordinator import (
 
 # Re-export QueueEntry from orchestra (still in orchestra layer)
 from vibe3.orchestra.queue_entry import QueueEntry
+
+# Emit deprecation warning when module is imported
+warnings.warn(
+    "Importing GlobalDispatchCoordinator from "
+    "orchestra.global_dispatch_coordinator is deprecated. "
+    "Use 'from vibe3.domain import GlobalDispatchCoordinator' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = ["GlobalDispatchCoordinator", "QueueEntry", "MAX_INTENTS_PER_TICK"]
