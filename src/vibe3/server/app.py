@@ -343,11 +343,34 @@ def start(
 @app.command()
 def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
+    from rich.console import Console
+
+    from vibe3.config.orchestra_config import get_manager_usernames
     from vibe3.services.serve_status_service import ServeStatusService
+
+    console = Console()
 
     config = load_orchestra_config()
     instance_info, is_valid = _validate_pid_file(config.pid_file)
     tmux_exists = _orchestra_tmux_session_exists()
+
+    # Display instance info from PID file
+    if instance_info is not None:
+        console.print("[bold]Instance Info:[/bold]")
+        console.print(f"  PID: {instance_info.pid}")
+        console.print(f"  Directory: {instance_info.cwd}")
+        console.print(f"  Port: {instance_info.port}")
+        console.print(
+            f"  Started: {instance_info.started_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        console.print()
+
+    # Display manager username
+    manager_usernames = get_manager_usernames(config)
+    if manager_usernames:
+        console.print("[bold]Configuration:[/bold]")
+        console.print(f"  Manager: {manager_usernames[0]}")
+        console.print()
 
     # Extract PID for compatibility with ServeStatusService
     pid = instance_info.pid if instance_info is not None else None
