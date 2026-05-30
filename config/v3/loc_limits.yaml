@@ -200,8 +200,8 @@ code_limits:
         limit: 470
         reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop），合并后内聚度高，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/orchestra/test_serve.py"
-        limit: 500
-        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑等紧密耦合场景，新增 2 个 resume 回归测试"
+        limit: 520
+        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑、全局单例实例管理等紧密耦合场景，新增 3 个集成测试（test_start_blocks_when_instance_running, test_status_displays_instance_directory, test_stop_clears_global_pid_file）"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
         limit: 610
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
