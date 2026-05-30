@@ -87,7 +87,7 @@ class TestGitStateIndependence:
             with patch(
                 "vibe3.utils.git_helpers.get_current_branch", return_value="test-branch"
             ):
-                with patch("vibe3.config.loader.get_config") as mock_config:
+                with patch("vibe3.config.get_config") as mock_config:
                     mock_config.return_value.review_scope.critical_paths = []
                     mock_config.return_value.review_scope.public_api_paths = []
                     with patch(
