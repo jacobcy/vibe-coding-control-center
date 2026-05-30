@@ -45,6 +45,7 @@ def read_instance_info(pid_file: Path) -> OrchestraInstanceInfo | None:
     - File doesn't exist
     - File has invalid JSON
     - File has invalid format
+    - File has non-object JSON (TypeError)
     """
     if not pid_file.exists():
         return None
@@ -52,7 +53,7 @@ def read_instance_info(pid_file: Path) -> OrchestraInstanceInfo | None:
     try:
         data = json.loads(pid_file.read_text())
         return OrchestraInstanceInfo.from_dict(data)
-    except (json.JSONDecodeError, KeyError, ValueError):
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
         return None
 
 

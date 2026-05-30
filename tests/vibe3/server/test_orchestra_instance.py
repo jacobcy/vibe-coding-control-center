@@ -57,3 +57,13 @@ def test_read_invalid_format(tmp_path: Path) -> None:
     result = read_instance_info(pid_file)
 
     assert result is None
+
+
+def test_read_non_object_json(tmp_path: Path) -> None:
+    """Test reading non-object JSON (bare integer) returns None."""
+    pid_file = tmp_path / "orchestra.pid"
+    pid_file.write_text("12345")  # Plain integer, not object
+
+    result = read_instance_info(pid_file)
+
+    assert result is None

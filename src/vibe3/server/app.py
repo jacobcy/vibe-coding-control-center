@@ -413,16 +413,16 @@ def stop() -> None:
             )
             raise typer.Exit(1)
         typer.echo(f"Cleaning up stale PID file (process {pid} is not orchestra)")
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
         raise typer.Exit(0)
 
     try:
         os.kill(pid, signal.SIGTERM)
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
         typer.echo(f"Stopped Orchestra server (PID: {pid})")
     except ProcessLookupError:
         typer.echo(f"Process {pid} not found, cleaning up PID file")
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
     except PermissionError:
         typer.echo(f"Permission denied to stop process {pid}")
         raise typer.Exit(1)
