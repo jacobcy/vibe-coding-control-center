@@ -111,6 +111,7 @@ class TestPlannerDispatchHandler:
         mock_build_request: MagicMock,
         mock_record_error: MagicMock,
     ) -> None:
+        """Test dispatch-level failures (e.g., worktree_unavailable) record errors."""
         from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
@@ -127,11 +128,12 @@ class TestPlannerDispatchHandler:
         mock_build_request.return_value = _make_mock_request("planner", 42)
 
         mock_coordinator = MagicMock()
+        # Use worktree_unavailable (dispatch-level failure) to test error recording
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
             launched=False,
             skipped=False,
-            reason="Failed to start session",
-            reason_code="launch_failed",
+            reason="Worktree unavailable: permission denied",
+            reason_code="worktree_unavailable",
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
@@ -146,6 +148,63 @@ class TestPlannerDispatchHandler:
 
         mock_record_error.assert_called_once()
         assert mock_record_error.call_args.kwargs["tick_id"] == 17
+        assert mock_record_error.call_args.kwargs["error_code"] == "E_DISPATCH_FAILURE"
+
+    @patch("vibe3.services.error_helpers.record_error")
+    @patch("vibe3.domain.handlers.dispatch.build_plan_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_planner_dispatch_launch_failed_no_duplicate_error(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        mock_record_error: MagicMock,
+    ) -> None:
+        """Test launch_failed does NOT record duplicate error.
+
+        Bottom layer (codeagent_runner) already recorded error.
+        """
+        from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = None
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_build_request.return_value = _make_mock_request("planner", 42)
+
+        mock_coordinator = MagicMock()
+        # launch_failed: bottom layer (codeagent_runner) already recorded error
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="codeagent failed (code 1): execution error",
+            reason_code="launch_failed",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_planner_dispatch_intent(
+            PlannerDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="claimed",
+                tick_id=17,
+            )
+        )
+
+        # Should NOT call record_error (avoid duplicate)
+        mock_record_error.assert_not_called()
 
 
 class TestExecutorDispatchHandler:

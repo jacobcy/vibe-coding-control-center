@@ -89,10 +89,8 @@ def _dispatch_role_intent(
 
         # Not launched, not skipped:
         # - capacity_full / duplicate_dispatch → normal throttling (info)
-        # - all other failures → warning (FailedGate will control)
-        # Dispatch failures do NOT trigger flow block.
-        # Flow block is determined by business logic only
-        # (noop_gate, dependencies, loops).
+        # - launch_failed →底层已记录错误，避免重复记录
+        # - worktree_unavailable → dispatch 层面基础设施问题，需要记录
         # FailedGate controls dispatch based on error severity.
         reason_code = result.reason_code or "unknown"
 
@@ -103,8 +101,20 @@ def _dispatch_role_intent(
                 issue_number=issue_number,
                 reason_code=reason_code,
             ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
+        elif reason_code == "launch_failed":
+            # Bottom layer (codeagent_runner) already recorded error to error_log
+            # Avoid duplicate recording - just log at info level
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).info(
+                f"{role.capitalize()} dispatch failed: {result.reason} "
+                "(error already recorded by execution layer)"
+            )
         else:
-            # Unexpected failure - record to error_log and log warning
+            # Unexpected dispatch-level failure - record to error_log
+            # Examples: worktree_unavailable, unknown reason codes
             # FailedGate will control dispatch based on threshold
             from vibe3.services.error_helpers import record_error
 
