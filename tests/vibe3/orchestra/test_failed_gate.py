@@ -27,12 +27,18 @@ def reset_error_tracking() -> Iterator[None]:
         db_paths.append(ErrorTrackingService._default_instance.db_path)
     ErrorTrackingService.clear_instance()
     for db_path in set(db_paths):
-        with sqlite3.connect(db_path) as conn:
-            conn.execute("DELETE FROM error_log")
-            conn.execute(
-                "UPDATE failed_gate_state SET is_active = 0, "
-                "reason = NULL, triggered_at = NULL, blocked_ticks = 0 WHERE id = 1"
-            )
+        # Only handle "no such table" errors - these occur when the DB file
+        # was deleted by concurrent test cleanup. Other errors should propagate.
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("DELETE FROM error_log")
+                conn.execute(
+                    "UPDATE failed_gate_state SET is_active = 0, "
+                    "reason = NULL, triggered_at = NULL, blocked_ticks = 0 WHERE id = 1"
+                )
+        except sqlite3.OperationalError as e:
+            if "no such table" not in str(e):
+                raise
 
 
 @pytest.fixture

@@ -27,6 +27,7 @@ from vibe3.domain.protocols.dispatch_protocols import (
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.qualify_gate import QualifyGateService
+from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
@@ -35,7 +36,6 @@ from vibe3.observability.degraded_mode import get_degraded_manager
 # GlobalDispatchCoordinator depends on them via protocols
 from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
 from vibe3.orchestra.issue_loader import (
-    find_role_for_state,
     get_flow_context,
     load_issue,
 )

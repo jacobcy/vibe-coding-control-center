@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Callable
 
 from vibe3.config.orchestra_config import get_manager_usernames
 from vibe3.domain.qualify_gate import QualifyGateService
+from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.issue_loader import (
-    find_role_for_state,
     get_flow_context,
     is_auto_task_branch,
     load_issue,
