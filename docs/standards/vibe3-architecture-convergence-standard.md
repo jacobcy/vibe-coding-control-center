@@ -304,3 +304,35 @@ Vibe3 后续收敛的核心不是继续增加抽象，而是收回主控权。
 
 若没有完成这一步，`domain-first` 只会让系统多一层；  
 完成这一步后，`domain-first` 才会真正降低耦合并压住代码膨胀。
+
+## 11. Migration History
+
+### 2026-05-30: Domain Orchestration Migration (Issue #1624)
+
+**Completed:**
+- FlowManager migrated from `orchestra/flow_dispatch.py` to `domain/flow_manager.py`
+- GlobalDispatchCoordinator migrated from `orchestra/global_dispatch_coordinator.py` to `domain/dispatch_coordinator.py`
+- FailedGate migrated from `orchestra/failed_gate.py` to `domain/failed_gate.py`
+- FlowManagerProtocol migrated to `domain/protocols/flow_protocols.py`
+- DispatchProtocols created in `domain/protocols/dispatch_protocols.py`
+- Orchestra layer now contains adapter shells for backward compatibility
+
+**Architecture Impact:**
+- Domain layer established as orchestration truth
+- Domain layer independent of orchestra implementation (protocol-based)
+- Orchestra internal services accessed via protocol injection
+- Orchestra logging remains as infrastructure service
+- All dependent modules updated to import from domain
+
+**Acceptance Criteria Met:**
+- ✓ `domain/__init__.py` exports FlowManager, GlobalDispatchCoordinator, FailedGate
+- ✓ Domain layer has no direct orchestra imports (only protocol-based)
+- ✓ Orchestra layer positioned as adapter (internal services remain)
+- ✓ All tests pass
+- ✓ Type checking passes
+
+**Rationale:**
+This migration establishes domain-first architecture by moving orchestration
+truth from orchestra to domain layer. Orchestra retains internal services
+(queue operations, health checks) accessed via protocols, enabling clean
+separation while maintaining backward compatibility through adapter shells.

@@ -20,7 +20,7 @@ from vibe3.runtime.service_protocol import ServiceBase
 from vibe3.services.error_tracking_service import ErrorTrackingService
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.domain.failed_gate import FailedGate
 
 
 class HeartbeatServer:

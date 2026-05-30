@@ -25,7 +25,7 @@ def reset_degraded_manager():
 
 
 @patch(
-    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    "vibe3.domain.dispatch_coordinator.get_manager_usernames",
     return_value=["manager-bot"],
 )
 def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
@@ -73,13 +73,11 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
         manager.enter_degraded_mode(DegradedModeReason.GITHUB_API_TIMEOUT)
         return IssueState.READY  # Return a valid state
 
-    with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.load_issue"
-    ) as mock_load_issue:
+    with patch("vibe3.domain.dispatch_coordinator.load_issue") as mock_load_issue:
         with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+            "vibe3.domain.dispatch_coordinator.get_flow_context"
         ) as mock_flow_context:
-            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+            with patch("vibe3.domain.dispatch_coordinator.publish"):
                 # Configure mock_store methods
                 mock_store.load_frozen_queue.return_value = []
                 mock_store.save_frozen_queue = MagicMock()
@@ -112,9 +110,7 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
                 # Run coordination with log capture
                 import asyncio
 
-                with patch(
-                    "vibe3.orchestra.global_dispatch_coordinator.logger"
-                ) as mock_logger:
+                with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
                     asyncio.run(coordinator.coordinate(tick_id=1))
 
                     # Verify degraded mode warning was logged
@@ -142,7 +138,7 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
 
 
 @patch(
-    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    "vibe3.domain.dispatch_coordinator.get_manager_usernames",
     return_value=["manager-bot"],
 )
 def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
@@ -188,13 +184,11 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
         # Do NOT enter degraded mode
         return IssueState.READY
 
-    with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.load_issue"
-    ) as mock_load_issue:
+    with patch("vibe3.domain.dispatch_coordinator.load_issue") as mock_load_issue:
         with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+            "vibe3.domain.dispatch_coordinator.get_flow_context"
         ) as mock_flow_context:
-            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+            with patch("vibe3.domain.dispatch_coordinator.publish"):
                 # Configure mock_store methods
                 mock_store.load_frozen_queue.return_value = []
                 mock_store.save_frozen_queue = MagicMock()
@@ -227,9 +221,7 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
                 # Run coordination with log capture
                 import asyncio
 
-                with patch(
-                    "vibe3.orchestra.global_dispatch_coordinator.logger"
-                ) as mock_logger:
+                with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
                     asyncio.run(coordinator.coordinate(tick_id=1))
 
                     # Verify NO degraded mode warning was logged

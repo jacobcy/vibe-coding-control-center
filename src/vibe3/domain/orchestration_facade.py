@@ -22,11 +22,11 @@ from vibe3.models.orchestration import IssueInfo
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.domain.failed_gate import FailedGate
+    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-    from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
-    from vibe3.orchestra.protocols import FlowManagerProtocol
 
 
 class OrchestrationFacade(ServiceBase):
@@ -85,16 +85,14 @@ class OrchestrationFacade(ServiceBase):
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._failed_gate = failed_gate
         self._github = github or GitHubClient()
-        from vibe3.orchestra.flow_dispatch import FlowManager
+        from vibe3.domain import FlowManager
 
         self._flow_manager = flow_manager or FlowManager(self._config)
         self._registry: SessionRegistryService | None = registry
 
         if self._capacity is not None:
+            from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
             from vibe3.environment.session_registry import SessionRegistryService
-            from vibe3.orchestra.global_dispatch_coordinator import (
-                GlobalDispatchCoordinator,
-            )
             from vibe3.services.check_service import CheckService
             from vibe3.services.flow_service import FlowService
 

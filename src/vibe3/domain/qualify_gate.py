@@ -21,7 +21,7 @@ from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.orchestra.protocols import FlowManagerProtocol
+    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
 
 class QualifyGateService:

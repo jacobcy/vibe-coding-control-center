@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import CapacityDeferredError
@@ -23,7 +24,6 @@ from vibe3.execution.issue_role_support import (
 from vibe3.execution.role_contracts import MANAGER_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition

@@ -28,6 +28,14 @@ from vibe3.domain.events import (
     SupervisorPromptRendered,
 )
 
+# Import orchestration components lazily to avoid circular imports
+# FlowManager, GlobalDispatchCoordinator, and FailedGate are available through
+# __getattr__ for runtime access
+if TYPE_CHECKING:
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.domain.failed_gate import FailedGate
+    from vibe3.domain.flow_manager import FlowManager
+
 if TYPE_CHECKING:
     from vibe3.domain.publisher import EventPublisher
 
@@ -62,6 +70,23 @@ def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None
     return _subscribe(event_type, handler)
 
 
+def __getattr__(name: str) -> type:
+    """Lazy import for heavy modules to avoid circular dependencies."""
+    if name == "FlowManager":
+        from vibe3.domain.flow_manager import FlowManager
+
+        return FlowManager
+    if name == "GlobalDispatchCoordinator":
+        from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+
+        return GlobalDispatchCoordinator
+    if name == "FailedGate":
+        from vibe3.domain.failed_gate import FailedGate
+
+        return FailedGate
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     # Base
     "DomainEvent",
@@ -78,6 +103,10 @@ __all__ = [
     "SupervisorApplyStarted",
     "SupervisorApplyCompleted",
     "SupervisorApplyDelegated",
+    # Orchestration
+    "FlowManager",
+    "GlobalDispatchCoordinator",
+    "FailedGate",
     # Publisher
     "get_publisher",
     "publish",
