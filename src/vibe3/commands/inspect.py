@@ -8,7 +8,6 @@ import typer
 import yaml
 
 from vibe3.analysis import command_analyzer, dag_service, structure_service
-from vibe3.analysis.command_analyzer_helpers import find_command_file
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
@@ -52,7 +51,19 @@ _TRACE_OPT = Annotated[
 def _list_analyzable_top_level_commands(
     commands_root: str = "src/vibe3/commands",
 ) -> list[str]:
-    """Return root CLI commands that have analyzable command files."""
+    """Return root CLI commands that have analyzable command files.
+
+    Uses filesystem-based heuristic to discover top-level commands by scanning
+    the commands/ directory. This approach avoids layer violation (importing from
+    cli layer) but has limitations:
+
+    - Assumes top-level commands have simple filenames (no underscores)
+    - Relies on hardcoded exclusion list (_non_command)
+    - Does NOT validate commands are actually registered in Typer app
+
+    Future improvement: Consider adding validation against registered Typer commands
+    without creating layer violation.
+    """
     root = Path(commands_root)
     if not root.is_dir():
         return []
@@ -76,8 +87,11 @@ def _list_analyzable_top_level_commands(
         # helper modules like inspect_helpers.py, flow_status.py are excluded.
         if "_" in stem:
             continue
-        if find_command_file(stem, None, commands_root):
-            names.append(stem)
+        # Note: This is a filesystem heuristic. We assume files with simple names
+        # in commands/ are top-level commands. The tautological check
+        # (find_command_file) has been removed since we already know the file exists
+        # (we're iterating over it).
+        names.append(stem)
     return sorted(dict.fromkeys(names))
 
 
