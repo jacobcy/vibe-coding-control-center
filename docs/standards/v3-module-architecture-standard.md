@@ -102,6 +102,6 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 
 ## 7. 与其他标准的关系
 
-- 整体架构愿景：见 [vibe3-architecture-convergence-standard.md](vibe3-architecture-convergence-standard.md)
+- 整体架构愿景：见 [architecture-convergence-standard.md](v3/architecture-convergence-standard.md)
 - 详细 LOC 限制：见 [loc-governance.md](loc-governance.md)
 - 术语定义：见 [glossary.md](glossary.md)

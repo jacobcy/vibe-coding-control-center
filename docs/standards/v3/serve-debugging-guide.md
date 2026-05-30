@@ -11,8 +11,8 @@ created: 2026-05-01
 last_updated: 2026-05-01
 related_docs:
   - docs/standards/agent-debugging-standard.md
-  - docs/standards/v3/orchestra-runtime-standard.md
-  - docs/standards/vibe3-noop-gate-boundary-standard.md
+  - docs/standards/vibe3-orchestra-runtime-standard.md
+  - docs/standards/v3/noop-gate-boundary-standard.md
   - docs/standards/v3/command-standard.md
 ---
 
@@ -33,11 +33,11 @@ related_docs:
    - 上层业务 vs 底层触发的职责边界
    - async/tmux 观察优先原则
 
-2. **[orchestra-runtime-standard.md](./orchestra-runtime-standard.md)**：运行时架构
+2. **[vibe3-orchestra-runtime-standard.md](./vibe3-orchestra-runtime-standard.md)**：运行时架构
    - 服务生命周期、service 注册、事件流转
    - 同步链/异步链执行路径
 
-3. **[vibe3-noop-gate-boundary-standard.md](./vibe3-noop-gate-boundary-standard.md)**：no-op gate 语义
+3. **[noop-gate-boundary-standard.md](./v3/noop-gate-boundary-standard.md)**：no-op gate 语义
    - blocked 作为调试信号的正确理解
    - gate/block/fail 的区别与处理
 
@@ -175,7 +175,7 @@ tail -f temp/logs/orchestra/events.log
 - ❌ 看到 blocked 就认为是 bug
 - ✅ blocked 可能是正确的状态，需要理解为什么被 blocked
 
-详细语义见 [vibe3-noop-gate-boundary-standard.md](./vibe3-noop-gate-boundary-standard.md)。
+详细语义见 [noop-gate-boundary-standard.md](./v3/noop-gate-boundary-standard.md)。
 
 ---
 
