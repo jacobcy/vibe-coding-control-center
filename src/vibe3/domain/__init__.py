@@ -29,8 +29,10 @@ from vibe3.domain.events import (
 )
 
 # Import orchestration components lazily to avoid circular imports
-# FlowManager is available through __getattr__ for runtime access
+# FlowManager and GlobalDispatchCoordinator are available through
+# __getattr__ for runtime access
 if TYPE_CHECKING:
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.flow_manager import FlowManager
 
 if TYPE_CHECKING:
@@ -73,6 +75,10 @@ def __getattr__(name: str) -> type:
         from vibe3.domain.flow_manager import FlowManager
 
         return FlowManager
+    if name == "GlobalDispatchCoordinator":
+        from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+
+        return GlobalDispatchCoordinator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -94,6 +100,7 @@ __all__ = [
     "SupervisorApplyDelegated",
     # Orchestration
     "FlowManager",
+    "GlobalDispatchCoordinator",
     # Publisher
     "get_publisher",
     "publish",
