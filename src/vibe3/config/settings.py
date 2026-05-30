@@ -216,13 +216,10 @@ class AgentConfig(BaseModel):
 
 
 class PolicyResolverMixin:
-    """Mixin holding policy_file and common_rules fields.
+    """Mixin providing a common base type for policy config classes.
 
-    Used by ReviewConfig, PlanConfig, RunConfig to define these fields
-    without duplicating field declarations.
-
-    Note: Subclasses must declare policy_file and common_rules as actual
-    Pydantic fields. This mixin only provides a common base type.
+    Used by ReviewConfig, PlanConfig, RunConfig to share type identity.
+    Subclasses declare policy_file and common_rules as their own Pydantic fields.
     """
 
     __slots__ = ()

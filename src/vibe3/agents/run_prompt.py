@@ -99,7 +99,11 @@ def _build_run_prompt_providers(
     def run_policy() -> str | None:
         if not run_config:
             return None
-        policy_path = run_config.policy_file or resolver.get_policy_path("run")
+        policy_path = (
+            run_config.policy_file
+            if run_config.policy_file is not None
+            else resolver.get_policy_path("run")
+        )
         if policy_path:
             path = resolve_runtime_asset(policy_path)
             if path.exists():
@@ -115,17 +119,22 @@ def _build_run_prompt_providers(
             )
         return getattr(run_config, "coding_task", None)
 
+    def common_rules_path() -> str | None:
+        if run_config and run_config.common_rules is not None:
+            result: str | None = run_config.common_rules
+            return result
+        return resolver.get_policy_path("common")
+
+    def common_rules_section() -> str | None:
+        return build_tools_guide_section(common_rules_path())
+
     return {
         "run.plan_ref": plan_ref,
         "run.skill_content": lambda: skill_content,
         "run.coding_task": lambda: mode_task("coding"),
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
-        "common.rules": lambda: build_tools_guide_section(
-            (run_config.common_rules or resolver.get_policy_path("common"))
-            if run_config
-            else resolver.get_policy_path("common")
-        ),
+        "common.rules": common_rules_section,
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None
         ),
