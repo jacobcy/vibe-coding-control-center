@@ -23,14 +23,15 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.server.orchestra_instance import (
-    OrchestraInstanceInfo,
-    read_instance_info,
-    validate_instance,
-)
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
+)
+
+from .orchestra_instance import (
+    OrchestraInstanceInfo,
+    read_instance_info,
+    validate_instance,
 )
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
@@ -161,7 +162,7 @@ def _build_server_with_launch_cwd(
 
     # Mount MCP server (gracefully degrades if not available)
     try:
-        from vibe3.server.mcp import create_mcp_server
+        from .mcp import create_mcp_server
 
         mcp = create_mcp_server(
             status_service, get_queued=facade.get_queued_issue_numbers
@@ -289,9 +290,7 @@ def _build_async_serve_command(
     # - Global install: points to ~/.vibe
     # Important: Do NOT use resolve_orchestra_repo_root() which returns
     # the current working project root, not the vibe3 tool's source root.
-    import vibe3.server.registry as this_module
-
-    repo_root = (Path(this_module.__file__).parent.parent.parent.parent).resolve()
+    repo_root = (Path(__file__).parent.parent.parent.parent).resolve()
     cli_path = repo_root / "src" / "vibe3" / "cli.py"
 
     # Always explicitly set VIBE3_ASYNC_CLI_PROJECT_ROOT to prevent

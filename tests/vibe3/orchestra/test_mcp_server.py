@@ -55,7 +55,7 @@ class TestMCPServerCreation:
 
     def test_create_mcp_server_success(self):
         """MCP server creation function exists and accepts status_service."""
-        from vibe3.server.mcp import create_mcp_server
+        from vibe3.server import create_mcp_server
 
         # This test verifies the function exists
         # Actual MCP creation requires mcp package to be installed
@@ -74,7 +74,7 @@ class TestMCPResources:
 
     def test_status_resource_returns_json(self):
         """Status resource should return JSON snapshot."""
-        from vibe3.server.mcp import _serialize_snapshot
+        from vibe3.server import _serialize_snapshot
 
         mock_state = MockIssueState("in-progress")
         mock_entry = MockIssueStatusEntry(
@@ -115,7 +115,7 @@ class TestMCPResources:
 
     def test_format_snapshot_for_mcp(self):
         """Snapshot should be formatted as markdown for MCP tool output."""
-        from vibe3.server.mcp import format_snapshot_for_mcp
+        from vibe3.server import format_snapshot_for_mcp
 
         mock_state = MockIssueState("in-progress")
         mock_entry = MockIssueStatusEntry(
@@ -145,7 +145,7 @@ class TestMCPResources:
 
     def test_format_snapshot_includes_queue_metadata_for_ready_issues(self):
         """READY issues should show queue metadata in MCP output."""
-        from vibe3.server.mcp import format_snapshot_for_mcp
+        from vibe3.server import format_snapshot_for_mcp
 
         mock_ready_state = MockIssueState("ready")
         mock_ready_entry = MockIssueStatusEntry(
@@ -179,7 +179,7 @@ class TestMCPTools:
 
     def test_orchestra_status_tool(self):
         """orchestra_status tool should return formatted status."""
-        from vibe3.server.mcp import format_snapshot_for_mcp
+        from vibe3.server import format_snapshot_for_mcp
 
         mock_state = MockIssueState("blocked")
         mock_entry = MockIssueStatusEntry(
@@ -207,7 +207,7 @@ class TestMCPTools:
     def test_orchestra_issue_detail_tool(self):
         """orchestra_issue_detail tool should return issue details."""
         # This is tested indirectly via _serialize_snapshot
-        from vibe3.server.mcp import _serialize_snapshot
+        from vibe3.server import _serialize_snapshot
 
         mock_state = MockIssueState("review")
         mock_entry = MockIssueStatusEntry(
@@ -298,7 +298,7 @@ class TestMCPServerIntegration:
     def test_mcp_server_graceful_degradation_on_import_error(self):
         """Should continue without MCP if import fails."""
         from vibe3.models.orchestra_config import OrchestraConfig
-        from vibe3.server.registry import _build_server
+        from vibe3.server import _build_server
 
         config = OrchestraConfig()
 
@@ -313,7 +313,7 @@ class TestMCPServerIntegration:
     def test_build_server_creates_fastapi_app(self):
         """_build_server should create FastAPI app with status endpoint."""
         from vibe3.models.orchestra_config import OrchestraConfig
-        from vibe3.server.registry import _build_server
+        from vibe3.server import _build_server
 
         config = OrchestraConfig()
         heartbeat, fastapi_app = _build_server(config)
@@ -326,7 +326,7 @@ class TestMCPServerIntegration:
 
     def test_serialize_snapshot_includes_queue_metadata(self):
         """MCP serialization includes queue metadata for ready issues."""
-        from vibe3.server.mcp import _serialize_snapshot
+        from vibe3.server import _serialize_snapshot
 
         # Create a ready issue with queue metadata
         ready_issue = MockIssueStatusEntry(

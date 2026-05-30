@@ -2,7 +2,7 @@
 
 import typer
 
-from vibe3.server.mcp import create_mcp_server
+from vibe3.server import create_mcp_server
 
 app = typer.Typer(
     help="MCP server for Orchestra tools",

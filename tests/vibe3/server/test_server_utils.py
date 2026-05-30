@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from vibe3.server.server_utils import find_available_port
+from vibe3.server import find_available_port
 
 
 def test_find_available_port_returns_start_when_available() -> None:
