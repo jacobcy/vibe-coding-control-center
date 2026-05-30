@@ -52,7 +52,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=mock_store,
             ),
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
                 return_value=None,
@@ -101,9 +101,7 @@ class TestExecuteSyncGateIntegration:
 
         for command in [command_no_issue, command_no_branch]:
             with (
-                patch(
-                    "vibe3.agents.backends.codeagent.CodeagentBackend"
-                ) as mock_backend,
+                patch("vibe3.agents.CodeagentBackend") as mock_backend,
                 patch(
                     "vibe3.execution.codeagent_runner.load_session_id",
                     return_value=None,
@@ -145,7 +143,7 @@ class TestExecuteSyncGateIntegration:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
@@ -196,7 +194,7 @@ class TestExecuteSyncGateIntegration:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
@@ -259,7 +257,7 @@ class TestExecuteSyncGateIntegration:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
@@ -312,7 +310,7 @@ class TestTransitionCountFlow:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
@@ -360,7 +358,7 @@ class TestTransitionCountFlow:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
-            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch("vibe3.agents.CodeagentBackend") as mock_backend,
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
