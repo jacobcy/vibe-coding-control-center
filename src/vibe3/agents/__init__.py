@@ -30,6 +30,10 @@ Types:
 """
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.codeagent_config import (
+    resolve_effective_agent_options,
+    sync_models_json,
+)
 from vibe3.agents.base import AgentBackend
 from vibe3.agents.models import CodeagentCommand, CodeagentResult, ExecutionRole
 from vibe3.agents.plan_prompt import (
@@ -59,6 +63,9 @@ __all__ = [
     "ExecutionRole",
     # Backend
     "CodeagentBackend",
+    # Config helpers
+    "resolve_effective_agent_options",
+    "sync_models_json",
     # Prompt Builders
     "build_plan_prompt_body",
     "make_plan_context_builder",

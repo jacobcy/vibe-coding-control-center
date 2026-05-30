@@ -5,13 +5,15 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent_config import (
+from vibe3.agents import (
     resolve_effective_agent_options as resolve_backend_effective_agent_options,
 )
-from vibe3.agents.backends.codeagent_config import sync_models_json
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.review_runner import AgentOptions
+from vibe3.agents import (
+    sync_models_json,
+)
+from vibe3.config import load_orchestra_config
+from vibe3.models import AgentOptions
+from vibe3.orchestra import OrchestraConfig
 
 
 @dataclass(frozen=True)

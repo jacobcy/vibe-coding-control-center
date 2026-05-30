@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, NoReturn
 
 from loguru import logger
 
-from vibe3.exceptions.runtime_errors import GitHubAPIError
+from vibe3.exceptions import GitHubAPIError
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

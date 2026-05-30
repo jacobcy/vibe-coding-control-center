@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.models import IssueState
+from vibe3.orchestra import append_orchestra_event
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService

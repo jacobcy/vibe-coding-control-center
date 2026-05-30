@@ -220,6 +220,12 @@ class InvalidTransitionError(UserError):
         super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
 
 
+# ========== Runtime Infrastructure Errors ==========
+# Import at end to avoid circular dependency with runtime_errors.py
+from vibe3.exceptions.runtime_errors import (  # noqa: E402, I001
+    GitHubAPIError as GitHubAPIError,
+)
+
 # ========== Error Classification ==========
 # This module provides error classification utilities.
 # For error tracking service, see vibe3.services.error_tracking_service.
