@@ -16,7 +16,7 @@ from vibe3.orchestra.queue_entry import QueueEntry
 
 @pytest.fixture
 @patch(
-    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames",
+    "vibe3.domain.dispatch_coordinator.get_manager_usernames",
     return_value=["manager-bot"],
 )
 def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
@@ -166,7 +166,7 @@ class TestDispatchLoop:
 
         # Mock role finding
         with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.find_role_for_state"
+            "vibe3.domain.dispatch_coordinator.find_role_for_state"
         ) as mock_find_role:
             mock_role = MagicMock()
             mock_role.registry_role = "manager"
@@ -211,7 +211,7 @@ class TestDispatchLoop:
         mock_coordinator._load_issue = mock_load_issue
 
         with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.find_role_for_state"
+            "vibe3.domain.dispatch_coordinator.find_role_for_state"
         ) as mock_find_role:
             mock_role = MagicMock()
             mock_role.registry_role = "manager"

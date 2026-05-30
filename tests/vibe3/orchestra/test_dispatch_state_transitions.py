@@ -283,7 +283,7 @@ class TestLoggingBehavior:
             events.append(message)
 
         monkeypatch.setattr(
-            "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event",
+            "vibe3.domain.dispatch_coordinator.append_orchestra_event",
             capture_event,
         )
 
@@ -336,7 +336,7 @@ class TestLoggingBehavior:
             events.append(message)
 
         monkeypatch.setattr(
-            "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event",
+            "vibe3.domain.dispatch_coordinator.append_orchestra_event",
             capture_event,
         )
 

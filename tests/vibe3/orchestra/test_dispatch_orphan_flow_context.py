@@ -62,9 +62,7 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     assert "missing flow context" in append_event.call_args[0][1]
 
 
-@patch(
-    "vibe3.orchestra.global_dispatch_coordinator.get_manager_usernames", return_value=[]
-)
+@patch("vibe3.domain.dispatch_coordinator.get_manager_usernames", return_value=[])
 def test_dispatch_loop_logs_missing_flow_context_once(
     mock_get_manager_usernames,
 ) -> None:
