@@ -1,6 +1,6 @@
 """Adapter registry for vibe3 distributions."""
 
-from vibe3.config.adapter_manifest import AdapterManifest
+from vibe3.models.adapter_manifest import AdapterManifest
 
 # Registry of known adapters
 _ADAPTERS: dict[str, AdapterManifest] = {}

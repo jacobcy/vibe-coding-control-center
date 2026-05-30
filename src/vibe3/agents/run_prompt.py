@@ -18,6 +18,7 @@ from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
+from vibe3.services.convention_resolver import ConventionResolver
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -88,6 +89,7 @@ def _build_run_prompt_providers(
     from vibe3.agents.review_prompt import build_tools_guide_section
 
     run_config = getattr(config, "run", None)
+    resolver = ConventionResolver.from_repo()
 
     def plan_ref() -> str | None:
         if not plan_content:
@@ -95,9 +97,13 @@ def _build_run_prompt_providers(
         return f"## Implementation Plan\n\n{plan_content}"
 
     def run_policy() -> str | None:
-        if not run_config or not hasattr(run_config, "get_policy_file"):
+        if not run_config:
             return None
-        policy_path = run_config.get_policy_file()
+        policy_path = (
+            run_config.policy_file
+            if run_config.policy_file is not None
+            else resolver.get_policy_path("run")
+        )
         if policy_path:
             path = resolve_runtime_asset(policy_path)
             if path.exists():
@@ -113,17 +119,22 @@ def _build_run_prompt_providers(
             )
         return getattr(run_config, "coding_task", None)
 
+    def common_rules_path() -> str | None:
+        if run_config and run_config.common_rules is not None:
+            result: str | None = run_config.common_rules
+            return result
+        return resolver.get_policy_path("common")
+
+    def common_rules_section() -> str | None:
+        return build_tools_guide_section(common_rules_path())
+
     return {
         "run.plan_ref": plan_ref,
         "run.skill_content": lambda: skill_content,
         "run.coding_task": lambda: mode_task("coding"),
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
-        "common.rules": lambda: build_tools_guide_section(
-            run_config.get_common_rules()
-            if run_config and hasattr(run_config, "get_common_rules")
-            else None
-        ),
+        "common.rules": common_rules_section,
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None
         ),

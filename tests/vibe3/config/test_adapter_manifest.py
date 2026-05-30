@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from vibe3.config.adapter_manifest import AdapterManifest, AdapterResource
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
 
 def test_adapter_manifest_simple():

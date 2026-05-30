@@ -21,6 +21,7 @@ from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
+from vibe3.services.convention_resolver import ConventionResolver
 
 PlanPromptMode = Literal["first", "retry"]
 
@@ -153,11 +154,16 @@ def _build_plan_prompt_providers(
     task_request = (
         request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
     )
+    resolver = ConventionResolver.from_repo()
 
     def plan_policy() -> str | None:
-        if not plan_config or not hasattr(plan_config, "get_policy_file"):
+        if not plan_config:
             return None
-        policy_path = plan_config.get_policy_file()
+        policy_path = (
+            plan_config.policy_file
+            if plan_config.policy_file is not None
+            else resolver.get_policy_path("plan")
+        )
         if policy_path:
             return build_plan_policy_section(policy_path)
         return None
@@ -177,13 +183,18 @@ def _build_plan_prompt_providers(
         )
         return build_plan_task_section(task_request, plan_task_text)
 
+    def common_rules_path() -> str | None:
+        if plan_config and plan_config.common_rules is not None:
+            result: str | None = plan_config.common_rules
+            return result
+        return resolver.get_policy_path("common")
+
+    def common_rules_section() -> str | None:
+        return build_tools_guide_section(common_rules_path())
+
     return {
         "plan.policy": plan_policy,
-        "common.rules": lambda: build_tools_guide_section(
-            plan_config.get_common_rules()
-            if plan_config and hasattr(plan_config, "get_common_rules")
-            else None
-        ),
+        "common.rules": common_rules_section,
         "plan.output_format": plan_output_format,
         "plan.retry_task": plan_retry_task,
         "plan.exit_contract": plan_exit_contract,

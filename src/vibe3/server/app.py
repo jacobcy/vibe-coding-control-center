@@ -345,7 +345,7 @@ def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
     from rich.console import Console
 
-    from vibe3.config.orchestra_config import get_manager_usernames
+    from vibe3.services.orchestra_helpers import get_manager_usernames
     from vibe3.services.serve_status_service import ServeStatusService
 
     console = Console()
