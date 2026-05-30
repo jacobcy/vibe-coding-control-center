@@ -303,7 +303,9 @@ def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
     Shared artifacts (``vibe3/handoff/...``) get the ``@`` prefix form.
     Canonical worktree refs (``docs/reports/...``, ``docs/plans/...``) get
     ``--branch <branch>`` when branch is known.
-    Other relative paths and absolute paths are returned as-is (not handoff artifacts).
+    All other paths (including absolute paths like /tmp/) are displayed as
+    ``vibe3 handoff show <path>`` to avoid permission issues and provide
+    consistent user experience.
     """
     # Determine display target with alias substitution
     if (
@@ -325,8 +327,16 @@ def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
         if branch:
             return f"vibe3 handoff show --branch {branch} {display_target}"
         return f"vibe3 handoff show {display_target}"
-    # Non-handoff paths (temp/logs, etc.) return as-is
-    return path
+    # All other paths (including /tmp/) - use vibe3 handoff show
+    # This avoids permission issues and provides consistent UX
+    if not path:
+        # Empty path: just show command without path argument
+        return (
+            f"vibe3 handoff show --branch {branch}" if branch else "vibe3 handoff show"
+        )
+    if branch:
+        return f"vibe3 handoff show --branch {branch} {display_target}"
+    return f"vibe3 handoff show {display_target}"
 
 
 def sanitize_event_detail_paths(

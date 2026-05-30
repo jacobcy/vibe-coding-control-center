@@ -19,6 +19,7 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
         task_issue_number=issue_number,
         plan_ref=None,
         report_ref=None,
+        audit_ref=None,
         latest_verdict=None,
         pr_number=None,
         pr_ref=None,

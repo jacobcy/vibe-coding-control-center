@@ -105,23 +105,23 @@ def test_ref_to_handoff_cmd_docs_without_branch() -> None:
 
 
 def test_ref_to_handoff_cmd_non_handoff_path() -> None:
-    """Non-handoff paths (temp/logs, etc.) return as-is."""
+    """Non-handoff paths (temp/logs, etc.) are wrapped in vibe3 handoff show."""
     path = "temp/logs/debug.log"
     result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "temp/logs/debug.log"
+    assert result == "vibe3 handoff show --branch task/issue-476 temp/logs/debug.log"
 
 
 def test_ref_to_handoff_cmd_absolute_path() -> None:
-    """Absolute paths return as-is."""
+    """Absolute paths are wrapped in vibe3 handoff show to avoid permission issues."""
     path = "/abs/path/to/file.md"
     result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "/abs/path/to/file.md"
+    assert result == "vibe3 handoff show --branch task/issue-476 /abs/path/to/file.md"
 
 
 def test_ref_to_handoff_cmd_empty_string() -> None:
-    """Empty string returns as-is."""
+    """Empty string is wrapped in vibe3 handoff show."""
     result = ref_to_handoff_cmd("", branch="task/issue-476")
-    assert result == ""
+    assert result == "vibe3 handoff show --branch task/issue-476"
 
 
 # --- resolve_ref_path ---

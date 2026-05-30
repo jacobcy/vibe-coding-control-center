@@ -88,6 +88,8 @@ def _render_task_item_details(
         console.print(f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]")
     if flow.report_ref:
         console.print(f"             [dim]report:[/] [cyan]{flow.report_ref}[/]")
+    if flow.audit_ref:
+        console.print(f"             [dim]audit:[/] [cyan]{flow.audit_ref}[/]")
     if flow.latest_verdict:
         v = flow.latest_verdict
         color = {
