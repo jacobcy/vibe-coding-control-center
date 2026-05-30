@@ -167,22 +167,30 @@ def test_build_async_serve_command_forces_sync_child_process() -> None:
     assert "--no-async" in cmd
 
 
-def test_build_async_serve_command_sets_code_root_override_only_in_debug() -> None:
-    debug_root = Path("/tmp/debug-wt").resolve()
-    cmd = _build_async_serve_command(
+def test_build_async_serve_command_never_sets_code_root_override() -> None:
+    """Cross-project dispatch must always use global vibe3, never caller repo.
+
+    Debug mode only affects logging verbosity, not code paths.
+    Both debug and normal mode set VIBE3_ASYNC_CLI_PROJECT_ROOT= (empty)
+    to ensure resolve_async_cli_project_root() uses module location.
+    """
+    # Debug mode: still must NOT set code root override
+    debug_cmd = _build_async_serve_command(
         OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=True),
         verbose=0,
         launch_cwd=Path("/tmp/debug-wt"),
     )
+    assert "VIBE3_ASYNC_CLI_PROJECT_ROOT=" in debug_cmd
+    # Should NOT contain the debug-wt path
+    debug_root = Path("/tmp/debug-wt").resolve()
+    assert f"VIBE3_ASYNC_CLI_PROJECT_ROOT={debug_root}" not in debug_cmd
 
-    assert f"VIBE3_ASYNC_CLI_PROJECT_ROOT={debug_root}" in cmd
-
+    # Normal mode: also sets empty string (not unset)
     normal_cmd = _build_async_serve_command(
         OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=False),
         verbose=0,
         launch_cwd=Path("/tmp/external-repo"),
     )
-
     # Normal mode must explicitly clear VIBE3_ASYNC_CLI_PROJECT_ROOT
     # to prevent parent environment hijacking
     assert "VIBE3_ASYNC_CLI_PROJECT_ROOT=" in normal_cmd

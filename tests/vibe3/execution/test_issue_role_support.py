@@ -78,7 +78,15 @@ def test_build_issue_async_cli_request_uses_main_repo_by_default() -> None:
 def test_build_issue_async_cli_request_uses_debug_code_root_override(
     monkeypatch,
 ) -> None:
-    """Debug serve mode should only override the code root, not orchestration repo."""
+    """Manual VIBE3_ASYNC_CLI_PROJECT_ROOT override for debugging purposes.
+
+    Note: Serve command no longer sets this env var automatically (even in debug mode),
+    as of PR #1662. This tests the manual override capability for advanced debugging
+    scenarios where developers need to point to a specific vibe3 installation.
+
+    The test verifies that when manually set, the override takes precedence over
+    the default module-based resolution.
+    """
     monkeypatch.setenv("VIBE3_ASYNC_CLI_PROJECT_ROOT", str(WORKTREE_REPO))
     issue = IssueInfo(number=431, title="Test issue", labels=[])
 
