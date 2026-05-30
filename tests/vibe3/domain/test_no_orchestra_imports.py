@@ -52,6 +52,9 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
     - Other orchestra modules
+
+    Note: protocols and failed_gate are allowed but must be in TYPE_CHECKING blocks.
+    The caller is responsible for checking TYPE_CHECKING context.
     """
     if not import_str.startswith("vibe3.orchestra"):
         return False
@@ -59,8 +62,8 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     # Allowed imports (infrastructure services)
     allowed_orchestra_modules = {
         "vibe3.orchestra.logging",  # Infrastructure logging
-        "vibe3.orchestra.protocols",  # TYPE_CHECKING only
-        "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only
+        "vibe3.orchestra.protocols",  # TYPE_CHECKING only (checked by caller)
+        "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only (checked by caller)
         # Orchestra internal services (used via protocol injection)
         "vibe3.orchestra.dispatch_health_check",
         "vibe3.orchestra.issue_loader",
@@ -71,14 +74,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
 
     # Check if import is in allowed list
     if import_str in allowed_orchestra_modules:
-        # For protocols and failed_gate, verify it's only in TYPE_CHECKING
-        if import_str in {
-            "vibe3.orchestra.protocols",
-            "vibe3.orchestra.failed_gate",
-        }:
-            # This should be caught by TYPE_CHECKING check
-            # For now, allow it
-            return False
         return False
 
     # All other orchestra imports are violations

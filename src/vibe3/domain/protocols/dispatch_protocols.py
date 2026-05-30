@@ -1,9 +1,10 @@
 """Protocol definitions for dispatch coordination."""
 
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo
+    from vibe3.orchestra.queue_entry import QueueEntry
 
 
 class IssueCollectionServiceProtocol(Protocol):
@@ -24,13 +25,13 @@ class IssueCollectionServiceProtocol(Protocol):
 class QueuePersistenceServiceProtocol(Protocol):
     """Protocol for queue persistence."""
 
-    frozen_queue: list[Any] | None
+    frozen_queue: list["QueueEntry"] | None
 
     def persist(self) -> None:
         """Persist queue state."""
         ...
 
-    def restore(self) -> list[dict[str, Any]] | None:
+    def restore(self) -> list["QueueEntry"] | None:
         """Restore queue state.
 
         Returns:
