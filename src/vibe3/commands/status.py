@@ -303,8 +303,12 @@ def status(
     ]
 
     # Separate remote and non-remote items for rendering
+    # Exclude BLOCKED from remote_items to prevent double-rendering
     remote_items = [
-        item for item in task_progress_items if cast(bool, item.get("remote"))
+        item
+        for item in task_progress_items
+        if cast(bool, item.get("remote"))
+        and cast(IssueState, item["state"]) != IssueState.BLOCKED
     ]
     non_remote_items = [
         item for item in task_progress_items if not cast(bool, item.get("remote"))

@@ -295,14 +295,23 @@ class StatusQueryService:
 
             # Get blocked_by and blocked_reason from flow state
             # (Note: failed_reason is deprecated, now unified to blocked_reason)
-            blocked_by = None
-            blocked_reason = None
-            if state == IssueState.BLOCKED and flow:
-                # Read from database instead of parsing issue body
-                blocked_by_issue = getattr(flow, "blocked_by_issue", None)
-                if blocked_by_issue:
-                    blocked_by = (blocked_by_issue,)
-                blocked_reason = getattr(flow, "blocked_reason", None)
+            blocked_by: tuple[int, ...] | None = None
+            blocked_reason: str | None = None
+            if state == IssueState.BLOCKED:
+                if flow:
+                    # Read from database instead of parsing issue body
+                    blocked_by_issue = getattr(flow, "blocked_by_issue", None)
+                    if blocked_by_issue:
+                        blocked_by = (blocked_by_issue,)
+                    blocked_reason = getattr(flow, "blocked_reason", None)
+                elif issue.body:
+                    # For remote BLOCKED issues, parse from issue body
+                    from vibe3.services.issue_body_service import parse_projection
+
+                    proj = parse_projection(issue.body)
+                    if proj.blocked_by:
+                        blocked_by = tuple(proj.blocked_by)
+                    blocked_reason = proj.blocked_reason
 
             labels = list(issue.labels)
             milestone = issue.milestone
@@ -330,7 +339,7 @@ class StatusQueryService:
                     pr_state = pr.state.value
 
             # Calculate remote flag: issue claimed by manager but no local flow
-            # Only mark as remote for active states (not BLOCKED, not DONE)
+            # Mark as remote for active states and BLOCKED state
             is_remote = (
                 state
                 in {
@@ -339,6 +348,7 @@ class StatusQueryService:
                     IssueState.HANDOFF,
                     IssueState.REVIEW,
                     IssueState.MERGE_READY,
+                    IssueState.BLOCKED,
                 }
                 and assignee is not None
                 and assignee in (manager_usernames or [])
