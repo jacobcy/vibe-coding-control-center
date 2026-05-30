@@ -12,8 +12,19 @@ Design Principles:
 - Rich integration for console beautification
 """
 
+from .audit import AuditEntry, AuditLogger
+from .degraded_mode import DegradedModeManager, DegradedModeReason, get_degraded_manager
 from .logger import setup_logging
+from .trace_method import set_trace_max_lines, set_trace_min_ms, trace_method
 
 __all__ = [
+    "AuditEntry",
+    "AuditLogger",
+    "DegradedModeManager",
+    "DegradedModeReason",
+    "get_degraded_manager",
+    "set_trace_max_lines",
+    "set_trace_min_ms",
     "setup_logging",
+    "trace_method",
 ]
