@@ -223,6 +223,9 @@ code_limits:
       - path: "tests/vibe3/domain/handlers/test_issue_state_dispatch.py"
         limit: 500
         reason: "Issue state dispatch 测试集（从 test_manager.py 合并），覆盖 manager handler、issue state transition、dispatch blocking 等紧密耦合场景，测试类结构清晰，拆分收益低"
+      - path: "tests/vibe3/domain/handlers/test_dispatch.py"
+        limit: 450
+        reason: "Planner dispatch handler 测试集，覆盖 reason code branching、launch_failed 非重复错误记录等紧密耦合场景，新增 launch_failed 测试后略微超标"
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
