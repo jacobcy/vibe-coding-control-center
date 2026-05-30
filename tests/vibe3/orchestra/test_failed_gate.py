@@ -27,12 +27,16 @@ def reset_error_tracking() -> Iterator[None]:
         db_paths.append(ErrorTrackingService._default_instance.db_path)
     ErrorTrackingService.clear_instance()
     for db_path in set(db_paths):
-        with sqlite3.connect(db_path) as conn:
-            conn.execute("DELETE FROM error_log")
-            conn.execute(
-                "UPDATE failed_gate_state SET is_active = 0, "
-                "reason = NULL, triggered_at = NULL, blocked_ticks = 0 WHERE id = 1"
-            )
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("DELETE FROM error_log")
+                conn.execute(
+                    "UPDATE failed_gate_state SET is_active = 0, "
+                    "reason = NULL, triggered_at = NULL, blocked_ticks = 0 WHERE id = 1"
+                )
+        except sqlite3.OperationalError:
+            # Database file may not exist in concurrent test scenarios
+            pass
 
 
 @pytest.fixture
