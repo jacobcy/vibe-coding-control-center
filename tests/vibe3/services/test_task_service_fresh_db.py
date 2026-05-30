@@ -160,7 +160,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
         def add_issue_label(self, issue_number: int, label: str) -> bool:
             self.calls.append(("add", issue_number, label))
             assert issue_number == 467
-            assert label in {"supervisor", "state/handoff"}
+            assert label in {"supervisor", "state/handoff", "vibe-task"}
             return True
 
         def get_issue_labels(self, issue_number: int):
@@ -199,6 +199,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
     assert any(flow["branch"] == "task/issue-467" for flow in related_flows)
     assert ("add", 467, "supervisor") in label_port.calls
     assert ("add", 467, "state/handoff") in label_port.calls
+    assert ("add", 467, "vibe-task") in label_port.calls  # Auto-mirrored
     assert ("remove", 467, "state/claimed") in label_port.calls
 
 
