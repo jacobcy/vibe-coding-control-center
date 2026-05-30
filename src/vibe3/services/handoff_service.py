@@ -327,20 +327,10 @@ class HandoffService:
 
         self.store.update_flow_state(target_branch, **flow_updates)
 
-        event_refs: dict[str, str] = {"ref": ref_value}
-        if verdict:
-            event_refs["verdict"] = verdict
-
-        # Active handoff event type (passive recorded via record_passive_artifact)
-        event_type = f"handoff_{ref_kind.lower()}"
-        self.store.add_event(
-            target_branch,
-            event_type,
-            effective_actor,
-            detail=message,
-            refs=event_refs,
-        )
-
+        # Write to handoff file (best-effort, non-authoritative)
+        # This replaces the duplicate event recording pattern:
+        # - OLD: add_event(handoff_plan) + append_current_handoff(handoff_append)
+        # - NEW: only append_current_handoff (single event via FlowTimelineService)
         try:
             self.append_current_handoff(
                 message=message,
