@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.prompts.manifest import DEFAULT_PROMPT_RECIPES_PATH
 
 

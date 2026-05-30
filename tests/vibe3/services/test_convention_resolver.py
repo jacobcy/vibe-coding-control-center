@@ -128,7 +128,7 @@ def test_convention_used_for_branch_generation():
 
 def test_convention_no_prefix_state_label():
     """Test state_label with empty prefix."""
-    from vibe3.config.profile_convention import ProfileConvention
+    from vibe3.config import ProfileConvention
 
     convention = ProfileConvention(state_prefix="")
     assert convention.state_label("handoff") == "handoff"

@@ -13,8 +13,7 @@ from vibe3.agents.plan_prompt import (
     make_plan_context_builder,
 )
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig, load_orchestra_config
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest

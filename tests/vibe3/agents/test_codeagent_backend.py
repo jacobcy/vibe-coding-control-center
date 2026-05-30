@@ -11,7 +11,7 @@ from vibe3.agents.backends.async_launcher import (
 from vibe3.agents.backends.codeagent import (
     CodeagentBackend,
 )
-from vibe3.config.settings import AgentPromptConfig, VibeConfig
+from vibe3.config import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,

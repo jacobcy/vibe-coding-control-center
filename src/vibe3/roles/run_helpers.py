@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,

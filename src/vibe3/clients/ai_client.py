@@ -6,7 +6,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.config.settings import AIConfig
+from vibe3.config import AIConfig
 
 # Check if litellm is available without importing
 HAS_LITELLM = importlib.util.find_spec("litellm") is not None

@@ -2,7 +2,7 @@
 
 from loguru import logger
 
-from vibe3.config.orchestra_config import PeriodicCheckConfig
+from vibe3.config import PeriodicCheckConfig
 from vibe3.orchestra.logging import append_orchestra_event
 
 

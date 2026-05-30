@@ -9,7 +9,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
+    from vibe3.config import TimelineCommentPolicy
 
 
 # Event type to display text mapping
@@ -79,7 +79,7 @@ class FlowTimelineService:
 
         # Use default policy if not provided
         if policy is None:
-            from vibe3.config.timeline_comment_policy import DEFAULT_COMMENT_POLICY
+            from vibe3.config import DEFAULT_COMMENT_POLICY
 
             policy = DEFAULT_COMMENT_POLICY
 

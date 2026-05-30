@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.services.issue_context_loader import load_issue_info
 
 app = typer.Typer(

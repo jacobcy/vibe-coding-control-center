@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.config.orchestra_settings import OrchestraConfig
+    from vibe3.config import OrchestraConfig
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.coordinator import ExecutionCoordinator

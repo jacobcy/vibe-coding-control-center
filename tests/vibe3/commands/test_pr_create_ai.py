@@ -9,7 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.config.settings import AIConfig
+from vibe3.config import AIConfig
 from vibe3.models.pr import UpdatePRRequest
 from vibe3.utils.branch_compare import BranchBehindInfo
 

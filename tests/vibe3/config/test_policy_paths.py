@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vibe3.config.settings import PlanConfig, ReviewConfig, RunConfig
+from vibe3.config import PlanConfig, ReviewConfig, RunConfig
 from vibe3.services.convention_resolver import ConventionResolver
 
 

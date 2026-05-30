@@ -44,7 +44,7 @@ class TestWorkingDirectoryIndependence:
         """Verify config loading works from any working directory."""
         import os
 
-        from vibe3.config.loader import get_config
+        from vibe3.config import get_config
         from vibe3.services.path_helpers import get_worktree_root
 
         # Save current working directory
@@ -113,7 +113,7 @@ class TestEnvironmentVariableIndependence:
             # If a test requires GITHUB_ACTIONS=true, it should mock it
 
             # Import and verify basic functionality works
-            from vibe3.config.loader import get_config
+            from vibe3.config import get_config
 
             config = get_config()
             assert config is not None

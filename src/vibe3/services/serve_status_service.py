@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.services.error_tracking_service import ErrorTrackingService

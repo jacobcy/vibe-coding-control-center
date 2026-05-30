@@ -13,7 +13,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin

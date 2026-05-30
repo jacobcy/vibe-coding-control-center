@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.config.profile_convention import ProfileConvention
+from vibe3.config import ProfileConvention
 
 if TYPE_CHECKING:
-    from vibe3.config.profile_config import ProfileConfig
+    from vibe3.config import ProfileConfig
 
 
 @dataclass
@@ -186,7 +186,7 @@ class ConventionResolver:
             ProfileConfig instance with detected or explicit profile.
         """
         from vibe3.adapters import get_adapter
-        from vibe3.config.profile_config import ProfileConfig
+        from vibe3.config import ProfileConfig
 
         detected_profile = self.profile or self._detect_profile()
         return ProfileConfig(profile=detected_profile, adapter_resolver=get_adapter)

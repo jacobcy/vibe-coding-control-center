@@ -83,8 +83,7 @@ class TestOrchestraConfigMapping:
     def test_from_settings_maps_supervisor_prompt_template(self) -> None:
         from unittest.mock import patch
 
-        from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig, load_orchestra_config
 
         settings = VibeConfig.get_defaults()
         settings.orchestra.supervisor_handoff.prompt_template = (
@@ -102,8 +101,7 @@ class TestOrchestraConfigMapping:
         """Default retry budget should be 3 (not 20) to fail fast on stuck entries."""
         from unittest.mock import patch
 
-        from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig, load_orchestra_config
 
         settings = VibeConfig.get_defaults()
 

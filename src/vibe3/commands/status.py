@@ -18,7 +18,7 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState

@@ -24,7 +24,7 @@ from vibe3.services.signature_service import SignatureService
 from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:
-    from vibe3.config.orchestra_config import OrchestraConfig
+    from vibe3.config import OrchestraConfig
     from vibe3.models.orchestration import IssueInfo
     from vibe3.services.orchestra_status_service import OrchestraSnapshot
 

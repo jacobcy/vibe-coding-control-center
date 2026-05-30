@@ -53,7 +53,7 @@ class CheckCleanupService:
         Returns:
             Dict with summary and details of cleaned branches.
         """
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
         from vibe3.services.expired_resource_cleanup_service import (
             ExpiredResourceCleanupService,
         )

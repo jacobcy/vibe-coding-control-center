@@ -185,7 +185,7 @@ class ExpiredResourceCleanupService:
             )
 
         # Load protected branches from config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)
@@ -325,7 +325,7 @@ class ExpiredResourceCleanupService:
             )
 
         # Load protected branches from config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)

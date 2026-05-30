@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 import vibe3.server.app as serve_module
 from vibe3.cli import app
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.server.registry import _build_async_serve_command

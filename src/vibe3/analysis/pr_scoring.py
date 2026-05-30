@@ -13,7 +13,7 @@ from enum import Enum
 from loguru import logger
 from pydantic import BaseModel
 
-from vibe3.config.loader import get_config
+from vibe3.config import get_config
 from vibe3.exceptions import VibeError
 
 

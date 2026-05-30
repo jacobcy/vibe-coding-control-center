@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 from vibe3.clients.ai_suggestion_client import AISuggestionClient
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService

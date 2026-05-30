@@ -10,7 +10,7 @@ from vibe3.agents.run_prompt import (
     make_run_context_builder,
 )
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.issue_role_support import build_issue_sync_spec
 from vibe3.execution.prompt_meta import build_prompt_meta

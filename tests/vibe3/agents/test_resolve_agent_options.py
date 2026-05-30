@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 
 

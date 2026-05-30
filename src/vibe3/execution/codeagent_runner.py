@@ -20,8 +20,7 @@ if TYPE_CHECKING:
         CodeagentCommand,
         CodeagentResult,
     )
-from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig, get_role_required_ref_key, get_role_section
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_lifecycle import (
@@ -69,7 +68,7 @@ class CodeagentExecutionService:
         the next tick does not re-dispatch the same issue.
         """
         from vibe3.clients.github_labels import GhIssueLabelPort
-        from vibe3.config.orchestra_settings import load_orchestra_config
+        from vibe3.config import load_orchestra_config
         from vibe3.services.orchestra_helpers import get_handoff_state_label
 
         config = load_orchestra_config()

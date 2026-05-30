@@ -11,7 +11,7 @@ from vibe3.analysis.change_scope_service import (
 )
 from vibe3.analysis.serena_service import SerenaService
 from vibe3.clients.git_client import GitClient
-from vibe3.config.loader import get_config
+from vibe3.config import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.change_source import BranchSource
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report

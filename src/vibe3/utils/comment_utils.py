@@ -3,7 +3,7 @@
 import re
 from typing import Any
 
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.utils.constants import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 

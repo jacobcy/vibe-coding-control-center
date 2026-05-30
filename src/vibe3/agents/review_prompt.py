@@ -18,7 +18,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.exceptions import VibeError
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.review import ReviewRequest

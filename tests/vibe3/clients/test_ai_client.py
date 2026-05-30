@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients.ai_client import AIClient
-from vibe3.config.settings import AIConfig
+from vibe3.config import AIConfig
 
 
 class TestAIClient:

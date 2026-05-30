@@ -3,7 +3,7 @@
 import pytest
 
 from vibe3.clients import SQLiteClient
-from vibe3.config.settings import FlowConfig, VibeConfig
+from vibe3.config import FlowConfig, VibeConfig
 from vibe3.models.flow import MainBranchProtectedError
 from vibe3.services.flow_service import FlowService
 

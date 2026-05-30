@@ -13,7 +13,7 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider

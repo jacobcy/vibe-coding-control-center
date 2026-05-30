@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService

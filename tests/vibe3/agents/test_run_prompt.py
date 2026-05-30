@@ -8,7 +8,7 @@ from vibe3.agents.run_prompt import (
     build_run_prompt_body,
     build_run_task_section,
 )
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 
 FORBIDDEN_INTERNAL_TOKENS = (

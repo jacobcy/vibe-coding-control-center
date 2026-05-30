@@ -16,7 +16,7 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.roles.run import (
     ensure_plan_file_exists,

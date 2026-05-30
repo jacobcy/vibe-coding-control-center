@@ -12,7 +12,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_lock import check_lock

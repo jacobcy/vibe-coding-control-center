@@ -6,13 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from vibe3.config import VibeConfig, load_config
 from vibe3.config.loader import (
     _deep_merge,
     _expand_variables,
-    load_config,
     load_yaml_config,
 )
-from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import ConfigError
 
 

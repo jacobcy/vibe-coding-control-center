@@ -6,7 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 
 
 def _load_loc_settings_module():

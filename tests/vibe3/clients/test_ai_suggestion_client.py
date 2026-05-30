@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from vibe3.clients.ai_client import AIClient
 from vibe3.clients.ai_suggestion_client import AISuggestionClient
-from vibe3.config.settings import AIConfig
+from vibe3.config import AIConfig
 
 
 class TestAISuggestionClient:

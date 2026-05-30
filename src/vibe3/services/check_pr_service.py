@@ -340,7 +340,7 @@ class CheckPRService:
             )
 
             # Rebuild flow after reset to avoid dangling state
-            from vibe3.config.orchestra_config import OrchestraConfig
+            from vibe3.config import OrchestraConfig
             from vibe3.services.flow_orchestrator_service import (
                 FlowOrchestratorService,
             )

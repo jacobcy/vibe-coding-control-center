@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 
 
 class TestExpandConfigVariables:

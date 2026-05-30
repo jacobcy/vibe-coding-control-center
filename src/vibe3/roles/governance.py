@@ -11,7 +11,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.execution import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root

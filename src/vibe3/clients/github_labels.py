@@ -43,7 +43,7 @@ class GhIssueLabelPort:
     def __init__(self, repo: str | None = None) -> None:
         self.repo = repo
         if self.repo is None:
-            from vibe3.config.settings import VibeConfig
+            from vibe3.config import VibeConfig
 
             config = VibeConfig.get_defaults()
             self.repo = getattr(getattr(config, "orchestra", None), "repo", None)
