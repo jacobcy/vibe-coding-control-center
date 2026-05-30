@@ -5,6 +5,7 @@ import os
 import signal
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -17,6 +18,10 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
+from vibe3.server.orchestra_instance import (
+    OrchestraInstanceInfo,
+    write_instance_info,
+)
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
@@ -297,9 +302,14 @@ def start(
     typer.echo(f"Status endpoint: GET http://0.0.0.0:{config.port}/status")
     typer.echo("Press Ctrl+C to stop")
 
-    # Write PID file for the synchronous server process
-    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
-    config.pid_file.write_text(str(os.getpid()))
+    # Write instance info to global PID file
+    instance_info = OrchestraInstanceInfo(
+        pid=os.getpid(),
+        cwd=Path.cwd(),
+        port=config.port,
+        started_at=datetime.now(),
+    )
+    write_instance_info(config.pid_file, instance_info)
 
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
