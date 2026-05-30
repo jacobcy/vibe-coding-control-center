@@ -49,13 +49,12 @@ def _resolve_async_cli_override_root(
 ) -> Path | None:
     """Resolve optional async child code-root override.
 
-    Only debug mode should override the async child code root. Normal mode must
-    keep using the installed/source vibe3 project root so cross-project scans
-    do not treat the caller repository as the vibe3 source tree.
+    DEPRECATED: Always returns None. Cross-project dispatch must always use
+    the installed/source vibe3 project root, never the caller repository.
+
+    Debug mode only affects logging verbosity and debug output, not code paths.
     """
-    if not config.debug:
-        return None
-    return (launch_cwd or Path.cwd()).resolve()
+    return None
 
 
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
