@@ -23,15 +23,14 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.services.orchestra_status_service import (
-    OrchestraSnapshot,
-    OrchestraStatusService,
-)
-
-from .orchestra_instance import (
+from vibe3.server.orchestra_instance import (
     OrchestraInstanceInfo,
     read_instance_info,
     validate_instance,
+)
+from vibe3.services import (
+    OrchestraSnapshot,
+    OrchestraStatusService,
 )
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"

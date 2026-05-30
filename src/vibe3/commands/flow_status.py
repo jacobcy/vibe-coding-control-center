@@ -31,11 +31,13 @@ from vibe3.commands.flow_status_helpers import (
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services.flow_projection_service import FlowProjectionService
-from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_branch_resolver import resolve_command_branch
-from vibe3.services.pr_service import PRService
-from vibe3.services.task_binding_guard import build_bind_task_hint
+from vibe3.services import (
+    FlowProjectionService,
+    FlowService,
+    PRService,
+    build_bind_task_hint,
+    resolve_command_branch,
+)
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_error,
@@ -125,13 +127,13 @@ def show(
 
         # Fallback: parse issue number from branch name when local DB missing
         if task_issue_number is None:
-            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services import IssueFlowService
 
             issue_flow_service = IssueFlowService(store=service.store)
             task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
 
     # Use resolver for source-aware read
-    from vibe3.services.flow_status_resolver import FlowStatusResolver
+    from vibe3.services import FlowStatusResolver
 
     resolver = FlowStatusResolver(store=service.store, flow_service=service)
     flow_status = resolver.resolve(
@@ -143,7 +145,7 @@ def show(
     # Handle non-registered flow or special branches
     if not flow_status or flow_status.flow_status == "aborted":
         if output_format == "table":
-            from vibe3.services.flow_service import FlowService as FlowService_
+            from vibe3.services import FlowService as FlowService_
 
             is_safe = target_branch.startswith(FlowService_.SAFE_BRANCH_PREFIX)
             is_aborted = flow_status and flow_status.flow_status == "aborted"
@@ -209,7 +211,7 @@ def show(
     if snapshot:
         # Use resolver's flow_status directly (already source-aware)
         # Do NOT re-read from local via FlowProjectionService.get_projection
-        from vibe3.services.flow_projection_service import FlowProjection
+        from vibe3.services import FlowProjection
 
         projection = FlowProjection.from_flow_status(flow_status)
 
@@ -361,7 +363,7 @@ def status(
         raise typer.Exit(0)
 
     # Try to fetch cached issue titles from orchestra server first
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services import OrchestraStatusService
 
     config = load_orchestra_config()
     orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)

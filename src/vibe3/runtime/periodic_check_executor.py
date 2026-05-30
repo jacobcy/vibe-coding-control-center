@@ -30,7 +30,7 @@ async def execute_periodic_check(
     """
     # Delay imports to avoid circular dependencies
     from vibe3.clients import SQLiteClient
-    from vibe3.services.check_service import CheckService
+    from vibe3.services import CheckService
 
     # Initialize services
     store = SQLiteClient()

@@ -13,8 +13,7 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.common import enable_method_trace, validate_trace_options
 from vibe3.models.flow import IssueLink
-from vibe3.services.flow_service import FlowService
-from vibe3.services.task_service import TaskService
+from vibe3.services import FlowService, TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_flow_created
 
@@ -173,8 +172,7 @@ def update(
         output_format = "json"
     from vibe3.clients.git_client import GitClient
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.branch_arg import resolve_branch_arg
-    from vibe3.services.convention_resolver import ConventionResolver
+    from vibe3.services import ConventionResolver, resolve_branch_arg
     from vibe3.utils.issue_ref import try_parse_issue_number
 
     # Early handling for issue number: resolve to canonical branch
@@ -220,7 +218,7 @@ def update(
         if name:
             updates["flow_slug"] = name
         if actor:
-            from vibe3.services.signature_service import SignatureService
+            from vibe3.services import SignatureService
 
             updates["latest_actor"] = SignatureService.resolve_actor(
                 explicit_actor=actor
@@ -454,7 +452,7 @@ def restore_flow(
         typer.echo("Error: Branch is required for flow restore", err=True)
         raise typer.Exit(1)
 
-    from vibe3.services.branch_arg import resolve_branch_arg
+    from vibe3.services import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 

@@ -39,7 +39,7 @@ from vibe3.roles.governance_utils import (
     find_material_in_catalog,
     get_governed_issue_numbers,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services import get_manager_usernames
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",

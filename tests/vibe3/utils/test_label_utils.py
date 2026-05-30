@@ -1,6 +1,6 @@
 """Tests for label utility functions."""
 
-from vibe3.services.label_utils import (
+from vibe3.services import (
     has_manager_assignee,
     normalize_assignees,
     normalize_labels,

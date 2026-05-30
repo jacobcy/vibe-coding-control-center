@@ -12,7 +12,7 @@ from vibe3.execution.issue_role_support import (
 )
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services import ConventionResolver
 
 
 def build_role_async_request(

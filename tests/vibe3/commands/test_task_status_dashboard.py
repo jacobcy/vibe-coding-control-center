@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.models.orchestration import IssueState
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services import OrchestraSnapshot
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 

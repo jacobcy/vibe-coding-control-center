@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.check_service import CheckResult
+from vibe3.services import CheckResult
 
 if TYPE_CHECKING:
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator

@@ -7,9 +7,7 @@ from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
 from vibe3.models.verdict_types import VerdictValue
-from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.handoff_service import HandoffService
-from vibe3.services.verdict_service import VerdictService
+from vibe3.services import HandoffService, VerdictService, resolve_branch_arg
 from vibe3.ui.console import console
 
 

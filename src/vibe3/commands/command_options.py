@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 import typer
 
 if TYPE_CHECKING:
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services import FlowService
 
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
@@ -89,7 +89,7 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
         typer.Exit: If on main branch or flow creation fails
     """
     from vibe3.models.flow import MainBranchProtectedError
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services import FlowService
 
     flow_service = FlowService()
     branch = flow_service.get_current_branch()

@@ -15,7 +15,7 @@ from vibe3.execution.issue_role_support import (
 from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
 from vibe3.models.orchestration import IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.services.flow_service import FlowService
+from vibe3.services import FlowService
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
@@ -189,7 +189,7 @@ def ensure_plan_file_exists(
         return
     if Path(plan_file).is_absolute() and Path(plan_file).exists():
         return
-    from vibe3.services.path_helpers import resolve_handoff_target
+    from vibe3.services import resolve_handoff_target
 
     try:
         resolve_handoff_target(plan_file, branch=branch)

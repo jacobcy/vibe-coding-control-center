@@ -19,13 +19,13 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.services import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.config.orchestra_config import OrchestraConfig
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services import OrchestraStatusService
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class GovernanceScanDependencies:
         from vibe3.agents.backends.codeagent import CodeagentBackend
         from vibe3.domain import FlowManager
         from vibe3.environment.session_registry import SessionRegistryService
-        from vibe3.services.orchestra_status_service import OrchestraStatusService
+        from vibe3.services import OrchestraStatusService
 
         backend = CodeagentBackend()
         registry = SessionRegistryService(store, backend)

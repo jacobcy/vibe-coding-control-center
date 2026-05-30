@@ -27,8 +27,7 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.issue_failure_service import fail_manager_issue
+from vibe3.services import ConventionResolver, fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",

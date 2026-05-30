@@ -2,7 +2,7 @@
 
 from vibe3.adapters import get_adapter
 from vibe3.config.profile_config import ProfileConfig
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services import ConventionResolver
 
 
 def test_profile_config_vibe_center_loads_adapter() -> None:

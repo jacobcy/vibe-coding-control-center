@@ -3,7 +3,7 @@
 import sqlite3
 
 from vibe3.clients import SQLiteClient
-from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services import ErrorTrackingService
 
 
 def test_get_all_errors_status_empty_db(temp_store: SQLiteClient) -> None:

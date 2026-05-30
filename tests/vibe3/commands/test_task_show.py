@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.services.task_service import (
+from vibe3.services import (
     TaskCommentSummary,
     TaskPRSummary,
     TaskRefSummary,

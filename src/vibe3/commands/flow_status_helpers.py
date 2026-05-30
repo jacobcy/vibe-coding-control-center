@@ -9,7 +9,7 @@ import typer
 from loguru import logger
 
 from vibe3.exceptions import UserError
-from vibe3.services.flow_projection_service import FlowProjectionService
+from vibe3.services import FlowProjectionService
 from vibe3.ui.flow_ui import render_error, render_flow_status
 from vibe3.utils.branch_utils import find_parent_branch
 
@@ -178,7 +178,7 @@ def _fetch_issue_titles_for_status(
         return titles, False
 
     # Server not running, use cache service with real branches
-    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+    from vibe3.services import IssueTitleCacheService
 
     branches = [flow.branch for flow in flows if flow.branch]
     title_cache = IssueTitleCacheService(

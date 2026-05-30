@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services import load_issue_info
 
 app = typer.Typer(
     name="internal",
@@ -62,7 +62,7 @@ def internal_apply_dispatch(
     ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
-    from vibe3.services.scan_service import dispatch_supervisor_execution
+    from vibe3.services import dispatch_supervisor_execution
 
     dispatch_supervisor_execution(issue_number=issue, no_async=no_async)
 
@@ -89,7 +89,7 @@ def internal_governance_dispatch(
     Note: This command is only called via CLI self-invocation (internal governance)
     from the tmux wrapper launched by governance_scan handler. It always runs sync.
     """
-    from vibe3.services.scan_service import dispatch_governance_execution
+    from vibe3.services import dispatch_governance_execution
 
     dispatch_governance_execution(tick_count=tick, material_override=material)
 
@@ -132,7 +132,7 @@ def internal_bootstrap(
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services import FlowOrchestratorService
 
     config = load_orchestra_config()
     store = SQLiteClient()
@@ -159,7 +159,7 @@ def backfill_worktree_paths() -> None:
     """Backfill worktree_path for existing active task/ flows."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.status_query_service import is_auto_task_branch
+    from vibe3.services import is_auto_task_branch
 
     git = GitClient()
     store = SQLiteClient()

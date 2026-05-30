@@ -18,7 +18,7 @@ from vibe3.models.pr_analysis import (  # noqa: F401
     CriticalFileInfo,
     PRCriticalAnalysis,
 )
-from vibe3.services.pr_analysis_service import (  # noqa: F401 - backward compat re-exports
+from vibe3.services import (  # noqa: F401 - backward compat re-exports
     _analyze_critical_files,
     _calculate_risk_score,
     _filter_critical_files,

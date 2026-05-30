@@ -16,7 +16,7 @@ import pytest
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.exceptions.runtime_errors import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
-from vibe3.services.issue_failure_service import (
+from vibe3.services import (
     fail_issue,
 )
 
@@ -197,7 +197,7 @@ class TestDependencyNotSatisfiedTriggersBlock:
 
     def test_flow_service_block_flow_writes_blocked_reason(self, temp_db):
         """FlowService.block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services import FlowService
 
         branch = "test-branch"
 
@@ -222,7 +222,7 @@ class TestErrorBlockOrthogonality:
 
     def test_error_log_stores_runtime_errors(self, temp_db):
         """Runtime errors should be stored in error_log, not block flow."""
-        from vibe3.services.error_tracking_service import ErrorTrackingService
+        from vibe3.services import ErrorTrackingService
 
         branch = "test-branch"
 
@@ -241,7 +241,7 @@ class TestErrorBlockOrthogonality:
 
     def test_block_flow_writes_blocked_reason(self, temp_db):
         """block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services import FlowService
 
         branch = "test-branch"
 

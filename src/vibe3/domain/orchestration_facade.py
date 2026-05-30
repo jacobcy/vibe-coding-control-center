@@ -93,8 +93,7 @@ class OrchestrationFacade(ServiceBase):
         if self._capacity is not None:
             from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
             from vibe3.environment.session_registry import SessionRegistryService
-            from vibe3.services.check_service import CheckService
-            from vibe3.services.flow_service import FlowService
+            from vibe3.services import CheckService, FlowService
 
             actual_store = store or SQLiteClient()
             self._registry = registry or SessionRegistryService(

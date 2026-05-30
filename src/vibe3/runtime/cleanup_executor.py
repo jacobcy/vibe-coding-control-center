@@ -23,7 +23,7 @@ async def execute_expired_resource_cleanup(
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.expired_resource_cleanup_service import (
+    from vibe3.services import (
         ExpiredResourceCleanupService,
     )
 

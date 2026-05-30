@@ -31,8 +31,7 @@ from vibe3.execution.execution_lifecycle import (
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.actor_support import format_agent_actor
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services import HandoffService, format_agent_actor
 
 
 @dataclass
@@ -70,7 +69,7 @@ class CodeagentExecutionService:
         """
         from vibe3.clients.github_labels import GhIssueLabelPort
         from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.services.orchestra_helpers import get_handoff_state_label
+        from vibe3.services import get_handoff_state_label
 
         config = load_orchestra_config()
         handoff_label = get_handoff_state_label(config.supervisor_handoff)
@@ -430,7 +429,7 @@ class CodeagentExecutionService:
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.services.error_helpers import record_error
+            from vibe3.services import record_error
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.

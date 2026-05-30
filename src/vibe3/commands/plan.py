@@ -17,9 +17,7 @@ from vibe3.roles.plan import (
     execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
-from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_resolution import resolve_handoff_target
+from vibe3.services import FlowService, resolve_branch_arg, resolve_handoff_target
 
 app = typer.Typer(
     name="plan",

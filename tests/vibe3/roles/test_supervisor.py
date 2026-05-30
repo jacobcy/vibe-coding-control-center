@@ -16,7 +16,7 @@ from vibe3.roles.supervisor import (
     get_supervisor_prompt_path,
     iter_supervisor_identified_events,
 )
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services import ConventionResolver
 
 
 def _make_config(**overrides) -> OrchestraConfig:

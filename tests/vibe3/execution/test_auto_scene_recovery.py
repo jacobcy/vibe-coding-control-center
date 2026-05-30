@@ -9,7 +9,7 @@ from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_cleanup_service import LiveSessionsDetectedError
+from vibe3.services import LiveSessionsDetectedError
 
 
 @pytest.fixture

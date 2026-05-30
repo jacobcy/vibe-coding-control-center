@@ -265,7 +265,7 @@ class TestManagerBlockedReasonWriting:
             with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
                 mock_flow_instance = mock_flow_service.return_value
 
-                from vibe3.services.issue_failure_service import (
+                from vibe3.services import (
                     block_manager_noop_issue,
                 )
 

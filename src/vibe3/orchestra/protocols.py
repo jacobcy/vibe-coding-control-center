@@ -12,7 +12,7 @@ from typing import Protocol
 
 from vibe3.clients.git_client import GitClient
 from vibe3.models.orchestration import IssueInfo
-from vibe3.services.check_service import CheckResult
+from vibe3.services import CheckResult
 
 
 class CapacityServiceProtocol(Protocol):

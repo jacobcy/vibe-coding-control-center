@@ -25,7 +25,7 @@ from vibe3.models.review import ReviewRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.resources.runtime_assets import resolve_runtime_asset
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services import ConventionResolver
 
 ReviewPromptMode = Literal["first", "retry"]
 

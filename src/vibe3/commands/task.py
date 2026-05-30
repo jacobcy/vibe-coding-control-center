@@ -12,9 +12,7 @@ from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
-from vibe3.services.flow_service import FlowService
-from vibe3.services.task_resume_usecase import TaskResumeUsecase
-from vibe3.services.task_service import TaskService
+from vibe3.services import FlowService, TaskResumeUsecase, TaskService
 from vibe3.ui.task_ui import (
     render_task_comments,
     render_task_show,

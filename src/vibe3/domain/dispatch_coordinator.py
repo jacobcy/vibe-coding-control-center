@@ -49,14 +49,14 @@ from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
-from vibe3.services.check_service import CheckService
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_collection_service import IssueCollectionService
-from vibe3.services.label_utils import (
+from vibe3.services import (
+    CheckService,
+    FlowService,
+    IssueCollectionService,
     clean_old_state_labels,
+    get_manager_usernames,
     should_skip_from_queue,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient

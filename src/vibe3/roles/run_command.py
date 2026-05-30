@@ -29,8 +29,7 @@ from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
 )
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.services import ConventionResolver, record_dispatch_failure_if_unexpected
 
 
 def resolve_skill_path(

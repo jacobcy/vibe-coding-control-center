@@ -16,12 +16,14 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.pr_service import PRService
-from vibe3.services.task_service import TaskService
+from vibe3.services import (
+    FlowOrchestratorService,
+    FlowService,
+    IssueFlowService,
+    LabelService,
+    PRService,
+    TaskService,
+)
 
 
 class FlowManager:

@@ -240,7 +240,7 @@ class TestHandoffBasicCommands:
         self, mock_flow_service_class, mock_handoff_status_service_class
     ):
         """Test handoff status --format json outputs JSON."""
-        from vibe3.services.handoff_status_service import HandoffStatusResult
+        from vibe3.services import HandoffStatusResult
 
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "feature/test"
@@ -279,7 +279,7 @@ class TestHandoffBasicCommands:
         self, mock_flow_service_class, mock_handoff_status_service_class
     ):
         """Test handoff status --format yaml outputs YAML."""
-        from vibe3.services.handoff_status_service import HandoffStatusResult
+        from vibe3.services import HandoffStatusResult
 
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "feature/test"
@@ -315,7 +315,7 @@ class TestHandoffBasicCommands:
         self, mock_flow_service_class, mock_handoff_status_service_class
     ):
         """Test handoff status --json shows deprecation warning."""
-        from vibe3.services.handoff_status_service import HandoffStatusResult
+        from vibe3.services import HandoffStatusResult
 
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "feature/test"

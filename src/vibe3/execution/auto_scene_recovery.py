@@ -105,10 +105,10 @@ class AutoSceneRecoveryService:
         error_msg: str,
     ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
-        from vibe3.services.error_helpers import record_error
-        from vibe3.services.flow_cleanup_service import (
+        from vibe3.services import (
             FlowCleanupService,
             LiveSessionsDetectedError,
+            record_error,
         )
 
         detail = "; ".join(damage_signals)
@@ -218,7 +218,7 @@ class AutoSceneRecoveryService:
 
         # Use BlockedStateService to unblock and restore to READY
         # This ensures all three sources (body, DB, labels) are cleared
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services import BlockedStateService
 
         service = BlockedStateService(store=self.store)
         service.unblock(

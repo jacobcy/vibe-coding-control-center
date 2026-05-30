@@ -24,7 +24,7 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.roles.plan import build_plan_request
 from vibe3.roles.review import build_review_request
 from vibe3.roles.run import build_run_request
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
 
@@ -106,7 +106,7 @@ def _dispatch_role_intent(
         else:
             # Unexpected failure - record to error_log and log warning
             # FailedGate will control dispatch based on threshold
-            from vibe3.services.error_helpers import record_error
+            from vibe3.services import record_error
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:

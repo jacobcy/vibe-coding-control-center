@@ -13,8 +13,7 @@ from loguru import logger
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import promote_progressed_entries
-from vibe3.services.label_utils import should_skip_from_queue
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services import get_manager_usernames, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient

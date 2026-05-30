@@ -25,8 +25,7 @@ from vibe3.roles.run_helpers import (
     RUN_BRANCH_RESOLVER,
     resolve_run_options,
 )
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.issue_failure_service import fail_executor_issue
+from vibe3.services import ConventionResolver, fail_executor_issue
 
 
 def build_run_request(

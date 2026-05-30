@@ -14,8 +14,7 @@ from rich.progress import (
     TextColumn,
 )
 
-from vibe3.services.check_remote import InitResult
-from vibe3.services.check_service import CheckResult, CheckService
+from vibe3.services import CheckResult, CheckService, InitResult
 
 
 @dataclass
@@ -103,7 +102,7 @@ def execute_check_mode(
 
     if mode == "clean_branch":
         # Use dedicated cleanup service for --clean-branch
-        from vibe3.services.check_cleanup_service import CheckCleanupService
+        from vibe3.services import CheckCleanupService
 
         cleanup_service = CheckCleanupService(
             store=service.store,

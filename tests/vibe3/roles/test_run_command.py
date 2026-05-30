@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.roles.run_command import resolve_skill_path
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services import ConventionResolver
 
 
 def test_skill_path_uses_profile():

@@ -16,7 +16,7 @@ from vibe3.orchestra.logging import (
 )
 from vibe3.runtime.periodic_check_executor import execute_periodic_check
 from vibe3.runtime.service_protocol import ServiceBase
-from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services import ErrorTrackingService
 
 if TYPE_CHECKING:
     from vibe3.domain.failed_gate import FailedGate

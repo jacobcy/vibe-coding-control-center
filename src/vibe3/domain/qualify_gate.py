@@ -15,9 +15,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.coordination_resolver import CoordinationResolver
-from vibe3.services.flow_resume_resolver import infer_resume_label
+from vibe3.services import ConventionResolver, CoordinationResolver, infer_resume_label
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -191,7 +189,7 @@ class QualifyGateService:
         match the remote truth. Adds state/blocked label if missing.
         """
         from vibe3.orchestra.logging import append_orchestra_event
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
         label_blocked = blocked_label in labels
@@ -215,7 +213,7 @@ class QualifyGateService:
 
         if blocked_label not in labels:
             try:
-                from vibe3.services.label_service import LabelService
+                from vibe3.services import LabelService
 
                 label_service = LabelService(repo=self.config.repo)
                 label_service.confirm_issue_state(
@@ -306,8 +304,7 @@ class QualifyGateService:
         """
         from vibe3.models.flow import FlowState
         from vibe3.orchestra.logging import append_orchestra_event
-        from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.label_service import LabelService
+        from vibe3.services import BlockedStateService, LabelService
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -355,8 +352,7 @@ class QualifyGateService:
         wt_path = Path(worktree_path)
         if not wt_path.exists():
             reason = f"Worktree path does not exist: {worktree_path}"
-            from vibe3.services.blocked_state_service import BlockedStateService
-            from vibe3.services.label_service import LabelService
+            from vibe3.services import BlockedStateService, LabelService
 
             service = BlockedStateService(
                 store=self._store,
@@ -393,8 +389,7 @@ class QualifyGateService:
                     f"Worktree branch mismatch: expected {branch}, "
                     f"got {actual_branch}"
                 )
-                from vibe3.services.blocked_state_service import BlockedStateService
-                from vibe3.services.label_service import LabelService
+                from vibe3.services import BlockedStateService, LabelService
 
                 service = BlockedStateService(
                     store=self._store,
@@ -440,8 +435,7 @@ class QualifyGateService:
             return True
 
         # Use BlockedStateService for consistent three-source blocking
-        from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.label_service import LabelService
+        from vibe3.services import BlockedStateService, LabelService
 
         service = BlockedStateService(
             store=self._store,

@@ -22,14 +22,15 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.server import _validate_pid_file
-from vibe3.services.flow_service import FlowService
-from vibe3.services.orchestra_helpers import get_manager_usernames
-from vibe3.services.orchestra_status_service import OrchestraStatusService
-from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
-from vibe3.services.task_status_classifier import (
+from vibe3.server.registry import _validate_pid_file
+from vibe3.services import (
+    FlowService,
+    OrchestraStatusService,
+    StatusQueryService,
     TaskStatusBucket,
     classify_task_status,
+    get_manager_usernames,
+    is_auto_task_branch,
 )
 from vibe3.ui.console import console
 from vibe3.utils.time_format import format_age_aware_time
@@ -144,7 +145,7 @@ def status(
     if not orch_snapshot:
         from dataclasses import replace
 
-        from vibe3.services.flow_orchestrator_service import (
+        from vibe3.services import (
             FlowOrchestratorService,
         )
 

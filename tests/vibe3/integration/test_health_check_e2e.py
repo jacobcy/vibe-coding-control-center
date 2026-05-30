@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.services.check_service import CheckService
+from vibe3.services import CheckService
 
 
 def test_closed_issue_flow_gets_aborted_e2e(temp_store: SQLiteClient) -> None:

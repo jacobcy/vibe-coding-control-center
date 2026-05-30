@@ -3,7 +3,7 @@
 from typing import Any
 
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.services.path_helpers import ref_to_handoff_cmd
+from vibe3.services import ref_to_handoff_cmd
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
@@ -150,7 +150,7 @@ def render_flow_status(
             f"  [dim]verdict:[/] [{verdict_color}]{v.verdict}[/]" f"  [dim]{v.actor}[/]"
         )
 
-    from vibe3.services.spec_ref_service import SpecRefService
+    from vibe3.services import SpecRefService
 
     spec_service = SpecRefService()
     spec_display = spec_service.get_spec_display(
@@ -233,7 +233,7 @@ def render_flows_status_dashboard(
     - Blocked: Flows with blocked_by
     - Done/Aborted/Stale: Completed flows
     """
-    from vibe3.services.flow_classifier import (
+    from vibe3.services import (
         FlowCategory,
         FlowState,
         classify_flow,

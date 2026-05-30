@@ -148,7 +148,7 @@ class TestBlockModulesDoNotImportErrorModules:
         """BLOCK modules should not import record_error helper."""
         for file_path in block_files:
             content = get_file_content(file_path)
-            if "from vibe3.services.error_helpers import record_error" in content:
+            if "from vibe3.services import record_error" in content:
                 pytest.fail(
                     f"{file_path.name} imports record_error "
                     f"from services.error_helpers (ERROR module)"

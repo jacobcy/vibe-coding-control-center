@@ -16,8 +16,7 @@ from vibe3.orchestra.issue_loader import (
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.services.label_utils import should_skip_from_queue
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services import get_manager_usernames, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient

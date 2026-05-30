@@ -17,9 +17,7 @@ from vibe3.execution.role_contracts import (
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.orchestra_helpers import get_handoff_state_label
+from vibe3.services import ConventionResolver, IssueFlowService, get_handoff_state_label
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
