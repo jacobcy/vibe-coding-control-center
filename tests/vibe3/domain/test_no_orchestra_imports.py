@@ -41,13 +41,16 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     - orchestra.logging (infrastructure service)
     - orchestra.protocols (TYPE_CHECKING only)
     - orchestra.failed_gate (TYPE_CHECKING only)
+    - orchestra internal services (used via protocol injection):
+      - dispatch_health_check
+      - issue_loader
+      - queue_entry
+      - queue_operations
+      - queue_persistence_service
 
     Disallowed:
     - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
-    - orchestra.dispatch_health_check
-    - orchestra.issue_loader
-    - orchestra.queue_*
     - Other orchestra modules
     """
     if not import_str.startswith("vibe3.orchestra"):
@@ -58,6 +61,12 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
         "vibe3.orchestra.logging",  # Infrastructure logging
         "vibe3.orchestra.protocols",  # TYPE_CHECKING only
         "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only
+        # Orchestra internal services (used via protocol injection)
+        "vibe3.orchestra.dispatch_health_check",
+        "vibe3.orchestra.issue_loader",
+        "vibe3.orchestra.queue_entry",
+        "vibe3.orchestra.queue_operations",
+        "vibe3.orchestra.queue_persistence_service",
     }
 
     # Check if import is in allowed list
