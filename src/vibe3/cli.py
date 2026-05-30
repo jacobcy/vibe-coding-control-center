@@ -38,7 +38,6 @@ from vibe3.commands import (  # noqa: E402
     status,
     task,
 )
-from vibe3.commands.command_options import FormatOption  # noqa: E402
 from vibe3.exceptions import SystemError, UserError  # noqa: E402
 from vibe3.observability import setup_logging  # noqa: E402
 from vibe3.server import app as serve  # noqa: E402
@@ -110,33 +109,16 @@ app.add_typer(mcp.app, name="mcp")
 app.add_typer(ask.app, name="ask")
 
 
-@app.command(name="status", hidden=True)
+@app.command(name="status")
 def status_command(
-    all_flows: status.AllOption = False,
-    check: Annotated[
-        bool,
-        typer.Option("--check", help="显示前先运行完整 vibe3 check"),
-    ] = False,
-    output_format: FormatOption = "table",
+    json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: status.TraceOption = False,
-    min_ms: status.TraceMinMsOption = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="[DEPRECATED] Use --format json instead",
-            hidden=True,
-        ),
-    ] = False,
 ) -> None:
-    """[Compatibility] Redirect to task status."""
-    status.status(
-        all_flows=all_flows,
-        check=check,
-        output_format=output_format,
-        trace=trace,
-        min_ms=min_ms,
+    """Show governance status: manager-assigned issues, RFC/Epic/Blocked counts,
+    and pool health."""
+    status.governance_status(
         json_output=json_output,
+        trace=trace,
     )
 
 

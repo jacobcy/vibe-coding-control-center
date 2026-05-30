@@ -432,3 +432,109 @@ def render_scene_sections(
             )
     else:
         console.print("  [dim](none)[/]")
+
+
+def render_governance_dashboard(
+    manager_assigned: list[dict[str, object]],
+    rfc_items: list[dict[str, object]],
+    epic_items: list[dict[str, object]],
+    blocked_items: list[dict[str, object]],
+    waiting_pool: list[dict[str, object]],
+    governed_anomaly: list[dict[str, object]],
+) -> None:
+    """Render governance-focused status dashboard.
+
+    Consolidates governance-relevant issue subsets into a compact single-view summary.
+    """
+    console.print("[bold]Governance Status[/]\n")
+
+    # Manager-Assigned Issues section
+    console.print(f"[bold cyan]Manager-Assigned Issues:[/] {len(manager_assigned)}")
+    if manager_assigned:
+        # Group by state label
+        by_state: dict[str, list[dict[str, object]]] = {}
+        for item in manager_assigned:
+            state = cast(IssueState | None, item.get("state"))
+            state_str = state.value if state else "no-state"
+            if state_str not in by_state:
+                by_state[state_str] = []
+            by_state[state_str].append(item)
+
+        for state_str in sorted(by_state.keys()):
+            items = by_state[state_str]
+            for item in items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                state = cast(IssueState | None, item.get("state"))
+                state_str_display = state.value if state else "no-state"
+                display_title = title[:48] + "..." if len(title) > 48 else title
+                console.print(
+                    f"  #{number:4}  [cyan]{state_str_display:12}[/]  {display_title}"
+                )
+    else:
+        console.print("  [dim](none)[/]")
+    console.print()
+
+    # RFC Issues section
+    console.print(f"[bold cyan]RFC Issues:[/] {len(rfc_items)}")
+    if rfc_items:
+        for item in rfc_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState | None, item.get("state"))
+            state_str = state.value if state else "no-state"
+            display_title = title[:60] + "..." if len(title) > 60 else title
+            console.print(f"  #{number:4}  [yellow]{state_str:10}[/]  {display_title}")
+    else:
+        console.print("  [dim](none)[/]")
+    console.print()
+
+    # Epic Issues section
+    console.print(f"[bold cyan]Epic Issues:[/] {len(epic_items)}")
+    if epic_items:
+        for item in epic_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState | None, item.get("state"))
+            state_str = state.value if state else "no-state"
+            display_title = title[:60] + "..." if len(title) > 60 else title
+            console.print(f"  #{number:4}  [magenta]{state_str:10}[/]  {display_title}")
+    else:
+        console.print("  [dim](none)[/]")
+    console.print()
+
+    # Blocked Issues section
+    console.print(f"[bold cyan]Blocked Issues:[/] {len(blocked_items)}")
+    if blocked_items:
+        for item in blocked_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            display_title = title[:60] + "..." if len(title) > 60 else title
+            console.print(f"  #{number:4}  [red]BLOCKED    [/]  {display_title}")
+    else:
+        console.print("  [dim](none)[/]")
+    console.print()
+
+    # Pool Health section
+    console.print("[bold cyan]Pool Health:[/]")
+    console.print(f"  Manager-assigned (total): {len(manager_assigned)}")
+
+    # Waiting for governance
+    waiting_count = len(waiting_pool)
+    if waiting_pool:
+        waiting_numbers = [f"#{cast(int, item['number'])}" for item in waiting_pool]
+        numbers_str = ", ".join(waiting_numbers)
+        console.print(f"  Waiting for governance: {waiting_count}    ({numbers_str})")
+    else:
+        console.print(f"  Waiting for governance: {waiting_count}")
+
+    # State-missing (governed anomaly)
+    anomaly_count = len(governed_anomaly)
+    if governed_anomaly:
+        anomaly_numbers = [f"#{cast(int, item['number'])}" for item in governed_anomaly]
+        numbers_str = ", ".join(anomaly_numbers)
+        console.print(
+            f"  State-missing (governed anomaly): {anomaly_count}  ({numbers_str})"
+        )
+    else:
+        console.print(f"  State-missing (governed anomaly): {anomaly_count}")
