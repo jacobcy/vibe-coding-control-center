@@ -104,6 +104,22 @@ tmux display-message -p '#{session_name}'
   - 检查现有代码使用的命名模式
   - 检查是否有已存在的相似解决方案
 
+- **验证包级导入（通过 `__init__.py` 重导出链）**
+  - 如果计划涉及以下任一改动，必须测试包级导入：
+    - 新增/修改 `__init__.py` 中的 re-export
+    - 新增/修改模块间的交叉导入
+    - 移动或重命名符号
+    - 重组模块结构
+  - 验证命令模板：
+    ```bash
+    # 直接子模块导入（验证子模块自身无循环依赖）
+    uv run python -c "from vibe3.<module>.<submodule> import <Symbol>"
+    
+    # 包级导入（验证 __init__.py 重导出链无循环依赖）
+    uv run python -c "from vibe3.<module> import <Symbol>"
+    ```
+  - 失败处理：直接导入通过而包级导入失败是循环依赖的典型信号，必须在 plan 阶段记录为 finding 并标记为阻塞条件
+
 - **如果发现冲突**：
   ```bash
   uv run python src/vibe3/cli.py handoff append "Plan 前提不成立：<具体冲突点>" --kind finding --actor "<actor>"
