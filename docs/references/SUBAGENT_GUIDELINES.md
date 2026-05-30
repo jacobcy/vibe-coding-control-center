@@ -18,10 +18,11 @@ related_docs:
 
 ### ⭐⭐⭐ 强烈推荐
 
-**1. vibe-review-code**
+**1. vibe3-review (vibe3 review)**
 - **Token 成本**: 非常高（读取大量代码文件）
 - **执行时间**: 长（几分钟）
 - **优化策略**:
+  - **V3 模式**: 使用 `vibe3 review --branch <issue>` 或 `vibe3 review base` (Snapshot 对比)
   - **本地审查**: 使用 `codex review --uncommitted` (Codex CLI 本地审查)
   - **在线审查**: 在 PR 中评论 `@codex review` 触发 Codex Cloud 审查
   - **次选**: 使用 subagent + AI 审查
@@ -59,8 +60,8 @@ related_docs:
 
 | Skill | 原始成本 | 优化后成本 | 节省 |
 |-------|---------|-----------|------|
-| vibe-review-code | ~10K tokens | ~500 tokens (codex) | **95%** |
-| vibe-review-code | ~10K tokens | ~2K tokens (subagent) | **80%** |
+| vibe3-review | ~10K tokens | ~500 tokens (codex) | **95%** |
+| vibe3-review | ~10K tokens | ~2K tokens (subagent) | **80%** |
 | vibe-review-docs | ~5K tokens | ~1K tokens (subagent) | **80%** |
 | vibe-roadmap | ~5K tokens | ~1K tokens (subagent) | **80%** |
 | vibe-skills-manager | ~3K tokens | ~800 tokens (subagent) | **73%** |
@@ -88,5 +89,5 @@ AI 会根据 skill description 中的 `**RECOMMENDED: Run as subagent to save to
 - 2026-03-07: 初始版本，标记 vibe-review-code, vibe-review-docs, vibe-roadmap, vibe-skills-manager
 - 2026-03-07: 增强 `codex review --uncommitted` 支持 codex/copilot fallback
 - 2026-05-05: 补充在线审查触发方式说明
-- 2026-05-03: 对齐 deprecated `vibe flow` patterns，更新为 `codex review` CLI
+- 2026-05-30: 对齐 V3 `vibe3 review` 命令模式与 subagent 推荐策略
 

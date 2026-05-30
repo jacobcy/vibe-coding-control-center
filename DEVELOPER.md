@@ -82,11 +82,11 @@ uv run pytest tests/vibe3
 
 | AI 的坏习惯 | 我们的制约 |
 |---|---|
-| 无限膨胀代码量 | LOC 硬上限：总量 ≤ 7000 行，单文件 ≤ 300 行 |
+| 无限膨胀代码量 | LOC 硬上限：Python 总量 ≤ 65000 行，单文件警告 300/阻塞 400 |
+| 文档膨胀 | 文档单文件：警告 500 / 阻塞 800 |
 | 添加"万一用到"的函数 | 零死代码：每个函数必须有调用者 |
-| 不测试直接提交 | 所有修改必须通过 `bats tests/` |
-| 自己看不见语法错误 | 修改后必须运行 `zsh -n` + `shellcheck` |
-| 不知道改了哪些地方 | 修改前必须查引用关系（Serena AST） |
+| 不测试直接提交 | 所有修改必须通过 `bats tests/` (V2) 或 `pytest tests/vibe3` (V3) |
+| 自己看不见语法错误 | 修改后必须运行 lint (Shell) 或 ruff/mypy (Python) |
 | 不经审批加功能 | SOUL.md + CLAUDE.md 锁死边界 |
 
 ### 3.2 三层防护机制
@@ -96,8 +96,11 @@ uv run pytest tests/vibe3
 写在 `CLAUDE.md` 和 `SOUL.md` 中的不可违反规则：
 
 ```
-- lib/ + bin/ 总 LOC ≤ 7000
-- 任何单个 .sh 文件 ≤ 300 行
+- V3 Python 总 LOC ≤ 65000 (config/v3/loc_limits.yaml)
+- 任何单个 .py 文件：警告 300 / 阻塞 400
+- 任何单个 .md 文档：警告 500 / 阻塞 800
+- lib/ + bin/ 总 LOC ≤ 7000 (V2 Shell)
+- 任何单个 .sh 文件 ≤ 300 行 (V2 Shell)
 - 零死代码：每个函数必须有 ≥1 个调用者
 - 不得在 SOUL.md 之外新增 CLI 功能
 ```
@@ -173,10 +176,10 @@ bats tests/
 
 `.github/workflows/ci.yml` 在每次 Push 和 PR 时自动运行：
 
-1. `bash scripts/hooks/lint.sh` — 双层 lint
-2. `bats tests/` — 所有测试
-3. LOC 总量检查（`find lib/ bin/ | xargs wc -l` ≤ 7000）
-4. 单文件行数检查（每个文件 ≤ 300 行）
+1. `bash scripts/hooks/lint.sh` — 双层 lint (Shell) + ruff/mypy (Python)
+2. `bats tests/` & `pytest tests/vibe3` — 所有测试
+3. Python LOC 总量检查 (≤ 65000)
+4. 单文件行数检查 (Code ≤ 400, Doc ≤ 800)
 
 **CI 不过 = PR 不能合并。**
 
@@ -185,21 +188,22 @@ bats tests/
 随时运行以下命令查看项目健康状态：
 
 ```bash
-bash scripts/tools/metrics.sh
+uv run python src/vibe3/cli.py check --metrics  # V3 核心仪表盘
+bash scripts/tools/metrics.sh                  # V2 Legacy 仪表盘
 ```
 
-输出示例：
+输出示例 (V3)：
 
 ```
-## 📊 MSC 健康度仪表盘
+## 📊 Vibe Center 健康度仪表盘
 
-| 指标       | 上限  | 当前值 | 状态 |
-|-----------|-------|--------|------|
-| 总 LOC    | 7000  | 689    | ✅   |
-| 最大文件  | 300   | 191    | ✅   |
-| 测试用例  | ≥20   | 20     | ✅   |
-| ShellCheck| 0错误 | 0      | ✅   |
-| 死代码函数| 0     | 0      | ✅   |
+| 指标       | 上限         | 当前值  | 状态 |
+|-----------|--------------|---------|------|
+| Python LOC| 65000        | 45894   | ✅   |
+| Code 文件 | 400          | 320     | ✅   |
+| Doc 文件  | 800          | 505     | ✅   |
+| Pytest    | 0 失败       | 0       | ✅   |
+| Type Check| 0 错误       | 0       | ✅   |
 ```
 
 ---

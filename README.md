@@ -40,8 +40,9 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 
 ```bash
 # 1. 查看 V3 运行时与 Flow 状态 (这是 Agent 的首选入口)
-uv run python src/vibe3/cli.py status
-uv run python src/vibe3/cli.py flow show
+vibe3 status
+vibe3 flow update
+vibe3 flow show
 
 # 2. 如果是首次使用或环境变更，执行初始化
 # 这会同步基础文件并初始化本地 worktree (symlinks, hooks, etc.)
