@@ -7,7 +7,7 @@
 > `SystemError / UserError / BatchError`。  
 > Orchestra 运行时的 `CRITICAL / ERROR / WARNING`、`failed_gate`、
 > `blocked` 语义，不由本文档定义，统一以
-> [vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)
+> [error-severity-and-blocking-standard.md](./v3/error-severity-and-blocking-standard.md)
 > 为准。
 
 ---

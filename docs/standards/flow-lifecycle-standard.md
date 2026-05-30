@@ -12,7 +12,7 @@ created: 2026-04-28
 last_updated: 2026-04-28
 related_docs:
   - docs/standards/glossary.md
-  - docs/standards/vibe3-error-severity-and-blocking-standard.md
+  - docs/standards/v3/error-severity-and-blocking-standard.md
   - docs/standards/vibe3-role-checks-and-balances-standard.md
   - docs/standards/v3/data-model-standard.md
   - docs/standards/vibe3-event-driven-standard.md
@@ -74,7 +74,7 @@ new → active ↔ blocked
 
 **ERROR 与 BLOCK 的正交化 (Decoupling)**：
 
-见 [vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md) §11。
+见 [error-severity-and-blocking-standard.md](./v3/error-severity-and-blocking-standard.md) §11。
 
 - **ERROR 系统**：关注运行时基础设施健康（Runtime Infrastructure Health）。
   - 触发：`mark_issue(action="fail")` 或 `vibe3.services.error_helpers.record_error(...)` 或 `ErrorTrackingService.get_instance(...).record_error(...)`。

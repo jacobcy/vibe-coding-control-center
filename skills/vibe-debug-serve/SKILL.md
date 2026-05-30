@@ -414,8 +414,8 @@ tail -f temp/logs/issues/issue-{n}/manager.async.log
 ## 相关标准
 
 - `docs/standards/agent-debugging-standard.md` — 调试规范权威来源（日志分层、调试循环、反模式）
-- `docs/standards/vibe3-orchestra-runtime-standard.md` — Orchestra 运行时架构
-- `docs/standards/vibe3-state-sync-standard.md` — state labels 与状态迁移语义
+- `docs/standards/v3/orchestra-runtime-standard.md` — Orchestra 运行时架构
+- `docs/standards/v3/command-standard.md` — state labels 与状态迁移语义
 - `docs/standards/v3/command-standard.md` — Shell 命令边界与共享状态规范
 
 ## 关键源文件速查

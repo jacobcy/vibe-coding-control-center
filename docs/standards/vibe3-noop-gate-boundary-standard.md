@@ -11,9 +11,9 @@ author: GPT-5 Codex
 created: 2026-04-17
 last_updated: 2026-04-18
 related_docs:
-  - docs/standards/vibe3-error-severity-and-blocking-standard.md
+  - docs/standards/v3/error-severity-and-blocking-standard.md
   - docs/standards/vibe3-state-sync-standard.md
-  - docs/standards/vibe3-orchestra-runtime-standard.md
+  - docs/standards/v3/orchestra-runtime-standard.md
   - docs/standards/vibe3-architecture-convergence-standard.md
   - supervisor/manager.md
   - config/settings.yaml
@@ -33,7 +33,7 @@ related_docs:
 
 运行时错误等级、`failed_gate` 触发条件、warning 展示规则，
 统一由
-[vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)
+[error-severity-and-blocking-standard.md](./v3/error-severity-and-blocking-standard.md)
 定义；本文档只定义 no-op / block 的业务边界，不定义系统可用性等级。
 
 ## 1. 当前业务原则

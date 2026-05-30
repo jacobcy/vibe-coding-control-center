@@ -1,4 +1,10 @@
-# Vibe3 Worktree Runtime Standard
+# Vibe3 Worktree Runtime Standard (DEPRECATED)
+
+> **WARNING**: This document is **DEPRECATED**.
+> The physical worktree lifecycle and management have been moved to:
+> **[Worktree Lifecycle Standard](v3/worktree-lifecycle-standard.md)**.
+> For execution layers (L0-L4), please refer to:
+> **[Orchestra Runtime Standard](v3/orchestra-runtime-standard.md)**.
 
 > **文档定位**：定义 vibe3 各执行层的 worktree 分配、runtime session、执行路径与清理边界。
 > **适用范围**：所有涉及 agent dispatch、codeagent-wrapper 调用、worktree 管理的代码路径。
@@ -158,7 +164,7 @@ find . -name ".git" -type f | grep -v "^./.git$" | head -20
 
 ## 六、与其他标准的关系
 
-- **[vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)**：定义 driver/tick/async child 架构，本文件补充其 worktree 语义。
+- **[v3/orchestra-runtime-standard.md](v3/orchestra-runtime-standard.md)**：定义 driver/tick/async child 架构，本文件补充其 worktree 语义。
 - **[v3/command-standard.md](v3/command-standard.md)**：定义 flow 状态机，worktree 生命周期与 flow 状态绑定。
 - **[agent-debugging-standard.md](agent-debugging-standard.md)**：调试手册，§5.3 apply 步骤以本文件语义为准。
 - **[agent-workflow-standard.md](agent-workflow-standard.md)**：Agent 工作流规范，`cwd` 参数传递细节参考本文件。

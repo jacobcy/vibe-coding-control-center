@@ -44,7 +44,7 @@ related_docs:
 - 心跳兜底：`polling_interval` 默认 900 秒。
 
 代码参考：
-- `docs/standards/vibe3-orchestra-runtime-standard.md` — runtime semantics
+- `docs/standards/v3/orchestra-runtime-standard.md` — runtime semantics
 - `docs/v3/orchestra/runtime-modes.md` — deployment modes
 - `src/vibe3/orchestra/global_dispatch_coordinator.py` — heartbeat tick driver
 

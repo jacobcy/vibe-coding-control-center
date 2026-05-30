@@ -55,7 +55,7 @@ AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
 | `resumed` | "Flow resumed" | `[flow] Flow resumed\n\n{detail}` | 流程恢复 |
 | `state_transitioned` | "State transitioned" | `[flow] State transitioned\n\n{detail}` | 状态迁移 |
 
-**Note**: According to the [Error Severity Standard](../standards/vibe3-error-severity-and-blocking-standard.md), runtime infrastructure failures (`flow_failed`) are recorded in the SQLite `error_log` and `events` table. Callers such as `IssueFailureService.mark_issue(action="fail")` **omit the `issue_number` parameter** to avoid posting noise comments. Only business-level blocks that require human intervention pass `issue_number` and post `[flow]` comments.
+**Note**: According to the [Error Severity Standard](../standards/v3/error-severity-and-blocking-standard.md), runtime infrastructure failures (`flow_failed`) are recorded in the SQLite `error_log` and `events` table. Callers such as `IssueFailureService.mark_issue(action="fail")` **omit the `issue_number` parameter** to avoid posting noise comments. Only business-level blocks that require human intervention pass `issue_number` and post `[flow]` comments.
 
 **Example**:
 

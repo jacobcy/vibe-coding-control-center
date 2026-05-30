@@ -11,7 +11,7 @@ created: 2026-05-01
 last_updated: 2026-05-01
 related_docs:
   - docs/standards/agent-debugging-standard.md
-  - docs/standards/vibe3-orchestra-runtime-standard.md
+  - docs/standards/v3/orchestra-runtime-standard.md
   - docs/standards/vibe3-noop-gate-boundary-standard.md
   - docs/standards/v3/command-standard.md
 ---
@@ -33,7 +33,7 @@ related_docs:
    - 上层业务 vs 底层触发的职责边界
    - async/tmux 观察优先原则
 
-2. **[vibe3-orchestra-runtime-standard.md](./vibe3-orchestra-runtime-standard.md)**：运行时架构
+2. **[orchestra-runtime-standard.md](./orchestra-runtime-standard.md)**：运行时架构
    - 服务生命周期、service 注册、事件流转
    - 同步链/异步链执行路径
 

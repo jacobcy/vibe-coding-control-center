@@ -59,7 +59,7 @@ L3  Manager / Plan / Run / Review  -- 代码开发核心，独立 worktree
 L4  Human collaboration            -- 人工协作流程
 ```
 
-**参考**: [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md) — Worktree 分配与 Runtime Session
+**参考**: [vibe3-worktree-ownership-standard.md (DEPRECATED)](vibe3-worktree-ownership-standard.md) — Worktree 分配与 Runtime Session
 
 ---
 
@@ -320,7 +320,7 @@ subscribe(
 
 ## 六、Worktree 语义与事件
 
-**参考**: [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)
+**参考**: [vibe3-worktree-ownership-standard.md (DEPRECATED)](vibe3-worktree-ownership-standard.md)
 
 ### 6.1 L1 Governance Events
 
@@ -514,16 +514,16 @@ LabelService().transition(
 
 ### 11.1 引用标准
 
-- **[vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)**: 定义执行层级与 worktree 语义，本文件补充事件语义。
-- **[vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)**: 定义 driver/tick/async child 架构，事件发布时机参考该文件。
+- **[vibe3-worktree-ownership-standard.md (DEPRECATED)](vibe3-worktree-ownership-standard.md)**: 定义执行层级与 worktree 语义，本文件补充事件语义。
+- **[v3/orchestra-runtime-standard.md](v3/orchestra-runtime-standard.md)**: 定义 driver/tick/async child 架构，事件发布时机参考该文件。
 - **[v3/command-standard.md](v3/command-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
 - **[agent-debugging-standard.md](agent-debugging-standard.md)**: 调试手册，事件日志规范以本文件为准。
 
 ### 11.2 术语真源
 
-- **执行层级（L0-L4）**: 以 `vibe3-worktree-ownership-standard.md` 为准
+- **执行层级（L0-L4）**: 以 `vibe3-worktree-ownership-standard.md (DEPRECATED)` 为准
 - **事件类型与语义**: 以本文件为准
-- **Worktree 参数规则**: 以 `vibe3-worktree-ownership-standard.md` 为准
+- **Worktree 参数规则**: 以 `vibe3-worktree-ownership-standard.md (DEPRECATED)` 为准
 - **事件处理器行为**: 以本文件为准
 
 ---
@@ -553,7 +553,7 @@ LabelService().transition(
 - 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
 - 与上述两个治理概念无关，负责基础事件调度与 tick 循环
 
-这三个概念不等价，不可混用。见 `vibe3-worktree-ownership-standard.md` §二 了解完整层级定义。
+这三个概念不等价，不可混用。见 `vibe3-worktree-ownership-standard.md (DEPRECATED)` §二 了解完整层级定义。
 
 ### Issue 池边界总结
 
