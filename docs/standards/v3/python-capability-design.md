@@ -149,7 +149,7 @@ Skill Layer 负责：
 - [glossary.md](../glossary.md)
 - [command-standard.md](./command-standard.md)
 - [data-model-standard.md](./data-model-standard.md)
-- [registry-json-standard.md](./registry-json-standard.md)
+- [registry-json-standard.md](./registry-json-standard.md) (deprecated → [data-model-standard.md](./data-model-standard.md))
 - [roadmap-json-standard.md](./roadmap-json-standard.md) (deprecated → [github-labels-standard.md](../github-labels-standard.md))
 
 设计层只回答：

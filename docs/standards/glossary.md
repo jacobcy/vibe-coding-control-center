@@ -65,7 +65,7 @@ related_docs:
   - GitHub issue 不是 flow
 - 落点：
   - 命令语义见 [command-standard.md](v3/command-standard.md)
-  - task 关联字段见 [registry-json-standard.md](v3/registry-json-standard.md)
+  - task 关联字段见 [data-model-standard.md](v3/data-model-standard.md)
   - 标准规范见 [issue-standard.md](issue-standard.md)
 - 使用规则：
   - 所有 issue 都是 GitHub repository issue
@@ -151,17 +151,17 @@ related_docs:
 - 使用规则：
   - roadmap governance 可从此池中把适合自动化推进的 issue 纳入 assignee issue pool。
   - cron governance 可从与文档治理相关的 broader repo 范围中形成 supervisor issue。
-### 3.3.5 `task audit`
+### 3.3.5 `check`
 
-- 正式术语：`task audit`
-- 别称：无
-- 定义：`vibe task audit` 对 execution record、runtime 绑定证据和关联完整性进行审计/修复的动作。
+- 正式术语：`check`
+- 别称：`handoff check`
+- 定义：`vibe3 check` 对 execution record (handoff artifact)、runtime 绑定证据和关联完整性进行审计/修复的动作。
 - 边界：
-  - `task audit` 不是 roadmap mirror 同步
-  - `task audit` 不替 OpenSpec 或 plan 文档定义规划优先级
+  - `check` 不是 roadmap mirror 同步
+  - `check` 不替 OpenSpec 或 plan 文档定义规划优先级
 - 使用规则：
-  - 讨论 task registry、分支、OpenSpec、plans 的执行层核对时使用 `task audit`
-  - 不要把 `task audit` 表述成 GitHub Project 同步
+  - 讨论 task registry、handoff store、分支、OpenSpec、plans 的执行层核对时使用 `check`
+  - 不要把 `check` 表述成 GitHub Project 同步
 
 ### 3.3.6 `OpenSpec 注册`
 
@@ -251,7 +251,7 @@ related_docs:
   - `pr` 不是 task
   - `pr` 不是 flow
 - 落点：
-  - task 与 PR 的关系见 [registry-json-standard.md](registry-json-standard.md)
+  - task 与 PR 的关系见 [data-model-standard.md](v3/data-model-standard.md)
 - 使用规则：
   - 讨论代码评审与合并对象时使用 `pr`
   - 不要把 `pr` 当作需求或执行单元
