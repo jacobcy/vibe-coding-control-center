@@ -215,16 +215,6 @@ class TaskService:
             f"Issue #{issue_number} reclassified: {old_role} -> {new_role}",
         )
 
-        # Update vibe-task label based on new role
-        if old_role == "task" and new_role != "task":
-            # Removing task role: remove vibe-task label
-            self._get_label_service().confirm_vibe_task(
-                issue_number, should_exist=False
-            )
-        elif old_role != "task" and new_role == "task":
-            # Adding task role: add vibe-task label
-            self._get_label_service().confirm_vibe_task(issue_number, should_exist=True)
-
         return IssueLink(
             branch=branch,
             issue_number=issue_number,
