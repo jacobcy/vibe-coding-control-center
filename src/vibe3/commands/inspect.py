@@ -1,13 +1,13 @@
 """Inspect command - 信息提供层，输出结构化数据供 vibe review 消费."""
 
 import json
-from typing import Annotated, Any, cast
+from pathlib import Path
+from typing import Annotated
 
 import typer
 import yaml
 
 from vibe3.analysis import command_analyzer, dag_service, structure_service
-from vibe3.analysis.command_analyzer_helpers import find_command_file
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
@@ -51,15 +51,47 @@ _TRACE_OPT = Annotated[
 def _list_analyzable_top_level_commands(
     commands_root: str = "src/vibe3/commands",
 ) -> list[str]:
-    """Return root CLI commands that have analyzable command files."""
-    from vibe3.cli import app as root_app  # noqa: I001
-    from typer.main import get_command  # noqa: I001
+    """Return root CLI commands that have analyzable command files.
+
+    Uses filesystem-based heuristic to discover top-level commands by scanning
+    the commands/ directory. This approach avoids layer violation (importing from
+    cli layer) but has limitations:
+
+    - Assumes top-level commands have simple filenames (no underscores)
+    - Relies on hardcoded exclusion list (_non_command)
+    - Does NOT validate commands are actually registered in Typer app
+
+    Future improvement: Consider adding validation against registered Typer commands
+    without creating layer violation.
+    """
+    root = Path(commands_root)
+    if not root.is_dir():
+        return []
+
+    # Files in commands/ that are not top-level CLI commands
+    _non_command = {
+        "__init__.py",
+        "common.py",
+        "command_options.py",
+        "output_format.py",
+    }
 
     names: list[str] = []
-    click_app = cast(Any, get_command(root_app))
-    for name in click_app.commands.keys():
-        if name and find_command_file(name, None, commands_root):
-            names.append(name)
+    for entry in sorted(root.iterdir()):
+        if not entry.name.endswith(".py"):
+            continue
+        if entry.name in _non_command:
+            continue
+        stem = entry.stem
+        # Top-level command files have simple names (no underscores);
+        # helper modules like inspect_helpers.py, flow_status.py are excluded.
+        if "_" in stem:
+            continue
+        # Note: This is a filesystem heuristic. We assume files with simple names
+        # in commands/ are top-level commands. The tautological check
+        # (find_command_file) has been removed since we already know the file exists
+        # (we're iterating over it).
+        names.append(stem)
     return sorted(dict.fromkeys(names))
 
 

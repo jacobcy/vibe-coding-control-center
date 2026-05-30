@@ -110,7 +110,7 @@ graph TD
 | **environment** | 环境资源管理 (Worktree) | clients, services, utils | execution, orchestra, roles | **High (Circular)** |
 | **models** | Pydantic 领域数据模型 | config, services, utils | (most modules) | **High (Circular)** |
 | **config** | 配置加载与 Schema | models, adapters, exceptions | (most modules) | **High (Circular)** |
-| **exceptions** | 统一异常层级 | clients | (most modules) | **High (Circular)** |
+| **exceptions** | 统一异常层级 | (none) | (most modules) | Low |
 | **utils** | 通用工具函数 | models, services, config | (most modules) | **High (Circular)** |
 
 ## 3. 依赖规则说明
