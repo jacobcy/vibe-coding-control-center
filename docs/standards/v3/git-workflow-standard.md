@@ -341,14 +341,18 @@ closeout 约束：
 
 V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 
-### Key V3 Components
+### 10.1 Key V3 Components
 
 - **CLI Layer**: `src/vibe3/cli.py` - Typer-based command interface
 - **Git Operations**: `src/vibe3/clients/git_client.py` - Pythonic git operations
 - **Flow Management**: `src/vibe3/services/flow_service.py` - Flow state tracking
 - **Task Integration**: `src/vibe3/services/task_service.py` - Bridge to task system
 
-### V3 vs V2 Differences
+## 11. Legacy (Migration from V2)
+
+以下内容仅供从 V2 迁移时参考，V3 原生开发可忽略。
+
+### 11.1 V3 vs V2 Differences
 
 | Aspect | V2 (Shell) | V3 (Python) |
 |--------|-----------|-------------|
@@ -358,7 +362,7 @@ V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 | Configuration | `.viberc` | `config/settings.yaml` |
 | Command Prefix | `vibe` | `vibe3` |
 
-### Migration Path
+### 11.2 Migration Path
 
 V3 保持与 V2 相同的工作流语义，但使用 Python 实现：
 - `git checkout -b` + `vibe3 flow update` → 替代 vibe2 `flow new`

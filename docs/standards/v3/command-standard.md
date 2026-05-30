@@ -58,14 +58,14 @@ related_docs:
 本文档只覆盖共享状态域的现行公共调用面：
 
 - `vibe3 flow`
-- `vibe3 task status`
+- `vibe3 task`
 - `vibe3 check`
 - `vibe3 handoff`
 
 其中：
 
 - `roadmap` 是规划概念，默认通过 GitHub / `gh` 管理
-- `task` 是 execution bridge 语义，不再对应独立公共顶层 CLI
+- `task` 是 execution bridge 语义，对应 `vibe3 task` 顶层 CLI 组
 
 ## 2. 真源与本地事实
 
@@ -86,13 +86,22 @@ related_docs:
 
 ### 3.1 `vibe3 flow`
 
-现行公共子命令只有：
+现行公共子命令：
 
 - `update`
 - `bind`
 - `blocked`
+- `unblock`
 - `show`
 - `status`
+
+### 3.2 `vibe3 task`
+
+`vibe3 task` 组用于管理 execution record：
+
+- `show`：查看当前或指定 task 的 execution scene 摘要
+- `status`：项目级总览入口，汇总活跃 flow、orchestra 状态与 worktree 上下文
+- `resume`：恢复 blocked issues 到 ready 状态
 
 明确不再作为现行公共命令面的旧入口：
 
@@ -103,16 +112,7 @@ related_docs:
 - `flow list`
 - `flow done`
 - `flow aborted`
-- `task show`
 - `task list`
-
-### 3.2 `vibe3 task status`
-
-`status` 是项目特有的总览入口，用于：
-
-- 汇总活跃 flow
-- 汇总 orchestra 状态
-- 补充当前仓库的 worktree / flow / issue 绑定上下文
 
 ### 3.3 `vibe3 handoff`
 
@@ -246,18 +246,36 @@ vibe3 flow bind <issue> [<issue> ...] [--role <role>] [--branch <branch>]
 - `--branch` 省略时默认当前分支
 - 显式 `--branch` 只允许已注册且非保护的 flow 分支
 
-### 7.3 `flow blocked`
+### 7.3 `flow blocked` / `flow unblock`
 
 ```bash
+# Block
 vibe3 flow blocked [--branch <branch>] [--reason <text>] [--task <issue>]
+
+# Unblock (Manual override)
+vibe3 flow unblock [--branch <branch>]
 ```
 
 约束：
 
 - 目标 flow 必须已存在
-- 通过 `--branch` 指定目标 flow 分支（可选，默认当前分支）
+- `unblock` 负责清除 `blocked_reason` 并尝试恢复 state
 
-### 7.4 `flow show`
+### 7.4 `task show` / `task status` / `task resume`
+
+```bash
+# Show current task
+vibe3 task show [<issue>]
+
+# Global status
+vibe3 task status [--all] [--json]
+
+# Resume blocked tasks
+vibe3 task resume [<issue>] [--blocked] [--yes]
+```
+
+### 7.5 `flow show` / `flow status`
+
 
 ```bash
 vibe3 flow show [--branch <branch>] [--snapshot] [--json]
