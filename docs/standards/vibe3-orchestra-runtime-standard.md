@@ -163,6 +163,10 @@ governance 是一个**周期性治理与审查任务组**。
 - **`cron-supervisor`**: 扫描全局事实（docs/standards），识别偏差，创建 `state/ready` 治理 issue。
 - **`roadmap-intake`**: 审查 `state/ready` issue，执行架构一致性检查，晋升为 `state/handoff`。
 
+此外，还支持**手动 Assignee Pool 管理**：
+- 人类可以直接将 issue 指派给配置中的 manager assignee（如 `vibe-manager-agent`）。
+- `roadmap-intake` 会识别这类已分配的 issue 并将其自然纳入 assignee issue pool，不再重复扫描。
+
 它们共同负责：
 
 - 查看全局 issue / flow / scene 事实

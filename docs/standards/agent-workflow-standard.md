@@ -35,8 +35,8 @@ Agent 工作流适用于：
 **settings.yaml 配置示例**：
 ```yaml
 run:
-  policy_file: ".agent/policies/run.md"
-  common_rules: ".agent/policies/common.md"
+  policy_file: "supervisor/policies/run.md"
+  common_rules: "supervisor/policies/common.md"
   agent_config:
     agent: "develop"  # 默认 agent preset
     timeout_seconds: 600  # 默认超时（秒）
@@ -174,10 +174,10 @@ vibe3 flow update
 vibe3 flow bind <issue_number> --role task
 
 # 3. 创建 plan
-vibe plan --branch <issue_number>
+vibe3 plan --branch <issue_number>
 
 # 4. 执行 plan（agent 实现）
-vibe run --branch <issue_number>
+vibe3 run --branch <issue_number>
 
 # 5. 验证结果
 uv run pytest tests/vibe3
