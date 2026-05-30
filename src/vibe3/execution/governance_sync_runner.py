@@ -58,7 +58,7 @@ def run_governance_sync(
         append_event = _ae
 
     config = load_orchestra_config()
-    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.domain import FlowManager
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
     flow_manager = FlowManager(config)
@@ -174,7 +174,7 @@ def run_governance_async(
 
         build_execution_name = _ben
 
-    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.domain import FlowManager
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 

@@ -28,8 +28,10 @@ from vibe3.domain.events import (
     SupervisorPromptRendered,
 )
 
-# Import orchestration components
-from vibe3.domain.flow_manager import FlowManager
+# Import orchestration components lazily to avoid circular imports
+# FlowManager is available through __getattr__ for runtime access
+if TYPE_CHECKING:
+    from vibe3.domain.flow_manager import FlowManager
 
 if TYPE_CHECKING:
     from vibe3.domain.publisher import EventPublisher
@@ -63,6 +65,15 @@ def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None
     from vibe3.domain.publisher import subscribe as _subscribe
 
     return _subscribe(event_type, handler)
+
+
+def __getattr__(name: str) -> type:
+    """Lazy import for heavy modules to avoid circular dependencies."""
+    if name == "FlowManager":
+        from vibe3.domain.flow_manager import FlowManager
+
+        return FlowManager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
