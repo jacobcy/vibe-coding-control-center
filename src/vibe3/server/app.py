@@ -5,6 +5,7 @@ import os
 import signal
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -17,6 +18,10 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
+from vibe3.server.orchestra_instance import (
+    OrchestraInstanceInfo,
+    write_instance_info,
+)
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
@@ -195,12 +200,12 @@ def start(
         config = config.model_copy(update=overrides)
 
     # Check for existing process
-    pid, is_valid = _validate_pid_file(config.pid_file)
-    if is_valid:
-        typer.echo(f"Orchestra server already running (PID: {pid})")
+    instance_info, is_valid = _validate_pid_file(config.pid_file)
+    if is_valid and instance_info is not None:
+        typer.echo(f"Orchestra server already running (PID: {instance_info.pid})")
         raise typer.Exit(1)
-    elif pid is not None:
-        typer.echo(f"Cleaning up stale PID file (dead process {pid})")
+    elif instance_info is not None:
+        typer.echo(f"Cleaning up stale PID file (dead process {instance_info.pid})")
         config.pid_file.unlink(missing_ok=True)
 
     # Pre-flight: Check if port is available
@@ -297,9 +302,14 @@ def start(
     typer.echo(f"Status endpoint: GET http://0.0.0.0:{config.port}/status")
     typer.echo("Press Ctrl+C to stop")
 
-    # Write PID file for the synchronous server process
-    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
-    config.pid_file.write_text(str(os.getpid()))
+    # Write instance info to global PID file
+    instance_info = OrchestraInstanceInfo(
+        pid=os.getpid(),
+        cwd=Path.cwd(),
+        port=config.port,
+        started_at=datetime.now(),
+    )
+    write_instance_info(config.pid_file, instance_info)
 
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
@@ -333,11 +343,37 @@ def start(
 @app.command()
 def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
+    from rich.console import Console
+
+    from vibe3.config.orchestra_config import get_manager_usernames
     from vibe3.services.serve_status_service import ServeStatusService
 
+    console = Console()
+
     config = load_orchestra_config()
-    pid, is_valid = _validate_pid_file(config.pid_file)
+    instance_info, is_valid = _validate_pid_file(config.pid_file)
     tmux_exists = _orchestra_tmux_session_exists()
+
+    # Display instance info from PID file
+    if instance_info is not None:
+        console.print("[bold]Instance Info:[/bold]")
+        console.print(f"  PID: {instance_info.pid}")
+        console.print(f"  Directory: {instance_info.cwd}")
+        console.print(f"  Port: {instance_info.port}")
+        console.print(
+            f"  Started: {instance_info.started_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        console.print()
+
+    # Display manager username
+    manager_usernames = get_manager_usernames(config)
+    if manager_usernames:
+        console.print("[bold]Configuration:[/bold]")
+        console.print(f"  Manager: {manager_usernames[0]}")
+        console.print()
+
+    # Extract PID for compatibility with ServeStatusService
+    pid = instance_info.pid if instance_info is not None else None
 
     service = ServeStatusService(config)
     service.display_status(pid, is_valid, tmux_exists)
@@ -348,9 +384,9 @@ def stop() -> None:
     """Stop Orchestra server via SIGTERM."""
     config = load_orchestra_config()
     pid_file = config.pid_file
-    pid, is_valid = _validate_pid_file(pid_file)
+    instance_info, is_valid = _validate_pid_file(pid_file)
 
-    if pid is None:
+    if instance_info is None:
         if _orchestra_tmux_session_exists():
             if _kill_orchestra_tmux_session():
                 typer.echo("Stopped Orchestra server tmux session")
@@ -359,6 +395,8 @@ def stop() -> None:
             raise typer.Exit(1)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
+
+    pid = instance_info.pid
 
     if not is_valid:
         if _orchestra_tmux_session_exists():
@@ -375,16 +413,16 @@ def stop() -> None:
             )
             raise typer.Exit(1)
         typer.echo(f"Cleaning up stale PID file (process {pid} is not orchestra)")
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
         raise typer.Exit(0)
 
     try:
         os.kill(pid, signal.SIGTERM)
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
         typer.echo(f"Stopped Orchestra server (PID: {pid})")
     except ProcessLookupError:
         typer.echo(f"Process {pid} not found, cleaning up PID file")
-        pid_file.unlink()
+        pid_file.unlink(missing_ok=True)
     except PermissionError:
         typer.echo(f"Permission denied to stop process {pid}")
         raise typer.Exit(1)

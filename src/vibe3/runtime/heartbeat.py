@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -76,7 +75,7 @@ class HeartbeatServer:
     async def run(self) -> None:
         """Start heartbeat. Runs until stop() is called."""
         self._running = True
-        self._write_pid()
+        # PID file is written by serve start command (app.py) before launching server
         log = logger.bind(domain="orchestra", action="start")
         append_orchestra_run_separator()
         append_orchestra_event(
@@ -280,13 +279,6 @@ class HeartbeatServer:
         """Keep server running when polling is disabled (HTTP-only mode)."""
         while self._running:
             await asyncio.sleep(1)
-
-    # -- pid management --
-
-    def _write_pid(self) -> None:
-        pid_file = self.config.pid_file
-        pid_file.parent.mkdir(parents=True, exist_ok=True)
-        pid_file.write_text(str(os.getpid()))
 
     def _cleanup(self) -> None:
         if self._shutdown_callback is not None:

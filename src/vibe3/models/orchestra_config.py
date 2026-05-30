@@ -4,35 +4,16 @@ These configuration classes are shared across orchestra, manager, and agents
 modules. This is the canonical location for these Pydantic models.
 """
 
-import subprocess
 from pathlib import Path
 
-from loguru import logger
 from pydantic import BaseModel, Field
 
 
 def _default_pid_file() -> Path:
-    """Resolve PID path under shared git common dir when available."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--git-common-dir"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        if result.returncode == 0:
-            git_common_dir = result.stdout.strip()
-            if git_common_dir:
-                common_path = Path(git_common_dir)
-                if not common_path.is_absolute():
-                    common_path = (Path.cwd() / common_path).resolve()
-                return common_path / "vibe3" / "orchestra.pid"
-    except Exception:
-        logger.bind(domain="orchestra").debug(
-            "Cannot resolve git common dir, using default PID path"
-        )
-    return Path(".git/vibe3/orchestra.pid")
+    """Resolve global PID file path."""
+    vibe_dir = Path.home() / ".vibe"
+    vibe_dir.mkdir(parents=True, exist_ok=True)
+    return vibe_dir / "orchestra.pid"
 
 
 class PollingConfig(BaseModel):
