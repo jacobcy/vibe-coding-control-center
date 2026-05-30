@@ -14,8 +14,8 @@
 |------|------|---------|--------|
 | **Human-Mirror 架构** | [docs/standards/vibe3-human-mirror-architecture.md](standards/vibe3-human-mirror-architecture.md) | 核心设计哲学：系统操作 = 人类操作 | ⭐⭐⭐ 权威 |
 | **事件驱动架构** | [docs/standards/vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) | 事件发布/订阅机制、处理器注册、向后兼容 | ⭐⭐⭐ 权威 |
-| **Worktree Runtime** | [docs/standards/vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md) | 执行层级（L0-L4）、worktree 分配、runtime session | ⭐⭐⭐ 权威 |
-| **Orchestra Runtime** | [docs/standards/vibe3-orchestra-runtime-standard.md](standards/vibe3-orchestra-runtime-standard.md) | Driver/Tick/Async Child 架构、调度主循环 | ⭐⭐⭐ 权威 |
+| **Worktree Runtime** | [docs/standards/vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md) | 执行层级（L0-L4）、worktree 分配、runtime session | ⭐⭐⭐ 权威 (DEPRECATED) |
+| **Orchestra Runtime** | [docs/standards/v3/orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md) | Driver/Tick/Async Child 架构、调度主循环 | ⭐⭐⭐ 权威 |
 | **State Sync** | [docs/standards/v3/command-standard.md](standards/v3/command-standard.md) | Flow 状态机、状态转换规则 | ⭐⭐⭐ 权威 |
 
 ### 实现细节文档
@@ -79,7 +79,7 @@ L4  Human collaboration            -- 人工协作流程
 - **L3**: 持久 worktree（`cwd=wt_path`）
 
 
-**详细文档**: [vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)
+**详细文档**: [vibe3-worktree-ownership-standard.md (DEPRECATED)](standards/vibe3-worktree-ownership-standard.md)
 
 ---
 
@@ -148,7 +148,7 @@ def register_dispatch_handlers() -> None:
 ### 修改 Worktree 相关代码时
 
 1. **阅读架构文档**：
-   - [vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)
+   - [vibe3-worktree-ownership-standard.md (DEPRECATED)](standards/vibe3-worktree-ownership-standard.md)
 
 2. **关键检查点**：
    - ✅ 确认执行层级（L0-L4）
@@ -158,7 +158,7 @@ def register_dispatch_handlers() -> None:
 ### 修改 Orchestra 相关代码时
 
 1. **阅读架构文档**：
-   - [vibe3-orchestra-runtime-standard.md](standards/vibe3-orchestra-runtime-standard.md)
+   - [v3/orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md)
    - [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md)
 
 2. **关键检查点**：

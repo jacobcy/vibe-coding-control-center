@@ -15,7 +15,7 @@
 
 运行时错误等级、`failed_gate`、warning 与 blocked 的区别，
 以
-[vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)
+[error-severity-and-blocking-standard.md](./error-severity-and-blocking-standard.md)
 为准；本文档聚焦 driver/tick/dispatch 运行层级。
 
 本标准回答的问题：

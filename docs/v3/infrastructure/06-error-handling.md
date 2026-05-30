@@ -7,7 +7,7 @@ created: 2026-03-15
 last_updated: 2026-03-19
 related_docs:
   - docs/standards/error-handling.md  # 错误处理规范（权威）
-  - docs/standards/vibe3-error-severity-and-blocking-standard.md
+  - docs/standards/v3/error-severity-and-blocking-standard.md
   - docs/standards/error-handling-fix-summary.md  # 修复总结
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
@@ -19,7 +19,7 @@ related_docs:
 
 > **权威规范**：[docs/standards/error-handling.md](../../standards/error-handling.md)
 > **Orchestra 运行时补充规范**：
-> [docs/standards/vibe3-error-severity-and-blocking-standard.md](../../standards/vibe3-error-severity-and-blocking-standard.md)
+> [docs/standards/v3/error-severity-and-blocking-standard.md](../../standards/v3/error-severity-and-blocking-standard.md)
 > **本文档定位**：实现指南，提供代码示例和架构说明
 
 ---
@@ -34,7 +34,7 @@ related_docs:
 
 **详细规范请参考**：
 - [错误处理规范](../../standards/error-handling.md)
-- [Vibe3 Error Severity and Blocking Standard](../../standards/vibe3-error-severity-and-blocking-standard.md)
+- [Vibe3 Error Severity and Blocking Standard](../../standards/v3/error-severity-and-blocking-standard.md)
 
 ### 本文档与运行时错误标准的边界
 
@@ -51,7 +51,7 @@ related_docs:
 - `blocked` 是否代表工作流正常收口
 
 这些运行时语义统一以
-`docs/standards/vibe3-error-severity-and-blocking-standard.md`
+`docs/standards/v3/error-severity-and-blocking-standard.md`
 为准。
 
 ---

@@ -14,7 +14,7 @@ related_docs:
   - docs/specs/2026-05-21-error-severity-system-refactor-design.md
   - docs/standards/error-handling.md
   - docs/standards/vibe3-noop-gate-boundary-standard.md
-  - docs/standards/vibe3-orchestra-runtime-standard.md
+  - docs/standards/v3/orchestra-runtime-standard.md
 ---
 
 # Vibe3 Error Severity and Blocking Standard

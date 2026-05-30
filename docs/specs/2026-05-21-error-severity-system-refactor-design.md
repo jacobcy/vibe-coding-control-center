@@ -399,4 +399,4 @@ Required improvements:
 
 - `docs/standards/error-handling.md`
 - `docs/standards/vibe3-noop-gate-boundary-standard.md`
-- `docs/standards/vibe3-orchestra-runtime-standard.md`
+- `docs/standards/v3/orchestra-runtime-standard.md`

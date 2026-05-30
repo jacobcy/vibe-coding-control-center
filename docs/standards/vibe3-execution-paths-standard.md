@@ -12,7 +12,7 @@ created: 2026-04-18
 last_updated: 2026-04-19
 related_docs:
   - docs/standards/vibe3-noop-gate-boundary-standard.md
-  - docs/standards/vibe3-orchestra-runtime-standard.md
+  - docs/standards/v3/orchestra-runtime-standard.md
   - docs/standards/v3/command-standard.md
   - src/vibe3/execution/issue_role_sync_runner.py
   - src/vibe3/execution/codeagent_runner.py

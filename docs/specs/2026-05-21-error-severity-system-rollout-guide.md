@@ -20,7 +20,7 @@ Use it during implementation and again during verification to answer:
 Implementation must conform to:
 
 - `docs/specs/2026-05-21-error-severity-system-refactor-design.md`
-- `docs/standards/vibe3-error-severity-and-blocking-standard.md`
+- `docs/standards/v3/error-severity-and-blocking-standard.md`
 
 If this guide and the standard disagree, the standard wins.
 
@@ -299,7 +299,7 @@ Expected:
 
 The refactor is complete only when all of the following are true:
 
-1. implementation matches `vibe3-error-severity-and-blocking-standard`
+1. implementation matches `error-severity-and-blocking-standard`
 2. all affected tests pass
 3. warning-only scenarios no longer trigger failed-gate closure
 4. blocked workflow scenarios are rendered as workflow outcomes rather than system failures
