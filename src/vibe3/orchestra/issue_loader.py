@@ -7,25 +7,12 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
-from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.models.orchestration import IssueInfo
     from vibe3.orchestra.protocols import FlowManagerProtocol
-    from vibe3.roles.definitions import TriggerableRoleDefinition
-
-
-def find_role_for_state(
-    state: IssueState,
-) -> "TriggerableRoleDefinition | None":
-    """Find the role definition for a state label."""
-    for role in LABEL_DISPATCH_ROLES:
-        if role.trigger_state == state:
-            return role
-    return None
 
 
 def is_auto_task_branch(branch: str) -> bool:
