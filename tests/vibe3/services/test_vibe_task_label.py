@@ -28,6 +28,12 @@ def test_link_issue_as_task_adds_vibe_task_label(tmp_path, monkeypatch):
     mock_label_service.confirm_vibe_task.return_value = "advanced"
     service._get_label_service = lambda: mock_label_service
 
+    # Mock GitClient to return True for branch_exists
+    monkeypatch.setattr(
+        "vibe3.clients.git_client.GitClient",
+        lambda: Mock(branch_exists=lambda branch: True),
+    )
+
     # Setup a flow
     store.update_flow_state("task/test-branch", flow_slug="test")
 
@@ -75,4 +81,30 @@ def test_link_issue_as_dependency_does_not_add_vibe_task_label(tmp_path, monkeyp
     service.link_issue("task/test-branch", 789, role="dependency")
 
     # ASSERT: confirm_vibe_task was NOT called
+    mock_label_service.confirm_vibe_task.assert_not_called()
+
+
+def test_link_issue_as_task_without_branch_does_not_add_label(tmp_path, monkeypatch):
+    """Verify that linking issue as task without real branch does NOT add label."""
+    db_path = tmp_path / "test.db"
+    store = SQLiteClient(db_path=str(db_path))
+    service = TaskService(store=store)
+
+    # Mock the label service
+    mock_label_service = Mock()
+    service._get_label_service = lambda: mock_label_service
+
+    # Mock GitClient to return False for branch_exists
+    monkeypatch.setattr(
+        "vibe3.clients.git_client.GitClient",
+        lambda: Mock(branch_exists=lambda branch: False),
+    )
+
+    # Setup a flow
+    store.update_flow_state("task/test-branch", flow_slug="test")
+
+    # ACT: link issue as task
+    service.link_issue("task/test-branch", 999, role="task")
+
+    # ASSERT: confirm_vibe_task was NOT called (no real branch)
     mock_label_service.confirm_vibe_task.assert_not_called()

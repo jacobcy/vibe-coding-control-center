@@ -150,8 +150,15 @@ class TaskService:
             )
 
         # Auto-mirror vibe-task label for task role
+        # Only add label if the branch actually exists (true local flow)
         if role == "task":
-            self._get_label_service().confirm_vibe_task(issue_number, should_exist=True)
+            from vibe3.clients.git_client import GitClient
+
+            git = GitClient()
+            if git.branch_exists(normalized_branch):
+                self._get_label_service().confirm_vibe_task(
+                    issue_number, should_exist=True
+                )
 
         # Demote superseded flows AFTER successful link
         if role == "task" and superseded_flows:
