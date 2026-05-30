@@ -295,6 +295,24 @@ def test_task_status_shows_missing_state_label_section(
     ]
     mock_status_service_cls.return_value = status_service
 
+    # Mock enrich_epic_items to add dep_status
+    def mock_enrich_epic_items(epic_items):
+        return [
+            {
+                **item,
+                "dep_status": {
+                    "total": 0,
+                    "completed": 0,
+                    "items": [],
+                    "is_ready": False,
+                    "summary_text": "No dependencies",
+                },
+            }
+            for item in epic_items
+        ]
+
+    status_service.enrich_epic_items = mock_enrich_epic_items
+
     result = runner.invoke(app, ["task", "status"])
 
     assert result.exit_code == 0
