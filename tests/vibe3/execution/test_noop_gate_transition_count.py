@@ -45,7 +45,7 @@ class TestTransitionCount:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
             patch("sqlite3.connect", return_value=mock_conn),
         ):
@@ -76,7 +76,7 @@ class TestTransitionCount:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -109,7 +109,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -143,7 +143,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -177,7 +177,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -208,7 +208,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -240,7 +240,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -273,7 +273,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -309,7 +309,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -340,7 +340,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -371,7 +371,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -406,7 +406,7 @@ class TestTransitionCount:
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("sqlite3.connect", return_value=mock_conn),
             patch(
-                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
