@@ -18,11 +18,12 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.server.orchestra_instance import (
+
+from .orchestra_instance import (
     OrchestraInstanceInfo,
     write_instance_info,
 )
-from vibe3.server.registry import (
+from .registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
     _orchestra_tmux_session_exists,
@@ -33,7 +34,7 @@ from vibe3.server.registry import (
     _start_async_serve,
     _validate_pid_file,
 )
-from vibe3.server.server_utils import find_available_port
+from .server_utils import find_available_port
 
 app = typer.Typer(
     help="Orchestra server: heartbeat polling + HTTP status endpoints",

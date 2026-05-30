@@ -12,7 +12,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate, GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.server.app import app
+from vibe3.server import app
 from vibe3.services.error_tracking_service import ErrorTrackingService
 
 
@@ -267,7 +267,7 @@ class TestFailedGateIntegration:
                             "vibe3.server.app.find_available_port",
                             lambda port, max_port: (port, False),
                         ):
-                            result = runner.invoke(app, ["start"])
+                            result = runner.invoke(app.app, ["start"])
                 assert result.exit_code == 1
                 output = result.output
                 assert "blocked by failed gate" in output
