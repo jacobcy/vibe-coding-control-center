@@ -18,7 +18,7 @@ Execute commit + PR creation for runtime public interface unification
 - ✅ Review quality: High quality, based on actual code evidence
 
 ## Changes Summary
-- **Core code changes**: 3 Python files, +27 lines
+- **Core code changes**: 6 Python files, +36 lines, -9 lines
   - runtime/__init__.py: Added __all__ and re-exports (8 symbols)
   - External imports refactored: domain/orchestration_facade.py, server/registry.py, services/orchestra_status_service.py
   - Internal imports converted to relative: runtime/heartbeat.py, runtime/periodic_check_executor.py
@@ -40,5 +40,4 @@ Execute commit + PR creation for runtime public interface unification
 Low. Pure refactor with no behavior change. All tests pass, type checks pass, violations eliminated.
 
 ## Notes
-- orchestra/README.md still uses old import patterns, but was explicitly excluded from scope (documentation files not tracked by violation detection system)
-- Can be updated in follow-up work
+- orchestra/README.md import examples updated to use new public interface

@@ -58,8 +58,7 @@ driver 在 heartbeat tick 中消费已有 `state/*`：
 ## 注册自定义 Service
 
 ```python
-from vibe3.runtime.service_protocol import ServiceBase
-from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime import ServiceBase, HeartbeatServer
 
 class MyService(ServiceBase):
     async def on_tick(self) -> None:
