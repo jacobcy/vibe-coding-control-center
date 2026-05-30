@@ -3,6 +3,9 @@
 These protocols define the interfaces required by GlobalDispatchCoordinator,
 allowing it to depend on abstractions rather than concrete service implementations.
 This breaks the orchestra→services/execution/roles circular dependency chain.
+
+Note: FlowManagerProtocol has been migrated to domain layer (flow_protocols.py).
+The definition below is maintained for backward compatibility during migration.
 """
 
 from typing import Protocol

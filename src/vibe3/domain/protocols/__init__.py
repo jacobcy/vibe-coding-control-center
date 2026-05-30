@@ -12,9 +12,11 @@ from vibe3.domain.protocols.dispatch_protocols import (
     IssueCollectionServiceProtocol,
     QueuePersistenceServiceProtocol,
 )
+from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
 __all__ = [
     "DispatchHealthCheckProtocol",
     "IssueCollectionServiceProtocol",
     "QueuePersistenceServiceProtocol",
+    "FlowManagerProtocol",
 ]

@@ -25,6 +25,7 @@ from vibe3.domain import publish
 from vibe3.domain.protocols.dispatch_protocols import (
     IssueCollectionServiceProtocol,
 )
+from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -42,7 +43,6 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
-    FlowManagerProtocol,
     FlowServiceProtocol,
     LabelDispatchCallable,
 )
