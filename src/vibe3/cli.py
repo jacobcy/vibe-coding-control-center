@@ -116,7 +116,9 @@ def status_command(
 ) -> None:
     """Show governance status: manager-assigned issues, RFC/Epic/Blocked counts,
     and pool health."""
-    status.governance_status(
+    from vibe3.commands.governance_status import governance_status
+
+    governance_status(
         json_output=json_output,
         trace=trace,
     )

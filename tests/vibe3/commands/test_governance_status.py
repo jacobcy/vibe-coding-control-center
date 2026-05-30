@@ -26,11 +26,14 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
     )
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch(
+    "vibe3.commands.governance_status.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.commands.governance_status.load_orchestra_config")
+@patch("vibe3.commands.governance_status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.governance_status.FlowService")
+@patch("vibe3.commands.governance_status.StatusQueryService")
 def test_governance_status_table_output(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -121,11 +124,14 @@ def test_governance_status_table_output(
     assert "Blocked task" in output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch(
+    "vibe3.commands.governance_status.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.commands.governance_status.load_orchestra_config")
+@patch("vibe3.commands.governance_status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.governance_status.FlowService")
+@patch("vibe3.commands.governance_status.StatusQueryService")
 def test_governance_status_json_output(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -188,11 +194,14 @@ def test_governance_status_json_output(
     assert output_data["pool_health"]["manager_assigned_total"] == 1
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch(
+    "vibe3.commands.governance_status.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.commands.governance_status.load_orchestra_config")
+@patch("vibe3.commands.governance_status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.governance_status.FlowService")
+@patch("vibe3.commands.governance_status.StatusQueryService")
 def test_governance_status_empty_repo(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -239,11 +248,14 @@ def test_governance_status_empty_repo(
     assert "State-missing (governed anomaly): 0" in output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch(
+    "vibe3.commands.governance_status.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.commands.governance_status.load_orchestra_config")
+@patch("vibe3.commands.governance_status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.governance_status.FlowService")
+@patch("vibe3.commands.governance_status.StatusQueryService")
 def test_governance_status_manager_assigned_filtering(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -318,11 +330,14 @@ def test_governance_status_manager_assigned_filtering(
     assert "Unassigned" not in output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch(
+    "vibe3.commands.governance_status.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.commands.governance_status.load_orchestra_config")
+@patch("vibe3.commands.governance_status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.governance_status.FlowService")
+@patch("vibe3.commands.governance_status.StatusQueryService")
 def test_governance_status_waiting_pool_and_anomaly(
     mock_status_service_cls,
     mock_flow_service_cls,
