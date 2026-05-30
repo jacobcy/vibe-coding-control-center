@@ -1,7 +1,8 @@
 """Inspect command - 信息提供层，输出结构化数据供 vibe review 消费."""
 
 import json
-from typing import Annotated, Any, cast
+from pathlib import Path
+from typing import Annotated
 
 import typer
 import yaml
@@ -52,14 +53,31 @@ def _list_analyzable_top_level_commands(
     commands_root: str = "src/vibe3/commands",
 ) -> list[str]:
     """Return root CLI commands that have analyzable command files."""
-    from vibe3.cli import app as root_app  # noqa: I001
-    from typer.main import get_command  # noqa: I001
+    root = Path(commands_root)
+    if not root.is_dir():
+        return []
+
+    # Files in commands/ that are not top-level CLI commands
+    _non_command = {
+        "__init__.py",
+        "common.py",
+        "command_options.py",
+        "output_format.py",
+    }
 
     names: list[str] = []
-    click_app = cast(Any, get_command(root_app))
-    for name in click_app.commands.keys():
-        if name and find_command_file(name, None, commands_root):
-            names.append(name)
+    for entry in sorted(root.iterdir()):
+        if not entry.name.endswith(".py"):
+            continue
+        if entry.name in _non_command:
+            continue
+        stem = entry.stem
+        # Top-level command files have simple names (no underscores);
+        # helper modules like inspect_helpers.py, flow_status.py are excluded.
+        if "_" in stem:
+            continue
+        if find_command_file(stem, None, commands_root):
+            names.append(stem)
     return sorted(dict.fromkeys(names))
 
 
