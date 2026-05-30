@@ -49,10 +49,20 @@ def _resolve_async_cli_override_root(
 ) -> Path | None:
     """Resolve optional async child code-root override.
 
-    DEPRECATED: Always returns None. Cross-project dispatch must always use
-    the installed/source vibe3 project root, never the caller repository.
+    DEPRECATED: Always returns None.
+
+    Cross-project dispatch must always use the installed/source vibe3 project
+    root, never the caller repository. This ensures correct cli.py resolution
+    when running `vibe3 scan` from external projects.
 
     Debug mode only affects logging verbosity and debug output, not code paths.
+    See VIBE3_REPO_MODELS_ROOT for project-specific models root override
+    (which IS debug-mode sensitive).
+
+    Historical context (PR #1662):
+    - Pre-fix: debug mode returned launch_cwd, breaking cross-project dispatch
+    - Post-fix: always returns None, forcing module-based resolution
+    - Rationale: cli.py must always point to vibe3 installation, not caller repo
     """
     return None
 
