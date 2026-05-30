@@ -27,7 +27,7 @@ from vibe3.services.status_query_service import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.runtime.circuit_breaker import CircuitBreaker
+    from vibe3.runtime import CircuitBreaker
 
 
 @dataclass(frozen=True)
