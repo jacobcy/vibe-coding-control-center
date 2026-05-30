@@ -195,12 +195,12 @@ def start(
         config = config.model_copy(update=overrides)
 
     # Check for existing process
-    pid, is_valid = _validate_pid_file(config.pid_file)
-    if is_valid:
-        typer.echo(f"Orchestra server already running (PID: {pid})")
+    instance_info, is_valid = _validate_pid_file(config.pid_file)
+    if is_valid and instance_info is not None:
+        typer.echo(f"Orchestra server already running (PID: {instance_info.pid})")
         raise typer.Exit(1)
-    elif pid is not None:
-        typer.echo(f"Cleaning up stale PID file (dead process {pid})")
+    elif instance_info is not None:
+        typer.echo(f"Cleaning up stale PID file (dead process {instance_info.pid})")
         config.pid_file.unlink(missing_ok=True)
 
     # Pre-flight: Check if port is available
@@ -336,8 +336,11 @@ def status() -> None:
     from vibe3.services.serve_status_service import ServeStatusService
 
     config = load_orchestra_config()
-    pid, is_valid = _validate_pid_file(config.pid_file)
+    instance_info, is_valid = _validate_pid_file(config.pid_file)
     tmux_exists = _orchestra_tmux_session_exists()
+
+    # Extract PID for compatibility with ServeStatusService
+    pid = instance_info.pid if instance_info is not None else None
 
     service = ServeStatusService(config)
     service.display_status(pid, is_valid, tmux_exists)
@@ -348,9 +351,9 @@ def stop() -> None:
     """Stop Orchestra server via SIGTERM."""
     config = load_orchestra_config()
     pid_file = config.pid_file
-    pid, is_valid = _validate_pid_file(pid_file)
+    instance_info, is_valid = _validate_pid_file(pid_file)
 
-    if pid is None:
+    if instance_info is None:
         if _orchestra_tmux_session_exists():
             if _kill_orchestra_tmux_session():
                 typer.echo("Stopped Orchestra server tmux session")
@@ -359,6 +362,8 @@ def stop() -> None:
             raise typer.Exit(1)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
+
+    pid = instance_info.pid
 
     if not is_valid:
         if _orchestra_tmux_session_exists():

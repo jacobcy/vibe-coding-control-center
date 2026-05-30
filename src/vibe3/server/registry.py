@@ -23,6 +23,11 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.server.orchestra_instance import (
+    OrchestraInstanceInfo,
+    read_instance_info,
+    validate_instance,
+)
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
@@ -251,42 +256,21 @@ def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
     return True, stdout or f"Tailscale webhook configured for port {port}"
 
 
-def _is_orchestra_process(pid: int) -> bool:
-    """Check if a PID is actually an orchestra process."""
-    try:
-        result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "command="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0:
-            return False
+def _validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, bool]:
+    """Validate PID file and check if process is a running orchestra instance.
 
-        cmdline = result.stdout.strip().lower()
-        return "vibe3" in cmdline and "serve" in cmdline
-    except Exception:
-        return False
-
-
-def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
-    """Validate PID file and check if process is an orchestra instance."""
-    if not pid_file.exists():
+    Returns:
+        tuple of (instance_info, is_running):
+        - (None, False): No PID file or invalid format
+        - (info, False): Valid PID file but process is dead/not orchestra
+        - (info, True): Valid PID file and process is running orchestra
+    """
+    info = read_instance_info(pid_file)
+    if info is None:
         return None, False
 
-    try:
-        pid = int(pid_file.read_text().strip())
-    except (ValueError, OSError):
-        return None, False
-
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return pid, False
-    except PermissionError:
-        return pid, False
-
-    return pid, _is_orchestra_process(pid)
+    is_running = validate_instance(info)
+    return info, is_running
 
 
 def _build_async_serve_command(
