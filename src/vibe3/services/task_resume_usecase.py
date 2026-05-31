@@ -163,7 +163,6 @@ class TaskResumeUsecase:
             resume_kind = candidate.get("resume_kind")
             flow = cast("FlowStatusResponse | None", candidate.get("flow"))
             branch = getattr(flow, "branch", None) if flow else None
-            worktree_path: str | None = None
 
             if not isinstance(issue_number, int) or not isinstance(resume_kind, str):
                 continue
@@ -177,6 +176,8 @@ class TaskResumeUsecase:
             ).info("Processing resume candidate")
 
             if resume_kind == "all":
+                worktree_path: str | None = None
+                has_live_sessions: bool | None = None
                 if isinstance(branch, str):
                     resolved_path = self.git_client.find_worktree_path_for_branch(
                         branch
@@ -184,15 +185,13 @@ class TaskResumeUsecase:
                     worktree_path = (
                         str(resolved_path) if resolved_path is not None else None
                     )
-                    # Query registry for truly live sessions (with tmux liveness check)
                     backend = CodeagentBackend()
                     registry = SessionRegistryService(
                         store=self.flow_service.store, backend=backend
                     )
                     live_sessions = registry.get_truly_live_sessions_for_branch(branch)
                     has_live_sessions = len(live_sessions) > 0
-                else:
-                    has_live_sessions = None
+
                 skip_reason = self.candidates.maybe_skip_all_task_candidate(
                     issue_number=issue_number,
                     flow=flow,
@@ -207,53 +206,34 @@ class TaskResumeUsecase:
                     )
                     continue
 
-            # Defensive check: verify current state matches resume_kind
             if not self.candidates.verify_issue_state_for_resume(
                 issue_number, resume_kind, repo
             ):
-                # Generate state-specific skip reason
-                if resume_kind == "all":
-                    skip_reason = "issue 已完成（DONE），跳过恢复"
-                elif resume_kind == "blocked":
-                    skip_reason = "不再处于 blocked 状态，跳过恢复"
-                elif resume_kind == "aborted":
-                    skip_reason = "不再处于可恢复状态（ready/handoff），跳过恢复"
-                else:
-                    skip_reason = "状态验证失败，跳过恢复"
-
                 result["skipped"].append(
                     {
                         "number": issue_number,
-                        "reason": skip_reason,
+                        "reason": "状态验证失败，跳过恢复",
                     }
                 )
                 continue
 
             try:
-                if resume_kind in {"blocked", "all"}:
-                    self.operations.reset_issue_to_ready(
-                        issue_number=issue_number,
-                        resume_kind=resume_kind,
-                        flow=flow,
-                        repo=repo,
-                        reason=reason,
-                        worktree_path=worktree_path,
-                        label_state=label_state,
-                        remote=remote,
-                        progress_callback=progress_callback,
-                    )
+                self.operations.reset_issue_to_ready(
+                    issue_number=issue_number,
+                    resume_kind=resume_kind,
+                    flow=flow,
+                    repo=repo,
+                    reason=reason,
+                    label_state=label_state,
+                    remote=remote,
+                    progress_callback=progress_callback,
+                )
 
-                    if resume_kind == "all":
-                        self._comment_all_resume_success(
-                            issue_number=issue_number,
-                            repo=repo,
-                            reason=reason,
-                        )
-
-                elif resume_kind == "aborted":
-                    flow = cast("FlowStatusResponse | None", candidate.get("flow"))
-                    if flow and isinstance(flow.branch, str):
-                        self.operations.reactivate_aborted_flow(flow.branch)
+                self._comment_resume_success(
+                    issue_number=issue_number,
+                    repo=repo,
+                    reason=reason,
+                )
 
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
@@ -277,14 +257,14 @@ class TaskResumeUsecase:
 
         return result
 
-    def _comment_all_resume_success(
+    def _comment_resume_success(
         self,
         *,
         issue_number: int,
         repo: str | None,
         reason: str,
     ) -> None:
-        """Record all-mode reset success without affecting command outcome."""
+        """Record resume success without affecting command outcome."""
         try:
             comment_body = (
                 "[resume] 已重置 task scene，回到 state/ready。\n\n"
