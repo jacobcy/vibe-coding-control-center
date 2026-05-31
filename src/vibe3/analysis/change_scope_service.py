@@ -10,7 +10,7 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from vibe3.analysis.serena_service import SerenaService
-    from vibe3.models.change_source import ChangeSource
+    from vibe3.models import ChangeSource
 
 
 @dataclass(frozen=True)
