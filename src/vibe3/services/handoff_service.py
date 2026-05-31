@@ -180,6 +180,8 @@ class HandoffService:
         actor: str | None,
         kind: str = "note",
         branch: str | None = None,
+        *,
+        skip_event: bool = False,
     ) -> Path:
         """Append a lightweight update block to current.md for a branch.
 
@@ -188,6 +190,7 @@ class HandoffService:
             actor: Actor identifier
             kind: Update kind (note/finding/blocker/next)
             branch: Target branch name (defaults to current branch)
+            skip_event: Skip event recording (used internally for dedup)
         """
         target_branch = branch or self.git_client.get_current_branch()
         effective_actor = SignatureService.resolve_for_branch(
@@ -201,7 +204,11 @@ class HandoffService:
             message, effective_actor, kind, branch
         )
 
-        # 2. Record timeline event for milestone handoff updates
+        # 2. Skip event recording if requested (for dedup)
+        if skip_event:
+            return handoff_path
+
+        # 3. Record timeline event for milestone handoff updates
         # Query issue_number from branch → issue link
         issue_links = self.store.get_issue_links(target_branch)
         issue_number: int | None = None
@@ -346,6 +353,7 @@ class HandoffService:
                 message=message,
                 actor=effective_actor,
                 kind=ref_kind.lower(),
+                skip_event=True,
             )
         except (OSError, PermissionError) as exc:
             logger.bind(

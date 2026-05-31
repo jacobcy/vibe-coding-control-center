@@ -151,7 +151,7 @@ def record_dispatch_failure_if_unexpected(
 
     reason_code = result.reason_code or "unknown"
 
-    if reason_code in ("capacity_full", "duplicate_dispatch"):
+    if reason_code in ("capacity_full", "duplicate_dispatch", "launch_failed"):
         return
 
     # For launch_failed, check if bottom layer already recorded specific error

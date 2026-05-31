@@ -200,6 +200,61 @@ class TestPlannerDispatchHandler:
         # Should NOT call record_error for launch_failed
         mock_record_error.assert_not_called()
 
+    @patch("vibe3.services.error_helpers.record_error")
+    @patch("vibe3.domain.handlers.dispatch.build_plan_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
+    def test_launch_failed_skipped(
+        self,
+        mock_config_cls: MagicMock,
+        mock_load_issue: MagicMock,
+        mock_get_store: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+        mock_record_error: MagicMock,
+    ) -> None:
+        """Verify launch_failed does not trigger error recording.
+
+        (runner already logged)
+        """
+        from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.return_value = config
+
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = None
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
+
+        mock_build_request.return_value = _make_mock_request("planner", 42)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=False,
+            skipped=False,
+            reason="Failed to start session",
+            reason_code="launch_failed",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_planner_dispatch_intent(
+            PlannerDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="claimed",
+                tick_id=17,
+            )
+        )
+
+        # Should NOT record error for launch_failed
+        mock_record_error.assert_not_called()
+
 
 class TestExecutorDispatchHandler:
     """Executor dispatch should delegate to build_run_request + coordinator."""
