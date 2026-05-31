@@ -127,6 +127,24 @@
 - **非控制位**：不作为 governance 或执行引擎的判定依据。
 - **手动操作后果**：手动添加/移除此标签不会改变 issue 的执行角色。系统在下次同步时会尝试根据真源状态纠正此标签。
 
+#### `orchestra-governed`
+
+**语义**: 治理决策镜像标签 (Governance Review Mark)
+
+**职责**: 辅助 governance (assignee-pool) 识别已完成池内评估（priority/roadmap/epic 判定）的 issue。
+
+**规则**:
+- **决策触发**：由 `assignee-pool` 扫描并做出实质性决策（如设置 `state/ready`、`roadmap/rfc` 等）后添加。
+- **过滤依据**：governance 扫描时会过滤掉已持有此标签的 issue，避免重复评估。
+- **三层治理联动**：
+  - `orchestra-scanned`: Level 1 intake 审查标记。
+  - `orchestra-governed`: Level 2 assignee-pool 决策标记。
+  - `roadmap-reviewed`: Level 3 roadmap 终审标记。
+- **与 vibe-task 区别**：
+  - `vibe-task` 是 **自动化副作用**，表示 issue "正在/曾被" flow 绑定。
+  - `orchestra-governed` 是 **治理状态**，表示 issue "已通过" 治理审查。
+  - 严禁混用。
+
 ### 3.4 编排状态标签语义 (state/*)
 
 **语义**: 说明"当前处于 flow 循环的哪一阶段"
@@ -254,6 +272,7 @@ agent 认领 issue 时：
 - 把 `dependency` 当成一种状态
 - 把 `review` 当成一种 issue 类型
 - 用 `vibe-task` 表达 "现在正在执行"
+- 用 `vibe-task` 作为治理审查标记（应使用 `orchestra-governed`）
 - 把 `roadmap/p0` 等同于 `priority/high`
 
 **正确示例**:
