@@ -354,6 +354,12 @@ run:
     - test_one.py: What is being tested
     - test_two.py: What is being tested
 
+    **Test Scope Selection**:
+    - Run tests for ALL affected modules, not only tests explicitly mentioned in the plan
+    - Use changed source files to determine which test directories to run
+    - Start with direct tests: `tests/vibe3/<module>/test_<file>.py`
+    - Then run module-level tests: `tests/vibe3/<module>/`
+
     ## Plan Requirements Verification
     **REQUIRED if plan contains explicit Verification requirements**
 
@@ -368,7 +374,9 @@ run:
     ## Verification
     - [ ] All changes committed (git status clean)
     - [ ] Commit message follows standards
-    - [ ] All tests pass
+    - [ ] Tests for directly modified files pass
+    - [ ] Tests for affected modules/dependencies pass
+    - [ ] Integration tests pass (if applicable)
     - [ ] No type errors
     - [ ] No lint errors
 
@@ -455,6 +463,21 @@ run:
        - If work is already complete: document this in your report, skip redundant execution, still run verification tests
        - If work is partially done: identify what remains, only execute the missing parts
     3. If unsure whether existing commits are related: run `git diff --name-only <commit>~1 <commit>` on suspicious commits
+
+    ### Post-Implementation Test Scope
+    After completing implementation, determine test scope based on changed files:
+
+    1. **Identify changed source files**: Use `git diff --name-only HEAD~1 HEAD -- src/vibe3/`
+    2. **Run direct tests first**: For each changed file `src/vibe3/<module>/<file>.py`, run `tests/vibe3/<module>/test_<file>.py` if it exists
+    3. **Run affected module tests**: Run `tests/vibe3/<module>/` for each module with changed files
+    4. **Handle test failures**: If tests fail, clearly report which tests failed and why. Do not claim all tests pass if any fail.
+
+    **Example**:
+    ```bash
+    # Changed: src/vibe3/agents/run_prompt.py
+    # Direct test: uv run pytest tests/vibe3/agents/test_run_prompt.py -v
+    # Module tests: uv run pytest tests/vibe3/agents/ -q
+    ```
 
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
@@ -561,6 +584,11 @@ plan:
     ## Implementation Steps
     1. Step one with details
     2. Step two with details
+
+    ## Test Scope
+    - Direct: tests/vibe3/<module>/test_<specific>.py
+    - Affected: tests/vibe3/<module>/
+    - Recommended command: uv run pytest tests/vibe3/<module>/ -q
 
     ## Risks & Considerations
     - Risk 1 and mitigation

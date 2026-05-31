@@ -153,6 +153,47 @@
   - 不要跳过或弱化该要求
   - 等待 manager 指示是否调整 scope
 
+### 测试范围选择
+
+执行完成后，必须基于改动文件选择合适的测试范围，而不是仅运行计划中明确提到的测试。
+
+#### 使用 pre_push_test_selector 工具
+
+项目提供了 `vibe3.analysis.pre_push_test_selector.select_pre_push_tests` 用于映射源文件到相关测试：
+
+```bash
+# 列出改动的源文件，通过 test selector 获取相关测试
+git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
+  uv run python src/vibe3/analysis/pre_push_test_selector.py
+```
+
+#### 三层映射策略
+
+1. **第一层：直接测试文件匹配**
+   - 改动 `src/vibe3/<module>/<name>.py` → 运行 `tests/vibe3/<module>/test_<name>.py`
+   - 优先级最高，必须运行
+
+2. **第二层：DAG 导入分析**
+   - 通过 import DAG 找出哪些测试间接引用了改动模块
+   - 优先级中等，建议运行
+
+3. **第三层：目录级回退**
+   - 运行改动源文件对应的整个测试目录：`tests/vibe3/<module>/`
+   - 优先级最低，覆盖面最广
+
+#### 范围过大处理
+
+如果测试范围 resolve 到 `tests/vibe3` 全量：
+- 本地只运行直接对应的测试目录（第一层和第二层）
+- 全量测试交由 CI 覆盖
+- 不要在本地盲目运行全量测试，避免超时
+
+#### 测试失败处理
+
+- 如果测试失败，在报告中明确记录哪些测试失败
+- 不要冒称"所有测试通过"
+- 提供失败测试的 reproduction 命令
+
 ### 命名/术语变更验证
 
 对于涉及命名、术语变更的任务，实现完成后必须验证：
