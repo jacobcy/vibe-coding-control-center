@@ -110,10 +110,23 @@ Forbidden:
 
 - 如果某个动作没有被明确允许，视为 forbidden
 - **Comment vs Handoff 统一规则**：
-  - **大部分场景**：使用 `handoff append`，它会自动同步到 GitHub comment，兼具内外可见性
-  - **关键里程碑**（claim/block/close/done）：独立 comment + handoff append
-  - **人类介入 blocker**：独立 comment + handoff append
-  - **响应人类指令**：独立 comment
+  - **Comment 仅用于 handoff 不能覆盖的事项**：
+    1. **关键里程碑**（claim/block/close/done）：
+       - ✅ 独立 comment + handoff append
+       - 这些里程碑需要人类特别关注
+    2. **人类介入 blocker**：
+       - ✅ 独立 comment + handoff append
+       - 明确说明需要人类决策的具体问题
+    3. **响应人类指令**：
+       - ✅ 独立 comment（回复人类）
+       - 不需要 handoff append
+  - **其他所有场景**：
+    - ❌ 不要写独立 comment
+    - ✅ 只用 `handoff append`（会自动同步到 GitHub comment）
+    - handoff 自动同步已经提供了足够的可见性
+  - **禁止**：
+    - ❌ 在非关键里程碑写独立 comment + handoff append（会导致重复）
+    - ❌ 在 handoff 已覆盖的内容上再写独立 comment
 - **Handoff 使用原则**：
   - **handoff append**：轻量级记录（状态更新、发现问题、注意事项）
   - **handoff indicate**：传递完整指令文件给下游 agent（plan/audit/PR directive）
@@ -423,7 +436,7 @@ Steps:
        - 创建时间超过 2 周且无任何实质进展（无 spec_ref、plan_ref）
        - 标题或 body 中明确标注"Low priority"、"纯清洁度"、"不影响行为"
      - **测试失败无计划判断**：检查是否为测试 Issue 失败多次且无修复计划
-       - 标签包含 `vibe-task` 且标题包含 "test"
+       - 标题包含 "test"
        - Comments 中有 3 次以上失败记录（`state/failed` 或执行错误）
        - 最新评论无明确修复计划或后续步骤
 
@@ -1037,10 +1050,13 @@ Steps:
 
 规则：
 
+- **去重优先**：禁止在非关键里程碑（如执行中、一般性审核阶段）写独立 comment。优先使用 `handoff append`（会自动同步到 GitHub comment）。
+- **关键里程碑必写**（claim/block/close/done）：独立 comment + handoff append。
+- **独立 Comment 场景**：仅限关键里程碑、人类介入 blocker、响应人类指令。
 - 若无新增事实，不重复发布几乎相同的长 comment
 - 若最新评论已给出明确方向，不再输出 `Option A/B/C`
 - 若当前 state 是 `ready` 且无明确阻止推进的指示，本轮 comment 应写”已认领、当前风险、下一阶段 handoff”
-- **去重与修正优先编辑**：
+- **修正优先编辑**：
   - 发 comment 前必须检查上一条 `[manager]` 评论是否已包含本轮核心论点（状态转换、关键发现、质量判断）
   - 若上一条 `[manager]` 评论内容截断或信息不完整，**编辑上一条评论**而非发新评论：
     ```bash
