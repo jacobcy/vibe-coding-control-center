@@ -177,6 +177,38 @@ class QualifyGateService:
 
         return result
 
+    def qualify_handoff_issue(self, issue: IssueInfo) -> IssueState | None:
+        """Run qualify gate for a handoff issue at dispatch intent time.
+
+        Prevents erroneous manager re-dispatch after reviewer completes.
+        Returns None when dispatch should be skipped:
+        - No local flow found
+        - Flow has no branch
+        - Reviewer already set latest_verdict (PASS/FAIL)
+        - PR already exists (waiting for merge)
+
+        Args:
+            issue: HANDOFF issue to qualify
+
+        Returns:
+            IssueState.HANDOFF to dispatch manager, or None to skip.
+        """
+        flow = self._flow_manager.get_flow_for_issue(issue.number)
+        if not flow:
+            return None
+
+        branch = str(flow.get("branch") or "").strip()
+        if not branch:
+            return None
+
+        if flow.get("latest_verdict"):
+            return None
+
+        if flow.get("pr_ref"):
+            return None
+
+        return IssueState.HANDOFF
+
     def _align_blocked_state(
         self,
         issue_number: int,
