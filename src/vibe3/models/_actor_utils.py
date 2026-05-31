@@ -1,7 +1,10 @@
 """Actor normalization utilities for models layer.
 
-This module provides pure functions for normalizing actor identifiers,
+This module provides the canonical implementation of normalize_actor,
 extracted from vibe3.utils.actor_utils to maintain proper architecture layering.
+
+This is the single source of truth for actor normalization. The utils module
+(vibe3.utils.actor_utils) re-exports from here for backward compatibility.
 
 This is a private module (underscore prefix) not part of the public models API.
 """
