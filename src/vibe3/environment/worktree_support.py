@@ -36,23 +36,26 @@ def align_auto_scene_to_base(
     except Exception:
         has_commits = False
 
-    commands = [["git", "fetch", "--all", "--prune"]]
-    if not has_commits:
-        commands.extend(
-            [
-                ["git", "checkout", flow_branch],
-                ["git", "reset", "--hard", base_ref],
-                ["git", "clean", "-fd"],
-            ]
-        )
-    else:
+    # Best-effort remote sync: a fetch failure (network blip or a transient git
+    # lock left by a just-finished role) must NOT mark the worktree unusable —
+    # the local worktree remains fully valid for the next role to use.
+    _best_effort_fetch(cwd, flow_branch)
+
+    if has_commits:
         logger.info(
             "Skipping destructive alignment for existing task branch with commits",
             branch=flow_branch,
             cwd=str(cwd),
         )
+        return True
 
-    for cmd in commands:
+    # Destructive alignment only runs for empty branches; a failure here DOES
+    # gate usability because a failed reset would leave the scene incorrect.
+    for cmd in (
+        ["git", "checkout", flow_branch],
+        ["git", "reset", "--hard", base_ref],
+        ["git", "clean", "-fd"],
+    ):
         try:
             result = subprocess.run(
                 cmd,
@@ -86,6 +89,39 @@ def align_auto_scene_to_base(
         base_ref=base_ref,
     )
     return True
+
+
+def _best_effort_fetch(cwd: Path, flow_branch: str) -> None:
+    """Run ``git fetch`` best-effort; log on failure but never raise or gate.
+
+    A fetch failure (transient lock from a just-finished role, network blip)
+    must not mark the worktree unusable — the local worktree remains valid for
+    the next role to use. This is the root-cause fix for issue #1729: a manager
+    dispatched to a reviewer's permanent worktree no longer fails with
+    ``worktree_unavailable`` just because ``git fetch`` could not reach origin.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "fetch", "--all", "--prune"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except Exception as exc:
+        logger.warning(
+            f"Best-effort fetch failed (continuing): {exc}",
+            branch=flow_branch,
+            cwd=str(cwd),
+        )
+        return
+    if result.returncode != 0:
+        logger.warning(
+            "Best-effort fetch failed (continuing): "
+            f"{(result.stderr or result.stdout).strip()}",
+            branch=flow_branch,
+            cwd=str(cwd),
+        )
 
 
 def initialize_worktree(repo_path: Path, wt_path: Path, reason: str) -> None:

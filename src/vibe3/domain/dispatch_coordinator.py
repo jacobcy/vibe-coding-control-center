@@ -467,18 +467,6 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
                 entry.collected_state = target_state.value
-            elif issue.state == IssueState.HANDOFF:
-                # For HANDOFF issues: run qualify gate to prevent re-dispatch
-                # after reviewer verdict PASS or when PR is awaiting merge.
-                target_state = self._qualify_gate.qualify_handoff_issue(issue)
-                if target_state is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                role = find_role_for_state(target_state)
-                if role is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                entry.collected_state = target_state.value
             else:
                 role = find_role_for_state(issue.state)
                 if role is None:
