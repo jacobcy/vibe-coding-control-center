@@ -7,6 +7,7 @@
 ## 📁 目录结构
 
 ```
+lib3/                                # V3 Python 核心 Shell 包装器 (hub)
 docs/
 ├── README.md                        # 本文件：文档总览
 ├── standards/                       # 标准和规范文档

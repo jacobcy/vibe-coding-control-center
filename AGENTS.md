@@ -61,6 +61,7 @@ This project has **two parallel implementations**:
 
 - **V2 (Shell)**: `bin/`, `lib/`, `config/shell/`
 - **V3 (Python)**: `src/vibe3/` (Support global `vibe3` command via `uv tool install -e .`)
+- **V3 Hub**: `lib3/` (Shell wrappers for repo redirection and keys)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
 - **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
