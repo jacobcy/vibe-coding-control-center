@@ -115,7 +115,37 @@ related_docs:
   - 不说 "创建 task issue"，而是 "将 issue 关联为 task"。
   - 它是相对于 flow 的**关系**，而不是 issue 的固有属性。
 
+### 3.3.1a `orchestra-governed` (label)
+
+- 正式术语：`orchestra-governed`
+- 别称：无
+- 定义：**治理决策镜像标签**。用于标记已通过 `assignee-pool` (Level 2 scan) 评估并做出确定性决策（如 ready/rfc/epic/close）的 issue。
+- 职责：作为 governance 扫描的“已审查”标记，防止重复扫描，并作为三层治理体系（scanned -> governed -> reviewed）的中间状态。
+- 边界：
+  - **不是**自动化镜像，而是治理决策的显式标记。
+  - 标记该 issue 已经过池内决策，无需再次 intake 或评估。
+- 使用规则：
+  - 由 `assignee-pool` 扫描完成后添加。
+  - 人类手动移除此标签可使 issue 重新进入 governance 评估循环。
+
+### 3.3.1b `orchestra-scanned` (label)
+
+- 正式术语：`orchestra-scanned`
+- 别称：无
+- 定义：**Intake 审查镜像标签**。用于标记已通过 `roadmap-intake` (Level 1 scan) 审查但未被纳入执行池的 issue。
+- 职责：标记该 issue 已被 intake 层处理（通常是跳过或拒绝），防止重复扫描。
+- 边界：Level 1 治理标记。
+
+### 3.3.1c `roadmap-reviewed` (label)
+
+- 正式术语：`roadmap-reviewed`
+- 别称：无
+- 定义：**Roadmap 终审镜像标签**。用于标记已由 `vibe-roadmap` (Level 3 review) 完成终审决策的 issue。
+- 职责：治理体系的终态标记，表示决策已固化并写入 memory。
+- 边界：Level 3 治理标记。
+
 ### 3.3.2 `assignee issue`
+
 
 - 正式术语：`assignee issue`
 - 别称：无
@@ -739,4 +769,4 @@ related_docs:
 - `执行代理` != `Shell 能力层`
 
 若后续 doc review 发现新的高频混用，应优先在本文档补充修正。
-��
+

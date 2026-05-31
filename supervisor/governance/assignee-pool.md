@@ -38,6 +38,11 @@
 
 **所有决策完成后打 `orchestra-governed` 标签**。
 
+**三层治理体系联动**：
+- **Level 1 (Intake)**: 审查无 assignee issue，跳过时打 `orchestra-scanned`。
+- **Level 2 (Assignee Pool)**: 评估池内优先级与形态，决策后打 `orchestra-governed`（即本材料）。
+- **Level 3 (Roadmap)**: 终审决策，结果产出后打 `roadmap-reviewed`。
+
 **核心逻辑**：
 - **决策** → 对池内 issue 做出确定性判断（不再只是”建议”）
 - **观察** → 分析当前 issue 池和队列状态，辅助决策
@@ -328,9 +333,10 @@ pool 扫描有 assignee 的 issue →
 Steps:
 
 0. **标签验证（强制，先于过滤）**：先执行「标签验证与清理」段——校验所有带 `orchestra-governed` 的 open issue 是否仍满足持有条件，不满足则移除并写 cleanup comment。然后才进入下面的标签过滤。
-1. **标签过滤（强制）**：只处理有 manager assignee 但无 `orchestra-governed` 标签的 issue：
+1. **标签过滤（强制）**：只处理有 manager assignee，且无 `orchestra-governed` 且无 `roadmap-reviewed` 标签的 issue：
    - 无 assignee → 跳过（不在 pool 中，由 roadmap-intake 负责）
    - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不重复检查）
+   - 有 `roadmap-reviewed` 标签 → 跳过（roadmap 已终审，pool 不再干预）
 2. 运行全局现场观察命令，读取当前 running issues、ready queue、blocked issues、remote tasks 与 flow 现场：
    ```bash
    uv run python src/vibe3/cli.py task status

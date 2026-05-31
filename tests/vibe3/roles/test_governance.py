@@ -311,7 +311,7 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_empty_issues(self, mock_github_cls):
         mock_github = MagicMock()
-        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github.list_issues.return_value = []  # No orchestra-governed issues
         mock_github_cls.return_value = mock_github
 
         snapshot = _make_snapshot()
@@ -329,7 +329,7 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_with_running_and_suggested_issues(self, mock_github_cls):
         mock_github = MagicMock()
-        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github.list_issues.return_value = []  # No orchestra-governed issues
         mock_github_cls.return_value = mock_github
 
         running = IssueStatusEntry(
@@ -373,7 +373,7 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_server_stopped(self, mock_github_cls):
         mock_github = MagicMock()
-        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github.list_issues.return_value = []  # No orchestra-governed issues
         mock_github_cls.return_value = mock_github
 
         snapshot = _make_snapshot(server_running=False)
@@ -383,7 +383,7 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_truncation_note(self, mock_github_cls):
         mock_github = MagicMock()
-        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github.list_issues.return_value = []  # No orchestra-governed issues
         mock_github_cls.return_value = mock_github
 
         issues = tuple(
