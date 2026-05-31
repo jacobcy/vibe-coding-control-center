@@ -7,7 +7,7 @@
 
 import warnings
 
-from vibe3.domain.flow_manager import FlowManager
+from vibe3.domain import FlowManager
 
 # Emit deprecation warning when module is imported
 warnings.warn(
