@@ -7,7 +7,7 @@ terminal state detection) rather than re-testing CheckService internals.
 """
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.check_service import CheckResult
@@ -139,16 +139,15 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return valid result
-        with patch(
-            "vibe3.domain.dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=True,
-                issues=[],
-                branch="task/issue-43",
-            )
-            result = coordinator._health_check_service.check_issue_health(issue)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=True,
+            issues=[],
+            branch="task/issue-43",
+        )
+        coordinator._check_service = mock_check_service
+        _setup_health_check_service(coordinator, mock_check_service, store)
+        result = coordinator._health_check_service.check_issue_health(issue)
 
         # Assert
         assert result is True, "Health check should pass for healthy active flow"
@@ -255,16 +254,15 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return valid (open PR is not a failure)
-        with patch(
-            "vibe3.domain.dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=True,
-                issues=[],
-                branch="task/issue-45",
-            )
-            result = coordinator._health_check_service.check_issue_health(issue)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=True,
+            issues=[],
+            branch="task/issue-45",
+        )
+        coordinator._check_service = mock_check_service
+        _setup_health_check_service(coordinator, mock_check_service, store)
+        result = coordinator._health_check_service.check_issue_health(issue)
 
         # Assert
         assert result is True, "Health check should pass for active flow with open PR"
@@ -313,16 +311,15 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with transient error
-        with patch(
-            "vibe3.domain.dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=False,
-                issues=["Cannot verify task issue #46: network/auth error"],
-                branch="task/issue-46",
-            )
-            result = coordinator._health_check_service.check_issue_health(issue)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=["Cannot verify task issue #46: network/auth error"],
+            branch="task/issue-46",
+        )
+        coordinator._check_service = mock_check_service
+        _setup_health_check_service(coordinator, mock_check_service, store)
+        result = coordinator._health_check_service.check_issue_health(issue)
 
         # Assert - should fail open on transient errors
         assert result is True, "Health check should fail open on network errors"
@@ -445,25 +442,23 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with transient error
-        with patch(
-            "vibe3.domain.dispatch_coordinator.CheckService"
-        ) as mock_check_service:
-            mock_service = mock_check_service.return_value
-            mock_service.verify_branch.return_value = CheckResult(
-                is_valid=False,
-                issues=["Cannot verify task issue #46: network/auth error"],
-                branch="task/issue-46",
-            )
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=["Cannot verify task issue #46: network/auth error"],
+            branch="task/issue-46",
+        )
+        coordinator._check_service = mock_check_service
 
-            # Mock FlowService.block_flow to ensure it's NOT called
-            with patch(
-                "vibe3.domain.dispatch_coordinator.FlowService"
-            ) as mock_flow_service:
-                mock_flow = mock_flow_service.return_value
-                result = coordinator._health_check_service.check_issue_health(issue)
+        # Mock FlowService.block_flow to ensure it's NOT called
+        mock_flow_blocker = MagicMock()
+        coordinator._flow_blocker = mock_flow_blocker
 
-                # Assert - block_flow should NOT be called for transient errors
-                mock_flow.block_flow.assert_not_called()
+        _setup_health_check_service(coordinator, mock_check_service, store)
+        result = coordinator._health_check_service.check_issue_health(issue)
+
+        # Assert - block_flow should NOT be called for transient errors
+        mock_flow_blocker.block_flow.assert_not_called()
 
         # Assert - should fail open
         assert result is True, "Health check should fail open on transient errors"
