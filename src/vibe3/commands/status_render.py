@@ -290,7 +290,9 @@ def render_blocked_items(blocked_items: list[dict[str, object]]) -> None:
             if flow:
                 console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
             else:
-                console.print("         [dim]flow:[/] [dim](no flow scene)[/]")
+                console.print(
+                    "         [dim]flow:[/] [dim](no flow scene)[/] [cyan]\\[remote][/]"
+                )
 
             if blocked_by:
                 blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)

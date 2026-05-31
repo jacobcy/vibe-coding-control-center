@@ -186,6 +186,7 @@ class IssueInfo(BaseModel):
     url: str | None = None
     milestone: str | None = None  # GitHub milestone title
     github_state: str | None = None  # GitHub issue state: "OPEN" or "CLOSED"
+    body: str | None = None  # Issue body for remote blocked_reason extraction
 
     @property
     def slug(self) -> str:
@@ -232,6 +233,7 @@ class IssueInfo(BaseModel):
                 url=payload.get("html_url") or payload.get("url"),
                 milestone=milestone,
                 github_state=github_state,
+                body=payload.get("body"),
             )
         except (KeyError, ValueError) as exc:
             logger.bind(domain="orchestra").warning(

@@ -190,8 +190,8 @@ class TestRemoteField:
         assert len(result) == 1
         assert result[0]["remote"] is False
 
-    def test_blocked_state_not_remote(self) -> None:
-        """BLOCKED state should not be marked as remote."""
+    def test_blocked_state_remote_when_manager_assigned_no_flow(self) -> None:
+        """BLOCKED state should be remote when manager-assigned without flow."""
         service = self._make_mock_service()
         service.github.list_issues.return_value = [
             {
@@ -210,8 +210,41 @@ class TestRemoteField:
         )
 
         assert len(result) == 1
-        assert result[0]["remote"] is False
+        assert result[0]["remote"] is True
         assert result[0]["state"] == IssueState.BLOCKED
+
+    def test_blocked_remote_parses_reason_from_body(self) -> None:
+        """Remote BLOCKED issues should parse blocked_reason from issue body."""
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 107,
+                "title": "Remote blocked task",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "body": """<!-- vibe3-flow-state-start -->
+## Managed Section
+
+- **State**: blocked
+- **Blocked by**: #123, #456
+- **Blocked reason**: Waiting for external dependency
+<!-- vibe3-flow-state-end -->
+""",
+            }
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=[],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["remote"] is True
+        assert result[0]["state"] == IssueState.BLOCKED
+        assert result[0]["blocked_reason"] == "Waiting for external dependency"
+        assert result[0]["blocked_by"] == (123, 456)
 
     def test_keeps_no_state_items_with_dispatch_exclusion_reasons(self) -> None:
         """Issues without state/* should still be returned for dashboard
