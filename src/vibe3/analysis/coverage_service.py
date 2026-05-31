@@ -9,7 +9,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.models.coverage import CoverageReport, LayerCoverage
+from vibe3.models import CoverageReport, LayerCoverage
 
 
 class CoverageService:
