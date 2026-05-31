@@ -29,13 +29,17 @@ Vibe Center uses a two-tier distribution model:
 - Major version upgrade
 - After `scripts/uninstall.sh`
 
-### Global Update: `vibe update`
+### Global Update: `vibe update` (Legacy Helper)
 
 **Responsibilities:**
 - Sync V2/V3 core components to `~/.vibe`
 - Clean stale files
 - Preserve user configs (`config/keys.env`, `settings.yaml`)
 - Idempotent operation
+
+**Mindset:**
+- V3 (`vibe3`) is the primary logic layer. `vibe update` is a distribution helper to ensure the global `~/.vibe` environment matches the repository truth.
+- Prefer worktree-local execution during development; use global commands for stable daily operations.
 
 **When to run:**
 - After pulling upstream changes

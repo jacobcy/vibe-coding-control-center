@@ -52,14 +52,15 @@ related_docs:
 
 ## 调用面标注规范
 
-为避免 `vibe` 相关能力在文档中出现语义混淆，文档写作必须显式区分调用面：
+为避免 `vibe` 相关能力在文档中出现语义混淆，文档写作必须显式区分调用面，并**优先推荐 V3 标注**：
 
-- `shell 命令`：`vibe3 <subcommand>` (或 V2 `vibe <domain> <subcommand>`)，例如 `vibe3 flow (shell)`
+- `shell 命令`：**优先使用 `vibe3 <subcommand>`** (仅在环境管理等特定场景使用 V2 `vibe <domain> <subcommand>`)，例如 `vibe3 check (shell)`
 - `skill 命令`：`/<skill-name>`，例如 `/vibe-save (skill)`
 
 写作规则：
 
 - 同一段首次提及时，必须带调用面后缀（`(shell)` 或 `(skill)`）
+- **示例命令应尽可能基于 V3 (`vibe3`)**，除非该功能仅在 V2 中提供。
 - 同段后续复用可省略后缀
 - 跨段再次出现同名或近似名称时，建议重新标注
 

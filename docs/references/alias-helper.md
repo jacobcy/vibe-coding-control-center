@@ -44,7 +44,7 @@ repo/
         └── vibe3.sh       # Vibe3 CLI 命令
 ```
 
-**与 V3 的关系**：V3 Python 命令（`vibe3`）已接管核心业务逻辑，Shell alias 主要用于 tmux/worktree 管理和快捷调用。
+**与 V3 的关系**：**`vibe3` (Python) 是项目的核心业务逻辑与状态管理层**。Shell aliases (`vt*`, `wt*` 等) 仅作为辅助工具（Support Tools），用于快速管理 tmux 会话、worktree 跳转和快捷调用。核心的 Flow、Task 和 PR 状态流转应由 `vibe3` 命令集负责。
 
 ---
 
