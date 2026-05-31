@@ -11,6 +11,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.state_machine import (
     STATE_LABEL_META,
     VIBE_TASK_LABEL,
@@ -31,6 +32,8 @@ class LabelService:
         issue_port: IssueLabelPort | None = None,
         repo: str | None = None,
     ) -> None:
+        if issue_port is None and repo is None:
+            repo = load_orchestra_config().repo
         self.issue_port = issue_port or GhIssueLabelPort(repo=repo)
 
     def get_state(self, issue_number: int) -> IssueState | None:

@@ -6,7 +6,6 @@ import yaml
 from loguru import logger
 
 from vibe3.clients.ai_client import AIClient
-from vibe3.config.settings import AIConfig
 
 DEFAULT_PROMPTS = {
     "pr": {
@@ -38,15 +37,13 @@ class AISuggestionClient:
 
     def __init__(
         self,
-        config: AIConfig,
+        ai_client: AIClient | None,
         prompts_path: Path | None = None,
     ) -> None:
-        self.config = config
+        self.ai_client = ai_client
         self.prompts = self._load_prompts(prompts_path)
-        self.ai_client: AIClient | None = AIClient(config)
 
-        if self.ai_client._api_key is None:
-            self.ai_client = None
+        if self.ai_client is None:
             logger.bind(module="ai_suggestion_client").debug(
                 "AI client not available, suggestion client will return None"
             )
