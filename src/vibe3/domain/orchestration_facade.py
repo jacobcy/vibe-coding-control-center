@@ -19,7 +19,7 @@ from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.runtime.service_protocol import ServiceBase
+from vibe3.runtime import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator

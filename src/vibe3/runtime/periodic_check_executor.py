@@ -84,6 +84,6 @@ async def execute_periodic_check(
 
     # Phase 2: Expired resource cleanup (if enabled)
     # Import cleanup executor to reuse existing logic
-    from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
+    from .cleanup_executor import execute_expired_resource_cleanup
 
     await execute_expired_resource_cleanup(config, tick_number)

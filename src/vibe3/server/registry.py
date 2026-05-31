@@ -21,8 +21,7 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime.circuit_breaker import CircuitBreaker
-from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime import CircuitBreaker, HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
