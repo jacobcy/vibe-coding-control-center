@@ -7,6 +7,7 @@ from typing import Annotated, cast
 
 import typer
 
+from vibe3.commands import _validate_pid_file
 from vibe3.commands.command_options import (
     AllOption,
     FormatOption,
@@ -22,7 +23,6 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.server import _validate_pid_file
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.services.orchestra_status_service import OrchestraStatusService

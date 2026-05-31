@@ -1,5 +1,8 @@
 """Commands package."""
 
+# Re-export from server for commands-internal use
+from vibe3.server import _validate_pid_file
+
 from . import (
     check,
     flow,
@@ -22,4 +25,5 @@ __all__ = [
     "review",
     "run",
     "snapshot",
+    "_validate_pid_file",
 ]
