@@ -76,7 +76,8 @@ class CodeagentExecutionService:
         handoff_label = get_handoff_state_label(config.supervisor_handoff)
 
         try:
-            labels_client = GhIssueLabelPort()
+            repo = config.repo
+            labels_client = GhIssueLabelPort(repo=repo)
             labels_client.remove_issue_label(issue_number, handoff_label)
             log.info(f"Removed {handoff_label} label from #{issue_number}")
         except Exception as exc:
