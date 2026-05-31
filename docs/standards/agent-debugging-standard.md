@@ -2,8 +2,8 @@
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
-> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`supervisor/policies/` 为准；编排状态语义与 authoritative ref 定义以 [v3/command-standard.md](v3/command-standard.md) 为准；运行时架构以 [v3/orchestra-runtime-standard.md](v3/orchestra-runtime-standard.md) 为准。
-> **实践入口**：快速上手请参考 [v3/serve-debugging-guide.md](v3/serve-debugging-guide.md)。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`supervisor/policies/` 为准；编排状态语义与 authoritative ref 定义以 [v3/command-standard.md](v3/command-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
+> **实践入口**：快速上手请参考 [vibe3-serve-debugging-guide.md](vibe3-serve-debugging-guide.md)。
 
 ---
 
@@ -588,7 +588,7 @@ ls temp/logs/*issue-420*.async.log
 
 | 文档 | 用途 |
 |---|---|
-| [v3/orchestra-runtime-standard.md](v3/orchestra-runtime-standard.md) | Orchestra 运行时架构：driver、heartbeat、service 分层、governance 语义 |
+| [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) | Orchestra 运行时架构：driver、heartbeat、service 分层、governance 语义 |
 | [v3/command-standard.md](v3/command-standard.md) | `state/*` labels 语义、状态迁移规则、manager 判定规则、真源分层 |
 | `supervisor/manager.md` | Manager 角色材料：Permission Contract、Pseudo Functions、Stop Conditions |
 | `supervisor/governance/assignee-pool.md` | Governance supervisor material（原 orchestra.md）；governance agent 的角色材料，不是 runtime orchestra 本体 |

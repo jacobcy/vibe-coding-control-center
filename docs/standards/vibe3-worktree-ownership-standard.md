@@ -43,7 +43,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
   - `plan` 触发器：检测 `state/plan` label → dispatch planner agent
   - `run` 触发器：检测 `state/run` label → dispatch executor agent
   - `review` 触发器：检测 `state/review` label → dispatch reviewer agent
-- **事件驱动协同**：Agent 执行完成或失败时发布领域事件（见 [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md)），由事件处理器负责更新 GitHub labels。Orchestra 的 tick 循环作为“外部观察者”消费这些 label 变迁并触发下一阶段 dispatch。
+- **事件驱动协同**：Agent 执行完成或失败时发布领域事件（见 [v3/event-driven-standard.md](v3/event-driven-standard.md)），由事件处理器负责更新 GitHub labels。Orchestra 的 tick 循环作为“外部观察者”消费这些 label 变迁并触发下一阶段 dispatch。
 - Worktree：**不需要**。Orchestra 本身不执行代码修改，不调用 codeagent-wrapper 直接。
 - 实现位置：`src/vibe3/orchestra/services/state_label_dispatch.py`（`StateLabelDispatchService`）
 

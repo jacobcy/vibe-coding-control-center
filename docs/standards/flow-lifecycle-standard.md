@@ -15,7 +15,7 @@ related_docs:
   - docs/standards/v3/error-severity-and-blocking-standard.md
   - docs/standards/vibe3-role-checks-and-balances-standard.md
   - docs/standards/v3/data-model-standard.md
-  - docs/standards/vibe3-event-driven-standard.md
+  - docs/standards/v3/event-driven-standard.md
 ---
 
 # Flow 生命周期与回收机制标准
@@ -630,6 +630,6 @@ store.add_event(
 - [glossary.md](glossary.md) - 术语定义（权威）
 - [vibe3-role-checks-and-balances-standard.md](vibe3-role-checks-and-balances-standard.md) - 角色权力边界（权威）
 - [v3/data-model-standard.md](v3/data-model-standard.md) - 数据模型（权威）
-- [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md) - 事件驱动架构
-- [vibe3-noop-gate-boundary-standard.md](vibe3-noop-gate-boundary-standard.md) - 阻塞原则与 noop gate 边界
+- [event-driven-standard.md](v3/event-driven-standard.md) - 事件驱动架构
+- [noop-gate-boundary-standard.md](v3/noop-gate-boundary-standard.md) - 阻塞原则与 noop gate 边界
 - [../analysis/flow-blocked-vs-bind-dependency-analysis.md](../analysis/flow-blocked-vs-bind-dependency-analysis.md) - blocked_reason vs dependency 依赖分析

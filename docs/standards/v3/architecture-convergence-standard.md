@@ -281,11 +281,11 @@ Vibe3 最终应收敛为六层。
 
 ## 9. 与其他标准的关系
 
-- 事件语义与处理规则：见 [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md)
-- runtime driver / tick / async child：见 [v3/orchestra-runtime-standard.md](v3/orchestra-runtime-standard.md)
-- 状态机与 authoritative refs：见 [v3/command-standard.md](v3/command-standard.md)
-- 模块职责边界与分层定义：见 [v3-module-architecture-standard.md](v3-module-architecture-standard.md)
-- worktree 分配与 runtime session：见 [vibe3-worktree-ownership-standard.md (DEPRECATED)](vibe3-worktree-ownership-standard.md)
+- 事件语义与处理规则：见 [event-driven-standard.md](event-driven-standard.md)
+- runtime driver / tick / async child：见 [../vibe3-orchestra-runtime-standard.md](../vibe3-orchestra-runtime-standard.md)
+- 状态机与 authoritative refs：见 [command-standard.md](command-standard.md)
+- 模块职责边界与分层定义：见 [../v3-module-architecture-standard.md](../v3-module-architecture-standard.md)
+- worktree 分配与 runtime session：见 [worktree-ownership-standard.md](worktree-ownership-standard.md)
 
 本文件负责回答“整体最后该长成什么样”，上述文件负责回答各分层内部的细节语义。
 
