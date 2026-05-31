@@ -1,5 +1,13 @@
 """Models package."""
 
+from vibe3.models.change_source import (
+    BranchSource,
+    ChangeSource,
+    ChangeSourceType,
+    CommitSource,
+    PRSource,
+    UncommittedSource,
+)
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
 from vibe3.models.inspection import CallNode, CommandInspection
@@ -21,8 +29,12 @@ from vibe3.models.snapshot import (
 from vibe3.models.trace import ExecutionStep, TraceOutput
 
 __all__: list[str] = [
+    "BranchSource",
     "CallNode",
+    "ChangeSource",
+    "ChangeSourceType",
     "CommandInspection",
+    "CommitSource",
     "CoverageReport",
     "DeadCodeFinding",
     "DeadCodeReport",
@@ -37,9 +49,11 @@ __all__: list[str] = [
     "LayerCoverage",
     "ModuleChange",
     "ModuleSnapshot",
+    "PRSource",
     "PromptContextMode",
     "StructureDiff",
     "StructureMetrics",
     "StructureSnapshot",
     "TraceOutput",
+    "UncommittedSource",
 ]

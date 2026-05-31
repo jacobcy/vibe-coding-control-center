@@ -12,7 +12,7 @@ from vibe3.analysis.serena_file_analyzer import analyze_files
 from vibe3.clients import SerenaClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import SerenaError
-from vibe3.models.change_source import ChangeSource
+from vibe3.models import ChangeSource
 
 if TYPE_CHECKING:
     from vibe3.models import DeadCodeReport
