@@ -33,6 +33,7 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
             include_remote=True,
             terminate_sessions=True,
             keep_flow_record=False,  # Resume always deletes flow record
+            force_delete=False,  # Default: soft delete for audit trail
         )
 
 
@@ -68,6 +69,7 @@ def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
             include_remote=True,
             terminate_sessions=True,
             keep_flow_record=False,
+            force_delete=False,  # Default: soft delete for audit trail
         )
 
         # Note: Tombstone normalization is validated in repository tests
@@ -103,6 +105,67 @@ def test_reset_task_scene_with_remote_keeps_remote_branch() -> None:
             include_remote=False,  # Key assertion: keep remote branch
             terminate_sessions=True,
             keep_flow_record=False,
+            force_delete=False,  # Default: soft delete for audit trail
+        )
+
+
+def test_reset_task_scene_with_force_delete_true() -> None:
+    """Test reset_task_scene with force_delete=True (hard delete for rebuild)."""
+    operations = _make_operations()
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup_instance = MagicMock()
+        mock_cleanup_instance.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        mock_cleanup_cls.return_value = mock_cleanup_instance
+
+        # Call with force_delete=True (PR closed / resume all scenario)
+        operations.reset_task_scene("task/issue-1719", force_delete=True)
+
+        # Verify cleanup_flow_scene was called with force_delete=True
+        mock_cleanup_instance.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-1719",
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,
+            force_delete=True,  # Key assertion: hard delete for rebuild
+        )
+
+
+def test_reset_task_scene_with_force_delete_false_default() -> None:
+    """Test reset_task_scene defaults to force_delete=False (soft delete for audit)."""
+    operations = _make_operations()
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup_instance = MagicMock()
+        mock_cleanup_instance.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        mock_cleanup_cls.return_value = mock_cleanup_instance
+
+        # Call without force_delete (default behavior)
+        operations.reset_task_scene("task/issue-123")
+
+        # Verify cleanup_flow_scene was called with force_delete=False
+        mock_cleanup_instance.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-123",
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,
+            force_delete=False,  # Key assertion: soft delete for audit trail
         )
 
 

@@ -95,4 +95,5 @@ def test_reset_issue_to_ready_with_remote_flag() -> None:
                 include_remote=False,  # Key assertion
                 terminate_sessions=True,
                 keep_flow_record=False,
+                force_delete=False,  # Soft delete for audit trail
             )

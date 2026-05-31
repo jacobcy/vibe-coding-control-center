@@ -173,6 +173,21 @@ class TaskResumeOperations:
             # Original logic: delete worktree/branch for full rebuild
             emit_progress("full rebuild mode")
 
+            # Determine deletion strategy based on resume_kind
+            # PR closed / resume all → hard delete (rebuild, clear events)
+            # Failed / blocked → soft delete (audit, keep events)
+            should_hard_delete = resume_kind in ("pr_closed", "all")
+
+            logger.bind(
+                domain="resume",
+                action="reset_issue_to_ready",
+                resume_kind=resume_kind,
+                force_delete=should_hard_delete,
+            ).info(
+                f"Resume strategy: "
+                f"{'hard delete' if should_hard_delete else 'soft delete'}"
+            )
+
             # Always use BlockedStateService.unblock() for consistent state clearing
             # Both blocked and non-blocked resume need to clear any stale metadata
             from vibe3.services.blocked_state_service import BlockedStateService
@@ -196,6 +211,7 @@ class TaskResumeOperations:
                     self.reset_task_scene(
                         branch,
                         include_remote=not remote,
+                        force_delete=should_hard_delete,  # Pass deletion strategy
                     )
                     emit_progress("task scene reset done", status="done")
                 except Exception as exc:
@@ -214,6 +230,7 @@ class TaskResumeOperations:
         self,
         branch: str,
         include_remote: bool = True,
+        force_delete: bool = False,
     ) -> None:
         """Delete the stale task scene so the next run starts from scratch.
 
@@ -228,6 +245,9 @@ class TaskResumeOperations:
             branch: Branch name
             include_remote: If True, delete remote branch (default).
                 If False, keep remote branch (for --remote mode).
+            force_delete: If True, hard delete flow (remove events).
+                Use True for rebuild scenarios (PR closed, resume all).
+                Use False for aborted scenarios (keep audit trail).
 
         Note: Always deletes flow record (keep_flow_record=False) because
             the purpose of `task resume` is to restart the flow from scratch.
@@ -238,6 +258,7 @@ class TaskResumeOperations:
             domain="resume",
             action="reset_task_scene",
             branch=branch,
+            force_delete=force_delete,
         ).info("Resetting task scene")
 
         cleanup_service = FlowCleanupService(
@@ -252,6 +273,7 @@ class TaskResumeOperations:
             include_remote=include_remote,  # Use parameter (False for --remote mode)
             terminate_sessions=True,
             keep_flow_record=False,  # Delete flow record to allow fresh start
+            force_delete=force_delete,  # Hard delete for rebuild, soft for audit
         )
 
         # Log if any step failed
