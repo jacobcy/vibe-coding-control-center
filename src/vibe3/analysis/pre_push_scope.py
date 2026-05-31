@@ -72,7 +72,7 @@ def resolve_pre_push_scope(
     # - Git version doesn't provide stdin properly
     # - Multiple refs pushed but none matched above
     try:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git_client = GitClient()
         current_branch = git_client.get_current_branch()

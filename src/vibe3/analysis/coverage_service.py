@@ -111,7 +111,7 @@ class CoverageService:
         Raises:
             RuntimeError: If pytest or coverage run fails
         """
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         # Always use branch for paths (branch is always available)
         git = GitClient()
