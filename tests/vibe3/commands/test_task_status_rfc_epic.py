@@ -411,3 +411,73 @@ def test_epic_no_dependencies(
     # Should NOT show any dependency status line
     assert "✓ READY" not in output
     assert "⏳ WAITING" not in output
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_epic_parser_rejects_partial_header_match(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """Parser should not match '## Dependencies Overview' as '## Dependencies'."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    # Epic with "## Dependencies Overview" section containing #123,
+    # followed by actual "## Dependencies" section containing #456
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 888,
+            "title": "Epic with similarly-named sections",
+            "state": IssueState.BLOCKED,
+            "assignee": "manager-bot",
+            "flow": _make_flow(888),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": ["roadmap/epic"],
+            "remote": False,
+            "body": (
+                "## Dependencies Overview\n\n"
+                "- #123 (API)\n\n"
+                "## Dependencies\n\n"
+                "- #456 (DB)\n"
+            ),
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Roadmap Epic:" in output
+    assert "# 888" in output
+    # Should show READY for #456 (correct), not WAITING for #123 (wrong)
+    assert "✓ READY" in output

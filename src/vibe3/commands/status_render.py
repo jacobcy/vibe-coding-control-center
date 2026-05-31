@@ -3,6 +3,7 @@
 Filtering rules: docs/v3/orchestra/task-status-filtering.md
 """
 
+import re
 from typing import cast
 
 from vibe3.models.flow import FlowStatusResponse
@@ -77,10 +78,21 @@ def _parse_epic_dependencies(body: str | None) -> list[int]:
     if not body:
         return []
 
-    # Find the ## Dependencies section
-    deps_start = body.find("## Dependencies")
-    if deps_start == -1:
-        return []
+    # Find the exact "## Dependencies" section (not "## DependenciesAndMore")
+    search_start = 0
+    deps_start = -1
+    while True:
+        deps_start = body.find("## Dependencies", search_start)
+        if deps_start == -1:
+            return []
+
+        # Verify this is exactly "## Dependencies" (followed by newline or end)
+        after = body[deps_start + len("## Dependencies") :]
+        if not after or after[0] in ("\n", "\r"):
+            break  # Found exact match
+
+        # Not exact match, continue searching after this position
+        search_start = deps_start + 1
 
     # Extract text after "## Dependencies" until the next ## header or end
     deps_section = body[deps_start:]
@@ -89,8 +101,6 @@ def _parse_epic_dependencies(body: str | None) -> list[int]:
         deps_section = deps_section[:next_header]
 
     # Extract all issue numbers (#123 format) from the section
-    import re
-
     issue_numbers = re.findall(r"#(\d+)", deps_section)
     # Return unique sorted list
     return sorted(set(int(num) for num in issue_numbers))
