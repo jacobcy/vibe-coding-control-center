@@ -72,6 +72,9 @@ vibe-center/
 │   ├── *.sh                     # 各功能模块
 │   └── ...
 │
+├── lib3/                        # V3 Python 核心 Shell 包装器 (hub)
+│   └── vibe.sh                  # 负责仓库重定向和加载密钥
+│
 ├── config/                      # V2 配置文件
 │   ├── keys/                    # API 密钥配置
 │   └── aliases/                 # 命令别名
@@ -233,6 +236,17 @@ vibe3 inspect commit <sha>                # 改动影响范围
 - `tool.sh` - 工具链管理
 - `keys.sh` - API 密钥管理
 - `utils.sh` - 通用工具函数
+
+### `lib3/` - V3 Python 核心 Shell 包装器 (hub)
+
+**职责**：V3 Python 核心的 Shell 包装器，负责仓库重定向和加载密钥。
+
+**规则**：
+- 是 V3 Python 运行时的辅助入口。
+- 负责 `vibe3` 命令在不同环境下的正确分发。
+
+**主要模块**：
+- `vibe.sh` - 核心包装器逻辑。
 
 ### `config/` - V2 配置文件
 
