@@ -154,7 +154,7 @@ related_docs:
 ### 3.3.5 `check`
 
 - 正式术语：`check`
-- 别称：`handoff check`
+- 别称：`handoff check`、`vibe task audit` (Legacy)
 - 定义：`vibe3 check` 对 execution record (handoff artifact)、runtime 绑定证据和关联完整性进行审计/修复的动作。
 - 边界：
   - `check` 不是 roadmap mirror 同步
@@ -184,7 +184,7 @@ related_docs:
   - `milestone` 不是 roadmap item type
   - `milestone` 不是 flow
 - 落点：
-  - 规划语义见 [command-standard.md](command-standard.md)
+  - 规划语义见 [command-standard.md](v3/command-standard.md)
   - 文件边界见 [roadmap-json-standard.md](v3/roadmap-json-standard.md)
 - 使用规则：
   - 讨论版本、阶段、交付窗口时优先使用 `milestone`
@@ -201,8 +201,8 @@ related_docs:
   - `flow` 不是业务愿望本身
   - `flow` 不承担规划语义
 - 落点：
-  - 命令边界见 [command-standard.md](command-standard.md)
-  - 现场态边界见 [data-model-standard.md](data-model-standard.md)
+  - 命令边界见 [command-standard.md](v3/command-standard.md)
+  - 现场态边界见 [data-model-standard.md](v3/data-model-standard.md)
   - 状态定义：`flow_status` 字段在 `flow_state` 表
 - 使用规则：
   - 讨论当前交付切片、由 branch 锚定且由 worktree 承载的任务现场时使用 `flow`
@@ -267,7 +267,7 @@ related_docs:
   - `worktree` 不是 flow
   - `worktree` 不是 branch
 - 落点：
-  - 现场态边界见 [data-model-standard.md](data-model-standard.md)
+  - 现场态边界见 [data-model-standard.md](v3/data-model-standard.md)
 - 使用规则：
   - 讨论物理目录、当前文件现场、worktree 清理时使用 `worktree`
 
@@ -445,7 +445,7 @@ related_docs:
   - `调度` 不是代码执行
   - `调度` 不是单个 task 的步骤 organization
 - 落点：
-  - 命令边界见 [command-standard.md](command-standard.md)
+  - 命令边界见 [command-standard.md](v3/command-standard.md)
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
@@ -458,7 +458,7 @@ related_docs:
   - `编排` 不是调度
   - `编排` 不直接等于执行
 - 落点：
-  - skill 职责边界见 [python-capability-design.md](python-capability-design.md)
+  - skill 职责边界见 [python-capability-design.md](v3/python-capability-design.md)
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
@@ -487,8 +487,8 @@ related_docs:
   - 不应各自实现通用的派发（Dispatch）骨架。
   - 业务逻辑应收拢至 Domain 层，执行动作应收拢至 Execution 层。
 - 落点：
-  - 规则见 [skill-standard.md](skill-standard.md)
-  - 设计边界见 [python-capability-design.md](python-capability-design.md)
+  - 规则见 [skill-standard.md](v3/skill-standard.md)
+  - 设计边界见 [python-capability-design.md](v3/python-capability-design.md)
 - 使用规则：
   - 文档中优先使用 `Role Adapters`
   - `Skill 层` 作为历史叫法保留
@@ -537,7 +537,7 @@ related_docs:
   - `Shell 能力层` 不是调度器
   - `Shell 能力层` 不是编排器
 - 落点：
-  - 定义见 [python-capability-design.md](python-capability-design.md)
+  - 定义见 [python-capability-design.md](v3/python-capability-design.md)
 - 使用规则：
   - 讨论命令设计、原子能力、shell 边界时使用 `Shell 能力层`
   - **V3 Python (`vibe3`) 是当前主能力层**，负责 flow/handoff/orchestra 逻辑
@@ -553,7 +553,7 @@ related_docs:
   - `共享状态真源` 不是 skill
   - `worktrees.json` 当前不是开放 flow 的主身份锚点
 - 落点：
-  - 边界见 [data-model-standard.md](data-model-standard.md)
+  - 边界见 [data-model-standard.md](v3/data-model-standard.md)
 - 使用规则：
   - 讨论共享状态文件本身时使用 `共享状态真源`
   - `roadmap.json` 当前只按 mirror / cache / projection / backup 理解
@@ -739,3 +739,4 @@ related_docs:
 - `执行代理` != `Shell 能力层`
 
 若后续 doc review 发现新的高频混用，应优先在本文档补充修正。
+��
