@@ -7,7 +7,7 @@ audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-04-24
+last_updated: 2026-06-01
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -61,6 +61,7 @@ vibe-center/
 │   ├── observability/           # 可观测性
 │   ├── orchestra/               # 编排中枢
 │   ├── prompts/                 # Prompt 组装与变量解析
+│   ├── resources/               # 运行时资产与静态资源
 │   ├── roles/                   # 角色定义与执行模块
 │   ├── runtime/                 # 事件驱动运行时
 │   ├── server/                  # HTTP / MCP / health 服务
@@ -72,7 +73,7 @@ vibe-center/
 │   ├── *.sh                     # 各功能模块
 │   └── ...
 │
-├── lib3/                        # V3 Python 核心 Shell 包装器 (hub)
+├── lib3/                        # V3 Python 核心包装器与仓库重定向 (hub)
 │   └── vibe.sh                  # 负责仓库重定向和加载密钥
 │
 ├── config/                      # V2 配置文件
@@ -190,22 +191,23 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `agents/` - AI Agent 调用层（plan/review/run pipeline + backends）
 - `analysis/` - 代码智能（symbol 分析、结构快照、变更范围）
 - `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
-- `commands/` - CLI 子命令实现
-- `config/` - 配置加载与 Pydantic schema 验证
+- `commands/` - CLI 子命令实现（flow, handoff, pr, task, status, inspect 等）
+- `config/` - 配置加载、Profile 管理与 Pydantic schema 验证
 - `environment/` - 环境资源管理（Session 和 Worktree 统一抽象层）
 - `execution/` - 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
 - `exceptions/` - 统一异常层级
 - `domain/` - 领域事件与 handlers（events, handlers, orchestration_facade）
-- `models/` - Pydantic 领域数据模型
+- `models/` - 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
 - `prompts/` - Prompt 模板组装与变量解析
+- `resources/` - 运行时资产与静态资源
 - `roles/` - 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
 - `ui/` - CLI 输出格式化（Rich 渲染）
-- `utils/` - 通用工具函数
+- `utils/` - 通用工具函数（Git 辅助、分支工具、评论处理等）
 
 **常用命令**：
 ```bash
@@ -237,9 +239,9 @@ vibe3 inspect commit <sha>                # 改动影响范围
 - `keys.sh` - API 密钥管理
 - `utils.sh` - 通用工具函数
 
-### `lib3/` - V3 Python 核心 Shell 包装器 (hub)
+### `lib3/` - V3 Python 核心包装器 (hub)
 
-**职责**：V3 Python 核心的 Shell 包装器，负责仓库重定向和加载密钥。
+**职责**：V3 Python 核心的运行时包装器，负责仓库重定向和加载密钥。
 
 **规则**：
 - 是 V3 Python 运行时的辅助入口。
@@ -577,3 +579,4 @@ uv run pytest tests/vibe3/ -k flow
 ---
 
 **注意**：本文档的元数据（作者、创建日期、最后更新日期）已在文档开头的 frontmatter 中定义。详见 [docs/standards/doc-quality-standards.md](docs/standards/doc-quality-standards.md)。
+tandards.md)。
