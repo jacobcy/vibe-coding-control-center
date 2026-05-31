@@ -4,20 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
-from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.domain.role_resolver import find_role_for_state
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.issue_loader import (
+from vibe3.orchestra import (
+    IssueInfo,
+    IssueState,
+    OrchestraConfig,
+    QualifyGateService,
+    QueueEntry,
+    append_orchestra_event,
+    find_role_for_state,
     get_flow_context,
+    get_manager_usernames,
     is_auto_task_branch,
     load_issue,
+    should_skip_from_queue,
+    sort_ready_issues,
 )
-from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.queue_entry import QueueEntry
-from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.services.label_utils import should_skip_from_queue
-from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient

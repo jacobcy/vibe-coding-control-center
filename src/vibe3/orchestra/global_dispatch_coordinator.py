@@ -8,13 +8,11 @@
 import warnings
 
 # Re-export GlobalDispatchCoordinator from domain
-from vibe3.domain.dispatch_coordinator import (
-    MAX_INTENTS_PER_TICK,
-    GlobalDispatchCoordinator,
-)
+from vibe3.domain import GlobalDispatchCoordinator
+from vibe3.domain.dispatch_coordinator import MAX_INTENTS_PER_TICK
 
 # Re-export QueueEntry from orchestra (still in orchestra layer)
-from vibe3.orchestra.queue_entry import QueueEntry
+from vibe3.orchestra import QueueEntry
 
 # Emit deprecation warning when module is imported
 warnings.warn(

@@ -7,7 +7,8 @@
 
 import warnings
 
-from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
+from vibe3.domain import FailedGate
+from vibe3.orchestra import GateResult, GateStatus
 
 # Emit deprecation warning when module is imported
 warnings.warn(

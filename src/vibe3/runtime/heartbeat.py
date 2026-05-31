@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.logging import (
+from vibe3.runtime import (
+    ErrorTrackingService,
+    OrchestraConfig,
     append_orchestra_event,
     append_orchestra_run_separator,
 )
-from vibe3.services.error_tracking_service import ErrorTrackingService
 
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
