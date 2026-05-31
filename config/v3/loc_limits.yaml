@@ -233,8 +233,8 @@ code_limits:
         limit: 500
         reason: "Check PR 状态测试集，覆盖 PR closed 检测、terminal 状态判断、duplicate handling 等紧密耦合场景，新增 before_issue_is_closed 测试后略微超标"
       - path: "src/vibe3/commands/status_render.py"
-        limit: 450
-        reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
+        limit: 490
+        reason: "Status 渲染层，包含 render_epic_items（+42行 Epic 依赖状态可视化）、render_missing_state_items（+24行）等渲染函数，与其他渲染函数共享 console/config 依赖，拆分收益低"
 
 
   total_file_loc:
