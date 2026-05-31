@@ -79,6 +79,41 @@ def _compute_effective_server_running(
     return pid_valid
 
 
+def _resolve_repo_name(config_repo: str | None) -> str:
+    """Resolve repo name from config or fallback to git remote URL."""
+    if config_repo:
+        return config_repo
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        url = result.stdout.strip()
+        if url.startswith("git@github.com:"):
+            return url.split(":")[-1].removesuffix(".git")
+        if "github.com" in url:
+            return url.split("/")[-2] + "/" + url.split("/")[-1].removesuffix(".git")
+    except Exception:
+        pass
+    return "(unknown)"
+
+
+def _render_configuration(config: OrchestraConfig) -> None:
+    """Render Vibe3 configuration section in status output."""
+    manager = ", ".join(get_manager_usernames(config))
+    console.print("[bold]Vibe3 Configuration[/]")
+    console.print(f"  Repo:              {_resolve_repo_name(config.repo)}")
+    console.print(f"  Manager agents:    {manager}")
+    console.print(f"  Max concurrent:    {config.max_concurrent_flows}")
+    console.print(f"  Polling interval:  {config.polling_interval}s")
+    console.print(f"  Scene base ref:    {config.scene_base_ref}")
+    console.print()
+
+
 def status(
     all_flows: AllOption = False,
     check: Annotated[
@@ -212,6 +247,8 @@ def status(
             f"Queue: [yellow]{len(orch_snapshot.queued_issues)} issues waiting[/]"
         )
     console.print()
+
+    _render_configuration(config)
 
     service = FlowService()
     flows = service.list_flows(status=None if all_flows else "active")
