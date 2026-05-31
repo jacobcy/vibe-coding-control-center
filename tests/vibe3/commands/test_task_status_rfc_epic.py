@@ -73,6 +73,7 @@ def test_task_status_shows_rfc_and_epic_in_separate_sections(
             "priority": 0,
             "labels": ["roadmap/rfc"],
             "remote": False,
+            "body": None,
         },
         {
             "number": 888,
@@ -88,6 +89,7 @@ def test_task_status_shows_rfc_and_epic_in_separate_sections(
             "priority": 0,
             "labels": ["roadmap/epic"],
             "remote": False,
+            "body": None,
         },
     ]
     mock_status_service_cls.return_value = status_service
@@ -154,6 +156,7 @@ def test_task_status_blocked_issues_excludes_rfc_and_epic(
             "priority": 0,
             "labels": [],  # No RFC/Epic labels
             "remote": False,
+            "body": None,
         },
         {
             "number": 777,
@@ -169,6 +172,7 @@ def test_task_status_blocked_issues_excludes_rfc_and_epic(
             "priority": 0,
             "labels": ["roadmap/rfc"],
             "remote": False,
+            "body": None,
         },
     ]
     mock_status_service_cls.return_value = status_service
@@ -196,3 +200,214 @@ def test_task_status_blocked_issues_excludes_rfc_and_epic(
         rfc_section_end = len(output)
     rfc_section = output[rfc_section_start:rfc_section_end]
     assert "# 777" in rfc_section
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_epic_shows_dependency_ready(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """Epic should show ✓ READY when all dependencies are completed."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    # Epic with dependencies #457 and #458, both NOT in open issues (completed)
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 888,
+            "title": "Epic with completed dependencies",
+            "state": IssueState.BLOCKED,
+            "assignee": "manager-bot",
+            "flow": _make_flow(888),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": ["roadmap/epic"],
+            "remote": False,
+            "body": (
+                "## Dependencies\n\n- Blocked by #457 (API)\n- Blocked by #458 (DB)\n"
+            ),
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Roadmap Epic:" in output
+    assert "# 888" in output
+    assert "✓ READY" in output
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_epic_shows_dependency_waiting(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """Epic should show ⏳ WAITING when some dependencies are still open."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    # Epic with dependencies #457 (still open) and #458 (completed)
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 457,
+            "title": "Still open dependency",
+            "state": IssueState.IN_PROGRESS,
+            "assignee": "developer",
+            "flow": _make_flow(457),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "remote": False,
+            "body": None,
+        },
+        {
+            "number": 888,
+            "title": "Epic with partial dependencies",
+            "state": IssueState.BLOCKED,
+            "assignee": "manager-bot",
+            "flow": _make_flow(888),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": ["roadmap/epic"],
+            "remote": False,
+            "body": (
+                "## Dependencies\n\n- Blocked by #457 (API)\n- Blocked by #458 (DB)\n"
+            ),
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Roadmap Epic:" in output
+    assert "# 888" in output
+    assert "⏳ WAITING" in output
+    assert "(1/2)" in output
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_epic_no_dependencies(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """Epic without dependencies section should not show dependency status."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 888,
+            "title": "Epic without dependencies",
+            "state": IssueState.BLOCKED,
+            "assignee": "manager-bot",
+            "flow": _make_flow(888),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": ["roadmap/epic"],
+            "remote": False,
+            "body": "## Summary\n\nThis epic has no dependencies section.\n",
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Roadmap Epic:" in output
+    assert "# 888" in output
+    # Should NOT show any dependency status line
+    assert "✓ READY" not in output
+    assert "⏳ WAITING" not in output

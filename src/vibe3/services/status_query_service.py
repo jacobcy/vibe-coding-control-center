@@ -377,6 +377,8 @@ class StatusQueryService:
                     "dispatch_exclusion_messages": exclusion_messages,
                     # Remote task flag
                     "remote": is_remote,
+                    # Issue body for dependency parsing
+                    "body": issue.body,
                 }
             )
 

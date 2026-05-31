@@ -65,6 +65,37 @@ def _extract_blocked_reason_summary(blocked_reason: str) -> str:
     return result
 
 
+def _parse_epic_dependencies(body: str | None) -> list[int]:
+    """Parse issue numbers from the ## Dependencies section of an Epic body.
+
+    Args:
+        body: The issue body text to parse
+
+    Returns:
+        List of unique issue numbers mentioned in the ## Dependencies section
+    """
+    if not body:
+        return []
+
+    # Find the ## Dependencies section
+    deps_start = body.find("## Dependencies")
+    if deps_start == -1:
+        return []
+
+    # Extract text after "## Dependencies" until the next ## header or end
+    deps_section = body[deps_start:]
+    next_header = deps_section.find("\n## ", 1)  # Skip the initial "## Dependencies"
+    if next_header != -1:
+        deps_section = deps_section[:next_header]
+
+    # Extract all issue numbers (#123 format) from the section
+    import re
+
+    issue_numbers = re.findall(r"#(\d+)", deps_section)
+    # Return unique sorted list
+    return sorted(set(int(num) for num in issue_numbers))
+
+
 def _render_task_item_details(
     flow: FlowStatusResponse | None,
     config: OrchestraConfig,
@@ -325,10 +356,20 @@ def render_rfc_items(rfc_items: list[dict[str, object]]) -> None:
         console.print("  [dim](none)[/]")
 
 
-def render_epic_items(epic_items: list[dict[str, object]]) -> None:
+def render_epic_items(
+    epic_items: list[dict[str, object]],
+    orchestrated_issues: list[dict[str, object]] | None = None,
+) -> None:
     """Render Roadmap Epic section (parent governance containers)."""
     console.print("\n[bold cyan]Roadmap Epic:[/]")
     if epic_items:
+        # Build set of open issue numbers for dependency status checking
+        open_issue_numbers: set[int] = set()
+        if orchestrated_issues:
+            open_issue_numbers = {
+                cast(int, issue["number"]) for issue in orchestrated_issues
+            }
+
         for item in epic_items:
             number = cast(int, item["number"])
             title = cast(str, item["title"])
@@ -341,6 +382,18 @@ def render_epic_items(epic_items: list[dict[str, object]]) -> None:
 
             if flow:
                 console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+
+            # Render dependency status if dependencies exist
+            deps = _parse_epic_dependencies(cast(str | None, item.get("body")))
+            if deps:
+                still_open = [d for d in deps if d in open_issue_numbers]
+                completed = len(deps) - len(still_open)
+                if completed == len(deps):
+                    console.print("         [green]✓ READY[/]")
+                else:
+                    console.print(
+                        f"         [yellow]⏳ WAITING[/] ({completed}/{len(deps)})"
+                    )
     else:
         console.print("  [dim](none)[/]")
 
