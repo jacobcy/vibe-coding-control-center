@@ -62,6 +62,9 @@ code_limits:
           - 事务原子性保证
 
       # Commands 层 —— 允许 480-550
+      - path: "src/vibe3/commands/status.py"
+        limit: 450
+        reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）后略微超标"
       - path: "src/vibe3/commands/task.py"
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
