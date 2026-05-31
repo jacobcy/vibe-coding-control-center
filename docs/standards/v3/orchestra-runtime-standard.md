@@ -43,9 +43,11 @@
 
 - 启动 HTTP server（webhook / health / status）
 - 启动 heartbeat loop
-- 注册 runtime services
+- 注册并驱动各 runtime services
+- **Event Bus (事件总线)**：负责领域事件的发布与订阅路由
+- **Dispatcher (派发器)**：负责异步任务（ExecutionRequest）的并发控制与 session 管理
 - 在每轮 heartbeat 时调用 service `on_tick()`
-- 在 webhook 到达时调用 service `handle_event()`
+- 在 webhook 或事件到达时调用对应的 handler
 
 它不是：
 

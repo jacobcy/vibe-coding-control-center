@@ -136,8 +136,8 @@ vibe3 run --plan  # 恢复 session 继续工作
 # Handoff 显示 session 信息
 vibe3 handoff show
 
-# 查看当前 flow 状态
-vibe3 flow status
+# 查看当前 flow 详情
+vibe3 flow show
 ```
 
 **清理 Session**：
