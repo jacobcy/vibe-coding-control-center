@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.run_prompt import (
+from vibe3.agents import (
+    CodeagentResult,
     RunPromptMode,
+    create_codeagent_command,
     describe_run_plan_sections,
     make_run_context_builder,
     make_skill_context_builder,

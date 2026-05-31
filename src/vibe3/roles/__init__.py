@@ -35,6 +35,11 @@ if TYPE_CHECKING:
         render_governance_prompt,
         resolve_governance_options,
     )
+    from vibe3.roles.governance_factory import build_default_governance_fns
+    from vibe3.roles.governance_utils import (
+        find_material_in_catalog,
+        normalize_material_name,
+    )
     from vibe3.roles.manager import (
         HANDOFF_MANAGER_ROLE,
         MANAGER_BRANCH_RESOLVER,
@@ -179,6 +184,10 @@ _LAZY_IMPORTS: dict[str, str] = {
     "load_governance_material_catalog": "vibe3.roles.governance",
     "render_governance_prompt": "vibe3.roles.governance",
     "resolve_governance_options": "vibe3.roles.governance",
+    # governance factory & utils
+    "build_default_governance_fns": "vibe3.roles.governance_factory",
+    "find_material_in_catalog": "vibe3.roles.governance_utils",
+    "normalize_material_name": "vibe3.roles.governance_utils",
 }
 
 
@@ -271,6 +280,10 @@ __all__ = [
     "load_governance_material_catalog",
     "render_governance_prompt",
     "resolve_governance_options",
+    # governance factory & utils (lazy)
+    "build_default_governance_fns",
+    "find_material_in_catalog",
+    "normalize_material_name",
 ]
 
 # Consistency check: ensure __all__ matches eager + lazy symbols

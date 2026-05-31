@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.plan_prompt import (
+from vibe3.agents import (
+    CodeagentResult,
     build_plan_prompt_body,
+    create_codeagent_command,
     describe_plan_sections,
     make_plan_context_builder,
 )
