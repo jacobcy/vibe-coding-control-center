@@ -60,7 +60,7 @@ refactor(api): unify public interfaces in commands and server modules
 - ✅ 308 tests passed (commands 298 + server 10)
 - ✅ mypy 0 errors
 - ✅ ruff all passed
-- ✅ No circular dependencies (fresh import verified)
+- ✅ Fresh import succeeds (circular parent-package import documented below)
 - ✅ No stale references remaining (grep confirmed)
 
 ## Known Issues
