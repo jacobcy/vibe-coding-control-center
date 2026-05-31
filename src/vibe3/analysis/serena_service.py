@@ -15,7 +15,7 @@ from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import ChangeSource
 
 if TYPE_CHECKING:
-    from vibe3.models.dead_code import DeadCodeReport
+    from vibe3.models import DeadCodeReport
 
 
 class SerenaService:
@@ -266,7 +266,7 @@ class SerenaService:
             SerenaError: If scan fails
         """
         from vibe3.analysis.dead_code_rules import classify_confidence, is_dead_code
-        from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+        from vibe3.models import DeadCodeFinding, DeadCodeReport
 
         log = logger.bind(domain="serena", action="scan_dead_code", root=root)
         log.info("Scanning for dead code")
