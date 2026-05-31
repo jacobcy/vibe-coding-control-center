@@ -31,11 +31,20 @@ Types:
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.base import AgentBackend
-from vibe3.agents.models import CodeagentCommand, CodeagentResult, ExecutionRole
+from vibe3.agents.models import (
+    CodeagentCommand,
+    CodeagentResult,
+    ExecutionRole,
+    create_codeagent_command,
+)
 from vibe3.agents.plan_prompt import (
     build_plan_prompt_body,
     describe_plan_sections,
     make_plan_context_builder,
+)
+from vibe3.agents.review_pipeline_helpers import (
+    build_snapshot_diff,
+    run_inspect_json,
 )
 from vibe3.agents.review_prompt import (
     build_review_prompt_body,
@@ -44,6 +53,7 @@ from vibe3.agents.review_prompt import (
     make_review_context_builder,
 )
 from vibe3.agents.run_prompt import (
+    RunPromptMode,
     build_run_prompt_body,
     describe_run_plan_sections,
     make_run_context_builder,
@@ -56,6 +66,7 @@ __all__ = [
     "AgentBackend",
     "CodeagentCommand",
     "CodeagentResult",
+    "create_codeagent_command",
     "ExecutionRole",
     # Backend
     "CodeagentBackend",
@@ -71,6 +82,10 @@ __all__ = [
     "describe_plan_sections",
     "describe_run_plan_sections",
     "describe_review_sections",
+    # Pipeline Helpers
+    "build_snapshot_diff",
+    "run_inspect_json",
     # Types
     "PromptContextMode",
+    "RunPromptMode",
 ]

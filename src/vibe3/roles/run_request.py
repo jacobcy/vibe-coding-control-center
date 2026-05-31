@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from vibe3.agents.run_prompt import (
+from vibe3.agents import (
     describe_run_plan_sections,
     make_run_context_builder,
 )
