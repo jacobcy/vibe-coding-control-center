@@ -40,7 +40,6 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
                 flow=mock_flow,
                 repo=None,
                 reason="test resume",
-                worktree_path="/tmp/issue-303",
                 label_state=None,  # No --label
             )
 
@@ -95,4 +94,5 @@ def test_reset_issue_to_ready_with_remote_flag() -> None:
                 include_remote=False,  # Key assertion
                 terminate_sessions=True,
                 keep_flow_record=False,
+                force_delete=True,
             )

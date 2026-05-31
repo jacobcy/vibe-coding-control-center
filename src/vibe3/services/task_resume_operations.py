@@ -52,27 +52,27 @@ class TaskResumeOperations:
         flow: FlowStatusResponse | None,
         repo: str | None,
         reason: str,
-        worktree_path: str | None = None,
         label_state: str | None = None,
         remote: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
 
+        Two modes:
+        - --label provided: only restore labels, no flow involvement
+        - No --label: hard delete flow + worktree, complete rebuild
+
         Args:
             issue_number: GitHub issue number
-            resume_kind: Resume kind (failed, blocked, all)
+            resume_kind: Resume kind (blocked, all, aborted, pr_closed)
             flow: Flow status response
             repo: Repository (owner/repo format, optional)
             reason: Resume reason to include in comments
-            worktree_path: Optional worktree path (for optimization)
-            label_state: Optional state to restore (None=delete worktree,
+            label_state: Optional state to restore (None=full rebuild,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
             remote: If True, keep remote branch (use with --remote flag).
                 If False, delete remote branch (default).
             progress_callback: Optional callback for progress updates.
-                Signature: (issue_number: int, branch: str | None, step: str,
-                    status: str) -> None
 
         Raises:
             UserError: If flow has status "done" (completed flows cannot be reset
@@ -170,11 +170,9 @@ class TaskResumeOperations:
 
             # DO NOT call reset_task_scene (keep worktree)
         else:
-            # Original logic: delete worktree/branch for full rebuild
+            # Full rebuild: hard delete flow + worktree, then orchestra rebuilds
             emit_progress("full rebuild mode")
 
-            # Always use BlockedStateService.unblock() for consistent state clearing
-            # Both blocked and non-blocked resume need to clear any stale metadata
             from vibe3.services.blocked_state_service import BlockedStateService
 
             service = BlockedStateService(
@@ -183,7 +181,7 @@ class TaskResumeOperations:
                 store=self.flow_service.store,
             )
             service.unblock(
-                branch=branch or "",  # Empty string if no branch (DB ops skipped)
+                branch=branch or "",
                 target_state=IssueState.READY,
                 issue_number=issue_number,
                 detail=f"Resumed from {resume_kind}: {reason}",
@@ -215,22 +213,16 @@ class TaskResumeOperations:
         branch: str,
         include_remote: bool = True,
     ) -> None:
-        """Delete the stale task scene so the next run starts from scratch.
+        """Hard delete flow + worktree so the next run starts from scratch.
 
-        Flow record deletion is guaranteed even if worktree/branch/handoff
-        cleanup fails partially — a stale flow record is the root cause of
-        phantom downstream dispatches (issue #301).
-
-        This method uses FlowCleanupService for consistent cleanup behavior
-        across `task resume` and `check --clean-branch`.
+        Always uses hard delete (force_delete=True) because task resume
+        means complete rebuild — old events have no audit value.
+        Soft delete is only for vibe3 check (issue closed / flow aborted).
 
         Args:
             branch: Branch name
             include_remote: If True, delete remote branch (default).
                 If False, keep remote branch (for --remote mode).
-
-        Note: Always deletes flow record (keep_flow_record=False) because
-            the purpose of `task resume` is to restart the flow from scratch.
         """
         from vibe3.services.flow_cleanup_service import FlowCleanupService
 
@@ -249,9 +241,10 @@ class TaskResumeOperations:
 
         results = cleanup_service.cleanup_flow_scene(
             branch,
-            include_remote=include_remote,  # Use parameter (False for --remote mode)
+            include_remote=include_remote,
             terminate_sessions=True,
-            keep_flow_record=False,  # Delete flow record to allow fresh start
+            keep_flow_record=False,
+            force_delete=True,
         )
 
         # Log if any step failed
@@ -337,26 +330,3 @@ class TaskResumeOperations:
                 issue_number=issue_number,
                 previous_state=previous_state.value,
             ).warning("Failed to rollback issue state after resume error: " f"{exc}")
-
-    def reactivate_aborted_flow(self, branch: str) -> None:
-        """Reactivate an aborted flow.
-
-        Args:
-            branch: Branch name for the aborted flow
-        """
-        try:
-            logger.bind(
-                domain="resume",
-                action="reactivate_aborted",
-                branch=branch,
-            ).info("Reactivating aborted flow")
-
-            # Reactivate the aborted flow (change status from "aborted" to "active")
-            self.flow_service.reactivate_flow(branch)
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="reactivate_aborted",
-                branch=branch,
-            ).warning(f"Failed to reactivate aborted flow: {exc}")
-            raise

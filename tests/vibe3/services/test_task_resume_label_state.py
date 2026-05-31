@@ -41,7 +41,6 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="",  # --label auto (converted to empty string internally)
         )
 
@@ -77,7 +76,6 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="ready",  # --label ready
         )
 
@@ -112,7 +110,6 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="handoff",  # --label handoff (explicit)
         )
 
@@ -147,7 +144,6 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="claimed",  # --label claimed
         )
 
@@ -180,7 +176,6 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="in-progress",  # --label in-progress
         )
 
@@ -213,7 +208,6 @@ def test_reset_issue_to_ready_with_label_review() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="review",  # --label review
         )
 
@@ -246,7 +240,6 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path="/tmp/issue-303",
             label_state="merge-ready",  # --label merge-ready
         )
 
@@ -283,7 +276,6 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
             flow=mock_flow,
             repo=None,
             reason="test resume",
-            worktree_path=None,
             label_state="",  # --label auto (no flow exists)
         )
 
