@@ -28,6 +28,47 @@ from vibe3.config.settings_pr import (
 )
 
 
+def _vibe3_config_root() -> Path:
+    """Find the vibe3 config root directory by walking up from this module.
+
+    Returns the directory containing config/v3/settings.yaml, which is the vibe3
+    installation root (repo root for source installs, ~/.vibe for pip installs).
+
+    Used as fallback when CWD-relative config paths fail (cross-project invocation).
+    """
+    # Start from this module's location
+    current = Path(__file__).resolve()
+
+    # Walk up to find the directory containing config/v3/settings.yaml
+    # Max 10 levels to prevent infinite loops
+    for _ in range(10):
+        parent = current.parent
+        if parent == current:
+            # Reached filesystem root, stop
+            break
+
+        # Check if this parent contains config/v3/settings.yaml
+        if (parent / "config" / "v3" / "settings.yaml").exists():
+            return parent
+
+        current = parent
+
+    # Fallback: return parent of src/ directory (repo root for source installs)
+    # This handles the case where config/v3/settings.yaml doesn't exist yet
+    # Walk up from __file__ to find the directory containing src/vibe3/
+    current = Path(__file__).resolve()
+    for _ in range(10):
+        parent = current.parent
+        if parent == current:
+            break
+        if (parent / "src" / "vibe3").exists():
+            return parent
+        current = parent
+
+    # Last resort: return current working directory
+    return Path.cwd()
+
+
 class AIConfig(BaseModel):
     """AI 辅助配置.
 
@@ -307,14 +348,25 @@ class VibeConfig(BaseModel):
     check_cleanup: CheckCleanupSettings = Field(default_factory=CheckCleanupSettings)
 
     @classmethod
-    def _load_supplementary(cls, data: dict) -> dict:
+    def _load_supplementary(cls, data: dict, config_path: Path | None = None) -> dict:
         """Merge LOC limits and prompt content from their migrated config files."""
         import yaml
         from loguru import logger
 
+        # Determine base directory for resolving supplementary files
+        if config_path is not None:
+            # Use the directory containing the config file
+            config_root = config_path.resolve().parent.parent  # config/v3/ -> config/
+        else:
+            config_root = None
+
         # Load loc_limits.yaml for code_limits and doc_limits
         # Try new path first, then fallback to old path
         new_loc_limits_path = Path("config/v3/loc_limits.yaml")
+        if not new_loc_limits_path.exists():
+            new_loc_limits_path = (
+                _vibe3_config_root() / "config" / "v3" / "loc_limits.yaml"
+            )
         old_loc_limits_path = Path("config/loc_limits.yaml")
         loc_limits_path = None
 
@@ -326,6 +378,11 @@ class VibeConfig(BaseModel):
                 "Please migrate to config/v3/loc_limits.yaml"
             )
             loc_limits_path = old_loc_limits_path
+        elif config_root is not None:
+            # Try relative to config file
+            root_loc_limits = config_root / "v3" / "loc_limits.yaml"
+            if root_loc_limits.exists():
+                loc_limits_path = root_loc_limits
 
         if loc_limits_path:
             with open(loc_limits_path) as f:
@@ -352,6 +409,11 @@ class VibeConfig(BaseModel):
                 prompts_path = new_prompts_path
             elif old_prompts_path.exists():
                 prompts_path = old_prompts_path
+            elif config_root is not None:
+                # Try relative to config file
+                root_prompts = config_root / "prompts" / "prompts.yaml"
+                if root_prompts.exists():
+                    prompts_path = root_prompts
 
         if prompts_path:
             with open(prompts_path) as f:
@@ -423,7 +485,7 @@ class VibeConfig(BaseModel):
         if data is None:
             data = {}
 
-        data = cls._load_supplementary(data)
+        data = cls._load_supplementary(data, config_path)
 
         # Expand variable references before instantiation
         data = cls._expand_config_variables(data)
@@ -436,7 +498,15 @@ class VibeConfig(BaseModel):
         new_default_path = Path("config/v3/settings.yaml")
         if new_default_path.exists():
             return cls.from_yaml(new_default_path)
+        # Fallback: vibe3 installation default config
+        root = _vibe3_config_root()
+        root_new_path = root / "config" / "v3" / "settings.yaml"
+        if root_new_path.exists():
+            return cls.from_yaml(root_new_path)
         legacy_default_path = Path("config/settings.yaml")
         if legacy_default_path.exists():
             return cls.from_yaml(legacy_default_path)
+        root_legacy_path = root / "config" / "settings.yaml"
+        if root_legacy_path.exists():
+            return cls.from_yaml(root_legacy_path)
         return cls()
