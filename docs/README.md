@@ -7,7 +7,7 @@
 ## 📁 目录结构
 
 ```
-lib3/                                # V3 Python 核心 Shell 包装器 (hub)
+lib3/                                # V3 Python 核心包装器与仓库重定向 (hub)
 docs/
 ├── README.md                        # 本文件：文档总览
 ├── standards/                       # 标准和规范文档
@@ -20,11 +20,17 @@ docs/
 ├── prds/                           # 产品需求文档 (全局 PRD)
 ├── plans/                          # 执行计划 (草稿于 .agent/plans/)
 ├── reports/                        # 报告与总结 (草稿于 .agent/reports/)
+├── design/                          # 设计文档与架构演进
+├── closeout/                        # 任务结项报告与回顾
+├── directives/                      # 任务指令与执行引导
 ├── analysis/                        # 架构与逻辑分析报告
-├── governance/                      # 治理流程与审计记录
-├── handoff/                         # Handoff 链路存档
+├── governance/                      # 治理流程、审计记录与立项决策
+├── handoff/                         # Handoff 链路存档与交接记录
 ├── migration/                       # 迁移设计与执行记录
-├── references/                     # 外部参考资料
+├── project/                         # 项目级文档与 Meta-layer
+├── publish/                         # 发布记录与发布指令
+├── references/                      # 外部参考资料
+├── superpowers/                     # Superpowers 技能文档
 ├── validation/                      # 验证报告与测试证据
 └── ...                             # 其他现行文档
 ```

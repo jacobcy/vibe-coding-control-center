@@ -8,7 +8,7 @@ authority:
   - essential-reading-order
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-05-22
+last_updated: 2026-06-01
 related_docs:
   - SOUL.md
   - STRUCTURE.md
@@ -46,6 +46,18 @@ Follow this reading order. Each document is the authority for its domain:
 7. **[.agent/README.md](.agent/README.md)** — AI workflows and rules
 8. **[docs/README.md](docs/README.md)** — Documentation structure
 
+## 🔄 Key Workflows (工作流)
+
+| Workflow | Description | Usage |
+| :--- | :--- | :--- |
+| **[/vibe-new](.agent/workflows/vibe:new.md)** | 规划入口 | intake 新目标、handoff 或缺 spec 的 task，产出 plan 和 task 绑定。 |
+| **[/vibe-continue](.agent/workflows/vibe:continue.md)** | 执行入口 | 执行当前 flow 已绑定且带 plan 的 task，按图纸推进实现。 |
+| **[/vibe-commit](.agent/workflows/vibe:commit.md)** | 提交入口 | 读取工作区事实，处理提交分组与 PR 切片。 |
+| **[/vibe-task](.agent/workflows/vibe:task.md)** | 任务总览 | 处理跨 worktree 总览与 roadmap-task 状态修复。 |
+| **[/vibe-check](.agent/workflows/vibe:check.md)** | 运行时检查 | 处理 `task <-> flow` / runtime 状态不一致。 |
+| **[/vibe-issue](.agent/workflows/vibe:issue.md)** | Issue 管理 | 处理 GitHub issue 创建、查重与补全。 |
+| **[/vibe-save](.agent/workflows/vibe:save.md)** | 会话保存 | 将当前会话上下文持久化到本地 handoff。 |
+
 ## 📍 Project Identity
 
 V3 是默认执行链：flow、handoff、orchestra 和 role dispatch 的语义真源都在 V3 Python + `docs/standards/v3/`。V2 仍然存在，但只作为兼容入口和环境工具。
@@ -61,7 +73,7 @@ This project has **two parallel implementations**:
 
 - **V2 (Shell)**: `bin/`, `lib/`, `config/shell/`
 - **V3 (Python)**: `src/vibe3/` (Support global `vibe3` command via `uv tool install -e .`)
-- **V3 Hub**: `lib3/` (Shell wrappers for repo redirection and keys)
+- **V3 Hub**: `lib3/` (V3 Python 核心包装器与仓库重定向)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
 - **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
