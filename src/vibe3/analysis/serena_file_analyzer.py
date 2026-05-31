@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.clients.serena_client import (
+from vibe3.clients import (
     count_references,
     extract_function_names,
 )

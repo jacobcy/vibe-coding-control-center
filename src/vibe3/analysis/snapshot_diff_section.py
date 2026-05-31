@@ -4,7 +4,7 @@ This module provides the build_snapshot_diff_section() function
 to format StructureDiff data for review context.
 """
 
-from vibe3.models.snapshot import StructureDiff
+from vibe3.models import StructureDiff
 
 
 def build_snapshot_diff_section(structure_diff: StructureDiff | None) -> str | None:
