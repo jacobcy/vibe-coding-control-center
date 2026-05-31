@@ -221,13 +221,16 @@ def status(
 
     stale_flows = service.list_flows(status="stale") if not all_flows else []
 
+    # Extract manager_usernames once to avoid redundant calls
+    manager_usernames = get_manager_usernames(config)
+
     queued_set = set(orch_snapshot.queued_issues)
     query_service = StatusQueryService(repo=config.repo)
     orchestrated_issues = query_service.fetch_orchestrated_issues(
         flows,
         queued_set,
         stale_flows=stale_flows,
-        manager_usernames=get_manager_usernames(config),
+        manager_usernames=manager_usernames,
         supervisor_label=config.supervisor_handoff.issue_label,
     )
 
@@ -263,7 +266,6 @@ def status(
     # Split missing state items into two categories:
     # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
     # 2. Governed but anomaly (has orchestra-governed label) - needs attention
-    manager_usernames = get_manager_usernames(config)
 
     waiting_for_pool_items = [
         item
@@ -329,7 +331,7 @@ def status(
         bucket = classify_task_status(
             state,
             cast(str | None, item.get("assignee")),
-            get_manager_usernames(config),
+            manager_usernames,
         )
         bucketed_items[bucket].append(item)
 
