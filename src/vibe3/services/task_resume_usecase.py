@@ -229,11 +229,12 @@ class TaskResumeUsecase:
                     progress_callback=progress_callback,
                 )
 
-                self._comment_resume_success(
-                    issue_number=issue_number,
-                    repo=repo,
-                    reason=reason,
-                )
+                if label_state is None:
+                    self._comment_resume_success(
+                        issue_number=issue_number,
+                        repo=repo,
+                        reason=reason,
+                    )
 
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
