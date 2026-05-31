@@ -208,7 +208,7 @@ def _resolve_artifact_alias(
         FileNotFoundError: If flow not found or ref field not set
         ValueError: If ref value is self-referential (would cause infinite recursion)
     """
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     if not branch:
         branch = git_client.get_current_branch()

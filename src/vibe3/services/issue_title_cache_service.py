@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
 
 
 class IssueTitleCacheService:

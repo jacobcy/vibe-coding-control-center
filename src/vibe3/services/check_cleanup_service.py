@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.flow_cleanup_service import FlowCleanupService
 
 
@@ -207,7 +207,7 @@ class CheckCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()

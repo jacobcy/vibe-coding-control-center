@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
+from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.models.pr import PRState
 from vibe3.services.flow_cleanup_service import FlowCleanupService

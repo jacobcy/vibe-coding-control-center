@@ -94,7 +94,7 @@ class TaskResumeOperations:
 
         # Guard: block resume if branch has live runtime sessions
         if isinstance(branch, str):
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()
