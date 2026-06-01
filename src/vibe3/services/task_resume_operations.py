@@ -44,6 +44,28 @@ class TaskResumeOperations:
         self.label_service = label_service
         self.issue_flow_service = issue_flow_service
 
+    def _should_rebuild_missing_worktree(self, branch: str | None) -> bool:
+        """Check if worktree is missing but should exist based on flow state.
+
+        Args:
+            branch: Branch name to check
+
+        Returns:
+            True if worktree is missing but flow has refs or recorded path
+        """
+        if not isinstance(branch, str) or not branch:
+            return False
+        flow_state = self.flow_service.store.get_flow_state(branch)
+        if not flow_state:
+            return False
+        recorded_path = flow_state.get("worktree_path")
+        has_refs = any(
+            flow_state.get(key) for key in ("plan_ref", "report_ref", "audit_ref")
+        )
+        if not recorded_path and not has_refs:
+            return False
+        return self.git_client.find_worktree_path_for_branch(branch) is None
+
     def reset_issue_to_ready(
         self,
         *,
@@ -149,6 +171,36 @@ class TaskResumeOperations:
             # wasn't updated correctly, causing a block.  Clear blocked state
             # and resume issue using unified BlockedStateService.
             from vibe3.services.blocked_state_service import BlockedStateService
+
+            # Guard: if worktree is missing, rebuild instead of unblock
+            if self._should_rebuild_missing_worktree(branch):
+                from vibe3.models.orchestration import IssueInfo
+                from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+
+                # Type guard: _should_rebuild_missing_worktree ensures branch is str
+                assert isinstance(branch, str)
+
+                FlowRebuildUsecase(
+                    store=self.flow_service.store,
+                    git_client=self.git_client,
+                    github_client=self.github_client,
+                ).rebuild_issue_flow(
+                    issue=IssueInfo(
+                        number=issue_number,
+                        title=f"Issue {issue_number}",
+                        labels=[IssueState.READY.to_label()],
+                        state=IssueState.READY,
+                    ),
+                    branch=branch,
+                    reason=(
+                        f"label resume found missing worktree for branch {branch}: "
+                        f"{reason}"
+                    ),
+                    include_remote=True,
+                    ensure_worktree=True,
+                )
+                emit_progress("missing worktree rebuilt", status="done")
+                return
 
             if isinstance(branch, str):
                 emit_progress(f"clearing reasons for branch {branch}")
