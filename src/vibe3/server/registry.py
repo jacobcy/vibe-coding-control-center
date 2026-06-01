@@ -14,14 +14,13 @@ from starlette.concurrency import run_in_threadpool
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.domain import FailedGate, FlowManager
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime import CircuitBreaker, HeartbeatServer
+from vibe3.server import CircuitBreaker, FailedGate, FlowManager, HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
