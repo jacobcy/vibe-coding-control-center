@@ -78,7 +78,7 @@ def dispatch_supervisor_execution(issue_number: int, no_async: bool = False) -> 
         run_issue_role_async,
         run_issue_role_sync,
     )
-    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
+    from vibe3.roles import SUPERVISOR_CLI_SYNC_SPEC
 
     if no_async:
         run_issue_role_sync(
@@ -147,7 +147,7 @@ def get_available_governance_materials() -> list[str]:
         List of material short names (e.g., ["assignee-pool", "roadmap-intake"])
     """
     try:
-        from vibe3.roles.governance import load_governance_material_catalog
+        from vibe3.roles import load_governance_material_catalog
 
         catalog = load_governance_material_catalog()
         materials = []

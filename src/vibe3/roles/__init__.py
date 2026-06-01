@@ -277,7 +277,6 @@ __all__ = [
     "build_governance_recipe",
     "build_governance_request",
     "build_governance_snapshot_context",
-    "find_material_in_catalog",
     "load_governance_material_catalog",
     "render_governance_prompt",
     "resolve_governance_options",

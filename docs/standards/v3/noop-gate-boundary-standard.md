@@ -86,11 +86,14 @@ related_docs:
 
 当前 `plan / run / review` 的 worker sync 路径已改成：
 
-- 缺 ref 就 block
+- 缺 ref 但 state 改变 → warning，继续
+- 缺 ref 且 state 未变 → block
 - 报错就 fail
 - 不应再用 success-handler 自动推进到 `handoff`
 
-这能把“agent 没按约定执行”暴露为真实断链，而不是被系统自动补平后继续把错误带到下一阶段。
+这能把”agent 没按约定执行”暴露为真实断链，而不是被系统自动补平后继续把错误带到下一阶段。
+
+**注意**：state-change-aware 的 ref 检查规则见 §3.1.1 详细说明。
 
 ### 2.4 `blocked` 比伪成功更有价值
 
@@ -147,8 +150,11 @@ related_docs:
   - 若 state 改变（如 `in-progress` → `review`）→ `warning`，通过 gate
   - 若 state 未改变 → `blocked`
 - reviewer 跑完但没有 `audit_ref`：
-  - 若 state 改变（如 `review` → `done`）→ `warning`，通过 gate
-  - 若 state 未改变 → `blocked`
+  - 若 `latest_verdict` 缺失 → `blocked`（必须先持久化 verdict）
+  - 若 verdict 为 `MINOR`/`MAJOR` 且 `audit_ref` 缺失 → `blocked`（非 PASS verdict 必须产出 audit_ref）
+  - 若 verdict 为 `PASS` → 通过 gate（PASS 不要求 audit_ref）
+
+**注意**：reviewer 的 ref 检查是 verdict-aware，不是 state-change-aware。verdict 存在性和值优先于 state 改变判断。
 
 gate 检查顺序（state-change-aware）：
 1. required_ref 缺失 + state 改变 → warning，继续检查 state transition
