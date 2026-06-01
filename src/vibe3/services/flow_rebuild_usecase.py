@@ -57,8 +57,11 @@ class FlowRebuildUsecase:
         """Hard-delete the old scene, recreate flow/worktree, append handoff, resume.
 
         This performs a destructive rebuild of the flow scene.
+
+        Raises:
+            RuntimeError: If cleanup fails (prevents bootstrap on dirty state)
         """
-        FlowCleanupService(
+        cleanup_results = FlowCleanupService(
             git_client=self.git_client,
             store=self.store,
         ).cleanup_flow_scene(
@@ -68,6 +71,16 @@ class FlowRebuildUsecase:
             keep_flow_record=False,
             force_delete=True,
         )
+
+        # Check cleanup results before proceeding
+        failed_steps = [
+            step for step, success in cleanup_results.items() if not success
+        ]
+        if failed_steps:
+            raise RuntimeError(
+                f"Flow cleanup failed for steps: {', '.join(failed_steps)}. "
+                f"Cannot rebuild flow in dirty state."
+            )
 
         result = self.orchestrator.bootstrap_issue_flow(
             issue,
