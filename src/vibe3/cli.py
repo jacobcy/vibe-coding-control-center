@@ -129,7 +129,7 @@ def status_command(
         ),
     ] = False,
 ) -> None:
-    """[Compatibility] Redirect to task status."""
+    """Show basic configuration status."""
     status.status(
         all_flows=all_flows,
         check=check,
@@ -137,6 +137,7 @@ def status_command(
         trace=trace,
         min_ms=min_ms,
         json_output=json_output,
+        show_task_progress=False,  # 只显示基本信息
     )
 
 

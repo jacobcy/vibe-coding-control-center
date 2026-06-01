@@ -131,6 +131,7 @@ def status(
             hidden=True,
         ),
     ] = False,
+    show_task_progress: bool = True,
 ) -> None:
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
     validate_trace_options(trace, min_ms)
@@ -249,6 +250,12 @@ def status(
     console.print()
 
     _render_configuration(config)
+
+    if not show_task_progress:
+        console.print(
+            "[dim]Use `vibe3 task status` to view issue progress and ready queue.[/]"
+        )
+        return
 
     service = FlowService()
     flows = service.list_flows(status=None if all_flows else "active")
