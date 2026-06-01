@@ -25,7 +25,10 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
     )
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -122,7 +125,10 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     assert "non-manager assignee" in output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -178,7 +184,10 @@ def test_task_status_shows_flows_with_prs(
     assert "PR: https://github.com/openai/vibe-center/pull/1" in result.output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
@@ -498,7 +507,10 @@ class TestComputeEffectiveServerRunning:
         assert self._call(snapshot_running=False, pid_valid=False) is False
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
 @patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.commands.status.FlowService")
