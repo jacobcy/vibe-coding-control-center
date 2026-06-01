@@ -35,6 +35,12 @@ class TestResolvePriority:
         labels_low = ["priority/7", "state/ready"]
         assert resolve_priority(labels_high) > resolve_priority(labels_low)
 
+    def test_priority_9_sorts_before_priority_0(self):
+        """Test priority/9 issue sorts before priority/0 in ready queue."""
+        labels_high = ["priority/9", "state/ready"]
+        labels_low = ["priority/0", "state/ready"]
+        assert resolve_priority(labels_high) > resolve_priority(labels_low)
+
     def test_legacy_priority_critical(self):
         """Test legacy label priority/critical maps to numeric."""
         labels = ["priority/critical", "state/ready"]
