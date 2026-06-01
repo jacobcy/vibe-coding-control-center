@@ -73,6 +73,7 @@ def execute_check_mode(
     branch: str | None = None,
     verbose: bool = False,
     show_progress: bool = True,
+    force: bool = False,
 ) -> ExecuteCheckResult:
     """Run command-oriented check modes
     using CheckService primitives.
@@ -83,6 +84,7 @@ def execute_check_mode(
         branch: Branch to check (for single-branch modes).
         verbose: Enable verbose output.
         show_progress: Show progress bar for 'all' and 'fix_all' modes.
+        force: Force delete for clean_branch mode.
     """
     if mode == "init":
         init_result: InitResult = service.init_remote_index()
@@ -109,7 +111,7 @@ def execute_check_mode(
             store=service.store,
             git_client=service.git_client,
         )
-        result = cleanup_service.clean_residual_branches()
+        result = cleanup_service.clean_residual_branches(force=force)
         return ExecuteCheckResult(
             mode="clean_branch",
             success=True,

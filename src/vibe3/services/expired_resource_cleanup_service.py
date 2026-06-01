@@ -291,7 +291,7 @@ class ExpiredResourceCleanupService:
         }
 
     def clean_expired_local_branches(
-        self, max_age_days: int = 7, *, quiet: bool = False
+        self, max_age_days: int = 7, *, force: bool = False, quiet: bool = False
     ) -> dict[str, object]:
         """Clean expired local non-protected branches older than max_age_days.
 
@@ -304,6 +304,7 @@ class ExpiredResourceCleanupService:
 
         Args:
             max_age_days: Max age in days before cleanup (default: 7)
+            force: If True, use force delete (git branch -D) for unmerged branches
             quiet: If True, suppress terminal output (for daemon/heartbeat use)
 
         Returns:
@@ -458,7 +459,7 @@ class ExpiredResourceCleanupService:
                 # Delete local branch
                 if not quiet:
                     console.print(f"    [yellow][cleaning][/yellow] {branch}...")
-                self.git_client.delete_branch(branch, force=False)
+                self.git_client.delete_branch(branch, force=force)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired local branch"
