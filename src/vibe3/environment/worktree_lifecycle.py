@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_support import (
     find_worktree_by_path,
@@ -23,7 +23,7 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
 
 
 def _is_auto_task_branch(branch: str) -> bool:
