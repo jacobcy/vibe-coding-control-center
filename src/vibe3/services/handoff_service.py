@@ -353,6 +353,7 @@ class HandoffService:
                 message=message,
                 actor=effective_actor,
                 kind=ref_kind.lower(),
+                branch=target_branch,
                 skip_event=True,
             )
         except (OSError, PermissionError) as exc:

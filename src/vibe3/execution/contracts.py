@@ -66,3 +66,4 @@ class ExecutionLaunchResult:
     stdout: Optional[str] = None  # Only populated for sync mode
     reason: Optional[str] = None
     reason_code: Optional[str] = None
+    error_recorded: bool = False  # True if runner already recorded specific error

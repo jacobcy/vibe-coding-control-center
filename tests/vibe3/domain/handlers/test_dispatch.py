@@ -225,6 +225,7 @@ class TestPlannerDispatchHandler:
             skipped=False,
             reason="Failed to start session",
             reason_code="launch_failed",
+            error_recorded=True,  # Runner already recorded specific error
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
