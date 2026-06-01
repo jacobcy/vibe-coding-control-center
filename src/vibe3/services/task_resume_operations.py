@@ -56,11 +56,13 @@ class TaskResumeOperations:
         remote: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
-        """Reset an issue to ready after clearing stale task scene state.
+        """Resume an issue after clearing stale blocked state.
 
-        Two modes:
-        - --label provided: only restore labels, no flow involvement
-        - No --label: hard delete flow + worktree, complete rebuild
+        Public task resume callers pass label_state="" for auto inference.
+        That path clears blocked cache/labels and preserves worktree/branch.
+
+        label_state=None is legacy/internal destructive compatibility only.
+        New destructive callers must prefer FlowRebuildUsecase.
 
         Args:
             issue_number: GitHub issue number
@@ -170,7 +172,8 @@ class TaskResumeOperations:
 
             # DO NOT call reset_task_scene (keep worktree)
         else:
-            # Full rebuild: hard delete flow + worktree, then orchestra rebuilds
+            # Legacy/internal destructive compatibility. Public CLI paths must
+            # not reach this branch; use FlowRebuildUsecase for new rebuilds.
             emit_progress("full rebuild mode")
 
             from vibe3.services.blocked_state_service import BlockedStateService
