@@ -262,7 +262,9 @@ vibe keys check
 
 **失败时的修复建议**：
 - 工具缺失：根据 `vibe doctor` 输出安装缺失工具
-- 密钥问题：运行 `vibe keys setup` 配置 API 密钥
+- 密钥问题：
+  - 运行 `vibe keys init` 从模板创建配置文件
+  - 或手动编辑 `~/.vibe/config/keys.env` 添加密钥
 
 **重要**：`vibe doctor --essential` 不检查密钥，需要单独运行 `vibe keys check`。
 
