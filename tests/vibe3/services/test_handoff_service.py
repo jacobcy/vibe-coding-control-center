@@ -1,6 +1,7 @@
 """Tests for handoff ref validation and normalization."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -370,36 +371,29 @@ def test_success_events_includes_next_step_set(tmp_path: Path) -> None:
 
 def test_record_ref_skips_handoff_append_event(tmp_path: Path) -> None:
     """Verify _record_ref does not record duplicate handoff_append event."""
-    from unittest.mock import MagicMock
-
     worktree_root = tmp_path / "wt"
     git_common = tmp_path / ".git"
     plan_path = worktree_root / "docs" / "plans" / "test.md"
     plan_path.parent.mkdir(parents=True)
     plan_path.write_text("plan content", encoding="utf-8")
-
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(
         store=store,
         git_client=StubGitClient(worktree_root, git_common, "task/issue-1678"),
     )
-
     handoff_file = (
         git_common / "vibe3" / "handoff" / "task-issue-1678-abc" / "current.md"
     )
     service.storage.ensure_current_handoff = MagicMock(return_value=handoff_file)
     service.storage.append_current_handoff = MagicMock(return_value=handoff_file)
     service.storage.normalize_ref_value = MagicMock(return_value="docs/plans/test.md")
-
     service._record_ref("plan", "docs/plans/test.md", actor="planner")
-
     events = service.get_handoff_events("task/issue-1678")
     handoff_plan_events = [e for e in events if e.event_type == "handoff_plan"]
     assert len(handoff_plan_events) == 1
     assert (
         handoff_plan_events[0].detail == "Recorded plan reference: docs/plans/test.md"
     )
-
     handoff_append_events = [e for e in events if e.event_type == "handoff_append"]
     assert len(handoff_append_events) == 0
     service.storage.append_current_handoff.assert_called_once()
