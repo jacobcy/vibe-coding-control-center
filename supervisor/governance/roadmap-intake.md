@@ -232,7 +232,7 @@ Manager assignee 配置位于：
 
 **错误示例**（旧版本）：
 ```
-[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
+[governance suggest] Intake: assigned to manager-agent (manager-pool); scope=bugfix.
 ```
 
 **正确示例**：
