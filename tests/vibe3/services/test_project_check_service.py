@@ -1,5 +1,6 @@
 """Tests for project check service."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,6 +14,40 @@ from vibe3.services.project_check_service import (
 
 class TestProjectCheckService:
     """Tests for ProjectCheckService."""
+
+    def test_get_git_root_from_repo_root(self, tmp_path: Path) -> None:
+        """Test _get_git_root works correctly from repo root."""
+        # Create a real git repo
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        subprocess.run(["git", "init"], cwd=repo_root, check=True)
+
+        # Test from repo root
+        service = ProjectCheckService(project_root=repo_root)
+        git_root = service._get_git_root()
+        assert git_root == repo_root, f"Expected {repo_root}, got {git_root}"
+
+    def test_get_git_root_from_subdirectory(self, tmp_path: Path) -> None:
+        """Test _get_git_root works correctly from a subdirectory."""
+        # Create a real git repo
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        subprocess.run(["git", "init"], cwd=repo_root, check=True)
+
+        # Create a subdirectory
+        subdir = repo_root / "subdir"
+        subdir.mkdir()
+
+        # Test from subdirectory
+        service = ProjectCheckService(project_root=subdir)
+        git_root = service._get_git_root()
+        assert git_root == repo_root, f"Expected {repo_root}, got {git_root}"
+
+    def test_get_git_root_not_a_repo(self, tmp_path: Path) -> None:
+        """Test _get_git_root returns None when not in a git repo."""
+        service = ProjectCheckService(project_root=tmp_path)
+        git_root = service._get_git_root()
+        assert git_root is None
 
     def test_check_git_not_a_repo(self, tmp_path: Path) -> None:
         """Test git checks fail when not in a git repo."""

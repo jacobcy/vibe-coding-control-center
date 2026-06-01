@@ -84,6 +84,11 @@ class ProjectCheckService:
     def _get_git_root(self) -> Path | None:
         """Get git repository root directory.
 
+        Correctly handles:
+        - Worktrees: git-common-dir returns absolute path
+        - Repo root: git-common-dir returns .git (relative)
+        - Subdirectories: git-common-dir returns ../.git (relative)
+
         Returns:
             Path to git root or None if not in a git repo
         """
@@ -97,10 +102,16 @@ class ProjectCheckService:
 
         # Get the git common dir (handles worktrees correctly)
         # For main repo: returns .git
-        # For worktree: returns main repo's .git directory
+        # For worktree: returns main repo's .git directory (absolute)
+        # For subdirectory: returns ../.git (relative to cwd)
         result = self._run_git("rev-parse", "--git-common-dir")
         if result.returncode == 0:
             git_common_dir = Path(result.stdout.strip())
+
+            # If it's a relative path, resolve it from cwd
+            if not git_common_dir.is_absolute():
+                git_common_dir = (self.project_root / git_common_dir).resolve()
+
             # The git root is the parent of .git directory
             self._git_root = git_common_dir.parent
             return self._git_root
@@ -487,52 +498,46 @@ class ProjectCheckService:
         category.items.append(
             CheckItem(
                 name="repo configuration valid",
-                status="pass",
+                status="skip",
                 message=(
                     "Repository configuration check skipped " "(requires running vibe3)"
                 ),
-                detail=(
-                    "Run 'vibe3 inspect base' " "for detailed configuration validation"
-                ),
+                detail="Run 'vibe3 inspect base' for detailed configuration validation",
             )
         )
 
         # Check 3: scene_base_ref validity
         if git_root:
-            # Try to get scene_base_ref from config or default to main/master
-            result = self._run_git("rev-parse", "--verify", "main")
+            # Try to get scene_base_ref from config
+            scene_base_ref = None
+            try:
+                from vibe3.config.settings import VibeConfig
+
+                config = VibeConfig.get_defaults()
+                scene_base_ref = config.orchestra.scene_base_ref
+            except Exception:
+                # Fallback to default if config loading fails
+                scene_base_ref = "origin/main"
+
+            # Verify the scene_base_ref exists
+            result = self._run_git("rev-parse", "--verify", scene_base_ref)
             if result.returncode == 0:
                 category.items.append(
                     CheckItem(
                         name="scene_base_ref valid",
                         status="pass",
-                        message="scene_base_ref 'main' is valid",
+                        message=f"scene_base_ref '{scene_base_ref}' is valid",
                     )
                 )
             else:
-                result = self._run_git("rev-parse", "--verify", "master")
-                if result.returncode == 0:
-                    category.items.append(
-                        CheckItem(
-                            name="scene_base_ref valid",
-                            status="pass",
-                            message="scene_base_ref 'master' is valid",
-                        )
+                category.items.append(
+                    CheckItem(
+                        name="scene_base_ref valid",
+                        status="warning",
+                        message=f"scene_base_ref '{scene_base_ref}' not found",
+                        detail="Verify after remote sync or configure base ref",
                     )
-                else:
-                    category.items.append(
-                        CheckItem(
-                            name="scene_base_ref valid",
-                            status="warning",
-                            message=(
-                                "No main/master branch found " "for scene_base_ref"
-                            ),
-                            detail=(
-                                "Verify after remote sync "
-                                "or set custom base ref in config"
-                            ),
-                        )
-                    )
+                )
         else:
             category.items.append(
                 CheckItem(
