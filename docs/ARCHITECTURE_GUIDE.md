@@ -14,7 +14,7 @@
 |------|------|---------|--------|
 | **Human-Mirror 架构** | [docs/standards/vibe3-human-mirror-architecture.md](standards/vibe3-human-mirror-architecture.md) | 核心设计哲学：系统操作 = 人类操作 | ⭐⭐⭐ 权威 |
 | **事件驱动架构** | [docs/standards/vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) | 事件发布/订阅机制、处理器注册、向后兼容 | ⭐⭐⭐ 权威 |
-| **Worktree Runtime** | [docs/standards/vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md) | 执行层级（L0-L4）、worktree 分配、runtime session | ⭐⭐⭐ 权威 (DEPRECATED) |
+| **Worktree Runtime** | [docs/standards/v3/worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md) | 执行层级（L0-L4）、worktree 生命周期管理、runtime session | ⭐⭐⭐ 权威 |
 | **Orchestra Runtime** | [docs/standards/v3/orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md) | Driver/Tick/Async Child 架构、调度主循环 | ⭐⭐⭐ 权威 |
 | **State Sync** | [docs/standards/v3/command-standard.md](standards/v3/command-standard.md) | Flow 状态机、状态转换规则 | ⭐⭐⭐ 权威 |
 
@@ -79,7 +79,7 @@ L4  Human collaboration            -- 人工协作流程
 - **L3**: 持久 worktree（`cwd=wt_path`）
 
 
-**详细文档**: [vibe3-worktree-ownership-standard.md (DEPRECATED)](standards/vibe3-worktree-ownership-standard.md)
+**详细文档**: [worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md)
 
 ---
 
@@ -218,4 +218,4 @@ def register_dispatch_handlers() -> None:
 ---
 
 **维护者**: Vibe Team
-**最后更新**: 2026-04-21
+**最后更新**: 2026-06-01

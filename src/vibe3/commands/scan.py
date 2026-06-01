@@ -185,8 +185,10 @@ def governance(
 
     # Handle --list option (highest priority)
     if list_materials:
+        from vibe3.ui.scan_display import display_material_list
+
         console = Console()
-        list_governance_materials(console)
+        list_governance_materials(console, display_fn=display_material_list)
         return
 
     available_materials = get_available_governance_materials()

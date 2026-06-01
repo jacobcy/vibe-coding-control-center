@@ -339,36 +339,67 @@ def apply_unified_noop_gate(
     elif required_ref_key is not None and flow_state is not None:
         ref_value = flow_state.get(required_ref_key)
         if not ref_value:
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"No-op gate BLOCK: required ref {required_ref_key} "
-                f"missing after {role}"
-            )
-            store.add_event(
-                branch,
-                EVENT_REQUIRED_REF_MISSING,
-                actor,
-                detail=(
-                    f"Required ref {required_ref_key} missing after {role}: "
-                    f"state was {before_state_label}"
-                ),
-                refs={
-                    "before_state": str(before_state_label or ""),
-                    "issue": str(issue_number),
-                    "required_ref": required_ref_key,
-                },
-            )
-            _block_fn(
-                issue_number=issue_number,
-                repo=repo,
-                reason=f"required ref missing: {required_ref_key}",
-                actor=actor,
-            )
-            return
+            if before_state_label != after_state_label:
+                # State changed but missing ref → WARNING only, pass gate
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(
+                    f"No-op gate WARNING: required ref {required_ref_key} "
+                    f"missing after {role} but state changed, passing gate"
+                )
+                store.add_event(
+                    branch,
+                    EVENT_REQUIRED_REF_MISSING,
+                    actor,
+                    detail=(
+                        f"Required ref {required_ref_key} missing after {role} "
+                        f"but state changed: {before_state_label} -> "
+                        f"{after_state_label}"
+                    ),
+                    refs={
+                        "before_state": str(before_state_label or ""),
+                        "after_state": str(after_state_label or ""),
+                        "issue": str(issue_number),
+                        "required_ref": required_ref_key,
+                        "severity": "warning",
+                    },
+                )
+                # Do NOT block — fall through to state transition check
+            else:
+                # State unchanged AND missing ref → BLOCK
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(
+                    f"No-op gate BLOCK: required ref {required_ref_key} "
+                    f"missing after {role} AND state unchanged"
+                )
+                store.add_event(
+                    branch,
+                    EVENT_REQUIRED_REF_MISSING,
+                    actor,
+                    detail=(
+                        f"Required ref {required_ref_key} missing after {role}: "
+                        f"state was {before_state_label}"
+                    ),
+                    refs={
+                        "before_state": str(before_state_label or ""),
+                        "issue": str(issue_number),
+                        "required_ref": required_ref_key,
+                    },
+                )
+                _block_fn(
+                    issue_number=issue_number,
+                    repo=repo,
+                    reason=f"required ref missing: {required_ref_key}",
+                    actor=actor,
+                )
+                return
 
     if before_state_label == after_state_label:
         state_desc = before_state_label or "(no state)"

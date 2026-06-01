@@ -9,7 +9,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.models.coverage import CoverageReport, LayerCoverage
+from vibe3.models import CoverageReport, LayerCoverage
 
 
 class CoverageService:
@@ -111,7 +111,7 @@ class CoverageService:
         Raises:
             RuntimeError: If pytest or coverage run fails
         """
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         # Always use branch for paths (branch is always available)
         git = GitClient()

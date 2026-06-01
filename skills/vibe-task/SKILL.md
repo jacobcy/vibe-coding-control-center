@@ -47,66 +47,175 @@ description: Use when the user wants to inspect RFC, blocked, or epic issues, ch
 vibe3 task status
 ```
 
-### Step 2: 解析 RFC issues
+### Step 2: 处理 RFC Issues（逐项决策）
 
-从输出中找出带 `roadmap/rfc` 的 issues：
+对每个 `roadmap/rfc` issue，按以下顺序执行：
 
-- issue 编号、标题
-- RFC 原因（从 labels 或 body 中解析）
-- 当前状态
+**必须逐项处理，不可批量扫描后输出报告。**
 
-### Step 3: 解析 Blocked issues
+#### 2.1 读取 issue 详情
 
-从输出中找出带 `state/blocked` 的 issues：
+```bash
+gh issue view <N>
+```
 
-- issue 编号、标题
-- 阻塞原因（从 `blocked_reason` 或 `blocked_by_issue` 中解析）
-- 依赖的 issue（如有）
+查看 issue 描述和已有 comments，理解 RFC 的具体问题。
 
-### Step 4: 解析 Epic issues
+#### 2.2 做出决策（三选一）
 
-从输出中找出带 `roadmap/epic` 的 issues：
+**方案 1：采纳并推进**
+- 移除 `roadmap/rfc` label
+- 设置 `state/ready`（或 `state/claimed`）
+- 在 comment 写入决策结论
 
-- issue 编号、标题
-- 已有的子 issues（从 body 或 comments 中解析 split 产出）
-- 是否已触发 split 流程
+```bash
+gh issue comment <N> --body "[decision] 采纳并推进；[reason] <理由>"
+gh issue edit <N> --remove-label roadmap/rfc --add-label state/ready
+```
 
-### Step 5: 依赖图编排
+**方案 2：转为依赖等待**
+- 明确依赖的 issue 或外部条件
+- 保留 `roadmap/rfc` label
+- 设置 `state/blocked` 并在 comment 中说明依赖关系
 
-基于上述三类 issue，梳理依赖链：
+```bash
+gh issue comment <N> --body "[decision] 转为依赖等待；[reason] 需要 #<M> 完成后再讨论；[blocked_by] #<M>"
+gh issue edit <N> --add-label state/blocked
+```
 
-1. **构建依赖链**：找出 blocked_by 关系，找出 epic → 子 issues 关系
-2. **识别根节点阻塞**：依赖链最上游的阻塞点（RFC / epic 未 split）
-3. **milestone 可进性**：当前 milestone 的所有候选 issue 是否有未解除阻塞
+**方案 3：推迟或关闭**
+- 在 comment 写入决策理由
+- 保留 `roadmap/rfc` label
+- 状态不变
 
-### Step 6: 输出状态
+```bash
+gh issue comment <N> --body "[decision] 推迟处理；[reason] <理由>"
+```
+
+#### 2.3 验证决策已落地
+
+决策写入后，验证 comment 是否成功：
+
+```bash
+gh issue view <N> --comments | grep "\[decision\]"
+```
+
+如果未找到决策标记，重新执行决策写入。
+
+**不允许悬浮结论**：每个 RFC 必须有明确的决策和 action，不能只输出"需要讨论"而没有下一步。只有当前 RFC 决策验证通过后，才处理下一个。
+
+### Step 3: 处理 Blocked Issues（二选一方案）
+
+对每个 `state/blocked` issue，只允许两种操作：
+
+**明确禁止发明中间方案。**
+
+#### 3.1 检查 flow 状态
+
+```bash
+vibe3 task status
+```
+
+查看 flow 的 `pr_ref` 或 `audit_ref` 是否存在，判断是否有有效产出。
+
+#### 3.2 选择处理方案
+
+**方案 1：完全重置**（适用于 worktree/分支已失效的场景）
+
+```bash
+vibe3 task resume <N> --yes
+```
+
+效果：
+- 删除 worktree 和分支
+- 清除 blocked_reason
+- 恢复到 `state/ready`
+
+**方案 2：移除阻塞恢复**（适用于 agent 已产出有效工作的场景）
+
+```bash
+vibe3 task resume <N> --label auto --yes
+```
+
+效果：
+- 保留 worktree 和分支
+- 清除 blocked_reason
+- 自动推断状态（优先 review/merge-ready，否则 claimed）
+
+#### 3.3 选择依据
+
+- 如果 flow 的 `pr_ref` 或 `audit_ref` 存在 → 用方案 2（有产出值得保留）
+- 如果 flow 已 stale 或无有效产出 → 用方案 1
+
+**禁止选择性保留**：既不完全重置也不按标准方案恢复的操作。
+
+### Step 4: 处理 Epic Issues（依赖图梳理）
+
+对每个 `roadmap/epic` issue，执行依赖图梳理：
+
+#### 4.1 读取 epic 详情
+
+```bash
+gh issue view <N>
+```
+
+查看 epic issue body 中的子 issue 列表。
+
+#### 4.2 检查子 issues 状态
+
+确认：
+- 子 issues 是否已创建
+- 子 issues 的依赖关系是否明确
+- 子 issues 的状态（ready/claimed/in-progress/blocked）
+
+#### 4.3 检查 epic 完整性
+
+**如果 epic body 缺少子 issue 列表**：
+- 通过 comments 或交叉引用查找已创建的子 issues
+- 更新 epic body 添加子 issue 列表
+
+**如果 epic 尚未拆分**：
+
+```bash
+gh issue comment <N> --body "[epic] 建议调用 /roadmap 触发拆分流程"
+```
+
+#### 4.4 构建依赖图
+
+基于 epic 及其子 issues，构建依赖关系：
+- epic → 子 issues（split 产出的依赖关系）
+- 子 issues 间的依赖关系
+- 识别关键路径和阻塞点
+
+### Step 5: 输出汇总报告
+
+总结三类 issue 的处理结果：
 
 ```text
-RFC & Blocked & Epic Issues 检查
+RFC & Blocked & Epic Issues 处理报告
 
-RFC Issues (需要人类讨论)
-- #123: 架构方向未定
-  原因: 需要确认是否使用新框架
-  状态: open
+RFC Issues（已逐项处理）
+- #123: [decision] 采纳并推进；[reason] 架构方向已明确
+- #124: [decision] 推迟处理；[reason] 需要更多技术调研
 
-Blocked Issues (有依赖阻塞)
-- #456: 依赖 #123 完成
-  阻塞原因: depends on #123
-  状态: blocked
+Blocked Issues（已按方案处理）
+- #456: 方案 2 恢复（保留 worktree，已有 PR 产出）
+- #457: 方案 1 重置（分支已 stale）
 
-Epic Issues (需要拆分)
-- #789: 大功能重构
-  已有子 issues: #790, #791
-  状态: split in progress
+Epic Issues（依赖图梳理）
+- #789: 已拆分为 #790, #791, #792
+  依赖关系: #789 → #790 → #791, #792
+  关键路径: #789 → #790 → #791
 
-依赖图
-- #123 (RFC) -> #456 (blocked) [根节点阻塞：先解决 RFC]
-- #789 (epic) -> #790, #791 [split 未完成，milestone 暂不可进]
+依赖图总览
+- RFC 已解决: #123 → 解锁 downstream issues
+- Blocked 已处理: #456 恢复为 in-progress
+- Epic 关键路径: #789 → #790 → #791
 
-建议
-- RFC: 安排讨论，解除 #123 的 rfc 状态
-- Blocked: #123 解除后 #456 自动解锁
-- Epic: #789 需完成 split 才能进入调度
+下一步建议
+- RFC: 监控决策执行情况
+- Blocked: 跟踪恢复后的 issues 进度
+- Epic: 关注关键路径上的 issues
 ```
 
 ## 与其他 Skills 的区别
@@ -117,7 +226,10 @@ Epic Issues (需要拆分)
 
 ## Restrictions
 
-- 不做复杂审计或修复
-- 不补充 CLI 未提供的字段
-- 不处理正常运行的 issue
-- 不做版本规划建议
+- **必须逐项处理**：不允许一次扫描完就输出报告
+- **RFC 必须落地**：每个 RFC 必须写入 issue comment，不允许悬浮结论
+- **Blocked 二选一**：只允许"完全重置"或"移除阻塞恢复"，禁止发明中间方案
+- **不处理正常运行 issue**：由 `vibe-orchestra` 管理
+- **不做版本规划建议**：由 `vibe-roadmap` 管理
+- **不做复杂审计或修复**：只处理 RFC、blocked、epic issues
+- **不补充 CLI 未提供的字段**：基于真源，只读 shell 输出

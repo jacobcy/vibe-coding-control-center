@@ -19,7 +19,7 @@ def test_terminate_task_sessions_raises_when_live_sessions_exist() -> None:
     service.issue_flow_service.parse_issue_number.return_value = 123
 
     with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend") as backend_cls,
+        patch("vibe3.agents.CodeagentBackend") as backend_cls,
         patch("vibe3.environment.session_registry.SessionRegistryService") as registry,
     ):
         registry.return_value.get_truly_live_sessions_for_branch.return_value = [

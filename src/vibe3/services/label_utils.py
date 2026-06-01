@@ -12,7 +12,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo
-    from vibe3.roles.definitions import TriggerableRoleDefinition
+    from vibe3.roles import TriggerableRoleDefinition
 
 
 def normalize_labels(raw_labels: object) -> list[str]:

@@ -55,7 +55,7 @@ class TestResolvePrePushScope:
         assert scope.base_ref == "2222222222222222222222222222222222222222"
         assert scope.head_ref == "1111111111111111111111111111111111111111"
 
-    @patch("vibe3.clients.git_client.GitClient")
+    @patch("vibe3.clients.GitClient")
     def test_infers_incremental_push_from_git_state(
         self, mock_git_client: MagicMock
     ) -> None:
@@ -72,7 +72,7 @@ class TestResolvePrePushScope:
         assert scope.is_incremental is True
         assert "inferred incremental push" in scope.summary
 
-    @patch("vibe3.clients.git_client.GitClient")
+    @patch("vibe3.clients.GitClient")
     def test_infers_new_branch_push_from_git_state(
         self, mock_git_client: MagicMock
     ) -> None:

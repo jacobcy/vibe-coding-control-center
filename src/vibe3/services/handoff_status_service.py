@@ -4,8 +4,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
+from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.models.verdict import VerdictRecord
@@ -152,7 +152,7 @@ class HandoffStatusService:
         Returns:
             List of session dicts that are truly live
         """
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents import CodeagentBackend
 
         if self.session_registry is None:
             with self._registry_lock:

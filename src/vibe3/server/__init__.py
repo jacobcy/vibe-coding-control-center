@@ -1,5 +1,11 @@
 """vibe3 server module."""
 
+# Domain layer re-exports
+from vibe3.domain import FailedGate, FlowManager
+
+# Runtime layer re-exports
+from vibe3.runtime import CircuitBreaker, HeartbeatServer
+
 # Orchestra instance utilities
 # MCP server
 from vibe3.server.mcp import (
@@ -34,6 +40,12 @@ from vibe3.server.registry import (
 from vibe3.server.server_utils import find_available_port
 
 __all__ = [
+    # domain
+    "FailedGate",
+    "FlowManager",
+    # runtime
+    "CircuitBreaker",
+    "HeartbeatServer",
     # orchestra_instance
     "OrchestraInstanceInfo",
     "read_instance_info",

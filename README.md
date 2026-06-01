@@ -27,23 +27,28 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
-- `uv run python src/vibe3/cli.py status`
+- `uv run python src/vibe3/cli.py status` (兼容入口，重定向至 `task status`)
 - `uv run python src/vibe3/cli.py flow show`
 - `uv run python src/vibe3/cli.py handoff show`
 - `flow update` / `flow bind` / `flow show` / `flow status`
-- `status` 全局总览
+- `task status` / `status` 全局总览
 - `handoff` 本地协作增强
 - `plan` / `run` / `review` agent 执行入口
 - `serve` / orchestra / manager 运行时能力
+- `snapshot` 项目健康度度量
+- `inspect` 代码影响分析
 
 ## 快速开始
 
 ```bash
 # 1. 查看 V3 运行时与 Flow 状态 (这是 Agent 的首选入口)
-vibe3 status
+vibe3 status           # 重定向至 task status
+vibe3 snapshot show    # 查看项目健康度仪表盘
+vibe3 inspect symbols  # (可选) 分析当前代码结构
+
 vibe3 flow update
 vibe3 flow show
-
+```
 # 2. 如果是首次使用或环境变更，执行初始化
 # 这会同步基础文件并初始化本地 worktree (symlinks, hooks, etc.)
 zsh scripts/init.sh

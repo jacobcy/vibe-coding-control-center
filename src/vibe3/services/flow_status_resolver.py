@@ -12,7 +12,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_body_service import parse_projection
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class FlowStatusResolver:
