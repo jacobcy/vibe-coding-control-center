@@ -6,6 +6,7 @@ Protocols & Models:
 - ``AgentBackend`` — protocol that all agent backends must implement
 - ``CodeagentCommand`` — dataclass for codeagent execution configuration
 - ``CodeagentResult`` — dataclass for codeagent execution result
+- ``create_codeagent_command`` — factory function for codeagent execution commands
 - ``ExecutionRole`` — literal type for execution roles
   (planner/executor/reviewer/manager)
 
@@ -24,9 +25,14 @@ Prompt Builders:
 - ``describe_plan_sections`` / ``describe_run_plan_sections`` /
   ``describe_review_sections`` — section key inspectors for dry-run summaries
 
+Review Helpers:
+- ``build_snapshot_diff`` — build structural diff for review context
+- ``run_inspect_json`` — helper to call inspect subcommand for review analysis
+
 Types:
 - ``PromptContextMode`` — literal type for prompt context mode
   (bootstrap/resume)
+- ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
 """
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -82,7 +88,7 @@ __all__ = [
     "describe_plan_sections",
     "describe_run_plan_sections",
     "describe_review_sections",
-    # Pipeline Helpers
+    # Review Helpers
     "build_snapshot_diff",
     "run_inspect_json",
     # Types
