@@ -261,12 +261,16 @@ def mock_services(mock_orchestra_config, mock_orchestra_snapshot):
     Returns dict with keys: config, flow_service, status_service
     """
     with (
-        patch("vibe3.commands.status.load_orchestra_config") as mock_load_config,
         patch(
-            "vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot"
+            "vibe3.config.orchestra_settings.load_orchestra_config"
+        ) as mock_load_config,
+        patch(
+            "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
         ) as mock_fetch_snapshot,
-        patch("vibe3.commands.status.FlowService") as mock_flow_service_cls,
-        patch("vibe3.commands.status.StatusQueryService") as mock_status_service_cls,
+        patch("vibe3.services.flow_service.FlowService") as mock_flow_service_cls,
+        patch(
+            "vibe3.services.status_query_service.StatusQueryService"
+        ) as mock_status_service_cls,
     ):
         mock_load_config.return_value = mock_orchestra_config
         mock_fetch_snapshot.return_value = mock_orchestra_snapshot
@@ -277,6 +281,7 @@ def mock_services(mock_orchestra_config, mock_orchestra_snapshot):
 
         status_service = MagicMock()
         status_service.fetch_worktree_map.return_value = {}
+        status_service.fetch_orchestrated_issues.return_value = []
         mock_status_service_cls.return_value = status_service
 
         yield {
