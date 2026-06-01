@@ -25,7 +25,10 @@ class TestProjectCheckService:
         # Test from repo root
         service = ProjectCheckService(project_root=repo_root)
         git_root = service._get_git_root()
-        assert git_root == repo_root, f"Expected {repo_root}, got {git_root}"
+        # Use resolve() to handle macOS /var -> /private/var symlink
+        assert (
+            git_root == repo_root.resolve()
+        ), f"Expected {repo_root.resolve()}, got {git_root}"
 
     def test_get_git_root_from_subdirectory(self, tmp_path: Path) -> None:
         """Test _get_git_root works correctly from a subdirectory."""
@@ -41,7 +44,10 @@ class TestProjectCheckService:
         # Test from subdirectory
         service = ProjectCheckService(project_root=subdir)
         git_root = service._get_git_root()
-        assert git_root == repo_root, f"Expected {repo_root}, got {git_root}"
+        # Use resolve() to handle macOS /var -> /private/var symlink
+        assert (
+            git_root == repo_root.resolve()
+        ), f"Expected {repo_root.resolve()}, got {git_root}"
 
     def test_get_git_root_not_a_repo(self, tmp_path: Path) -> None:
         """Test _get_git_root returns None when not in a git repo."""
