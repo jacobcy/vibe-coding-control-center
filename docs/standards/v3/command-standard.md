@@ -25,7 +25,7 @@ related_docs:
 
 本文档是 Vibe 3.0 共享状态命令的现行规范真源。
 
-旧文档 [docs/standards/vibe3-command-standard.md](../vibe3-command-standard.md)、[docs/standards/vibe3-state-sync-standard.md](../vibe3-state-sync-standard.md) 与 [docs/standards/vibe3-user-guide.md](../vibe3-user-guide.md) 仅保留为废弃目录页，不再承载规范正文。
+旧文档 [docs/archive/vibe3-user-guide.md](../../archive/vibe3-user-guide.md) 与 [docs/archive/v3/ARCHIVED_vibe3-state-sync-standard.md](../../archive/v3/ARCHIVED_vibe3-state-sync-standard.md) 仅保留为废弃目录页，不再承载规范正文。
 
 ## 0. CLI 定位
 

@@ -21,7 +21,7 @@
 - `supervisor/policies/run.md` — Run 模式策略
 - `supervisor/policies/review.md` — Review 模式策略
 
-角色层级与 worktree 分配/runtime session 语义见 `vibe3-worktree-ownership-standard.md`。
+角色层级与 worktree 分配/runtime session 语义见 `v3/orchestra-runtime-standard.md`。
 事件驱动语义见 `v3/event-driven-standard.md`。
 
 ## 2. 核心判断
@@ -36,7 +36,7 @@
 
 Vibe3 的架构是**协作式制衡**:
 
-- 共同目标分层: Governance (L1) 负责 assignee issue pool 的观察与排序；Manager/Plan/Run/Review (L3) 负责把 assignee issue 从 ready 推进到 done；Supervisor/Apply (L2) 负责 supervisor issue 的治理执行。三者不是同一条执行链
+- 共同目标分层: Governance (Tier 3) 负责 assignee issue pool 的观察与排序；Manager/Plan/Run/Review (Tier 2) 负责把 assignee issue 从 ready 推进到 done；Supervisor/Apply (Tier 3) 负责 supervisor issue 的治理执行。三者不是同一条执行链
 - 边界清晰: 每个角色有明确的 Allowed / Forbidden list
 - 有分层真源: assignee issue 的状态由 flow 状态管理，supervisor issue 由 supervisor/apply 管理，`state/*` 标签仅为可选镜像
 - 有仲裁机制: 人类评论 > Orchestra 系统 > 各角色
@@ -45,10 +45,10 @@ Vibe3 的架构是**协作式制衡**:
 
 | 分层 | 架构 Tier | 对应角色 | 权力 | 制衡机制 |
 |------|-----------|----------|------|----------|
-| **L1** | **Tier 3 (Cognitive)** | Governance | 观察 assignee pool、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
-| **L2** | **Tier 3 (Governance)**| Supervisor/Apply | 处理 supervisor issue、close/recreate 治理 issue | Manager 不干预 supervisor issue；人类可 override |
-| **L3** | **Tier 2 (Skill)** | Manager + Plan / Run | 状态机推进、代码实现、PR 产出 | Review 可 BLOCK; Orchestra 系统可强制回退 |
-| **L3** | **Tier 2 (Skill)** | Review | PASS / MAJOR / BLOCK 裁决 | Manager 可覆盖 UNKNOWN / 判定 review 不可信 |
+| **Tier 3** | **Cognitive / Governance** | Governance | 观察 assignee pool、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
+| **Tier 3** | **Governance Execution** | Supervisor/Apply | 处理 supervisor issue、close/recreate 治理 issue | Manager 不干预 supervisor issue；人类可 override |
+| **Tier 2** | **Skill Layer** | Manager + Plan / Run | 状态机推进、代码实现、PR 产出 | Review 可 BLOCK; Orchestra 系统可强制回退 |
+| **Tier 2** | **Skill Layer** | Review | PASS / MAJOR / BLOCK 裁决 | Manager 可覆盖 UNKNOWN / 判定 review 不可信 |
 
 ## 3. 权力结构
 
@@ -57,11 +57,11 @@ Vibe3 的架构是**协作式制衡**:
 ```
 人类评论（绝对否决权）
         |
-Orchestra 系统层（L0）
+Orchestra 系统层 (Tier 1)
 Progress Contract + Fallback Matrix
 强制回退真源 / runtime guard
         |
-Manager（L3）状态机控制者
+Manager (Tier 2) 状态机控制者
 可 block / claimed / review
 可覆盖 review UNKNOWN verdict
 可判定 review 不可信
@@ -69,7 +69,7 @@ Manager（L3）状态机控制者
    +--------+--------+--------+
    |        |        |        |
   Plan     Run    Review   Governance
-  (L3)    (L3)    (L3)      (L1)
+(Tier 2) (Tier 2) (Tier 2) (Tier 3)
   产出    产出   PASS/     [governance suggest]
 plan_ref report  MAJOR/     纯建议，无强制权
                  BLOCK
@@ -82,7 +82,7 @@ plan_ref report  MAJOR/     纯建议，无强制权
 
 ```yaml
 governance:
-  worktree: NONE (L1)
+  worktree: NONE (Tier 3)
   can_override: []  # 无直接覆盖能力
   can_be_overridden_by:
     - manager: 可自主判断是否采纳
@@ -90,7 +90,7 @@ governance:
   teeth: advisory_only
 
 apply:
-  worktree: TEMPORARY (L2)
+  worktree: TEMPORARY (Tier 3)
   can_override:
     - issue: 可 close / recreate 治理 issue
     - label: 可读写（限 supervisor label issue）
@@ -99,7 +99,7 @@ apply:
   teeth: limited_execution
 
 manager:
-  worktree: DEDICATED (L3)
+  worktree: DEDICATED (Tier 2)
   can_override:
     - plan: 可改 plan_ref，可要求重做
     - run: 可打回 in-progress
@@ -112,7 +112,7 @@ manager:
   teeth: high
 
 review:
-  worktree: DEDICATED (L3)
+  worktree: DEDICATED (Tier 2)
   can_override:
     - run: MAJOR/BLOCK 可阻塞 merge
   can_be_overridden_by:
@@ -129,7 +129,7 @@ review:
 
 **风险**: 如果 Manager 长期忽略 governance 建议，系统没有自动升级机制。
 
-**缓解**: Governance 目前定位正确（L1 轻量扫描不应有强制执行权）。如需增强，建议增加 escalation 机制: 连续 N 个 tick 建议未处理时，自动加 `governance/escalated` label 提醒人类，而非直接修改 state。
+**缓解**: Governance 目前定位正确（Tier 3 轻量扫描不应有强制执行权）。如需增强，建议增加 escalation 机制: 连续 N 个 tick 建议未处理时，自动加 `governance/escalated` label 提醒人类，而非直接修改 state。
 
 ### 4.2 Manager 可覆盖 Review
 
@@ -173,7 +173,7 @@ review:
 ```
 vibe3-role-checks-and-balances-standard.md (本文件)
         |
-        +-- vibe3-worktree-ownership-standard.md  (层级与 runtime/worktree 语义)
+        +-- v3/orchestra-runtime-standard.md  (层级与 runtime/worktree 语义)
         +-- v3/event-driven-standard.md        (事件链语义)
         +-- v3/command-standard.md          (state/* 标签语义)
         +-- agent-workflow-standard.md            (Agent 工作流规范)
