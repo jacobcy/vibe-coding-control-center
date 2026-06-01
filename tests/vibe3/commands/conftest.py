@@ -7,6 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
+from tests.vibe3.test_rfc_epic_utils import (
+    make_orchestra_config,
+    make_orchestra_snapshot,
+)
 from vibe3.commands.inspect import app as inspect_app
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.flow import FlowState, FlowStatusResponse
@@ -235,3 +239,48 @@ def mock_inspect_passing() -> dict[str, Any]:
             "reason": "Low risk changes",
         }
     }
+
+
+# RFC/Epic test fixtures
+@pytest.fixture
+def mock_orchestra_config():
+    """Create a mock orchestra config for RFC/Epic tests."""
+    return make_orchestra_config()
+
+
+@pytest.fixture
+def mock_orchestra_snapshot():
+    """Create a mock orchestra snapshot for RFC/Epic tests."""
+    return make_orchestra_snapshot()
+
+
+@pytest.fixture
+def mock_services(mock_orchestra_config, mock_orchestra_snapshot):
+    """Patch all services and return mock objects.
+
+    Returns dict with keys: config, flow_service, status_service
+    """
+    with (
+        patch("vibe3.commands.status.load_orchestra_config") as mock_load_config,
+        patch(
+            "vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot"
+        ) as mock_fetch_snapshot,
+        patch("vibe3.commands.status.FlowService") as mock_flow_service_cls,
+        patch("vibe3.commands.status.StatusQueryService") as mock_status_service_cls,
+    ):
+        mock_load_config.return_value = mock_orchestra_config
+        mock_fetch_snapshot.return_value = mock_orchestra_snapshot
+
+        flow_service = MagicMock()
+        flow_service.list_flows.return_value = []
+        mock_flow_service_cls.return_value = flow_service
+
+        status_service = MagicMock()
+        status_service.fetch_worktree_map.return_value = {}
+        mock_status_service_cls.return_value = status_service
+
+        yield {
+            "config": mock_orchestra_config,
+            "flow_service": flow_service,
+            "status_service": status_service,
+        }

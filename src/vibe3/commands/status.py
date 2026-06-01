@@ -397,7 +397,7 @@ def status(
 
     render_missing_state_items(waiting_for_pool_items, governed_anomaly_items)
     render_rfc_items(roadmap_rfc_items)
-    render_epic_items(roadmap_epic_items)
+    render_epic_items(roadmap_epic_items, orchestrated_issues)
     render_blocked_items(blocked_items)
 
     if all_flows:
