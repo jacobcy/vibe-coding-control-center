@@ -15,6 +15,7 @@ from vibe3.observability.logger import setup_logging
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
+from vibe3.ui.console import console
 from vibe3.ui.task_ui import (
     render_task_comments,
     render_task_show,
@@ -146,14 +147,260 @@ def status(
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Show task-oriented global status dashboard."""
-    from vibe3.commands import status as status_command
+    from typing import cast
 
-    status_command.status(
-        all_flows=all_flows,
-        check=check,
-        json_output=json_output,
-        trace=trace,
+    from vibe3.commands.status_render import (
+        render_blocked_items,
+        render_completed_flows,
+        render_epic_items,
+        render_issue_progress,
+        render_missing_state_items,
+        render_pr_ref_items,
+        render_remote_items,
+        render_rfc_items,
+        render_supervisor_issues,
     )
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.models.orchestration import IssueState
+    from vibe3.services.flow_service import FlowService
+    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services.status_query_service import (
+        StatusQueryService,
+        is_auto_task_branch,
+    )
+    from vibe3.services.task_status_classifier import (
+        TaskStatusBucket,
+        classify_task_status,
+    )
+
+    if trace:
+        setup_logging(verbose=2)
+        enable_method_trace()
+
+    if check:
+        from vibe3.commands.common import run_full_check_shortcut
+
+        run_full_check_shortcut()
+
+    # Get orchestra snapshot and config
+    config = load_orchestra_config()
+    orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    if orch_snapshot is None:
+        import time
+
+        time.sleep(0.5)
+        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+
+    if not orch_snapshot:
+        from dataclasses import replace
+
+        from vibe3.services.flow_orchestrator_service import (
+            FlowOrchestratorService,
+        )
+
+        orch_service = OrchestraStatusService(
+            config, orchestrator=FlowOrchestratorService(config)
+        )
+        local_snap = orch_service.snapshot()
+        orch_snapshot = replace(local_snap, server_running=False)
+
+    # JSON output
+    if json_output:
+        service = FlowService()
+        flows = service.list_flows(status=None if all_flows else "active")
+
+        queued_set = set(orch_snapshot.queued_issues)
+        query_service = StatusQueryService(repo=config.repo)
+        orchestrated_issues = query_service.fetch_orchestrated_issues(
+            flows,
+            queued_set,
+            stale_flows=[],
+            manager_usernames=get_manager_usernames(config),
+            supervisor_label=config.supervisor_handoff.issue_label,
+        )
+
+        from dataclasses import asdict
+
+        output_data = {
+            "orchestra": asdict(orch_snapshot),
+            "flows": [f.model_dump() for f in flows],
+            "orchestrated_issues": orchestrated_issues,
+        }
+        typer.echo(json.dumps(output_data, indent=2, default=str))
+        return
+
+    # Table output - task progress only
+    def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
+        """Only auto-task flows should participate in task-oriented Issue Progress."""
+        from vibe3.models.flow import FlowStatusResponse
+
+        flow = cast(FlowStatusResponse | None, item.get("flow"))
+        state = cast(IssueState, item["state"])
+
+        if flow is None:
+            is_remote = cast(bool, item.get("remote", False))
+            if is_remote:
+                return True
+            return state in {
+                IssueState.READY,
+                IssueState.HANDOFF,
+                IssueState.BLOCKED,
+                IssueState.DONE,
+                IssueState.CLAIMED,
+                IssueState.IN_PROGRESS,
+                IssueState.REVIEW,
+            }
+        return is_auto_task_branch(flow.branch)
+
+    service = FlowService()
+    flows = service.list_flows(status=None if all_flows else "active")
+    if not all_flows:
+        flows.extend(service.list_flows(status="done"))
+        flows.extend(service.list_flows(status="blocked"))
+
+    stale_flows = service.list_flows(status="stale") if not all_flows else []
+
+    queued_set = set(orch_snapshot.queued_issues)
+    query_service = StatusQueryService(repo=config.repo)
+    orchestrated_issues = query_service.fetch_orchestrated_issues(
+        flows,
+        queued_set,
+        stale_flows=stale_flows,
+        manager_usernames=get_manager_usernames(config),
+        supervisor_label=config.supervisor_handoff.issue_label,
+    )
+
+    supervisor_label = config.supervisor_handoff.issue_label
+
+    # Filtering decision tree
+    supervisor_items = [
+        item
+        for item in orchestrated_issues
+        if supervisor_label in cast(list[str], item.get("labels", []))
+    ]
+    supervisor_numbers = {cast(int, item["number"]) for item in supervisor_items}
+
+    roadmap_rfc_items = [
+        item
+        for item in orchestrated_issues
+        if "roadmap/rfc" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+    ]
+    roadmap_rfc_numbers = {cast(int, item["number"]) for item in roadmap_rfc_items}
+    roadmap_epic_items = [
+        item
+        for item in orchestrated_issues
+        if "roadmap/epic" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+    ]
+    roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
+
+    manager_usernames = get_manager_usernames(config)
+
+    waiting_for_pool_items = [
+        item
+        for item in orchestrated_issues
+        if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" not in cast(list[str], item.get("labels", []))
+    ]
+    governed_anomaly_items = [
+        item
+        for item in orchestrated_issues
+        if item.get("state") is None
+        and item.get("assignee") is not None
+        and item.get("assignee") in manager_usernames
+        and supervisor_label not in cast(list[str], item.get("labels", []))
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and "orchestra-governed" in cast(list[str], item.get("labels", []))
+    ]
+    missing_state_numbers = {
+        cast(int, item["number"])
+        for item in waiting_for_pool_items + governed_anomaly_items
+    }
+
+    task_progress_items = [
+        item
+        for item in orchestrated_issues
+        if _include_issue_in_task_progress(item)
+        and cast(int, item["number"]) not in supervisor_numbers
+        and cast(int, item["number"]) not in roadmap_rfc_numbers
+        and cast(int, item["number"]) not in roadmap_epic_numbers
+        and cast(int, item["number"]) not in missing_state_numbers
+    ]
+
+    remote_items = [
+        item
+        for item in task_progress_items
+        if cast(bool, item.get("remote"))
+        and cast(IssueState, item["state"]) != IssueState.BLOCKED
+    ]
+    non_remote_items = [
+        item for item in task_progress_items if not cast(bool, item.get("remote"))
+    ]
+
+    bucketed_items: dict[TaskStatusBucket, list[dict[str, object]]] = {
+        TaskStatusBucket.ASSIGNEE_INTAKE: [],
+        TaskStatusBucket.READY_QUEUE: [],
+        TaskStatusBucket.READY_ANOMALY: [],
+        TaskStatusBucket.ACTIVE_ANOMALY: [],
+        TaskStatusBucket.OTHER: [],
+    }
+    for item in non_remote_items:
+        state = cast(IssueState | None, item["state"])
+        if state == IssueState.DONE:
+            continue
+
+        bucket = classify_task_status(
+            state,
+            cast(str | None, item.get("assignee")),
+            get_manager_usernames(config),
+        )
+        bucketed_items[bucket].append(item)
+
+    render_issue_progress(bucketed_items, config)
+    console.print()
+
+    render_remote_items(remote_items)
+    console.print()
+
+    render_supervisor_issues(supervisor_items)
+    console.print()
+
+    pr_ref_items = [
+        item
+        for item in task_progress_items
+        if item.get("flow") and getattr(item["flow"], "pr_ref", None)
+    ]
+    render_pr_ref_items(pr_ref_items)
+
+    blocked_items = [
+        item
+        for item in orchestrated_issues
+        if cast(IssueState, item["state"]) == IssueState.BLOCKED
+        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
+        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and cast(int, item["number"]) not in supervisor_numbers
+    ]
+
+    render_missing_state_items(waiting_for_pool_items, governed_anomaly_items)
+    render_rfc_items(roadmap_rfc_items)
+    render_epic_items(roadmap_epic_items, orchestrated_issues)
+    render_blocked_items(blocked_items)
+
+    if all_flows:
+        completed_flows = [
+            flow
+            for flow in flows
+            if getattr(flow, "flow_status", "active") in {"done", "aborted", "merged"}
+        ]
+        render_completed_flows(completed_flows)
 
 
 @app.command()
