@@ -9,7 +9,7 @@ from typing import Any, Final
 
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 
 # Known backend-internal error patterns with suggested fixes
 KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (

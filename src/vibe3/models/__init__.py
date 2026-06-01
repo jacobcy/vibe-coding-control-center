@@ -11,6 +11,7 @@ from vibe3.models.change_source import (
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
 from vibe3.models.inspection import CallNode, CommandInspection
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.snapshot import (
     DependencyChange,
@@ -49,6 +50,7 @@ __all__: list[str] = [
     "LayerCoverage",
     "ModuleChange",
     "ModuleSnapshot",
+    "OrchestraConfig",
     "PRSource",
     "PromptContextMode",
     "StructureDiff",

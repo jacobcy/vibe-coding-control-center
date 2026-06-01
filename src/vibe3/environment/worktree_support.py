@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Optional
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
 
 
 def align_auto_scene_to_base(

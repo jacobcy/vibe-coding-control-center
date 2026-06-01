@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_lifecycle import WorktreeLifecycle
 from vibe3.environment.worktree_pr_mixin import WorktreePRMixin
@@ -19,7 +19,7 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
 
 
 class WorktreeManager(WorktreePRMixin):
