@@ -8,7 +8,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
-from vibe3.services.status_query_service import StatusQueryService
+from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
 from vibe3.services.task_status_classifier import TaskStatusBucket, classify_task_status
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def fetch_task_status_data(
     snapshot_found = orch_snapshot is not None
 
     if not orch_snapshot:
-        from vibe3.commands.status import _validate_pid_file
+        from vibe3.server.registry import _validate_pid_file
 
         _, pid_alive = _validate_pid_file(config.pid_file)
         if pid_alive:
@@ -114,28 +114,17 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
         is_remote = cast(bool, item.get("remote", False))
         if is_remote:
             return True
-
-        # Include issues in BLOCKED state even without flow
-        if state == IssueState.BLOCKED:
-            return True
-
-        return False
-
-    # Has flow - check if auto-task
-    trigger = getattr(flow, "trigger", None)
-    if trigger and trigger.source == "auto":
-        return True
-
-    # Include remote issues even if not auto-task
-    is_remote = cast(bool, item.get("remote", False))
-    if is_remote:
-        return True
-
-    # Include blocked issues for visibility
-    if state == IssueState.BLOCKED:
-        return True
-
-    return False
+        return state in {
+            IssueState.READY,
+            IssueState.HANDOFF,
+            IssueState.BLOCKED,
+            IssueState.DONE,
+            IssueState.CLAIMED,
+            IssueState.IN_PROGRESS,
+            IssueState.REVIEW,
+            IssueState.MERGE_READY,
+        }
+    return is_auto_task_branch(flow.branch)
 
 
 def classify_task_issues_for_rendering(
