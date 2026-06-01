@@ -468,6 +468,17 @@ Exit:
 - `milestone` 是大桶，用于表达大的交付窗口
 - `roadmap/*` 是 milestone 内的排序桶
 - `priority/[0-9]` 是同一 roadmap 桶内的细粒度抢占顺序，默认 `0`
+
+**优先级刻度**：
+- priority/9: 最高优先级（紧急、阻塞）
+- priority/7-8: 很高优先级
+- priority/5-6: 中等优先级
+- priority/3-4: 较低优先级
+- priority/1-2: 低优先级
+- priority/0: 最低优先级（默认、可选增强）
+
+**数字越大优先级越高**（与 roadmap/p0-p2 语义相反，勿混淆）。
+
 - 数字越大越靠前
 - legacy `priority/critical|high|medium|low` 仅作兼容输入；新建议统一使用数字 priority
 - 不要用 `state/*` label 编码排序意图

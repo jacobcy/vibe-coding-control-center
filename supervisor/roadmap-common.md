@@ -59,6 +59,17 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 
 ---
 
+## Priority Scale
+
+优先级标签语义详见 [label-semantics.md](../docs/standards/label-semantics.md)。
+
+**关键规则**：
+- `priority/[0-9]`：数字越大优先级越高（9 = 最高，0 = 最低）
+- `roadmap/p0-p2`：数字越小越紧急（p0 = 当前版本，最紧急）
+- **两者语义相反，勿混淆**
+
+---
+
 ## 三标签语义
 
 ### 1. orchestra-scanned（入口层闭环）
