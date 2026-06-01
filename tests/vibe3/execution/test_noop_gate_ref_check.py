@@ -22,8 +22,8 @@ def _make_github_issue_payload(state_label: str = "state/plan") -> dict:
 class TestRefCheck:
     """Tests for required_ref_key logic in no-op gate."""
 
-    def test_blocks_when_required_ref_missing_even_if_state_changed(self) -> None:
-        """Gate blocks when required ref is missing, even if state changed."""
+    def test_passes_when_state_changed_but_ref_missing(self) -> None:
+        """Gate passes with warning when state changed but required ref is missing."""
         store = _make_mock_store()
 
         with (
@@ -34,6 +34,38 @@ class TestRefCheck:
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
                 "state/in-progress"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                required_ref_key="plan_ref",
+                flow_state={},  # plan_ref missing
+            )
+
+        mock_block.assert_not_called()
+        # Should have two events: ref_missing warning and state_transitioned
+        assert store.add_event.call_count == 2
+        event_calls = [call[0][1] for call in store.add_event.call_args_list]
+        assert "required_ref_missing" in event_calls
+        assert "state_transitioned" in event_calls
+
+    def test_blocks_when_ref_missing_and_state_unchanged(self) -> None:
+        """Gate blocks when required ref is missing AND state unchanged."""
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            # State unchanged: before and after are the same
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
             )
             apply_unified_noop_gate(
                 store=store,
