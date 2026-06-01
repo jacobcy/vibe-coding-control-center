@@ -240,10 +240,13 @@ def render_epic_items(
     console.print("\n[bold cyan]Roadmap Epic:[/]")
     if epic_items:
         # Build set of open issue numbers for dependency status checking
+        # Filter out DONE issues since they're no longer blocking
         open_issue_numbers: set[int] = set()
         if orchestrated_issues:
             open_issue_numbers = {
-                cast(int, issue["number"]) for issue in orchestrated_issues
+                cast(int, issue["number"])
+                for issue in orchestrated_issues
+                if cast(IssueState, issue["state"]) != IssueState.DONE
             }
 
         for item in epic_items:

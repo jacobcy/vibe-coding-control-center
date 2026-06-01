@@ -172,3 +172,32 @@ def test_epic_parser_rejects_partial_header_match(mock_services) -> None:
     assert "# 888" in output
     # Should show READY for #456 (correct), not WAITING for #123 (wrong)
     assert "✓ READY" in output
+
+
+def test_epic_ignores_done_dependencies(mock_services) -> None:
+    """Epic should show ✓ READY when dependencies are DONE."""
+    # Epic with dependency #457 that is DONE
+    mock_services["status_service"].fetch_orchestrated_issues.return_value = [
+        make_issue(
+            457,
+            "Completed dependency",
+            state=IssueState.DONE,
+            assignee="developer",
+        ),
+        make_issue(
+            888,
+            "Epic with DONE dependency",
+            labels=["roadmap/epic"],
+            body="## Dependencies\n\n- Blocked by #457 (API)\n",
+        ),
+    ]
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "Roadmap Epic:" in output
+    assert "# 888" in output
+    # Should show READY because #457 is DONE (not blocking)
+    assert "✓ READY" in output
+    assert "⏳ WAITING" not in output
