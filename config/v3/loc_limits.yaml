@@ -209,8 +209,8 @@ code_limits:
         limit: 610
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
-        limit: 505
-        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206)、github_state CLOSED guard 等场景，共享 fixture，拆分收益低"
+        limit: 540
+        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206)、github_state CLOSED guard 等场景，共享 fixture，拆分收益低；PR #1818 重构后略微超标"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 480
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
