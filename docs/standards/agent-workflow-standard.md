@@ -65,11 +65,10 @@ Plan → Run → Review → Commit
 vibe3 plan --branch <branch_or_issue_number>
 vibe3 plan                    # 使用当前 branch
 
-# 从 spec 文件创建 plan（替换当前 flow 的 spec_ref）
-vibe3 plan --spec --file spec.md
-
-# 从 spec message 创建 plan
-vibe3 plan --spec --msg "Add dark mode support"
+# 从 spec 文件/Issue/别名创建 plan（更新当前 flow 的 spec_ref 并创建计划）
+vibe3 plan --spec docs/specs/feature.md
+vibe3 plan --spec #123
+vibe3 plan --spec @spec
 ```
 
 **Step 2: 执行 Plan（使用 Agent）**
@@ -88,8 +87,12 @@ vibe3 run --agent planner-pro --plan
 **Step 3: 审查结果**
 
 ```bash
-# 查看 handoff 记录
-vibe3 handoff show
+# 查看当前 flow 的 handoff 链路
+vibe3 handoff show @current
+
+# 查看指定 artifact
+vibe3 handoff show @plan
+vibe3 handoff show docs/reports/run-1.md
 
 # 查看 agent 做了哪些修改
 git status
