@@ -54,6 +54,7 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
             IssueState.CLAIMED,
             IssueState.IN_PROGRESS,
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
         }
     return is_auto_task_branch(flow.branch)
 
