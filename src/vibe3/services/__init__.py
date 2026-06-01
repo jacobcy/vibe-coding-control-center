@@ -9,7 +9,6 @@ from vibe3.services.bootstrap_context_service import (
     BootstrapContextService,
     BootstrapPlan,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
 
 __all__ = [
     # Bootstrap symbols (direct import)
