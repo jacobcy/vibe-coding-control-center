@@ -30,9 +30,14 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
     )
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
 def test_status_without_task_progress_shows_basic_config_only(
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
@@ -72,11 +77,16 @@ def test_status_without_task_progress_shows_basic_config_only(
     assert "Use `vibe3 task status` to view issue progress and ready queue" in output
 
 
-@patch("vibe3.commands.status.get_manager_usernames", return_value=["manager-bot"])
+@patch(
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    return_value=["manager-bot"],
+)
 @patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
 @patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.services.status_query_service.StatusQueryService")
 def test_task_status_shows_full_task_progress(
     mock_status_service_cls,
     mock_flow_service_cls,
