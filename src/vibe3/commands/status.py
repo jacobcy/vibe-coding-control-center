@@ -19,6 +19,7 @@ from vibe3.commands.common import (
     validate_trace_options,
 )
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.ui.console import console
 from vibe3.utils.time_format import format_age_aware_time
@@ -98,6 +99,7 @@ def _render_system_status(
         "Server: "
         + _resolve_server_label(config, snapshot_found, orch_snapshot.server_running)
     )
+    console.print(f"Log: {orchestra_events_log_path()}")
 
     if orch_snapshot.dispatch_blocked:
         console.print(

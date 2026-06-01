@@ -214,3 +214,29 @@ class TestSnapshotIssuePoolBoundary:
         issue_502 = next(e for e in snapshot.active_issues if e.number == 502)
         assert issue_501.pr_number == 9001
         assert issue_502.pr_number is None
+
+    def test_snapshot_includes_log_path_field(self):
+        """Snapshot should include log_path field with non-empty absolute path."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 600,
+                "title": "Test issue",
+                "assignees": [{"login": "manager-bot"}],
+                "labels": [{"name": "state/ready"}],
+                "milestone": None,
+                "body": "",
+            },
+        ]
+
+        service = self._make_service(github)
+        snapshot = service.snapshot()
+
+        # log_path should be a non-empty string
+        assert hasattr(snapshot, "log_path")
+        assert isinstance(snapshot.log_path, str)
+        assert len(snapshot.log_path) > 0
+        # Should be an absolute path containing expected components
+        assert "temp" in snapshot.log_path
+        assert "logs" in snapshot.log_path
+        assert "events.log" in snapshot.log_path

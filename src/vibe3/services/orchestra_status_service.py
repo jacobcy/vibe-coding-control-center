@@ -14,6 +14,7 @@ from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
 from vibe3.services.orchestra_helpers import get_manager_usernames
@@ -71,6 +72,7 @@ class OrchestraSnapshot:
     blocked_issue_reason: str | None = None
     polling_interval: int = OrchestraConfig.model_fields["polling_interval"].default
     port: int = OrchestraConfig.model_fields["port"].default
+    log_path: str = ""
 
 
 def format_issue_summary_line(entry: IssueStatusEntry) -> str:
@@ -227,6 +229,7 @@ class OrchestraStatusService:
                             data.get("polling_interval", config.polling_interval)
                         ),
                         port=int(data.get("port", config.port)),
+                        log_path=str(data.get("log_path", "")),
                     )
                 return None
         except (URLError, TimeoutError, ConnectionError, ValueError, TypeError):
@@ -445,6 +448,7 @@ class OrchestraStatusService:
             blocked_issue_reason=blocked_issue_reason,
             polling_interval=self.config.polling_interval,
             port=self.config.port,
+            log_path=str(orchestra_events_log_path()),
         )
 
         log.debug(
