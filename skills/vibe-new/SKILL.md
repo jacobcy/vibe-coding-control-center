@@ -25,7 +25,7 @@ git status
 
 ## 2. Pre-Bootstrap Sync Check（强制）
 
-在 bootstrap 前，**必须**确保从最新的 origin/main 创建分支：
+在 bootstrap 前，**必须**检查 origin/main 是否有更新：
 
 ```bash
 # 1. Fetch latest main
@@ -37,19 +37,15 @@ git log main..origin/main --oneline | wc -l
 
 **决策逻辑**：
 - **如果落后 > 0 commits**：
-  - 提示用户：`本地 main 分支落后 origin/main {N} commits，建议先更新再创建新分支`
-  - **推荐做法**（快速更新，不影响当前分支）：
-    ```bash
-    git checkout main
-    git pull origin main
-    git checkout -
-    ```
-  - **用户选择**：
-    - 同意更新 → 执行上述命令，然后继续 bootstrap
-    - 拒绝更新 → 记录风险并询问是否继续：`vibe3 handoff append "跳过 main 同步，新分支基于落后代码创建"`
+  - 提示用户：`本地 main 分支落后 origin/main {N} commits，新分支将基于最新的 origin/main 创建`
+  - 用户确认后直接继续 bootstrap（`vibe3 internal bootstrap` 会自动从 origin/main 创建分支）
 - **如果 origin/main 与本地 main 一致**：直接继续 bootstrap
 
-**原因**：避免 Issue #1250 类型的问题——长时间重构期间 main 已演进，新分支从一开始就落后会导致后续严重冲突。
+**用户选择**：
+- 继续 Bootstrap → 进入 Step 6，由 `vibe3 internal bootstrap` 自动处理 fetch + 分支创建
+- 跳过检查 → 记录风险：`vibe3 handoff append "跳过 main 同步检查，用户主动选择"`
+
+**原因**：`vibe3 internal bootstrap` 内部已执行 `git fetch` + `git create_branch_ref(branch, start_ref=origin/main)`，不依赖本地 main 分支状态。新分支始终基于最新的 origin/main 创建，避免从落后代码开始的问题。
 
 ## 3. Epic 入口分流检查
 
