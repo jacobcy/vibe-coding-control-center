@@ -59,3 +59,25 @@ def test_resume_issues_uses_exception_class_when_message_missing() -> None:
     assert result["skipped"] == [
         {"number": 432, "reason": "恢复操作失败: RuntimeError"}
     ]
+
+
+def test_resume_issues_defaults_to_label_auto_and_skips_reset_comment() -> None:
+    """Direct usecase callers must also get label-auto, not destructive rebuild."""
+    usecase = _make_usecase()
+    candidate = {
+        "number": 303,
+        "title": "resume me",
+        "resume_kind": "blocked",
+        "flow": MagicMock(branch="task/issue-303"),
+    }
+    usecase.status_service.fetch_resume_candidates.return_value = [candidate]
+    usecase.candidates.verify_issue_state_for_resume = MagicMock(return_value=True)
+    usecase.operations.reset_issue_to_ready = MagicMock()
+    usecase._comment_resume_success = MagicMock()
+
+    result = usecase.resume_issues(dry_run=False)
+
+    assert result["resumed"] == [{"number": 303, "resume_kind": "blocked"}]
+    call = usecase.operations.reset_issue_to_ready.call_args.kwargs
+    assert call["label_state"] == ""
+    usecase._comment_resume_success.assert_not_called()

@@ -80,7 +80,7 @@ class TaskResumeUsecase:
         stale_flows: list[FlowStatusResponse] | None = None,
         repo: str | None = None,
         candidate_mode: str = "resumable",
-        label_state: str | None = None,
+        label_state: str | None = "",
         remote: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> dict[str, Any]:
@@ -94,8 +94,10 @@ class TaskResumeUsecase:
             stale_flows: Stale flow status responses
             repo: Repository (owner/repo format, optional)
             candidate_mode: Candidate selection mode ("resumable" or "all_task")
-            label_state: Optional state to restore (None=delete worktree,
-                "handoff"/"ready"=keep worktree)
+            label_state: State to restore. Empty string means infer automatically.
+                Public default is empty string, so task resume preserves the
+                worktree/branch. None is reserved for explicit internal rebuild
+                compatibility and should not be used by public task resume paths.
             remote: If True, keep remote branch (do not delete origin).
                 If False, delete remote branch (default).
             progress_callback: Optional callback for progress updates.
