@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         CodeagentCommand,
         CodeagentResult,
     )
+    from vibe3.exceptions.error_severity import ErrorSeverity
 from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
@@ -33,6 +34,19 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.actor_support import format_agent_actor
 from vibe3.services.handoff_service import HandoffService
+
+
+def _severity_event_type(role: str, severity: "ErrorSeverity") -> str:
+    """Build event type suffix based on error severity."""
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    prefix = execution_prefix(role)  # type: ignore[arg-type]
+    if severity == ErrorSeverity.WARNING:
+        return f"codeagent_{prefix}_warning"
+    elif severity == ErrorSeverity.CRITICAL:
+        return f"codeagent_{prefix}_aborted"
+    else:  # ERROR
+        return f"codeagent_{prefix}_error"
 
 
 @dataclass
@@ -468,6 +482,8 @@ class CodeagentExecutionService:
                 if isinstance(exc, AgentExecutionError) and exc.log_path:
                     abort_refs["log_path"] = str(exc.log_path)
 
+                # Build severity-aware event type
+                event_type = _severity_event_type(command.role, error_contract.severity)
                 persist_execution_lifecycle_event(
                     ctx.store,
                     ctx.branch,
@@ -477,7 +493,7 @@ class CodeagentExecutionService:
                     abort_msg,
                     session_id=ctx.session_id,
                     refs=abort_refs,
-                    event_type=f"codeagent_{execution_prefix(command.role)}_aborted",
+                    event_type=event_type,
                 )
 
             # Runtime error handling: record to error_log only.

@@ -96,6 +96,19 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_started": "yellow",
     "codeagent_manager_completed": "green",
     "codeagent_manager_aborted": "red",
+    # Severity-aware variants
+    "codeagent_manager_warning": "yellow",
+    "codeagent_manager_error": "red",
+    "codeagent_plan_warning": "yellow",
+    "codeagent_plan_error": "red",
+    "codeagent_run_warning": "yellow",
+    "codeagent_run_error": "red",
+    "codeagent_review_warning": "yellow",
+    "codeagent_review_error": "red",
+    "codeagent_supervisor_warning": "yellow",
+    "codeagent_supervisor_error": "red",
+    "codeagent_governance_warning": "yellow",
+    "codeagent_governance_error": "red",
 }
 
 # Explicit mapping from ref field names to their corresponding actor field names
