@@ -20,7 +20,7 @@ def test_manager_imports_from_domain():
 
 
 def test_server_registry_imports_from_domain():
-    """Verify server/registry.py imports FlowManager from server package."""
+    """Verify server/registry.py imports FlowManager directly from domain."""
     with open("src/vibe3/server/registry.py") as f:
         tree = ast.parse(f.read())
 
@@ -32,8 +32,9 @@ def test_server_registry_imports_from_domain():
     ]
 
     assert len(flow_manager_imports) == 1
-    # After refactor: server/registry.py imports from vibe3.server (re-export)
-    assert flow_manager_imports[0].module == "vibe3.server"
+    # After circular dependency elimination: server/registry.py imports
+    # directly from vibe3.domain
+    assert flow_manager_imports[0].module == "vibe3.domain"
 
 
 def test_governance_sync_runner_imports_from_domain():
