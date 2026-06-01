@@ -163,7 +163,7 @@ def register_dispatch_handlers() -> None:
 ### 修改 Worktree 相关代码时
 
 1. **阅读架构文档**：
-   - [vibe3-worktree-ownership-standard.md (DEPRECATED)](standards/vibe3-worktree-ownership-standard.md)
+   - [worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md)
 
 2. **关键检查点**：
    - ✅ 确认执行层级（L0-L4）
