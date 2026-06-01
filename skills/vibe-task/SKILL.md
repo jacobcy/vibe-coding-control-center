@@ -73,13 +73,13 @@ gh issue comment <N> --body "[decision] 采纳并推进；[reason] <理由>"
 gh issue edit <N> --remove-label roadmap/rfc --add-label state/ready
 ```
 
-**方案 2：转为 blocked**
-- 明确 blocked reason
-- 保留或添加 `roadmap/rfc` label（待 RFC 解决后自动解锁）
-- 设置 `state/blocked`
+**方案 2：转为依赖等待**
+- 明确依赖的 issue 或外部条件
+- 保留 `roadmap/rfc` label
+- 设置 `state/blocked` 并在 comment 中说明依赖关系
 
 ```bash
-gh issue comment <N> --body "[decision] 转为 blocked；[reason] <理由>"
+gh issue comment <N> --body "[decision] 转为依赖等待；[reason] 需要 #<M> 完成后再讨论；[blocked_by] #<M>"
 gh issue edit <N> --add-label state/blocked
 ```
 
@@ -94,10 +94,15 @@ gh issue comment <N> --body "[decision] 推迟处理；[reason] <理由>"
 
 #### 2.3 验证决策已落地
 
-- 决策结论必须写入 issue comment（格式：`[decision] <结论>；[reason] <理由>`）
-- 只有当前 RFC 有明确决策后，才处理下一个
+决策写入后，验证 comment 是否成功：
 
-**不允许悬浮结论**：每个 RFC 必须有明确的决策和 action，不能只输出"需要讨论"而没有下一步。
+```bash
+gh issue view <N> --comments | grep "\[decision\]"
+```
+
+如果未找到决策标记，重新执行决策写入。
+
+**不允许悬浮结论**：每个 RFC 必须有明确的决策和 action，不能只输出"需要讨论"而没有下一步。只有当前 RFC 决策验证通过后，才处理下一个。
 
 ### Step 3: 处理 Blocked Issues（二选一方案）
 
@@ -163,9 +168,13 @@ gh issue view <N>
 - 子 issues 的依赖关系是否明确
 - 子 issues 的状态（ready/claimed/in-progress/blocked）
 
-#### 4.3 处理未拆分的 epic
+#### 4.3 检查 epic 完整性
 
-如果 epic 尚未拆分：
+**如果 epic body 缺少子 issue 列表**：
+- 通过 comments 或交叉引用查找已创建的子 issues
+- 更新 epic body 添加子 issue 列表
+
+**如果 epic 尚未拆分**：
 
 ```bash
 gh issue comment <N> --body "[epic] 建议调用 /roadmap 触发拆分流程"
