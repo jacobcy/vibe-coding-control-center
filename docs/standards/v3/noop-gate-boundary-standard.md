@@ -12,7 +12,7 @@ created: 2026-04-17
 last_updated: 2026-04-18
 related_docs:
   - ../vibe3-error-severity-and-blocking-standard.md
-  - ARCHIVED_vibe3-state-sync-standard.md
+  - ../../archive/v3/ARCHIVED_vibe3-state-sync-standard.md
   - ../vibe3-orchestra-runtime-standard.md
   - architecture-convergence-standard.md
   - supervisor/manager.md
