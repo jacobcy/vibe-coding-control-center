@@ -166,7 +166,8 @@ def resume(
         bool,
         typer.Option(
             "--remote",
-            help="保留远程分支不删除（默认删除远程分支）",
+            help="[DEPRECATED] This option is only valid for vibe3 flow rebuild",
+            hidden=True,
         ),
     ] = False,
     blocked: Annotated[
@@ -184,14 +185,11 @@ def resume(
         typer.Option(
             "--label",
             metavar="[STATE]",
-            help="Clear blocked_reason and restore to specified state "
+            help="Restore blocked issue to inferred or specified state "
             "WITHOUT deleting worktree/branch. "
             "STATE can be: auto, ready, claimed, in-progress, handoff, "
             "review, merge-ready. "
-            "Use 'auto' to infer state from flow refs "
-            "(prefers review/merge-ready if pr_ref/audit_ref present, "
-            "else defaults to CLAIMED). "
-            "Without --label, the original behavior deletes worktree/branch.",
+            "Omitting --label is equivalent to --label auto.",
         ),
     ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
@@ -201,11 +199,10 @@ def resume(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
-    """Resume blocked issues to ready.
+    """Resume blocked issues without deleting worktree/branch.
 
-    Use --remote to keep remote branch (do not delete origin).
-    Use --label [STATE] to only update labels without deleting worktree.
-    --remote and --label are mutually exclusive.
+    `vibe3 task resume` is equivalent to `vibe3 task resume --label auto`.
+    Destructive scene rebuild is handled by `vibe3 flow rebuild`.
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -217,14 +214,15 @@ def resume(
 
     register_event_handlers()
 
-    # Validate arguments
-    if remote and label is not None:
+    # Reject --remote (destructive rebuild is now in flow rebuild command)
+    if remote:
         typer.echo(
-            "Error: Cannot specify both --remote and --label",
+            "Error: --remote is only valid for vibe3 flow rebuild",
             err=True,
         )
         raise typer.Exit(1)
 
+    # Validate arguments
     selected_modes = [blocked, all_tasks]
     has_flag = any(selected_modes)
     if not has_flag and not issue_numbers:
@@ -248,7 +246,8 @@ def resume(
         )
         raise typer.Exit(1)
 
-    # Resolve label state from parameter
+    # Resolve label state from parameter.
+    # Public contract: task resume == task resume --label auto.
     valid_states = {
         "ready",
         "claimed",
@@ -257,14 +256,11 @@ def resume(
         "review",
         "merge-ready",
     }
-    effective_label: str | None = None
+    effective_label: str | None = ""
     if label is not None:
-        # --label flag is present
         if label == "auto":
-            # --label auto -> trigger inference in service
             effective_label = ""
         elif label in valid_states:
-            # --label <state> provided
             effective_label = label
         else:
             typer.echo(
@@ -273,7 +269,6 @@ def resume(
                 err=True,
             )
             raise typer.Exit(1)
-    # else: label is None → don't specify --label → delete worktree
 
     target_issues: list[int] | None
     candidate_mode = "resumable"
