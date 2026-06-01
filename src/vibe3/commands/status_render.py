@@ -3,152 +3,18 @@
 Filtering rules: docs/v3/orchestra/task-status-filtering.md
 """
 
-import re
 from typing import cast
 
+from vibe3.commands.status_render_utils import (
+    extract_blocked_reason_summary,
+    parse_epic_dependencies,
+    render_task_item_details,
+)
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_status_classifier import TaskStatusBucket
 from vibe3.ui.console import console
-from vibe3.utils.error_message_cleaner import (
-    CODEAGENT_WRAPPER_ANYWHERE_RE,
-    clean_error_message,
-)
-
-
-def _extract_blocked_reason_summary(blocked_reason: str) -> str:
-    """Extract key information from blocked_reason for status display.
-
-    Filters out verbose runtime details (TMPDIR, Recent Errors, stdin mode).
-    Preserves short status messages and error codes for quick diagnosis.
-    """
-    if not blocked_reason:
-        return ""
-
-    lines = blocked_reason.strip().split("\n")
-    if not lines:
-        return ""
-
-    # First, remove the "codeagent-wrapper failed (code X):" prefix
-    # Use ANYWHERE version to handle "E_EXEC_NO_OUTPUT: codeagent-wrapper..."
-    first_line = CODEAGENT_WRAPPER_ANYWHERE_RE.sub("", lines[0].strip())
-
-    # If first line becomes empty or only contains error code
-    # (e.g., "E_EXEC_NO_OUTPUT:"), try next line for more descriptive error
-    if (not first_line or first_line.rstrip(":").startswith("E_")) and len(lines) > 1:
-        next_line = lines[1].strip()
-        if next_line:
-            first_line = next_line
-
-    if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
-        result = first_line
-    else:
-        cleaned = clean_error_message(first_line)
-
-        if len(cleaned) <= 80:
-            result = cleaned
-        else:
-            # Try to find a sentence boundary
-            for sep in ["。", "."]:
-                pos = cleaned.rfind(sep, 0, 80)
-                if pos > 0:
-                    result = cleaned[: pos + 1]
-                    break
-            else:
-                # No sentence boundary found, just truncate
-                result = cleaned[:80]
-
-    # Don't end with colon - it looks awkward in "reason: xxx:" format
-    if result.endswith(":"):
-        result = result[:-1]
-
-    return result
-
-
-def _parse_epic_dependencies(body: str | None) -> list[int]:
-    """Parse issue numbers from the ## Dependencies section of an Epic body.
-
-    Args:
-        body: The issue body text to parse
-
-    Returns:
-        List of unique issue numbers mentioned in the ## Dependencies section
-    """
-    if not body:
-        return []
-
-    # Find the exact "## Dependencies" section (not "## DependenciesAndMore")
-    search_start = 0
-    deps_start = -1
-    while True:
-        deps_start = body.find("## Dependencies", search_start)
-        if deps_start == -1:
-            return []
-
-        # Verify this is exactly "## Dependencies" (followed by newline or end)
-        after = body[deps_start + len("## Dependencies") :]
-        if not after or after[0] in ("\n", "\r"):
-            break  # Found exact match
-
-        # Not exact match, continue searching after this position
-        search_start = deps_start + 1
-
-    # Extract text after "## Dependencies" until the next ## header or end
-    deps_section = body[deps_start:]
-    next_header = deps_section.find("\n## ", 1)  # Skip the initial "## Dependencies"
-    if next_header != -1:
-        deps_section = deps_section[:next_header]
-
-    # Extract all issue numbers (#123 format) from the section
-    issue_numbers = re.findall(r"#(\d+)", deps_section)
-    # Return unique sorted list
-    return sorted(set(int(num) for num in issue_numbers))
-
-
-def _render_task_item_details(
-    flow: FlowStatusResponse | None,
-    config: OrchestraConfig,
-    assignee: str | None = None,
-) -> None:
-    """Render shared task detail lines for task-oriented dashboard sections."""
-    flow_info = (
-        f"[dim]flow:[/] [cyan]{flow.branch}[/]"
-        if flow
-        else "[dim]flow:[/] [dim](none)[/]"
-    )
-    detail_parts = [flow_info]
-    if assignee:
-        detail_parts.append(f"[dim]assignee:[/] [cyan]{assignee}[/]")
-    console.print("             " + "  ".join(detail_parts))
-
-    if not flow:
-        return
-
-    if flow.plan_ref:
-        console.print(f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]")
-    if flow.report_ref:
-        console.print(f"             [dim]report:[/] [cyan]{flow.report_ref}[/]")
-    if flow.latest_verdict:
-        v = flow.latest_verdict
-        color = {
-            "PASS": "green",
-            "MINOR": "cyan",
-            "MAJOR": "yellow",
-            "BLOCK": "red",
-            "REFUSE": "magenta",
-        }.get(v.verdict, "cyan")
-        console.print(
-            f"             [dim]verdict:[/] "
-            f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
-        )
-    if flow.pr_number:
-        pr_ref = (
-            f"https://github.com/{config.repo}/pull/{flow.pr_number}"
-            if config.repo
-            else f"PR #{flow.pr_number}"
-        )
-        console.print(f"             [dim]PR:[/] [cyan]{pr_ref}[/]")
 
 
 def render_issue_progress(
@@ -178,7 +44,7 @@ def render_issue_progress(
                 f"  #{number:4}  [{status_color}]{status_str:10}[/]"
                 f"  {title[:48] + ('...' if len(title) > 48 else '')}"
             )
-            _render_task_item_details(flow, config, assignee=assignee)
+            render_task_item_details(flow, config, assignee=assignee)
     else:
         console.print("  [dim](none)[/]")
 
@@ -207,7 +73,7 @@ def render_issue_progress(
 
             display_title = title[:48] + "..." if len(title) > 48 else title
             console.print(f"  #{number:4}  [cyan]READY     [/]  {display_title}")
-            _render_task_item_details(flow, config, assignee=assignee)
+            render_task_item_details(flow, config, assignee=assignee)
             console.print(f"             [dim]{metadata_str}[/]")
     else:
         console.print("  [dim](none)[/]")
@@ -222,7 +88,7 @@ def render_issue_progress(
 
             display_title = title[:48] + "..." if len(title) > 48 else title
             console.print(f"  #{number:4}  [red]READY     [/]  {display_title}")
-            _render_task_item_details(flow, config, assignee=assignee)
+            render_task_item_details(flow, config, assignee=assignee)
             if assignee:
                 console.print(
                     "             [yellow]non-manager assignee:[/] "
@@ -247,7 +113,7 @@ def render_issue_progress(
             state_str = state.value.upper()
             display_title = title[:48] + "..." if len(title) > 48 else title
             console.print(f"  #{number:4}  [red]{state_str:10}[/]  {display_title}")
-            _render_task_item_details(flow, config)
+            render_task_item_details(flow, config)
             console.print(
                 "             [yellow]missing assignee:[/] active state"
                 " but no assignee (rule 2)"
@@ -340,7 +206,7 @@ def render_blocked_items(blocked_items: list[dict[str, object]]) -> None:
                 console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
 
             if blocked_reason:
-                reason_summary = _extract_blocked_reason_summary(blocked_reason)
+                reason_summary = extract_blocked_reason_summary(blocked_reason)
                 console.print(f"         [yellow]reason:[/] {reason_summary}")
     else:
         console.print("  [dim](none)[/]")
@@ -394,7 +260,7 @@ def render_epic_items(
                 console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
 
             # Render dependency status if dependencies exist
-            deps = _parse_epic_dependencies(cast(str | None, item.get("body")))
+            deps = parse_epic_dependencies(cast(str | None, item.get("body")))
             if deps:
                 still_open = [d for d in deps if d in open_issue_numbers]
                 completed = len(deps) - len(still_open)
