@@ -26,7 +26,6 @@ class FlowConsistencyResult:
     code: FlowConsistencyCode = FlowConsistencyCode.OK
     reason: str = ""
     severity: str = ""
-    auto_rebuild: bool = False
     ref_field: str | None = None
     ref_value: str | None = None
 
@@ -50,7 +49,6 @@ def check_flow_consistency(
             code=FlowConsistencyCode.MISSING_WORKTREE,
             reason=f"Worktree does not exist for branch '{branch}'",
             severity="critical",
-            auto_rebuild=True,
         )
 
     if branch.startswith("task/issue-") and not flow_state.get("worktree_path"):
@@ -59,14 +57,13 @@ def check_flow_consistency(
             code=FlowConsistencyCode.MISSING_RECORDED_WORKTREE,
             reason="Worktree exists but is not recorded in flow_state",
             severity="critical",
-            auto_rebuild=False,
         )
 
     for ref_field in ("plan_ref", "report_ref", "audit_ref"):
         ref_value = flow_state.get(ref_field)
         if not ref_value:
             continue
-        _display_path, exists = check_ref_exists(
+        _, exists = check_ref_exists(
             str(ref_value),
             branch,
             git_client=git_client,
@@ -77,7 +74,6 @@ def check_flow_consistency(
                 code=FlowConsistencyCode.MISSING_REF,
                 reason=f"{ref_field} file not found: {ref_value}",
                 severity="critical",
-                auto_rebuild=False,
                 ref_field=ref_field,
                 ref_value=str(ref_value),
             )

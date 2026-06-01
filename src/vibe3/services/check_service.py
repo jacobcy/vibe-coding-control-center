@@ -450,9 +450,9 @@ class CheckService(CheckRemote):
             # ref files exist
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
                 from vibe3.services.flow_consistency_check import (
-                    FlowConsistencyCode,
                     check_flow_consistency,
                 )
+                from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
                 consistency = check_flow_consistency(
                     branch,
@@ -460,19 +460,48 @@ class CheckService(CheckRemote):
                     git_client=self.git_client,
                 )
                 if consistency.needs_rebuild:
-                    suggestion = self._flow_rebuild_suggestion(task_issue, branch)
-                    if consistency.code == FlowConsistencyCode.MISSING_REF:
-                        issues.append(
-                            f"{consistency.ref_field} file not found: "
-                            f"{consistency.ref_value}. "
-                            f"Suggestion: Run '{suggestion}' to rebuild the "
-                            "flow scene."
+                    # Health check is automatic operation - must auto-rebuild
+                    # to fix inconsistent state without human intervention
+                    try:
+                        from vibe3.models.orchestration import IssueInfo
+
+                        rebuild_usecase = FlowRebuildUsecase(
+                            store=self.store,
+                            git_client=self.git_client,
+                            github_client=self.github_client,
                         )
-                    else:
+                        issue_info = IssueInfo(
+                            number=task_issue or 0,
+                            title=f"Issue {task_issue}",
+                            labels=[IssueState.READY.to_label()],
+                            state=IssueState.READY,
+                        )
+                        rebuild_usecase.rebuild_issue_flow(
+                            issue=issue_info,
+                            branch=branch,
+                            reason=f"Health check auto-rebuild: {consistency.reason}",
+                            include_remote=False,
+                            ensure_worktree=True,
+                        )
+                        logger.info(
+                            "Auto-rebuilt inconsistent flow",
+                            branch=branch,
+                            code=consistency.code.value,
+                            reason=consistency.reason,
+                        )
+                        # Rebuild succeeded, mark as valid
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    except Exception as e:
+                        # Rebuild failed - report as error
+                        logger.error(
+                            "Auto-rebuild failed",
+                            branch=branch,
+                            error=str(e),
+                        )
                         issues.append(
-                            f"{consistency.reason}. "
-                            f"Suggestion: Run '{suggestion}' to rebuild the "
-                            "flow scene."
+                            f"Flow consistency issue: {consistency.reason}. "
+                            f"Auto-rebuild failed: {e}. "
+                            f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
                         )
 
             is_valid = len(issues) == 0
@@ -482,15 +511,6 @@ class CheckService(CheckRemote):
             return CheckResult(
                 is_valid=is_valid, issues=issues, warnings=warnings, branch=branch
             )
-
-    def _flow_rebuild_suggestion(self, task_issue: int | None, branch: str) -> str:
-        if task_issue:
-            return f"vibe3 flow rebuild {task_issue} --yes"
-        if branch.startswith("task/issue-"):
-            issue_part = branch.removeprefix("task/issue-")
-            if issue_part.isdigit():
-                return f"vibe3 flow rebuild {issue_part} --yes"
-        return "vibe3 flow rebuild <issue> --yes"
 
     def verify_all_flows(
         self,

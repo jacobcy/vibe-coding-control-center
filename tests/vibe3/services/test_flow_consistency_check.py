@@ -9,8 +9,8 @@ from vibe3.services.flow_consistency_check import (
 )
 
 
-def test_missing_worktree_requires_auto_rebuild() -> None:
-    """A recorded flow with no physical worktree must be rebuilt directly."""
+def test_missing_worktree_requires_rebuild() -> None:
+    """A recorded flow with no physical worktree must be rebuilt."""
     git_client = MagicMock()
     git_client.find_worktree_path_for_branch.return_value = None
 
@@ -22,10 +22,9 @@ def test_missing_worktree_requires_auto_rebuild() -> None:
 
     assert result.needs_rebuild is True
     assert result.code == FlowConsistencyCode.MISSING_WORKTREE
-    assert result.auto_rebuild is True
 
 
-def test_missing_recorded_worktree_path_requires_manual_rebuild(
+def test_missing_recorded_worktree_path_requires_rebuild(
     tmp_path: Path,
 ) -> None:
     """A task worktree that exists but is not recorded is an inconsistent scene."""
@@ -40,10 +39,9 @@ def test_missing_recorded_worktree_path_requires_manual_rebuild(
 
     assert result.needs_rebuild is True
     assert result.code == FlowConsistencyCode.MISSING_RECORDED_WORKTREE
-    assert result.auto_rebuild is False
 
 
-def test_missing_ref_requires_manual_rebuild(tmp_path: Path) -> None:
+def test_missing_ref_requires_rebuild(tmp_path: Path) -> None:
     """Missing refs should produce a rebuild recommendation, not label resume."""
     git_client = MagicMock()
     git_client.find_worktree_path_for_branch.return_value = tmp_path
@@ -62,4 +60,3 @@ def test_missing_ref_requires_manual_rebuild(tmp_path: Path) -> None:
     assert result.needs_rebuild is True
     assert result.code == FlowConsistencyCode.MISSING_REF
     assert result.ref_field == "plan_ref"
-    assert result.auto_rebuild is False

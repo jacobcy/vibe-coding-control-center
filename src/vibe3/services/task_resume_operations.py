@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Callable
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_consistency_check import (
-    FlowConsistencyCode,
     FlowConsistencyResult,
     check_flow_consistency,
 )
@@ -94,10 +93,8 @@ class TaskResumeOperations:
                 progress_callback(issue_number, branch, step, status)
 
         consistency = self._check_flow_consistency(branch)
-        if consistency and consistency.code == FlowConsistencyCode.MISSING_WORKTREE:
-            self._rebuild_missing_worktree(issue_number, branch, reason, emit_progress)
-            return
         if consistency and consistency.needs_rebuild:
+            # Task resume is manual operation - give user clear guidance
             raise UserError(
                 f"{consistency.reason}. "
                 f"Suggestion: vibe3 flow rebuild {issue_number} --yes"
@@ -169,34 +166,3 @@ class TaskResumeOperations:
             "merge-ready": IssueState.MERGE_READY,
         }
         return valid_states.get(label_state, IssueState.CLAIMED)
-
-    def _rebuild_missing_worktree(
-        self,
-        issue_number: int,
-        branch: str | None,
-        reason: str,
-        emit_progress: Callable[[str, str], None],
-    ) -> None:
-        if not isinstance(branch, str):
-            return
-
-        from vibe3.models.orchestration import IssueInfo
-        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-
-        FlowRebuildUsecase(
-            store=self.flow_service.store,
-            git_client=self.git_client,
-            github_client=self.github_client,
-        ).rebuild_issue_flow(
-            issue=IssueInfo(
-                number=issue_number,
-                title=f"Issue {issue_number}",
-                labels=[IssueState.READY.to_label()],
-                state=IssueState.READY,
-            ),
-            branch=branch,
-            reason=f"label resume found missing worktree for branch {branch}: {reason}",
-            include_remote=True,
-            ensure_worktree=True,
-        )
-        emit_progress("missing worktree rebuilt", "done")
