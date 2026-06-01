@@ -9,7 +9,7 @@ from vibe3.exceptions import UserError
 from vibe3.services.handoff_service import HandoffService
 
 
-class _StubGitClient:
+class StubGitClient:
     def __init__(self, worktree_root: Path, git_common_dir: Path, branch: str) -> None:
         self._worktree_root = worktree_root
         self._git_common_dir = git_common_dir
@@ -25,9 +25,7 @@ class _StubGitClient:
         return str(self._worktree_root)
 
     def find_worktree_path_for_branch(self, branch: str) -> Path | None:
-        if branch == self._branch:
-            return self._worktree_root
-        return None
+        return self._worktree_root if branch == self._branch else None
 
 
 def test_record_report_rejects_temp_log_paths(tmp_path: Path) -> None:
@@ -39,7 +37,7 @@ def test_record_report_rejects_temp_log_paths(tmp_path: Path) -> None:
 
     service = HandoffService(
         store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     with pytest.raises(UserError, match="temp/logs"):
@@ -55,7 +53,7 @@ def test_record_report_rejects_shared_handoff_store_paths(tmp_path: Path) -> Non
 
     service = HandoffService(
         store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     with pytest.raises(UserError, match="shared handoff store"):
@@ -72,7 +70,7 @@ def test_record_report_accepts_worktree_relative_canonical_doc(tmp_path: Path) -
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     service.record_report("docs/reports/issue-304-report.md", actor="codex/gpt-5.4")
@@ -92,7 +90,7 @@ def test_record_indicate_writes_indicate_ref(tmp_path: Path) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     service.record_indicate("docs/indicate.md", actor="codex/gpt-5.4")
@@ -111,7 +109,7 @@ def test_record_ref_rejects_unknown_active_kind(tmp_path: Path) -> None:
 
     service = HandoffService(
         store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     with pytest.raises(UserError, match="Unsupported handoff kind: mystery"):
@@ -126,7 +124,7 @@ def test_record_ref_rejects_legacy_positional_shape(tmp_path: Path) -> None:
 
     service = HandoffService(
         store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     with pytest.raises(TypeError):
@@ -141,7 +139,7 @@ def test_record_ref_requires_keyword_verdict(tmp_path: Path) -> None:
 
     service = HandoffService(
         store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
     )
 
     with pytest.raises(TypeError):
@@ -153,7 +151,7 @@ def test_get_handoff_events_excludes_non_handoff_runtime_events(tmp_path: Path) 
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "tmux_manager_started", "orchestra:manager")
@@ -177,7 +175,7 @@ def test_get_handoff_events_applies_limit_after_handoff_filter(tmp_path: Path) -
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="oldest handoff")
@@ -193,16 +191,12 @@ def test_get_handoff_events_applies_limit_after_handoff_filter(tmp_path: Path) -
 def test_get_handoff_events_includes_both_active_and_passive_events(
     tmp_path: Path,
 ) -> None:
-    """Both active (handoff_*) and passive (*_recorded) events should be shown.
-
-    Passive events serve as fallback records when active writes fail,
-    so they should not be filtered out even when active events exist.
-    """
+    """Both active and passive events should be shown."""
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "plan_recorded", "codex/gpt-5.4", detail="auto plan")
@@ -210,7 +204,6 @@ def test_get_handoff_events_includes_both_active_and_passive_events(
 
     events = service.get_handoff_events(branch)
 
-    # Both events should be present (order: newest first)
     assert [event.event_type for event in events] == ["handoff_plan", "plan_recorded"]
 
 
@@ -221,7 +214,7 @@ def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "report_recorded", "codex/gpt-5.4", detail="auto run")
@@ -234,15 +227,14 @@ def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
 def test_get_success_handoff_events_filters_passive_only(
     tmp_path: Path,
 ) -> None:
-    """Verify get_success_handoff_events excludes *_recorded passive fallbacks."""
+    """Verify get_success_handoff_events excludes passive fallbacks."""
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
-    # Add a mix of event types
     store.add_event(branch, "plan_recorded", "codex/gpt-5.4", detail="auto plan")
     store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="plan ready")
     store.add_event(branch, "handoff_indicate", "manager", detail="manager indicate")
@@ -253,10 +245,8 @@ def test_get_success_handoff_events_filters_passive_only(
     success_events = service.get_success_handoff_events(branch)
     event_types = {e.event_type for e in success_events}
 
-    # Only success handoff events should be present (exclude passive *_recorded)
     assert "plan_recorded" not in event_types
     assert "audit_recorded" not in event_types
-    # Active events should be present
     assert "handoff_plan" in event_types
     assert "handoff_audit" in event_types
     assert "handoff_indicate" in event_types
@@ -269,7 +259,7 @@ def test_get_success_handoff_events_applies_limit(tmp_path: Path) -> None:
     branch = "task/issue-304"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="oldest")
@@ -277,9 +267,7 @@ def test_get_success_handoff_events_applies_limit(tmp_path: Path) -> None:
     store.add_event(branch, "handoff_audit", "codex/gpt-5.4", detail="newest")
 
     events = service.get_success_handoff_events(branch, limit=2)
-
     assert len(events) == 2
-    # Should return newest first (audit, report)
     assert events[0].event_type == "handoff_audit"
     assert events[1].event_type == "handoff_report"
 
@@ -290,22 +278,18 @@ def test_success_events_includes_legacy_handoff_run(tmp_path: Path) -> None:
     branch = "task/issue-581"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "handoff_run", "codex/gpt-5.4", detail="legacy report")
 
     events = service.get_success_handoff_events(branch)
-
     assert len(events) == 1
     assert events[0].event_type == "handoff_run"
 
 
 class TestHandoffFailureDetection:
-    """Tests for handoff failure record detection."""
-
     def test_get_handoff_events_finds_blocker_kind(self, tmp_path: Path) -> None:
-        """get_handoff_events finds handoff_indicate events with blocked detail."""
         worktree_root = tmp_path / "wt"
         git_common = tmp_path / ".git"
         worktree_root.mkdir()
@@ -314,10 +298,9 @@ class TestHandoffFailureDetection:
         store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
         service = HandoffService(
             store=store,
-            git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+            git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
         )
 
-        # Create a handoff_indicate event with "blocked" in detail
         store.add_event(
             "task/issue-304",
             "handoff_indicate",
@@ -331,7 +314,6 @@ class TestHandoffFailureDetection:
         assert "blocked" in events[0].detail
 
     def test_success_events_exclude_blocker_events(self, tmp_path: Path) -> None:
-        """get_success_handoff_events excludes non-success event types."""
         worktree_root = tmp_path / "wt"
         git_common = tmp_path / ".git"
         worktree_root.mkdir()
@@ -340,37 +322,26 @@ class TestHandoffFailureDetection:
         store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
         service = HandoffService(
             store=store,
-            git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+            git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
         )
 
-        # Mix of success and non-success events
         store.add_event(
-            "task/issue-304",
-            "handoff_plan",
-            "planner",
-            detail="Plan created",
+            "task/issue-304", "handoff_plan", "planner", detail="Plan created"
+        )
+        store.add_event(
+            "task/issue-304", "state_unchanged", "executor", detail="State unchanged"
         )
         store.add_event(
             "task/issue-304",
-            "state_unchanged",  # Not in _SUCCESS_HANDOFF_EVENT_TYPES
-            "executor",
-            detail="State unchanged",
-        )
-        store.add_event(
-            "task/issue-304",
-            "transition_count_exceeded",  # Not in _SUCCESS_HANDOFF_EVENT_TYPES
+            "transition_count_exceeded",
             "executor",
             detail="Loop detected",
         )
         store.add_event(
-            "task/issue-304",
-            "handoff_report",
-            "executor",
-            detail="Report created",
+            "task/issue-304", "handoff_report", "executor", detail="Report created"
         )
 
         success_events = service.get_success_handoff_events("task/issue-304")
-        # Should only include handoff_plan and handoff_report
         assert len(success_events) == 2
         event_types = [e.event_type for e in success_events]
         assert "handoff_plan" in event_types
@@ -385,7 +356,7 @@ def test_success_events_includes_next_step_set(tmp_path: Path) -> None:
     branch = "task/issue-894"
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+        git_client=StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
     store.add_event(branch, "next_step_set", "executor", detail="Next step test")
@@ -410,30 +381,18 @@ def test_record_ref_skips_handoff_append_event(tmp_path: Path) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(
         store=store,
-        git_client=_StubGitClient(worktree_root, git_common, "task/issue-1678"),
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-1678"),
     )
 
-    # Mock storage methods
-    service.storage.ensure_current_handoff = MagicMock(
-        return_value=git_common
-        / "vibe3"
-        / "handoff"
-        / "task-issue-1678-abc"
-        / "current.md"
+    handoff_file = (
+        git_common / "vibe3" / "handoff" / "task-issue-1678-abc" / "current.md"
     )
-    service.storage.append_current_handoff = MagicMock(
-        return_value=git_common
-        / "vibe3"
-        / "handoff"
-        / "task-issue-1678-abc"
-        / "current.md"
-    )
+    service.storage.ensure_current_handoff = MagicMock(return_value=handoff_file)
+    service.storage.append_current_handoff = MagicMock(return_value=handoff_file)
     service.storage.normalize_ref_value = MagicMock(return_value="docs/plans/test.md")
 
-    # Call _record_ref
     service._record_ref("plan", "docs/plans/test.md", actor="planner")
 
-    # Verify handoff_plan event was recorded
     events = service.get_handoff_events("task/issue-1678")
     handoff_plan_events = [e for e in events if e.event_type == "handoff_plan"]
     assert len(handoff_plan_events) == 1
@@ -441,9 +400,6 @@ def test_record_ref_skips_handoff_append_event(tmp_path: Path) -> None:
         handoff_plan_events[0].detail == "Recorded plan reference: docs/plans/test.md"
     )
 
-    # Verify handoff_append event was NOT recorded (skip_event=True worked)
     handoff_append_events = [e for e in events if e.event_type == "handoff_append"]
     assert len(handoff_append_events) == 0
-
-    # Verify handoff file was still written (storage.append_current_handoff called)
     service.storage.append_current_handoff.assert_called_once()

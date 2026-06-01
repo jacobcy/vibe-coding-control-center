@@ -1,8 +1,4 @@
-"""Tests for async dispatch intent handlers.
-
-Verifies that dispatch handlers delegate to role request builders
-and ExecutionCoordinator without hand-crafting CLI commands.
-"""
+"""Tests for async dispatch intent handlers."""
 
 from unittest.mock import MagicMock, patch
 
@@ -19,7 +15,7 @@ def _make_mock_request(
     issue_number: int,
     **overrides: object,
 ) -> ExecutionRequest:
-    """Create a minimal ExecutionRequest for testing."""
+    """Create minimal ExecutionRequest for testing."""
     defaults = {
         "role": role,
         "target_branch": f"task/issue-{issue_number}",
@@ -32,8 +28,6 @@ def _make_mock_request(
 
 
 class TestPlannerDispatchHandler:
-    """Planner dispatch should delegate to build_plan_request + coordinator."""
-
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
@@ -52,21 +46,17 @@ class TestPlannerDispatchHandler:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        # Mock issue loading
         mock_issue = MagicMock(number=42, title="Test issue")
         mock_load_issue.return_value = mock_issue
 
-        # Mock get_store context manager
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = None
         mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
         mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
-        # Mock request builder
         expected_request = _make_mock_request("planner", 42)
         mock_build_request.return_value = expected_request
 
-        # Mock coordinator
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
             launched=True,
@@ -83,14 +73,12 @@ class TestPlannerDispatchHandler:
             )
         )
 
-        # Verify request builder was called with config, issue, and branch
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
-        assert call_kwargs[0][0] is config  # first positional = config
-        assert call_kwargs[0][1].number == 42  # second positional = issue
+        assert call_kwargs[0][0] is config
+        assert call_kwargs[0][1].number == 42
         assert call_kwargs[1].get("branch") == "task/issue-42"
 
-        # Verify coordinator dispatched the request
         mock_coordinator.dispatch_execution.assert_called_once()
         request = mock_coordinator.dispatch_execution.call_args[0][0]
         assert request.role == "planner"
@@ -215,10 +203,7 @@ class TestPlannerDispatchHandler:
         mock_build_request: MagicMock,
         mock_record_error: MagicMock,
     ) -> None:
-        """Verify launch_failed does not trigger error recording.
-
-        (runner already logged)
-        """
+        """Verify launch_failed does not trigger error recording."""
         from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
@@ -252,12 +237,10 @@ class TestPlannerDispatchHandler:
             )
         )
 
-        # Should NOT record error for launch_failed
         mock_record_error.assert_not_called()
 
 
 class TestExecutorDispatchHandler:
-    """Executor dispatch should delegate to build_run_request + coordinator."""
 
     @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
@@ -280,7 +263,6 @@ class TestExecutorDispatchHandler:
         mock_issue = MagicMock(number=42, title="Test issue")
         mock_load_issue.return_value = mock_issue
 
-        # Mock flow_state with plan_ref (normal implementation path)
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
         mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
@@ -297,7 +279,6 @@ class TestExecutorDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        # Event no longer carries plan_ref; handler reads from flow_state
         handle_executor_dispatch_intent(
             ExecutorDispatchIntent(
                 issue_number=42,
@@ -306,11 +287,8 @@ class TestExecutorDispatchHandler:
             )
         )
 
-        # Verify handler read flow_state
         mock_store.get_flow_state.assert_called_with("task/issue-42")
 
-        # Verify request builder was called with plan_ref from flow_state
-        # and commit_mode=False (trigger_state is in-progress, not merge-ready)
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"
@@ -342,9 +320,7 @@ class TestExecutorDispatchHandler:
         mock_load_issue.return_value = mock_issue
 
         mock_store = MagicMock()
-        mock_store.get_flow_state.return_value = {
-            "plan_ref": "plan.md",
-        }
+        mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
         mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
         mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
@@ -359,7 +335,6 @@ class TestExecutorDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        # merge-ready trigger_state drives commit_mode
         handle_executor_dispatch_intent(
             ExecutorDispatchIntent(
                 issue_number=42,
@@ -373,7 +348,6 @@ class TestExecutorDispatchHandler:
 
 
 class TestReviewerDispatchHandler:
-    """Reviewer dispatch should delegate to build_review_request + coordinator."""
 
     @patch("vibe3.domain.handlers.dispatch.build_review_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
@@ -396,7 +370,6 @@ class TestReviewerDispatchHandler:
         mock_issue = MagicMock(number=42, title="Test issue")
         mock_load_issue.return_value = mock_issue
 
-        # Mock flow_state with report_ref
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"report_ref": "report.md"}
         mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
@@ -413,7 +386,6 @@ class TestReviewerDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        # Event no longer carries report_ref; handler reads from flow_state
         handle_reviewer_dispatch_intent(
             ReviewerDispatchIntent(
                 issue_number=42,
@@ -422,10 +394,8 @@ class TestReviewerDispatchHandler:
             )
         )
 
-        # Verify handler read flow_state
         mock_store.get_flow_state.assert_called_with("task/issue-42")
 
-        # Verify request builder was called with report_ref from flow_state
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"
