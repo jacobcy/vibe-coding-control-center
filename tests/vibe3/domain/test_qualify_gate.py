@@ -315,10 +315,10 @@ class TestRunQualifyGate:
                     return_value=IssueState.IN_PROGRESS,
                 ):
                     with patch(
-                        "vibe3.services.blocked_state_service.BlockedStateService"
-                    ) as mock_blocked_cls:
-                        mock_blocked_instance = MagicMock()
-                        mock_blocked_cls.return_value = mock_blocked_instance
+                        "vibe3.domain.qualify_gate.TaskResumeOperations"
+                    ) as mock_operations_cls:
+                        mock_operations = MagicMock()
+                        mock_operations_cls.return_value = mock_operations
 
                         result = qualify_gate_service.run_qualify_gate(
                             issue=sample_issue,
@@ -329,12 +329,10 @@ class TestRunQualifyGate:
                         )
 
                         assert result == IssueState.IN_PROGRESS
-                        mock_blocked_instance.unblock.assert_called_once_with(
-                            branch="task/issue-123-test",
-                            target_state=IssueState.IN_PROGRESS,
-                            actor="orchestra:qualify",
-                            issue_number=sample_issue.number,
-                        )
+                        mock_operations.reset_issue_to_ready.assert_called_once()
+                        call = mock_operations.reset_issue_to_ready.call_args.kwargs
+                        assert call["issue_number"] == sample_issue.number
+                        assert call["label_state"] == ""
 
     def test_unblock_with_stale_local_cache_without_blocked_label(
         self, qualify_gate_service, sample_issue, mock_store, mock_github
@@ -379,11 +377,12 @@ class TestRunQualifyGate:
                     "vibe3.domain.qualify_gate.infer_resume_label",
                     return_value=IssueState.IN_PROGRESS,
                 ):
-                    mock_label_port = Mock()
                     with patch(
-                        "vibe3.services.label_service.LabelService",
-                        return_value=mock_label_port,
-                    ):
+                        "vibe3.domain.qualify_gate.TaskResumeOperations"
+                    ) as mock_operations_cls:
+                        mock_operations = Mock()
+                        mock_operations_cls.return_value = mock_operations
+
                         result = qualify_gate_service.run_qualify_gate(
                             issue=sample_issue,
                             branch="task/issue-123-test",
@@ -393,16 +392,6 @@ class TestRunQualifyGate:
                         )
 
                         assert result == IssueState.IN_PROGRESS
-                        mock_store.update_flow_state.assert_called_once_with(
-                            "task/issue-123-test",
-                            flow_status="active",
-                            blocked_reason=None,
-                            failed_reason=None,  # Also cleared for consistency
-                            blocked_by_issue=None,
-                            latest_actor="orchestra:qualify",
-                        )
-                        mock_store.add_event.assert_called_once()
-                        mock_label_port.remove_issue_label.assert_not_called()
 
 
 class TestQualifyBlockedIssue:
@@ -500,3 +489,43 @@ class TestIsDependencySatisfied:
 
         assert result is None
         mock_store.soft_delete_flow.assert_not_called()
+
+
+def test_auto_resume_blocked_uses_task_resume_operations() -> None:
+    """QualifyGate auto-resume must share task resume --label auto semantics."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.domain.qualify_gate import QualifyGateService
+    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models.orchestration import IssueState
+
+    service = QualifyGateService(
+        OrchestraConfig(repo="owner/repo"),
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+    )
+    service._store.get_flow_state.return_value = {
+        "branch": "task/issue-303",
+        "flow_slug": "issue-303",
+        "flow_status": "blocked",
+        "latest_actor": "test",
+        "task_issue_number": 303,
+    }
+
+    with patch("vibe3.domain.qualify_gate.TaskResumeOperations") as operations_cls:
+        operations = MagicMock()
+        operations_cls.return_value = operations
+
+        result = service._auto_resume_blocked(
+            issue_number=303,
+            branch="task/issue-303",
+            labels=["state/blocked"],
+            flow_state=service._store.get_flow_state.return_value,
+        )
+
+        operations.reset_issue_to_ready.assert_called_once()
+        call = operations.reset_issue_to_ready.call_args.kwargs
+        assert call["issue_number"] == 303
+        assert call["label_state"] == ""
+        assert result != IssueState.BLOCKED
