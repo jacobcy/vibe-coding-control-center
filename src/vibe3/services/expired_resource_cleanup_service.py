@@ -18,9 +18,9 @@ from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.clients.protocols import GitHubClientProtocol
 
 if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.pr_service import PRService
 
 
@@ -514,7 +514,7 @@ class ExpiredResourceCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()

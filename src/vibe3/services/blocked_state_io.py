@@ -20,7 +20,7 @@ from vibe3.services.issue_body_service import merge_projection, parse_projection
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class BlockedStateIO:

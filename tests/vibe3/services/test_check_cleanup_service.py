@@ -104,7 +104,7 @@ def test_clean_residual_branches_logs_skipped_branches() -> None:
     service = CheckCleanupService(store=store, git_client=git_client)
 
     with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
+        patch("vibe3.agents.CodeagentBackend"),
         patch("vibe3.environment.session_registry.SessionRegistryService") as registry,
     ):
         registry.return_value._store.list_live_runtime_sessions.return_value = [
@@ -132,7 +132,7 @@ def test_get_branches_with_live_sessions_queries_once() -> None:
     service = CheckCleanupService(store=store, git_client=git_client)
 
     with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
+        patch("vibe3.agents.CodeagentBackend"),
         patch(
             "vibe3.environment.session_registry.SessionRegistryService"
         ) as registry_cls,

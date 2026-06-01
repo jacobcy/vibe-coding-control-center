@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
-    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.pr_service import PRService
@@ -58,8 +58,8 @@ class FlowCleanupService:
             flow_service: Service for flow lifecycle
             issue_flow_service: Service for issue-flow mapping
         """
+        from vibe3.clients import SQLiteClient
         from vibe3.clients.git_client import GitClient
-        from vibe3.clients.sqlite_client import SQLiteClient
 
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
@@ -328,7 +328,7 @@ class FlowCleanupService:
         # DEFENSIVE LAYER 2: Query runtime_session table for live sessions
         # This catches race conditions where sessions started after pre-filter
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
             backend = CodeagentBackend()

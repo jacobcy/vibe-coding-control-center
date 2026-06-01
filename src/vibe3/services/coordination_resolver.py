@@ -15,7 +15,7 @@ from vibe3.observability.degraded_mode import (
 from vibe3.services.flow_status_resolver import FlowStatusResolver
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class CoordinationResolver:
