@@ -104,7 +104,8 @@ new → active ↔ blocked
 **清理机制**：
 
 - **被动清理**：`vibe3 check --clean-branch` 处理 aborted flows
-- **主动清理**：`task resume` 人类重置权限
+- **主动恢复**：`task resume` 清除 blocked 状态（不删除现场）
+- **主动重建**：`flow rebuild` 显式删除并重建 flow scene
 - **自动清理**：FailedGate 检测并清理无效 FAILED 标签
 
 ### 2.2 终端状态处理
@@ -443,11 +444,17 @@ flow_service.delete_flow(branch, force=True)  # 物理删除
 ### 6.3 Issue Label 清理
 
 **主动恢复**（task resume）：
-```python
-# 先恢复 label，再清理 flow
-resume_blocked_issue_to_ready(...)
-reset_task_scene(...)
-```
+
+- `vibe3 task resume <issue>` 等价于 `vibe3 task resume <issue> --label auto`。
+- `task resume` 只负责清除 blocked cache/body/label，并按 flow refs 推断恢复 label。
+- `task resume` 不删除 worktree、branch 或 flow record。
+- 若 label-auto 恢复发现 recorded worktree/ref 场景已经丢失，应委托 explicit rebuild path，而不是在 resume 内静默继续。
+
+**主动重建**（flow rebuild）：
+
+- `vibe3 flow rebuild <issue>` 是唯一公共 destructive rebuild 入口。
+- rebuild 使用 hard delete 清理旧 flow/worktree/branch scene。
+- rebuild 完成后重新 bootstrap flow/worktree，append rebuild handoff event，然后调用 label-auto resume 清除 blocked。
 
 **被动清理**（check --clean-branch）：
 ```python
@@ -500,29 +507,40 @@ PR merged
   └─ flow 记录: preserved ✅
 ```
 
-### 7.2 中止后重建
+### 7.2 阻塞后恢复
 
 ```
-Issue #456 (state/ready)
-  ↓ Orchestra 派发
-Manager 创建 flow task/issue-456
+Issue #456 (state/blocked)
   ↓ Agent 执行失败
 Manager 标记 blocked
   ├─ flow.blocked_reason: "Agent error..."
   └─ issue label: state/blocked
-  ↓ 用户决定放弃现场
+  ↓ 用户决定恢复
 vibe3 task resume 456
-  ├─ resume_issue(#456, to_state=READY)
-  └─ reset_task_scene(task/issue-456)
-      ├─ 删除 worktree
-      ├─ 删除 branch
-      └─ 软删除 flow 记录 ✅
-  ↓ Orchestra 重新派发
-Manager 创建新 flow task/issue-456
-  └─ 全新开始
+  ├─ 清除 blocked_reason
+  ├─ 推断恢复目标 label (auto)
+  └─ issue label: state/blocked → state/in-progress ✅
+  ↓ 继续执行
+Agent 恢复运行
+  └─ flow 现场保持完整
 ```
 
-### 7.3 被动清理孤儿 Flow
+### 7.3 阻塞后重建
+
+```
+Issue #789 (state/blocked)
+  ↓ 用户决定放弃现场并重建
+vibe3 flow rebuild 789
+  ├─ hard cleanup: 删除 worktree/branch/flow
+  ├─ bootstrap: 创建新 flow/worktree
+  ├─ append rebuild handoff event
+  └─ label-auto resume: 清除 blocked
+  ↓ 全新开始
+Manager 重新派发
+  └─ Issue #789 → state/ready
+```
+
+### 7.4 被动清理孤儿 Flow
 
 ```
 Issue #789 (state/blocked)
@@ -536,7 +554,7 @@ Issue #789 (state/blocked)
       └─ issue label: state/blocked → state/ready ✅
 ```
 
-### 7.4 软删除恢复流程
+### 7.5 软删除恢复流程
 
 ```
 Issue #999 (state/blocked)
@@ -578,22 +596,28 @@ vibe3 flow show task/issue-999
    - 使用 `force=True` 绕过状态机规则
    - `from_state` 为语义标签（不验证实际状态）
 
-3. **主动清理**（task resume）：
-   - 人类最高权限，可纠正任何非 DONE 状态
-   - `resume_kind` 动态识别：failed/blocked/all
-   - `resume_kind="all"` 支持：`state != DONE` 的任意状态重置
+3. **主动恢复**（task resume）：
+   - 清除 blocked 状态，不删除现场
+   - 推断恢复目标 label（auto 模式）
    - 人类可选择手动更改 label 或使用 task resume
+
+4. **主动重建**（flow rebuild）：
+   - 显式 destructive 重建入口
+   - hard delete + re-bootstrap
+   - 需要明确意图，不作为常规恢复路径
 
 **设计理由**：
 - 状态机规则约束 Agent 自动化流程，防止机器越权
 - 人类拥有最终决策权，不受规则约束
 - 被动清理自动化执行，无需人类介入决策
+- 恢复优先尝试保留现场，重建显式声明放弃现场
 
 ### 8.3 测试覆盖
 
 必须覆盖以下场景：
 - 正常完成（PR merged）→ 清理
-- 中止重建（task resume）→ 清理
+- 阻塞后恢复（task resume）→ 清除 blocked 状态
+- 阻塞后重建（flow rebuild）→ hard delete + re-bootstrap
 - 被动清理（check --clean-branch）→ 恢复 labels
 - 依赖阻塞 → 自动恢复
 - FailedGate 自动清理无效 FAILED 标签

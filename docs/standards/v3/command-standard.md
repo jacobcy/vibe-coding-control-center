@@ -271,8 +271,26 @@ vibe3 task show [<issue>]
 vibe3 task status [--all] [--json]
 
 # Resume blocked tasks
-vibe3 task resume [<issue>] [--blocked] [--yes]
+vibe3 task resume [<issue>] [--blocked] [--label auto|ready|claimed|in-progress|handoff|review|merge-ready] [--yes]
 ```
+
+约束：
+
+- 省略 `--label` 等价于 `--label auto`。
+- `task resume` 只恢复 blocked 状态，不删除 worktree、branch 或 flow record。
+- destructive rebuild 必须使用 `vibe3 flow rebuild <issue>`。
+
+### 7.5 `flow rebuild`
+
+```bash
+vibe3 flow rebuild <issue> [--keep-remote] [--no-worktree] [--yes]
+```
+
+约束：
+
+- 这是 destructive 操作，会 hard delete 旧 flow scene。
+- 操作顺序：hard cleanup -> bootstrap flow/worktree -> append rebuild handoff -> label-auto resume。
+- 不能作为普通 blocked 恢复入口使用；blocked 恢复优先使用 `task resume`。
 
 ### 7.5 `flow show` / `flow status`
 
