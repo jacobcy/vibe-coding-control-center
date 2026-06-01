@@ -219,44 +219,35 @@ def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
     assert result == {"branch": "task/issue-777"}
 
 
-def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
+def test_rebuild_stale_issue_flow_delegates_to_flow_rebuild_usecase() -> None:
     config = load_orchestra_config()
     github = MagicMock()
-    # No PR found via list_prs_for_branch, triggers cleanup + bootstrap
     github.list_prs_for_branch = MagicMock(return_value=[])
     service = FlowOrchestratorService(
         config, store=MagicMock(), git=MagicMock(), github=github
     )
     issue = IssueInfo(number=320, title="Rebuild lifecycle")
 
-    with patch(
-        "vibe3.services.flow_orchestrator_service.FlowCleanupService"
-    ) as cleanup_cls:
-        cleanup = cleanup_cls.return_value
-        cleanup.cleanup_flow_scene.return_value = {
-            "worktree": True,
-            "local_branch": True,
-            "remote_branch": True,
-            "handoff": True,
-            "flow_record": True,
-        }
-        with patch.object(
-            service,
-            "bootstrap_issue_flow",
-            return_value={"branch": "task/issue-320"},
-        ) as mock_bootstrap:
-            result = service.rebuild_stale_issue_flow(
-                issue, branch="task/issue-320", slug="issue-320"
-            )
+    with patch("vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase") as rebuild_cls:
+        rebuild = rebuild_cls.return_value
+        rebuild.rebuild_issue_flow.return_value = {"branch": "task/issue-320"}
 
-    cleanup.cleanup_flow_scene.assert_called_once_with(
-        "task/issue-320",
+        result = service.rebuild_stale_issue_flow(
+            issue,
+            branch="task/issue-320",
+            slug="custom-320",
+            source="check:stale-ready",
+        )
+
+    rebuild.rebuild_issue_flow.assert_called_once_with(
+        issue=issue,
+        branch="task/issue-320",
+        slug="custom-320",
+        source="check:stale-ready",
+        reason="stale flow rebuild",
         include_remote=False,
-        terminate_sessions=False,
-        keep_flow_record=True,
-        force_delete=False,
+        ensure_worktree=False,
     )
-    mock_bootstrap.assert_called_once()
     assert result == {"branch": "task/issue-320"}
 
 

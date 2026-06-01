@@ -6,9 +6,12 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_context_loader import load_issue_info
 from vibe3.utils.issue_ref import try_parse_issue_number
 
 
@@ -126,6 +129,52 @@ def blocked(
     typer.echo(msg)
 
 
+def rebuild(
+    issue_number: Annotated[int, typer.Argument(help="Issue number to rebuild")],
+    keep_remote: Annotated[
+        bool,
+        typer.Option("--keep-remote", help="Keep remote branch during rebuild"),
+    ] = False,
+    no_worktree: Annotated[
+        bool,
+        typer.Option("--no-worktree", help="Recreate flow without creating worktree"),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Execute rebuild (default dry-run)"),
+    ] = False,
+) -> None:
+    """Hard rebuild an issue flow scene.
+
+    This deletes the old task flow/worktree/branch scene, recreates the flow,
+    appends a rebuild handoff event, and clears blocked state through the
+    label-auto resume path.
+    """
+    branch = (
+        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
+    )
+    if not yes:
+        typer.echo(
+            "[dry-run mode] Would hard rebuild "
+            f"issue #{issue_number} at branch {branch}. Use --yes to execute."
+        )
+        return
+
+    from vibe3.clients.github_client import GitHubClient
+
+    config = load_orchestra_config()
+    issue = load_issue_info(issue_number, config=config, github=GitHubClient())
+    result = FlowRebuildUsecase().rebuild_issue_flow(
+        issue=issue,
+        branch=branch,
+        reason="manual flow rebuild",
+        include_remote=not keep_remote,
+        ensure_worktree=not no_worktree,
+    )
+    typer.echo(f"Rebuilt flow for issue #{issue_number}: {result}")
+
+
 def register_lifecycle_commands(app: typer.Typer) -> None:
     """Register flow lifecycle commands."""
     app.command(name="blocked")(blocked)
+    app.command(name="rebuild")(rebuild)

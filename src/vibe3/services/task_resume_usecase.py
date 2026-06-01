@@ -10,10 +10,8 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
 
-from vibe3.agents import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
@@ -79,12 +77,10 @@ class TaskResumeUsecase:
         flows: list[FlowStatusResponse] | None = None,
         stale_flows: list[FlowStatusResponse] | None = None,
         repo: str | None = None,
-        candidate_mode: str = "resumable",
-        label_state: str | None = None,
-        remote: bool = False,
+        label_state: str = "",
         progress_callback: ProgressCallback | None = None,
     ) -> dict[str, Any]:
-        """Resume failed or blocked issues.
+        """Resume blocked issues.
 
         Args:
             issue_numbers: Optional list of specific issue numbers to resume
@@ -93,11 +89,9 @@ class TaskResumeUsecase:
             flows: Active flow status responses
             stale_flows: Stale flow status responses
             repo: Repository (owner/repo format, optional)
-            candidate_mode: Candidate selection mode ("resumable" or "all_task")
-            label_state: Optional state to restore (None=delete worktree,
-                "handoff"/"ready"=keep worktree)
-            remote: If True, keep remote branch (do not delete origin).
-                If False, delete remote branch (default).
+            label_state: State to restore. Empty string means infer automatically.
+                Task resume preserves worktree/branch; destructive rebuild belongs
+                to FlowRebuildUsecase.
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
@@ -109,14 +103,11 @@ class TaskResumeUsecase:
                 - requested: List of requested issue numbers (if provided)
                 - candidates: List of resumable candidates (dry-run only)
         """
-        if candidate_mode == "all_task":
-            candidates = self.candidates.build_all_task_candidates(flows or [])
-        else:
-            candidates = self.status_service.fetch_resume_candidates(
-                flows=flows or [], stale_flows=stale_flows or []
-            )
+        candidates = self.status_service.fetch_resume_candidates(
+            flows=flows or [], stale_flows=stale_flows or []
+        )
 
-        if issue_numbers is not None and candidate_mode != "all_task":
+        if issue_numbers is not None:
             candidates = self.candidates.merge_explicit_issue_candidates(
                 issue_numbers=issue_numbers,
                 candidates=candidates,
@@ -133,12 +124,6 @@ class TaskResumeUsecase:
             "skipped": [],
             "requested": issue_numbers if issue_numbers is not None else [],
         }
-        if candidate_mode == "all_task" and issue_numbers is None:
-            result["requested"] = [
-                num
-                for candidate in candidates
-                if isinstance((num := candidate.get("number")), int)
-            ]
 
         # Add skipped for requested issues not in candidates
         if issue_numbers is not None:
@@ -175,37 +160,6 @@ class TaskResumeUsecase:
                 branch=branch,
             ).info("Processing resume candidate")
 
-            if resume_kind == "all":
-                worktree_path: str | None = None
-                has_live_sessions: bool | None = None
-                if isinstance(branch, str):
-                    resolved_path = self.git_client.find_worktree_path_for_branch(
-                        branch
-                    )
-                    worktree_path = (
-                        str(resolved_path) if resolved_path is not None else None
-                    )
-                    backend = CodeagentBackend()
-                    registry = SessionRegistryService(
-                        store=self.flow_service.store, backend=backend
-                    )
-                    live_sessions = registry.get_truly_live_sessions_for_branch(branch)
-                    has_live_sessions = len(live_sessions) > 0
-
-                skip_reason = self.candidates.maybe_skip_all_task_candidate(
-                    issue_number=issue_number,
-                    flow=flow,
-                    candidate_state=candidate.get("state"),
-                    worktree_path=worktree_path,
-                    has_live_sessions=has_live_sessions,
-                    label_state=label_state,
-                )
-                if skip_reason is not None:
-                    result["skipped"].append(
-                        {"number": issue_number, "reason": skip_reason}
-                    )
-                    continue
-
             if not self.candidates.verify_issue_state_for_resume(
                 issue_number, resume_kind, repo
             ):
@@ -225,16 +179,8 @@ class TaskResumeUsecase:
                     repo=repo,
                     reason=reason,
                     label_state=label_state,
-                    remote=remote,
                     progress_callback=progress_callback,
                 )
-
-                if label_state is None:
-                    self._comment_resume_success(
-                        issue_number=issue_number,
-                        repo=repo,
-                        reason=reason,
-                    )
 
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
@@ -257,55 +203,3 @@ class TaskResumeUsecase:
                 )
 
         return result
-
-    def _comment_resume_success(
-        self,
-        *,
-        issue_number: int,
-        repo: str | None,
-        reason: str,
-    ) -> None:
-        """Record resume success without affecting command outcome."""
-        try:
-            comment_body = (
-                "[resume] 已重置 task scene，回到 state/ready。\n\n"
-                "后续会按标准 dispatcher/manager 路径重新创建 worktree 并执行。"
-            )
-            normalized_reason = reason.strip()
-            if normalized_reason:
-                comment_body += f"\n\n原因:{normalized_reason}"
-
-            issue_payload = self.github_client.view_issue(issue_number, repo=repo)
-            if isinstance(issue_payload, dict) and self._latest_comment_matches(
-                issue_payload, comment_body
-            ):
-                return
-
-            self.github_client.add_comment(
-                issue_number,
-                comment_body,
-                repo=repo,
-            )
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="comment_all_resume_success",
-                issue_number=issue_number,
-            ).warning(f"Failed to add all-mode resume comment: {exc}")
-
-    def _latest_comment_matches(
-        self,
-        issue_payload: dict[str, object],
-        comment_body: str,
-    ) -> bool:
-        """Return True when the latest issue comment is the same comment."""
-        comments = issue_payload.get("comments")
-        if not isinstance(comments, list):
-            return False
-        normalized_comment = comment_body.strip()
-        for comment in reversed(comments):
-            if not isinstance(comment, dict):
-                continue
-            body = comment.get("body")
-            return isinstance(body, str) and body.strip() == normalized_comment
-        return False

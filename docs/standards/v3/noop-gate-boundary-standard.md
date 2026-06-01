@@ -286,26 +286,28 @@ No-Op Gate (`codeagent_runner.execute_sync`)
   ↓
 block 或 通过
   ↓ (block 时)
-人工判断 + resume task
-  ├── resume (不带 --label) → 完整重建
-  │   删除 worktree / branch / flow / handoff
-  │   issue 回到 state/ready，manager 从零开始
-  ├── resume --label → 最小修复
-  │   只修 label + 清 reason，保留 flow / worktree / refs
-  │   issue 回到 state/handoff 或 state/ready
-  │   手动指派给原 agent 或下一个 manager
+人工判断 + 恢复操作
+  ├── task resume → 恢复 blocked 状态
+  │   清除 blocked_reason，推断恢复 label
+  │   保留 flow / worktree / refs
+  │   issue 回到推断的 state (auto label)
+  ├── flow rebuild → 显式重建
+  │   删除 worktree / branch / flow
+  │   重新 bootstrap，issue 回到 state/ready
   ↓
 Re-dispatch
 ```
 
-### 7.2 两种 resume 路径的设计意图
+### 7.2 两种恢复路径的设计意图
 
 | 路径 | flow record | worktree / branch | 适用场景 |
 |------|------------|-------------------|---------|
-| `resume` (不带 `--label`) | 删除 | 删除 | 完整重建，从 scratch 开始 |
-| `resume --label` | 保留（只清 reason） | 保留 | agent 做了工作但 label 没改对 |
+| `task resume` | 保留（只清 reason） | 保留 | agent 做了工作但遇到 blocked 状态 |
+| `flow rebuild` | 删除并重建 | 删除并重建 | 需要从 scratch 重新开始 |
 
-`--label` 的场景：agent 实际完成了工作（产出了 ref、代码等），但没能正确修改 issue label，导致被 no-op gate block。此时 flow record 和 worktree 里的工作成果都是有效的，只需要修正 label 就能让 agent 继续推进。
+`task resume` 的场景：agent 遇到了 blocked 状态（如依赖未满足、临时错误等），但 flow record 和 worktree 里的工作成果仍然有效，只需清除 blocked 状态并恢复 label 就能让 agent 继续推进。
+
+`flow rebuild` 的场景：现场已经完全不可用或需要放弃，需要显式删除所有资源并重新开始。
 
 不带 `--label` 的场景：agent 的整个执行现场有问题（分支创建失败、执行报错、工作产出全废），需要从零开始。删除 flow record 防止 stale 数据被下游 dispatch 捡起。
 

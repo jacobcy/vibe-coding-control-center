@@ -6,7 +6,8 @@ This service provides complete cleanup of flow scenes including:
 - Handoff cleanup
 - Flow record deletion
 
-Used by both `task resume` and `check --clean-branch` to ensure consistent behavior.
+Used by terminal cleanup and explicit rebuild paths. `task resume` is
+non-destructive and does not call this service.
 """
 
 from __future__ import annotations

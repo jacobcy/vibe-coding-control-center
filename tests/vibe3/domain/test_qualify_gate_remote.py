@@ -532,11 +532,12 @@ class TestE2EBlockedReconciliation:
                     "vibe3.domain.qualify_gate.infer_resume_label",
                     return_value=IssueState.IN_PROGRESS,
                 ):
-                    mock_label_service = Mock()
                     with patch(
-                        "vibe3.services.label_service.LabelService",
-                        return_value=mock_label_service,
-                    ):
+                        "vibe3.domain.qualify_gate.TaskResumeOperations"
+                    ) as mock_operations_cls:
+                        mock_operations = Mock()
+                        mock_operations_cls.return_value = mock_operations
+
                         result = qualify_gate.run_qualify_gate(
                             issue=sample_issue,
                             branch="task/issue-123",
