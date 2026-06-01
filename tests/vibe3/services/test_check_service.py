@@ -47,25 +47,12 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
     }
 
     with (
-        patch(
-            "vibe3.services.task_resume_operations.TaskResumeOperations"
-        ) as mock_resume_ops_cls,
-        patch(
-            "vibe3.services.flow_orchestrator_service.FlowOrchestratorService"
-        ) as mock_orchestrator_cls,
-        patch("vibe3.services.handoff_service.HandoffService") as mock_handoff_cls,
+        patch("vibe3.services.check_pr_service.FlowRebuildUsecase") as rebuild_cls,
         patch("vibe3.services.issue_context_loader.load_issue_info") as mock_load_issue,
     ):
-        mock_resume_ops = MagicMock()
-        mock_resume_ops_cls.return_value = mock_resume_ops
+        rebuild = MagicMock()
+        rebuild_cls.return_value = rebuild
 
-        mock_orchestrator = MagicMock()
-        mock_orchestrator_cls.return_value = mock_orchestrator
-
-        mock_handoff = MagicMock()
-        mock_handoff_cls.return_value = mock_handoff
-
-        # Mock issue info
         from vibe3.models.orchestration import IssueInfo
 
         mock_issue_info = IssueInfo(number=456, title="Test Issue", labels=[])
@@ -73,19 +60,13 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-        # Verify reset_issue_to_ready was called
-        mock_resume_ops.reset_issue_to_ready.assert_called_once()
-        call_kwargs = mock_resume_ops.reset_issue_to_ready.call_args[1]
-        assert call_kwargs["issue_number"] == 456
-        assert call_kwargs["resume_kind"] == "pr_closed"
+        rebuild.rebuild_issue_flow.assert_called_once()
+        call = rebuild.rebuild_issue_flow.call_args.kwargs
+        assert call["issue"] == mock_issue_info
+        assert call["branch"] == "task/issue-456"
+        assert call["include_remote"] is True
+        assert call["ensure_worktree"] is False
 
-        # Verify flow rebuild was attempted
-        mock_orchestrator.bootstrap_issue_flow.assert_called_once()
-
-        # Verify handoff milestone was recorded
-        mock_handoff.append_current_handoff.assert_called_once()
-
-        # Verify result is valid and handled
         assert handled is True
         assert len(issues) == 0
 
@@ -106,14 +87,10 @@ def test_handle_closed_pr_reports_reset_failure() -> None:
         "state": "open",
     }
 
-    with patch(
-        "vibe3.services.task_resume_operations.TaskResumeOperations"
-    ) as mock_resume_ops_cls:
-        mock_resume_ops = MagicMock()
-        mock_resume_ops.reset_issue_to_ready.side_effect = RuntimeError(
-            "scene cleanup failed"
-        )
-        mock_resume_ops_cls.return_value = mock_resume_ops
+    with patch("vibe3.services.check_pr_service.FlowRebuildUsecase") as rebuild_cls:
+        rebuild = MagicMock()
+        rebuild.rebuild_issue_flow.side_effect = RuntimeError("scene cleanup failed")
+        rebuild_cls.return_value = rebuild
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
