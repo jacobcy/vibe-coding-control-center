@@ -103,8 +103,19 @@ def _dispatch_role_intent(
                 issue_number=issue_number,
                 reason_code=reason_code,
             ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
+        elif reason_code == "launch_failed":
+            # Bottom layer (codeagent_runner) already recorded specific error
+            # Avoid duplicate - just log at info level
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).info(
+                f"{role.capitalize()} dispatch failed (bottom layer recorded): "
+                f"{result.reason}"
+            )
         else:
-            # Unexpected failure - record to error_log and log warning
+            # Dispatch-level infrastructure failure - record to error_log
             # FailedGate will control dispatch based on threshold
             from vibe3.services.error_helpers import record_error
 
