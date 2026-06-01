@@ -1,16 +1,21 @@
-# V3 Next Steps Roadmap
+# V3 Next Steps Roadmap (STALE / ARCHIVED)
 
 **日期**: 2026-03-22
-**状态**: 收敛中
-**定位**: 本轮 handoff / review explainability 收口后的后续路线图，聚焦 GitHub label 编排与质量治理能力补齐
-
-> 新增目标与能力缺口文档：
-> - [GitHub Label 多 Agent 编排目标](../prds/github-label-agent-orchestration-target.md)
-> - [GitHub Label 多 Agent 编排能力缺口](../prds/github-label-agent-orchestration-gaps.md)
+**状态**: 已归档 (Archived 2026-06-01)
+**定位**: 本文档已过时。核心能力（Orchestra, Label State Machine, Handoff Protocol）已在 2026-05 期间交付并进入 Stable 阶段。后续规划请参考 [roadmap-common.md](../../supervisor/roadmap-common.md)。
 
 ---
 
-## 1. 当前判断
+## 0. 交付状态汇总 (2026-06-01)
+
+- ✅ **Label State Machine**: 已交付。实现了 `state/ready`, `state/claimed`, `state/in-progress`, `state/review`, `state/blocked` 等标准迁移逻辑。
+- ✅ **Handoff Protocol**: 已交付。实现了 `.git/vibe3/handoff/` 结构化存储与 `vibe3 handoff` 命令面。
+- ✅ **Orchestra (vibe3 serve)**: 已交付。驱动 heartbeat, domain events 和异步 session dispatch。
+- ✅ **Structure Snapshot**: 已交付。`vibe3 inspect symbols/files` 提供了稳定的结构上下文。
+
+---
+
+## 1. 当前判断 (Historical)
 
 ### 1.1 已经收敛的部分
 

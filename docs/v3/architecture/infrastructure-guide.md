@@ -4,21 +4,38 @@
 
 本文档说明如何使用 Vibe 3.0 的核心基础设施服务。
 
-## 概述
+## Architecture Tiers
 
-Vibe 3.0 提供了以下核心基础设施服务：
+Vibe 3.0 遵循 3-tier 架构模型：
 
-- **ExecutionRolePolicyService** - 统一的执行配置解析
-- **CapacityService** - 统一的容量控制
-- **ExecutionLifecycleService** - 统一的生命周期管理
-- **BackendProtocol** - Protocol-based dependency injection
+- **Tier 3: Cognitive / Governance Layer** — 决策与治理层。负责 PRD/Spec/Plan 立法，以及 Audit/Review/Orchestra 司法。
+- **Tier 2: Skill Layer** — 任务执行层。Agent 通过组合不同的 Skill（位于 `skills/`）和 V3 Core Services 实现具体业务逻辑。
+- **Tier 1: Shell Layer** — 原子能力层。提供环境隔离、命令封装与基础工具集。
 
-这些服务解决了以下问题：
+---
 
-1. **配置分散**：不同执行路径（manager/plan/run/review）的配置解析逻辑重复
-2. **容量冲突**：StateLabelDispatchService 和 ManagerExecutor 之间的双层节流问题
-3. **生命周期记录不一致**：不同角色的生命周期事件记录方式不统一
-4. **依赖耦合**：Backend 实现硬编码，难以测试和扩展
+## Tier 1 (Shell Layer) 原子能力
+
+Tier 1 提供了系统运行的物理基础，主要由以下组件构成：
+
+### 1. V3 Hub (lib3/)
+`lib3/` 是 V3 Python 核心能力的包装器。它负责：
+- 仓库路径的自动重定向（寻找 git root）。
+- 环境初始化（确保 `uv run` 正确执行）。
+- 作为 V2 Shell 与 V3 Python 的桥接点。
+
+### 2. 命令入口 (bin/)
+- **`vibe3`**: V3 统一命令面入口。驱动 flow, task, handoff, serve 等核心子命令。
+- **`vibe`**: V2 兼容性入口。提供 alias 和环境增强工具。
+
+### 3. 环境隔离 (Worktree)
+利用 Git Worktree 实现任务间的完全物理隔离，确保每个 Issue 都在独立的环境中运行，互不干扰。
+
+---
+
+## Tier 3 Core Services (V3 Core)
+
+Vibe 3.0 在 `src/vibe3/` 中提供了以下核心基础设施服务：
 
 ## ExecutionRolePolicyService
 

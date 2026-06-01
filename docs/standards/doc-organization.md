@@ -31,7 +31,7 @@ related_docs:
 ## 核心原则
 
 1. **文档即规范**：文档是唯一的真理来源，代码必须符合文档
-2. **流程对齐**：文档结构与 Vibe Guard 流程一一对应
+2. **流程对齐**：文档结构与 V3 规范工作流 (Vibe Guard) 一一对应
 3. **人工优先**：标准设计为人工操作友好，不依赖自动化工具
 4. **AI 工作区分离**：模板等 AI 工具放在 `.agent/`，人类文档放在 `docs/`
 
@@ -45,12 +45,17 @@ docs/
 │   └── ...                         # 其他现行标准
 ├── specs/                          # 规范文档
 ├── prds/                           # 产品需求文档（全局 PRD）
-│   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
-│   └── ...                         # 其他全局 PRD
 ├── plans/                         # 执行计划
 ├── reports/                       # 报告与总结
 ├── archive/                        # 历史文档归档
 │   └── ...                         # 已退役设计与历史任务文档
+
+核心系统目录说明：
+- `src/vibe3/` - V3 Python 核心源码 (Tier 2/3 逻辑)
+- `lib3/` - V3 核心包装器与仓库重定向中心 (Tier 1)
+- `supervisor/` - 治理与决策指令集 (Tier 3 Governance)
+- `temp/` - 运行时临时产物 (Logs, sessions, temporary state)
+- `skills/` - 各 Agent 技能包 (Tier 2)
 
 AI 工作区中的临时产物与模板：
 - `.agent/plans/` - AI 临时计划
