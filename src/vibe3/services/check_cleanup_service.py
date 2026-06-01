@@ -42,13 +42,16 @@ class CheckCleanupService:
         self.git_client = git_client
         self._github_client = github_client
 
-    def clean_residual_branches(self) -> dict[str, Any]:
+    def clean_residual_branches(self, *, force: bool = False) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
 
         NEW: Also cleans expired resources:
         - Agent worktrees (> 7 days)
         - Remote non-protected branches (> 7 days)
         - Local inactive branches (> 7 days)
+
+        Args:
+            force: If True, force delete unmerged branches (git branch -D)
 
         Returns:
             Dict with summary and details of cleaned branches.
@@ -88,7 +91,7 @@ class CheckCleanupService:
 
         if cleanup_config.enable_local_branch_cleanup:
             results["local_branches"] = expired_service.clean_expired_local_branches(
-                max_age_days=cleanup_config.local_branch_max_age_days
+                max_age_days=cleanup_config.local_branch_max_age_days, force=force
             )
             cleaned = results["local_branches"].get("cleaned") or []
             summary_parts.append(f"local_branches cleaned {len(cleaned)}")
