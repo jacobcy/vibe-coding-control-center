@@ -127,9 +127,7 @@ def test_flow_bind_remains_atomic_command_surface() -> None:
 
 @patch("vibe3.commands.flow_manage.FlowService")
 @patch("vibe3.environment.session_registry.SessionRegistryService")
-@patch("vibe3.agents.backends.codeagent.CodeagentBackend")
 def test_flow_update_blocks_when_branch_has_live_runtime_session(
-    mock_backend,
     mock_registry_cls,
     mock_flow_service,
 ) -> None:

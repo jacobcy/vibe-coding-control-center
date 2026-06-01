@@ -103,10 +103,7 @@ def test_clean_residual_branches_logs_skipped_branches() -> None:
 
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    with (
-        patch("vibe3.agents.CodeagentBackend"),
-        patch("vibe3.environment.session_registry.SessionRegistryService") as registry,
-    ):
+    with patch("vibe3.environment.session_registry.SessionRegistryService") as registry:
         registry.return_value._store.list_live_runtime_sessions.return_value = [
             {
                 "branch": "task/issue-123",
@@ -131,12 +128,9 @@ def test_get_branches_with_live_sessions_queries_once() -> None:
     git_client = MagicMock()
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    with (
-        patch("vibe3.agents.CodeagentBackend"),
-        patch(
-            "vibe3.environment.session_registry.SessionRegistryService"
-        ) as registry_cls,
-    ):
+    with patch(
+        "vibe3.environment.session_registry.SessionRegistryService"
+    ) as registry_cls:
         registry = registry_cls.return_value
         # Mock the new method
         registry.get_all_branches_with_live_sessions.return_value = {

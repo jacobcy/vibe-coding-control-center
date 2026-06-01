@@ -11,7 +11,6 @@ class TestGovernanceScanHandler:
 
     @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
-    @patch("vibe3.agents.backends.codeagent.CodeagentBackend")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
@@ -24,7 +23,6 @@ class TestGovernanceScanHandler:
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
         mock_sqlite_cls: MagicMock,
-        mock_backend_cls: MagicMock,
         mock_registry_cls: MagicMock,
         mock_append_governance_event: MagicMock,
     ) -> None:
