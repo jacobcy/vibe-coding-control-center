@@ -48,7 +48,10 @@ from vibe3.agents.plan_prompt import (
     describe_plan_sections,
     make_plan_context_builder,
 )
-from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
+from vibe3.agents.review_pipeline_helpers import (
+    build_snapshot_diff,
+    run_inspect_json,
+)
 from vibe3.agents.review_prompt import (
     build_review_prompt_body,
     build_tools_guide_section,
