@@ -43,12 +43,12 @@ Vibe3 的架构是**协作式制衡**:
 
 ### 2.2 这是"三权分立"的制衡架构
 
-| 分支 | 对应角色 | 权力 | 制衡机制 |
-|------|----------|------|----------|
-| 立法 / 观察 | Governance (L1) | 观察 assignee pool、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
-| 治理执行 | Supervisor/Apply (L2) | 处理 supervisor issue、close/recreate 治理 issue | Manager 不干预 supervisor issue；人类可 override |
-| 行政 / 执行 | Manager + Plan / Run (L3) | 状态机推进、代码实现、PR 产出 | Review 可 BLOCK; Orchestra 系统可强制回退 |
-| 司法 / 审计 | Review (L3) | PASS / MAJOR / BLOCK 裁决 | Manager 可覆盖 UNKNOWN / 判定 review 不可信 |
+| 分层 | 架构 Tier | 对应角色 | 权力 | 制衡机制 |
+|------|-----------|----------|------|----------|
+| **L1** | **Tier 3 (Cognitive)** | Governance | 观察 assignee pool、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
+| **L2** | **Tier 3 (Governance)**| Supervisor/Apply | 处理 supervisor issue、close/recreate 治理 issue | Manager 不干预 supervisor issue；人类可 override |
+| **L3** | **Tier 2 (Skill)** | Manager + Plan / Run | 状态机推进、代码实现、PR 产出 | Review 可 BLOCK; Orchestra 系统可强制回退 |
+| **L3** | **Tier 2 (Skill)** | Review | PASS / MAJOR / BLOCK 裁决 | Manager 可覆盖 UNKNOWN / 判定 review 不可信 |
 
 ## 3. 权力结构
 

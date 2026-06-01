@@ -57,27 +57,42 @@ Publisher.publish(event) → EventPublisher 查找订阅者 → 调用 handlers
 - ❌ Handler 没有类型注解 → mypy 报错
 
 **详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md)
+---
+
+## 3-Tier 架构模型
+
+Vibe 3.0 采用三层架构模型，明确了认知治理、编排管理与原子能力的分工：
+
+| 层级 | 名称 | 职责 | 核心命令 |
+|------|------|------|----------|
+| **Tier 3** | **Cognitive / Governance** | 认知与治理层：负责策略、规则执行、Supervisor 扫描与全局状态监控。 | `serve`, `scan`, `check`, `mcp` |
+| **Tier 2** | **Skill Layer** | 技能/编排层：负责 Flow 生命周期管理、任务调度与上下文组装。 | `flow`, `task`, `run`, `plan`, `review` |
+| **Tier 1** | **Shell Layer** | 壳层/原子能力：提供原子级能力访问、状态读取与项目信息检索。 | `handoff`, `inspect`, `pr`, `snapshot`, `ask` |
 
 ---
 
-### 2. 执行层级与 Worktree
+## 关键概念速查
 
-**五层架构**：
+### 1. 执行层级与 3-tier 对应关系
+
+**层级映射**：
 ```
-L0  Orchestra / Heartbeat          -- 调度主循环
-L1  Governance Service             -- 定期扫描（cron-supervisor, roadmap-intake），只操作 GitHub labels
-                                      真源：supervisor/governance/ (cron-supervisor.md, roadmap-intake.md)
-L2  Supervisor + Apply             -- 轻量治理执行（supervisor-apply），临时 worktree 隔离
-                                      真源：supervisor/apply.md
-L3  Manager / Plan / Run / Review  -- 代码开发核心，独立 worktree
-L4  Human collaboration            -- 人工协作流程
+Tier 3 (Cognitive/Governance)
+  L0  Orchestra / Heartbeat          -- 调度主循环
+  L1  Governance Service             -- 定期扫描（cron-supervisor, roadmap-intake）
+  L2  Supervisor + Apply             -- 轻量治理执行（supervisor-apply）
+
+Tier 2 (Skill Layer)
+  L3  Manager / Plan / Run / Review  -- 核心编排流程（CodeAgent 执行）
+
+Tier 1 (Shell Layer)
+  L3/L4 Atomic Commands              -- 原子工具（pr, handoff, inspect, ask）
 ```
 
 **Worktree 语义**：
-- **L0/L1**: 无 worktree（`cwd=None`）
-- **L2**: 临时 worktree（`--worktree` 标志）
-- **L3**: 持久 worktree（`cwd=wt_path`）
-
+- **Tier 3 (L0/L1)**: 无 worktree（`cwd=None`）
+- **Tier 3 (L2)**: 临时 worktree（`--worktree` 标志）
+- **Tier 2 (L3)**: 持久 worktree（`cwd=wt_path`）
 
 **详细文档**: [worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md)
 

@@ -52,15 +52,14 @@ related_docs:
 
 - 触发条件：`issues/assigned` 且 assignee 在 `manager_usernames`。
 - 执行动作：创建/复用 flow，检查依赖后调度 manager 执行。
-- 默认策略：`assignee_dispatch.use_worktree=true`，通过 `vibe3 run --worktree ...` 触发独立临时 worktree 执行。
+- 默认策略：`assignee_dispatch.use_worktree=true`，通过 `vibe3 run ...` 触发。
 - 执行语义（当前真源）：
   - 不切换 `serve` 进程当前分支，避免污染守护进程工作树。
   - 优先在已存在的 issue 分支 worktree 执行；不存在则自动创建 `.worktrees/issue-<number>`。
-  - 对旧分支兼容：若目标分支暂不支持 `vibe3 run --worktree`，自动降级去掉该参数继续执行。
 - 心跳会对当前已分配 issue 做重检（依赖/flow 存在性），避免漏调度。
 
 代码参考：
-- `src/vibe3/orchestra/global_dispatch_coordinator.py` — frozen queue coordinator
+- `src/vibe3/orchestra/global_dispatch_coordinator.py` — 调度主入口（Heartbeat Tick Driver）
 - `src/vibe3/orchestra/flow_dispatch.py` — flow/manager dispatch
 - `src/vibe3/orchestra/issue_loader.py` — issue loading utilities
 - `src/vibe3/domain/handlers/issue_state_dispatch.py` — ManagerDispatchIntent handler
@@ -71,7 +70,7 @@ related_docs:
 - 触发条件：requested reviewer 命中 `manager_usernames`。
 - 执行动作：通过 `GlobalDispatchCoordinator` 冻结队列派发 reviewer 角色执行。
 - 默认策略：优先复用 PR 对应已有 worktree（按 `head_branch` 匹配），不新建 worktree。
-- 可选：配置中使用 worktree 参数时改为 `vibe3 review pr <pr_number> --worktree`。
+- 可选：配置中使用派发 reviewer 执行。
 - 可选异步：配置异步模式时，调度为 `vibe3 review pr <pr_number> --async`（tmux 后台执行，不阻塞当前进程）。
 
 代码参考：
