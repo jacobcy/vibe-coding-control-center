@@ -163,7 +163,15 @@ class QualifyGateService:
                     f"qualify_gate skip_blocked (#{issue.number}): "
                     "issue closed on GitHub — terminalizing local flow",
                 )
-                self._store.soft_delete_flow(branch)
+                # Use FlowCleanupService for unified terminalization
+                from vibe3.services.flow_cleanup_service import FlowCleanupService
+
+                FlowCleanupService(store=self._store).cleanup_flow_scene(
+                    branch,
+                    include_remote=False,
+                    terminate_sessions=True,
+                    keep_flow_record=True,  # Preserve flow record as terminal history
+                )
             return None
 
         flow = self._flow_manager.get_flow_for_issue(issue.number)

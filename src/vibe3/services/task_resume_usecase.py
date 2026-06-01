@@ -111,8 +111,20 @@ class TaskResumeUsecase:
                 - requested: List of requested issue numbers (if provided)
                 - candidates: List of resumable candidates (dry-run only)
         """
+        # DEPRECATED: candidate_mode="all_task" is no longer supported
+        # Task resume only handles blocked issues.
+        # Use flow rebuild for explicit rebuild.
         if candidate_mode == "all_task":
-            candidates = self.candidates.build_all_task_candidates(flows or [])
+            logger.bind(
+                domain="task_resume",
+                action="deprecated_candidate_mode",
+                candidate_mode=candidate_mode,
+            ).warning(
+                "candidate_mode='all_task' is deprecated. "
+                "Task resume only handles blocked issues. "
+                "Use 'vibe3 flow rebuild' for explicit rebuild."
+            )
+            candidates = []
         else:
             candidates = self.status_service.fetch_resume_candidates(
                 flows=flows or [], stale_flows=stale_flows or []

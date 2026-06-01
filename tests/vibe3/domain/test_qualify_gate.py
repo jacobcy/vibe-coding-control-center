@@ -470,7 +470,10 @@ class TestIsDependencySatisfied:
         result = qualify_gate_service.qualify_blocked_issue(closed_issue)
 
         assert result is None
-        mock_store.soft_delete_flow.assert_called_once_with("task/issue-999")
+        # Now uses FlowCleanupService instead of soft_delete_flow
+        # FlowCleanupService.cleanup_flow_scene should be called
+        # We verify that soft_delete_flow is NOT called directly
+        mock_store.soft_delete_flow.assert_not_called()
 
     def test_qualify_blocked_closed_no_flow_skips(
         self, qualify_gate_service, mock_store, mock_flow_manager

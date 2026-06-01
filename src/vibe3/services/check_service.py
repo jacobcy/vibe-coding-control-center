@@ -470,13 +470,13 @@ class CheckService(CheckRemote):
                                     f"worktree for branch '{branch}'. "
                                     "Suggestion: Check if worktree was "
                                     "accidentally deleted or run 'vibe3 "
-                                    f"task resume --label handoff {task_issue}'."
+                                    f"flow rebuild {task_issue}'."
                                 )
                             else:
                                 issues.append(
                                     f"{ref_field} file not found: {ref_value}. "
-                                    f"Suggestion: Run 'vibe3 task resume --blocked "
-                                    f"{task_issue}' to reset."
+                                    f"Suggestion: Run 'vibe3 task resume "
+                                    f"{task_issue}' to resume from blocked state."
                                 )
 
             is_valid = len(issues) == 0

@@ -224,9 +224,19 @@ class TaskResumeOperations:
 
             # DO NOT call reset_task_scene (keep worktree)
         else:
-            # Legacy/internal destructive compatibility. Public CLI paths must
-            # not reach this branch; use FlowRebuildUsecase for new rebuilds.
-            emit_progress("full rebuild mode")
+            # DEPRECATED: Legacy destructive path.
+            # Public CLI no longer reaches this branch.
+            # New callers must use FlowRebuildUsecase for destructive rebuild.
+            logger.bind(
+                domain="task_resume",
+                action="deprecated_deprecated_path",
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                "TaskResumeOperations.reset_issue_to_ready(label_state=None) "
+                "is deprecated. Use FlowRebuildUsecase for destructive rebuild instead."
+            )
+            emit_progress("full rebuild mode (DEPRECATED)")
 
             from vibe3.services.blocked_state_service import BlockedStateService
 

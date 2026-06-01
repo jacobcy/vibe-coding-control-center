@@ -7,7 +7,6 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueState
 
 
@@ -38,7 +37,9 @@ class FlowStatusService:
         task_issue: int | None,
         issue_payload: dict | None,
     ) -> bool:
-        """Rebuild stale canonical ready flow as a fresh registered task flow."""
+        """Rebuild stale canonical ready flow using FlowRebuildUsecase."""
+        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+
         issue_number = task_issue
         if issue_number is None:
             try:
@@ -47,7 +48,6 @@ class FlowStatusService:
                 return False
 
         from vibe3.models.orchestration import IssueInfo
-        from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 
         issue = IssueInfo(
             number=issue_number,
@@ -55,13 +55,18 @@ class FlowStatusService:
             state=IssueState.READY,
             labels=[IssueState.READY.to_label()],
         )
-        orchestrator = FlowOrchestratorService(
-            load_orchestra_config(),
+
+        FlowRebuildUsecase(
             store=self.store,
-            git=self.git_client,
-            github=self.github_client,
+            git_client=self.git_client,
+            github_client=self.github_client,
+        ).rebuild_issue_flow(
+            issue=issue,
+            branch=branch,
+            reason="stale ready flow rebuild",
+            include_remote=False,
+            ensure_worktree=True,
         )
-        orchestrator.create_flow_for_issue(issue)
         return True
 
     def mark_flow_status(

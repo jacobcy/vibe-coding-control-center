@@ -220,7 +220,7 @@ uv run python src/vibe3/cli.py handoff status     # 阅读 agent 留下的 Findi
 
 - **先看现场**：运行 `vibe3 task status`，必要时补 `vibe3 flow status` / `vibe3 flow show`。
 - **状态不一致**：运行 `vibe3 check` 进行同步审计。
-- **其他 auto-task scene 需要回退**：运行 `vibe3 task resume --blocked|--all`。
+- **其他 auto-task scene 需要恢复**：运行 `vibe3 task resume --blocked`。
 - **代码总量 / 单文件超限**：先看 `config/v3/loc_limits.yaml` 的阈值与 exceptions，再决定是否进入质量复查或 exception 处理。
 - **环境配置**：查看 `config/v3/settings.yaml`。
 - **调用追踪**：任何命令加 `--trace` 可查看内部调用栈。
