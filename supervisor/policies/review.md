@@ -56,7 +56,30 @@ gh issue view <ISSUE_NUMBER> --comments
 - 最新的 agent 状态通报
 - Manager 的具体审查要求
 
-### 3. 确认影响范围
+### 3. 测试质量检查
+
+在审查执行报告时，必须检查测试质量：
+
+#### 检查核心逻辑是否有真实测试
+
+- 参考 `supervisor/policies/test-strategy.md` 的分类矩阵
+- 核心业务逻辑（路径解析、Git 命令解析、业务规则计算等）必须有真实测试
+- 不能仅凭 mock 测试通过就认为验证充分
+
+#### 检查 executor 报告中的验证证据
+
+- "验证通过"的声明是否有真实测试证据？
+- 是否明确标注了哪些是真实测试、哪些使用了 mock？
+- 是否提供了真实测试的输出片段或关键断言？
+
+#### 验证证据不足的处理
+
+如果核心函数只有 mock 测试：
+- 视为验证证据不足
+- 至少给 MAJOR
+- 要求补充真实测试或说明为何无法真实测试
+
+### 4. 确认影响范围
 
 ```bash
 uv run python src/vibe3/cli.py inspect base --json
@@ -66,7 +89,7 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 - 不要只看 diff 表面，要理解符号级波及范围
 - 检查是否触及关键路径、公开入口、共享状态
 
-### 4. 确认真源
+### 5. 确认真源
 
 - GitHub 当前 `state/*` labels（状态真源）
 - Issue comments（人类指令真源）
@@ -74,7 +97,7 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 如果历史 refs 与当前 GitHub scene 冲突，以当前 scene 为准。
 
-### 5. 读取 Executor Report（如有）
+### 6. 读取 Executor Report（如有）
 
 如果 flow 中有 `report_ref`，读取 executor 的执行报告：
 
@@ -84,7 +107,7 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 
 使用 `handoff show` 而非直接读文件路径，以正确处理跨 worktree 路径解析。
 
-### 6. 跨层一致性检查（命名/文档/API 变更）
+### 7. 跨层一致性检查（命名/文档/API 变更）
 
 对于涉及命名一致性、文档同步、API 签名的变更：
 - 使用 `inspect symbols` 和 `rg` 确认所有层（service/UI/command）的引用均已更新
@@ -106,7 +129,8 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 - **是否验证了执行效果？**
   - 检查测试是否真的覆盖了变更点
   - 检查 type check/lint 是否通过
-  - 不要因为"测试全部通过"就认为实现正确（可能是 mock 没生效）
+  - **检查核心逻辑是否有真实测试（参考 `supervisor/policies/test-strategy.md`）**
+  - 不要因为"测试全部通过"就认为实现正确（核心逻辑可能只有 mock 测试）
 
 ### 2. 我的 verdict 是否有足够证据？
 
