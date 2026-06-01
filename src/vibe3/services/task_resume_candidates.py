@@ -74,8 +74,8 @@ class TaskResumeCandidates:
     ) -> dict[str, Any] | None:
         """为显式指定的 issue 直接构造恢复候选。
 
-        对于显式指定的 issue（通过 vibe3 task resume <issue_number>），
-        允许任何非 DONE 状态进行完整重建，用于清理脏数据场景。
+        Task resume 只处理 blocked 状态。
+        对于其他状态，用户应使用 vibe3 flow rebuild。
         """
         current_state = self.label_service.get_state(issue_number)
 
@@ -83,49 +83,29 @@ class TaskResumeCandidates:
         if current_state is None or current_state == IssueState.DONE:
             return None
 
+        # 只处理 blocked 状态
+        if current_state != IssueState.BLOCKED:
+            logger.bind(
+                domain="task",
+                action="resume_candidate_skip",
+                issue_number=issue_number,
+                current_state=current_state,
+            ).warning(
+                f"Issue #{issue_number} is not blocked (state={current_state}), "
+                "task resume only handles blocked issues. "
+                "Use 'vibe3 flow rebuild' for explicit rebuild."
+            )
+            return None
+
         # 查找关联的 flow（可能不存在）
         flow = self.find_resume_flow(issue_number, flows, stale_flows)
 
-        # 对于 aborted flow 且状态为 ready/handoff，使用 aborted 恢复
-        if current_state in {IssueState.READY, IssueState.HANDOFF}:
-            aborted_flow = self.find_resume_flow_by_status(
-                issue_number,
-                statuses={"aborted"},
-                flows=flows,
-                stale_flows=stale_flows,
-            )
-            if aborted_flow is not None:
-                return {
-                    "number": issue_number,
-                    "title": "",
-                    "state": current_state,
-                    "resume_kind": "aborted",
-                    "flow": aborted_flow,
-                }
-
-            if flow is not None and flow.flow_status == "aborted":
-                return {
-                    "number": issue_number,
-                    "title": "",
-                    "state": current_state,
-                    "resume_kind": "aborted",
-                    "flow": flow,
-                }
-
-        # 根据状态确定 resume_kind
-        # Note: FAILED unified to BLOCKED, resume_kind always "blocked"
-        if current_state == IssueState.BLOCKED:
-            resume_kind = "blocked"
-        else:
-            # 对于其他状态（ready/handoff/review/merge-ready 等），
-            # 使用 "all" 类型，允许完整重建
-            resume_kind = "all"
-
+        # blocked 状态统一使用 resume_kind="blocked"
         return {
             "number": issue_number,
             "title": "",
             "state": current_state,
-            "resume_kind": resume_kind,
+            "resume_kind": "blocked",
             "flow": flow,
         }
 

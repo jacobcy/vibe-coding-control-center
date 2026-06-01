@@ -177,7 +177,8 @@ def resume(
         bool,
         typer.Option(
             "--all",
-            help="Reset all auto-created task/issue-* scenes and resume from ready",
+            help="[DEPRECATED] Use 'vibe3 flow rebuild' for explicit rebuild",
+            hidden=True,
         ),
     ] = False,
     label: Annotated[
@@ -222,26 +223,26 @@ def resume(
         )
         raise typer.Exit(1)
 
+    # Reject --all (destructive reset is now in flow rebuild command)
+    if all_tasks:
+        typer.echo(
+            "Error: --all is deprecated. Use 'vibe3 flow rebuild <issue>' "
+            "for explicit rebuild",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     # Validate arguments
-    selected_modes = [blocked, all_tasks]
-    has_flag = any(selected_modes)
-    if not has_flag and not issue_numbers:
+    if not blocked and not issue_numbers:
         typer.echo(
-            "Error: Must specify --blocked, --all, or provide issue numbers",
+            "Error: Must specify --blocked or provide issue numbers",
             err=True,
         )
         raise typer.Exit(1)
 
-    if sum(1 for flag in selected_modes if flag) > 1:
+    if blocked and issue_numbers:
         typer.echo(
-            "Error: Cannot specify more than one of --blocked and --all",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if has_flag and issue_numbers:
-        typer.echo(
-            "Error: Cannot combine issue numbers with --blocked or --all",
+            "Error: Cannot combine issue numbers with --blocked",
             err=True,
         )
         raise typer.Exit(1)
@@ -271,11 +272,8 @@ def resume(
             raise typer.Exit(1)
 
     target_issues: list[int] | None
-    candidate_mode = "resumable"
-    if has_flag:
+    if blocked:
         target_issues = None
-        if all_tasks:
-            candidate_mode = "all_task"
     else:
         assert issue_numbers is not None
         target_issues = list(issue_numbers)
@@ -284,17 +282,11 @@ def resume(
     flow_service = FlowService()
 
     # Fetch all flows for candidate building
-    resume_flows = (
-        flow_service.list_flows(status=None)
-        if candidate_mode == "all_task"
-        else flow_service.list_flows(status="active")
-    )
-    stale_flows = []
-    if candidate_mode != "all_task":
-        stale_flows = flow_service.list_flows(status="stale")
+    resume_flows = flow_service.list_flows(status="active")
+    stale_flows = flow_service.list_flows(status="stale")
 
     # Handle --blocked filtering by state label
-    if has_flag and candidate_mode == "resumable":
+    if blocked:
         # Fetch all orchestrated issues (not just stale)
         all_issues = usecase.status_service.fetch_orchestrated_issues(
             flows=resume_flows,
@@ -332,37 +324,34 @@ def resume(
             typer.echo(f"{prefix} → {step}")
 
     # Execute resume
-    if has_flag and candidate_mode == "resumable":
+    if blocked:
         result = usecase.resume_issues(
             issue_numbers=issue_numbers,
             reason=reason,
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode=candidate_mode,
+            candidate_mode="resumable",
             label_state=effective_label,
-            remote=remote,
+            remote=False,
             progress_callback=progress_callback if yes else None,
         )
     else:
-        # Original logic for --all or explicit issue numbers
+        # Explicit issue numbers
         result = usecase.resume_issues(
             issue_numbers=target_issues,
             reason=reason,
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode=candidate_mode,
+            candidate_mode="resumable",
             label_state=effective_label,
-            remote=remote,
+            remote=False,
             progress_callback=progress_callback if yes else None,
         )
 
-    if not yes and has_flag and not result.get("candidates"):
-        if all_tasks:
-            typer.echo("No auto-created task scenes found.")
-        else:
-            typer.echo("No blocked issues found.")
+    if not yes and blocked and not result.get("candidates"):
+        typer.echo("No blocked issues found.")
         return
 
     if json_output:
@@ -370,12 +359,9 @@ def resume(
     else:
         # Human-readable output
         if not yes:
-            if has_flag:
+            if blocked:
                 candidate_count = len(result.get("candidates", []))
-                if all_tasks:
-                    typer.echo(f"Found {candidate_count} auto-created task scene(s)")
-                else:
-                    typer.echo(f"Found {candidate_count} blocked issue(s)")
+                typer.echo(f"Found {candidate_count} blocked issue(s)")
                 typer.echo("\n[dry-run mode] Would resume the following issues:")
             if "candidates" in result:
                 for candidate in result["candidates"]:

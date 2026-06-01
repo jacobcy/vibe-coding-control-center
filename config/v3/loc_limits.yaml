@@ -29,8 +29,8 @@ code_limits:
 
       # Exceptions 聚合 —— 允许 480-590
       - path: "src/vibe3/domain/qualify_gate.py"
-        limit: 505
-        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard 等紧密耦合逻辑"
+        limit: 530
+        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard 等紧密耦合逻辑；Task #8 重构后新增 TaskResumeOperations 集成，略微超标"
       - path: "src/vibe3/services/handoff_service.py"
         limit: 650
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）"
@@ -95,8 +95,8 @@ code_limits:
         limit: 420
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤"
       - path: "src/vibe3/services/check_cleanup_service.py"
-        limit: 550
-        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；新增 --force 参数支持后略微超标"
+        limit: 560
+        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；Task #9 重构后新增 TaskResumeOperations 集成，略微超标"
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/review.py"
