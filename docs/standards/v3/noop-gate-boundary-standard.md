@@ -129,8 +129,10 @@ related_docs:
 
 对 `planner / executor / reviewer` 三类 worker，正确语义是：
 
-- agent 执行后 **required_ref 缺失** → `blocked`（agent 未按 contract 产出 authoritative ref）
-- agent 执行后 **state 未改变** → `blocked`（agent 未按 contract 推进状态）
+- agent 执行后 **required_ref 缺失**：
+  - 若 **state 改变** → `warning`（agent 推进了状态但未产出 ref，记录警告但不阻塞）
+  - 若 **state 未改变** → `blocked`（agent 既未产出 ref 也未推进状态）
+- agent 执行后 **state 未改变**（且 required_ref 存在）→ `blocked`（agent 未按 contract 推进状态）
 - agent 执行后 **两项都满足** → 通过
 
 也就是说：
@@ -138,14 +140,21 @@ related_docs:
 - planner 跑完但还在 `state/claimed` → `blocked`
 - executor 跑完但还在 `state/in-progress` → `blocked`
 - reviewer 跑完但还在 `state/review` → `blocked`
-- planner 跑完但没有 `plan_ref` → `blocked`
-- executor 跑完但没有 `report_ref` → `blocked`
-- reviewer 跑完但没有 `audit_ref` → `blocked`
+- planner 跑完但没有 `plan_ref`：
+  - 若 state 改变（如 `claimed` → `planned`）→ `warning`，通过 gate
+  - 若 state 未改变 → `blocked`
+- executor 跑完但没有 `report_ref`：
+  - 若 state 改变（如 `in-progress` → `review`）→ `warning`，通过 gate
+  - 若 state 未改变 → `blocked`
+- reviewer 跑完但没有 `audit_ref`：
+  - 若 state 改变（如 `review` → `done`）→ `warning`，通过 gate
+  - 若 state 未改变 → `blocked`
 
-gate 同时检查 required_ref 存在性和 state change：
-1. required_ref 缺失 → block（agent 未按 contract 产出 authoritative ref）
-2. state 未变 → block（agent 未按 contract 推进状态）
-3. 两项都满足 → pass
+gate 检查顺序（state-change-aware）：
+1. required_ref 缺失 + state 改变 → warning，继续检查 state transition
+2. required_ref 缺失 + state 未变 → block（agent 既未产出 ref 也未推进状态）
+3. required_ref 存在 + state 未变 → block（agent 未按 contract 推进状态）
+4. required_ref 存在 + state 改变 → pass
 
 manager 角色不受 ref 检查约束（只有 state change 检查）。
 
