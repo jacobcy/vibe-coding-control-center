@@ -17,8 +17,7 @@
 
 ## 分支管理与保护
 
-为了维护 `main` 分支的稳定性，我们实施了严格的分支保护规则（Rulesets）。
-详细配置请参阅 [Branch Protection Rules](docs/governance/BRANCH_PROTECTION.md)。
+为了维护 `main` 分支的稳定性，我们实施了严格的分支保护规则。
 
 - **禁止直接提交到 main**：所有变更必须通过 PR 合并。
 - **强制代码审查**：所有 PR 必须经过至少一次 Review。

@@ -188,8 +188,8 @@ bats tests/
 随时运行以下命令查看项目健康状态：
 
 ```bash
-uv run python src/vibe3/cli.py check --metrics  # V3 核心仪表盘
-bash scripts/tools/metrics.sh                  # V2 Legacy 仪表盘
+vibe3 snapshot show           # V3 核心仪表盘（替换旧的 check --metrics）
+bash scripts/tools/metrics.sh  # V2 Legacy 仪表盘
 ```
 
 输出示例 (V3)：
@@ -208,11 +208,12 @@ bash scripts/tools/metrics.sh                  # V2 Legacy 仪表盘
 
 ---
 
-## 4. V2 标准开发流程（V2 Legacy，仅供参考）
+## 4. V2 标准开发流程（V2 Legacy，已退居二线）
 
-> ⚠️ **此流程基于已不再扩展的 V2 Shell 入口（`bin/vibe`）。V3 用户请优先参考 §2.4 V3 开发入口。**
-> 小白入门：**每次开发功能，严格按这 5 步走。**
-> V3 用户请参考 §2.4 V3 开发入口中的 `uv run python src/vibe3/cli.py` 命令集，以及 `.agent/README.md` 中的 agent workflow 入口。
+> ⚠️ **重要提示**：此流程基于已不再扩展的 V2 Shell 入口（`bin/vibe`）。
+> **当前项目已全面切换到 V3 Python 运行时为核心。**
+> 新功能开发、架构调整和日常运维必须优先使用 §2.4 节定义的 V3 入口和命令集。
+> 仅在维护旧逻辑、环境同步或简单的密钥管理时，才参考此 V2 流程。
 
 ### Step 1：创建工作区
 
@@ -345,13 +346,23 @@ bin/vibe clean                 # 清理临时文件
 ### V3 (Python)
 
 ```bash
-vibe3 flow show    # 查看 flow 上下文 (或 uv run python src/vibe3/cli.py flow show)
-vibe3 flow update  # 注册/更新 flow
-vibe3 flow bind    # 绑定 issue-flow 关系
-vibe3 handoff show # 查看 handoff 链路
-vibe3 handoff append # 追加 handoff
-vibe3 task status  # 总览活跃 flow 与 orchestra 状态
-vibe3 check        # 共享状态审计
+# 核心运行时管理
+vibe3 serve status      # 查看 Orchestra 服务状态与门禁
+vibe3 task status       # 总览活跃 flow 与 orchestra 状态
+vibe3 check             # 共享状态审计与一致性检查
+vibe3 snapshot show     # 项目健康度度量仪表盘
+
+# Flow 与协作
+vibe3 flow show         # 查看当前 flow 上下文与绑定信息
+vibe3 flow update       # 注册/更新当前分支为活跃 flow
+vibe3 flow bind         # 显式绑定 issue-flow 关系
+vibe3 handoff show      # 查看 agent 间的 handoff 链路
+vibe3 handoff append    # 向当前 flow 追加 handoff 记录
+
+# 代码智能与执行 (Agent 模式)
+vibe3 inspect symbols   # AST 级代码结构分析
+vibe3 plan/run/review   # 标准 Agent 执行入口
+vibe3 ask               # 向 Vibe 知识库/现场提问
 ```
 
 ---
