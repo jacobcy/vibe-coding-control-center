@@ -361,7 +361,7 @@ def apply_unified_noop_gate(
                     ),
                     refs={
                         "before_state": str(before_state_label or ""),
-                        "after_state": after_state_label,
+                        "after_state": str(after_state_label or ""),
                         "issue": str(issue_number),
                         "required_ref": required_ref_key,
                         "severity": "warning",
