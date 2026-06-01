@@ -24,7 +24,7 @@ description: 项目冷启动环境检查。用于检查当前项目是否满足 
 3. **依赖环境检查**：确认 Python 和 vibe3 可用
 4. **Orchestra 状态检查**：确认 orchestra 服务状态
 5. **GitHub 集成检查**：确认 gh 认证和 repo 可访问
-6. **工具链检查**：确认必要工具和密钥
+6. **工具链和密钥检查**：确认必要工具和 API 密钥
 
 **分层原则**：
 - 本 skill 只负责编排现有命令和解释输出
@@ -65,6 +65,7 @@ description: 项目冷启动环境检查。用于检查当前项目是否满足 
   ├─ Step 3: 依赖环境检查
   │   ├─ uv run python --version
   │   ├─ which vibe3
+  │   ├─ which gh
   │   ├─ 若失败：标记 ❌，提示安装依赖
   │   └─ 若成功：标记 ✅，显示版本信息
   │
@@ -82,10 +83,11 @@ description: 项目冷启动环境检查。用于检查当前项目是否满足 
   │   ├─ 若 repo 不可访问：标记 ⚠️，提示检查权限
   │   └─ 若成功：标记 ✅，显示 repo 信息
   │
-  ├─ Step 6: 工具链检查
+  ├─ Step 6: 工具链和密钥检查
   │   ├─ vibe doctor --essential
-  │   ├─ 若失败：标记 ❌，列出缺失工具
-  │   └─ 若成功：标记 ✅，显示工具状态
+  │   ├─ vibe keys check
+  │   ├─ 若失败：标记 ❌，列出缺失工具或未配置密钥
+  │   └─ 若成功：标记 ✅，显示工具和密钥状态
   │
   └─ Step 7: 汇总报告
       ├─ 统计通过/失败/警告项数量
@@ -150,7 +152,7 @@ vibe3 handoff status
 
 ### Step 3: 依赖环境检查
 
-**目标**：确认 Python 和 vibe3 命令可用。
+**目标**：确认 Python、vibe3 和 gh 命令可用。
 
 **执行命令**：
 
@@ -160,16 +162,21 @@ uv run python --version
 
 # 检查 vibe3 命令路径
 which vibe3
+
+# 检查 gh 命令路径
+which gh
 ```
 
 **判断标准**：
-- ✅ Python 和 vibe3 都可用
+- ✅ Python、vibe3 和 gh 都可用
 - ❌ Python 不可用（`uv run python` 失败）
 - ❌ vibe3 不可用（`which vibe3` 失败）
+- ❌ gh 不可用（`which gh` 失败）
 
 **失败时的修复建议**：
 - Python 不可用：安装 uv（`curl -LsSf https://astral.sh/uv/install.sh | sh`）
 - vibe3 不可用：运行安装脚本（`zsh scripts/install.sh`）
+- gh 不可用：安装 GitHub CLI（`brew install gh` 或参考 https://cli.github.com/）
 
 ### Step 4: Orchestra 状态检查
 
@@ -205,9 +212,14 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 
 # 如果 remote URL 存在，解析并访问 repo
 if [ -n "$REMOTE_URL" ]; then
-  # 解析 owner/repo（支持 https 和 ssh 格式）
-  REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github.com[/:]||; s|\.git$||')
-  gh api "repos/$REPO"
+  # 检查是否为 GitHub.com（不支持 GitHub Enterprise）
+  if echo "$REMOTE_URL" | grep -qE '(^https?://|^git@)github\.com[/:]'; then
+    # 解析 owner/repo（支持 https 和 ssh 格式）
+    REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[/:]||; s|\.git$||')
+    gh api "repos/$REPO"
+  else
+    echo "⚠️ 非 GitHub.com 仓库，跳过 API 检查"
+  fi
 fi
 ```
 
@@ -216,32 +228,43 @@ fi
 - ❌ gh 未认证（`gh auth status` 失败）
 - ⚠️ gh 已认证但 repo 不可访问（权限问题）
 - ⚠️ 无 remote URL，跳过 repo 检查
+- ⚠️ 非 GitHub.com 仓库（如 GitHub Enterprise、GitLab），跳过 API 检查
 
 **失败时的修复建议**：
 - 未认证：`gh auth login`
 - repo 不可访问：检查 GitHub 权限设置
+- GitHub Enterprise：当前不支持，建议手动验证访问权限
 
 **边界处理**：
 - 如果解析 remote URL 失败（如无 remote），标记为 ⚠️ 并跳过 API 调用
-- 如果 repo 不在 GitHub（如 GitLab），标记为 ⚠️ 并说明不支持
+- 如果 repo 不在 GitHub.com（如 GitLab、GitHub Enterprise），标记为 ⚠️ 并说明不支持
+- 只匹配 `github.com`（精确匹配），不匹配 `github.company.com` 等企业域名
 
-### Step 6: 工具链检查
+### Step 6: 工具链和密钥检查
 
-**目标**：确认必要工具和依赖已安装。
+**目标**：确认必要工具已安装且 API 密钥已配置。
 
 **执行命令**：
 
 ```bash
+# 检查必要工具
 vibe doctor --essential
+
+# 检查 API 密钥配置
+vibe keys check
 ```
 
 **判断标准**：
-- ✅ 所有必要工具已安装
+- ✅ 所有必要工具已安装且密钥已配置
 - ❌ 有缺失的必要工具
+- ❌ 密钥未配置或配置错误
 - ⚠️ 有可选工具缺失
 
 **失败时的修复建议**：
-- 根据 `vibe doctor` 输出安装缺失工具
+- 工具缺失：根据 `vibe doctor` 输出安装缺失工具
+- 密钥问题：运行 `vibe keys setup` 配置 API 密钥
+
+**重要**：`vibe doctor --essential` 不检查密钥，需要单独运行 `vibe keys check`。
 
 ### Step 7: 汇总报告
 
@@ -253,10 +276,10 @@ vibe doctor --essential
 ### 检查结果
 ✅ Git 仓库: /path/to/repo (origin: https://github.com/owner/repo.git)
 ✅ vibe3 配置: /path/to/.git/vibe3/
-✅ 依赖环境: Python 3.11.6, vibe3 at /usr/local/bin/vibe3
+✅ 依赖环境: Python 3.11.6, vibe3 at /usr/local/bin/vibe3, gh at /usr/local/bin/gh
 ⚠️ Orchestra: 未运行 (可选服务)
 ✅ GitHub 集成: 已认证, repo: owner/repo
-✅ 工具链: 所有必要工具已安装
+✅ 工具链和密钥: 所有必要工具已安装，API 密钥已配置
 
 ### 汇总
 通过: 5/6
@@ -282,7 +305,7 @@ vibe doctor --essential
 - `uv run python --version`、`which vibe3`：依赖环境事实
 - `vibe3 serve status`：Orchestra 服务事实
 - `gh auth status`、`gh api`：GitHub 集成事实
-- `vibe doctor --essential`：工具链事实
+- `vibe doctor --essential`、`vibe keys check`：工具链和密钥事实
 
 如果命令执行失败或输出与预期不符，以命令输出为准，记录实际错误信息。
 
