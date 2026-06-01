@@ -497,6 +497,20 @@ class OrchestraStatusService:
             )
             return 0
 
+    @staticmethod
+    def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
+        """Get manager usernames for orchestra operations.
+
+        This is a static method to allow usage without service instantiation.
+
+        Args:
+            config: OrchestraConfig instance
+
+        Returns:
+            Tuple of manager usernames (e.g., ('vibe-manager-agent',)).
+        """
+        return get_manager_usernames(config)
+
     def _get_circuit_breaker_state(self) -> str:
         if self._circuit_breaker:
             return self._circuit_breaker.state_value

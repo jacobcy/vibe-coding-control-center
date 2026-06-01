@@ -150,8 +150,8 @@ code_limits:
         limit: 580
         reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑"
       - path: "src/vibe3/services/orchestra_status_service.py"
-        limit: 520
-        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑，职责单一但方法较多"
+        limit: 540
+        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783），职责单一但方法较多"
       - path: "src/vibe3/services/check_pr_service.py"
         limit: 450
         reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断等紧密耦合逻辑，rebase 后新增 before_issue_is_closed 参数支持"

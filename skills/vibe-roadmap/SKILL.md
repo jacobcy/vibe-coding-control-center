@@ -145,7 +145,7 @@ gh issue list -l "roadmap/p1"
 **场景 A: 适合自动化推进**（通过全部三级审查）
 ```bash
 gh issue edit <number> --add-assignee <manager_bot_name>
-gh issue comment <number> --body "[roadmap decision] assign to @{manager_bot} (manager-pool); scope=<bugfix|feature|refactor>."
+gh issue comment <number> --body "[roadmap decision] Intake completed (scope=<bugfix|feature|refactor>)."
 gh issue edit <number> --add-label "roadmap-reviewed"
 ```
 
