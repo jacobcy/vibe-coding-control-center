@@ -27,7 +27,7 @@ Prompt Builders:
 
 Review Helpers:
 - ``build_snapshot_diff`` — build structural diff for review context
-- ``run_inspect_json`` — internal helper to call inspect subcommand
+- ``run_inspect_json`` — helper to call inspect subcommand for review analysis
 
 Types:
 - ``PromptContextMode`` — literal type for prompt context mode

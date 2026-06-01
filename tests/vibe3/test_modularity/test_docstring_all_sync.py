@@ -38,15 +38,21 @@ def test_agents_doc_mentions_exist_in_all() -> None:
     # This pattern matches symbols wrapped in double backticks
     mentions = re.findall(r"``([^`]+)``", doc)
 
-    # Some mentions might be descriptive or external (though currently they aren't)
-    # Filter to only check those that look like they should be internal exports
+    # Filter to valid Python identifiers only (avoid descriptive text)
+    # and de-duplicate to avoid repeated failures
+    valid_identifier_pattern = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+    symbol_mentions = {
+        mention for mention in mentions if valid_identifier_pattern.match(mention)
+    }
+
+    # Check that all documented symbols are exported
     missing_in_all = []
-    for mention in mentions:
-        if mention not in all_symbols:
-            missing_in_all.append(mention)
+    for symbol in sorted(symbol_mentions):
+        if symbol not in all_symbols:
+            missing_in_all.append(symbol)
 
     assert not missing_in_all, (
         f"Symbols documented in vibe3.agents docstring are missing from __all__: "
-        f"{sorted(missing_in_all)}\n\n"
+        f"{missing_in_all}\n\n"
         "Ensure all documented Public API symbols are exported."
     )
