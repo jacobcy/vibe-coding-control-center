@@ -146,11 +146,20 @@ def build_manager_request(
         # Re-raise capacity defer so handler can defer properly
         raise
     except Exception as exc:
+        from vibe3.services.error_helpers import record_error
+
+        record_error(
+            error_code="E_DISPATCH_FAILURE",
+            error_message=f"build_manager_request failed: {exc}",
+            severity=None,  # inferred from E_DISPATCH_FAILURE registry entry
+            tick_id=tick_id,
+            issue_number=issue.number,
+        )
         logger.bind(
             domain="manager",
             issue_number=issue.number,
-        ).warning(f"create_flow_for_issue failed: {exc}")
-        return None
+        ).exception(f"create_flow_for_issue failed: {exc}")
+        raise
 
     if not flow:
         return None
