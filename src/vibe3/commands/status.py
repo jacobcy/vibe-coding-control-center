@@ -220,9 +220,10 @@ def status(
             )
         return
 
-    from datetime import datetime
+    else:
+        from datetime import datetime
 
-    ts_utc = datetime.fromtimestamp(orch_snapshot.timestamp, tz=timezone.utc)
+        ts_utc = datetime.fromtimestamp(orch_snapshot.timestamp, tz=timezone.utc)
     ts_str = format_age_aware_time(ts_utc)
     console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
     console.print(
