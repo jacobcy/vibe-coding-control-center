@@ -79,6 +79,7 @@ class TestBuildGovernanceRequest:
         req = build_governance_request(config, 1, snapshot)
         from vibe3.execution.role_contracts import WorktreeRequirement
 
+        assert req is not None
         assert req.worktree_requirement == WorktreeRequirement.NONE
 
 
@@ -114,33 +115,32 @@ class TestRoundRobinMaterialSelection:
     def test_tick_0_selects_first(self):
         """tick_count=0 selects first material from recipe catalog."""
         recipe = build_governance_recipe(_make_config(), tick_count=0)
-        # Material catalog is from prompt-recipes.yaml
         val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
+        assert val == "supervisor/governance/assignee-pool.md"
 
     def test_tick_1_selects_second(self):
         """tick_count=1 selects second material from recipe catalog."""
         recipe = build_governance_recipe(_make_config(), tick_count=1)
         val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
+        assert val == "supervisor/governance/roadmap-intake.md"
+
+    def test_tick_2_selects_third(self):
+        """tick_count=2 selects third material from recipe catalog."""
+        recipe = build_governance_recipe(_make_config(), tick_count=2)
+        val = recipe.variables["supervisor_name"].value
+        assert val == "supervisor/governance/cron-supervisor.md"
 
     def test_tick_wraps_around(self):
-        """tick_count wraps around material catalog."""
+        """tick_count wraps around material catalog (3 materials, tick 3 -> index 0)."""
         recipe = build_governance_recipe(_make_config(), tick_count=3)
-        # 3 % 3 = 0, so should be first material
         val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
+        assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """tick_count=7 should wrap around 3 materials to index 1."""
+        """tick_count=7 wraps around 3 materials to index 1 (7 % 3 = 1)."""
         recipe = build_governance_recipe(_make_config(), tick_count=7)
         val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        # 7 % 3 = 1, should be second material
-        assert "supervisor/governance/" in val
+        assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_build_governance_request_uses_round_robin(self):
         """build_governance_request picks material per tick from recipe catalog."""
