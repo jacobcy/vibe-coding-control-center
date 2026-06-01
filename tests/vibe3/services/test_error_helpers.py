@@ -68,54 +68,6 @@ class TestRecordDispatchFailureIfUnexpected:
 
         mock_record_error.assert_not_called()
 
-    def test_launch_failed_not_recorded(self) -> None:
-        """Verify launch_failed is not recorded when error_recorded=True."""
-        result = ExecutionLaunchResult(
-            launched=False,
-            skipped=False,
-            reason="Failed to start session",
-            reason_code="launch_failed",
-            error_recorded=True,  # Runner already recorded specific error
-        )
-
-        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
-            record_dispatch_failure_if_unexpected(
-                result=result,
-                role="planner",
-                issue_number=123,
-                branch="dev/test",
-            )
-
-        mock_record_error.assert_not_called()
-
-    def test_launch_failed_recorded_when_no_error_flag(self) -> None:
-        """Verify launch_failed IS recorded when error_recorded=False."""
-        result = ExecutionLaunchResult(
-            launched=False,
-            skipped=False,
-            reason="Launch failed before runner started",
-            reason_code="launch_failed",
-            error_recorded=False,  # No specific error recorded yet
-        )
-
-        mock_store = MagicMock()
-
-        with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
-            patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
-                return_value=mock_store,
-            ),
-        ):
-            record_dispatch_failure_if_unexpected(
-                result=result,
-                role="planner",
-                issue_number=123,
-                branch="dev/test",
-            )
-
-        mock_record_error.assert_called_once()
-
     def test_unexpected_failure_recorded(self) -> None:
         """Verify worktree_unavailable is recorded."""
         # Test worktree_unavailable

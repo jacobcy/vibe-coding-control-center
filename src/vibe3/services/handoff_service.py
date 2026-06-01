@@ -201,7 +201,7 @@ class HandoffService:
 
         # 1. Write to handoff file
         handoff_path = self.storage.append_current_handoff(
-            message, effective_actor, kind, branch
+            message, effective_actor, kind, target_branch
         )
 
         # 2. Skip event recording if requested (for dedup)

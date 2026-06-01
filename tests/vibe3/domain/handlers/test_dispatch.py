@@ -188,6 +188,7 @@ class TestPlannerDispatchHandler:
         # Should NOT call record_error for launch_failed
         mock_record_error.assert_not_called()
 
+    @patch("vibe3.services.error_helpers.has_recent_specific_error")
     @patch("vibe3.services.error_helpers.record_error")
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
@@ -202,8 +203,12 @@ class TestPlannerDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
         mock_record_error: MagicMock,
+        mock_has_recent_error: MagicMock,
     ) -> None:
-        """Verify launch_failed does not trigger error recording."""
+        """Verify launch_failed does not trigger error recording when prior error.
+
+        exists.
+        """
         from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
@@ -225,9 +230,11 @@ class TestPlannerDispatchHandler:
             skipped=False,
             reason="Failed to start session",
             reason_code="launch_failed",
-            error_recorded=True,  # Runner already recorded specific error
         )
         mock_coordinator_cls.return_value = mock_coordinator
+
+        # Mock has_recent_specific_error to return True (prior error exists)
+        mock_has_recent_error.return_value = True
 
         handle_planner_dispatch_intent(
             PlannerDispatchIntent(
@@ -238,7 +245,9 @@ class TestPlannerDispatchHandler:
             )
         )
 
+        # Should NOT call record_error when prior error exists
         mock_record_error.assert_not_called()
+        mock_has_recent_error.assert_called_once()
 
 
 class TestExecutorDispatchHandler:
