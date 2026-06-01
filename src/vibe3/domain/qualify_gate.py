@@ -150,10 +150,6 @@ class QualifyGateService:
         """
         from vibe3.orchestra.logging import append_orchestra_event
 
-        # Guard: if the GitHub issue is closed, terminalize the flow and skip.
-        # Closed issues with lingering state/blocked labels should be cleaned up,
-        # not dispatched. Without this check, the qualify gate may attempt to
-        # dispatch a closed issue with stale flow_state and produce errors.
         if issue.github_state and issue.github_state.upper() == "CLOSED":
             flow = self._flow_manager.get_flow_for_issue(issue.number)
             branch = str(flow.get("branch") or "").strip() if flow else ""
@@ -163,14 +159,13 @@ class QualifyGateService:
                     f"qualify_gate skip_blocked (#{issue.number}): "
                     "issue closed on GitHub — terminalizing local flow",
                 )
-                # Use FlowCleanupService for unified terminalization
                 from vibe3.services.flow_cleanup_service import FlowCleanupService
 
                 FlowCleanupService(store=self._store).cleanup_flow_scene(
                     branch,
                     include_remote=False,
                     terminate_sessions=True,
-                    keep_flow_record=True,  # Preserve flow record as terminal history
+                    keep_flow_record=True,
                 )
             return None
 
@@ -184,8 +179,6 @@ class QualifyGateService:
             issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
         )
 
-        # Guard: run_qualify_gate may return BLOCKED when flow_state is missing
-        # but labels contain state/blocked. BLOCKED state cannot be dispatched.
         if result == IssueState.BLOCKED:
             return None
 

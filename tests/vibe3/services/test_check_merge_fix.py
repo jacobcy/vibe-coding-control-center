@@ -225,9 +225,13 @@ class TestStaleFlowHandling:
         mock_github_client.list_prs_for_branch.return_value = []
 
         with patch(
-            "vibe3.services.flow_orchestrator_service.FlowOrchestratorService.create_flow_for_issue",
-            return_value={"branch": "task/issue-431", "flow_status": "active"},
-        ) as mock_create_flow:
+            "vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase"
+        ) as rebuild_cls:
+            rebuild = rebuild_cls.return_value
+            rebuild.rebuild_issue_flow.return_value = {
+                "branch": "task/issue-431",
+                "flow_status": "active",
+            }
             with patch.object(
                 check_service.git_client,
                 "get_current_branch",
@@ -236,7 +240,7 @@ class TestStaleFlowHandling:
                 result = check_service.verify_current_flow()
 
         assert result.is_valid
-        mock_create_flow.assert_called_once()
+        rebuild.rebuild_issue_flow.assert_called_once()
 
 
 class TestAutoFix:

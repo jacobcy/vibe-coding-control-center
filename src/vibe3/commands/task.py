@@ -162,24 +162,8 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
-    remote: Annotated[
-        bool,
-        typer.Option(
-            "--remote",
-            help="[DEPRECATED] This option is only valid for vibe3 flow rebuild",
-            hidden=True,
-        ),
-    ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
-    ] = False,
-    all_tasks: Annotated[
-        bool,
-        typer.Option(
-            "--all",
-            help="[DEPRECATED] Use 'vibe3 flow rebuild' for explicit rebuild",
-            hidden=True,
-        ),
     ] = False,
     label: Annotated[
         str | None,
@@ -215,23 +199,6 @@ def resume(
 
     register_event_handlers()
 
-    # Reject --remote (destructive rebuild is now in flow rebuild command)
-    if remote:
-        typer.echo(
-            "Error: --remote is only valid for vibe3 flow rebuild",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # Reject --all (destructive reset is now in flow rebuild command)
-    if all_tasks:
-        typer.echo(
-            "Error: --all is deprecated. Use 'vibe3 flow rebuild <issue>' "
-            "for explicit rebuild",
-            err=True,
-        )
-        raise typer.Exit(1)
-
     # Validate arguments
     if not blocked and not issue_numbers:
         typer.echo(
@@ -257,7 +224,7 @@ def resume(
         "review",
         "merge-ready",
     }
-    effective_label: str | None = ""
+    effective_label = ""
     if label is not None:
         if label == "auto":
             effective_label = ""
@@ -331,9 +298,7 @@ def resume(
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode="resumable",
             label_state=effective_label,
-            remote=False,
             progress_callback=progress_callback if yes else None,
         )
     else:
@@ -344,9 +309,7 @@ def resume(
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode="resumable",
             label_state=effective_label,
-            remote=False,
             progress_callback=progress_callback if yes else None,
         )
 

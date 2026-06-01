@@ -212,7 +212,7 @@ uv run python src/vibe3/cli.py handoff status     # 阅读 agent 留下的 Findi
    - `handoff show <artifact-path>` 读取共享 artifact，不再把 `handoff show` 当成状态总览入口。
 5. **恢复已有 branch 统一用 `/vibe-continue`**：`/vibe-start` 已不再作为现行入口。
 6. **Orchestra 是后台服务**：`vibe3 serve` 启动心跳轮询，自动处理 Webhook 事件，`vibe3 task status` 是它的主展示面。
-7. **现场判断顺序有主次**：先 `task status` / `flow status` / `flow show` 看现场，再用 `check` 核对同步，再按需用 `task resume` 回退其他 auto-task scenes。
+7. **现场判断顺序有主次**：先 `task status` / `flow status` / `flow show` 看现场，再用 `check` 核对同步；blocked 用 `task resume` 恢复，坏现场用 `flow rebuild` 重建。
 
 ---
 

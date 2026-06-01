@@ -189,68 +189,6 @@ class TaskResumeCandidates:
 
         return current
 
-    def maybe_skip_all_task_candidate(
-        self,
-        *,
-        issue_number: int,
-        flow: FlowStatusResponse | None,
-        candidate_state: object,
-        worktree_path: str | None,
-        has_live_sessions: bool | None = None,
-        label_state: str | None = None,  # 新增：区分 --label 和完整重建
-    ) -> str | None:
-        """Skip noop all-task candidates that no longer have a task scene to reset.
-
-        Args:
-            issue_number: GitHub issue number
-            flow: Flow status response
-            candidate_state: Current issue state
-            worktree_path: Worktree path (if exists)
-            has_live_sessions: Whether branch has live runtime sessions (from registry).
-                Registry is the single source of truth for session status.
-            label_state: Optional label state (--label mode). None means full rebuild.
-
-        Returns:
-            Skip reason string if candidate should be skipped, None otherwise.
-        """
-        branch = getattr(flow, "branch", None) if flow else None
-
-        # Registry is the source of truth for live sessions
-        has_runtime_sessions = bool(has_live_sessions)
-
-        # --label 模式：保留现场，只清理 reason
-        # 如果没有现场可清理 reason，则跳过
-        if label_state is not None:
-            if (
-                candidate_state == IssueState.READY
-                and worktree_path is None
-                and not has_runtime_sessions
-            ):
-                logger.bind(
-                    domain="resume",
-                    action="skip_noop_label_resume",
-                    issue_number=issue_number,
-                    branch=branch,
-                    worktree_path=None,
-                    state="ready",
-                ).info("Skipping --label resume without task scene")
-                return "已是 state/ready 且无 task scene，无法清理 reason，跳过恢复"
-
-        # 完整重建模式（无 --label）：
-        # 即使没有 worktree/flow，也可以继续（将状态设为 ready，等待重新 dispatch）
-        # 只有当有活跃 session 时才跳过（需要用户手动处理）
-        if has_runtime_sessions:
-            logger.bind(
-                domain="resume",
-                action="skip_live_session",
-                issue_number=issue_number,
-                branch=branch,
-                worktree_path=worktree_path,
-            ).info("Skipping resume due to live runtime sessions")
-            return "存在活跃 runtime session，需要先手动终止，跳过恢复"
-
-        return None
-
     def verify_issue_state_for_resume(
         self, issue_number: int, resume_kind: str, repo: str | None
     ) -> bool:
@@ -258,7 +196,7 @@ class TaskResumeCandidates:
 
         Args:
             issue_number: GitHub issue number
-            resume_kind: Expected resume kind ("failed", "blocked", "aborted", or "all")
+            resume_kind: Expected resume kind ("blocked" or "aborted")
             repo: Repository (owner/repo format, optional)
 
         Returns:
@@ -278,9 +216,6 @@ class TaskResumeCandidates:
 
         current_state = self.label_service.get_state(issue_number)
 
-        if resume_kind == "all":
-            return current_state is None or current_state != IssueState.DONE
-
         if current_state is None:
             return False
 
@@ -293,79 +228,3 @@ class TaskResumeCandidates:
             return current_state.value in ("ready", "handoff")
 
         return False
-
-    def build_all_task_candidates(
-        self, flows: list[FlowStatusResponse]
-    ) -> list[dict[str, Any]]:
-        """Build reset candidates for every auto-created task flow."""
-        issue_details: dict[int, dict[str, Any]] = {}
-        try:
-            orchestrated_issues = self.status_service.fetch_orchestrated_issues(
-                flows=flows,
-                queued_set=set(),
-                stale_flows=[],
-            )
-            for issue in orchestrated_issues:
-                issue_number = issue.get("number")
-                if isinstance(issue_number, int):
-                    issue_details[issue_number] = issue
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="build_all_task_candidates",
-            ).warning(f"Failed to enrich all-task candidates from GitHub: {exc}")
-
-        candidates: list[dict[str, Any]] = []
-        for flow in flows:
-            branch = getattr(flow, "branch", None)
-            if not isinstance(branch, str):
-                continue
-            if not self.issue_flow_service.is_task_branch(branch):
-                continue
-            issue_number = getattr(flow, "task_issue_number", None)
-            if not isinstance(issue_number, int):
-                continue
-
-            # Filter out completed/aborted/merged flows
-            flow_status = getattr(flow, "flow_status", None)
-            if flow_status in {"done", "aborted", "merged"}:
-                logger.bind(
-                    domain="resume",
-                    action="skip_completed_flow",
-                    issue_number=issue_number,
-                    flow_status=flow_status,
-                ).debug(f"Skipping {flow_status} flow for issue #{issue_number}")
-                continue
-
-            # Filter out flows with PR (factually complete)
-            pr_ref = getattr(flow, "pr_ref", None)
-            if isinstance(pr_ref, str) and pr_ref:
-                logger.bind(
-                    domain="resume",
-                    action="skip_pr_flow",
-                    issue_number=issue_number,
-                    pr_ref=pr_ref,
-                ).debug(f"Skipping flow with PR {pr_ref} for issue #{issue_number}")
-                continue
-
-            # Validate issue exists and get current state
-            current_state = self.label_service.get_state(issue_number)
-            if current_state is None:
-                # Issue doesn't exist or labels missing, skip
-                logger.bind(
-                    domain="resume",
-                    action="skip_nonexistent_issue",
-                    issue_number=issue_number,
-                ).debug(f"Skipping issue #{issue_number} without valid state labels")
-                continue
-
-            issue = issue_details.get(issue_number, {})
-            candidate = {
-                "number": issue_number,
-                "title": str(issue.get("title") or ""),
-                "state": current_state,  # Use validated state
-                "flow": flow,
-            }
-            candidate["resume_kind"] = "all"
-            candidates.append(candidate)
-        return candidates

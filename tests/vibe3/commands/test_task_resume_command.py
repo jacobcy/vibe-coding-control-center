@@ -46,7 +46,6 @@ def test_task_resume_issue_defaults_to_label_auto(
     call = usecase.resume_issues.call_args.kwargs
     assert call["issue_numbers"] == [303]
     assert call["label_state"] == ""
-    assert call["remote"] is False
 
 
 @patch("vibe3.commands.task.FlowService")
@@ -104,9 +103,17 @@ def test_task_resume_label_ready_preserves_explicit_label(
     assert call["label_state"] == "ready"
 
 
-def test_task_resume_rejects_remote_without_rebuild() -> None:
-    """`--remote` is destructive-rebuild-only and no longer valid on task resume."""
+def test_task_resume_has_no_remote_option() -> None:
+    """`--remote` is not part of task resume."""
     result = runner.invoke(app, ["task", "resume", "303", "--remote"])
 
     assert result.exit_code != 0
-    assert "--remote is only valid for vibe3 flow rebuild" in result.output
+    assert "No such option" in result.output
+
+
+def test_task_resume_has_no_all_option() -> None:
+    """`--all` is not part of task resume."""
+    result = runner.invoke(app, ["task", "resume", "--all"])
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output

@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 
 if TYPE_CHECKING:
@@ -140,17 +140,20 @@ class AutoSceneRecoveryService:
             },
         )
 
-        # Use BlockedStateService for unified unblock path
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
         try:
-            service = BlockedStateService(store=self.store)
-            service.unblock(
+            FlowRebuildUsecase(store=self.store).rebuild_issue_flow(
+                issue=IssueInfo(
+                    number=request.target_id,
+                    title=f"Issue {request.target_id}",
+                    labels=[IssueState.READY.to_label()],
+                    state=IssueState.READY,
+                ),
                 branch=branch,
-                target_state=IssueState.READY,
-                issue_number=request.target_id,
-                actor=recovery_actor,
-                detail=f"Auto scene recovery: {detail}",
+                reason=recovery_reason,
+                include_remote=True,
+                ensure_worktree=True,
             )
         except Exception as exc:
             append_orchestra_event(

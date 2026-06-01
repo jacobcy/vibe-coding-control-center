@@ -44,7 +44,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
             label_state="",  # --label auto (converted to empty string internally)
         )
 
-        # Verify: worktree NOT deleted (reset_task_scene NOT called)
+        # Verify: worktree NOT deleted (cleanup service not called)
         operations.git_client.remove_worktree.assert_not_called()
         operations.git_client.delete_branch.assert_not_called()
 
