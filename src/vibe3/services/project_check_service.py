@@ -85,9 +85,9 @@ class ProjectCheckService:
         """Get git repository root directory.
 
         Correctly handles:
-        - Worktrees: git-common-dir returns absolute path
-        - Repo root: git-common-dir returns .git (relative)
-        - Subdirectories: git-common-dir returns ../.git (relative)
+        - Worktrees: --show-toplevel returns worktree root
+        - Repo root: --show-toplevel returns repository root
+        - Subdirectories: --show-toplevel returns repository root
 
         Returns:
             Path to git root or None if not in a git repo
@@ -95,25 +95,14 @@ class ProjectCheckService:
         if self._git_root is not None:
             return self._git_root
 
-        # First check if we're in a git repo
-        result = self._run_git("rev-parse", "--git-dir")
-        if result.returncode != 0:
-            return None
-
-        # Get the git common dir (handles worktrees correctly)
-        # For main repo: returns .git
-        # For worktree: returns main repo's .git directory (absolute)
-        # For subdirectory: returns ../.git (relative to cwd)
-        result = self._run_git("rev-parse", "--git-common-dir")
+        # Get the top-level directory (handles worktrees correctly)
+        # For main repo: returns the repository root
+        # For worktree: returns the worktree root (not the main repo)
+        # For subdirectory: returns the repository root
+        result = self._run_git("rev-parse", "--show-toplevel")
         if result.returncode == 0:
-            git_common_dir = Path(result.stdout.strip())
-
-            # If it's a relative path, resolve it from cwd
-            if not git_common_dir.is_absolute():
-                git_common_dir = (self.project_root / git_common_dir).resolve()
-
-            # The git root is the parent of .git directory
-            self._git_root = git_common_dir.parent
+            git_root = Path(result.stdout.strip()).resolve()
+            self._git_root = git_root
             return self._git_root
         return None
 
