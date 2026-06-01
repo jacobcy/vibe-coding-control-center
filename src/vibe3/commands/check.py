@@ -254,6 +254,14 @@ def check(
         else:
             mode = "fix_all"
 
+        # Guard: --force only valid with --clean-branch
+        if force and mode != "clean_branch":
+            typer.echo(
+                "Error: --force can only be used with --clean-branch.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
         result = execute_check_mode(
             service,
             mode,
