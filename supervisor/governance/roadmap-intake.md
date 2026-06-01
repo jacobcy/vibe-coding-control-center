@@ -232,12 +232,12 @@ Manager assignee 配置位于：
 
 **错误示例**（旧版本）：
 ```
-[governance suggest] Intake: assigned to @alice (manager-pool); scope=bugfix.
+[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
 ```
 
 **正确示例**：
 ```
-[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
+[governance suggest] Intake completed (scope=bugfix).
 ```
 
 ## Permission Contract
@@ -339,7 +339,7 @@ Forbidden:
 
 合规示例：
 ```
-[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
+[governance suggest] Intake completed (scope=bugfix).
 [governance suggest] Skipped: scope unclear, needs pool or roadmap review before automation.
 ```
 

@@ -190,7 +190,6 @@ orchestra:
 
       ## Governance Material
       - Supervisor: {supervisor_name}
-      - Manager Bot: {manager_bot}
 
       {supervisor_content}
 
