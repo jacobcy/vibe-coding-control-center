@@ -51,6 +51,8 @@ class FlowRebuildUsecase:
         issue: IssueInfo,
         branch: str,
         reason: str,
+        slug: str | None = None,
+        source: str = "flow:rebuild",
         include_remote: bool = True,
         ensure_worktree: bool = True,
     ) -> dict[str, Any] | None:
@@ -85,9 +87,9 @@ class FlowRebuildUsecase:
         result = self.orchestrator.bootstrap_issue_flow(
             issue,
             branch=branch,
-            slug=f"issue-{issue.number}",
-            source="flow:rebuild",
-            initiated_by="flow:rebuild",
+            slug=slug or f"issue-{issue.number}",
+            source=source,
+            initiated_by=source,
             ensure_worktree=ensure_worktree,
             reactivate_existing=False,
         )

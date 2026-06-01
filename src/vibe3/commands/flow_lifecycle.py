@@ -6,6 +6,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
@@ -149,7 +150,9 @@ def rebuild(
     appends a rebuild handoff event, and clears blocked state through the
     label-auto resume path.
     """
-    branch = f"task/issue-{issue_number}"
+    branch = (
+        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
+    )
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
@@ -158,9 +161,8 @@ def rebuild(
         return
 
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.config.orchestra_config import OrchestraConfig
 
-    config = OrchestraConfig()
+    config = load_orchestra_config()
     issue = load_issue_info(issue_number, config=config, github=GitHubClient())
     result = FlowRebuildUsecase().rebuild_issue_flow(
         issue=issue,

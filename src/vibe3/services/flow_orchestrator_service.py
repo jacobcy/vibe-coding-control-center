@@ -239,7 +239,6 @@ class FlowOrchestratorService:
         """
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
-        slug = slug or f"issue-{issue.number}"
         # Use branch→PR lookup for consistency (not issue→PR)
         # Query all PR states (including merged) to detect merged PRs
         try:
@@ -270,6 +269,8 @@ class FlowOrchestratorService:
         ).rebuild_issue_flow(
             issue=issue,
             branch=branch,
+            slug=slug,
+            source=source,
             reason="stale flow rebuild",
             include_remote=False,
             ensure_worktree=ensure_worktree,

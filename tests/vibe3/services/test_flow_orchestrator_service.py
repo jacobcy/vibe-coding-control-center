@@ -233,12 +233,17 @@ def test_rebuild_stale_issue_flow_delegates_to_flow_rebuild_usecase() -> None:
         rebuild.rebuild_issue_flow.return_value = {"branch": "task/issue-320"}
 
         result = service.rebuild_stale_issue_flow(
-            issue, branch="task/issue-320", slug="issue-320"
+            issue,
+            branch="task/issue-320",
+            slug="custom-320",
+            source="check:stale-ready",
         )
 
     rebuild.rebuild_issue_flow.assert_called_once_with(
         issue=issue,
         branch="task/issue-320",
+        slug="custom-320",
+        source="check:stale-ready",
         reason="stale flow rebuild",
         include_remote=False,
         ensure_worktree=False,
