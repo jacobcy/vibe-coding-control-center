@@ -10,7 +10,31 @@ from typing import IO
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    """Get the main repository root directory.
+
+    Uses git common dir to correctly handle worktrees:
+    - In worktrees, git common dir points to the main repo's .git directory
+    - In main repo, it points to the local .git directory
+    - The parent of git common dir is always the main repository root
+
+    Falls back to path-based detection if git command fails.
+    """
+    try:
+        import subprocess
+
+        # Get the shared .git directory (works in both main repo and worktrees)
+        result = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        git_common_dir = Path(result.stdout.strip())
+        # The parent of .git is the main repository root
+        return git_common_dir.parent
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        # Fallback to path-based detection for non-git environments
+        return Path(__file__).resolve().parents[3]
 
 
 def orchestra_log_dir(repo_root: Path | None = None) -> Path:
