@@ -295,10 +295,10 @@ class CheckPRService:
 
         # Build minimal FlowStatusResponse for task resume
         try:
-            from vibe3.config.orchestra_config import OrchestraConfig
+            from vibe3.config.orchestra_settings import load_orchestra_config
             from vibe3.services.issue_context_loader import load_issue_info
 
-            config = OrchestraConfig()
+            config = load_orchestra_config()
             issue_info = load_issue_info(
                 task_issue_number, config=config, github=self.github_client
             )

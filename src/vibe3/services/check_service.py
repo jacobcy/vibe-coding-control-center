@@ -449,35 +449,31 @@ class CheckService(CheckRemote):
 
             # ref files exist
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.path_helpers import check_ref_exists
+                from vibe3.services.flow_consistency_check import (
+                    FlowConsistencyCode,
+                    check_flow_consistency,
+                )
 
-                for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
-                    ref_value = flow_data.get(ref_field)
-                    if ref_value:
-                        # Use unified check_ref_exists method
-                        display_path, exists = check_ref_exists(
-                            ref_value, branch, git_client=self.git_client
+                consistency = check_flow_consistency(
+                    branch,
+                    flow_data,
+                    git_client=self.git_client,
+                )
+                if consistency.needs_rebuild:
+                    suggestion = self._flow_rebuild_suggestion(task_issue, branch)
+                    if consistency.code == FlowConsistencyCode.MISSING_REF:
+                        issues.append(
+                            f"{consistency.ref_field} file not found: "
+                            f"{consistency.ref_value}. "
+                            f"Suggestion: Run '{suggestion}' to rebuild the "
+                            "flow scene."
                         )
-
-                        if not exists:
-                            # Check if worktree exists for better error message
-                            worktree_path = (
-                                self.git_client.find_worktree_path_for_branch(branch)
-                            )
-                            if worktree_path is None:
-                                issues.append(
-                                    f"{ref_field} cannot be verified: no "
-                                    f"worktree for branch '{branch}'. "
-                                    "Suggestion: Check if worktree was "
-                                    "accidentally deleted or run 'vibe3 "
-                                    f"flow rebuild {task_issue}'."
-                                )
-                            else:
-                                issues.append(
-                                    f"{ref_field} file not found: {ref_value}. "
-                                    f"Suggestion: Run 'vibe3 task resume "
-                                    f"{task_issue}' to resume from blocked state."
-                                )
+                    else:
+                        issues.append(
+                            f"{consistency.reason}. "
+                            f"Suggestion: Run '{suggestion}' to rebuild the "
+                            "flow scene."
+                        )
 
             is_valid = len(issues) == 0
             logger.bind(
@@ -486,6 +482,15 @@ class CheckService(CheckRemote):
             return CheckResult(
                 is_valid=is_valid, issues=issues, warnings=warnings, branch=branch
             )
+
+    def _flow_rebuild_suggestion(self, task_issue: int | None, branch: str) -> str:
+        if task_issue:
+            return f"vibe3 flow rebuild {task_issue} --yes"
+        if branch.startswith("task/issue-"):
+            issue_part = branch.removeprefix("task/issue-")
+            if issue_part.isdigit():
+                return f"vibe3 flow rebuild {issue_part} --yes"
+        return "vibe3 flow rebuild <issue> --yes"
 
     def verify_all_flows(
         self,

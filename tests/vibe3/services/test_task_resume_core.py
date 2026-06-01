@@ -19,7 +19,11 @@ def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
         "flow_status": "blocked",
         "latest_actor": "test",
         "task_issue_number": 303,
+        "worktree_path": "/tmp/task-issue-303",
     }
+    operations.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/task-issue-303"
+    )
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"

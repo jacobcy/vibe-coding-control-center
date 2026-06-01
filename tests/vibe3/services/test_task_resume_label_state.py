@@ -2,7 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from tests.vibe3.services.conftest import _make_operations
+from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 
 
@@ -22,12 +25,16 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         "flow_slug": "task/issue-303",
         "pr_ref": None,
         "audit_ref": None,
-        "plan_ref": "docs/plans/test.md",
+        "plan_ref": None,
         "report_ref": None,
         "latest_verdict": None,
+        "worktree_path": "/tmp/task-issue-303",
     }
     operations.flow_service.store.get_flow_state.return_value = mock_flow_state_dict
     operations.flow_service.store.get_task_issue_number.return_value = 303
+    operations.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/task-issue-303"
+    )
 
     with patch(
         "vibe3.services.blocked_state_service.BlockedStateService"
@@ -320,3 +327,37 @@ def test_label_auto_with_missing_recorded_worktree_rebuilds_scene() -> None:
         )
 
         rebuild.rebuild_issue_flow.assert_called_once()
+
+
+def test_label_auto_with_unrecorded_existing_worktree_requires_rebuild() -> None:
+    """A physical task worktree without flow_state.worktree_path is inconsistent."""
+    operations = _make_operations()
+    operations.flow_service.store.get_flow_state.return_value = {
+        "branch": "task/issue-303",
+        "flow_slug": "issue-303",
+        "flow_status": "blocked",
+        "latest_actor": "test",
+        "task_issue_number": 303,
+        "worktree_path": None,
+    }
+    operations.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/task-issue-303"
+    )
+
+    mock_flow = MagicMock()
+    mock_flow.branch = "task/issue-303"
+
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as blocked_cls:
+        with pytest.raises(UserError, match="vibe3 flow rebuild 303 --yes"):
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="resume inconsistent scene",
+                label_state="",
+            )
+
+    blocked_cls.assert_not_called()
