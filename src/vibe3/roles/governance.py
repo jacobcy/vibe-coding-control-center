@@ -39,7 +39,7 @@ from vibe3.roles.governance_utils import (
     find_material_in_catalog,
     get_governed_issue_numbers,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
@@ -246,7 +246,7 @@ def build_governance_recipe(
 
     supervisor_content_source = current.source
 
-    manager_usernames = get_manager_usernames(config)
+    manager_usernames = OrchestraStatusService.get_manager_usernames(config)
     manager_bot = manager_usernames[0] if manager_usernames else "vibe-manager-agent"
 
     variables: dict[str, PromptVariableSource] = {
