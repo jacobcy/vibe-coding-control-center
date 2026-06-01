@@ -233,11 +233,12 @@ class FlowOrchestratorService:
         source: str = "dispatch",
         ensure_worktree: bool = False,
     ) -> dict[str, Any] | None:
-        """Rebuild a stale flow: cleanup then re-bootstrap.
+        """Rebuild a stale flow using FlowRebuildUsecase.
 
         Returns None if the issue already has a merged PR (no rebuild needed).
         """
-        slug = slug or f"issue-{issue.number}"
+        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+
         # Use branch→PR lookup for consistency (not issue→PR)
         # Query all PR states (including merged) to detect merged PRs
         try:
@@ -261,20 +262,18 @@ class FlowOrchestratorService:
             # GitHub CLI not available or query failed, continue with rebuild
             pass
 
-        FlowCleanupService(git_client=self.git, store=self.store).cleanup_flow_scene(
-            branch,
-            include_remote=False,
-            terminate_sessions=False,
-            keep_flow_record=True,
-            force_delete=False,
-        )
-        return self.bootstrap_issue_flow(
-            issue,
+        return FlowRebuildUsecase(
+            store=self.store,
+            git_client=self.git,
+            orchestrator=self,
+        ).rebuild_issue_flow(
+            issue=issue,
             branch=branch,
             slug=slug,
             source=source,
+            reason="stale flow rebuild",
+            include_remote=False,
             ensure_worktree=ensure_worktree,
-            reactivate_existing=True,
         )
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict[str, Any] | None:

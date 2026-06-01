@@ -58,6 +58,7 @@ def classify_task_status(
         IssueState.HANDOFF,
         IssueState.IN_PROGRESS,
         IssueState.REVIEW,
+        IssueState.MERGE_READY,
     }:
         # Active state without assignee is an anomaly (rule 2)
         if not assignee or not assignee.strip():

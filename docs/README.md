@@ -47,7 +47,9 @@ docs/
 - **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
 - **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
-- **[vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 v3/worktree-lifecycle-standard.md)
+
+**已废弃文档 (Archives)**：
+- **[vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 standards/v3/worktree-lifecycle-standard.md)
 
 **V3 规范目录**：
 - **[standards/v3/](standards/v3/)** - V3 核心标准（handoff, git, models, registry migration）

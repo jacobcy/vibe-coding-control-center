@@ -11,13 +11,19 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.coordination_truth import CoordinationTruth
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
+from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.label_service import LabelService
+from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -144,10 +150,6 @@ class QualifyGateService:
         """
         from vibe3.orchestra.logging import append_orchestra_event
 
-        # Guard: if the GitHub issue is closed, terminalize the flow and skip.
-        # Closed issues with lingering state/blocked labels should be cleaned up,
-        # not dispatched. Without this check, the qualify gate may attempt to
-        # dispatch a closed issue with stale flow_state and produce errors.
         if issue.github_state and issue.github_state.upper() == "CLOSED":
             flow = self._flow_manager.get_flow_for_issue(issue.number)
             branch = str(flow.get("branch") or "").strip() if flow else ""
@@ -157,7 +159,14 @@ class QualifyGateService:
                     f"qualify_gate skip_blocked (#{issue.number}): "
                     "issue closed on GitHub — terminalizing local flow",
                 )
-                self._store.soft_delete_flow(branch)
+                from vibe3.services.flow_cleanup_service import FlowCleanupService
+
+                FlowCleanupService(store=self._store).cleanup_flow_scene(
+                    branch,
+                    include_remote=False,
+                    terminate_sessions=True,
+                    keep_flow_record=True,
+                )
             return None
 
         flow = self._flow_manager.get_flow_for_issue(issue.number)
@@ -170,8 +179,6 @@ class QualifyGateService:
             issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
         )
 
-        # Guard: run_qualify_gate may return BLOCKED when flow_state is missing
-        # but labels contain state/blocked. BLOCKED state cannot be dispatched.
         if result == IssueState.BLOCKED:
             return None
 
@@ -306,8 +313,6 @@ class QualifyGateService:
         """
         from vibe3.models.flow import FlowState
         from vibe3.orchestra.logging import append_orchestra_event
-        from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.label_service import LabelService
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -315,16 +320,37 @@ class QualifyGateService:
         else:
             target_label = IssueState.CLAIMED
 
-        service = BlockedStateService(
-            github_client=self._github,
-            label_service=LabelService(repo=self.config.repo),
-            store=self._store,
+        from typing import Literal, cast
+
+        flow_status_value = (
+            flow_state.get("flow_status", "blocked") if flow_state else "blocked"
         )
-        service.unblock(
+        flow = FlowStatusResponse(
             branch=branch,
-            target_state=target_label,
-            actor="orchestra:qualify",
+            flow_slug=(
+                str(flow_state.get("flow_slug") or branch) if flow_state else branch
+            ),
+            flow_status=cast(
+                Literal["active", "blocked", "done", "stale", "aborted"],
+                flow_status_value,
+            ),
+            latest_actor="orchestra:qualify",
+            task_issue_number=issue_number,
+        )
+        operations = TaskResumeOperations(
+            git_client=GitClient(),
+            github_client=self._github,
+            flow_service=FlowService(store=self._store),
+            label_service=LabelService(repo=self.config.repo),
+            issue_flow_service=IssueFlowService(store=self._store),
+        )
+        operations.reset_issue_to_ready(
             issue_number=issue_number,
+            resume_kind="blocked",
+            flow=flow,
+            repo=self.config.repo,
+            reason="qualify gate auto-resume",
+            label_state="",
         )
 
         append_orchestra_event(

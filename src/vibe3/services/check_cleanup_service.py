@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.models.flow import FlowStatusResponse
+from vibe3.services.task_resume_operations import TaskResumeOperations
+
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
@@ -42,13 +45,16 @@ class CheckCleanupService:
         self.git_client = git_client
         self._github_client = github_client
 
-    def clean_residual_branches(self) -> dict[str, Any]:
+    def clean_residual_branches(self, *, force: bool = False) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
 
         NEW: Also cleans expired resources:
         - Agent worktrees (> 7 days)
         - Remote non-protected branches (> 7 days)
         - Local inactive branches (> 7 days)
+
+        Args:
+            force: If True, force delete unmerged branches (git branch -D)
 
         Returns:
             Dict with summary and details of cleaned branches.
@@ -88,7 +94,7 @@ class CheckCleanupService:
 
         if cleanup_config.enable_local_branch_cleanup:
             results["local_branches"] = expired_service.clean_expired_local_branches(
-                max_age_days=cleanup_config.local_branch_max_age_days
+                max_age_days=cleanup_config.local_branch_max_age_days, force=force
             )
             cleaned = results["local_branches"].get("cleaned") or []
             summary_parts.append(f"local_branches cleaned {len(cleaned)}")
@@ -324,9 +330,6 @@ class CheckCleanupService:
             branch: Branch name (expected to be task/issue-N pattern)
         """
         try:
-            from vibe3.models.orchestration import IssueState
-            from vibe3.services.blocked_state_service import BlockedStateService
-
             issue_number = self._parse_issue_number(branch)
             if issue_number is None:
                 logger.bind(domain="check", branch=branch).debug(
@@ -335,6 +338,9 @@ class CheckCleanupService:
                 return
 
             from vibe3.clients.github_client import GitHubClient
+            from vibe3.services.flow_service import FlowService
+            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.label_service import LabelService
 
             gh = self._github_client or GitHubClient()
             gh_issue = gh.view_issue(issue_number)
@@ -347,16 +353,27 @@ class CheckCleanupService:
                 )
                 return
 
-            # Resume issue using unified BlockedStateService
-            service = BlockedStateService(
-                store=self.store,
-                github_client=gh,
-            )
-            service.unblock(
+            # Resume issue using unified TaskResumeOperations
+            flow = FlowStatusResponse(
                 branch=branch,
-                target_state=IssueState.READY,
+                flow_slug=branch,
+                flow_status="aborted",
+                latest_actor="vibe3:check",
+                task_issue_number=issue_number,
+            )
+            TaskResumeOperations(
+                git_client=self.git_client,
+                github_client=gh,
+                flow_service=FlowService(store=self.store),
+                label_service=LabelService(),
+                issue_flow_service=IssueFlowService(store=self.store),
+            ).reset_issue_to_ready(
                 issue_number=issue_number,
-                detail="Flow aborted and cleaned up by vibe check --clean-branch",
+                resume_kind="aborted",
+                flow=flow,
+                repo=None,
+                reason="Flow aborted and cleaned up by vibe check --clean-branch",
+                label_state="",
             )
 
             # Add informative comment

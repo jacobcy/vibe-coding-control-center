@@ -395,8 +395,6 @@ class TestCleanResidualBranches:
 
 def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
     """Aborted flow with --clean-branch should resume issue to READY."""
-    from vibe3.models.orchestration import IssueState
-
     store = MagicMock()
     git_client = MagicMock()
     github_client = MagicMock()
@@ -433,18 +431,18 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
         mock_cleanup_cls.return_value = mock_cleanup
 
         with patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
-        ) as mock_service_cls:
-            mock_service = MagicMock()
-            mock_service_cls.return_value = mock_service
+            "vibe3.services.check_cleanup_service.TaskResumeOperations"
+        ) as mock_operations_cls:
+            mock_operations = MagicMock()
+            mock_operations_cls.return_value = mock_operations
 
             results = service._clean_terminal_flows()
 
-    # Verify BlockedStateService.unblock was called
-    mock_service.unblock.assert_called_once()
-    call_args = mock_service.unblock.call_args
-    assert call_args.kwargs["target_state"] == IssueState.READY
+    # Verify TaskResumeOperations.reset_issue_to_ready was called
+    mock_operations.reset_issue_to_ready.assert_called_once()
+    call_args = mock_operations.reset_issue_to_ready.call_args
     assert call_args.kwargs["issue_number"] == 200
+    assert call_args.kwargs["label_state"] == ""
 
     # Verify cleanup happened
     assert "Cleaned 1 aborted flows" in results["summary"]
@@ -466,7 +464,7 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
         "state": "open",
     }
 
-    with patch("vibe3.services.blocked_state_service.BlockedStateService"):
+    with patch("vibe3.services.check_cleanup_service.TaskResumeOperations"):
         service._resume_blocked_issue("task/issue-300")
 
     # Verify comment added
@@ -478,3 +476,29 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
     assert "旧 flow 已清理" in comment_body
     assert "follow-up issue" in comment_body.lower()
     assert "不建议" in comment_body
+
+
+def test_resume_blocked_issue_uses_task_resume_operations() -> None:
+    """check --clean-branch restores labels through the same resume operation."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.services.check_cleanup_service import CheckCleanupService
+
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    github.view_issue.return_value = {"state": "OPEN"}
+    service = CheckCleanupService(store=store, git_client=git, github_client=github)
+
+    with patch(
+        "vibe3.services.check_cleanup_service.TaskResumeOperations"
+    ) as operations_cls:
+        operations = MagicMock()
+        operations_cls.return_value = operations
+
+        service._resume_blocked_issue("task/issue-300")
+
+        operations.reset_issue_to_ready.assert_called_once()
+        call = operations.reset_issue_to_ready.call_args.kwargs
+        assert call["issue_number"] == 300
+        assert call["label_state"] == ""

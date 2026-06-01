@@ -1,19 +1,12 @@
-"""Tests for governance role module functions."""
+"""Tests for governance snapshot context and comment format contract."""
 
-import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.roles.governance import (
-    GOVERNANCE_ROLE,
-    build_governance_execution_name,
     build_governance_recipe,
-    build_governance_request,
     build_governance_snapshot_context,
-    render_governance_prompt,
 )
 from vibe3.services.orchestra_status_service import (
     IssueStatusEntry,
@@ -47,262 +40,6 @@ def _make_config(**overrides) -> OrchestraConfig:
         governance=GovernanceConfig(**{**gov_defaults, **gov_overrides}),
         **overrides,
     )
-
-
-class TestBuildGovernanceRecipe:
-    """Tests for build_governance_recipe."""
-
-    def test_default_recipe_structure(self):
-        config = _make_config()
-        recipe = build_governance_recipe(config)
-        assert recipe.template_key == "orchestra.governance.plan"
-        assert "supervisor_name" in recipe.variables
-        assert "server_status" in recipe.variables
-
-    def test_supervisor_content_uses_file_source(self):
-        config = _make_config()
-        recipe = build_governance_recipe(config)
-        from vibe3.prompts.models import VariableSourceKind
-
-        src = recipe.variables["supervisor_content"]
-        assert src.kind == VariableSourceKind.FILE
-        assert src.path == "supervisor/governance/assignee-pool.md"
-
-    def test_missing_material_catalog_fails_instead_of_using_python_fallback(
-        self, tmp_path, monkeypatch
-    ):
-        from vibe3.prompts import manifest
-
-        recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text(
-            textwrap.dedent("""\
-                recipes:
-                  governance.scan:
-                    kind: template_recipe
-                    template_key: orchestra.governance.plan
-                    variables: {}
-            """),
-            encoding="utf-8",
-        )
-        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-
-        with pytest.raises(ValueError, match="material_catalog"):
-            build_governance_recipe(_make_config())
-
-
-class TestRenderGovernancePrompt:
-    """Tests for render_governance_prompt."""
-
-    def test_renders_template(self, tmp_path):
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(textwrap.dedent("""\
-            orchestra:
-              governance:
-                plan: |
-                  Supervisor={supervisor_name}
-                  Status={server_status}
-                  Count={active_count}
-        """))
-        config = _make_config()
-        ctx = build_governance_snapshot_context(_make_snapshot())
-        result = render_governance_prompt(config, ctx, prompts_path)
-        assert (
-            "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
-        )
-        assert "Status=running" in result.rendered_text
-
-    def test_template_controls_whether_supervisor_content_is_rendered(self, tmp_path):
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(textwrap.dedent("""\
-            orchestra:
-              governance:
-                plan: |
-                  Supervisor={supervisor_name}
-                  Status={server_status}
-        """))
-        config = _make_config()
-        ctx = build_governance_snapshot_context(_make_snapshot())
-        result = render_governance_prompt(config, ctx, prompts_path)
-
-        assert "Assignee Pool 治理材料" not in result.rendered_text
-
-    def test_governance_material_renders_from_global_assets_in_external_repo(
-        self, tmp_path, monkeypatch
-    ):
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            textwrap.dedent("""\
-                orchestra:
-                  governance:
-                    plan: |
-                      Supervisor={supervisor_name}
-                      Material={supervisor_content}
-            """),
-            encoding="utf-8",
-        )
-        material_path = tmp_path / "supervisor/governance/roadmap-intake.md"
-        material_path.parent.mkdir(parents=True)
-        material_path.write_text("GLOBAL ROADMAP INTAKE MATERIAL", encoding="utf-8")
-        external_repo = tmp_path / "agent-mesh"
-        external_repo.mkdir()
-        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
-        monkeypatch.chdir(external_repo)
-
-        config = _make_config()
-        ctx = build_governance_snapshot_context(
-            _make_snapshot(),
-            config=config,
-            tick_count=1,
-        )
-        result = render_governance_prompt(
-            config,
-            ctx,
-            prompts_path,
-            tick_count=1,
-        )
-
-        assert (
-            "Supervisor=supervisor/governance/roadmap-intake.md" in result.rendered_text
-        )
-        assert "GLOBAL ROADMAP INTAKE MATERIAL" in result.rendered_text
-
-
-class TestBuildGovernanceRequest:
-    """Tests for build_governance_request."""
-
-    def test_returns_none_when_circuit_breaker_open(self):
-        snapshot = _make_snapshot(circuit_breaker_state="open")
-        config = _make_config()
-        assert build_governance_request(config, 1, snapshot) is None
-
-    @patch("vibe3.roles.governance._write_dry_run_plan")
-    def test_returns_none_when_dry_run(self, mock_write):
-        mock_write.return_value = Path("/tmp/dry.md")
-        snapshot = _make_snapshot()
-        config = _make_config(governance=dict(dry_run=True))
-        assert build_governance_request(config, 1, snapshot) is None
-        mock_write.assert_called_once()
-
-    @patch("vibe3.roles.governance.resolve_governance_options")
-    def test_returns_execution_request(self, mock_opts):
-        mock_opts.return_value = MagicMock()
-        snapshot = _make_snapshot()
-        config = _make_config()
-        req = build_governance_request(config, 5, snapshot)
-        assert req is not None
-        assert req.role == "governance"
-        assert req.target_branch == "governance"
-        assert req.execution_name.endswith("-t5")
-        assert req.mode == "async"
-
-    @patch("vibe3.roles.governance.resolve_governance_options")
-    def test_request_has_correct_gates(self, mock_opts):
-        mock_opts.return_value = MagicMock()
-        snapshot = _make_snapshot()
-        config = _make_config()
-        req = build_governance_request(config, 1, snapshot)
-        from vibe3.execution.role_contracts import WorktreeRequirement
-
-        assert req.worktree_requirement == WorktreeRequirement.NONE
-
-
-class TestBuildExecutionName:
-    """Tests for build_governance_execution_name."""
-
-    def test_format(self):
-        name = build_governance_execution_name(7)
-        assert name.startswith("vibe3-governance-scan-")
-        assert name.endswith("-t7")
-
-
-class TestGovernanceMaterials:
-    """Tests for GovernanceConfig defaults after migration."""
-
-    def test_governance_worktree_requirement_is_none(self):
-        """governance 默认 worktree requirement 仍为 NONE."""
-        from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
-        from vibe3.roles.definitions import WorktreeRequirement
-
-        assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
-
-    def test_roadmap_intake_material_requires_assignee_write(self):
-        """roadmap-intake material should require direct assignee assignment."""
-        content = Path("supervisor/governance/roadmap-intake.md").read_text()
-        assert "直接补齐可执行的 manager assignee" in content
-        assert "明确指派给一个配置中的 manager assignee" in content
-
-
-class TestRoundRobinMaterialSelection:
-    """Tests that build_governance_recipe selects material from recipe catalog."""
-
-    def test_tick_0_selects_first(self):
-        """tick_count=0 selects first material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=0)
-        # Material catalog is from prompt-recipes.yaml
-        val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
-
-    def test_tick_1_selects_second(self):
-        """tick_count=1 selects second material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=1)
-        val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
-
-    def test_tick_wraps_around(self):
-        """tick_count wraps around material catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=3)
-        # 3 % 3 = 0, so should be first material
-        val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        assert "supervisor/governance/" in val
-
-    def test_large_tick_uses_modulo(self):
-        """tick_count=7 should wrap around 3 materials to index 1."""
-        recipe = build_governance_recipe(_make_config(), tick_count=7)
-        val = recipe.variables["supervisor_name"].value
-        assert val is not None
-        # 7 % 3 = 1, should be second material
-        assert "supervisor/governance/" in val
-
-    def test_build_governance_request_uses_round_robin(self):
-        """build_governance_request picks material per tick from recipe catalog."""
-        from unittest.mock import patch
-
-        config = _make_config()
-        snapshot = _make_snapshot()
-        with (
-            patch("vibe3.roles.governance.resolve_governance_options") as mock_opts,
-            patch("vibe3.roles.governance.GitHubClient") as mock_github_cls,
-        ):
-            mock_opts.return_value = MagicMock()
-            mock_github = MagicMock()
-            mock_github.list_issues.return_value = []
-            mock_github_cls.return_value = mock_github
-            req_tick0 = build_governance_request(config, 0, snapshot)
-            req_tick1 = build_governance_request(config, 1, snapshot)
-        # Both should produce valid requests (circuit breaker closed, dry_run=False)
-        assert req_tick0 is not None
-        assert req_tick1 is not None
-        # Execution names reflect different ticks
-        assert req_tick0.execution_name.endswith("-t0")
-        assert req_tick1.execution_name.endswith("-t1")
-
-
-class TestGovernanceRoleDefinition:
-    """Tests for GOVERNANCE_ROLE."""
-
-    def test_name(self):
-        assert GOVERNANCE_ROLE.name == "governance"
-
-    def test_registry_role(self):
-        assert GOVERNANCE_ROLE.registry_role == "governance"
-
-    def test_gate_config(self):
-        from vibe3.execution.role_contracts import WorktreeRequirement
-
-        assert GOVERNANCE_ROLE.worktree == WorktreeRequirement.NONE
 
 
 class TestBuildSnapshotContext:
@@ -659,3 +396,114 @@ class TestBuildSnapshotContext:
 
             # Both issues should appear
             assert ctx["active_count"] == 2
+
+
+class TestCommentFormatContract:
+    """Tests for comment format consistency after #1783 changes."""
+
+    def test_roadmap_intake_comment_format_is_new_style(self):
+        """Verify roadmap-intake.md uses new comment format in correct examples."""
+        import re
+
+        content = Path("supervisor/governance/roadmap-intake.md").read_text()
+
+        # After PR #1801, format is: [governance suggest] Intake completed (scope=...)
+        # More concise, no "assigned to manager-agent (manager-pool)" part
+        correct_example_pattern = re.compile(
+            r"\[governance suggest\]\s+Intake completed.*scope="
+        )
+        assert correct_example_pattern.search(
+            content
+        ), "Correct example should use new format: Intake completed (scope=...)"
+
+        # Should NOT use @alice or other human usernames in correct examples
+        # Line 236 is marked as "错误示例"
+        wrong_example_pattern = re.compile(
+            r"\[governance suggest\]\s+Intake.*assigned to @alice"
+        )
+        # This pattern should NOT appear in the correct examples section
+        # We check that if it appears, it's clearly marked as wrong example
+        if wrong_example_pattern.search(content):
+            # Ensure it's in "错误示例" section
+            assert (
+                "错误示例" in content
+            ), "If @alice appears, it should be marked as wrong example"
+
+    def test_roadmap_skill_comment_format_matches_intake(self):
+        """Verify vibe-roadmap SKILL.md mentions roadmap decision marker."""
+        import re
+
+        content = Path("skills/vibe-roadmap/SKILL.md").read_text()
+
+        # vibe-roadmap should use [roadmap decision] marker
+        # The format is simpler: just mentions the marker,
+        # no specific format requirement
+        decision_pattern = re.compile(r"\[roadmap decision\]")
+        assert decision_pattern.search(
+            content
+        ), "vibe-roadmap SKILL.md should mention [roadmap decision] marker"
+
+        # Should use scope parameter format
+        scope_pattern = re.compile(r"scope=")
+        assert scope_pattern.search(content), "Should mention scope parameter"
+
+    def test_manager_bot_injected_but_not_in_prompt_header(self):
+        """Verify manager_bot is injected but not exposed in prompt header."""
+        import yaml
+
+        # Verify manager_bot exists in recipe variables
+        recipe = build_governance_recipe(_make_config())
+        assert (
+            "manager_bot" in recipe.variables
+        ), "manager_bot should be in recipe variables"
+
+        # Read prompts.yaml
+        prompts_path = Path("config/prompts/prompts.yaml")
+        prompts_content = yaml.safe_load(prompts_path.read_text())
+
+        # Get the governance plan template
+        template = prompts_content["orchestra"]["governance"]["plan"]
+
+        # The template should NOT contain "- Manager Bot: {manager_bot}" in the header
+        # This line would expose internal variable to user-visible prompt prefix
+        assert (
+            "- Manager Bot: {manager_bot}" not in template
+        ), "Template should not expose manager_bot in user-visible prompt header"
+
+    def test_roadmap_intake_scope_parameter_format(self):
+        """Verify all Intake completed comments use correct scope parameter format."""
+        import re
+
+        # Read both files
+        roadmap_intake = Path("supervisor/governance/roadmap-intake.md").read_text()
+        skill_content = Path("skills/vibe-roadmap/SKILL.md").read_text()
+
+        # Pattern for scope parameter in two forms:
+        # 1. Literal value: scope=bugfix or scope=feature or scope=refactor
+        # 2. Placeholder notation: scope=<bugfix|feature|refactor>
+        scope_literal_pattern = re.compile(r"scope=(bugfix|feature|refactor)[\s\.\)]")
+        scope_placeholder_pattern = re.compile(r"scope=<(bugfix\|feature\|refactor)>")
+
+        # Check roadmap-intake.md - should have at least literal examples
+        intake_literal_matches = scope_literal_pattern.findall(roadmap_intake)
+        assert (
+            len(intake_literal_matches) > 0
+        ), "roadmap-intake.md should have scope parameter with literal values"
+
+        # All scope values should be valid
+        valid_values = {"bugfix", "feature", "refactor"}
+        for match in intake_literal_matches:
+            assert (
+                match in valid_values
+            ), f"Scope value '{match}' should be one of {valid_values}"
+
+        # Check vibe-roadmap SKILL.md - should have placeholder or literal examples
+        skill_literal_matches = scope_literal_pattern.findall(skill_content)
+        skill_placeholder_matches = scope_placeholder_pattern.findall(skill_content)
+
+        assert (len(skill_literal_matches) > 0) or (
+            len(skill_placeholder_matches) > 0
+        ), (
+            "vibe-roadmap SKILL.md should have scope parameter examples "
+            "(literal or placeholder)"
+        )

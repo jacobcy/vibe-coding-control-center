@@ -126,6 +126,40 @@
 
 如果改动触及公开入口、关键路径或 prompt contract，验证强度必须随之提高。
 
+### Test Strategy Compliance
+
+执行验证时，必须遵循 `supervisor/policies/test-strategy.md` 中定义的 mock vs real-test 分类矩阵。
+
+#### Executor 验证清单
+
+在声称验证完成前，必须确认：
+
+1. **核心业务逻辑是否有真实测试（非 mock）？**
+   - 参考 test-strategy.md 的"禁止 mock"分类
+   - 至少有一个真实测试覆盖核心逻辑
+
+2. **是否从不同工作目录测试过？**
+   - Repo root
+   - Subdirectory
+   - 验证路径解析的目录无关性
+
+3. **边界情况是否覆盖？**
+   - 空输入
+   - 异常路径
+   - None/空字符串处理
+
+4. **"验证通过"的声明是否有真实测试证据？**
+   - 引用真实测试的文件路径和测试名称
+   - 不能仅凭 mock 测试通过
+
+#### 执行报告要求
+
+在执行报告中，必须明确标注：
+
+- 哪些测试是真实测试（未 mock 核心逻辑）
+- 哪些测试使用了 mock（明确 mock 范围）
+- 真实测试的证据（输出片段、关键断言）
+
 ## 验证原则
 
 验证不是固定模板，而是必须与改动类型匹配。
@@ -227,11 +261,11 @@ git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
 
 ### 环境依赖代码的验证要求
 
-如果实现依赖环境变量或外部 API，验证必须包含：
+如果实现依赖环境变量或外部 API，验证必须遵循 `supervisor/policies/test-strategy.md` 的分类矩阵：
 
 ### 1. 至少一个真实环境测试
 
-- 不能只依赖 mock tests
+- **不能只依赖 mock tests**（详见 test-strategy.md "禁止 mock" 部分）
 - 必须在实际环境执行相关命令/调用
 - 记录真实执行的命令和输出
 

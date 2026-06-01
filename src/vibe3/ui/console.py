@@ -1,11 +1,13 @@
 """Shared console instance for all UI output.
 
-Uses rich.Console with force_terminal=None so rich auto-detects TTY.
+Uses rich.Console with default TTY auto-detection.
 - TTY (human): full color + markup
-- Non-TTY (pipe / agent): plain text, no ANSI, no box chars
+- Non-TTY (pipe/agent): plain text, no ANSI, no box chars
 """
 
 from rich.console import Console
 
-# highlight=False 避免 rich 对数字/路径自动着色干扰 agent 解析
+# Default TTY auto-detection - Rich will:
+# - Emit ANSI colors/markup when TTY (human)
+# - Emit plain text when non-TTY (pipe/agent)
 console = Console(highlight=False)

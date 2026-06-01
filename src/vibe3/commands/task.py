@@ -162,36 +162,19 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
-    remote: Annotated[
-        bool,
-        typer.Option(
-            "--remote",
-            help="保留远程分支不删除（默认删除远程分支）",
-        ),
-    ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
-    ] = False,
-    all_tasks: Annotated[
-        bool,
-        typer.Option(
-            "--all",
-            help="Reset all auto-created task/issue-* scenes and resume from ready",
-        ),
     ] = False,
     label: Annotated[
         str | None,
         typer.Option(
             "--label",
             metavar="[STATE]",
-            help="Clear blocked_reason and restore to specified state "
+            help="Restore blocked issue to inferred or specified state "
             "WITHOUT deleting worktree/branch. "
             "STATE can be: auto, ready, claimed, in-progress, handoff, "
             "review, merge-ready. "
-            "Use 'auto' to infer state from flow refs "
-            "(prefers review/merge-ready if pr_ref/audit_ref present, "
-            "else defaults to CLAIMED). "
-            "Without --label, the original behavior deletes worktree/branch.",
+            "Omitting --label is equivalent to --label auto.",
         ),
     ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
@@ -201,11 +184,10 @@ def resume(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
-    """Resume blocked issues to ready.
+    """Resume blocked issues without deleting worktree/branch.
 
-    Use --remote to keep remote branch (do not delete origin).
-    Use --label [STATE] to only update labels without deleting worktree.
-    --remote and --label are mutually exclusive.
+    `vibe3 task resume` is equivalent to `vibe3 task resume --label auto`.
+    Destructive scene rebuild is handled by `vibe3 flow rebuild`.
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -218,37 +200,22 @@ def resume(
     register_event_handlers()
 
     # Validate arguments
-    if remote and label is not None:
+    if not blocked and not issue_numbers:
         typer.echo(
-            "Error: Cannot specify both --remote and --label",
+            "Error: Must specify --blocked or provide issue numbers",
             err=True,
         )
         raise typer.Exit(1)
 
-    selected_modes = [blocked, all_tasks]
-    has_flag = any(selected_modes)
-    if not has_flag and not issue_numbers:
+    if blocked and issue_numbers:
         typer.echo(
-            "Error: Must specify --blocked, --all, or provide issue numbers",
+            "Error: Cannot combine issue numbers with --blocked",
             err=True,
         )
         raise typer.Exit(1)
 
-    if sum(1 for flag in selected_modes if flag) > 1:
-        typer.echo(
-            "Error: Cannot specify more than one of --blocked and --all",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if has_flag and issue_numbers:
-        typer.echo(
-            "Error: Cannot combine issue numbers with --blocked or --all",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # Resolve label state from parameter
+    # Resolve label state from parameter.
+    # Public contract: task resume == task resume --label auto.
     valid_states = {
         "ready",
         "claimed",
@@ -257,14 +224,11 @@ def resume(
         "review",
         "merge-ready",
     }
-    effective_label: str | None = None
+    effective_label = ""
     if label is not None:
-        # --label flag is present
         if label == "auto":
-            # --label auto -> trigger inference in service
             effective_label = ""
         elif label in valid_states:
-            # --label <state> provided
             effective_label = label
         else:
             typer.echo(
@@ -273,14 +237,10 @@ def resume(
                 err=True,
             )
             raise typer.Exit(1)
-    # else: label is None → don't specify --label → delete worktree
 
     target_issues: list[int] | None
-    candidate_mode = "resumable"
-    if has_flag:
+    if blocked:
         target_issues = None
-        if all_tasks:
-            candidate_mode = "all_task"
     else:
         assert issue_numbers is not None
         target_issues = list(issue_numbers)
@@ -289,17 +249,11 @@ def resume(
     flow_service = FlowService()
 
     # Fetch all flows for candidate building
-    resume_flows = (
-        flow_service.list_flows(status=None)
-        if candidate_mode == "all_task"
-        else flow_service.list_flows(status="active")
-    )
-    stale_flows = []
-    if candidate_mode != "all_task":
-        stale_flows = flow_service.list_flows(status="stale")
+    resume_flows = flow_service.list_flows(status="active")
+    stale_flows = flow_service.list_flows(status="stale")
 
     # Handle --blocked filtering by state label
-    if has_flag and candidate_mode == "resumable":
+    if blocked:
         # Fetch all orchestrated issues (not just stale)
         all_issues = usecase.status_service.fetch_orchestrated_issues(
             flows=resume_flows,
@@ -337,37 +291,30 @@ def resume(
             typer.echo(f"{prefix} → {step}")
 
     # Execute resume
-    if has_flag and candidate_mode == "resumable":
+    if blocked:
         result = usecase.resume_issues(
             issue_numbers=issue_numbers,
             reason=reason,
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode=candidate_mode,
             label_state=effective_label,
-            remote=remote,
             progress_callback=progress_callback if yes else None,
         )
     else:
-        # Original logic for --all or explicit issue numbers
+        # Explicit issue numbers
         result = usecase.resume_issues(
             issue_numbers=target_issues,
             reason=reason,
             dry_run=not yes,
             flows=resume_flows,
             stale_flows=stale_flows,
-            candidate_mode=candidate_mode,
             label_state=effective_label,
-            remote=remote,
             progress_callback=progress_callback if yes else None,
         )
 
-    if not yes and has_flag and not result.get("candidates"):
-        if all_tasks:
-            typer.echo("No auto-created task scenes found.")
-        else:
-            typer.echo("No blocked issues found.")
+    if not yes and blocked and not result.get("candidates"):
+        typer.echo("No blocked issues found.")
         return
 
     if json_output:
@@ -375,12 +322,9 @@ def resume(
     else:
         # Human-readable output
         if not yes:
-            if has_flag:
+            if blocked:
                 candidate_count = len(result.get("candidates", []))
-                if all_tasks:
-                    typer.echo(f"Found {candidate_count} auto-created task scene(s)")
-                else:
-                    typer.echo(f"Found {candidate_count} blocked issue(s)")
+                typer.echo(f"Found {candidate_count} blocked issue(s)")
                 typer.echo("\n[dry-run mode] Would resume the following issues:")
             if "candidates" in result:
                 for candidate in result["candidates"]:

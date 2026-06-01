@@ -215,7 +215,7 @@ related_docs:
   - `milestone` 不是 flow
 - 落点：
   - 规划语义见 [command-standard.md](v3/command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](v3/roadmap-json-standard.md)
+  - 文件边界见 [github-labels-standard.md](github-labels-standard.md)
 - 使用规则：
   - 讨论版本、阶段、交付窗口时优先使用 `milestone`
   - 历史上的 `version_goal` 应视为兼容字段，而不是长期上位概念

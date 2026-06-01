@@ -44,7 +44,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
             label_state="",  # --label auto (converted to empty string internally)
         )
 
-        # Verify: worktree NOT deleted (reset_task_scene NOT called)
+        # Verify: worktree NOT deleted (cleanup service not called)
         operations.git_client.remove_worktree.assert_not_called()
         operations.git_client.delete_branch.assert_not_called()
 
@@ -286,3 +286,37 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
         call_args = mock_service.unblock.call_args
         assert call_args.kwargs["target_state"] == IssueState.READY
         assert call_args.kwargs["issue_number"] == 303
+
+
+def test_label_auto_with_missing_recorded_worktree_rebuilds_scene() -> None:
+    """If label-auto resume finds a missing recorded worktree, rebuild hard."""
+    operations = _make_operations()
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
+    operations.github_client.get_issue_body.return_value = "User content"
+    operations.flow_service.store.get_flow_state.return_value = {
+        "branch": "task/issue-303",
+        "flow_slug": "issue-303",
+        "flow_status": "blocked",
+        "latest_actor": "test",
+        "task_issue_number": 303,
+        "worktree_path": "/tmp/missing-task-303",
+    }
+    operations.git_client.find_worktree_path_for_branch.return_value = None
+
+    mock_flow = MagicMock()
+    mock_flow.branch = "task/issue-303"
+
+    with patch("vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase") as rebuild_cls:
+        rebuild = MagicMock()
+        rebuild_cls.return_value = rebuild
+
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="missing worktree",
+            label_state="",
+        )
+
+        rebuild.rebuild_issue_flow.assert_called_once()

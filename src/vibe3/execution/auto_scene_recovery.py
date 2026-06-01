@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 
 if TYPE_CHECKING:
@@ -106,10 +106,6 @@ class AutoSceneRecoveryService:
     ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
         from vibe3.services.error_helpers import record_error
-        from vibe3.services.flow_cleanup_service import (
-            FlowCleanupService,
-            LiveSessionsDetectedError,
-        )
 
         detail = "; ".join(damage_signals)
         recovery_actor = "orchestra:auto-recover"
@@ -144,90 +140,46 @@ class AutoSceneRecoveryService:
             },
         )
 
+        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+
         try:
-            cleanup_results = FlowCleanupService(store=self.store).cleanup_flow_scene(
-                branch,
-                include_remote=True,
-                terminate_sessions=True,
-                keep_flow_record=False,
-            )
-        except LiveSessionsDetectedError:
-            append_orchestra_event(
-                "dispatcher",
-                (
-                    f"{request.role} auto-reset aborted for #{request.target_id}: "
-                    f"live session detected during cleanup (race condition)"
+            FlowRebuildUsecase(store=self.store).rebuild_issue_flow(
+                issue=IssueInfo(
+                    number=request.target_id,
+                    title=f"Issue {request.target_id}",
+                    labels=[IssueState.READY.to_label()],
+                    state=IssueState.READY,
                 ),
-                level="WARNING",
-            )
-            self.store.add_event(
-                branch,
-                "auto_scene_reset_aborted",
-                recovery_actor,
-                detail=(
-                    "Auto-scene reset was aborted because a live runtime session was "
-                    "detected during the cleanup phase. This indicates a race "
-                    "condition where a session started between damage detection "
-                    "and cleanup."
-                ),
-                refs={
-                    "role": request.role,
-                    "damage_signals": detail,
-                },
-            )
-            logger.bind(
-                domain="auto_scene_recovery",
                 branch=branch,
-            ).warning("Auto-scene reset aborted due to live session race condition")
-            return None
-        critical_failures = [
-            step
-            for step in ("worktree", "local_branch", "flow_record")
-            if not cleanup_results.get(step, False)
-        ]
-        if critical_failures:
-            failed_steps = ", ".join(critical_failures)
+                reason=recovery_reason,
+                include_remote=True,
+                ensure_worktree=True,
+            )
+        except Exception as exc:
             append_orchestra_event(
                 "dispatcher",
                 (
-                    f"{request.role} auto-reset incomplete for #{request.target_id}: "
-                    f"{failed_steps}"
+                    f"{request.role} auto-reset failed for #{request.target_id}: "
+                    f"{exc}"
                 ),
                 level="ERROR",
             )
             self.store.add_event(
                 branch,
-                "auto_scene_reset_incomplete",
+                "auto_scene_reset_failed",
                 recovery_actor,
-                detail=(
-                    "Automatic auto-scene reset did not finish critical cleanup "
-                    f"steps: {failed_steps}"
-                ),
-                refs={k: str(v) for k, v in cleanup_results.items()},
+                detail=f"Auto scene reset failed: {exc}",
             )
             logger.bind(
                 domain="auto_scene_recovery",
                 branch=branch,
-                failed_steps=failed_steps,
-            ).error("Auto-scene reset incomplete")
+            ).error(f"Auto-scene reset failed: {exc}")
             return ExecutionLaunchResult(
                 launched=False,
-                reason=f"Auto-reset incomplete: {failed_steps}",
-                reason_code="auto_scene_reset_incomplete",
+                reason=f"Auto-reset failed: {exc}",
+                reason_code="auto_scene_reset_failed",
             )
 
-        # Use BlockedStateService to unblock and restore to READY
-        # This ensures all three sources (body, DB, labels) are cleared
-        from vibe3.services.blocked_state_service import BlockedStateService
-
-        service = BlockedStateService(store=self.store)
-        service.unblock(
-            branch=branch,
-            target_state=IssueState.READY,
-            issue_number=request.target_id,
-            actor=recovery_actor,
-            detail="Auto scene reset completed - issue returned to READY",
-        )
         self.store.add_event(
             branch,
             "auto_scene_reset_completed",
@@ -236,7 +188,6 @@ class AutoSceneRecoveryService:
                 f"Auto scene reset completed for issue #{request.target_id}; "
                 "issue returned to READY for clean re-dispatch"
             ),
-            refs={k: str(v) for k, v in cleanup_results.items()},
         )
         append_orchestra_event(
             "dispatcher",

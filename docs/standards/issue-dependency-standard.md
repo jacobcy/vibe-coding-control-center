@@ -21,7 +21,7 @@
 **本文档不回答的问题**:
 - 有哪些标签？→ 见 [github-labels-reference.md](github-labels-reference.md)
 - 标签如何管理？→ 见 [roadmap-label-management.md](roadmap-label-management.md)
-- 具体命令怎么用？→ 见 [vibe3-command-standard.md](vibe3-command-standard.md)
+- 具体命令怎么用？→ 见 [v3/command-standard.md](v3/command-standard.md)
 
 ---
 

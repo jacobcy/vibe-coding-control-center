@@ -24,7 +24,6 @@ from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
-from vibe3.services.orchestra_helpers import get_manager_usernames
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
 from vibe3.services.task_status_classifier import (
@@ -54,6 +53,7 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
             IssueState.CLAIMED,
             IssueState.IN_PROGRESS,
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
         }
     return is_auto_task_branch(flow.branch)
 
@@ -104,7 +104,7 @@ def _resolve_repo_name(config_repo: str | None) -> str:
 
 def _render_configuration(config: OrchestraConfig) -> None:
     """Render Vibe3 configuration section in status output."""
-    manager = ", ".join(get_manager_usernames(config))
+    manager = ", ".join(OrchestraStatusService.get_manager_usernames(config))
     console.print("[bold]Vibe3 Configuration[/]")
     console.print(f"  Repo:              {_resolve_repo_name(config.repo)}")
     console.print(f"  Manager agents:    {manager}")
@@ -200,7 +200,7 @@ def status(
             flows,
             queued_set,
             stale_flows=[],
-            manager_usernames=get_manager_usernames(config),
+            manager_usernames=OrchestraStatusService.get_manager_usernames(config),
             supervisor_label=config.supervisor_handoff.issue_label,
         )
 
@@ -264,7 +264,7 @@ def status(
         flows,
         queued_set,
         stale_flows=stale_flows,
-        manager_usernames=get_manager_usernames(config),
+        manager_usernames=OrchestraStatusService.get_manager_usernames(config),
         supervisor_label=config.supervisor_handoff.issue_label,
     )
 
@@ -300,7 +300,7 @@ def status(
     # Split missing state items into two categories:
     # 1. Waiting for assignee-pool (no orchestra-governed label) - normal waiting
     # 2. Governed but anomaly (has orchestra-governed label) - needs attention
-    manager_usernames = get_manager_usernames(config)
+    manager_usernames = OrchestraStatusService.get_manager_usernames(config)
 
     waiting_for_pool_items = [
         item
@@ -366,7 +366,7 @@ def status(
         bucket = classify_task_status(
             state,
             cast(str | None, item.get("assignee")),
-            get_manager_usernames(config),
+            OrchestraStatusService.get_manager_usernames(config),
         )
         bucketed_items[bucket].append(item)
 

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.pr import PRState
+from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -248,8 +249,6 @@ class CheckPRService:
             Tuple of (error_str, warnings). error_str is None on success,
             warnings contains cleanup result messages.
         """
-        from vibe3.models.flow import FlowStatusResponse
-        from vibe3.services.task_resume_operations import TaskResumeOperations
 
         # Find task issue number
         issue_links = self.store.get_issue_links(branch)
@@ -295,78 +294,25 @@ class CheckPRService:
                 )
 
         # Build minimal FlowStatusResponse for task resume
-        flow = FlowStatusResponse(
-            branch=branch,
-            flow_slug=branch,
-            flow_status="active",
-            latest_actor="vibe:check",
-            task_issue_number=task_issue_number,
-        )
-
-        # Create TaskResumeOperations and reset to READY
-        from vibe3.services.flow_service import FlowService
-        from vibe3.services.issue_flow_service import IssueFlowService
-        from vibe3.services.label_service import LabelService
-
-        label_service = LabelService()
-        flow_service = FlowService(store=self.store)
-        issue_flow_service = IssueFlowService(store=self.store)
-
-        resume_ops = TaskResumeOperations(
-            git_client=self.git_client,
-            github_client=self.github_client,
-            flow_service=flow_service,
-            label_service=label_service,
-            issue_flow_service=issue_flow_service,
-        )
-
         try:
-            resume_ops.reset_issue_to_ready(
-                issue_number=task_issue_number,
-                resume_kind="pr_closed",
-                flow=flow,
-                repo=None,
-                reason=f"PR #{pr_number} closed without merge, resetting to READY",
-            )
-
-            logger.bind(
-                domain="check",
-                action="reset_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).info(
-                f"Reset issue #{task_issue_number} to READY after "
-                f"PR #{pr_number} closed"
-            )
-
-            # Rebuild flow after reset to avoid dangling state
             from vibe3.config.orchestra_config import OrchestraConfig
-            from vibe3.services.flow_orchestrator_service import (
-                FlowOrchestratorService,
-            )
             from vibe3.services.issue_context_loader import load_issue_info
 
             config = OrchestraConfig()
-            orchestrator = FlowOrchestratorService(
-                config,
-                store=self.store,
-                git=self.git_client,
-                github=self.github_client,
-            )
-
             issue_info = load_issue_info(
                 task_issue_number, config=config, github=self.github_client
             )
 
-            # Create new flow (ensure_worktree=False to delay creation)
-            orchestrator.bootstrap_issue_flow(
-                issue_info,
+            FlowRebuildUsecase(
+                store=self.store,
+                git_client=self.git_client,
+                github_client=self.github_client,
+            ).rebuild_issue_flow(
+                issue=issue_info,
                 branch=branch,
-                slug=f"issue-{task_issue_number}",
-                source="check:pr_closed",
-                initiated_by="check:pr_closed",
+                reason=f"PR #{pr_number} closed without merge",
+                include_remote=True,
                 ensure_worktree=False,
-                reactivate_existing=False,
             )
 
             logger.bind(
@@ -379,32 +325,13 @@ class CheckPRService:
                 f"PR #{pr_number} closed"
             )
 
-            # Record handoff milestone (optional but recommended)
-            from vibe3.services.handoff_service import HandoffService
-
-            handoff_service = HandoffService(
-                store=self.store,
-                git_client=self.git_client,
-                github_client=self.github_client,
-            )
-
-            handoff_service.append_current_handoff(
-                message=(
-                    f"PR #{pr_number} closed without merge, "
-                    f"flow rebuilt and reset to READY"
-                ),
-                actor="vibe:check",
-                kind="milestone",
-                branch=branch,
-            )
-
         except Exception as exc:
             logger.bind(
                 domain="check",
                 action="reset_pr_closed",
                 branch=branch,
                 issue_number=task_issue_number,
-            ).warning(f"Failed to reset issue: {exc}")
+            ).warning(f"Failed to rebuild issue flow: {exc}")
             return (
                 f"Failed to reset issue #{task_issue_number} after PR "
                 f"#{pr_number} closed: {exc}",

@@ -120,18 +120,30 @@ vibe3 task status
 
 #### 3.2 选择处理方案
 
-**方案 1：完全重置**（适用于 worktree/分支已失效的场景）
+**方案 1：恢复阻塞状态**（适用于 agent 已产出有效工作的场景）
 
 ```bash
 vibe3 task resume <N> --yes
 ```
 
 效果：
+- 保留 worktree 和分支
+- 清除 blocked_reason
+- 恢复到推断的状态（通常是 `state/ready` 或之前的状态）
+
+**方案 2：完全重建**（适用于 worktree/分支已失效的场景）
+
+```bash
+vibe3 flow rebuild <N> --yes
+```
+
+效果：
 - 删除 worktree 和分支
+- 重建新的 worktree
 - 清除 blocked_reason
 - 恢复到 `state/ready`
 
-**方案 2：移除阻塞恢复**（适用于 agent 已产出有效工作的场景）
+**方案 3：移除阻塞恢复**（适用于 agent 已产出有效工作的场景）
 
 ```bash
 vibe3 task resume <N> --label auto --yes

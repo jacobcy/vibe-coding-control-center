@@ -166,6 +166,13 @@ def check(
             ),
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force delete unmerged branches (use with --clean-branch).",
+        ),
+    ] = False,
     branch: Annotated[
         str | None,
         typer.Option(
@@ -196,6 +203,9 @@ def check(
 
     [green]vibe3 check --clean-branch[/green]  Clean residual branches
                          for done/aborted flows.
+
+    [green]vibe3 check --clean-branch --force[/green]  Force delete
+                         unmerged branches.
 
     [green]vibe3 check --branch <name>[/green]  Verify a single branch
                          instead of all active flows.
@@ -244,8 +254,21 @@ def check(
         else:
             mode = "fix_all"
 
+        # Guard: --force only valid with --clean-branch
+        if force and mode != "clean_branch":
+            typer.echo(
+                "Error: --force can only be used with --clean-branch.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
         result = execute_check_mode(
-            service, mode, branch=branch, verbose=trace, show_progress=not no_progress
+            service,
+            mode,
+            branch=branch,
+            verbose=trace,
+            show_progress=not no_progress,
+            force=force,
         )
 
         if result.success:
