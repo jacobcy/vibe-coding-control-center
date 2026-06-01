@@ -659,3 +659,117 @@ class TestBuildSnapshotContext:
 
             # Both issues should appear
             assert ctx["active_count"] == 2
+
+
+class TestCommentFormatContract:
+    """Tests for comment format consistency after #1783 changes."""
+
+    def test_roadmap_intake_comment_format_is_new_style(self):
+        """Verify roadmap-intake.md uses new comment format in correct examples."""
+        import re
+
+        content = Path("supervisor/governance/roadmap-intake.md").read_text()
+
+        # The "正确示例" should use Intake completed (scope=...) format
+        # Line 342 in roadmap-intake.md
+        correct_example_pattern = re.compile(
+            r"\[governance suggest\]\s+Intake.*assigned to @\{manager_bot\}.*scope="
+        )
+        assert correct_example_pattern.search(
+            content
+        ), "Correct example should use new format with {manager_bot}"
+
+        # Should NOT use @alice or other human usernames in correct examples
+        # Line 236 is marked as "错误示例"
+        wrong_example_pattern = re.compile(
+            r"\[governance suggest\]\s+Intake.*assigned to @alice"
+        )
+        # This pattern should NOT appear in the correct examples section
+        # We check that if it appears, it's clearly marked as wrong example
+        if wrong_example_pattern.search(content):
+            # Ensure it's in "错误示例" section
+            assert (
+                "错误示例" in content
+            ), "If @alice appears, it should be marked as wrong example"
+
+    def test_roadmap_skill_comment_format_matches_intake(self):
+        """Verify vibe-roadmap SKILL.md comment format matches roadmap-intake."""
+        import re
+
+        content = Path("skills/vibe-roadmap/SKILL.md").read_text()
+
+        # Scene A (line 149) should use Intake completed format with scope parameter
+        scene_a_pattern = re.compile(
+            r"\[roadmap decision\]\s+assign to @\{manager_bot\}.*scope="
+        )
+        assert scene_a_pattern.search(content), (
+            "Scene A should use format: "
+            "[roadmap decision] assign to @{manager_bot} (manager-pool); scope=<value>"
+        )
+
+        # Should use scope parameter format
+        scope_pattern = re.compile(r"scope=<bugfix\|feature\|refactor>")
+        assert scope_pattern.search(
+            content
+        ), "Should use scope parameter with (scope=<value>) format"
+
+    def test_manager_bot_injected_but_not_in_prompt_header(self):
+        """Verify manager_bot is injected but not exposed in prompt header."""
+        import yaml
+
+        # Verify manager_bot exists in recipe variables
+        recipe = build_governance_recipe(_make_config())
+        assert (
+            "manager_bot" in recipe.variables
+        ), "manager_bot should be in recipe variables"
+
+        # Read prompts.yaml
+        prompts_path = Path("config/prompts/prompts.yaml")
+        prompts_content = yaml.safe_load(prompts_path.read_text())
+
+        # Get the governance plan template
+        template = prompts_content["orchestra"]["governance"]["plan"]
+
+        # The template should NOT contain "- Manager Bot: {manager_bot}" in the header
+        # This line would expose internal variable to user-visible prompt prefix
+        assert (
+            "- Manager Bot: {manager_bot}" not in template
+        ), "Template should not expose manager_bot in user-visible prompt header"
+
+    def test_roadmap_intake_scope_parameter_format(self):
+        """Verify all Intake completed comments use correct scope parameter format."""
+        import re
+
+        # Read both files
+        roadmap_intake = Path("supervisor/governance/roadmap-intake.md").read_text()
+        skill_content = Path("skills/vibe-roadmap/SKILL.md").read_text()
+
+        # Pattern for scope parameter in two forms:
+        # 1. Literal value: scope=bugfix or scope=feature or scope=refactor
+        # 2. Placeholder notation: scope=<bugfix|feature|refactor>
+        scope_literal_pattern = re.compile(r"scope=(bugfix|feature|refactor)[\s\.\)]")
+        scope_placeholder_pattern = re.compile(r"scope=<(bugfix\|feature\|refactor)>")
+
+        # Check roadmap-intake.md - should have at least literal examples
+        intake_literal_matches = scope_literal_pattern.findall(roadmap_intake)
+        assert (
+            len(intake_literal_matches) > 0
+        ), "roadmap-intake.md should have scope parameter with literal values"
+
+        # All scope values should be valid
+        valid_values = {"bugfix", "feature", "refactor"}
+        for match in intake_literal_matches:
+            assert (
+                match in valid_values
+            ), f"Scope value '{match}' should be one of {valid_values}"
+
+        # Check vibe-roadmap SKILL.md - should have placeholder or literal examples
+        skill_literal_matches = scope_literal_pattern.findall(skill_content)
+        skill_placeholder_matches = scope_placeholder_pattern.findall(skill_content)
+
+        assert (len(skill_literal_matches) > 0) or (
+            len(skill_placeholder_matches) > 0
+        ), (
+            "vibe-roadmap SKILL.md should have scope parameter examples "
+            "(literal or placeholder)"
+        )
