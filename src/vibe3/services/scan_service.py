@@ -78,7 +78,7 @@ def dispatch_supervisor_execution(issue_number: int, no_async: bool = False) -> 
         run_issue_role_async,
         run_issue_role_sync,
     )
-    from vibe3.roles import SUPERVISOR_CLI_SYNC_SPEC
+    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
 
     if no_async:
         run_issue_role_sync(
@@ -147,7 +147,7 @@ def get_available_governance_materials() -> list[str]:
         List of material short names (e.g., ["assignee-pool", "roadmap-intake"])
     """
     try:
-        from vibe3.roles import load_governance_material_catalog
+        from vibe3.roles.governance import load_governance_material_catalog
 
         catalog = load_governance_material_catalog()
         materials = []
@@ -173,8 +173,10 @@ def governance_material_exists(material_name: str) -> bool:
     Accepts either short names like ``roadmap-intake`` or full material paths.
     """
     try:
-        from vibe3.roles import load_governance_material_catalog
-        from vibe3.roles.governance_utils import find_material_in_catalog
+        from vibe3.roles import (
+            find_material_in_catalog,
+            load_governance_material_catalog,
+        )
 
         catalog = load_governance_material_catalog()
         return find_material_in_catalog(catalog, material_name) is not None
@@ -313,25 +315,19 @@ def validate_governance_material_consistency(
     return issues
 
 
-def list_governance_materials(console: Any, *, display_fn: Any | None = None) -> None:
+def list_governance_materials(console: Any, *, display_fn: Any) -> None:
     """List available governance materials with descriptions.
 
-    Loads catalog, extracts descriptions, and displays via UI layer.
+    Loads catalog, extracts descriptions, and displays via injected display function.
 
     Args:
         console: Rich Console instance for display
-        display_fn: Optional display function (dependency injection).
-                   If None, uses default display_material_list from UI layer.
+        display_fn: Display function (dependency injection from UI layer).
+                   Must accept (console, materials) arguments.
     """
     import typer
 
     from vibe3.roles import load_governance_material_catalog
-
-    # Use injected display function or fall back to UI layer
-    if display_fn is None:
-        from vibe3.ui.scan_display import display_material_list
-
-        display_fn = display_material_list
 
     # Load catalog
     try:
@@ -346,5 +342,5 @@ def list_governance_materials(console: Any, *, display_fn: Any | None = None) ->
         description = extract_material_description(material.name)
         materials.append({"name": material.name, "description": description})
 
-    # Display via provided display function
+    # Display via injected display function
     display_fn(console, materials)
