@@ -12,20 +12,18 @@ runner = CliRunner()
 
 
 @patch("vibe3.commands.flow_lifecycle.FlowRebuildUsecase")
-@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_arg")
 @patch("vibe3.commands.flow_lifecycle.load_orchestra_config")
 @patch("vibe3.commands.flow_lifecycle.load_issue_info")
 def test_flow_rebuild_invokes_explicit_rebuild(
     load_issue_info: MagicMock,
     load_config: MagicMock,
-    convention_cls: MagicMock,
+    resolve_branch_arg_mock: MagicMock,
     rebuild_cls: MagicMock,
 ) -> None:
     config = OrchestraConfig(repo="owner/repo")
     load_config.return_value = config
-    resolved = convention_cls.from_repo.return_value.resolve.return_value
-    branch_convention = resolved.branch
-    branch_convention.canonical_branch.return_value = "feature/303"
+    resolve_branch_arg_mock.return_value = "feature/303"
     issue = IssueInfo(
         number=303,
         title="Rebuild me",
