@@ -130,10 +130,10 @@ class FlowStatusService:
         )
 
         suggestions: dict[str, int | None] = {"issue_to_close": None}
-        from vibe3.services.issue_flow_service import IssueFlowService
-
-        issue_flow_service = IssueFlowService(store=self.store)
-        task_issue = issue_flow_service.resolve_task_issue_number(branch)
+        # Only close issue if there's an explicit task-role binding.
+        # Do NOT fallback to branch name parsing - that would incorrectly close
+        # issues that are only linked as related/dependency.
+        task_issue = self.store.get_task_issue_number(branch)
         if not task_issue:
             return suggestions
 
