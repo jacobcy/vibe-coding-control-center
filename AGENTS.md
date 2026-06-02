@@ -67,7 +67,7 @@ This project has **two parallel implementations**:
 1. **V2 (Shell)** — Zsh alias 和环境工具（`bin/`, `lib/`, `config/shell/aliases.sh`）
 2. **V3 (Python)** — issue/flow/PR 管理主系统（`src/vibe3/`, `tests/vibe3/`）
 
-> V2 主要提供 alias（`wtnew`、`vup`）和环境工具；branch 生命周期优先直接使用 `git`，issue / PR 远端操作优先直接使用 `gh`，`vibe3` 负责本地 flow scene、events 与 handoff 增强。
+> branch 生命周期优先直接使用 `git`，issue / PR 远端操作优先直接使用 `gh`，`vibe3` 负责本地 flow scene、events 与 handoff 增强。
 
 ## 📍 Workspace Structure
 
