@@ -94,8 +94,8 @@
 
 在声称完成前，必须验证：
 ```bash
-# 检查是否有被删除的函数/方法
-git diff --diff-filter=D -- '*.py' | grep -E '^(def |class )' || echo "无符号删除"
+# 检查是否有被删除的函数/方法（在存续文件或已删除文件中）
+git diff -- '*.py' | grep -E '^-def |^-class ' || echo "无符号删除"
 
 # 如果有删除，逐个确认是否在 plan 的死代码清理声明列表中
 ```
