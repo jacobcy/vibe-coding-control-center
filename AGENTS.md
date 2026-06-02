@@ -8,7 +8,7 @@ authority:
   - essential-reading-order
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-06-01
+last_updated: 2026-06-02
 related_docs:
   - SOUL.md
   - STRUCTURE.md
@@ -57,6 +57,17 @@ Follow this reading order. Each document is the authority for its domain:
 | **[/vibe-check](.agent/workflows/vibe:check.md)** | 运行时检查 | 处理 `task <-> flow` / runtime 状态不一致。 |
 | **[/vibe-issue](.agent/workflows/vibe:issue.md)** | Issue 管理 | 处理 GitHub issue 创建、查重与补全。 |
 | **[/vibe-save](.agent/workflows/vibe:save.md)** | 会话保存 | 将当前会话上下文持久化到本地 handoff。 |
+
+## 🛡️ V2 Legacy Aliases (Compatibility)
+
+For backward compatibility with V2 workflows, the following aliases are supported but **demoted** in favor of V3 native commands:
+
+| Alias | Demoted To (V3) | Status |
+| :--- | :--- | :--- |
+| `wtnew` | `vibe3 flow update` | Supplementary |
+| `vup` | `vibe3 flow update` | Supplementary |
+
+> **Recommendation**: Prefer `vibe3` native commands for all new development flows.
 
 ## 📍 Project Identity
 
