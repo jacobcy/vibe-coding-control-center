@@ -26,7 +26,11 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import resolve_prompts_path
-from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
+from vibe3.roles.definitions import (
+    IssueRoleSyncSpec,
+    RoleOutputContract,
+    TriggerableRoleDefinition,
+)
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
 
@@ -36,6 +40,7 @@ MANAGER_ROLE = TriggerableRoleDefinition(
     worktree=MANAGER_GATE_CONFIG,
     trigger_name="manager",
     trigger_state=IssueState.READY,
+    output_contract=RoleOutputContract(),
 )
 
 HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
@@ -44,6 +49,7 @@ HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
     worktree=MANAGER_GATE_CONFIG,
     trigger_name="manager",
     trigger_state=IssueState.HANDOFF,
+    output_contract=RoleOutputContract(),
 )
 
 

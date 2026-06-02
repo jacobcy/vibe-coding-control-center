@@ -16,6 +16,25 @@ TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
 
 
 @dataclass(frozen=True)
+class RoleOutputContract:
+    """Declarative contract for what a role must produce after execution.
+
+    Used by the unified no-op gate to validate post-execution outputs.
+    Each role declares its own contract in its definition file.
+
+    Attributes:
+        required_ref: flow_state key that must be non-empty after execution.
+            Gate blocks if the key is absent or empty, regardless of whether
+            the state label changed. None means no ref is required.
+        requires_verdict: If True, flow_state["latest_verdict"] must be set.
+            Used exclusively by the reviewer role.
+    """
+
+    required_ref: str | None = None
+    requires_verdict: bool = False
+
+
+@dataclass(frozen=True)
 class RoleDefinition:
     """Minimal declarative definition for a runtime role."""
 
@@ -24,6 +43,7 @@ class RoleDefinition:
     worktree: WorktreeRequirement
     trigger_name: TriggerName | None = None
     trigger_state: IssueState | None = None
+    output_contract: RoleOutputContract = field(default_factory=RoleOutputContract)
 
 
 @dataclass(frozen=True)

@@ -36,7 +36,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
-from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.roles.review_helpers import (
     ReviewRunResult,
     finalize_review_output,
@@ -90,6 +90,7 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
     worktree=REVIEWER_GATE_CONFIG,
     trigger_name="review",
     trigger_state=IssueState.REVIEW,
+    output_contract=RoleOutputContract(requires_verdict=True),
 )
 
 

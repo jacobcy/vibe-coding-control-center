@@ -55,7 +55,6 @@ class TestRetryCounterPersistence:
                     role="executor",
                     before_state_label="state/running",
                     repo="owner/repo",
-                    required_ref_key="plan_ref",
                     flow_state=flow_state,
                 )
 
@@ -90,7 +89,6 @@ class TestRetryCounterPersistence:
                     role="executor",
                     before_state_label="state/running",
                     repo="owner/repo",
-                    required_ref_key="plan_ref",
                     flow_state=flow_state,
                 )
 
@@ -128,7 +126,6 @@ class TestRetryCounterPersistence:
                 role="executor",
                 before_state_label="state/running",
                 repo="owner/repo",
-                required_ref_key="plan_ref",
                 flow_state=flow_state,
             )
 
@@ -166,7 +163,6 @@ class TestRetryCounterPersistence:
                     role="executor",
                     before_state_label="state/running",
                     repo="owner/repo",
-                    required_ref_key="plan_ref",
                     flow_state=flow_state,
                 )
 

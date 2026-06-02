@@ -6,6 +6,8 @@ eliminating scattered mappings across multiple modules.
 
 from typing import Literal
 
+from vibe3.roles.definitions import RoleOutputContract
+
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
 # which is not part of ExecutionRole (only planner/executor/reviewer)
@@ -22,19 +24,22 @@ def get_role_section(role: str) -> Literal["manager", "plan", "run", "review"]:
     return ROLE_TO_SECTION[role]
 
 
-# Role to required ref key mapping for no-op gate
-# Used by unified no-op gate to check if agent produced required ref
-ROLE_TO_REQUIRED_REF_KEY: dict[str, str | None] = {
-    "planner": "plan_ref",
-    "executor": "report_ref",
-    "reviewer": None,
-    "manager": None,  # manager 不受 ref 检查约束
+# Role output contracts for the unified no-op gate.
+# Mirrors the output_contract field on each role's TriggerableRoleDefinition,
+# kept here as a separate lookup so noop_gate can resolve contracts by role
+# name string without importing from roles/ (which would create a cycle via
+# roles/plan.py → execution/codeagent_runner.py → execution/noop_gate.py).
+ROLE_OUTPUT_CONTRACTS: dict[str, RoleOutputContract] = {
+    "planner": RoleOutputContract(required_ref="plan_ref"),
+    "executor": RoleOutputContract(),
+    "reviewer": RoleOutputContract(requires_verdict=True),
+    "manager": RoleOutputContract(),
 }
 
 
-def get_role_required_ref_key(role: str) -> str | None:
-    """Get the required ref key for a given role's no-op gate check.
+def get_role_output_contract(role: str) -> RoleOutputContract:
+    """Return the output contract for a given role name.
 
-    Returns None for roles that should skip the ref check (e.g., manager).
+    Falls back to an empty contract (no requirements) for unknown roles.
     """
-    return ROLE_TO_REQUIRED_REF_KEY.get(role)
+    return ROLE_OUTPUT_CONTRACTS.get(role, RoleOutputContract())
