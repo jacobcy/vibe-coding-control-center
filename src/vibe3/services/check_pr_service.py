@@ -163,7 +163,7 @@ class CheckPRService:
 
     def _find_existing_bridge_marker(
         self, issue_number: int, closed_pr_number: int
-    ) -> bool:
+    ) -> int | None:
         """Check if a bridge marker already exists for this PR.
 
         Args:
@@ -171,31 +171,47 @@ class CheckPRService:
             closed_pr_number: Closed PR number
 
         Returns:
-            True if bridge marker found, False otherwise
+            Successor bridge issue number if marker found, None otherwise.
         """
+        import re
+
         try:
             comments = self.github_client.list_issue_comments(issue_number)
             if not comments:
-                return False
+                return None
 
             # Look for bridge marker comment
             # Check for both the marker header and the specific closed_pr reference
             for comment in comments:
+                if not isinstance(comment, dict):
+                    continue
                 body = comment.get("body", "")
                 # Check if this is a bridge marker for this specific PR
                 if (
                     "[flow] Bridge issue created" in body
                     and f"closed_pr: #{closed_pr_number}" in body
                 ):
+                    successor_match = re.search(r"^successor:\s*#(\d+)\s*$", body, re.M)
+                    if not successor_match:
+                        logger.bind(
+                            domain="check",
+                            action="bridge_idempotency",
+                            issue_number=issue_number,
+                            closed_pr=closed_pr_number,
+                        ).warning("Found bridge marker without successor issue number")
+                        return None
+
+                    bridge_number = int(successor_match.group(1))
                     logger.bind(
                         domain="check",
                         action="bridge_idempotency",
                         issue_number=issue_number,
                         closed_pr=closed_pr_number,
+                        bridge_issue=bridge_number,
                     ).debug("Found existing bridge marker, skipping creation")
-                    return True
+                    return bridge_number
 
-            return False
+            return None
 
         except Exception as exc:
             logger.bind(
@@ -203,7 +219,7 @@ class CheckPRService:
                 action="bridge_idempotency",
                 issue_number=issue_number,
             ).warning(f"Failed to check for existing bridge marker: {exc}")
-            return False
+            return None
 
     def _inherit_labels_for_bridge(
         self, original_issue: dict, closed_pr_number: int
@@ -546,12 +562,38 @@ The unresolved work continues in #{bridge_issue_number}.
             )
 
         # Check for existing bridge marker (idempotency)
-        if self._find_existing_bridge_marker(task_issue_number, pr_number):
-            # Bridge already exists, just abort and cleanup
+        existing_bridge_number = self._find_existing_bridge_marker(
+            task_issue_number, pr_number
+        )
+        if existing_bridge_number:
+            close_result = self._close_original_issue_with_comment(
+                original_issue_number=task_issue_number,
+                bridge_issue_number=existing_bridge_number,
+                closed_pr_number=pr_number,
+            )
+            if close_result == "failed":
+                logger.bind(
+                    domain="check",
+                    action="reset_pr_closed",
+                    branch=branch,
+                    issue_number=task_issue_number,
+                    bridge_issue=existing_bridge_number,
+                ).warning(
+                    f"Failed to close original issue #{task_issue_number} "
+                    "after finding existing bridge marker, preserving flow for retry"
+                )
+                return (
+                    f"Bridge issue #{existing_bridge_number} already exists, but "
+                    f"failed to close original issue #{task_issue_number} "
+                    "(network/permission error); please retry later or manually close",
+                    [],
+                )
+
+            # Bridge already exists and original issue is closed, just abort and cleanup
             return self._abort_and_cleanup(
                 branch,
-                f"Bridge already exists for PR #{pr_number}; "
-                f"original issue #{task_issue_number}",
+                f"Bridge issue #{existing_bridge_number} already exists for "
+                f"PR #{pr_number}; original issue #{task_issue_number} closed",
             )
 
         # Create bridge issue
