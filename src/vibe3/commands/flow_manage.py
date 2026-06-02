@@ -174,24 +174,16 @@ def update(
     from vibe3.clients.git_client import GitClient
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.services.branch_arg import resolve_branch_arg
-    from vibe3.services.convention_resolver import ConventionResolver
     from vibe3.utils.issue_ref import try_parse_issue_number
 
-    # Early handling for issue number: resolve to canonical branch
-    # before resolve_branch_arg. This avoids UserError from
-    # resolve_issue_branch_input when flow doesn't exist
-    issue_number_input = try_parse_issue_number(branch) if branch else None
-    if issue_number_input is not None:
-        convention = ConventionResolver.from_repo().resolve().branch
-        target_branch = convention.canonical_branch(issue_number_input)
-    else:
-        target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch)
 
     # Auto-create branch if:
     # 1. Positional argument was an issue number (not explicit branch name)
     # 2. Target branch doesn't exist in git
     # 3. Target branch matches task/dev convention
     git = GitClient()
+    issue_number_input = try_parse_issue_number(branch) if branch else None
     if issue_number_input is not None and not git.branch_exists(target_branch):
         # Create branch from scene_base_ref
         config = load_orchestra_config()

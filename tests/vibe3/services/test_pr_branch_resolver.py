@@ -191,6 +191,74 @@ class TestResolveCommandBranch:
         assert "PR #9999 不存在" in str(exc_info.value)
 
 
+class TestResolveCommandBranchCanonicalFallback:
+    """测试 canonical_fallback 参数"""
+
+    def test_canonical_fallback_with_issue_number_no_flow(self):
+        """测试：纯数字输入无 flow 时返回 canonical branch"""
+        from unittest.mock import Mock
+
+        from vibe3.services.pr_branch_resolver import resolve_command_branch
+
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []  # No flows
+        mock_store.get_flow_state.return_value = None  # No candidates
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+        mock_flow_service.get_current_branch.return_value = "main"
+
+        result = resolve_command_branch(
+            branch_opt="1234",
+            flow_service=mock_flow_service,
+            canonical_fallback=True,
+        )
+
+        # Should return canonical branch, not raise UserError
+        assert result == "task/issue-1234"
+
+    def test_canonical_fallback_false_raises_error_no_flow(self):
+        """测试：canonical_fallback=False 时仍抛出 UserError"""
+        from unittest.mock import Mock
+
+        from vibe3.exceptions import UserError
+        from vibe3.services.pr_branch_resolver import resolve_command_branch
+
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []
+        mock_store.get_flow_state.return_value = None
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        with pytest.raises(UserError) as exc_info:
+            resolve_command_branch(
+                branch_opt="1234",
+                flow_service=mock_flow_service,
+                canonical_fallback=False,
+            )
+
+        assert "No flow found for issue #1234" in str(exc_info.value)
+
+    def test_canonical_fallback_ignored_for_branch_name(self):
+        """测试：非数字输入时 canonical_fallback 无效"""
+        from unittest.mock import Mock
+
+        from vibe3.services.pr_branch_resolver import resolve_command_branch
+
+        mock_flow_service = Mock()
+        mock_flow_service.get_current_branch.return_value = "main"
+
+        result = resolve_command_branch(
+            branch_opt="dev/issue-999",
+            flow_service=mock_flow_service,
+            canonical_fallback=True,
+        )
+
+        # Should return as-is (branch name)
+        assert result == "dev/issue-999"
+
+
 class TestCommandIntegration:
     """测试命令集成"""
 

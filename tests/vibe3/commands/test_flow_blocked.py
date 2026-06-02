@@ -110,28 +110,16 @@ def test_flow_blocked_no_longer_supports_by_alias() -> None:
 
 def test_flow_blocked_auto_creates_flow_for_issue_branch() -> None:
     """Auto-create flow when branch matches issue convention and no flow exists."""
-    from vibe3.models.branch_convention import BranchConvention
-
     flow_service = MagicMock()
     flow_service.get_flow_status.return_value = None  # No flow exists
-
-    # Mock ConventionResolver to return vibe_center convention
-    mock_convention = BranchConvention.vibe_center()
-    mock_resolver = MagicMock()
-    mock_resolver.resolve.return_value.branch = mock_convention
 
     # Mock flow update command
     mock_update = MagicMock()
 
     with (
         patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
-        patch(
-            "vibe3.commands.flow_lifecycle.ConventionResolver"
-        ) as mock_resolver_class,
         patch("vibe3.commands.flow_manage.update", mock_update),
     ):
-        mock_resolver_class.from_repo.return_value = mock_resolver
-
         result = runner.invoke(
             app, ["flow", "blocked", "--branch", "task/issue-1212", "--task", "467"]
         )

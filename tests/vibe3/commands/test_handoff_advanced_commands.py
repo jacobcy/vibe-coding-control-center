@@ -54,12 +54,12 @@ class TestHandoffAdvancedCommands:
         assert result.exit_code == 0
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.services.branch_arg.GitClient")
-    def test_handoff_append_command(self, mock_git_class, mock_service_class):
+    @patch("vibe3.services.branch_arg.FlowService")
+    def test_handoff_append_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff append command."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "task/test-branch"
-        mock_git_class.return_value = mock_git
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
         mock_service.append_current_handoff.return_value = "/path/to/current.md"
@@ -88,12 +88,12 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.services.branch_arg.GitClient")
-    def test_handoff_plan_command(self, mock_git_class, mock_service_class):
+    @patch("vibe3.services.branch_arg.FlowService")
+    def test_handoff_plan_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff plan command."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "task/test-branch"
-        mock_git_class.return_value = mock_git
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
@@ -119,12 +119,12 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.services.branch_arg.GitClient")
-    def test_handoff_report_command(self, mock_git_class, mock_service_class):
+    @patch("vibe3.services.branch_arg.FlowService")
+    def test_handoff_report_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff report command."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "task/test-branch"
-        mock_git_class.return_value = mock_git
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
@@ -150,12 +150,12 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.services.branch_arg.GitClient")
-    def test_handoff_audit_command(self, mock_git_class, mock_service_class):
+    @patch("vibe3.services.branch_arg.FlowService")
+    def test_handoff_audit_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff audit command."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "task/test-branch"
-        mock_git_class.return_value = mock_git
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
@@ -317,13 +317,15 @@ def test_handoff_next_sets_next_step_for_numeric_branch() -> None:
 
 
 def test_handoff_next_rejects_nonexistent_flow() -> None:
-    """Should fail-fast with UserError if no flow found."""
+    """Should fail-fast if no flow state exists for the resolved branch."""
     service = MagicMock()
 
     # Mock store with no flow binding and no unbound candidates
     mock_store = MagicMock()
     mock_store.get_flows_by_issue.return_value = []
-    mock_store.get_flow_state.return_value = None  # No unbound candidates either
+    mock_store.get_flow_state.return_value = (
+        None  # No unbound candidates, no flow state
+    )
     service.store = mock_store
 
     # Mock FlowService in branch_arg (resolver creates its own instance)
@@ -339,11 +341,11 @@ def test_handoff_next_rejects_nonexistent_flow() -> None:
             ["handoff", "next", "message", "--branch", "999"],
         )
 
+    # With canonical_fallback=True, resolver returns "task/issue-999"
+    # But command should still fail because there's no flow state
     assert result.exit_code == 1
-    # UserError should be captured in the exception attribute
-    assert result.exception is not None
-    assert "No flow found for issue #999" in str(result.exception)
-    # Should NOT call record_next_step when flow doesn't exist
+    assert "没有 flow" in result.output
+    # Should NOT call record_next_step when flow state doesn't exist
     service.record_next_step.assert_not_called()
 
 

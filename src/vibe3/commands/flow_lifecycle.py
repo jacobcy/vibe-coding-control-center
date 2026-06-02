@@ -8,11 +8,9 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_context_loader import load_issue_info
-from vibe3.utils.issue_ref import try_parse_issue_number
 
 
 def blocked(
@@ -50,15 +48,7 @@ def blocked(
 
     service = FlowService()
 
-    # Early handling for issue number: resolve to canonical branch
-    # before resolve_branch_arg. This avoids UserError from
-    # resolve_issue_branch_input when flow doesn't exist
-    issue_number_input = try_parse_issue_number(branch) if branch else None
-    if issue_number_input is not None:
-        convention = ConventionResolver.from_repo().resolve().branch
-        target_branch = convention.canonical_branch(issue_number_input)
-    else:
-        target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch)
 
     logger.bind(
         command="flow blocked",
@@ -72,6 +62,8 @@ def blocked(
 
     if not flow_status:
         # Try to auto-create flow if branch matches task/dev convention
+        from vibe3.services.convention_resolver import ConventionResolver
+
         convention = ConventionResolver.from_repo().resolve().branch
         issue_number = convention.parse_issue_number(target_branch)
 
@@ -150,9 +142,7 @@ def rebuild(
     appends a rebuild handoff event, and clears blocked state through the
     label-auto resume path.
     """
-    branch = (
-        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
-    )
+    branch = resolve_branch_arg(str(issue_number))
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
