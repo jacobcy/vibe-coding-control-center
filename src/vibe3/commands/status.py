@@ -24,7 +24,7 @@ from vibe3.ui.console import console
 from vibe3.utils.time_format import format_age_aware_time
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestra_snapshot import OrchestraSnapshot
+    from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 
 def _resolve_server_label(
@@ -159,7 +159,7 @@ def _full_status_dashboard(
         run_full_check_shortcut()
 
     # Fetch all data via service layer
-    data = fetch_task_status_data(all_flows=all_flows, output_format=output_format)
+    data = fetch_task_status_data(all_flows=all_flows)
 
     # Handle JSON/YAML output
     if output_format in ("json", "yaml"):
@@ -275,6 +275,9 @@ def status(
         )
         local_snap = orch_service.snapshot()
         orch_snapshot = replace(local_snap, server_running=False)
+
+    # Assert orch_snapshot is non-None after fallback
+    assert orch_snapshot is not None
 
     # Handle JSON/YAML output (system status only)
     if output_format in ("json", "yaml"):

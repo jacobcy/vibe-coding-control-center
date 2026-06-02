@@ -128,7 +128,7 @@ def status_command(
         ),
     ] = False,
 ) -> None:
-    """[Compatibility] Redirect to task status."""
+    """[Compatibility] Show orchestra system status and configuration."""
     status.status(
         check=check,
         output_format=output_format,

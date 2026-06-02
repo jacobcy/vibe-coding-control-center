@@ -25,14 +25,12 @@ class TaskStatusData:
 
 def fetch_task_status_data(
     all_flows: bool = False,
-    output_format: str = "table",
 ) -> TaskStatusData:
     """Fetch all data needed for task status dashboard.
 
     Args:
         all_flows: If True, include all flow statuses;
             otherwise active/done/blocked only.
-        output_format: Output format ("table", "json", "yaml").
 
     Returns:
         TaskStatusData containing config, snapshot, flows, and issues.
@@ -71,6 +69,9 @@ def fetch_task_status_data(
         local_snap = orch_service.snapshot()
         orch_snapshot = replace(local_snap, server_running=False)
 
+    # Assert orch_snapshot is non-None after fallback
+    assert orch_snapshot is not None
+
     # Fetch flows
     service = FlowService()
     flows = service.list_flows(status=None if all_flows else "active")
@@ -103,7 +104,7 @@ def fetch_task_status_data(
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     """Only auto-task flows should participate in task-oriented Issue Progress."""
     flow = cast(FlowStatusResponse | None, item.get("flow"))
-    state = cast(IssueState, item["state"])
+    state = cast(IssueState | None, item.get("state"))
 
     if flow is None:
         # Include issues without flow if they are remote (claimed by manager)
@@ -111,6 +112,9 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
         is_remote = cast(bool, item.get("remote", False))
         if is_remote:
             return True
+        # State can be None; only check if present
+        if state is None:
+            return False
         return state in {
             IssueState.READY,
             IssueState.HANDOFF,
