@@ -312,4 +312,61 @@ def test_block_respects_state_machine_on_double_block(tmp_path: Path) -> None:
     flow_state = store.get_flow_state("test-branch")
     assert flow_state.get("flow_status") == "blocked"
     assert flow_state.get("blocked_reason") == "Second failure"
+
+
+def test_unblock_returns_result_with_label_status(tmp_path: Path) -> None:
+    """unblock() should return UnblockResult with label_cleared status."""
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "test-branch",
+        flow_slug="test",
+        flow_status="blocked",
+        blocked_reason="Previous error",
+    )
+
+    github = StubGitHubClient()
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
+    result = svc.unblock(
+        branch="test-branch",
+        target_state=IssueState.READY,
+        issue_number=123,
+        detail="test",
+    )
+    assert hasattr(result, "label_cleared")
+    assert result.label_cleared is True
+
+
+def test_unblock_reports_label_failure(tmp_path: Path) -> None:
+    """unblock() should report when label write fails."""
+    from unittest.mock import MagicMock
+
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "test-branch",
+        flow_slug="test",
+        flow_status="blocked",
+        blocked_reason="Previous error",
+    )
+
+    github = StubGitHubClient()
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
+    # Make label write fail
+    svc._io.write_label_state = MagicMock(side_effect=Exception("API error"))
+
+    result = svc.unblock(
+        branch="test-branch",
+        target_state=IssueState.READY,
+        issue_number=123,
+    )
+    assert result.label_cleared is False
     assert label_service.current_state == IssueState.BLOCKED
