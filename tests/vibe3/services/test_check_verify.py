@@ -119,6 +119,7 @@ class TestVerifyCurrentFlow:
         mock_store.get_issue_links.return_value = [
             {"issue_number": 123, "issue_role": "task"}
         ]
+        mock_store.get_task_issue_number.return_value = 123
         mock_github_client.view_issue.return_value = None
 
         result = check_service.verify_current_flow()
