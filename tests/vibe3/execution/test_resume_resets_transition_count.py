@@ -122,6 +122,17 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         latest_actor="system",
     )
 
+    # Simulate transition history
+    with sqlite3.connect(db.db_path) as conn:
+        db.record_transition(conn, branch, "state/claimed", "state/handoff", "actor")
+        db.record_transition(conn, branch, "state/claimed", "state/handoff", "actor")
+        db.record_transition(conn, branch, "state/claimed", "state/handoff", "actor")
+
+    # Verify transition history recorded
+    with sqlite3.connect(db.db_path) as conn:
+        count = db.count_specific_pair(conn, branch, "state/claimed", "state/handoff")
+    assert count == 3
+
     # Mock GitHub client
     github_client = MagicMock()
     github_client.get_issue_labels.return_value = [{"name": "state/blocked"}]
@@ -149,3 +160,35 @@ def test_resume_resets_hard_limit_counter(tmp_path):
     assert flow.get("transition_count") == 0, "Hard limit counter should be reset"
     assert flow.get("blocked_reason") is None
     assert flow.get("flow_status") == "active"
+
+    # Verify transition_history cleared
+    with sqlite3.connect(db.db_path) as conn:
+        count_after = db.count_specific_pair(
+            conn, branch, "state/claimed", "state/handoff"
+        )
+    assert count_after == 0, "transition_history should be cleared"
+
+    # Verify flow can transition again without blocking
+    mock_block_fn = MagicMock()
+    with patch(
+        "vibe3.execution.noop_gate.get_role_block_function",
+        return_value=mock_block_fn,
+    ):
+        with patch(
+            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label"
+        ) as mock_state:
+            mock_state.return_value = ("state/handoff", False)
+
+            apply_unified_noop_gate(
+                store=db,
+                issue_number=issue_number,
+                branch=branch,
+                actor="test",
+                role="executor",
+                before_state_label="state/claimed",
+                repo="test/repo",
+                flow_state=flow,
+            )
+
+    # Should NOT have called block function (no re-blocking)
+    mock_block_fn.assert_not_called()
