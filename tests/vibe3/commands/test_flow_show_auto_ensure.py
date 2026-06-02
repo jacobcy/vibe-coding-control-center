@@ -17,6 +17,9 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
     mock_service = MagicMock()
     mock_service.get_current_branch.return_value = "feature/unregistered"
     mock_service.get_flow_status.return_value = None
+    mock_store = MagicMock()
+    mock_store.get_task_issue_number.return_value = None
+    mock_service.store = mock_store
     mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show"])
@@ -52,6 +55,7 @@ def test_flow_show_timeline_when_registered(
     # Mock store to return empty events
     mock_store = MagicMock()
     mock_store.get_events.return_value = []
+    mock_store.get_task_issue_number.return_value = None
     mock_service.store = mock_store
 
     # Mock get_flow_status (resolver uses it internally)
@@ -95,6 +99,7 @@ def test_flow_show_numeric_issue_resolves_branch(
         {"branch": "task/issue-436", "flow_status": "active"}
     ]
     mock_store.get_events.return_value = []
+    mock_store.get_task_issue_number.return_value = None
     mock_service.store = mock_store
 
     def get_flow_status(branch: str):

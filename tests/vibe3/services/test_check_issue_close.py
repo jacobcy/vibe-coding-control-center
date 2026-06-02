@@ -7,7 +7,7 @@ Tests cover:
 - Non-task branch auto-close (extension beyond task/issue-N)
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
@@ -167,24 +167,44 @@ class TestMarkFlowDoneIssueClose:
     def test_mark_flow_done_ignores_related_issue(self, tmp_path):
         """Flow has role=related link → related issue NOT closed."""
         # ARRANGE
-        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store = MagicMock(spec=SQLiteClient)
         branch = "task/issue-456"
 
-        store.update_flow_state(branch, flow_status="active")
-        # Link with role=related (NOT role=task)
-        store.add_issue_link(branch, 456, role="related")
+        store.get_flow_state.return_value = {
+            "branch": branch,
+            "flow_status": "active",
+        }
+        store.get_task_issue_number.return_value = None  # No task link
+        store.get_flows_by_issue.return_value = []  # No other flows
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_git_common_dir.return_value = tmp_path
 
         github_client = MagicMock(spec=GitHubClient)
 
+        # Create handoff file
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, branch)
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
         service = CheckService(
             store=store, git_client=git_client, github_client=github_client
         )
 
-        # ACT
-        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
+        # Mock IssueFlowService instance and its method
+        mock_issue_flow_service = MagicMock()
+        mock_issue_flow_service.resolve_task_issue_number.return_value = None
+
+        with patch(
+            "vibe3.services.issue_flow_service.IssueFlowService",
+            return_value=mock_issue_flow_service,
+        ):
+            # ACT
+            suggestions = service._flow_status_service.mark_flow_done(
+                branch, "PR merged"
+            )
 
         # ASSERT: Issue should NOT be closed because role is "related" not "task"
         assert suggestions["issue_to_close"] is None
@@ -193,24 +213,44 @@ class TestMarkFlowDoneIssueClose:
     def test_mark_flow_done_ignores_dependency_issue(self, tmp_path):
         """Flow has role=dependency link → dependency issue NOT closed."""
         # ARRANGE
-        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store = MagicMock(spec=SQLiteClient)
         branch = "task/issue-789"
 
-        store.update_flow_state(branch, flow_status="active")
-        # Link with role=dependency (NOT role=task)
-        store.add_issue_link(branch, 789, role="dependency")
+        store.get_flow_state.return_value = {
+            "branch": branch,
+            "flow_status": "active",
+        }
+        store.get_task_issue_number.return_value = None  # No task link
+        store.get_flows_by_issue.return_value = []  # No other flows
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_git_common_dir.return_value = tmp_path
 
         github_client = MagicMock(spec=GitHubClient)
 
+        # Create handoff file
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, branch)
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
         service = CheckService(
             store=store, git_client=git_client, github_client=github_client
         )
 
-        # ACT
-        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
+        # Mock IssueFlowService instance and its method
+        mock_issue_flow_service = MagicMock()
+        mock_issue_flow_service.resolve_task_issue_number.return_value = None
+
+        with patch(
+            "vibe3.services.issue_flow_service.IssueFlowService",
+            return_value=mock_issue_flow_service,
+        ):
+            # ACT
+            suggestions = service._flow_status_service.mark_flow_done(
+                branch, "PR merged"
+            )
 
         # ASSERT: Issue should NOT be closed because role is "dependency" not "task"
         assert suggestions["issue_to_close"] is None

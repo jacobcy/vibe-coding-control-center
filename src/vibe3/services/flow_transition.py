@@ -122,12 +122,10 @@ class FlowTransitionMixin(FlowWriteMixin):
             issue_number=issue_number,
         ).debug("Initializing issue flow context cache")
 
-        # Check if there's an existing task issue link
-        issue_links = self.store.get_issue_links(branch)
-        task_issues = [
-            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
-        ]
-        effective_issue_number = task_issues[0] if task_issues else issue_number
+        # Resolve effective issue number from DB link or fallback
+        effective_issue_number = issue_service.resolve_task_issue_number(branch)
+        if effective_issue_number is None:
+            effective_issue_number = issue_number
 
         # Ensure cache entry exists with issue number before updating title
         # This must happen BEFORE title update so update_title() can preserve

@@ -26,6 +26,8 @@ def mock_store():
         "task_issue_number": 42,
         "latest_actor": "test-actor",
     }
+    # Mock get_task_issue_number for unified resolution
+    store.get_task_issue_number.return_value = None  # Default: fallback to issue_links
     return store
 
 

@@ -122,14 +122,7 @@ class FlowManager:
         task_issue = flow.get("task_issue_number")
         if isinstance(task_issue, int):
             return task_issue
-        issue_links = self.store.get_issue_links(branch)
-        for link in issue_links:
-            if (
-                link.get("issue_role") == "task"
-                and link.get("issue_number") is not None
-            ):
-                return int(link["issue_number"])
-        return self.issue_flow_service.parse_issue_number(branch)
+        return self.issue_flow_service.resolve_task_issue_number(branch)
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict | None:
         log = logger.bind(

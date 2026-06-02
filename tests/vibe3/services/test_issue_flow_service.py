@@ -259,3 +259,39 @@ class TestIssueFlowServiceFlowLookup:
             assert result is not None
             # First flow in list (order may vary)
             assert result["branch"] in [branch1, branch2]
+
+
+class TestIssueFlowServiceResolveTaskIssueNumber:
+    """Tests for unified task issue number resolution."""
+
+    def test_resolve_task_issue_number_from_db_links(self) -> None:
+        """Should resolve issue number from DB links when available."""
+        store = Mock()
+        store.get_task_issue_number = Mock(return_value=123)
+
+        service = IssueFlowService(store=store)
+
+        result = service.resolve_task_issue_number("task/issue-456")
+        assert result == 123
+        store.get_task_issue_number.assert_called_once_with("task/issue-456")
+
+    def test_resolve_task_issue_number_fallback_to_parsing(self) -> None:
+        """Should fallback to branch parsing when DB links unavailable."""
+        store = Mock()
+        store.get_task_issue_number = Mock(return_value=None)
+
+        service = IssueFlowService(store=store)
+
+        result = service.resolve_task_issue_number("task/issue-789")
+        assert result == 789
+        store.get_task_issue_number.assert_called_once_with("task/issue-789")
+
+    def test_resolve_task_issue_number_returns_none(self) -> None:
+        """Should return None when neither DB nor parsing finds issue."""
+        store = Mock()
+        store.get_task_issue_number = Mock(return_value=None)
+
+        service = IssueFlowService(store=store)
+
+        result = service.resolve_task_issue_number("feature/my-branch")
+        assert result is None

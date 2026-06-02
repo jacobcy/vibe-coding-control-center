@@ -21,7 +21,6 @@ from vibe3.services.check_remote import (
     CheckRemote,
     is_empty_auto_scene,
     issue_state_from_payload,
-    resolve_task_issue_number,
 )
 from vibe3.services.flow_status_service import FlowStatusService
 from vibe3.services.pr_service import PRService
@@ -309,8 +308,11 @@ class CheckService(CheckRemote):
                 )
 
             # task issue exists and is open on GitHub
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=self.store)
+            task_issue = issue_flow_service.resolve_task_issue_number(branch)
             issue_links = self.store.get_issue_links(branch)
-            task_issue = resolve_task_issue_number(branch, flow_data, issue_links)
             task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
 
             task_issue_closed = False

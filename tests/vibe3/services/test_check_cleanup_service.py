@@ -407,6 +407,8 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
             "blocked_reason": "PR #123 closed without merge",
         }
     ]
+    # Mock no DB issue link (fallback to branch parsing)
+    store.get_task_issue_number.return_value = None
 
     # Mock issue open
     github_client.view_issue.return_value = {
@@ -454,6 +456,9 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
     git_client = MagicMock()
     github_client = MagicMock()
 
+    # Mock no DB issue link (fallback to branch parsing)
+    store.get_task_issue_number.return_value = None
+
     service = CheckCleanupService(
         store=store,
         git_client=git_client,
@@ -488,6 +493,8 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
     git = MagicMock()
     github = MagicMock()
     github.view_issue.return_value = {"state": "OPEN"}
+    # Mock no DB issue link (fallback to branch parsing)
+    store.get_task_issue_number.return_value = None
     service = CheckCleanupService(store=store, git_client=git, github_client=github)
 
     with patch(

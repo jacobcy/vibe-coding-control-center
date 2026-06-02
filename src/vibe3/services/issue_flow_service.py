@@ -208,3 +208,32 @@ class IssueFlowService:
 
         # Priority 3: First available (fallback)
         return flows[0]
+
+    def resolve_task_issue_number(self, branch: str) -> int | None:
+        """Resolve task issue number from branch using unified two-tier logic.
+
+        Resolution order:
+        1. DB flow_issue_links table (via store.get_task_issue_number)
+        2. Branch name parsing (via parse_issue_number_any)
+
+        Args:
+            branch: Git branch name
+
+        Returns:
+            Issue number if found, None otherwise
+
+        Example:
+            >>> service.resolve_task_issue_number("task/issue-372")
+            372
+            >>> service.resolve_task_issue_number("dev/issue-123")
+            123
+            >>> service.resolve_task_issue_number("feature/my-branch")
+            None
+        """
+        # Tier 1: Try DB links first (most reliable)
+        issue_num = self.store.get_task_issue_number(branch)
+        if issue_num is not None:
+            return issue_num
+
+        # Tier 2: Fallback to branch name parsing
+        return self.parse_issue_number_any(branch)

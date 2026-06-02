@@ -210,13 +210,10 @@ class HandoffService:
 
         # 3. Record timeline event for milestone handoff updates
         # Query issue_number from branch → issue link
-        issue_links = self.store.get_issue_links(target_branch)
-        issue_number: int | None = None
-        for link in issue_links:
-            if link.get("issue_role") == "task":
-                issue_number = link.get("issue_number")
-                if isinstance(issue_number, int):
-                    break
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_flow_service = IssueFlowService(self.store)
+        issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
 
         # 3. Call FlowTimelineService to record event and optionally write comment
         if issue_number:

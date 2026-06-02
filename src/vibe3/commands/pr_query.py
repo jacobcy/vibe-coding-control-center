@@ -52,12 +52,28 @@ def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
 
     Returns:
         List of task issue numbers (empty if none found)
+
+    Note:
+        Multiple task issues per branch is flagged as an error by check_service,
+        but this function preserves the capability to display all if present.
     """
     try:
+        # Primary: read from issue_links for all task issues
         issue_links = pr_svc.store.get_issue_links(branch)
-        return [
+        task_issues = [
             link["issue_number"] for link in issue_links if link["issue_role"] == "task"
         ]
+
+        # Fallback: use unified method if no DB link exists
+        if not task_issues:
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=pr_svc.store)
+            task_issue_number = issue_flow_service.resolve_task_issue_number(branch)
+            if task_issue_number:
+                task_issues = [task_issue_number]
+
+        return task_issues
     except Exception as e:
         logger.bind(
             domain="pr",

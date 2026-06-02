@@ -330,7 +330,10 @@ class CheckCleanupService:
             branch: Branch name (expected to be task/issue-N pattern)
         """
         try:
-            issue_number = self._parse_issue_number(branch)
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=self.store)
+            issue_number = issue_flow_service.resolve_task_issue_number(branch)
             if issue_number is None:
                 logger.bind(domain="check", branch=branch).debug(
                     "Not a task branch, skipping issue label cleanup"
@@ -417,13 +420,6 @@ class CheckCleanupService:
                 issue_number=issue_number,
             ).debug(f"Failed to get issue state: {exc}")
             return None
-
-    def _parse_issue_number(self, branch: str) -> int | None:
-        """Extract issue number from task/issue-N branch."""
-        import re
-
-        match = re.fullmatch(r"^task/issue-(\d+)$", branch)
-        return int(match.group(1)) if match else None
 
     def _cleanup_detached_worktrees(self) -> dict[str, list[str]]:
         """Clean up orphaned detached HEAD worktrees from invalid flow records.

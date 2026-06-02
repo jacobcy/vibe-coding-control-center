@@ -34,6 +34,11 @@ def mock_pr_svc_factory():
 
         mock_store = MagicMock()
         mock_store.get_issue_links.return_value = kwargs.get("issue_links", [])
+        # Configure get_task_issue_number for fallback resolution
+        # Default to None so issue_links is used first
+        mock_store.get_task_issue_number.return_value = kwargs.get(
+            "task_issue_number", None
+        )
         mock_pr_svc.store = mock_store
 
         return mock_pr_svc

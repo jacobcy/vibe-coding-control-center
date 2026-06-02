@@ -321,10 +321,15 @@ class TaskShowService:
             target_branch = branch
         local_task = self.flow_service.get_flow_status(target_branch)
 
+        # Resolve task issue numbers from DB links
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_flow_service = IssueFlowService(store=self.store)
+        task_issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
+        task_issue_numbers = [task_issue_number] if task_issue_number else []
+
+        # Resolve related and dependency issue numbers from DB links
         issue_links = self.store.get_issue_links(target_branch)
-        task_issue_numbers = [
-            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
-        ]
         related_issue_numbers = [
             link["issue_number"]
             for link in issue_links
@@ -348,6 +353,9 @@ class TaskShowService:
         elif target_branch.isdigit():
             # Branch is an issue number but no flow exists
             issue_number = int(target_branch)
+        elif not local_task:
+            # Try to resolve from branch name pattern (e.g., task/issue-123)
+            issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
 
         if issue_number:
             issue = self.fetch_issue_with_comments(issue_number)
