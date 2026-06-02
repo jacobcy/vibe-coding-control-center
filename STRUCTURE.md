@@ -89,9 +89,9 @@ vibe-center/
 │
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
-│   ├── context/                 # AI 上下文
-│   │   ├── memory/              # [TRACKED] AI 上下文记忆（已迁移至 claude-memory MCP 工具）
-│   │   └── ...                  # 动态上下文（如 handoff）由 vibe3 管理，见 .git/vibe3/
+├── context/                 # AI 上下文
+│   ├── memory/              # [TRACKED] AI 上下文记忆（详见 docs/standards/v3/v3-memory-standard.md）
+│   └── ...                  # 动态上下文（如 handoff）由 vibe3 管理，见 .git/vibe3/
 │   ├── templates/               # 文档模板（AI 工具）
 │   │   ├── prd.md               # PRD 模板
 │   │   ├── tech-spec.md         # Spec 模板

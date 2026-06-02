@@ -65,19 +65,18 @@ Plan → Run → Review → Commit
 vibe3 plan --branch <branch_or_issue_number>
 vibe3 plan                    # 使用当前 branch
 
-# 从 spec 文件/Issue/别名创建 plan（更新当前 flow 的 spec_ref 并创建计划）
-vibe3 plan --spec docs/specs/feature.md
-vibe3 plan --spec #123
-vibe3 plan --spec @spec
+# 使用技能进行更智能的规划
+/vibe-new  # 启动新任务流
+/vibe-task # 分析并规划任务
 ```
 
-**Step 2: 执行 Plan（使用 Agent）**
+**Step 2: 执行 Plan（使用 Agent 或技能）**
 
 ```bash
 # 使用现有 plan 执行
 vibe3 run --plan
 
-# 使用自定义指令执行
+# 使用技能进行针对性开发
 vibe3 run "Focus on test coverage"
 
 # 使用指定 agent 执行
@@ -87,16 +86,12 @@ vibe3 run --agent planner-pro --plan
 **Step 3: 审查结果**
 
 ```bash
+# 使用技能进行标准化审查
+/vibe-review-code
+/vibe-review-docs
+
 # 查看当前 flow 的 handoff 链路
 vibe3 handoff show @current
-
-# 查看指定 artifact
-vibe3 handoff show @plan
-vibe3 handoff show docs/reports/run-1.md
-
-# 查看 agent 做了哪些修改
-git status
-git diff
 
 # 运行测试验证
 uv run pytest tests/vibe3
@@ -443,6 +438,14 @@ vibe3 run --plan --timeout 1800  # 30 分钟
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
 - [error-handling.md](./error-handling.md) - 错误处理规范
+- [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
+
+---
+
+**文档版本**：v1.0
+**最后更新**：2026-03-25
+**维护者**：Vibe Center Team
+.md) - 错误处理规范
 - [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
 
 ---
