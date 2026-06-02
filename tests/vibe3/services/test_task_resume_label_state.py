@@ -328,9 +328,10 @@ def test_label_auto_with_missing_physical_worktree_requires_rebuild() -> None:
     assert "vibe3 flow rebuild 303 --yes" in str(exc_info.value)
 
 
-def test_label_auto_with_unrecorded_existing_worktree_requires_rebuild() -> None:
-    """A physical task worktree without flow_state.worktree_path is inconsistent."""
+def test_label_auto_with_unrecorded_existing_worktree_fixes_and_resumes() -> None:
+    """A physical task worktree without flow_state.worktree_path gets backfilled."""
     operations = _make_operations()
+    operations.github_client.get_issue_body.return_value = "User content"
     operations.flow_service.store.get_flow_state.return_value = {
         "branch": "task/issue-303",
         "flow_slug": "issue-303",
@@ -346,8 +347,12 @@ def test_label_auto_with_unrecorded_existing_worktree_requires_rebuild() -> None
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    # Task resume is manual operation - should raise UserError with rebuild suggestion
-    with pytest.raises(UserError) as exc_info:
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+        mock_service_cls.return_value = mock_service
+
         operations.reset_issue_to_ready(
             issue_number=303,
             resume_kind="blocked",
@@ -357,5 +362,11 @@ def test_label_auto_with_unrecorded_existing_worktree_requires_rebuild() -> None
             label_state="",
         )
 
-    assert "not recorded in flow_state" in str(exc_info.value)
-    assert "vibe3 flow rebuild 303 --yes" in str(exc_info.value)
+        # Verify: worktree NOT deleted
+        operations.git_client.remove_worktree.assert_not_called()
+
+        # Verify: BlockedStateService.unblock was called (resume succeeded)
+        mock_service.unblock.assert_called_once()
+
+        # Verify: DB was backfilled with worktree_path
+        operations.flow_service.store.update_flow_state.assert_called()

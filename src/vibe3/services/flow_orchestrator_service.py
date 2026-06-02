@@ -192,6 +192,12 @@ class FlowOrchestratorService:
                     use_worktree=True,
                 )
                 result["worktree_path"] = str(worktree_ctx.path)
+                # Persist worktree_path to store -- the in-memory result
+                # is only returned to the caller, so DB must be updated
+                # explicitly for consistency checks to pass later.
+                self.store.update_flow_state(
+                    branch, worktree_path=str(worktree_ctx.path)
+                )
             return result
         except Exception as exc:
             # CRITICAL: Complete cleanup on bootstrap failure

@@ -312,7 +312,7 @@ class CheckPRService:
                 branch=branch,
                 reason=f"PR #{pr_number} closed without merge",
                 include_remote=True,
-                ensure_worktree=False,
+                ensure_worktree=True,  # FIX: was False, caused worktree_path NULL
             )
 
             logger.bind(

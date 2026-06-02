@@ -10,10 +10,6 @@ from typing import TYPE_CHECKING, Callable
 
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_consistency_check import (
-    FlowConsistencyResult,
-    check_flow_consistency,
-)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -43,21 +39,6 @@ class TaskResumeOperations:
         self.flow_service = flow_service
         self.label_service = label_service
         self.issue_flow_service = issue_flow_service
-
-    def _check_flow_consistency(
-        self, branch: str | None
-    ) -> FlowConsistencyResult | None:
-        """Return shared consistency result for an existing branch flow."""
-        if not isinstance(branch, str) or not branch:
-            return None
-        flow_state = self.flow_service.store.get_flow_state(branch)
-        if not flow_state:
-            return None
-        return check_flow_consistency(
-            branch,
-            flow_state,
-            git_client=self.git_client,
-        )
 
     def reset_issue_to_ready(
         self,
@@ -92,35 +73,23 @@ class TaskResumeOperations:
             if progress_callback:
                 progress_callback(issue_number, branch, step, status)
 
-        consistency = self._check_flow_consistency(branch)
-        if consistency and consistency.needs_rebuild:
-            # Task resume is manual operation - give user clear guidance
-            raise UserError(
-                f"{consistency.reason}. "
-                f"Suggestion: vibe3 flow rebuild {issue_number} --yes"
-            )
+        emit_progress("checking consistency and recovering")
 
-        target_state = self._resolve_target_state(branch, label_state)
+        # Delegate to unified recovery service (manual path: auto=False)
+        from vibe3.services.flow_recovery_service import FlowRecoveryService
 
-        emit_progress(
-            f"clearing reasons for branch {branch}"
-            if isinstance(branch, str)
-            else "clearing reasons (no branch)"
-        )
-
-        from vibe3.services.blocked_state_service import BlockedStateService
-
-        BlockedStateService(
-            github_client=self.github_client,
-            label_service=self.label_service,
+        recovery = FlowRecoveryService(
             store=self.flow_service.store,
-        ).unblock(
-            branch=branch or "",
-            target_state=target_state,
-            issue_number=issue_number,
-            detail=f"Resumed from {resume_kind} to {target_state.value}: {reason}",
+            git_client=self.git_client,
+            github_client=self.github_client,
         )
-        emit_progress("label resume done", status="done")
+        recovery.recover(
+            branch=branch or "",
+            issue_number=issue_number,
+            reason=f"Resumed from {resume_kind}: {reason}",
+            auto=False,
+        )
+        emit_progress("recovery complete", status="done")
 
     def _guard_no_live_sessions(self, branch: str) -> None:
         from vibe3.agents import CodeagentBackend
