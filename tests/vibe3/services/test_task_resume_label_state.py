@@ -295,8 +295,8 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
         assert call_args.kwargs["issue_number"] == 303
 
 
-def test_label_auto_with_missing_recorded_worktree_requires_rebuild() -> None:
-    """If label-auto resume finds a missing recorded worktree, suggest rebuild."""
+def test_label_auto_with_missing_physical_worktree_requires_rebuild() -> None:
+    """If label-auto resume finds a missing physical worktree, suggest rebuild."""
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.get_issue_body.return_value = "User content"
