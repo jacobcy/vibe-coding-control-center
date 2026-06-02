@@ -62,10 +62,10 @@ def blocked(
 
     if not flow_status:
         # Try to auto-create flow if branch matches task/dev convention
-        import re
+        from vibe3.services.convention_resolver import ConventionResolver
 
-        match = re.search(r"(?:task|dev)/issue-(\d+)", target_branch)
-        issue_number = int(match.group(1)) if match else None
+        convention = ConventionResolver.from_repo().resolve().branch
+        issue_number = convention.parse_issue_number(target_branch)
 
         if issue_number:
             logger.bind(
