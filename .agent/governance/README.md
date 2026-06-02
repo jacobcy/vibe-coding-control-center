@@ -16,7 +16,7 @@
 
 - 本目录只定义治理对象、规则结构、检查点和违规动作。
 - 本目录不定义具体 shell 命令实现，不直接取代 `vibe * (shell)`。
-- 本目录不直接重述 `SOUL.md`、`CLAUDE.md`、`.agent/rules/*` 中已存在的通用原则。
+- 本目录不直接重述 `SOUL.md`、`CLAUDE.md`、`.claude/rules/*` 中已存在的通用原则。
 - 共享状态仍以 `vibe * (shell)` 和 git 现场为准；handoff 不是治理真源。
 
 ## 设计原则
