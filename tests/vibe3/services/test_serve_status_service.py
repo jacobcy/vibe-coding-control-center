@@ -335,3 +335,34 @@ class TestDisplayErrorTracking:
             isinstance(call.args[0], Table) for call in print_calls if call.args
         )
         assert table_printed
+
+
+class TestDisplayLogPath:
+    """Test cases for _display_log_path method."""
+
+    def test_display_log_path_shows_absolute_path(self):
+        """_display_log_path should show the orchestra events log absolute path."""
+        service = ServeStatusService(MagicMock())
+        service.console = MagicMock()
+        service._display_log_path()
+        printed = [str(call.args[0]) for call in service.console.print.call_args_list]
+        assert any("Log:" in msg for msg in printed)
+        assert any("events.log" in msg for msg in printed)
+        assert any("temp" in msg and "logs" in msg for msg in printed)
+
+    def test_display_log_path_in_display_status(self):
+        """display_status should include log path after daemon status."""
+        with (
+            patch.object(ServeStatusService, "_display_daemon_status"),
+            patch.object(ServeStatusService, "_display_config"),
+            patch.object(ServeStatusService, "_display_recent_activity"),
+            patch.object(ServeStatusService, "_display_failed_gate"),
+            patch.object(ServeStatusService, "_display_error_tracking"),
+        ):
+            service = ServeStatusService(MagicMock())
+            service.console = MagicMock()
+            service.display_status(123, True, True)
+            printed = [
+                str(call.args[0]) for call in service.console.print.call_args_list
+            ]
+            assert any("Log:" in msg for msg in printed)

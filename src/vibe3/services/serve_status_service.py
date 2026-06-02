@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
@@ -11,6 +10,7 @@ from rich.table import Table
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.error_tracking_service import ErrorTrackingService
 from vibe3.utils.error_message_cleaner import (
     CODEAGENT_WRAPPER_RE,
@@ -45,6 +45,7 @@ class ServeStatusService:
             tmux_exists: Whether tmux session exists
         """
         self._display_daemon_status(pid, is_valid, tmux_exists)
+        self._display_log_path()
         self._display_config()
         self._display_recent_activity()
         self._display_failed_gate()
@@ -97,6 +98,11 @@ class ServeStatusService:
         else:
             self.console.print(f"[green]Orchestra server running (PID: {pid})[/green]")
 
+    def _display_log_path(self) -> None:
+        """Display the orchestra events log path."""
+        log_path = orchestra_events_log_path()
+        self.console.print(f"Log: {log_path}")
+
     def _display_config(self) -> None:
         """Display configuration summary."""
         from vibe3.services.orchestra_status_service import OrchestraStatusService
@@ -118,7 +124,7 @@ class ServeStatusService:
 
     def _display_recent_activity(self) -> None:
         """Display recent tick activity from events.log."""
-        events_log = Path("temp/logs/orchestra/events.log")
+        events_log = orchestra_events_log_path()
         if not events_log.exists():
             return
 

@@ -9,16 +9,14 @@ from pathlib import Path
 from typing import IO
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
-
-
 def orchestra_log_dir(repo_root: Path | None = None) -> Path:
     override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
     if override_dir:
         path = Path(override_dir).expanduser().resolve() / "orchestra"
     else:
-        root = repo_root or _repo_root()
+        from vibe3.clients.git_client import find_repo_root
+
+        root = repo_root or find_repo_root()
         path = root / "temp" / "logs" / "orchestra"
     path.mkdir(parents=True, exist_ok=True)
     return path

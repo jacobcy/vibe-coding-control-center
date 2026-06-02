@@ -1,5 +1,6 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
+import functools
 import os
 import re
 import subprocess
@@ -86,6 +87,7 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
 
 
+@functools.lru_cache(maxsize=1)
 def find_repo_root() -> Path:
     """Resolve the main repository root deterministically.
 
@@ -95,6 +97,9 @@ def find_repo_root() -> Path:
     This is the single source of truth for repo root resolution.
     All callers that need the repository root for worktree operations,
     database access, or git command execution must use this function.
+
+    Cached with lru_cache to avoid repeated subprocess calls — the repo root
+    cannot change during a process's lifetime.
 
     Resolution chain:
     1. git rev-parse --git-common-dir (works in main repo and worktrees)

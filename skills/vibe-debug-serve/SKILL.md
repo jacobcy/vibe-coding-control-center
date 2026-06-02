@@ -56,6 +56,12 @@ serve 派发链路按这个顺序排查：
 # 系统错误在 serve status 中直接展示
 uv run python src/vibe3/cli.py serve status
 
+# 从 serve status 输出中获取主日志路径（Log: 行）
+# 输出示例：
+#   Server: running
+#   Log: /Users/.../vibe-coding-control-center/temp/logs/orchestra/events.log
+# 使用该路径读取日志（适用于任何工作目录）
+
 # 查询详细错误日志（数据库在主仓库共享目录）
 sqlite3 <main_repo>/.git/vibe3/handoff.db \
   "SELECT id, tick_id, issue_number, severity, error_code, error_message, created_at
@@ -188,6 +194,8 @@ uv run python src/vibe3/cli.py serve status
 
 ## 日志结构速查
 
+**重要**：实际读取日志时应使用 `vibe3 serve status` 输出的绝对路径，而非硬编码的相对路径。以下结构仅供参考。
+
 ```
 temp/logs/
   orchestra/
@@ -245,12 +253,25 @@ curl http://127.0.0.1:8080/status
 
 ### Step 3: 读取主事件日志
 
+**获取日志路径**（推荐方式）：
+
+```bash
+# 从 serve status 获取主日志路径（适用于任何工作目录）
+uv run python src/vibe3/cli.py serve status
+# 输出中包含 "Log: <absolute_path>" 行
+
+# 使用输出的路径读取日志
+tail -f <log_path_from_status>
+```
+
+**读取日志**：
+
 ```bash
 # 实时跟踪（serve 正在运行时）
-tail -f temp/logs/orchestra/events.log
+tail -f <log_path_from_status>
 
 # 事后复盘
-cat temp/logs/orchestra/events.log
+cat <log_path_from_status>
 ```
 
 事件日志记录：server 启停、tick 开始/完成、dispatch 触发/跳过/失败、runtime 错误。
