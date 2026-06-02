@@ -267,13 +267,13 @@ vibe3 flow unblock [--branch <branch>]
 
 ```bash
 # Show current task
-vibe3 task show [<issue>]
+vibe3 task show [<branch>] [--branch <branch>]
 
 # Global status
 vibe3 task status [--all] [--json]
 
 # Resume blocked tasks
-vibe3 task resume [<issue>] [--blocked] [--label auto|ready|claimed|in-progress|handoff|review|merge-ready] [--yes]
+vibe3 task resume [<issue>] [--branch <branch>] [--blocked] [--label auto|ready|claimed|in-progress|handoff|review|merge-ready] [--yes]
 ```
 
 约束：
@@ -285,7 +285,7 @@ vibe3 task resume [<issue>] [--blocked] [--label auto|ready|claimed|in-progress|
 ### 7.5 `flow rebuild`
 
 ```bash
-vibe3 flow rebuild <issue> [--keep-remote] [--no-worktree] [--yes]
+vibe3 flow rebuild [<issue>] [--branch <branch>] [--keep-remote] [--no-worktree] [--yes]
 ```
 
 约束：
