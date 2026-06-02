@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.pr import PRState
-from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -162,6 +161,242 @@ class CheckPRService:
             ).warning(warning_msg)
             return (None, [warning_msg])
 
+    def _find_existing_bridge_marker(
+        self, issue_number: int, closed_pr_number: int
+    ) -> bool:
+        """Check if a bridge marker already exists for this PR.
+
+        Args:
+            issue_number: Original issue number
+            closed_pr_number: Closed PR number
+
+        Returns:
+            True if bridge marker found, False otherwise
+        """
+        try:
+            comments = self.github_client.list_issue_comments(issue_number)
+            if not comments:
+                return False
+
+            # Look for bridge marker comment
+            marker_pattern = (
+                f"[flow] Bridge issue created\nclosed_pr: #{closed_pr_number}"
+            )
+
+            for comment in comments:
+                body = comment.get("body", "")
+                if marker_pattern in body:
+                    logger.bind(
+                        domain="check",
+                        action="bridge_idempotency",
+                        issue_number=issue_number,
+                        closed_pr=closed_pr_number,
+                    ).debug("Found existing bridge marker, skipping creation")
+                    return True
+
+            return False
+
+        except Exception as exc:
+            logger.bind(
+                domain="check",
+                action="bridge_idempotency",
+                issue_number=issue_number,
+            ).warning(f"Failed to check for existing bridge marker: {exc}")
+            return False
+
+    def _inherit_labels_for_bridge(
+        self, original_issue: dict, closed_pr_number: int
+    ) -> list[str]:
+        """Prepare labels for bridge issue.
+
+        Inherit classification labels from original issue, exclude state labels,
+        and add state/ready.
+
+        Args:
+            original_issue: Original issue payload from view_issue()
+            closed_pr_number: Closed PR number (for logging)
+
+        Returns:
+            List of labels to apply to bridge issue
+        """
+        # Get labels from original issue
+        original_labels = original_issue.get("labels", [])
+        inherited = []
+
+        for label_data in original_labels:
+            label_name = label_data.get("name", "")
+            # Exclude state/* labels and vibe-task
+            if label_name.startswith("state/"):
+                continue
+            if label_name == "vibe-task":
+                continue
+            inherited.append(label_name)
+
+        # Add state/ready
+        if "state/ready" not in inherited:
+            inherited.append("state/ready")
+
+        logger.bind(
+            domain="check",
+            action="bridge_labels",
+            original_labels=[label.get("name") for label in original_labels],
+            inherited_labels=inherited,
+        ).debug("Prepared labels for bridge issue")
+
+        return inherited
+
+    def _create_bridge_issue(
+        self,
+        original_issue_number: int,
+        original_issue: dict,
+        closed_pr_number: int,
+        branch: str,
+    ) -> int | None:
+        """Create a bridge issue for abandoned work.
+
+        Args:
+            original_issue_number: Original issue number
+            original_issue: Original issue payload
+            closed_pr_number: Closed PR number
+            branch: Branch name
+
+        Returns:
+            Bridge issue number on success, None on failure
+        """
+        # Prepare title
+        original_title = original_issue.get("title", "Unknown Issue")
+        bridge_title = f"Follow-up: {original_title}"
+
+        # Prepare body
+        original_body = original_issue.get("body", "")
+        bridge_body = f"""[flow] Bridge issue
+
+status: unresolved
+source_issue: #{original_issue_number}
+closed_pr: #{closed_pr_number}
+source_branch: {branch}
+reason: linked PR closed without merge; health check closed the old execution lineage
+
+## Context
+
+The original issue remains unresolved, but its previous PR was closed without merge.
+This bridge issue is the new execution target.
+
+## Original Issue
+
+{original_body}
+
+## Contributors
+
+- @jacobcy
+- Codex
+"""
+
+        # Prepare labels
+        labels = self._inherit_labels_for_bridge(original_issue, closed_pr_number)
+
+        # Create bridge issue
+        bridge_number = self.github_client.create_issue(
+            title=bridge_title,
+            body=bridge_body,
+            labels=labels,
+        )
+
+        if bridge_number:
+            logger.bind(
+                domain="check",
+                action="bridge_created",
+                bridge_issue=bridge_number,
+                original_issue=original_issue_number,
+                closed_pr=closed_pr_number,
+            ).info(
+                f"Created bridge issue #{bridge_number} for "
+                f"original #{original_issue_number} after PR #{closed_pr_number} closed"
+            )
+
+        return bridge_number
+
+    def _add_bridge_marker_to_original(
+        self,
+        original_issue_number: int,
+        bridge_issue_number: int,
+        closed_pr_number: int,
+        branch: str,
+    ) -> bool:
+        """Add bridge marker comment to original issue.
+
+        Args:
+            original_issue_number: Original issue number
+            bridge_issue_number: Bridge issue number
+            closed_pr_number: Closed PR number
+            branch: Branch name
+
+        Returns:
+            True on success, False on failure
+        """
+        marker_body = f"""[flow] Bridge issue created
+
+successor: #{bridge_issue_number}
+closed_pr: #{closed_pr_number}
+source_branch: {branch}
+status: unresolved_continues_in_successor
+"""
+
+        success = self.github_client.add_comment(original_issue_number, marker_body)
+
+        if success:
+            logger.bind(
+                domain="check",
+                action="bridge_marker_added",
+                original_issue=original_issue_number,
+                bridge_issue=bridge_issue_number,
+            ).debug("Added bridge marker to original issue")
+        else:
+            logger.bind(
+                domain="check",
+                action="bridge_marker_failed",
+                original_issue=original_issue_number,
+            ).warning("Failed to add bridge marker to original issue")
+
+        return success
+
+    def _close_original_issue_with_comment(
+        self,
+        original_issue_number: int,
+        bridge_issue_number: int,
+        closed_pr_number: int,
+    ) -> str:
+        """Close original issue with explanatory comment.
+
+        Args:
+            original_issue_number: Original issue number
+            bridge_issue_number: Bridge issue number
+            closed_pr_number: Closed PR number
+
+        Returns:
+            Result string: "closed", "already_closed", or "failed"
+        """
+        closing_comment = f"""[flow] Closed after PR abandoned
+
+PR #{closed_pr_number} was closed without merge, so this execution lineage is ended.
+The unresolved work continues in #{bridge_issue_number}.
+"""
+
+        result = self.github_client.close_issue_if_open(
+            issue_number=original_issue_number,
+            closing_comment=closing_comment,
+        )
+
+        logger.bind(
+            domain="check",
+            action="original_closed",
+            original_issue=original_issue_number,
+            bridge_issue=bridge_issue_number,
+            result=result,
+        ).debug("Closed original issue after bridge creation")
+
+        return result
+
     def handle_closed_pr(
         self,
         branch: str,
@@ -273,72 +508,86 @@ class CheckPRService:
 
         # Check if issue already closed
         gh_issue = self.github_client.view_issue(task_issue_number)
-        if isinstance(gh_issue, dict):
-            issue_state = str(gh_issue.get("state", "")).upper()
-            if issue_state == "CLOSED":
-                logger.bind(
-                    domain="check",
-                    action="reset_pr_closed",
-                    branch=branch,
-                    issue_number=task_issue_number,
-                ).info(
-                    f"Issue #{task_issue_number} already closed, "
-                    "marking flow as aborted"
-                )
-
-                # Issue already closed → mark flow as aborted and clean up
-                return self._abort_and_cleanup(
-                    branch,
-                    f"Issue #{task_issue_number} already closed; "
-                    f"PR #{pr_number} closed without merge",
-                )
-
-        # Build minimal FlowStatusResponse for task resume
-        try:
-            from vibe3.config.orchestra_settings import load_orchestra_config
-            from vibe3.services.issue_context_loader import load_issue_info
-
-            config = load_orchestra_config()
-            issue_info = load_issue_info(
-                task_issue_number, config=config, github=self.github_client
-            )
-
-            FlowRebuildUsecase(
-                store=self.store,
-                git_client=self.git_client,
-                github_client=self.github_client,
-            ).rebuild_issue_flow(
-                issue=issue_info,
-                branch=branch,
-                reason=f"PR #{pr_number} closed without merge",
-                include_remote=True,
-                ensure_worktree=True,  # FIX: was False, caused worktree_path NULL
-            )
-
-            logger.bind(
-                domain="check",
-                action="reset_pr_closed_rebuild",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).info(
-                f"Rebuilt flow for issue #{task_issue_number} after "
-                f"PR #{pr_number} closed"
-            )
-
-        except Exception as exc:
+        if not isinstance(gh_issue, dict):
+            # Failed to fetch issue data (network error or not found)
             logger.bind(
                 domain="check",
                 action="reset_pr_closed",
                 branch=branch,
                 issue_number=task_issue_number,
-            ).warning(f"Failed to rebuild issue flow: {exc}")
+            ).warning(
+                f"Failed to fetch issue #{task_issue_number} data, "
+                "marking flow as aborted"
+            )
+            return self._abort_and_cleanup(
+                branch,
+                f"Failed to fetch issue #{task_issue_number} data; "
+                f"PR #{pr_number} closed without merge",
+            )
+
+        issue_state = str(gh_issue.get("state", "")).upper()
+        if issue_state == "CLOSED":
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).info(
+                f"Issue #{task_issue_number} already closed, " "marking flow as aborted"
+            )
+
+            # Issue already closed → mark flow as aborted and clean up
+            return self._abort_and_cleanup(
+                branch,
+                f"Issue #{task_issue_number} already closed; "
+                f"PR #{pr_number} closed without merge",
+            )
+
+        # Check for existing bridge marker (idempotency)
+        if self._find_existing_bridge_marker(task_issue_number, pr_number):
+            # Bridge already exists, just abort and cleanup
+            return self._abort_and_cleanup(
+                branch,
+                f"Bridge already exists for PR #{pr_number}; "
+                f"original issue #{task_issue_number}",
+            )
+
+        # Create bridge issue
+        bridge_number = self._create_bridge_issue(
+            original_issue_number=task_issue_number,
+            original_issue=gh_issue,
+            closed_pr_number=pr_number,
+            branch=branch,
+        )
+
+        if not bridge_number:
             return (
-                f"Failed to reset issue #{task_issue_number} after PR "
-                f"#{pr_number} closed: {exc}",
+                f"Failed to create bridge issue for #{task_issue_number} "
+                f"after PR #{pr_number} closed",
                 [],
             )
 
-        return (None, [])
+        # Add bridge marker to original issue
+        self._add_bridge_marker_to_original(
+            original_issue_number=task_issue_number,
+            bridge_issue_number=bridge_number,
+            closed_pr_number=pr_number,
+            branch=branch,
+        )
+
+        # Close original issue
+        self._close_original_issue_with_comment(
+            original_issue_number=task_issue_number,
+            bridge_issue_number=bridge_number,
+            closed_pr_number=pr_number,
+        )
+
+        # Abort and cleanup old flow
+        return self._abort_and_cleanup(
+            branch,
+            f"Bridge issue #{bridge_number} created; "
+            f"original #{task_issue_number} closed after PR #{pr_number} abandoned",
+        )
 
     def _update_pr_cache(self, branch: str, pr: "PRResponse") -> None:
         """Update PR cache when check discovers changes.
