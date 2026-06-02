@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Vibe Team
 created: 2026-03-24
-last_updated: 2026-04-01
+last_updated: 2026-06-02
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -94,6 +94,8 @@ related_docs:
 - `unblock`
 - `show`
 - `status`
+- `list-deleted`
+- `restore`
 
 ### 3.2 `vibe3 task`
 

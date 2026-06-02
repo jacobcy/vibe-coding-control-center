@@ -86,4 +86,4 @@ gates:
 ## 参考
 
 - [Vibe Workflow Paradigm](../../prds/vibe-workflow-paradigm.md)
-- [文档组织标准](../../standards/DOC_ORGANIZATION.md)
+- [文档组织标准](../../standards/doc-organization.md)
