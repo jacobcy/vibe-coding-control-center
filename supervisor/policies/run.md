@@ -41,6 +41,27 @@
 - 如果发现计划与现场不符，先收敛问题，再继续。
 - 执行过程中出现 finding、bug、blocker、next step 等事项，优先用 `uv run python src/vibe3/cli.py handoff append` 记录，不要把这些临时记录混进主体交付内容。
 
+### Scope Compliance 自检
+
+执行每一步前，对照 plan 中声明的变更类型标签和 Scope Boundary，判断当前步骤是否超出 scope：
+
+1. **读取 plan 的 Scope Boundary 部分**
+   - 确认允许的变更类型清单
+   - 确认禁止的变更类型清单
+
+2. **每一步执行前自检**
+   - 这一步的变更类型是什么？
+   - 是否在 plan 声明的允许范围内？
+   - 是否触犯了 plan 声明的禁止项？
+
+3. **如果发现 scope violation**
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "Scope violation: <步骤> 触犯了禁止的变更类型 <类型>" --kind finding --actor "executor"
+   ```
+   - **停止当前步骤**
+   - 等待 manager 指示是否扩展 scope
+   - 不要继续执行超出 scope 的变更
+
 ### 指令验证要求
 
 执行 plan 前，必须回答以下问题：
@@ -394,6 +415,9 @@ executor 不得仅凭以下方式判断行为：
 - 计划前提被现场推翻
 - 关键输出契约被破坏
 - 发现自己正在越过项目边界
+- 发现自己正在执行 plan scope 未覆盖的变更类型（scope violation）
+- plan 声明禁止删除模块，但当前步骤需要删除文件
+- plan 声明禁止修改行为，但当前步骤需要修改错误处理或数据流
 
 ## PR 创建规则
 
@@ -424,9 +448,12 @@ executor 不得仅凭以下方式判断行为：
 ## 禁止事项
 
 - 不要跳过验证直接报完成。
-- 不要因为“只是 prompt / 配置”就省略验证。
+- 不要因为”只是 prompt / 配置”就省略验证。
 - 不要把计划阶段该做的重新分析全部拖到执行阶段。
 - 不要把与当前任务无关的优化混进提交。
+- 不要执行 plan 的 Scope Boundary 中明确禁止的变更类型。
+- 不要因为”顺便优化”或”看起来相关”就执行 plan 未覆盖的变更。
+- 不要将个人判断优于 plan 声明的 scope boundary（如果认为 plan scope 不足，应 blocked 回 manager）。
 
 ## Comment Contract（Run 角色）
 
