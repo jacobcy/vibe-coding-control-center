@@ -247,8 +247,9 @@ class TestRecordDispatchFailureIfUnexpected:
                 exception=ValueError("Test error"),
             )
 
+        # ValueError is unclassified, maps to E_EXEC_UNKNOWN (WARNING severity)
         mock_record_error.assert_called_once_with(
-            error_code="E_DISPATCH_FAILURE",
+            error_code="E_EXEC_UNKNOWN",  # Classified by classify_error_hybrid
             error_message="manual executor dispatch failed [exception]: Test error",
             tick_id=0,
             issue_number=456,
@@ -275,7 +276,10 @@ class TestRecordDispatchFailureIfUnexpected:
             )
 
         call_args = mock_record_error.call_args
-        assert call_args[1]["error_code"] == "E_DISPATCH_FAILURE"
+        # RuntimeError is unclassified, maps to E_EXEC_UNKNOWN (WARNING severity)
+        assert (
+            call_args[1]["error_code"] == "E_EXEC_UNKNOWN"
+        )  # Classified by classify_error_hybrid
         assert (
             call_args[1]["error_message"]
             == "manual reviewer dispatch failed [exception]: Unexpected error"
@@ -325,4 +329,55 @@ class TestRecordDispatchFailureIfUnexpected:
                 branch="dev/test",
             )
 
+        mock_record_error.assert_not_called()
+
+    def test_magicmock_leak_skipped(self) -> None:
+        """Verify MagicMock leaks are detected and skipped."""
+        from unittest.mock import MagicMock
+
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            # Create a MagicMock exception (simulating test leak)
+            mock_exception = MagicMock()
+            mock_exception.__str__ = lambda self: "MagicMock()"
+
+            record_dispatch_failure_if_unexpected(
+                role="manager",
+                issue_number=42,
+                branch="task/issue-42",
+                exception=mock_exception,
+            )
+
+        # Should NOT record error for mock leaks
+        mock_record_error.assert_not_called()
+
+    def test_magicmock_in_error_message_skipped(self) -> None:
+        """Verify exceptions with MagicMock in message are skipped."""
+        mock_store = MagicMock()
+
+        with (
+            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch(
+                "vibe3.clients.sqlite_client.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            # Exception with "MagicMock" in string
+            record_dispatch_failure_if_unexpected(
+                role="executor",
+                issue_number=123,
+                branch="dev/test",
+                exception=ValueError(
+                    "Error binding parameter: type 'MagicMock' is not supported"
+                ),
+            )
+
+        # Should NOT record error for mock leaks
         mock_record_error.assert_not_called()

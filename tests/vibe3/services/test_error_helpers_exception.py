@@ -48,8 +48,9 @@ class TestRecordDispatchFailureException:
                 exception=ValueError("Test error"),
             )
 
+        # ValueError is unclassified, maps to E_EXEC_UNKNOWN (WARNING severity)
         mock_record_error.assert_called_once_with(
-            error_code="E_DISPATCH_FAILURE",
+            error_code="E_EXEC_UNKNOWN",  # Classified by classify_error_hybrid
             error_message="manual executor dispatch failed [exception]: Test error",
             tick_id=0,
             issue_number=456,
@@ -76,7 +77,10 @@ class TestRecordDispatchFailureException:
             )
 
         call_args = mock_record_error.call_args
-        assert call_args[1]["error_code"] == "E_DISPATCH_FAILURE"
+        # RuntimeError is unclassified, maps to E_EXEC_UNKNOWN (WARNING severity)
+        assert (
+            call_args[1]["error_code"] == "E_EXEC_UNKNOWN"
+        )  # Classified by classify_error_hybrid
         assert (
             call_args[1]["error_message"]
             == "manual reviewer dispatch failed [exception]: Unexpected error"
