@@ -268,8 +268,9 @@ def test_verify_branch_handles_missing_worktree_and_ref_files(tmp_path: Path) ->
     # Should report issues about missing worktree and ref files
     assert result.is_valid is False
     assert len(result.issues) > 0
-    # Should mention ref files cannot be verified
-    assert any("cannot be verified" in issue.lower() for issue in result.issues)
+    # Missing worktree/ref scenes must route operators to explicit rebuild.
+    assert any("vibe3 flow rebuild" in issue for issue in result.issues)
+    assert all("task resume" not in issue for issue in result.issues)
 
 
 def test_verify_branch_no_longer_reports_runtime_ownership_warnings(

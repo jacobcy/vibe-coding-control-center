@@ -449,35 +449,60 @@ class CheckService(CheckRemote):
 
             # ref files exist
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.path_helpers import check_ref_exists
+                from vibe3.services.flow_consistency_check import (
+                    check_flow_consistency,
+                )
+                from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
-                for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
-                    ref_value = flow_data.get(ref_field)
-                    if ref_value:
-                        # Use unified check_ref_exists method
-                        display_path, exists = check_ref_exists(
-                            ref_value, branch, git_client=self.git_client
+                consistency = check_flow_consistency(
+                    branch,
+                    flow_data,
+                    git_client=self.git_client,
+                )
+                if consistency.needs_rebuild:
+                    # Health check is automatic operation - must auto-rebuild
+                    # to fix inconsistent state without human intervention
+                    try:
+                        from vibe3.models.orchestration import IssueInfo
+
+                        rebuild_usecase = FlowRebuildUsecase(
+                            store=self.store,
+                            git_client=self.git_client,
+                            github_client=self.github_client,
                         )
-
-                        if not exists:
-                            # Check if worktree exists for better error message
-                            worktree_path = (
-                                self.git_client.find_worktree_path_for_branch(branch)
-                            )
-                            if worktree_path is None:
-                                issues.append(
-                                    f"{ref_field} cannot be verified: no "
-                                    f"worktree for branch '{branch}'. "
-                                    "Suggestion: Check if worktree was "
-                                    "accidentally deleted or run 'vibe3 "
-                                    f"flow rebuild {task_issue}'."
-                                )
-                            else:
-                                issues.append(
-                                    f"{ref_field} file not found: {ref_value}. "
-                                    f"Suggestion: Run 'vibe3 task resume "
-                                    f"{task_issue}' to resume from blocked state."
-                                )
+                        issue_info = IssueInfo(
+                            number=task_issue or 0,
+                            title=f"Issue {task_issue}",
+                            labels=[IssueState.READY.to_label()],
+                            state=IssueState.READY,
+                        )
+                        rebuild_usecase.rebuild_issue_flow(
+                            issue=issue_info,
+                            branch=branch,
+                            reason=f"Health check auto-rebuild: {consistency.reason}",
+                            include_remote=False,
+                            ensure_worktree=True,
+                        )
+                        logger.info(
+                            "Auto-rebuilt inconsistent flow",
+                            branch=branch,
+                            code=consistency.code.value,
+                            reason=consistency.reason,
+                        )
+                        # Rebuild succeeded, mark as valid
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    except Exception as e:
+                        # Rebuild failed - report as error
+                        logger.error(
+                            "Auto-rebuild failed",
+                            branch=branch,
+                            error=str(e),
+                        )
+                        issues.append(
+                            f"Flow consistency issue: {consistency.reason}. "
+                            f"Auto-rebuild failed: {e}. "
+                            f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
+                        )
 
             is_valid = len(issues) == 0
             logger.bind(

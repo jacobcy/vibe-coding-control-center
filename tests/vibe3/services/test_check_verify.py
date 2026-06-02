@@ -198,7 +198,12 @@ class TestVerifyCurrentFlow:
                 result = check_service.verify_current_flow()
 
         assert not result.is_valid
-        assert any("plan_ref file not found" in issue for issue in result.issues)
+        matching_issues = [
+            issue for issue in result.issues if "plan_ref file not found" in issue
+        ]
+        assert matching_issues
+        assert "vibe3 flow rebuild" in matching_issues[0]
+        assert "task resume" not in matching_issues[0]
 
     def test_verify_current_handoff_missing(self, check_service, mock_store):
         """Handoff file check removed - missing file is not an error."""

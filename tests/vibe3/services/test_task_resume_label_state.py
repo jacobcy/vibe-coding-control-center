@@ -2,7 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from tests.vibe3.services.conftest import _make_operations
+from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 
 
@@ -22,12 +25,16 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         "flow_slug": "task/issue-303",
         "pr_ref": None,
         "audit_ref": None,
-        "plan_ref": "docs/plans/test.md",
+        "plan_ref": None,
         "report_ref": None,
         "latest_verdict": None,
+        "worktree_path": "/tmp/task-issue-303",
     }
     operations.flow_service.store.get_flow_state.return_value = mock_flow_state_dict
     operations.flow_service.store.get_task_issue_number.return_value = 303
+    operations.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/task-issue-303"
+    )
 
     with patch(
         "vibe3.services.blocked_state_service.BlockedStateService"
@@ -288,8 +295,8 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
         assert call_args.kwargs["issue_number"] == 303
 
 
-def test_label_auto_with_missing_recorded_worktree_rebuilds_scene() -> None:
-    """If label-auto resume finds a missing recorded worktree, rebuild hard."""
+def test_label_auto_with_missing_physical_worktree_requires_rebuild() -> None:
+    """If label-auto resume finds a missing physical worktree, suggest rebuild."""
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.get_issue_body.return_value = "User content"
@@ -306,10 +313,8 @@ def test_label_auto_with_missing_recorded_worktree_rebuilds_scene() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase") as rebuild_cls:
-        rebuild = MagicMock()
-        rebuild_cls.return_value = rebuild
-
+    # Task resume is manual operation - should raise UserError with rebuild suggestion
+    with pytest.raises(UserError) as exc_info:
         operations.reset_issue_to_ready(
             issue_number=303,
             resume_kind="blocked",
@@ -319,4 +324,38 @@ def test_label_auto_with_missing_recorded_worktree_rebuilds_scene() -> None:
             label_state="",
         )
 
-        rebuild.rebuild_issue_flow.assert_called_once()
+    assert "Worktree does not exist" in str(exc_info.value)
+    assert "vibe3 flow rebuild 303 --yes" in str(exc_info.value)
+
+
+def test_label_auto_with_unrecorded_existing_worktree_requires_rebuild() -> None:
+    """A physical task worktree without flow_state.worktree_path is inconsistent."""
+    operations = _make_operations()
+    operations.flow_service.store.get_flow_state.return_value = {
+        "branch": "task/issue-303",
+        "flow_slug": "issue-303",
+        "flow_status": "blocked",
+        "latest_actor": "test",
+        "task_issue_number": 303,
+        "worktree_path": None,
+    }
+    operations.git_client.find_worktree_path_for_branch.return_value = (
+        "/tmp/task-issue-303"
+    )
+
+    mock_flow = MagicMock()
+    mock_flow.branch = "task/issue-303"
+
+    # Task resume is manual operation - should raise UserError with rebuild suggestion
+    with pytest.raises(UserError) as exc_info:
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="resume inconsistent scene",
+            label_state="",
+        )
+
+    assert "not recorded in flow_state" in str(exc_info.value)
+    assert "vibe3 flow rebuild 303 --yes" in str(exc_info.value)

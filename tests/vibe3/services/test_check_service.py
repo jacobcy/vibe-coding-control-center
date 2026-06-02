@@ -49,9 +49,14 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
     with (
         patch("vibe3.services.check_pr_service.FlowRebuildUsecase") as rebuild_cls,
         patch("vibe3.services.issue_context_loader.load_issue_info") as mock_load_issue,
+        patch(
+            "vibe3.config.orchestra_settings.load_orchestra_config"
+        ) as mock_load_config,
     ):
         rebuild = MagicMock()
         rebuild_cls.return_value = rebuild
+        config = MagicMock()
+        mock_load_config.return_value = config
 
         from vibe3.models.orchestration import IssueInfo
 
@@ -61,6 +66,8 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
         rebuild.rebuild_issue_flow.assert_called_once()
+        mock_load_config.assert_called_once()
+        assert mock_load_issue.call_args.kwargs["config"] is config
         call = rebuild.rebuild_issue_flow.call_args.kwargs
         assert call["issue"] == mock_issue_info
         assert call["branch"] == "task/issue-456"

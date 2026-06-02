@@ -10,6 +10,10 @@ from typing import TYPE_CHECKING, Callable
 
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
+from vibe3.services.flow_consistency_check import (
+    FlowConsistencyResult,
+    check_flow_consistency,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -40,21 +44,20 @@ class TaskResumeOperations:
         self.label_service = label_service
         self.issue_flow_service = issue_flow_service
 
-    def _should_rebuild_missing_worktree(self, branch: str | None) -> bool:
-        """Return True when a recorded scene lost its physical worktree."""
+    def _check_flow_consistency(
+        self, branch: str | None
+    ) -> FlowConsistencyResult | None:
+        """Return shared consistency result for an existing branch flow."""
         if not isinstance(branch, str) or not branch:
-            return False
+            return None
         flow_state = self.flow_service.store.get_flow_state(branch)
         if not flow_state:
-            return False
-
-        recorded_path = flow_state.get("worktree_path")
-        has_refs = any(
-            flow_state.get(key) for key in ("plan_ref", "report_ref", "audit_ref")
+            return None
+        return check_flow_consistency(
+            branch,
+            flow_state,
+            git_client=self.git_client,
         )
-        if not recorded_path and not has_refs:
-            return False
-        return self.git_client.find_worktree_path_for_branch(branch) is None
 
     def reset_issue_to_ready(
         self,
@@ -89,11 +92,15 @@ class TaskResumeOperations:
             if progress_callback:
                 progress_callback(issue_number, branch, step, status)
 
-        target_state = self._resolve_target_state(branch, label_state)
+        consistency = self._check_flow_consistency(branch)
+        if consistency and consistency.needs_rebuild:
+            # Task resume is manual operation - give user clear guidance
+            raise UserError(
+                f"{consistency.reason}. "
+                f"Suggestion: vibe3 flow rebuild {issue_number} --yes"
+            )
 
-        if self._should_rebuild_missing_worktree(branch):
-            self._rebuild_missing_worktree(issue_number, branch, reason, emit_progress)
-            return
+        target_state = self._resolve_target_state(branch, label_state)
 
         emit_progress(
             f"clearing reasons for branch {branch}"
@@ -159,34 +166,3 @@ class TaskResumeOperations:
             "merge-ready": IssueState.MERGE_READY,
         }
         return valid_states.get(label_state, IssueState.CLAIMED)
-
-    def _rebuild_missing_worktree(
-        self,
-        issue_number: int,
-        branch: str | None,
-        reason: str,
-        emit_progress: Callable[[str, str], None],
-    ) -> None:
-        if not isinstance(branch, str):
-            return
-
-        from vibe3.models.orchestration import IssueInfo
-        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-
-        FlowRebuildUsecase(
-            store=self.flow_service.store,
-            git_client=self.git_client,
-            github_client=self.github_client,
-        ).rebuild_issue_flow(
-            issue=IssueInfo(
-                number=issue_number,
-                title=f"Issue {issue_number}",
-                labels=[IssueState.READY.to_label()],
-                state=IssueState.READY,
-            ),
-            branch=branch,
-            reason=f"label resume found missing worktree for branch {branch}: {reason}",
-            include_remote=True,
-            ensure_worktree=True,
-        )
-        emit_progress("missing worktree rebuilt", "done")
