@@ -424,28 +424,33 @@ vibe_init() {
 
     echo "Next steps:"
     if [[ "$PROFILE_NAME" == "minimal" ]]; then
-        echo "  1. Your project is ready with minimal runtime"
-        echo "  2. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
-        echo "  3. Start using vibe commands"
+        echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
+        echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
+        echo "  3. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
+        echo "  4. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
     elif [[ "$PROFILE_NAME" == "github-flow" ]]; then
-        echo "  1. Review created directories: ${CYAN}.agent/${NC} and ${CYAN}.claude/${NC}"
+        echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
+        echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
         if [[ "$SKIP_LABELS" == true ]]; then
-            echo "  2. Create GitHub labels manually if needed"
+            echo "  3. Create GitHub labels manually if needed"
         else
-            echo "  2. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
+            echo "  3. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
         fi
-        echo "  3. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
-        echo "  4. Start using vibe flow/task commands"
+        echo "  4. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
+        echo "  5. Review created directories: ${CYAN}.agent/${NC} and ${CYAN}.claude/${NC}"
+        echo "  6. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
     elif [[ "$PROFILE_NAME" == "vibe-center" ]]; then
-        echo "  1. Review created directories: ${CYAN}.agent/${NC}, ${CYAN}skills/${NC}, ${CYAN}.claude/${NC}"
+        echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
+        echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
         if [[ "$SKIP_LABELS" == true ]]; then
-            echo "  2. Create GitHub labels manually if needed"
+            echo "  3. Create GitHub labels manually if needed"
         else
-            echo "  2. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
+            echo "  3. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
         fi
-        echo "  3. Policies and prompts from: ${CYAN}.agent/policies${NC} and ${CYAN}config/prompts${NC}"
-        echo "  4. Supervisor orchestration: ${CYAN}.agent/supervisor/${NC}"
-        echo "  5. Start using full Vibe Center capabilities"
+        echo "  4. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
+        echo "  5. Review created directories: ${CYAN}.agent/${NC}, ${CYAN}skills/${NC}, ${CYAN}.claude/${NC}"
+        echo "  6. Policies and prompts from: ${CYAN}.agent/policies${NC} and ${CYAN}config/prompts${NC}"
+        echo "  7. Supervisor orchestration: ${CYAN}.agent/supervisor/${NC}"
     fi
     echo ""
 }
