@@ -83,7 +83,7 @@ This project has **two parallel implementations**:
 1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
 2. **检查当前 flow**: 运行 `vibe3 flow show` (或 `uv run python src/vibe3/cli.py flow show`)
 3. **查看全局状态**: 运行 `vibe3 status` (或 `uv run python src/vibe3/cli.py status`)
-4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
+4. **了解执行规则**: 阅读 [.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)
 
 ## 🔁 Handoff 命令约定
 

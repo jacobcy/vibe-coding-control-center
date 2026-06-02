@@ -284,10 +284,10 @@ scripts/
 skills/                # 🟢 Vibe 自有技能（tracked，规范源）
   vibe-test-runner/    # 三层验证 Skill（Serena + Lint + bats）
   vibe-commit/         # 智能 commit 消息生成
+.claude/rules/        # 架构和编码规则
 .agent/                # Agent 工作区
   governance.yaml      # 治理配置
   workflows/           # 工作流定义
-  rules/               # 架构和编码规则
 .serena/
   project.yml          # Serena AST 检索配置（项目级约束）
 .shellcheckrc          # ShellCheck 豁免规则（Zsh 特有语法）
