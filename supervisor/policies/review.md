@@ -158,7 +158,7 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 
 ```bash
 # 检查是否有被删除的函数/类/方法（在存续文件或已删除文件中）
-git diff -- '*.py' | grep -E '^-def |^-class ' || echo "无符号删除"
+git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || echo "无符号删除"
 
 # 如果有删除，对比 plan 的死代码清理声明列表
 ```
