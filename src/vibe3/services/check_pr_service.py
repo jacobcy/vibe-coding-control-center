@@ -231,30 +231,16 @@ class CheckPRService:
     ) -> list[str]:
         """Prepare labels for bridge issue.
 
-        Inherit classification labels from original issue, exclude state labels,
-        and add state/ready.
-
-        Args:
-            original_issue: Original issue payload from view_issue()
-            closed_pr_number: Closed PR number (for logging)
-
-        Returns:
-            List of labels to apply to bridge issue
+        Inherit classification labels (exclude state/*), add state/ready.
         """
-        # Get labels from original issue
         original_labels = original_issue.get("labels", [])
-        inherited = []
+        inherited = [
+            label.get("name", "")
+            for label in original_labels
+            if not label.get("name", "").startswith("state/")
+            and label.get("name", "") != "vibe-task"
+        ]
 
-        for label_data in original_labels:
-            label_name = label_data.get("name", "")
-            # Exclude state/* labels and vibe-task
-            if label_name.startswith("state/"):
-                continue
-            if label_name == "vibe-task":
-                continue
-            inherited.append(label_name)
-
-        # Add state/ready
         if "state/ready" not in inherited:
             inherited.append("state/ready")
 
@@ -274,22 +260,8 @@ class CheckPRService:
         closed_pr_number: int,
         branch: str,
     ) -> int | None:
-        """Create a bridge issue for abandoned work.
-
-        Args:
-            original_issue_number: Original issue number
-            original_issue: Original issue payload
-            closed_pr_number: Closed PR number
-            branch: Branch name
-
-        Returns:
-            Bridge issue number on success, None on failure
-        """
-        # Prepare title
+        """Create a bridge issue for abandoned work."""
         original_title = original_issue.get("title", "Unknown Issue")
-        bridge_title = f"Follow-up: {original_title}"
-
-        # Prepare body
         original_body = original_issue.get("body", "")
         bridge_body = f"""[flow] Bridge issue
 
@@ -314,12 +286,9 @@ This bridge issue is the new execution target.
 - Codex
 """
 
-        # Prepare labels
         labels = self._inherit_labels_for_bridge(original_issue, closed_pr_number)
-
-        # Create bridge issue
         bridge_number = self.github_client.create_issue(
-            title=bridge_title,
+            title=f"Follow-up: {original_title}",
             body=bridge_body,
             labels=labels,
         )
@@ -345,17 +314,7 @@ This bridge issue is the new execution target.
         closed_pr_number: int,
         branch: str,
     ) -> bool:
-        """Add bridge marker comment to original issue.
-
-        Args:
-            original_issue_number: Original issue number
-            bridge_issue_number: Bridge issue number
-            closed_pr_number: Closed PR number
-            branch: Branch name
-
-        Returns:
-            True on success, False on failure
-        """
+        """Add bridge marker comment to original issue."""
         marker_body = f"""[flow] Bridge issue created
 
 successor: #{bridge_issue_number}
@@ -363,7 +322,6 @@ closed_pr: #{closed_pr_number}
 source_branch: {branch}
 status: unresolved_continues_in_successor
 """
-
         success = self.github_client.add_comment(original_issue_number, marker_body)
 
         if success:
@@ -390,20 +348,13 @@ status: unresolved_continues_in_successor
     ) -> str:
         """Close original issue with explanatory comment.
 
-        Args:
-            original_issue_number: Original issue number
-            bridge_issue_number: Bridge issue number
-            closed_pr_number: Closed PR number
-
-        Returns:
-            Result string: "closed", "already_closed", or "failed"
+        Returns: "closed", "already_closed", or "failed"
         """
         closing_comment = f"""[flow] Closed after PR abandoned
 
 PR #{closed_pr_number} was closed without merge, so this execution lineage is ended.
 The unresolved work continues in #{bridge_issue_number}.
 """
-
         result = self.github_client.close_issue_if_open(
             issue_number=original_issue_number,
             closing_comment=closing_comment,
@@ -426,15 +377,10 @@ The unresolved work continues in #{bridge_issue_number}.
     ) -> tuple[bool, list[str], list[str]]:
         """Handle PR state changes detected during check.
 
-        Args:
-            branch: Branch name
-            pr: PR response object
-
-        Returns:
-            Tuple of (handled, issues, warnings).
-            - handled: True if PR was merged or closed (caller should return early)
-            - issues: List of error/issue messages
-            - warnings: List of warning messages
+        Returns: (handled, issues, warnings)
+        - handled: True if PR was merged or closed (caller should return early)
+        - issues: List of error messages
+        - warnings: List of warning messages
         """
         if pr.merged_at or pr.state == PRState.MERGED:
             return self._handle_merged_pr(branch, pr)
@@ -450,11 +396,7 @@ The unresolved work continues in #{bridge_issue_number}.
     def _handle_merged_pr(
         self, branch: str, pr: "PRResponse"
     ) -> tuple[bool, list[str], list[str]]:
-        """Handle merged PR: mark flow done, auto-close linked issues.
-
-        Returns:
-            Tuple of (handled=True, issues, warnings).
-        """
+        """Handle merged PR: mark flow done, auto-close linked issues."""
         warnings: list[str] = []
 
         suggestions = self._flow_status_service.mark_flow_done(
@@ -464,7 +406,6 @@ The unresolved work continues in #{bridge_issue_number}.
         self._update_pr_cache(branch, pr)
 
         if suggestions.get("issue_to_close"):
-            # Informational message, not an error
             warnings.append(
                 f"Issue #{suggestions['issue_to_close']} was still OPEN — "
                 "auto-closed because PR was merged."
@@ -475,11 +416,7 @@ The unresolved work continues in #{bridge_issue_number}.
     def _handle_closed_pr(
         self, branch: str, pr: "PRResponse"
     ) -> tuple[bool, list[str], list[str]]:
-        """Handle closed PR (without merge): reset issue, clean up.
-
-        Returns:
-            Tuple of (handled=True, issues, warnings).
-        """
+        """Handle closed PR (without merge): reset issue, clean up."""
         reset_error, reset_warnings = self._reset_issue_after_pr_closed(
             branch, pr.number
         )
