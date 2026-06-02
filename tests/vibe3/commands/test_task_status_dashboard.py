@@ -25,14 +25,27 @@ def _make_flow(issue_number: int) -> SimpleNamespace:
     )
 
 
+def _make_config_mock() -> MagicMock:
+    """Create a standard config mock for tests."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    return config_mock
+
+
 @patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_splits_assignee_ready_and_anomaly(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -41,13 +54,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     mock_get_manager_usernames,
 ) -> None:
     """task status should keep intake, ready queue, and ready anomalies separate."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
-    mock_load_orchestra_config.return_value = config_mock
+    mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
         server_running=True,
@@ -126,13 +133,15 @@ def test_task_status_splits_assignee_ready_and_anomaly(
 
 
 @patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_shows_flows_with_prs(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -141,13 +150,7 @@ def test_task_status_shows_flows_with_prs(
     mock_get_manager_usernames,
 ) -> None:
     """task status should show flows that have a PR reference."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
-    mock_load_orchestra_config.return_value = config_mock
+    mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
         server_running=True,
@@ -185,13 +188,15 @@ def test_task_status_shows_flows_with_prs(
 
 
 @patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_hides_missing_blocked_issue_number(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -200,13 +205,7 @@ def test_task_status_hides_missing_blocked_issue_number(
     mock_get_manager_usernames,
 ) -> None:
     """task status should not render '#None' when failed gate has no issue number."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
-    mock_load_orchestra_config.return_value = config_mock
+    mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
         server_running=True,
@@ -233,10 +232,12 @@ def test_task_status_hides_missing_blocked_issue_number(
     assert "#None" not in result.output
 
 
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_shows_missing_state_label_section(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -244,12 +245,7 @@ def test_task_status_shows_missing_state_label_section(
     mock_load_orchestra_config,
 ) -> None:
     """task status should show issues without state/* in a dedicated section."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
+    config_mock = _make_config_mock()
     config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
@@ -316,10 +312,12 @@ def test_task_status_shows_missing_state_label_section(
     assert output.count("Roadmap epic without state") == 1
 
 
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_shows_active_exception_for_missing_assignee(
     mock_status_service_cls: MagicMock,
     mock_flow_service_cls: MagicMock,
@@ -327,12 +325,7 @@ def test_task_status_shows_active_exception_for_missing_assignee(
     mock_load_orchestra_config: MagicMock,
 ) -> None:
     """Active-state issue with missing assignee appears in Active Exceptions."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
+    config_mock = _make_config_mock()
     config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
@@ -380,10 +373,12 @@ def test_task_status_shows_active_exception_for_missing_assignee(
     assert "missing assignee" in output
 
 
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_shows_governed_anomaly_section(
     mock_status_service_cls: MagicMock,
     mock_flow_service_cls: MagicMock,
@@ -391,12 +386,7 @@ def test_task_status_shows_governed_anomaly_section(
     mock_load_orchestra_config: MagicMock,
 ) -> None:
     """Issue with governed label but no state appears in Governed but Anomaly."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
+    config_mock = _make_config_mock()
     config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
@@ -508,13 +498,15 @@ class TestComputeEffectiveServerRunning:
 
 
 @patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.get_manager_usernames",
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
-@patch("vibe3.commands.status.load_orchestra_config")
-@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.commands.status.FlowService")
-@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task_status_service.FlowService")
+@patch("vibe3.services.task_status_service.StatusQueryService")
 def test_task_status_shows_remote_tasks_section(
     mock_status_service_cls,
     mock_flow_service_cls,
@@ -523,13 +515,7 @@ def test_task_status_shows_remote_tasks_section(
     mock_get_manager_usernames,
 ) -> None:
     """task status should show remote tasks in a separate section."""
-    config_mock = MagicMock()
-    config_mock.pid_file = "/tmp/vibe3.pid"
-    config_mock.repo = "openai/vibe-center"
-    config_mock.port = 1234
-    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
-    config_mock.manager_usernames = ["manager-bot"]
-    mock_load_orchestra_config.return_value = config_mock
+    mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
         server_running=True,

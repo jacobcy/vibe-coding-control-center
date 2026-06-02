@@ -146,13 +146,15 @@ def status(
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Show task-oriented global status dashboard."""
-    from vibe3.commands import status as status_command
+    from vibe3.commands.status import _full_status_dashboard
 
-    status_command.status(
+    _full_status_dashboard(
         all_flows=all_flows,
         check=check,
-        json_output=json_output,
+        output_format="table" if not json_output else "json",
         trace=trace,
+        min_ms=None,
+        json_output=json_output,
     )
 
 

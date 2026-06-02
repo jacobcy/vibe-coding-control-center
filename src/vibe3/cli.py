@@ -112,7 +112,6 @@ app.add_typer(ask.app, name="ask")
 
 @app.command(name="status", hidden=True)
 def status_command(
-    all_flows: status.AllOption = False,
     check: Annotated[
         bool,
         typer.Option("--check", help="显示前先运行完整 vibe3 check"),
@@ -129,9 +128,8 @@ def status_command(
         ),
     ] = False,
 ) -> None:
-    """[Compatibility] Redirect to task status."""
+    """[Compatibility] Show orchestra system status and configuration."""
     status.status(
-        all_flows=all_flows,
         check=check,
         output_format=output_format,
         trace=trace,
