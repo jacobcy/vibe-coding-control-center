@@ -205,6 +205,6 @@ async def on_tick(self):
 | 文件 | 职责 |
 |------|------|
 | `docs/standards/v3/event-driven-standard.md` | L2 事件层级定义 |
-| `docs/standards/vibe3-worktree-ownership-standard.md` | L2 临时 worktree 语义 |
+| `docs/standards/v3/worktree-lifecycle-standard.md` | L2 临时 worktree 语义 |
 | `docs/standards/v3/noop-gate-boundary-standard.md` | Gate 边界定义 |
 | `docs/standards/github-labels-reference.md` | Label 语义参考 |
