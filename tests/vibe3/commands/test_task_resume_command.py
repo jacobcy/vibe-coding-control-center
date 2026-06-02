@@ -180,4 +180,40 @@ def test_task_resume_branch_invalid_name(convention_resolver_cls: MagicMock) -> 
     result = runner.invoke(app, ["task", "resume", "--branch", "invalid-name", "--yes"])
 
     assert result.exit_code == 1
-    assert "无法从 'invalid-name' 提取 issue number" in result.output
+    assert "无法从 'invalid-name' 解析 issue number" in result.output
+
+
+@patch("vibe3.commands.task.FlowService")
+@patch("vibe3.commands.task._build_resume_usecase")
+def test_task_resume_branch_bare_number(
+    build_usecase: MagicMock,
+    flow_service_cls: MagicMock,
+) -> None:
+    """`--branch 303` (bare number) should be equivalent to positional `303`."""
+    usecase = MagicMock()
+    usecase.resume_issues.return_value = {
+        "requested": [303],
+        "resumed": [{"number": 303, "resume_kind": "blocked"}],
+        "skipped": [],
+    }
+    build_usecase.return_value = usecase
+
+    flow_service = MagicMock()
+    flow_service.list_flows.side_effect = [[_flow(303)], []]
+    flow_service_cls.return_value = flow_service
+
+    result = runner.invoke(app, ["task", "resume", "--branch", "303", "--yes"])
+
+    assert result.exit_code == 0
+    call = usecase.resume_issues.call_args.kwargs
+    assert call["issue_numbers"] == [303]
+
+
+def test_task_resume_branch_conflicts_with_blocked() -> None:
+    """Cannot specify both --branch and --blocked."""
+    result = runner.invoke(
+        app, ["task", "resume", "--branch", "task/issue-303", "--blocked"]
+    )
+
+    assert result.exit_code == 1
+    assert "不能同时指定 --branch 和 --blocked" in result.output

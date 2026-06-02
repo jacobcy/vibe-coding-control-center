@@ -100,7 +100,29 @@ def test_flow_rebuild_branch_invalid_name(convention_resolver_cls: MagicMock) ->
     result = runner.invoke(app, ["flow", "rebuild", "--branch", "invalid-name"])
 
     assert result.exit_code == 1
-    assert "无法从 'invalid-name' 提取 issue number" in result.output
+    assert "无法从 'invalid-name' 解析 issue number" in result.output
+
+
+@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_arg")
+def test_flow_rebuild_branch_bare_number(
+    resolve_branch_arg_mock: MagicMock,
+    convention_resolver_cls: MagicMock,
+) -> None:
+    """`--branch 123` (bare number) should work the same as positional `123`."""
+    resolve_branch_arg_mock.return_value = "task/issue-123"
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = 123
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["flow", "rebuild", "--branch", "123"])
+
+    assert result.exit_code == 0
+    assert "Would hard rebuild issue #123" in result.output
+    resolve_branch_arg_mock.assert_called_once_with("123")
+    convention.parse_issue_number.assert_called_once_with("task/issue-123")
 
 
 @patch("vibe3.commands.flow_lifecycle.ConventionResolver")

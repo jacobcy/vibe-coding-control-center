@@ -20,6 +20,7 @@ from vibe3.ui.task_ui import (
     render_task_comments,
     render_task_show,
 )
+from vibe3.utils.issue_ref import try_parse_issue_number
 
 app = typer.Typer(
     help="""Manage execution tasks.
@@ -167,7 +168,7 @@ def resume(
     ] = None,
     branch: Annotated[
         str | None,
-        typer.Option("--branch", help="Branch name to extract issue number from"),
+        typer.Option("--branch", help="Branch name or issue number"),
     ] = None,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
@@ -202,10 +203,16 @@ def resume(
         if issue_numbers:
             typer.echo("Error: 不能同时指定 --branch 和位置参数", err=True)
             raise typer.Exit(1)
-        convention = ConventionResolver.from_repo().resolve().branch
-        issue_num = convention.parse_issue_number(branch)
+        if blocked:
+            typer.echo("Error: 不能同时指定 --branch 和 --blocked", err=True)
+            raise typer.Exit(1)
+        # Support bare numbers ("303") and convention branches ("task/issue-303")
+        issue_num = try_parse_issue_number(branch)
         if issue_num is None:
-            typer.echo(f"Error: 无法从 '{branch}' 提取 issue number", err=True)
+            convention = ConventionResolver.from_repo().resolve().branch
+            issue_num = convention.parse_issue_number(branch)
+        if issue_num is None:
+            typer.echo(f"Error: 无法从 '{branch}' 解析 issue number", err=True)
             raise typer.Exit(1)
         issue_numbers = [issue_num]
 

@@ -63,8 +63,6 @@ def blocked(
 
     if not flow_status:
         # Try to auto-create flow if branch matches task/dev convention
-        from vibe3.services.convention_resolver import ConventionResolver
-
         convention = ConventionResolver.from_repo().resolve().branch
         issue_number = convention.parse_issue_number(target_branch)
 
@@ -128,7 +126,7 @@ def rebuild(
     ] = None,
     branch: Annotated[
         str | None,
-        typer.Option("--branch", help="Branch name to extract issue number from"),
+        typer.Option("--branch", help="Branch name or issue number"),
     ] = None,
     keep_remote: Annotated[
         bool,
@@ -152,23 +150,26 @@ def rebuild(
     Examples:
         vibe3 flow rebuild 123
         vibe3 flow rebuild --branch task/issue-123
+        vibe3 flow rebuild --branch 123
     """
-    # Extract issue_number from --branch if provided
     if branch is not None and issue_number is not None:
         typer.echo("Error: 不能同时指定 --branch 和位置参数", err=True)
         raise typer.Exit(1)
-    if branch is not None:
-        convention = ConventionResolver.from_repo().resolve().branch
-        issue_number = convention.parse_issue_number(branch)
-        if issue_number is None:
-            typer.echo(f"Error: 无法从 '{branch}' 提取 issue number", err=True)
-            raise typer.Exit(1)
-    if issue_number is None:
+    if branch is None and issue_number is None:
         typer.echo("Error: 需要指定 issue number 或 --branch", err=True)
         raise typer.Exit(1)
 
-    # Resolve branch name
-    target_branch = resolve_branch_arg(str(issue_number))
+    # Unified resolution: both "123" and "task/issue-123" work via resolve_branch_arg
+    input_arg = branch if branch is not None else str(issue_number)
+    target_branch = resolve_branch_arg(input_arg)
+
+    # Derive issue_number from resolved branch when --branch is used
+    if issue_number is None:
+        convention = ConventionResolver.from_repo().resolve().branch
+        issue_number = convention.parse_issue_number(target_branch)
+        if issue_number is None:
+            typer.echo(f"Error: 无法从 '{branch}' 解析 issue number", err=True)
+            raise typer.Exit(1)
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
