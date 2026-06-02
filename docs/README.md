@@ -43,8 +43,8 @@ docs/
 **必读文档**：
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
-- **[vibe3-architecture-convergence-standard.md](standards/vibe3-architecture-convergence-standard.md)** - Vibe3 目标架构总纲
-- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
+- **[v3/architecture-convergence-standard.md](standards/v3/architecture-convergence-standard.md)** - Vibe3 目标架构总纲
+- **[v3/role-checks-and-balances-standard.md](standards/v3/role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
 - **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
 

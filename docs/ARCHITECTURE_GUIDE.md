@@ -56,7 +56,7 @@ Publisher.publish(event) → EventPublisher 查找订阅者 → 调用 handlers
 - ❌ 忘记注册 handler → 事件"断线"
 - ❌ Handler 没有类型注解 → mypy 报错
 
-**详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md)
+**详细文档**: [event-driven-standard.md](standards/v3/event-driven-standard.md)
 ---
 
 ## 3-Tier 架构模型
@@ -120,7 +120,7 @@ def register_dispatch_handlers() -> None:
     subscribe("ManagerDispatchIntent", handle_manager_dispatch_intent)
 ```
 
-**详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) §三
+**详细文档**: [event-driven-standard.md](standards/v3/event-driven-standard.md) §三
 
 ---
 
@@ -133,7 +133,7 @@ def register_dispatch_handlers() -> None:
 - 不是 agent 的 handoff 行为，是系统的解析行为
 - 区别于 `handoff_plan` / `handoff_report` / `handoff_indicate`（agent 主动提交）
 
-**详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) §1.2
+**详细文档**: [event-driven-standard.md](standards/v3/event-driven-standard.md) §1.2
 
 ---
 
@@ -142,7 +142,7 @@ def register_dispatch_handlers() -> None:
 ### 修改事件相关代码时
 
 1. **阅读架构文档**：
-   - [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md)
+   - [event-driven-standard.md](standards/v3/event-driven-standard.md)
    
 2. **关键检查点**：
    - ✅ 事件定义：`src/vibe3/domain/events/*.py`
@@ -173,8 +173,8 @@ def register_dispatch_handlers() -> None:
 ### 修改 Orchestra 相关代码时
 
 1. **阅读架构文档**：
-   - [v3/orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md)
-   - [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md)
+   - [orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md)
+   - [event-driven-standard.md](standards/v3/event-driven-standard.md)
 
 2. **关键检查点**：
    - ✅ 理解 Driver/Tick/Async Child 架构
@@ -211,7 +211,7 @@ def register_dispatch_handlers() -> None:
 5. 更新文档
 6. 提交变更
 
-**详细指南**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) §5.5
+**详细指南**: [event-driven-standard.md](standards/v3/event-driven-standard.md) §5.5
 
 ---
 
@@ -231,6 +231,10 @@ def register_dispatch_handlers() -> None:
 - **代码为准**: 最终实现以代码为准，文档记录意图
 
 ---
+
+**维护者**: Vibe Team
+**最后更新**: 2026-06-01
+--
 
 **维护者**: Vibe Team
 **最后更新**: 2026-06-01

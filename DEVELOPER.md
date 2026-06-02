@@ -218,41 +218,51 @@ bash scripts/tools/metrics.sh  # V2 Legacy 仪表盘
 ### Step 1：创建工作区
 
 ```bash
-# 在项目根目录
-bin/vibe flow start <feature-name>
-# 例如：bin/vibe flow start add-vibe-doctor
+# 在项目根目录，使用 git worktree 创建隔离工作空间
+git worktree add ../wt-task-1839 task/issue-1839
+cd ../wt-task-1839
+
+# 注册并同步 flow 状态
+vibe3 flow update
 ```
 
-> V3 不使用 `bin/vibe flow start` 创建 worktree；worktree 由 orchestra 自动创建或通过 `git worktree add` 手动管理。开发前通过 `uv run python src/vibe3/cli.py flow show` 查看当前 flow 上下文。
+> V3 优先使用 `vibe3 flow update` 注册当前分支为活跃 flow；worktree 建议使用原生 `git worktree` 管理或由 orchestra 自动调度。开发前通过 `vibe3 flow show` 查看当前 flow 上下文。
 
 这会：
-- 创建 `wt-claude-<feature>` 目录（git worktree）
-- 切换到新分支
-- 自动运行 `scripts/init.sh` 准备环境
-- 生成 `docs/prds/<feature>.md` 的 PRD 模板
+- 创建独立的物理工作目录
+- 自动检测并同步分支对应的 flow 状态
+- 准备技能环境（通过 `scripts/init.sh`）
+- 使当前目录成为该 flow 的权威执行区
 
-### Step 2：写 PRD（先写需求，再写代码）
+### Step 2：写计划（Plan Gate）
 
-打开 `docs/prds/<feature>.md`，填写：
-- 背景：为什么需要这个功能
-- 目标：这个功能做什么
-- 需求清单：具体的验收条件
-
-**不写 PRD，不开始写代码。**
-
-### Step 3：写代码 + 验证（边写边测）
-
-每改一次代码，运行三个命令：
+使用 `/vibe-task` 或 `/vibe-new` 技能明确任务范围，然后创建执行计划：
 
 ```bash
-# 1. 语法和质量检查
-bash scripts/hooks/lint.sh
+vibe3 plan --branch @current
+```
+
+**不通过 Plan Gate，不开始写代码。**
+
+### Step 3：执行任务（Run Gate）
+
+利用 `/vibe-*` 系列技能执行具体动作：
+- 使用 `/vibe-review-docs` 审查文档
+- 使用 `/vibe-review-code` 审查代码
+- 使用 `/vibe-commit` 自动提交并创建 PR
+
+每改一次代码，运行验证命令：
+
+```bash
+# 1. 语法和质量检查 (V3)
+uv run ruff check .
+uv run mypy src/vibe3
 
 # 2. 运行所有测试
-bats tests/
+uv run pytest tests/vibe3
 
 # 3. 查看健康度
-bash scripts/tools/metrics.sh
+vibe3 snapshot show
 ```
 
 **出现 ❌ 立刻修复，不要积累问题。**
@@ -260,15 +270,19 @@ bash scripts/tools/metrics.sh
 ### Step 4：Review + 创建 PR
 
 ```bash
-bin/vibe flow review   # 交互式 review
-bin/vibe flow pr       # 生成 PR
-```
+# 使用技能执行标准化审查
+/vibe-team-review
 
-> V3: 使用 `gh pr create` 创建 PR，或通过 agent workflow `/vibe-commit` 自动完成提交与 PR 创建。
+# 提交并推送到远端
+/vibe-commit
+```
 
 ### Step 5：清理工作区
 
-> V3: 使用 `git worktree remove` 手动清理，或由 orchestra 自动管理 worktree 生命周期。
+```bash
+# 完成后移除 worktree
+git worktree remove .
+```
 
 ---
 
