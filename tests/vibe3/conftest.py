@@ -43,7 +43,7 @@ def clear_find_repo_root_cache():
 
 
 @pytest.fixture(autouse=True)
-def isolate_database():
+def isolate_database(request):
     """Use temporary database for tests to prevent production DB contamination.
 
     Monkeypatches GitClient.get_git_common_dir() to return a temporary directory,
@@ -56,11 +56,22 @@ def isolate_database():
     Fixture scope: function (each test gets isolated temp database)
     Autouse: Yes (applies to all vibe3 tests automatically)
 
+    Exception: Tests of GitClient itself are skipped to avoid interfering with
+    unit tests that verify get_git_common_dir() behavior.
+
     See: https://github.com/jacobcy/vibe-coding-control-center/issues/1857
     Issue #1857 - Mock leaks contaminating production database.
     """
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.sqlite_base import _close_global_connection
+
+    # Skip patching for tests that verify GitClient.get_git_common_dir() itself
+    # to avoid interfering with their assertions
+    test_file = request.module.__file__
+    if "test_git_client.py" in test_file:
+        # Don't patch for GitClient's own unit tests
+        yield
+        return
 
     # Create temporary directory for this test
     with tempfile.TemporaryDirectory() as tmpdir:
