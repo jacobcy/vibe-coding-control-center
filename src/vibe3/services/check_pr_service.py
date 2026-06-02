@@ -612,12 +612,31 @@ The unresolved work continues in #{bridge_issue_number}.
             )
 
         # Add bridge marker to original issue
-        self._add_bridge_marker_to_original(
+        marker_added = self._add_bridge_marker_to_original(
             original_issue_number=task_issue_number,
             bridge_issue_number=bridge_number,
             closed_pr_number=pr_number,
             branch=branch,
         )
+
+        if not marker_added:
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+                bridge_issue=bridge_number,
+            ).warning(
+                f"Failed to add bridge marker to issue #{task_issue_number}, "
+                f"preserving flow for retry"
+            )
+            # Do NOT cleanup flow - allow retry to add marker
+            return (
+                f"Created bridge issue #{bridge_number} but failed to add marker "
+                f"to original #{task_issue_number} (network/permission error); "
+                f"please manually add marker or retry",
+                [],
+            )
 
         # Close original issue
         close_result = self._close_original_issue_with_comment(

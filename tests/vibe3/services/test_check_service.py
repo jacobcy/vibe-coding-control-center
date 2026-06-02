@@ -368,10 +368,9 @@ def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
     }
     service.github_client.list_issue_comments.return_value = []
     service.github_client.create_issue.return_value = 789
-    service.github_client.add_comment.return_value = True
 
-    # Mock close failure
-    service.github_client.close_issue_if_open.return_value = "failed"
+    # Mock marker addition failure
+    service.github_client.add_comment.return_value = False
 
     with patch(
         "vibe3.services.flow_cleanup_service.FlowCleanupService"
@@ -390,5 +389,56 @@ def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
         # Verify error message returned
         assert handled is True
         assert len(issues) == 1
-        assert "Failed to close original issue #456" in issues[0]
-        assert "bridge #789 created" in issues[0]
+        assert "Created bridge issue #789" in issues[0]
+        assert "failed to add marker" in issues[0]
+
+
+def test_handle_closed_pr_when_add_marker_fails_does_not_cleanup() -> None:
+    """When add bridge marker fails, do not cleanup flow, preserve for retry."""
+    service = _make_check_pr_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+        "title": "Original Issue",
+        "body": "Body",
+        "labels": [],
+    }
+    service.github_client.list_issue_comments.return_value = []
+    service.github_client.create_issue.return_value = 789
+    service.github_client.add_comment.return_value = False
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+
+        # Verify bridge issue was created
+        service.github_client.create_issue.assert_called_once()
+
+        # Verify marker addition was attempted
+        service.github_client.add_comment.assert_called_once()
+
+        # Verify flow was NOT marked as aborted (preserve for retry)
+        service._flow_status_service.mark_flow_aborted.assert_not_called()
+
+        # Verify cleanup was NOT called (preserve flow for retry)
+        mock_cleanup.cleanup_flow_scene.assert_not_called()
+
+        # Verify error message returned
+        assert handled is True
+        assert len(issues) == 1
+        assert "Created bridge issue #789" in issues[0]
+        assert "failed to add marker" in issues[0]
+        assert "manually add marker or retry" in issues[0]

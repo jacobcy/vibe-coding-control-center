@@ -153,8 +153,8 @@ code_limits:
         limit: 540
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783），职责单一但方法较多"
       - path: "src/vibe3/services/check_pr_service.py"
-        limit: 650
-        reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数）、label 继承、bridge marker idempotency 检查等紧密耦合逻辑，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）"
+        limit: 700
+        reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数 + idempotency 检查）、label 继承、GitHub API 失败保护（network/auth/timeout）、retry-safe cleanup 逻辑等紧密耦合功能，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）"
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
