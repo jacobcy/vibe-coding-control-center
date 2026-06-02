@@ -144,13 +144,22 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - `analysis/`: symbol、snapshot、change scope
 - `clients/`: Git、GitHub、SQLite、AI 客户端
 - `commands/`: CLI 子命令
-- `manager/`: 单 flow scene 能力与执行代理
+- `config/`: 配置加载、Profile 管理与 Pydantic schema 验证
+- `domain/`: 领域事件与 handlers（events, handlers, orchestration_facade）
+- `environment/`: 环境资源管理（Session 和 Worktree 统一抽象层）
+- `execution/`: 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
+- `exceptions/`: 统一异常层级
+- `models/`: 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
+- `observability/`: 日志、链路追踪、审计
 - `orchestra/`: 多 issue / 多 flow 的事实观察、排队与调度入口
 - `prompts/`: prompt 组装与 provenance
+- `resources/`: 运行时资产与静态资源
+- `roles/`: 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/`: heartbeat、event bus、executor
 - `server/`: webhook、MCP、health check
 - `services/`: flow / PR / task / handoff 业务服务
 - `ui/`: Rich 输出
+- `utils/`: 通用工具函数（Git 辅助、分支工具、评论处理等）
 
 ## 关键原则
 

@@ -9,7 +9,7 @@ authority:
   - issue-centered-traceability
 author: GPT-5 Codex
 created: 2026-04-02
-last_updated: 2026-04-02
+last_updated: 2026-06-02
 related_docs:
   - docs/README.md
   - docs/standards/doc-organization.md

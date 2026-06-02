@@ -113,7 +113,7 @@ vibe-center/
 ├── docs/                        # 人类文档区
 │   ├── README.md                # 文档总览
 │   ├── standards/               # 标准和规范
-│   │   ├── DOC_ORGANIZATION.md  # 文档组织标准
+│   │   ├── doc-organization.md  # 文档组织标准
 │   │   ├── cognition-spec-dominion.md  # 宪法大纲
 │   │   └── ...                         # 其他现行标准
 │   ├── specs/                   # 规范文档
@@ -292,7 +292,6 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 | 路径 | 职责 | 更新频率 |
 |------|------|---------|
-| **`.git/vibe3/handoff/`** | **[UNTRACKED]** 当前 flow 的 handoff 真源（包含 `current.md`、plans、reports）。通过 `vibe3 handoff` 命令管理。 | 每个动作后 |
 | `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具）。 | 仅补充关键模式 |
 
 #### `.claude/rules/` - 编码规则
@@ -344,7 +343,7 @@ vibe3 inspect commit <sha>                # 改动影响范围
 #### V3 数据存储（`.git/vibe3/`）
 
 **`.git/vibe3/handoff.db`** - SQLite 数据库（跨项目共享）
-- 存储所有 flow 状态和事件
+- 存储所有 flow 状态 and 事件
 - 包含 `flow_state` 和 `flow_events` 表
 - 所有 worktree 共享访问
 - 通过 `git rev-parse --git-common-dir` 定位
@@ -401,7 +400,7 @@ ls ~/.vibe/
 
 | 文件 | 职责 |
 |------|------|
-| `DOC_ORGANIZATION.md` | 文档组织标准 |
+| `doc-organization.md` | 文档组织标准 |
 | `cognition-spec-dominion.md` | 宪法大纲：Vibe Guard 流程定义 |
 
 #### `docs/archive/` - 历史文档归档
@@ -500,7 +499,7 @@ ls ~/.vibe/
 | 技术栈和硬规则 | `CLAUDE.md` |
 | 用户功能介绍 | `README.md` |
 | 开发流程 | `DEVELOPER.md` |
-| 文档组织标准 | `docs/standards/DOC_ORGANIZATION.md` |
+| 文档组织标准 | `docs/standards/doc-organization.md` |
 | 工作流范式 | `docs/prds/vibe-workflow-paradigm.md` |
 
 ### 人类 vs AI 分离
@@ -531,7 +530,7 @@ ls ~/.vibe/
 
 ### 我要创建新任务
 1. 阅读 `docs/README.md` - 文档结构
-2. 阅读 `docs/standards/DOC_ORGANIZATION.md` - 详细指南
+2. 阅读 `docs/standards/doc-organization.md` - 详细指南
 3. 使用 `.agent/templates/` 中的模板
 4. 运行 `git checkout -b <branch>` 创建分支，然后运行 `uv run python src/vibe3/cli.py flow update` 注册 flow
 
