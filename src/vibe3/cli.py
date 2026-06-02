@@ -26,6 +26,7 @@ from vibe3.commands import (  # noqa: E402
     check,
     flow,
     handoff,
+    init,
     inspect,
     internal,
     mcp,
@@ -108,6 +109,7 @@ app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
 app.add_typer(mcp.app, name="mcp")
 app.add_typer(ask.app, name="ask")
+app.add_typer(init.app, name="init")
 
 
 @app.command(name="status", hidden=True)
