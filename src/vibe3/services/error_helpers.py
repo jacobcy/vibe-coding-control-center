@@ -39,12 +39,12 @@ def has_recent_specific_error(
     if store is None:
         store = SQLiteClient()
 
-    query = """
+    query = f"""
         SELECT COUNT(*) FROM error_log
         WHERE error_code != 'E_DISPATCH_FAILURE'
           AND issue_number = ?
           AND branch = ?
-          AND datetime(created_at) >= datetime('now', f'-{within_seconds} seconds')
+          AND datetime(created_at) >= datetime('now', '-{within_seconds} seconds')
     """
 
     try:
