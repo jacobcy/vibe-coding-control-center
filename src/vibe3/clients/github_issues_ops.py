@@ -8,9 +8,7 @@ from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
-
-GH_API_TIMEOUT = 30
+from vibe3.clients.github_issue_admin_ops import GH_API_TIMEOUT, IssueAdminMixin
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(

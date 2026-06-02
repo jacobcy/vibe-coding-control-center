@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.pr import PRState
+from vibe3.services.label_utils import normalize_labels
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -226,19 +227,14 @@ class CheckPRService:
             ).warning(f"Failed to check for existing bridge marker: {exc}")
             return None
 
-    def _inherit_labels_for_bridge(
-        self, original_issue: dict, closed_pr_number: int
-    ) -> list[str]:
+    def _inherit_labels_for_bridge(self, original_issue: dict) -> list[str]:
         """Prepare labels for bridge issue.
 
-        Inherit classification labels (exclude state/*), add state/ready.
+        Inherit classification labels (exclude state/* and vibe-task), add state/ready.
         """
-        original_labels = original_issue.get("labels", [])
+        all_labels = normalize_labels(original_issue.get("labels"))
         inherited = [
-            label.get("name", "")
-            for label in original_labels
-            if not label.get("name", "").startswith("state/")
-            and label.get("name", "") != "vibe-task"
+            lb for lb in all_labels if not lb.startswith("state/") and lb != "vibe-task"
         ]
 
         if "state/ready" not in inherited:
@@ -247,7 +243,7 @@ class CheckPRService:
         logger.bind(
             domain="check",
             action="bridge_labels",
-            original_labels=[label.get("name") for label in original_labels],
+            original_labels=all_labels,
             inherited_labels=inherited,
         ).debug("Prepared labels for bridge issue")
 
@@ -279,14 +275,9 @@ This bridge issue is the new execution target.
 ## Original Issue
 
 {original_body}
-
-## Contributors
-
-- @jacobcy
-- Codex
 """
 
-        labels = self._inherit_labels_for_bridge(original_issue, closed_pr_number)
+        labels = self._inherit_labels_for_bridge(original_issue)
         bridge_number = self.github_client.create_issue(
             title=f"Follow-up: {original_title}",
             body=bridge_body,
