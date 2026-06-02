@@ -186,11 +186,16 @@ class CheckPRService:
                 if not isinstance(comment, dict):
                     continue
                 body = comment.get("body", "")
-                # Check if this is a bridge marker for this specific PR
-                if (
-                    "[flow] Bridge issue created" in body
-                    and f"closed_pr: #{closed_pr_number}" in body
-                ):
+                if not isinstance(body, str):
+                    continue
+
+                # Check if this is a bridge marker for this exact PR.
+                # Use a line-anchored regex instead of substring matching so
+                # closed_pr: #123 does not accidentally match closed_pr: #1234.
+                closed_pr_match = re.search(
+                    rf"^closed_pr:\s*#{closed_pr_number}\s*$", body, re.M
+                )
+                if "[flow] Bridge issue created" in body and closed_pr_match:
                     successor_match = re.search(r"^successor:\s*#(\d+)\s*$", body, re.M)
                     if not successor_match:
                         logger.bind(

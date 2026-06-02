@@ -310,6 +310,59 @@ def test_handle_closed_pr_existing_bridge_close_failure_does_not_cleanup() -> No
         assert warnings == []
 
 
+def test_handle_closed_pr_ignores_bridge_marker_for_prefixed_pr_number() -> None:
+    """Bridge marker matching must not treat PR #1234 as PR #123."""
+    service = _make_check_pr_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+        "title": "Original Issue",
+        "body": "Body",
+        "labels": [],
+    }
+    service.github_client.list_issue_comments.return_value = [
+        {"body": None},
+        {
+            "body": (
+                "[flow] Bridge issue created\n\n"
+                "successor: #789\n"
+                "closed_pr: #1234\n"
+                "source_branch: task/issue-456\n"
+                "status: unresolved_continues_in_successor"
+            )
+        },
+    ]
+    service.github_client.create_issue.return_value = 790
+    service.github_client.add_comment.return_value = True
+    service.github_client.close_issue_if_open.return_value = "closed"
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        mock_cleanup.cleanup_flow_scene.return_value = {}
+
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+
+        service.github_client.create_issue.assert_called_once()
+        service.github_client.close_issue_if_open.assert_called_once()
+        close_kwargs = service.github_client.close_issue_if_open.call_args.kwargs
+        assert "#790" in close_kwargs["closing_comment"]
+
+        assert handled is True
+        assert issues == []
+        assert len(warnings) == 1
+
+
 def test_handle_closed_pr_when_view_issue_fails_does_not_cleanup() -> None:
     """When view_issue() fails (network/auth), do not cleanup flow, allow retry."""
     service = _make_check_pr_service()
