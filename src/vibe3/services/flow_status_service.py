@@ -39,12 +39,13 @@ class FlowStatusService:
     ) -> bool:
         """Rebuild stale canonical ready flow using FlowRebuildUsecase."""
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+        from vibe3.services.issue_flow_service import IssueFlowService
 
         issue_number = task_issue
         if issue_number is None:
-            try:
-                issue_number = int(branch.removeprefix("task/issue-"))
-            except ValueError:
+            issue_flow_service = IssueFlowService(store=self.store)
+            issue_number = issue_flow_service.resolve_task_issue_number(branch)
+            if issue_number is None:
                 return False
 
         from vibe3.models.orchestration import IssueInfo
@@ -129,12 +130,12 @@ class FlowStatusService:
         )
 
         suggestions: dict[str, int | None] = {"issue_to_close": None}
-        issue_links = self.store.get_issue_links(branch)
-        task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
-        if not task_issues:
-            return suggestions
+        from vibe3.services.issue_flow_service import IssueFlowService
 
-        task_issue = task_issues[0]["issue_number"]
+        issue_flow_service = IssueFlowService(store=self.store)
+        task_issue = issue_flow_service.resolve_task_issue_number(branch)
+        if not task_issue:
+            return suggestions
 
         # Multi-flow binding protection: Check if other active flows exist
         # for the same task issue before closing.
