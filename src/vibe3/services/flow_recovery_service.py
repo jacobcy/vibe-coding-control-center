@@ -182,8 +182,12 @@ class FlowRecoveryService:
 
         # Determine target state from flow progress
         fs_dict = self.store.get_flow_state(branch)
-        if fs_dict:
-            target_state = infer_resume_label(FlowState.model_validate(fs_dict))
+        if fs_dict and isinstance(fs_dict, dict):
+            try:
+                target_state = infer_resume_label(FlowState.model_validate(fs_dict))
+            except Exception:
+                # Fallback to READY if validation fails
+                target_state = IssueState.READY
         else:
             target_state = IssueState.READY
 
