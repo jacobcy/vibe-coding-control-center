@@ -122,13 +122,28 @@ def record_dispatch_failure_if_unexpected(
     # Handle exception-level failures
     if exception is not None:
         from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.exceptions.error_classification import classify_error_hybrid
 
+        # Detect test mock leaks - skip recording entirely
+        exc_str = str(exception)
+        if "MagicMock" in exc_str or "Mock" in type(exception).__name__:
+            logger.bind(
+                domain=f"{role}_dispatch",
+                issue_number=issue_number,
+            ).warning(f"Test mock leak detected, skipping error recording: {exception}")
+            return
+
+        # Classify exception to preserve real error types (API/MODEL/EXEC)
+        error_code = classify_error_hybrid(exception)
+
+        # Build error message with classification context
         error_message = (
             f"{dispatch_source} {role} dispatch failed [exception]: {exception}"
         )
+
         try:
             record_error(
-                error_code="E_DISPATCH_FAILURE",
+                error_code=error_code,  # Use classified error code
                 error_message=error_message,
                 tick_id=tick_id or 0,
                 issue_number=effective_issue_number,
