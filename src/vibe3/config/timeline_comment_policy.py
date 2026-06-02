@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from loguru import logger
 from pydantic import BaseModel
+
+from vibe3.config.settings import _vibe3_config_root
 
 
 class TimelineCommentPolicy(BaseModel):
@@ -95,6 +100,66 @@ class TimelineCommentPolicy(BaseModel):
         # Unknown events - default to no comment (safe)
         return False
 
+    @classmethod
+    def from_yaml(cls, path: Path | None = None) -> TimelineCommentPolicy:
+        """Load policy from YAML config file.
+
+        Args:
+            path: Path to YAML config file. If None, uses default path.
+
+        Returns:
+            TimelineCommentPolicy instance loaded from YAML or default instance.
+        """
+        from vibe3.config.loader import load_yaml_config
+
+        # Use install root for cross-project invocation support
+        yaml_path = path or _vibe3_config_root() / "config" / "v3" / "timeline.yaml"
+        data = load_yaml_config(yaml_path)
+
+        if not data:
+            return cls()  # 回退到硬编码默认值
+
+        no_comment = data.get("no_comment", {})
+        write_comment = data.get("write_comment", {})
+
+        return cls(
+            state_sync_events=no_comment.get(
+                "state_sync", cls.model_fields["state_sync_events"].default
+            ),
+            runtime_error_events=no_comment.get(
+                "runtime_error", cls.model_fields["runtime_error_events"].default
+            ),
+            artifact_ref_events=no_comment.get(
+                "artifact_ref", cls.model_fields["artifact_ref_events"].default
+            ),
+            milestone_events=write_comment.get(
+                "milestone", cls.model_fields["milestone_events"].default
+            ),
+            human_readable_events=write_comment.get(
+                "human_readable", cls.model_fields["human_readable_events"].default
+            ),
+        )
+
+
+def _load_default_policy() -> TimelineCommentPolicy:
+    """Load default policy from YAML, fallback to hardcoded defaults.
+
+    Returns:
+        TimelineCommentPolicy instance from YAML or hardcoded defaults.
+    """
+    try:
+        policy = TimelineCommentPolicy.from_yaml()
+        if policy != TimelineCommentPolicy():
+            logger.bind(domain="config", action="load").debug(
+                "Timeline comment policy loaded from config/v3/timeline.yaml"
+            )
+        return policy
+    except Exception:
+        logger.bind(domain="config", action="load").warning(
+            "Failed to load timeline.yaml, using hardcoded defaults"
+        )
+        return TimelineCommentPolicy()
+
 
 # Default policy instance
-DEFAULT_COMMENT_POLICY = TimelineCommentPolicy()
+DEFAULT_COMMENT_POLICY = _load_default_policy()
