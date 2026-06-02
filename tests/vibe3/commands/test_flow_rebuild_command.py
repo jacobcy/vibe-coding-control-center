@@ -45,3 +45,102 @@ def test_flow_rebuild_invokes_explicit_rebuild(
     assert call["branch"] == "feature/303"
     assert call["include_remote"] is True
     assert call["ensure_worktree"] is True
+
+
+@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+def test_flow_rebuild_branch_extracts_issue_number(
+    convention_resolver_cls: MagicMock,
+) -> None:
+    """`--branch task/issue-123` should be equivalent to `123`."""
+    # Setup convention resolver mock
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = 123
+    convention.canonical_branch.return_value = "task/issue-123"
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["flow", "rebuild", "--branch", "task/issue-123"])
+
+    # Should be in dry-run mode
+    assert result.exit_code == 0
+    assert "Would hard rebuild issue #123" in result.output
+    # Verify parse_issue_number was called with the branch name
+    convention.parse_issue_number.assert_called_once_with("task/issue-123")
+
+
+def test_flow_rebuild_branch_conflicts_with_positional() -> None:
+    """Cannot specify both --branch and positional issue number."""
+    result = runner.invoke(
+        app, ["flow", "rebuild", "--branch", "task/issue-123", "123"]
+    )
+
+    assert result.exit_code == 1
+    assert "不能同时指定 --branch 和位置参数" in result.output
+
+
+def test_flow_rebuild_no_args() -> None:
+    """Must specify either issue number or --branch."""
+    result = runner.invoke(app, ["flow", "rebuild"])
+
+    assert result.exit_code == 1
+    assert "需要指定 issue number 或 --branch" in result.output
+
+
+@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+def test_flow_rebuild_branch_invalid_name(convention_resolver_cls: MagicMock) -> None:
+    """Invalid branch name should error."""
+    # Setup convention resolver mock
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = None  # Cannot parse
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["flow", "rebuild", "--branch", "invalid-name"])
+
+    assert result.exit_code == 1
+    assert "无法从 'invalid-name' 解析 issue number" in result.output
+
+
+@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_arg")
+def test_flow_rebuild_branch_bare_number(
+    resolve_branch_arg_mock: MagicMock,
+    convention_resolver_cls: MagicMock,
+) -> None:
+    """`--branch 123` (bare number) should work the same as positional `123`."""
+    resolve_branch_arg_mock.return_value = "task/issue-123"
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = 123
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["flow", "rebuild", "--branch", "123"])
+
+    assert result.exit_code == 0
+    assert "Would hard rebuild issue #123" in result.output
+    resolve_branch_arg_mock.assert_called_once_with("123")
+    convention.parse_issue_number.assert_called_once_with("task/issue-123")
+
+
+@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+def test_flow_rebuild_positional_still_works(
+    convention_resolver_cls: MagicMock,
+) -> None:
+    """Backward compatibility: positional argument still works."""
+    # Setup convention resolver mock
+    convention = MagicMock()
+    convention.canonical_branch.return_value = "task/issue-123"
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["flow", "rebuild", "123"])
+
+    # Should be in dry-run mode
+    assert result.exit_code == 0
+    assert "Would hard rebuild issue #123" in result.output
+    # Verify parse_issue_number was NOT called (we used positional arg)
+    convention.parse_issue_number.assert_not_called()

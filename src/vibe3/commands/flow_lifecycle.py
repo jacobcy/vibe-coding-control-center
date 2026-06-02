@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.branch_arg import resolve_branch_arg
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_context_loader import load_issue_info
@@ -62,8 +63,6 @@ def blocked(
 
     if not flow_status:
         # Try to auto-create flow if branch matches task/dev convention
-        from vibe3.services.convention_resolver import ConventionResolver
-
         convention = ConventionResolver.from_repo().resolve().branch
         issue_number = convention.parse_issue_number(target_branch)
 
@@ -122,7 +121,13 @@ def blocked(
 
 
 def rebuild(
-    issue_number: Annotated[int, typer.Argument(help="Issue number to rebuild")],
+    issue_number: Annotated[
+        int | None, typer.Argument(help="Issue number to rebuild")
+    ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name or issue number"),
+    ] = None,
     keep_remote: Annotated[
         bool,
         typer.Option("--keep-remote", help="Keep remote branch during rebuild"),
@@ -141,12 +146,34 @@ def rebuild(
     This deletes the old task flow/worktree/branch scene, recreates the flow,
     appends a rebuild handoff event, and clears blocked state through the
     label-auto resume path.
+
+    Examples:
+        vibe3 flow rebuild 123
+        vibe3 flow rebuild --branch task/issue-123
+        vibe3 flow rebuild --branch 123
     """
-    branch = resolve_branch_arg(str(issue_number))
+    if branch is not None and issue_number is not None:
+        typer.echo("Error: 不能同时指定 --branch 和位置参数", err=True)
+        raise typer.Exit(1)
+    if branch is None and issue_number is None:
+        typer.echo("Error: 需要指定 issue number 或 --branch", err=True)
+        raise typer.Exit(1)
+
+    # Unified resolution: both "123" and "task/issue-123" work via resolve_branch_arg
+    input_arg = branch if branch is not None else str(issue_number)
+    target_branch = resolve_branch_arg(input_arg)
+
+    # Derive issue_number from resolved branch when --branch is used
+    if issue_number is None:
+        convention = ConventionResolver.from_repo().resolve().branch
+        issue_number = convention.parse_issue_number(target_branch)
+        if issue_number is None:
+            typer.echo(f"Error: 无法从 '{branch}' 解析 issue number", err=True)
+            raise typer.Exit(1)
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
-            f"issue #{issue_number} at branch {branch}. Use --yes to execute."
+            f"issue #{issue_number} at branch {target_branch}. Use --yes to execute."
         )
         return
 
@@ -156,7 +183,7 @@ def rebuild(
     issue = load_issue_info(issue_number, config=config, github=GitHubClient())
     result = FlowRebuildUsecase().rebuild_issue_flow(
         issue=issue,
-        branch=branch,
+        branch=target_branch,
         reason="manual flow rebuild",
         include_remote=not keep_remote,
         ensure_worktree=not no_worktree,
