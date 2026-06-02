@@ -27,8 +27,12 @@ def reset_error_tracking() -> Iterator[None]:
         db_paths.append(ErrorTrackingService._default_instance.db_path)
     ErrorTrackingService.clear_instance()
     for db_path in set(db_paths):
-        # Only handle "no such table" errors - these occur when the DB file
-        # was deleted by concurrent test cleanup. Other errors should propagate.
+        # Only handle "no such table" and "unable to open database file" errors
+        # - These occur when the DB file was deleted by concurrent test cleanup
+        # - Or when the path doesn't exist in worktree environments
+        # Other errors should propagate.
+        if not Path(db_path).exists():
+            continue
         try:
             with sqlite3.connect(db_path) as conn:
                 conn.execute("DELETE FROM error_log")
