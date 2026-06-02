@@ -6,6 +6,7 @@ import typer
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 
@@ -69,6 +70,7 @@ def resolve_command_branch(
     flow_service: FlowService,
     github_client: GitHubClient | None = None,
     allow_no_flow: bool = False,
+    canonical_fallback: bool = False,
 ) -> str:
     """Unified branch resolution for flow/handoff/task commands.
 
@@ -87,6 +89,10 @@ def resolve_command_branch(
         allow_no_flow: If True, return raw numeric string instead of raising
             UserError when no flows exist for an issue number. Only affects
             --branch and <position-arg> paths.
+        canonical_fallback: If True, return canonical branch name for issue
+            numbers without flows (e.g., "1234" → "task/issue-1234") instead
+            of raising UserError. Only applies when input is a pure issue
+            number (digits only). Takes precedence over allow_no_flow.
 
     Returns:
         Resolved branch name
@@ -115,12 +121,20 @@ def resolve_command_branch(
 
     # Step 2: Priority 1 - Explicit --branch
     if branch_opt is not None:
-        return (
-            resolve_issue_branch_input(
-                branch_opt, flow_service, allow_no_flow=allow_no_flow
-            )
-            or branch_opt
+        # When canonical_fallback is enabled, allow_no_flow should also be True
+        # so resolve_issue_branch_input returns None instead of raising
+        effective_allow_no_flow = allow_no_flow or canonical_fallback
+        resolved = resolve_issue_branch_input(
+            branch_opt, flow_service, allow_no_flow=effective_allow_no_flow
         )
+        if resolved is not None:
+            return resolved
+        # If unresolved and canonical_fallback enabled for issue numbers
+        if canonical_fallback and branch_opt.isdigit():
+            resolver = ConventionResolver.from_repo()
+            convention = resolver.resolve()
+            return convention.branch.canonical_branch(int(branch_opt))
+        return branch_opt
 
     # Step 3: Priority 2 - --pr option
     if pr_opt is not None:
@@ -131,12 +145,20 @@ def resolve_command_branch(
 
     # Step 4: Priority 3 - Positional argument
     if position_arg is not None:
-        return (
-            resolve_issue_branch_input(
-                position_arg, flow_service, allow_no_flow=allow_no_flow
-            )
-            or position_arg
+        # When canonical_fallback is enabled, allow_no_flow should also be True
+        # so resolve_issue_branch_input returns None instead of raising
+        effective_allow_no_flow = allow_no_flow or canonical_fallback
+        resolved = resolve_issue_branch_input(
+            position_arg, flow_service, allow_no_flow=effective_allow_no_flow
         )
+        if resolved is not None:
+            return resolved
+        # If unresolved and canonical_fallback enabled for issue numbers
+        if canonical_fallback and position_arg.isdigit():
+            resolver = ConventionResolver.from_repo()
+            convention = resolver.resolve()
+            return convention.branch.canonical_branch(int(position_arg))
+        return position_arg
 
     # Step 5: Priority 4 - Current branch (fallback)
     return flow_service.get_current_branch()
