@@ -117,3 +117,67 @@ def test_task_resume_has_no_all_option() -> None:
 
     assert result.exit_code != 0
     assert "No such option" in result.output
+
+
+@patch("vibe3.commands.task.ConventionResolver")
+@patch("vibe3.commands.task.FlowService")
+@patch("vibe3.commands.task._build_resume_usecase")
+def test_task_resume_branch_extracts_issue_number(
+    build_usecase: MagicMock,
+    flow_service_cls: MagicMock,
+    convention_resolver_cls: MagicMock,
+) -> None:
+    """`--branch task/issue-303` should be equivalent to `303`."""
+    # Setup convention resolver mock
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = 303
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    # Setup usecase mock
+    usecase = MagicMock()
+    usecase.resume_issues.return_value = {
+        "requested": [303],
+        "resumed": [{"number": 303, "resume_kind": "blocked"}],
+        "skipped": [],
+    }
+    build_usecase.return_value = usecase
+
+    flow_service = MagicMock()
+    flow_service.list_flows.side_effect = [[_flow(303)], []]
+    flow_service_cls.return_value = flow_service
+
+    result = runner.invoke(
+        app, ["task", "resume", "--branch", "task/issue-303", "--yes"]
+    )
+
+    assert result.exit_code == 0
+    call = usecase.resume_issues.call_args.kwargs
+    assert call["issue_numbers"] == [303]
+
+
+def test_task_resume_branch_conflicts_with_positional() -> None:
+    """Cannot specify both --branch and positional issue number."""
+    result = runner.invoke(
+        app, ["task", "resume", "--branch", "task/issue-303", "303", "--yes"]
+    )
+
+    assert result.exit_code == 1
+    assert "不能同时指定 --branch 和位置参数" in result.output
+
+
+@patch("vibe3.commands.task.ConventionResolver")
+def test_task_resume_branch_invalid_name(convention_resolver_cls: MagicMock) -> None:
+    """Invalid branch name should error."""
+    # Setup convention resolver mock
+    convention = MagicMock()
+    convention.parse_issue_number.return_value = None  # Cannot parse
+    resolver = MagicMock()
+    resolver.branch = convention
+    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+
+    result = runner.invoke(app, ["task", "resume", "--branch", "invalid-name", "--yes"])
+
+    assert result.exit_code == 1
+    assert "无法从 'invalid-name' 提取 issue number" in result.output

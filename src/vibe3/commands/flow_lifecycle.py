@@ -122,7 +122,13 @@ def blocked(
 
 
 def rebuild(
-    issue_number: Annotated[int, typer.Argument(help="Issue number to rebuild")],
+    issue_number: Annotated[
+        int | None, typer.Argument(help="Issue number to rebuild")
+    ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name to extract issue number from"),
+    ] = None,
     keep_remote: Annotated[
         bool,
         typer.Option("--keep-remote", help="Keep remote branch during rebuild"),
@@ -141,12 +147,38 @@ def rebuild(
     This deletes the old task flow/worktree/branch scene, recreates the flow,
     appends a rebuild handoff event, and clears blocked state through the
     label-auto resume path.
+
+    Examples:
+        vibe3 flow rebuild 123
+        vibe3 flow rebuild --branch task/issue-123
     """
-    branch = resolve_branch_arg(str(issue_number))
+    from vibe3.services.pr_branch_resolver import resolve_command_branch
+
+    # Resolve branch using unified resolver
+    target_branch = resolve_command_branch(
+        branch_opt=branch,
+        position_arg=str(issue_number) if issue_number is not None else None,
+        flow_service=FlowService(),
+        allow_no_flow=False,
+        canonical_fallback=True,
+    )
+
+    # Extract issue_number from branch if --branch was used
+    if branch is not None and issue_number is None:
+        convention = ConventionResolver.from_repo().resolve().branch
+        issue_number = convention.parse_issue_number(branch)
+        if issue_number is None:
+            typer.echo(f"Error: 无法从 '{branch}' 提取 issue number", err=True)
+            raise typer.Exit(1)
+
+    # Final validation
+    if issue_number is None:
+        typer.echo("Error: 需要指定 issue number 或 --branch", err=True)
+        raise typer.Exit(1)
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
-            f"issue #{issue_number} at branch {branch}. Use --yes to execute."
+            f"issue #{issue_number} at branch {target_branch}. Use --yes to execute."
         )
         return
 
@@ -156,7 +188,7 @@ def rebuild(
     issue = load_issue_info(issue_number, config=config, github=GitHubClient())
     result = FlowRebuildUsecase().rebuild_issue_flow(
         issue=issue,
-        branch=branch,
+        branch=target_branch,
         reason="manual flow rebuild",
         include_remote=not keep_remote,
         ensure_worktree=not no_worktree,

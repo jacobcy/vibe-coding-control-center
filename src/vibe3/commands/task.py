@@ -12,6 +12,7 @@ from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
@@ -164,6 +165,10 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name to extract issue number from"),
+    ] = None,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
@@ -193,6 +198,17 @@ def resume(
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
+    if branch is not None:
+        if issue_numbers:
+            typer.echo("Error: 不能同时指定 --branch 和位置参数", err=True)
+            raise typer.Exit(1)
+        convention = ConventionResolver.from_repo().resolve().branch
+        issue_num = convention.parse_issue_number(branch)
+        if issue_num is None:
+            typer.echo(f"Error: 无法从 '{branch}' 提取 issue number", err=True)
+            raise typer.Exit(1)
+        issue_numbers = [issue_num]
+
     if trace:
         setup_logging(verbose=2)
 
