@@ -10,6 +10,8 @@ from loguru import logger
 
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 
+GH_API_TIMEOUT = 30
+
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
     r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*#(\d+)",
@@ -234,3 +236,53 @@ class IssuesMixin(IssueAdminMixin):
             )
             return None
         return cast("dict[str, Any] | None | str", json.loads(result.stdout))
+
+    def list_issue_comments(
+        self, issue_number: int, repo: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List comments on a GitHub issue.
+
+        Args:
+            issue_number: Issue number
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            List of comment dicts with keys: id, body, author, etc.
+        """
+        logger.bind(
+            external="github",
+            operation="list_issue_comments",
+            issue_number=issue_number,
+        ).debug("Calling GitHub API: list_issue_comments")
+
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--comments",
+            "--json",
+            "comments",
+        ]
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
+
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                f"Failed to list comments on issue #{issue_number}"
+            )
+            return []
+
+        try:
+            data = json.loads(result.stdout)
+            comments = data.get("comments", [])
+            return cast(list[dict[str, Any]], comments)
+        except json.JSONDecodeError as exc:
+            logger.bind(external="github", error=str(exc)).error(
+                "Failed to parse comments JSON"
+            )
+            return []
