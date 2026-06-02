@@ -9,7 +9,6 @@ import typer
 
 from vibe3.commands import _validate_pid_file
 from vibe3.commands.command_options import (
-    AllOption,
     FormatOption,
     TraceMinMsOption,
     TraceOption,
@@ -217,7 +216,6 @@ def _full_status_dashboard(
 
 
 def status(
-    all_flows: AllOption = False,
     check: Annotated[
         bool,
         typer.Option("--check", help="显示前先运行完整 vibe3 check"),
@@ -248,15 +246,40 @@ def status(
     if check:
         run_full_check_shortcut()
 
-    from vibe3.services.task_status_service import fetch_task_status_data
+    import time
 
-    # Fetch minimal data (config + snapshot only)
-    data = fetch_task_status_data(all_flows=False, output_format=output_format)
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+    # Fetch config and snapshot only (no flows or issues)
+    config = load_orchestra_config()
+    orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    if orch_snapshot is None:
+        time.sleep(0.5)
+        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    snapshot_found = orch_snapshot is not None
+
+    if not orch_snapshot:
+        _, pid_alive = _validate_pid_file(config.pid_file)
+        if pid_alive:
+            time.sleep(0.5)
+            orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+            snapshot_found = orch_snapshot is not None
+
+    if not orch_snapshot:
+        from dataclasses import replace
+
+        orch_service = OrchestraStatusService(
+            config, orchestrator=FlowOrchestratorService(config)
+        )
+        local_snap = orch_service.snapshot()
+        orch_snapshot = replace(local_snap, server_running=False)
 
     # Handle JSON/YAML output (system status only)
     if output_format in ("json", "yaml"):
         output_data = {
-            "orchestra": asdict(data.orch_snapshot),
+            "orchestra": asdict(orch_snapshot),
         }
 
         if output_format == "json":
@@ -270,7 +293,7 @@ def status(
         return
 
     # Render system status only
-    _render_system_status(data.config, data.orch_snapshot, data.snapshot_found)
+    _render_system_status(config, orch_snapshot, snapshot_found)
 
     # Print hint
     typer.echo(

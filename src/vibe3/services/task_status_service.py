@@ -1,7 +1,7 @@
 """Service layer for task status dashboard data fetching and classification."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -10,9 +10,6 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
 from vibe3.services.task_status_classifier import TaskStatusBucket, classify_task_status
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -239,7 +236,7 @@ def classify_task_issues_for_rendering(
         bucket = classify_task_status(
             state,
             cast(str | None, item.get("assignee")),
-            get_manager_usernames(config),
+            manager_usernames,
         )
         bucketed_items[bucket].append(item)
 
