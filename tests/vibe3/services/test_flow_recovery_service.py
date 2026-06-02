@@ -128,3 +128,32 @@ class TestRecover:
                 reason="manual",
                 auto=False,
             )
+
+    def test_auto_rebuild_fails_when_rebuilt_worktree_is_missing(self):
+        svc = _make_service(worktree_path=None, flow_state={})
+        svc.git_client.branch_exists.return_value = True
+        svc.git_client.find_worktree_path_for_branch.return_value = None
+
+        with (
+            patch(
+                "vibe3.services.issue_context_loader.load_issue_info",
+                return_value=MagicMock(number=1),
+            ),
+            patch(
+                "vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase"
+            ) as rebuild_cls,
+            pytest.raises(RuntimeError, match="Rebuild postcondition failed"),
+        ):
+            rebuild_cls.return_value.rebuild_issue_flow.side_effect = RuntimeError(
+                "Rebuild postcondition failed for task/issue-1: "
+                "git worktree not registered for branch: task/issue-1"
+            )
+
+            svc._do_rebuild(
+                "task/issue-1",
+                1,
+                "health check",
+                ensure_worktree=True,
+            )
+
+        rebuild_cls.return_value.rebuild_issue_flow.assert_called_once()

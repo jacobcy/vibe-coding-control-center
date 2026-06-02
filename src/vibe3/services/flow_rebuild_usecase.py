@@ -16,6 +16,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+from vibe3.services.flow_rebuild_postconditions import assert_rebuild_postconditions
 from vibe3.services.handoff_service import HandoffService
 
 LabelResume = Callable[..., None]
@@ -92,6 +93,13 @@ class FlowRebuildUsecase:
             initiated_by=source,
             ensure_worktree=ensure_worktree,
             reactivate_existing=False,
+        )
+        assert_rebuild_postconditions(
+            branch=branch,
+            result=result,
+            ensure_worktree=ensure_worktree,
+            git_client=self.git_client,
+            store=self.store,
         )
 
         HandoffService(
