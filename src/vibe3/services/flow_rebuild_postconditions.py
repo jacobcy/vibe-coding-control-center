@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Any
 
 
+def _refresh_worktree_cache(git_client: Any) -> None:
+    """Force the next worktree lookup to read current git metadata."""
+    if hasattr(git_client, "_worktree_list_cache"):
+        git_client._worktree_list_cache = None
+
+
 def assert_rebuild_postconditions(
     *,
     branch: str,
@@ -21,6 +27,7 @@ def assert_rebuild_postconditions(
         failures.append(f"branch does not exist: {branch}")
 
     if ensure_worktree:
+        _refresh_worktree_cache(git_client)
         worktree_path = git_client.find_worktree_path_for_branch(branch)
         if worktree_path is None:
             failures.append(f"git worktree not registered for branch: {branch}")
