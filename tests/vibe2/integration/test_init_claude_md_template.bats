@@ -97,3 +97,24 @@ setup() {
   # Intentional behavior: minimal profile does not check for AGENTS.md
   [[ ! "$output" =~ "Missing: AGENTS.md" ]]
 }
+
+@test "vibe init output guides users to project check and manager token setup" {
+  local fixture
+  fixture="$(mktemp -d)"
+  git -C "$fixture" init >/dev/null 2>&1
+
+  run zsh -c "
+    export VIBE_ROOT='$REPO_ROOT'
+    export VIBE_LIB='$REPO_ROOT/lib'
+    export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
+    source '$REPO_ROOT/lib/profiles.sh'
+    source '$REPO_ROOT/lib/init.sh'
+    cd '$fixture'
+    vibe_init --profile minimal --yes --skip-labels 2>&1
+  "
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "/vibe-project-check" ]]
+  [[ "$output" =~ "VIBE_MANAGER_GITHUB_TOKEN" ]]
+  [[ "$output" =~ "vibe3 serve" ]]
+}
