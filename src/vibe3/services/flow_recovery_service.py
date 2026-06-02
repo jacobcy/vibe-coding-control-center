@@ -259,12 +259,10 @@ class FlowRecoveryService:
         ensure_worktree: bool = True,
         include_remote: bool = False,
     ) -> None:
-        """Hard rebuild: cleanup + bootstrap (NO resume -- caller does that)."""
+        """Hard rebuild through the canonical rebuild usecase."""
         from vibe3.config.orchestra_settings import load_orchestra_config
         from vibe3.models.orchestration import IssueInfo, IssueState
-        from vibe3.services.flow_cleanup_service import FlowCleanupService
-        from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-        from vibe3.services.handoff_service import HandoffService
+        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
         from vibe3.services.issue_context_loader import load_issue_info
 
         # Load issue info from GitHub
@@ -281,49 +279,15 @@ class FlowRecoveryService:
                 state=IssueState.READY,
             )
 
-        # Step 1: Cleanup old scene
-        cleanup_results = FlowCleanupService(
-            git_client=self.git_client,
-            store=self.store,
-        ).cleanup_flow_scene(
-            branch,
-            include_remote=include_remote,
-            terminate_sessions=True,
-            keep_flow_record=False,
-            force_delete=True,
-        )
-        failed_steps = [s for s, ok in cleanup_results.items() if not ok]
-        if failed_steps:
-            raise RuntimeError(
-                f"Cleanup failed for: {', '.join(failed_steps)}. "
-                "Cannot rebuild in dirty state."
-            )
-
-        # Step 2: Bootstrap new flow + worktree
-        orchestrator = FlowOrchestratorService(
-            config,
-            store=self.store,
-            git=self.git_client,
-            github=self.github_client,
-        )
-        orchestrator.bootstrap_issue_flow(
-            issue_info,
-            branch=branch,
-            slug=f"issue-{issue_number}",
-            source="flow:rebuild",
-            initiated_by="flow:rebuild",
-            ensure_worktree=ensure_worktree,
-            reactivate_existing=False,
-        )
-
-        # Step 3: Handoff record
-        HandoffService(
+        FlowRebuildUsecase(
             store=self.store,
             git_client=self.git_client,
             github_client=self.github_client,
-        ).append_current_handoff(
-            message=f"Flow rebuilt: {reason}",
-            actor="vibe3:flow_rebuild",
-            kind="milestone",
+            label_resume=lambda **_: None,
+        ).rebuild_issue_flow(
+            issue=issue_info,
             branch=branch,
+            reason=reason,
+            ensure_worktree=ensure_worktree,
+            include_remote=include_remote,
         )
