@@ -267,6 +267,56 @@ class CheckService(CheckRemote):
                 ],
             )
 
+    def _check_missing_state_labels(
+        self, issue_number: int, flow_data: dict
+    ) -> tuple[list[str], list[str]]:
+        """Check and auto-fix missing state/* labels.
+
+        If an issue has no state labels but flow data exists locally,
+        infer the expected state from flow artifacts and restore it.
+
+        Args:
+            issue_number: GitHub issue number
+            flow_data: Flow state data from local store
+
+        Returns:
+            Tuple of (warnings, issues) - warnings for successful fixes,
+            issues for manual intervention required
+        """
+        from vibe3.models.flow import FlowState
+        from vibe3.services.flow_resume_resolver import infer_resume_label
+        from vibe3.services.label_service import LabelService
+
+        try:
+            # Infer expected state from flow's local artifacts
+            flow_state = FlowState.model_validate(flow_data)
+            expected_state = infer_resume_label(flow_state)
+
+            # Auto-restore the missing label
+            label_service = LabelService()
+            label_service.set_state(issue_number, expected_state)
+
+            logger.bind(domain="check", action="fix").warning(
+                f"Auto-restored missing state label on issue #{issue_number}: "
+                f"-> {expected_state.to_label()}"
+            )
+            return (
+                [
+                    f"Issue #{issue_number} had no state label, "
+                    f"auto-restored to {expected_state.to_label()}"
+                ],
+                [],
+            )
+        except Exception as exc:
+            logger.bind(domain="check", action="fix").warning(
+                f"Failed to auto-restore missing state label on "
+                f"issue #{issue_number}: {exc}"
+            )
+            return (
+                [],
+                [f"Issue #{issue_number} has no state label, " f"manual fix required"],
+            )
+
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
         # Acquire branch-level lock to prevent concurrent checks
@@ -338,6 +388,25 @@ class CheckService(CheckRemote):
                     )
                     warnings.extend(label_warnings)
                     issues.extend(label_issues)
+
+                    # Check for missing state/* labels
+                    # (anomaly: labels dropped but flow exists)
+                    if orchestration_state is None and not task_issue_closed:
+                        from vibe3.models.flow import FlowState
+                        from vibe3.services.flow_resume_resolver import (
+                            infer_resume_label,
+                        )
+
+                        miss_warnings, miss_issues = self._check_missing_state_labels(
+                            task_issue, flow_data
+                        )
+                        warnings.extend(miss_warnings)
+                        issues.extend(miss_issues)
+                        if miss_warnings:
+                            # Update orchestration_state to reflect the restored label
+                            orchestration_state = infer_resume_label(
+                                FlowState.model_validate(flow_data)
+                            )
 
             # only one task issue per branch
             if len(task_issues) > 1:
