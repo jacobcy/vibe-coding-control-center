@@ -69,12 +69,10 @@ class FlowLifecycleMixin:
             )
 
         issue_number: int | None = None
-        issue_links = self.store.get_issue_links(branch)
-        for link in issue_links:
-            if link.get("issue_role") == "task":
-                issue_number = link.get("issue_number")
-                if isinstance(issue_number, int):
-                    break
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_flow_service = IssueFlowService(store=self.store)
+        issue_number = issue_flow_service.resolve_task_issue_number(branch)
 
         service = BlockedStateService(store=self.store)
         service.block(
