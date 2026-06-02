@@ -117,18 +117,10 @@ def show(
             raise typer.Exit(1) from error
 
         # Get task issue number for remote fallback
-        links = service.store.get_issue_links(target_branch)
-        task_issue_number = next(
-            (link["issue_number"] for link in links if link["issue_role"] == "task"),
-            None,
-        )
+        from vibe3.services.issue_flow_service import IssueFlowService
 
-        # Fallback: parse issue number from branch name when local DB missing
-        if task_issue_number is None:
-            from vibe3.services.issue_flow_service import IssueFlowService
-
-            issue_flow_service = IssueFlowService(store=service.store)
-            task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
+        issue_flow_service = IssueFlowService(store=service.store)
+        task_issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
 
     # Use resolver for source-aware read
     from vibe3.services.flow_status_resolver import FlowStatusResolver
