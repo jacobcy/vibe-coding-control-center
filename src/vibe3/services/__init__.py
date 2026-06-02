@@ -124,7 +124,7 @@ _SYMBOL_MODULES = {
     "ref_to_handoff_cmd": "vibe3.services.path_helpers",
     "requires_audit_ref": "vibe3.services.verdict_policy",
     "resolve_branch_arg": "vibe3.services.branch_arg",
-    "resolve_branch_from_pr": "vibe3.services.branch_resolver",
+    "resolve_branch_from_pr": "vibe3.services.pr_branch_resolver",
     "resolve_command_branch": "vibe3.services.pr_branch_resolver",
     "resolve_handoff_target": "vibe3.services.handoff_resolution",
     "resolve_issue_branch_input": "vibe3.services.branch_arg",

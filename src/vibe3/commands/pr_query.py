@@ -34,7 +34,6 @@ from vibe3.commands.output_format import (
 )
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.models.trace import TraceOutput
-from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
@@ -427,15 +426,8 @@ def register_query_commands(app: typer.Typer) -> None:
 
         # Resolve branch from PR (compute once, reuse later)
         resolved_branch: str | None = None
-        try:
-            if pr and pr_number:
-                # Standard path: PR → Issue → Flow → Branch
-                # Pass pre-fetched PR to avoid duplicate API call
-                resolved_branch = resolve_branch_from_pr(pr_number, pr_svc, pr)
-        except Exception as exc:
-            logger.bind(domain="pr", action="resolve_branch").warning(
-                f"Failed to resolve branch from PR: {exc}"
-            )
+        if pr and pr.head_branch:
+            resolved_branch = pr.head_branch
 
         # Record external events (best-effort, non-blocking)
         try:
