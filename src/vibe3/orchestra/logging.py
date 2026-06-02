@@ -32,7 +32,7 @@ def _repo_root() -> Path:
         git_common_dir = Path(result.stdout.strip())
         # The parent of .git is the main repository root
         return git_common_dir.parent
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError, OSError):
         # Fallback to path-based detection for non-git environments
         return Path(__file__).resolve().parents[3]
 
