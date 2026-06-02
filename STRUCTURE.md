@@ -92,10 +92,6 @@ vibe-center/
 │   ├── context/                 # AI 上下文
 │   │   ├── memory/              # [TRACKED] AI 上下文记忆（已迁移至 claude-memory MCP 工具）
 │   │   └── ...                  # 动态上下文（如 handoff）由 vibe3 管理，见 .git/vibe3/
-│   ├── rules/                   # 编码规则
-│   │   ├── coding-standards.md  # 编码标准
-│   │   ├── python-standards.md  # Python 标准（V3 权威）
-│   │   └── patterns.md          # 设计模式
 │   ├── templates/               # 文档模板（AI 工具）
 │   │   ├── prd.md               # PRD 模板
 │   │   ├── tech-spec.md         # Spec 模板
@@ -105,7 +101,14 @@ vibe-center/
 │   │   ├── audit.md             # Audit 模板
 │   │   └── task-readme.md       # Task README 模板
 │   ├── workflows/               # 工作流定义
-│   └── skills/                  # 技能运行时（symlinks）
+│   └── skills/                  # 技能运行时（旧路径，symlinks）
+│
+├── .claude/                     # Claude AI 配置（当前真源）
+│   ├── rules/                   # 编码规则 (Moved from .agent/rules/)
+│   │   ├── coding-standards.md
+│   │   ├── python-standards.md
+│   │   └── patterns.md
+│   └── skills/                  # 技能运行时 (Moved from .agent/skills/)
 │
 ├── docs/                        # 人类文档区
 │   ├── README.md                # 文档总览
@@ -277,7 +280,7 @@ vibe3 inspect commit <sha>                # 改动影响范围
 **规则**：
 - 每个技能一个子目录
 - 包含 `SKILL.md` 定义文件
-- 运行时通过 symlink 链接到 `.agent/skills/`
+- 运行时通过 symlink 链接到 `.claude/skills/` (Legacy: `.agent/skills/`)
 
 ### `.agent/` - AI 工作区
 
@@ -319,9 +322,11 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 **职责**：定义各种工作流程
 
-#### `.agent/skills/` - 技能运行时
+#### `.claude/skills/` - 技能运行时
 
-**职责**：技能的运行时环境（symlinks 到 `skills/`）
+**职责**：技能的运行时环境（symlinks 到 `skills/`）。
+
+**注意**：这是 Claude Desktop 或 IDE 插件加载技能的实际路径。`.agent/skills/` 为旧路径，目前仍保持同步以兼容旧版工具。
 
 ### `.git/vibe3/`、`.git/vibe/`、`~/.vibe/` - 数据存储
 

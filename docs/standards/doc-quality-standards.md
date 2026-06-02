@@ -47,7 +47,7 @@ related_docs:
 以下目录和文档不在本标准范围内：
 
 - **`skills/` 目录**：项目自己的 skills 有特殊格式要求
-- **`.agent/skills/` 目录**：外部 skills 的 symlinks，不应修改
+- **`.claude/skills/` 目录**：技能的运行时 symlinks，真源位于 `skills/` 目录，不应在此直接修改。
 - **`lib/`、`bin/` 目录**：Shell 脚本，不需要 frontmatter
 
 ## 调用面标注规范
@@ -73,7 +73,7 @@ related_docs:
 | 文档类型 | document_type 值 | 位置 | 用途 | 受众 |
 |---------|-----------------|------|------|------|
 | 核心入口文档 | `core-entry` | 根目录 | 项目入口和核心定义 | Human + AI |
-| 技能文档 | `skill` | `.agent/skills/*/SKILL.md` | AI 技能定义 | AI |
+| 技能文档 | `skill` | `skills/*/SKILL.md` | AI 技能定义 | AI |
 | 模板文档 | `template` | `.agent/templates/*.md` | 文档生成模板 | AI |
 | 工作流文档 | `workflow` | `.agent/workflows/*.md` | 工作流定义 | AI |
 | 临时计划 | `temporary-plan` | `.agent/plans/*.md` | Agent 临时计划 | AI |
@@ -219,7 +219,7 @@ related_docs:
 
 ### 技能文档 (Skill Document)
 
-技能文档定义 AI Agent 的技能，位于 `.agent/skills/*/SKILL.md`。
+技能文档定义 AI Agent 的技能，位于 `skills/*/SKILL.md`。
 
 #### Schema
 

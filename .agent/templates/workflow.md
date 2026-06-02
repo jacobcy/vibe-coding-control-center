@@ -6,12 +6,12 @@ description: [Short Description of Workflow]
 
 ## 1. Prerequisites (前置准备)
 - [ ] Context gathered (e.g., `git status`, `git branch`)
-- [ ] Rules loaded (读取 `.agent/rules/`)
+- [ ] Rules loaded (读取 `.claude/rules/`)
 
 ## 2. Standards Check (规范检查)
 **CRITICAL**: 执行前请复核以下规则：
 // turbo
-cat .agent/rules/coding-standards.md .agent/rules/patterns.md
+cat .claude/rules/coding-standards.md .claude/rules/patterns.md
 
 ## 3. Execution (执行)
 [具体的步骤，保留原有的脚本调用逻辑]
