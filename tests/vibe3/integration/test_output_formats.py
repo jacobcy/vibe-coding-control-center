@@ -22,6 +22,14 @@ def stub_pr_show_service(monkeypatch):
         from_flow=False,
     )
     pr = SimpleNamespace(
+        number=123,
+        title="Test PR",
+        body="Body",
+        state="open",
+        head_branch="task/test",
+        base_branch="main",
+        url="https://example.test/pr/123",
+        draft=True,
         model_dump=lambda: {
             "number": 123,
             "title": "Test PR",
@@ -31,7 +39,7 @@ def stub_pr_show_service(monkeypatch):
             "base_branch": "main",
             "url": "https://example.test/pr/123",
             "draft": True,
-        }
+        },
     )
     analysis_summary = {
         "raw": {},
