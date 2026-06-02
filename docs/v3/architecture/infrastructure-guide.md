@@ -152,7 +152,7 @@ CapacityService 提供单一的容量检查点，结合 live session count 和 i
 **容量检查触发路径**（详见 [capacity-control.md](capacity-control.md)）：
 
 - **Heartbeat 自动调度**: GlobalDispatchCoordinator 通过 heartbeat 定期扫描
-- **CLI 手动触发**: `vibe3 internal issue-role-sync` 命令
+- **CLI 手动触发**: `vibe3 [run|plan|review|internal manager] <issue>` 等命令
 
 两条路径共享同一个 `_shared_in_flight_dispatches`，确保容量计数一致。
 

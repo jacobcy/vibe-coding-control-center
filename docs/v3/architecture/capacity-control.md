@@ -27,7 +27,7 @@ CapacityService 提供单一的容量检查点,结合 live session count 和 in-
 
 #### 路径2: CLI 手动触发
 
-- **触发源**: `vibe3 internal issue-role-sync` CLI 命令
+- **触发源**: `vibe3 [run|plan|review|internal manager] <issue>` 等 CLI 命令
 - **调度方式**: 手动触发,用于特定 issue-role 组合
 - **适用场景**: 紧急修复、手动干预、测试验证
 - **实现位置**: `src/vibe3/execution/issue_role_sync_runner.py`
