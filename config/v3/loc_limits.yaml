@@ -158,8 +158,8 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 600
-        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建等紧密耦合逻辑"
+        limit: 650
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"

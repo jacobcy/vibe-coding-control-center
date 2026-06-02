@@ -198,7 +198,7 @@ class TestCodeagentBackend:
     def test_run_uses_repo_models_mapping_for_agent_preset(
         self, tmp_path: Path
     ) -> None:
-        """Agent preset should resolve through repo-local config/models.json."""
+        """Agent preset should be passed through so wrapper applies preset fields."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
@@ -228,11 +228,10 @@ class TestCodeagentBackend:
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "codeagent-wrapper" in command[0]
-        assert "--agent" not in command
-        assert "--backend" in command
-        assert "claude" in command
-        assert "--model" in command
-        assert "claude-sonnet-4-6" in command
+        assert "--agent" in command
+        assert "vibe-reviewer" in command
+        assert "--backend" not in command
+        assert "--model" not in command
 
     def test_run_falls_back_to_default_backend_when_preset_missing(
         self, tmp_path: Path
@@ -260,8 +259,68 @@ class TestCodeagentBackend:
 
         assert result.exit_code == 0
         command = mock_run.call_args[0][0]
+        assert "--agent" not in command
         assert "--backend" in command
         assert "claude" in command
+
+    def test_run_uses_backend_when_agent_env_override_is_set(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Env backend override should still convert preset to backend/model flags."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text(
+            '{"agents":{"vibe-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
+        )
+        monkeypatch.setenv("VIBE_BACKEND_REVIEWER", "codex")
+
+        with (
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+        ):
+            mock_run.return_value = (mock_result, None)
+            backend = CodeagentBackend()
+            result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
+
+        assert result.exit_code == 0
+        command = mock_run.call_args[0][0]
+        assert "--agent" not in command
+        assert "--backend" in command
+        assert "codex" in command
+
+    def test_run_passes_prefixed_repo_preset_name(self, tmp_path: Path) -> None:
+        """Short agent aliases should pass the concrete repo preset to wrapper."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text(
+            '{"agents":{"vibe-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
+        )
+
+        with (
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+        ):
+            mock_run.return_value = (mock_result, None)
+            backend = CodeagentBackend()
+            result = backend.run("prompt body", AgentOptions(agent="reviewer"))
+
+        assert result.exit_code == 0
+        command = mock_run.call_args[0][0]
+        assert "--agent" in command
+        assert "vibe-reviewer" in command
+        assert "reviewer" not in command
 
     def test_run_without_model_when_repo_mapping_missing(self, tmp_path: Path) -> None:
         """Fallback to default_backend with no default_model should omit --model."""

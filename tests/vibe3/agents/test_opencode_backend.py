@@ -182,11 +182,8 @@ Error: Cannot find module 'some-plugin'
                 call_args = mock_run.call_args[0]
                 command = call_args[0]
 
-                # Verify command has opencode backend and model
-                assert "--backend" in command
-                backend_idx = command.index("--backend")
-                assert command[backend_idx + 1] == "opencode"
-
-                assert "--model" in command
-                model_idx = command.index("--model")
-                assert command[model_idx + 1] == "my-provider/gpt-4o"
+                # Preset should use --agent to preserve potential yolo permissions
+                # The wrapper will resolve backend/model from ~/.codeagent/models.json
+                assert "--agent" in command
+                agent_idx = command.index("--agent")
+                assert command[agent_idx + 1] == "vibe-executor"

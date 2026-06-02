@@ -35,7 +35,9 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     assert called_dir == Path.home() / ".codeagent" / "agents"
 
     called_command = mock_run.call_args[0][0]
-    assert "--backend" in called_command
+    # Preset should use --agent to preserve yolo permissions
+    assert "--agent" in called_command
+    assert "vibe-planner" in called_command
     assert "--prompt-file" in called_command
     assert "resume" in called_command
     assert session_id in called_command
@@ -69,7 +71,9 @@ def test_codeagent_backend_new_session(mock_tempfile, mock_run):
 
     called_command = mock_run.call_args[0][0]
     assert "resume" not in called_command
-    assert "--backend" in called_command
+    # Preset should use --agent to preserve yolo permissions
+    assert "--agent" in called_command
+    assert "vibe-planner" in called_command
     assert "--prompt-file" in called_command
     assert "start work" in called_command
 

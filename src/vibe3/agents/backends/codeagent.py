@@ -16,7 +16,9 @@ from vibe3.agents.backends.async_launcher import (
     spawn_tmux_command,
 )
 from vibe3.agents.backends.codeagent_config import (
+    has_agent_env_override,
     resolve_effective_agent_options,
+    resolve_repo_agent_preset_name,
     sync_models_json,
 )
 from vibe3.agents.backends.session_manager import (
@@ -58,10 +60,22 @@ class CodeagentBackend:
         session_id: str | None = None,
     ) -> list[str]:
         """Build codeagent-wrapper command."""
+        original_options = options
         options = resolve_effective_agent_options(options)
         command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
 
-        if options.agent:
+        preset_name = None
+        if (
+            original_options.agent
+            and not original_options.backend
+            and not original_options.model
+            and not has_agent_env_override(original_options.agent)
+        ):
+            preset_name = resolve_repo_agent_preset_name(original_options.agent)
+
+        if preset_name:
+            command.extend(["--agent", preset_name])
+        elif options.agent:
             command.extend(["--agent", options.agent])
         elif options.backend:
             command.extend(["--backend", options.backend])
