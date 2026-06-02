@@ -18,7 +18,11 @@ from loguru import logger
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.blocked_state_io import BlockedStateIO
-from vibe3.services.blocked_state_types import BlockedState, ConsistencyReport
+from vibe3.services.blocked_state_types import (
+    BlockedState,
+    ConsistencyReport,
+    UnblockResult,
+)
 from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.label_service import LabelService
 
@@ -160,7 +164,7 @@ class BlockedStateService:
         actor: str = "human:resume",
         issue_number: int | None = None,
         detail: str | None = None,
-    ) -> None:
+    ) -> UnblockResult:
         """Atomically clear blocked state in all three sources.
 
         Args:
@@ -170,8 +174,14 @@ class BlockedStateService:
             actor: Actor name for events
             issue_number: GitHub issue number
             detail: Custom timeline detail message (optional)
+
+        Returns:
+            UnblockResult indicating success/failure of each source.
         """
         has_branch = bool(branch)  # Skip DB ops for empty branch
+        body_ok = True
+        db_ok = True
+        label_ok = True
 
         if issue_number:
             try:
@@ -182,6 +192,7 @@ class BlockedStateService:
                     action="unblock",
                     branch=branch,
                 ).error(f"Failed to clear issue body projection: {exc}")
+                body_ok = False
                 raise
 
         if has_branch and self.store:
@@ -193,6 +204,7 @@ class BlockedStateService:
                     action="unblock",
                     branch=branch,
                 ).warning(f"Failed to clear database cache: {exc}")
+                db_ok = False
 
         if issue_number:
             try:
@@ -208,16 +220,15 @@ class BlockedStateService:
                         action="unblock",
                         branch=branch,
                         issue_number=issue_number,
-                    ).warning(
-                        "Label state machine blocked transition from BLOCKED; "
-                        "label may be out of sync with body/DB"
-                    )
+                    ).warning("Label state machine blocked transition from BLOCKED")
+                    label_ok = False
             except Exception as exc:
                 logger.bind(
                     domain="blocked_state",
                     action="unblock",
                     branch=branch,
                 ).warning(f"Failed to write label state: {exc}")
+                label_ok = False
 
         if has_branch and self.store and issue_number:
             try:
@@ -235,6 +246,12 @@ class BlockedStateService:
                     action="unblock",
                     branch=branch,
                 ).warning(f"Failed to write timeline event: {exc}")
+
+        return UnblockResult(
+            body_cleared=body_ok,
+            db_cleared=db_ok,
+            label_cleared=label_ok,
+        )
 
     # ========================================================================
     # Public API: Query Operations

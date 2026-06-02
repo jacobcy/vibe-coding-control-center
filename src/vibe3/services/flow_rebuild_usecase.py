@@ -119,31 +119,41 @@ class FlowRebuildUsecase:
         branch: str,
         reason: str,
     ) -> None:
-        from vibe3.models.flow import FlowStatusResponse
-        from vibe3.services.flow_service import FlowService
-        from vibe3.services.issue_flow_service import IssueFlowService
-        from vibe3.services.label_service import LabelService
-        from vibe3.services.task_resume_operations import TaskResumeOperations
+        """Clear blocked markers after rebuild.
 
-        flow = FlowStatusResponse(
-            branch=branch,
-            flow_slug=branch,
-            flow_status="active",
-            latest_actor="vibe3:flow_rebuild",
-            task_issue_number=issue_number,
-        )
-        operations = TaskResumeOperations(
-            git_client=self.git_client,
+        Post-rebuild: consistency is guaranteed (we just rebuilt), so we
+        skip the classify step and go straight to clearing blocked state.
+        """
+        from vibe3.models.flow import FlowState
+        from vibe3.models.orchestration import IssueState
+        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.flow_resume_resolver import infer_resume_label
+
+        # Determine target state from rebuilt flow
+        fs_dict = self.store.get_flow_state(branch)
+        if fs_dict:
+            target_state = infer_resume_label(FlowState.model_validate(fs_dict))
+        else:
+            target_state = IssueState.READY
+
+        result = BlockedStateService(
             github_client=self.github_client,
-            flow_service=FlowService(store=self.store),
-            label_service=LabelService(),
-            issue_flow_service=IssueFlowService(store=self.store),
-        )
-        operations.reset_issue_to_ready(
+            store=self.store,
+        ).unblock(
+            branch=branch,
+            target_state=target_state,
             issue_number=issue_number,
-            resume_kind="rebuild",
-            flow=flow,
-            repo=None,
-            reason=reason,
-            label_state="",
+            detail=f"Rebuilt and resumed: {reason}",
         )
+
+        if not result.label_cleared:
+            from loguru import logger
+
+            logger.bind(
+                domain="recovery",
+                branch=branch,
+                issue_number=issue_number,
+            ).error(
+                f"Label not cleared after rebuild for #{issue_number}. "
+                f"Manual fix: gh issue edit {issue_number} --remove-label state/blocked"
+            )

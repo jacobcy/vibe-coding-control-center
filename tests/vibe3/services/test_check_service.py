@@ -72,7 +72,9 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         assert call["issue"] == mock_issue_info
         assert call["branch"] == "task/issue-456"
         assert call["include_remote"] is True
-        assert call["ensure_worktree"] is False
+        assert (
+            call["ensure_worktree"] is True
+        )  # FIX: was False, caused worktree_path NULL
 
         assert handled is True
         assert len(issues) == 0

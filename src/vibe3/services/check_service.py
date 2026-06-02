@@ -447,60 +447,51 @@ class CheckService(CheckRemote):
                 )
                 return CheckResult(is_valid=True, branch=branch, issues=[])
 
-            # ref files exist
+            # Flow consistency check and auto-recovery
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.flow_consistency_check import (
-                    check_flow_consistency,
+                from vibe3.services.flow_recovery_service import (
+                    FlowRecoveryService,
+                    RecoveryAction,
                 )
-                from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
-                consistency = check_flow_consistency(
-                    branch,
-                    flow_data,
+                recovery_svc = FlowRecoveryService(
+                    store=self.store,
                     git_client=self.git_client,
+                    github_client=self.github_client,
                 )
-                if consistency.needs_rebuild:
-                    # Health check is automatic operation - must auto-rebuild
-                    # to fix inconsistent state without human intervention
-                    try:
-                        from vibe3.models.orchestration import IssueInfo
+                action, consistency = recovery_svc.classify(branch)
 
-                        rebuild_usecase = FlowRebuildUsecase(
-                            store=self.store,
-                            git_client=self.git_client,
-                            github_client=self.github_client,
-                        )
-                        issue_info = IssueInfo(
-                            number=task_issue or 0,
-                            title=f"Issue {task_issue}",
-                            labels=[IssueState.READY.to_label()],
-                            state=IssueState.READY,
-                        )
-                        rebuild_usecase.rebuild_issue_flow(
-                            issue=issue_info,
+                if action != RecoveryAction.RESUME_ONLY:
+                    # Use precomputed consistency result for error message
+                    consistency_error = (
+                        consistency.reason if consistency else "No flow record"
+                    )
+
+                    try:
+                        result = recovery_svc.recover(
                             branch=branch,
-                            reason=f"Health check auto-rebuild: {consistency.reason}",
-                            include_remote=False,
+                            issue_number=task_issue or 0,
+                            reason="Health check auto-recover",
+                            auto=True,
                             ensure_worktree=True,
                         )
                         logger.info(
-                            "Auto-rebuilt inconsistent flow",
+                            "Auto-recovered inconsistent flow",
                             branch=branch,
-                            code=consistency.code.value,
-                            reason=consistency.reason,
+                            action=result.action.value,
+                            detail=result.detail,
                         )
-                        # Rebuild succeeded, mark as valid
                         return CheckResult(is_valid=True, branch=branch, issues=[])
                     except Exception as e:
-                        # Rebuild failed - report as error
                         logger.error(
-                            "Auto-rebuild failed",
+                            "Auto-recovery failed",
                             branch=branch,
                             error=str(e),
                         )
+                        # Preserve original consistency error in message
                         issues.append(
-                            f"Flow consistency issue: {consistency.reason}. "
-                            f"Auto-rebuild failed: {e}. "
+                            f"{consistency_error}. "
+                            f"Auto-recovery failed: {e}. "
                             f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
                         )
 

@@ -219,6 +219,42 @@ def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
     assert result == {"branch": "task/issue-777"}
 
 
+def test_bootstrap_persists_worktree_path() -> None:
+    """bootstrap_issue_flow with ensure_worktree=True must persist worktree_path."""
+    from vibe3.models.orchestration import IssueState
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "task/issue-999",
+        "flow_slug": "issue-999",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "task/issue-999"})
+    )
+
+    # Mock worktree resolution
+    with patch("vibe3.services.flow_orchestrator_service.WorktreeManager") as mock_wm:
+        mock_ctx = MagicMock()
+        mock_ctx.path = Path("/tmp/worktrees/task/issue-999")
+        mock_wm.return_value.resolve_bootstrap_worktree_context.return_value = mock_ctx
+
+        issue = IssueInfo(number=999, title="Test", labels=[], state=IssueState.READY)
+        service.bootstrap_issue_flow(
+            issue, branch="task/issue-999", ensure_worktree=True
+        )
+
+    # Verify worktree_path was persisted to store
+    store.update_flow_state.assert_any_call(
+        "task/issue-999", worktree_path=str(mock_ctx.path)
+    )
+
+
 def test_rebuild_stale_issue_flow_delegates_to_flow_rebuild_usecase() -> None:
     config = load_orchestra_config()
     github = MagicMock()
