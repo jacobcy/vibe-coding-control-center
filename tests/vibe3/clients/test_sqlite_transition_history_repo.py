@@ -173,3 +173,33 @@ class TestTransitionHistoryRepo:
             ("new-branch",),
         )
         assert cursor.fetchone()[0] == event_id
+
+    def test_clear_transition_history_removes_all_records(self, repo, db_conn):
+        """clear_transition_history should delete all records for a branch."""
+        # Record some transitions
+        repo.record_transition(
+            db_conn, "test-branch", "state/claimed", "state/handoff", "actor1"
+        )
+        repo.record_transition(
+            db_conn, "test-branch", "state/handoff", "state/claimed", "actor2"
+        )
+        repo.record_transition(
+            db_conn, "other-branch", "state/ready", "state/claimed", "actor3"
+        )
+
+        # Clear test-branch
+        repo.clear_transition_history(db_conn, "test-branch")
+
+        # Verify test-branch records deleted
+        cursor = db_conn.cursor()
+        count_test = cursor.execute(
+            "SELECT COUNT(*) FROM transition_history WHERE branch = ?",
+            ("test-branch",),
+        ).fetchone()[0]
+        count_other = cursor.execute(
+            "SELECT COUNT(*) FROM transition_history WHERE branch = ?",
+            ("other-branch",),
+        ).fetchone()[0]
+
+        assert count_test == 0, "test-branch records should be deleted"
+        assert count_other == 1, "other-branch records should remain"

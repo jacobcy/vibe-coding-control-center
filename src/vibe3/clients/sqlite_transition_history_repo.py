@@ -120,3 +120,18 @@ class SQLiteTransitionHistoryRepo:
             """,
             (branch, from_state, to_state, datetime.now().isoformat(), actor, event_id),
         )
+
+    def clear_transition_history(self, conn: sqlite3.Connection, branch: str) -> None:
+        """Clear all transition history records for a branch.
+
+        Called during flow resume to reset loop detection counters.
+
+        Args:
+            conn: SQLite connection
+            branch: Flow branch name
+        """
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM transition_history WHERE branch = ?",
+            (branch,),
+        )
