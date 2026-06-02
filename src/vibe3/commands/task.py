@@ -60,22 +60,9 @@ def _build_resume_usecase() -> TaskResumeUsecase:
 def _parse_issue_number_from_branch(
     branch: str, store: "SQLiteClient", flow_service: FlowService
 ) -> int:
-    """Extract task issue number from a resolved branch name.
+    """Extract task issue number from branch.
 
-    Priority:
-    1. DB links (most reliable — handles non-canonical branches)
-    2. Pattern matching (task/issue-N, dev/issue-N)
-
-    Args:
-        branch: Resolved branch name
-        store: SQLiteClient for DB queries
-        flow_service: FlowService for issue resolution
-
-    Returns:
-        Issue number
-
-    Raises:
-        UserError: If cannot parse issue number from branch
+    Tries DB links first, then pattern matching.
     """
     # Try DB links first (most reliable — handles non-canonical branches)
     links = store.get_issue_links(branch)
@@ -260,15 +247,11 @@ def resume(
     register_event_handlers()
 
     # Validate arguments
-    # Check for --blocked conflicts with --branch/--pr
+    # Check for conflicts between --blocked, --branch/--pr, and positional issue_numbers
     if blocked and (branch_opt is not None or pr_opt is not None):
-        typer.echo(
-            "Error: Cannot combine --blocked with --branch or --pr",
-            err=True,
-        )
+        typer.echo("Error: Cannot combine --blocked with --branch or --pr", err=True)
         raise typer.Exit(1)
 
-    # Check for conflicts between --branch/--pr and positional issue_numbers
     if (branch_opt is not None or pr_opt is not None) and issue_numbers:
         typer.echo(
             "Error: Cannot combine --branch/--pr with positional issue numbers",
@@ -276,17 +259,13 @@ def resume(
         )
         raise typer.Exit(1)
 
-    # Check if at least one target is specified
+    if blocked and issue_numbers:
+        typer.echo("Error: Cannot combine issue numbers with --blocked", err=True)
+        raise typer.Exit(1)
+
     if not blocked and not issue_numbers and not branch_opt and not pr_opt:
         typer.echo(
             "Error: Must specify --blocked, --branch, --pr, or provide issue numbers",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if blocked and issue_numbers:
-        typer.echo(
-            "Error: Cannot combine issue numbers with --blocked",
             err=True,
         )
         raise typer.Exit(1)
