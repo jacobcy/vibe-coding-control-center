@@ -40,7 +40,7 @@ def test_no_state_labels_returns_empty(check_service):
     """Test that issue with no state labels returns empty warnings/issues."""
     issue_payload = {"labels": []}
 
-    warnings, issues = check_service._check_multiple_state_labels(123, issue_payload)
+    warnings, issues, _ = check_service._check_multiple_state_labels(123, issue_payload)
 
     assert warnings == []
     assert issues == []
@@ -50,7 +50,7 @@ def test_single_state_label_returns_empty(check_service):
     """Test that issue with single state label returns empty warnings/issues."""
     issue_payload = {"labels": [{"name": "state/blocked"}]}
 
-    warnings, issues = check_service._check_multiple_state_labels(123, issue_payload)
+    warnings, issues, _ = check_service._check_multiple_state_labels(123, issue_payload)
 
     assert warnings == []
     assert issues == []
@@ -70,7 +70,7 @@ def test_multiple_state_labels_auto_fix_success(check_service):
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 
-        warnings, issues = check_service._check_multiple_state_labels(
+        warnings, issues, _ = check_service._check_multiple_state_labels(
             123, issue_payload
         )
 
@@ -104,7 +104,7 @@ def test_multiple_state_labels_priority_order(check_service):
             mock_label_service = MagicMock()
             mock_cls.return_value = mock_label_service
 
-            warnings, issues = check_service._check_multiple_state_labels(
+            warnings, issues, _ = check_service._check_multiple_state_labels(
                 123, issue_payload
             )
 
@@ -122,7 +122,7 @@ def test_unknown_state_labels_flagged_for_manual_fix(check_service):
         ]
     }
 
-    warnings, issues = check_service._check_multiple_state_labels(123, issue_payload)
+    warnings, issues, _ = check_service._check_multiple_state_labels(123, issue_payload)
 
     # Should return issue (manual fix required), not warning
     assert len(warnings) == 0
@@ -144,7 +144,7 @@ def test_mixed_known_unknown_state_labels_keeps_known(check_service):
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 
-        warnings, issues = check_service._check_multiple_state_labels(
+        warnings, issues, _ = check_service._check_multiple_state_labels(
             123, issue_payload
         )
 
@@ -171,7 +171,7 @@ def test_auto_fix_failure_returns_manual_fix_issue(check_service):
         mock_label_service.set_state.side_effect = Exception("GitHub API error")
         mock_cls.return_value = mock_label_service
 
-        warnings, issues = check_service._check_multiple_state_labels(
+        warnings, issues, _ = check_service._check_multiple_state_labels(
             123, issue_payload
         )
 
@@ -195,7 +195,7 @@ def test_merge_ready_included_in_priority_list(check_service):
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 
-        warnings, issues = check_service._check_multiple_state_labels(
+        warnings, issues, _ = check_service._check_multiple_state_labels(
             123, issue_payload
         )
 
