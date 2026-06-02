@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         CodeagentResult,
     )
     from vibe3.exceptions.error_severity import ErrorSeverity
-from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
+from vibe3.config.role_policy import get_role_section
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.contracts import ExecutionRequest
@@ -314,11 +314,8 @@ class CodeagentExecutionService:
                 event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
             )
 
-            # Read flow state ONCE here, used by both ref check and passive recording
+            # Read flow state ONCE here, used by both gate check and passive recording
             flow_state = ctx.store.get_flow_state(ctx.branch) if ctx.store else {}
-
-            # Get required ref key for this role
-            required_ref_key = get_role_required_ref_key(command.role)
 
             # Planner commit detection: check for unauthorized commits
             if command.role == "planner" and ctx.commit_count_before is not None:
@@ -343,7 +340,6 @@ class CodeagentExecutionService:
                     role=command.role,
                     before_state_label=ctx.before_state_label,
                     repo=getattr(self.config, "repo", None),
-                    required_ref_key=required_ref_key,
                     flow_state=flow_state,
                     tick_id=command.tick_id,
                     before_issue_is_closed=ctx.before_issue_is_closed,

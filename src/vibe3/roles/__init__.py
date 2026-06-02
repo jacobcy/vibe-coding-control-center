@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleDefinition,
+    RoleOutputContract,
     TriggerableRoleDefinition,
     TriggerName,
 )
@@ -206,6 +207,7 @@ __all__ = [
     # definitions (eager)
     "IssueRoleSyncSpec",
     "RoleDefinition",
+    "RoleOutputContract",
     "TriggerName",
     "TriggerableRoleDefinition",
     # registry (lazy)
@@ -291,6 +293,7 @@ __all__ = [
 _eager_exports = {
     "IssueRoleSyncSpec",
     "RoleDefinition",
+    "RoleOutputContract",
     "TriggerName",
     "TriggerableRoleDefinition",
 }

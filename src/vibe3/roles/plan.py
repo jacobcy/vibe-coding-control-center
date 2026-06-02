@@ -34,7 +34,7 @@ from vibe3.execution.role_request_factory import (
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
-from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import fail_planner_issue
@@ -45,6 +45,7 @@ PLANNER_ROLE = TriggerableRoleDefinition(
     worktree=PLANNER_GATE_CONFIG,
     trigger_name="plan",
     trigger_state=IssueState.CLAIMED,
+    output_contract=RoleOutputContract(required_ref="plan_ref"),
 )
 
 

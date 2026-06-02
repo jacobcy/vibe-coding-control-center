@@ -130,37 +130,36 @@ related_docs:
 
 ### 3.1.1 worker no-op 的正确语义
 
-对 `planner / executor / reviewer` 三类 worker，正确语义是：
+每个角色通过 `RoleOutputContract` 声明其必要产出，gate 依次检查：
 
-- agent 执行后 **required_ref 缺失**：
-  - 若 **state 改变** → `warning`（agent 推进了状态但未产出 ref，记录警告但不阻塞）
-  - 若 **state 未改变** → `blocked`（agent 既未产出 ref 也未推进状态）
-- agent 执行后 **state 未改变**（且 required_ref 存在）→ `blocked`（agent 未按 contract 推进状态）
-- agent 执行后 **两项都满足** → 通过
+1. **contract.required_ref 缺失**（若角色声明了 required_ref）→ `blocked`（硬要求，无论 state 是否改变）
+2. **contract.requires_verdict 且 latest_verdict 缺失**（reviewer 专属）→ `blocked`（硬要求）
+3. **state 未改变** → `blocked`（agent 未推进状态）
+4. **以上都满足** → 通过
 
-也就是说：
+各角色契约：
+
+| 角色 | required_ref | requires_verdict | 说明 |
+|------|-------------|-----------------|------|
+| planner | `plan_ref`（硬要求） | 否 | 缺失即 block，无论 state 是否改变 |
+| executor | 无 | 否 | 只检查 state 改变 |
+| reviewer | 无 | 是（`latest_verdict`） | audit_ref 不强制 |
+| manager | 无 | 否 | 只检查 state 改变 |
+
+具体示例：
 
 - planner 跑完但还在 `state/claimed` → `blocked`
 - executor 跑完但还在 `state/in-progress` → `blocked`
 - reviewer 跑完但还在 `state/review` → `blocked`
-- planner 跑完但没有 `plan_ref`：
-  - 若 state 改变（如 `claimed` → `planned`）→ `warning`，通过 gate
-  - 若 state 未改变 → `blocked`
-- executor 跑完但没有 `report_ref`：
-  - 若 state 改变（如 `in-progress` → `review`）→ `warning`，通过 gate
-  - 若 state 未改变 → `blocked`
-- reviewer 跑完但没有 `audit_ref`：
-  - 若 `latest_verdict` 缺失 → `blocked`（必须先持久化 verdict）
-  - 若 verdict 为 `MINOR`/`MAJOR` 且 `audit_ref` 缺失 → `blocked`（非 PASS verdict 必须产出 audit_ref）
-  - 若 verdict 为 `PASS` → 通过 gate（PASS 不要求 audit_ref）
+- planner 跑完但没有 `plan_ref` → `blocked`（state 是否改变无影响，plan_ref 是硬要求）
+- executor 跑完，无论有没有 `report_ref` → 只看 state 是否改变
+- reviewer 跑完但 `latest_verdict` 缺失 → `blocked`
+- reviewer 跑完，verdict 为 `PASS`/`MINOR`/`MAJOR`/`BLOCK`，无 `audit_ref` → 通过 verdict 检查（只要 state 改变即可）
 
-**注意**：reviewer 的 ref 检查是 verdict-aware，不是 state-change-aware。verdict 存在性和值优先于 state 改变判断。
-
-gate 检查顺序（state-change-aware）：
-1. required_ref 缺失 + state 改变 → warning，继续检查 state transition
-2. required_ref 缺失 + state 未变 → block（agent 既未产出 ref 也未推进状态）
-3. required_ref 存在 + state 未变 → block（agent 未按 contract 推进状态）
-4. required_ref 存在 + state 改变 → pass
+**关于 audit_ref**：`audit_ref` 是 reviewer agent 的可选产出，不是 gate 强制要求。
+reviewer 是否写入 audit_ref 取决于是否有实质审计内容（PASS 通常无需写），
+但 gate 不以此为 block 依据。下游（如 manager handoff）可读取 audit_ref 辅助决策，
+但 gate 不依赖它。
 
 manager 角色不受 ref 检查约束（只有 state change 检查）。
 
@@ -337,7 +336,7 @@ Re-dispatch
 2. stale flow record 指向不存在的分支
 3. 下游 dispatch 基于 stale flow 派发 reviewer
 4. reviewer 从未实际运行
-5. domain event handler 的 `require_authoritative_ref` 发现无 audit_ref → block
+5. domain event handler 的 `require_authoritative_ref` 发现无 ref → block
 6. `force=True` 覆盖 failed 状态为 blocked
 7. 循环往复，每 30 秒一次
 

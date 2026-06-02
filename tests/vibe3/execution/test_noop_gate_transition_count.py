@@ -39,7 +39,7 @@ class TestTransitionCount:
     def test_transition_count_incremented_on_state_change(self) -> None:
         """transition_count is incremented when state changes."""
         store = _make_mock_store()
-        flow_state = {"transition_count": 3}
+        flow_state = {"transition_count": 3, "plan_ref": "docs/plans/plan.md"}
         mock_conn = _make_mock_conn()
 
         with (
@@ -71,7 +71,7 @@ class TestTransitionCount:
     def test_transition_count_not_incremented_on_state_unchanged(self) -> None:
         """transition_count is NOT incremented when state is unchanged."""
         store = _make_mock_store()
-        flow_state = {"transition_count": 3}
+        flow_state = {"transition_count": 3, "plan_ref": "docs/plans/plan.md"}
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
@@ -302,7 +302,7 @@ class TestTransitionCount:
         store = _make_mock_store()
         store.count_specific_pair = Mock(return_value=2)  # Below limit
         store.record_transition = Mock()
-        flow_state: dict[str, int] = {}
+        flow_state: dict[str, object] = {"plan_ref": "docs/plans/plan.md"}
         mock_conn = _make_mock_conn()
 
         with (
@@ -333,7 +333,7 @@ class TestTransitionCount:
         store = _make_mock_store()
         store.count_specific_pair = Mock(return_value=3)  # At limit
         store.record_transition = Mock()
-        flow_state: dict[str, int] = {}
+        flow_state: dict[str, object] = {"plan_ref": "docs/plans/plan.md"}
         mock_conn = _make_mock_conn()
 
         with (
@@ -364,7 +364,7 @@ class TestTransitionCount:
         store = _make_mock_store()
         store.count_specific_pair = Mock(return_value=2)  # Below limit
         store.record_transition = Mock()
-        flow_state: dict[str, int] = {}
+        flow_state: dict[str, object] = {"plan_ref": "docs/plans/plan.md"}
         mock_conn = _make_mock_conn()
 
         with (
@@ -399,7 +399,7 @@ class TestTransitionCount:
         store = _make_mock_store()
         store.count_specific_pair = Mock(return_value=0)  # No previous occurrences
         store.record_transition = Mock()
-        flow_state: dict[str, int] = {}
+        flow_state: dict[str, object] = {"plan_ref": "docs/plans/plan.md"}
         mock_conn = _make_mock_conn()
 
         with (

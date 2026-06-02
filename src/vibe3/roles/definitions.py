@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.role_policy import RoleOutputContract
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import SessionRole
@@ -24,6 +25,7 @@ class RoleDefinition:
     worktree: WorktreeRequirement
     trigger_name: TriggerName | None = None
     trigger_state: IssueState | None = None
+    output_contract: RoleOutputContract = field(default_factory=RoleOutputContract)
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ from vibe3.execution.issue_role_support import (
 )
 from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
 from vibe3.models.orchestration import IssueState
-from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService
 
 if TYPE_CHECKING:
@@ -56,6 +56,7 @@ EXECUTOR_ROLE = TriggerableRoleDefinition(
     worktree=EXECUTOR_GATE_CONFIG,
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
+    output_contract=RoleOutputContract(),
 )
 
 EXECUTOR_PUBLISH_ROLE = TriggerableRoleDefinition(
@@ -64,6 +65,7 @@ EXECUTOR_PUBLISH_ROLE = TriggerableRoleDefinition(
     worktree=EXECUTOR_GATE_CONFIG,
     trigger_name="run",
     trigger_state=IssueState.MERGE_READY,
+    output_contract=RoleOutputContract(),
 )
 
 
