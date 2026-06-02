@@ -32,14 +32,14 @@ related_docs:
 
 ## 📂 目录结构 (Directory Structure)
 
+- **`../.claude/rules/`**: 具体的编码标准和项目规则真源。
+  - `coding-standards.md`: 实现、边界、工具与交付细则
+  - `patterns.md`: 执行模式、报告模式与渐进披露模式
 - **`context/`**: 记忆与任务管理
   - `memory.md`: 长期记忆，记录关键决策和架构选择（日常记忆优先使用 `claude-memory` MCP 工具）。
   - `task.md`: **[UNTRACKED]** 由 `vibe3 handoff` 命令自动管理的短期上下文，不建议手动编辑。
   - `handoff`: 由 `vibe3 handoff status` 读取，`vibe3 handoff append` 写入的当前 flow 交接事实。
-- **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务 逻辑。
-- **`rules/`**: 具体的编码标准和项目规则。
-  - `coding-standards.md`: 实现、边界、工具与交付细则
-  - `patterns.md`: 执行模式、报告模式与渐进披露模式
+- **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务逻辑。
 - **`plans/`**: 临时计划工作区。只放工作中的 plan，不作为长期真源。
 - **`reports/`**: 临时报告工作区。只放工作中的 report，不作为长期真源。
 - **`templates/`**: Commit, PR 等模板。
@@ -62,7 +62,7 @@ related_docs:
 3.  **遵循约束**: 优先使用现有的能力（如 Skills），不要重新发明轮子。
 4.  **更新上下文**: 任务完成后，运行 `vibe3 handoff append` 记录状态，更新 `context/memory.md`。
 5.  **留存到主链**: 需要长期保留的发现或决策，写入 issue comment 或 PR comment，而不是只留在临时 plan/report。
-6.  **遇到歧义先查真源**: 名词看 `glossary.md`，动词看 `action-verbs.md`，执行细则看 `rules/`。
+6.  **遇到歧义先查真源**: 名词看 `glossary.md`，动词看 `action-verbs.md`，执行细则看 `../.claude/rules/`。
 
 ---
 

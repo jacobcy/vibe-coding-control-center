@@ -50,8 +50,8 @@
 
 ## 快速认知
 
-- 仓库是 AI 协作编排工具，存在 **V2 Shell**（`bin/`, `lib/`, `tests/vibe2/`）与 **V3 Python**（`src/vibe3/`, `tests/vibe3/`）双实现。配置与规则集中在 `.agent/`（规则）、`skills/`（技能）、`.git/vibe/`（共享状态真源，勿直接改）。
-- AI 工作入口与硬规则：先读 `AGENTS.md` → `CLAUDE.md` → `.agent/rules/*`。文档职责见 `SOUL.md`/`STRUCTURE.md`，术语以 `docs/standards/glossary.md` 为准。
+- 仓库是 AI 协作编排工具，存在 **V2 Shell**（`bin/`, `lib/`, `tests/vibe2/`）与 **V3 Python**（`src/vibe3/`, `tests/vibe3/`）双实现。配置与规则集中在 `.claude/rules/`（规则）、`skills/`（技能）、`.git/vibe/`（共享状态真源，勿直接改）。
+- AI 工作入口与硬规则：先读 `AGENTS.md` → `CLAUDE.md` → `.claude/rules/*`。文档职责见 `SOUL.md`/`STRUCTURE.md`，术语以 `docs/standards/glossary.md` 为准。
 - CI（`.github/workflows/ci.yml`）在 PR 上运行：Shell LOC 上限检查、Python LOC 上限、Shell 双层 lint、bats `tests/vibe2/`、`uv run ruff check src`、`uv run black --check src tests/vibe3`、`uv run mypy src`、`uv run pytest tests/vibe3 -v`。
 
 ## 环境与依赖（必备）
@@ -76,7 +76,7 @@
 
 - `bin/vibe`：Shell CLI 入口；`lib/`：核心逻辑；`config/`：别名与密钥模板；`scripts/`：lint/metrics/install 等工具。
 - `src/vibe3/`：Python V3 代码；`tests/vibe3/`：pytest 套件；`tests/vibe2/`：bats 套件。
-- `.agent/`：规则、workflow、记忆；`skills/`：项目自有技能；`.github/workflows/`：CI；`docs/`：规范与计划。
+- `.claude/rules/`：规则；`.agent/`：workflow、记忆、模板；`skills/`：项目自有技能；`.github/workflows/`：CI；`docs/`：规范与计划。
 
 ## 常见陷阱与绕过
 

@@ -159,14 +159,16 @@ docs/
 - **[AGENTS.md](../AGENTS.md)** - AI Agent 入口指南
 - **[CLAUDE.md](../CLAUDE.md)** - 项目上下文和硬性规则
 - **[SOUL.md](../SOUL.md)** - 项目宪法和核心原则
-- **[.agent/README.md](../.agent/README.md)** - AI 工作流和规则
+- **[.claude/rules/README.md](../.claude/rules/README.md)** - AI 编码规则与标准
+- **[.agent/README.md](../.agent/README.md)** - AI 工作流与治理
 - **[agent-document-lifecycle-standard.md](standards/agent-document-lifecycle-standard.md)** - Agent 文档生命周期标准
 
 ## 📚 文档 vs AI 工作区
 
 **重要区分**：
 - **`docs/`** - 人类主权区，存放给人类阅读的正式规范、计划、报告和历史归档
-- **`.agent/`** - AI 工作区，存放 AI 使用的模板、规则、工作流和临时产物
+- **`.claude/rules/`** - AI 规则区，存放架构规则、编码标准和模式约束
+- **`.agent/`** - AI 工作区，存放 AI 使用的模板、工作流、记忆和临时产物
 
 模板文件位于 `.agent/templates/`，临时计划与报告分别位于 `.agent/plans/` 和 `.agent/reports/`；正式计划与报告分别位于 `docs/plans/` 和 `docs/reports/`。
 
