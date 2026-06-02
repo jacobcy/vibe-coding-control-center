@@ -35,6 +35,34 @@
 
 开始 review 前，**必须完成**以下检查：
 
+### 0. Scope 审查（最高优先级）
+
+开始任何详细审查之前，**必须先确认变更范围与 issue scope 一致**。
+
+**快速 scope 检查**：
+
+```bash
+# 1. 查看变更范围
+git diff <base>...HEAD --stat
+
+# 2. 查看 plan 声明的 Scope Boundary
+# （通过 handoff show 读取 plan_ref）
+uv run python src/vibe3/cli.py handoff show <plan_ref> --branch <branch>
+```
+
+**Scope 审查检查清单**：
+
+- [ ] 变更范围与 issue scope 一致
+- [ ] 无未授权的模块删除（对照 plan 的 Scope Boundary 禁止清单）
+- [ ] 无未授权的行为变更（错误处理、数据流、业务逻辑修改）
+- [ ] 无未授权的重构（内联、重命名超出 scope、合并模块）
+
+**如果发现 scope violation**：
+- 立即给出 **MAJOR** 或 **BLOCK** verdict
+- 在 finding 中指出具体超出 scope 的变更
+- **不要继续审查细节**（scope violation 本身就是最严重的 finding）
+- 建议：回退超出 scope 的变更，或通过 manager 扩展 issue scope
+
 ### 1. 读取 Handoff 状态
 
 ```bash
@@ -160,6 +188,15 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 - 忽略系统性问题 → 质量持续下降
 
 ## 优先级
+
+### 0. Scope 一致性（最高优先级）
+
+首先判断：
+- 变更范围是否与 issue scope 和 plan 的 Scope Boundary 一致
+- 是否存在 plan 禁止清单中的变更类型
+- 是否存在 issue 未提及的删除、重构或行为修改
+
+scope violation 是最严重的 finding，优先级高于代码正确性审查。
 
 ### 1. 正确性
 

@@ -695,6 +695,10 @@ Decision sketch:
   - `exit()`
 - 已有 `plan_ref`，无 `report_ref`：
   - **实质审查 plan**: 读 plan_ref 内容，判断质量是否达标（是否完整、是否可执行、是否有遗漏）
+  - **Scope Boundary 审查（新增）**：
+    - 检查 plan 是否包含 Scope Boundary 声明（允许/禁止清单）
+    - 如果 plan 缺少 Scope Boundary，写 handoff append 要求补充
+    - 如果 plan 的 Scope Boundary 与 issue scope 不一致，写 handoff append 指出不一致点
   - 若 plan 不达标：可直接修改 plan_ref（你有 write 权限），或转回 `state/claimed` 要求重做 plan
   - 若 plan 达标：写 handoff append 说明当前进入执行阶段、重点关注区域、spec 要点
   - 进入 `state/in-progress`
@@ -703,6 +707,16 @@ Decision sketch:
   - 写 handoff append：说明 plan 产物缺失，需重新进入 planning，等待 plan agent 重新接手
   - `exit()`
 - 已有 `report_ref`，无 `audit_ref`：
+  - **Scope Violation 快速检测（新增）**：
+    ```bash
+    git diff main...HEAD --stat
+    ```
+    - 对照 issue scope 和 plan 的 Scope Boundary，检查变更范围是否一致
+    - 如果发现明显 scope violation（如 issue 只涉及导入路径，但 diff 显示删除了模块或修改了业务逻辑）：
+      - 写 handoff append：指出 scope violation 的具体内容
+      - 进入 `state/blocked`
+      - comment：明确说明 scope violation，需要人类判断是否接受或回退
+      - `exit()`
   - **实质审查执行结果**: 读 report_ref，判断代码质量是否达标
   - **若执行结果有明显缺陷**（编译错误、测试全部失败、关键功能未实现）：
     - 写 handoff indicate：明确缺陷列表、修复优先级、必须先通过的基础验证

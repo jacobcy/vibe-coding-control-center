@@ -351,3 +351,4 @@ uv run pytest tests/vibe3/integration/test_ci_parity.py -v
 - 不要把执行过程中的 findings / bug 直接写进流程正文代替 handoff 记录。
 - 不要盲目执行有缺陷的 plan — 必须验证前提成立（见各角色 policy）。
 - 不要凭经验判断而不验证 — 必须基于代码实际（见各角色 policy）。
+- 不要执行 issue scope 和 plan scope（Scope Boundary）未覆盖的变更；如果发现需要额外变更才能完成目标，先 blocked 回 manager 讨论 scope 扩展。

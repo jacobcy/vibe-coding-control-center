@@ -149,9 +149,20 @@ tmux display-message -p '#{session_name}'
   - 每一步是否都指定了验证方式？
   - 验证方式是否与改动类型匹配？
 
+### 4. Scope boundary 是否清晰？
+
+- **每个步骤是否标注了变更类型？**
+  - 如：`[import-only]`、`[re-export]`、`[behavior-change]`
+  - 未标注类型的步骤可能导致 executor 理解偏差
+
+- **是否存在不在允许清单中的变更？**
+  - 如果发现需要 plan scope 外的变更
+  - 不要继续规划，等待 manager 指示
+
 **违反独立判断的后果**：
 - Plan 前提错误 → Executor 执行失败 → Retry 浪费
 - 忽略现有模式 → 引入不必要复杂度 → 维护成本增加
+- Scope boundary 不清晰 → Executor 超范围变更 → 破坏系统边界
 
 ## 任务分型
 
@@ -201,6 +212,35 @@ tmux display-message -p '#{session_name}'
 - 触及共享状态相关逻辑
 
 这类计划必须显式写出风险和回滚思路。
+
+## Scope Boundary 声明
+
+Planner 必须在计划中显式声明变更边界，防止 executor 理解偏差导致超范围变更。
+
+### 必须包含的内容
+
+计划中**必须**包含「Scope Boundary」部分，明确列出：
+
+1. **允许的变更类型**：逐项列出（如：修改 import 语句、添加 re-export、更新测试引用路径）
+2. **禁止的变更类型**：逐项列出（如：删除模块或方法、内联业务逻辑、修改错误处理行为、修改数据流）
+3. **变更类型标签**：每个 Implementation Step 标注变更类型标签（如 `[import-only]`、`[re-export]`、`[test-update]`）
+
+### Scope 自检
+
+计划完成后，planner 必须逐一回答以下问题（写入计划正文）：
+
+- 所有变更是否仅限于声明的允许范围？ ✅/❌
+- 变更是否不涉及删除模块或方法？ ✅/❌（如果涉及删除，必须有 issue scope 明确授权）
+- 变更是否不涉及内联或重构？ ✅/❌
+- 变更是否不涉及行为修改（错误处理、数据流等）？ ✅/❌
+- 所有步骤标注的变更类型是否都在允许清单中？ ✅/❌
+
+### Scope 扩展流程
+
+如果规划过程中发现需要 issue scope 未覆盖的变更才能完成目标：
+- **禁止自行扩展 scope**
+- 用 handoff append 记录需要扩展的原因
+- 进入 `state/blocked`，请求 manager/人类确认是否扩展 scope
 
 ## 好计划长什么样
 
