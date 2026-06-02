@@ -449,7 +449,6 @@ class CheckService(CheckRemote):
 
             # Flow consistency check and auto-recovery
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.flow_consistency_check import check_flow_consistency
                 from vibe3.services.flow_recovery_service import (
                     FlowRecoveryService,
                     RecoveryAction,
@@ -460,14 +459,13 @@ class CheckService(CheckRemote):
                     git_client=self.git_client,
                     github_client=self.github_client,
                 )
-                action = recovery_svc.classify(branch)
+                action, consistency = recovery_svc.classify(branch)
 
                 if action != RecoveryAction.RESUME_ONLY:
-                    # Capture consistency error before recovery attempt
-                    consistency = check_flow_consistency(
-                        branch, flow_data, git_client=self.git_client
+                    # Use precomputed consistency result for error message
+                    consistency_error = (
+                        consistency.reason if consistency else "No flow record"
                     )
-                    consistency_error = consistency.reason
 
                     try:
                         result = recovery_svc.recover(

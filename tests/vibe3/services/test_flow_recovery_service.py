@@ -31,12 +31,12 @@ class TestClassifyRecovery:
             worktree_path=Path("/wt/task/issue-1"),
             flow_state={"worktree_path": "/wt/task/issue-1"},
         )
-        action = svc.classify("task/issue-1")
+        action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.RESUME_ONLY
 
     def test_missing_worktree_returns_rebuild(self):
         svc = _make_service(worktree_path=None, flow_state={})
-        action = svc.classify("task/issue-1")
+        action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.REBUILD
 
     def test_missing_recorded_worktree_returns_fix_and_resume(self):
@@ -44,7 +44,7 @@ class TestClassifyRecovery:
             worktree_path=Path("/wt/task/issue-1"),
             flow_state={},  # no worktree_path recorded
         )
-        action = svc.classify("task/issue-1")
+        action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.FIX_AND_RESUME
 
     def test_missing_ref_returns_rebuild(self):
@@ -59,7 +59,7 @@ class TestClassifyRecovery:
             "vibe3.services.flow_consistency_check.check_ref_exists",
             return_value=("docs/plans/missing.md", False),
         ):
-            action = svc.classify("task/issue-1")
+            action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.REBUILD
 
 

@@ -21,6 +21,7 @@ from loguru import logger
 from vibe3.exceptions import UserError
 from vibe3.services.flow_consistency_check import (
     FlowConsistencyCode,
+    FlowConsistencyResult,
     apply_consistency_fix,
     check_flow_consistency,
 )
@@ -66,29 +67,33 @@ class FlowRecoveryService:
         self.git_client = git_client
         self.github_client = github_client
 
-    def classify(self, branch: str) -> RecoveryAction:
+    def classify(
+        self, branch: str
+    ) -> tuple[RecoveryAction, FlowConsistencyResult | None]:
         """Classify what recovery action a branch needs.
 
         Returns:
-            RESUME_ONLY: scene consistent, just clear blocked markers
-            FIX_AND_RESUME: cheap DB fix + clear blocked markers
-            REBUILD: full scene rebuild + clear blocked markers
+            Tuple of (action, consistency_result):
+            - RESUME_ONLY: scene consistent, just clear blocked markers
+            - FIX_AND_RESUME: cheap DB fix + clear blocked markers
+            - REBUILD: full scene rebuild + clear blocked markers
+            - consistency_result: reusable check result (None if no flow_state)
         """
         flow_state = self.store.get_flow_state(branch)
         if flow_state is None:
-            return RecoveryAction.REBUILD
+            return (RecoveryAction.REBUILD, None)
 
         consistency = check_flow_consistency(
             branch, flow_state, git_client=self.git_client
         )
 
         if consistency.code == FlowConsistencyCode.OK:
-            return RecoveryAction.RESUME_ONLY
+            return (RecoveryAction.RESUME_ONLY, consistency)
         if consistency.fix_action:
-            return RecoveryAction.FIX_AND_RESUME
+            return (RecoveryAction.FIX_AND_RESUME, consistency)
         if consistency.needs_rebuild:
-            return RecoveryAction.REBUILD
-        return RecoveryAction.RESUME_ONLY
+            return (RecoveryAction.REBUILD, consistency)
+        return (RecoveryAction.RESUME_ONLY, consistency)
 
     def recover(
         self,
@@ -103,7 +108,7 @@ class FlowRecoveryService:
         """Execute the full recovery: classify -> act -> resume.
 
         Args:
-            branch: Flow branch name
+            branch: Flow branch name (empty string if no flow)
             issue_number: GitHub issue number
             reason: Human-readable reason for recovery
             auto: True for orchestra/health-check paths (auto-rebuild);
@@ -111,7 +116,37 @@ class FlowRecoveryService:
             ensure_worktree: Whether rebuild should create worktree
             include_remote: Whether rebuild should delete remote branch
         """
-        flow_state = self.store.get_flow_state(branch) or {}
+        # Special case: no branch (issue with no flow) -> just clear label
+        if not branch:
+            self._do_resume(branch, issue_number, reason)
+            return RecoveryResult(
+                action=RecoveryAction.RESUME_ONLY,
+                success=True,
+                detail="No flow branch; cleared blocked markers",
+            )
+
+        flow_state = self.store.get_flow_state(branch)
+
+        # Short-circuit: no flow record -> rebuild (consistent with classify())
+        if flow_state is None:
+            if not auto:
+                raise UserError(
+                    f"No flow record found for branch '{branch}'. "
+                    f"Run: vibe3 flow rebuild {issue_number} --yes"
+                )
+            self._do_rebuild(
+                branch,
+                issue_number,
+                reason,
+                ensure_worktree=ensure_worktree,
+                include_remote=include_remote,
+            )
+            self._do_resume(branch, issue_number, reason)
+            return RecoveryResult(
+                action=RecoveryAction.REBUILD,
+                success=True,
+                detail="No flow record; rebuilt scene and cleared blocked markers",
+            )
 
         consistency = check_flow_consistency(
             branch, flow_state, git_client=self.git_client
@@ -174,7 +209,11 @@ class FlowRecoveryService:
         )
 
     def _do_resume(self, branch: str, issue_number: int, reason: str) -> None:
-        """Clear blocked markers from all three sources (DB, body, label)."""
+        """Clear blocked markers from all three sources (DB, body, label).
+
+        Raises:
+            RuntimeError: If label write fails (RC2: prevents silent failure)
+        """
         from vibe3.models.flow import FlowState
         from vibe3.models.orchestration import IssueState
         from vibe3.services.blocked_state_service import BlockedStateService
@@ -196,14 +235,20 @@ class FlowRecoveryService:
             label_service=None,  # uses default
             store=self.store,
         )
-        service.unblock(
+        result = service.unblock(
             branch=branch,
             target_state=target_state,
             issue_number=issue_number,
             detail=f"Recovery resume: {reason}",
         )
-        # TODO(Task 4): After unblock() returns UnblockResult, check result
-        # and log if label_cleared is False
+
+        # RC2 fix: Fail-fast if label not cleared to prevent blocked loop
+        if not result.label_cleared:
+            raise RuntimeError(
+                f"Failed to clear state/blocked label on issue #{issue_number}. "
+                f"Manual fix: gh issue edit {issue_number} "
+                "--remove-label state/blocked"
+            )
 
     def _do_rebuild(
         self,
