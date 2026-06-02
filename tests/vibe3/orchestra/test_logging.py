@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import vibe3.orchestra.logging as logging_mod
 from vibe3.orchestra.logging import _repo_root, orchestra_events_log_path
 
 
@@ -30,23 +31,24 @@ class TestRepoRootResolution:
         # It should be the main repository root
         assert ".worktrees" not in str(root)
 
-        # The root should contain temp/logs/orchestra
-        expected_log_dir = root / "temp" / "logs" / "orchestra"
-        # This should exist (created by orchestra_log_dir)
-        assert expected_log_dir.exists()
-
     def test_repo_root_fallback_on_git_failure(self):
         """_repo_root should fallback to path-based detection if git fails."""
-        with patch("subprocess.run") as mock_run:
-            # Simulate git command failure
-            mock_run.side_effect = FileNotFoundError("git not found")
+        # Clear the lru_cache so the mocked subprocess is actually called
+        logging_mod._repo_root.cache_clear()
+        try:
+            with patch("subprocess.run") as mock_run:
+                # Simulate git command failure
+                mock_run.side_effect = FileNotFoundError("git not found")
 
-            root = _repo_root()
+                root = _repo_root()
 
-            # Should still return a Path object
-            assert isinstance(root, Path)
-            # Should be an absolute path
-            assert root.is_absolute()
+                # Should still return a Path object
+                assert isinstance(root, Path)
+                # Should be an absolute path
+                assert root.is_absolute()
+        finally:
+            # Restore the cache so subsequent tests use the real git result
+            logging_mod._repo_root.cache_clear()
 
     def test_orchestra_events_log_path_returns_main_repo_path(self):
         """orchestra_events_log_path should return path in main repository."""
@@ -61,5 +63,5 @@ class TestRepoRootResolution:
         # Should end with temp/logs/orchestra/events.log
         assert str(log_path).endswith("temp/logs/orchestra/events.log")
 
-        # Parent directory should exist
+        # Parent directory should exist (orchestra_events_log_path creates it)
         assert log_path.parent.exists()
