@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import atexit
+import functools
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import IO
 
 
+@functools.lru_cache(maxsize=1)
 def _repo_root() -> Path:
     """Get the main repository root directory.
 
@@ -18,10 +20,12 @@ def _repo_root() -> Path:
     - The parent of git common dir is always the main repository root
 
     Falls back to path-based detection if git command fails.
-    """
-    try:
-        import subprocess
 
+    Cached with lru_cache to avoid repeated subprocess calls on every event.
+    """
+    import subprocess
+
+    try:
         # Get the shared .git directory (works in both main repo and worktrees)
         result = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
