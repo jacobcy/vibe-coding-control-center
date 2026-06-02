@@ -1,25 +1,22 @@
 """Branch argument resolution for CLI commands.
 
-Reuses issue_branch_resolver for numeric resolution with flow lookup,
-adds current-branch fallback for None input.
+Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
-from vibe3.clients.git_client import GitClient
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.services.pr_branch_resolver import resolve_command_branch
 
 
 def resolve_branch_arg(branch_arg: str | None) -> str:
     """Resolve --branch argument to a canonical branch name.
 
+    This is a thin wrapper around resolve_command_branch for backward
+    compatibility with existing command imports.
+
     Rules:
     - None → current git branch
-    - digits only → canonical task branch (task/issue-N)
+    - digits only → canonical task branch (task/issue-N) if no flow exists
     - otherwise → return as-is (explicit branch name)
-
-    Unlike resolve_issue_branch_input:
-    - Returns current branch for None (not None)
-    - Falls back to canonical name if no flow exists (not original digits)
 
     Args:
         branch_arg: Branch argument from CLI (may be None, digits, or branch name)
@@ -27,16 +24,9 @@ def resolve_branch_arg(branch_arg: str | None) -> str:
     Returns:
         Resolved branch name
     """
-    if branch_arg is None:
-        return GitClient().get_current_branch()
-
-    # Delegate to existing resolver (checks flow store for task/dev patterns)
-    resolved = resolve_issue_branch_input(branch_arg, FlowService())
-    if resolved is None:
-        return GitClient().get_current_branch()
-
-    # If resolver returned original digits (no flow), convert to canonical
-    if resolved.isdigit():
-        return f"task/issue-{resolved}"
-
-    return resolved
+    return resolve_command_branch(
+        position_arg=branch_arg,
+        flow_service=FlowService(),
+        allow_no_flow=False,
+        canonical_fallback=True,
+    )
