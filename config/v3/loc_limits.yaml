@@ -69,8 +69,8 @@ code_limits:
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/pr_query.py"
-        limit: 550
-        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）等紧密耦合功能"
+        limit: 560
+        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
       - path: "src/vibe3/commands/flow_manage.py"
         limit: 500
         reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持"
