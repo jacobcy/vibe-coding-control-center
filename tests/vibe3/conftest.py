@@ -64,6 +64,7 @@ def isolate_database(request):
     """
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.sqlite_base import _close_global_connection
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Skip patching for tests that verify GitClient.get_git_common_dir() itself
     # to avoid interfering with their assertions
@@ -77,10 +78,14 @@ def isolate_database(request):
     with tempfile.TemporaryDirectory() as tmpdir:
         # Patch get_git_common_dir to return temp directory
         with patch.object(GitClient, "get_git_common_dir", return_value=tmpdir):
-            # Clear global connection to force re-initialization with temp DB
+            # Clear process-wide state to force re-initialization with temp DB.
+            # ErrorTrackingService may otherwise reuse a default singleton from a
+            # previous test, including a store bound to another database path.
             _close_global_connection()
+            ErrorTrackingService.clear_instance()
 
             yield Path(tmpdir)
 
-            # Cleanup: close global connection after test
+            # Cleanup: close global connection and drop service singletons after test
             _close_global_connection()
+            ErrorTrackingService.clear_instance()
