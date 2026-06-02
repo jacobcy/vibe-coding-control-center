@@ -8,6 +8,7 @@ This module handles reading/writing blocked state to individual sources:
 
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -130,17 +131,36 @@ class BlockedStateIO:
         )
 
     def clear_database_cache(self, branch: str, actor: str) -> None:
-        """Clear blocked state from database cache."""
+        """Clear blocked state from database cache.
+
+        Also resets transition counters to allow flow to continue after
+        being blocked by loop protection.
+        """
         if not self.store:
             return
+
+        # Reset transition_count to allow flow to continue
         self.store.update_flow_state(
             branch,
             flow_status="active",
             blocked_reason=None,
             failed_reason=None,  # Also clear failed_reason for consistency
             blocked_by_issue=None,
+            transition_count=0,  # Reset loop protection counter
             latest_actor=actor,
         )
+
+        # Clear transition history to reset per-pair loop detection
+        try:
+            with sqlite3.connect(self.store.db_path) as conn:
+                self.store.clear_transition_history(conn, branch)
+        except Exception as exc:
+            # Non-critical: log and continue
+            logger.bind(
+                domain="blocked_state",
+                action="clear_database_cache",
+                branch=branch,
+            ).warning(f"Failed to clear transition history: {exc}")
 
     def write_label_state(
         self,
