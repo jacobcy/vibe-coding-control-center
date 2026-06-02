@@ -1,5 +1,6 @@
 """Shared fixtures for services tests."""
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -11,15 +12,57 @@ from vibe3.services.task_resume_operations import TaskResumeOperations
 
 
 @pytest.fixture(autouse=True)
+def block_gh_subprocess(request, monkeypatch):
+    """Block real gh CLI calls in unit tests.
+
+    Fails the test with a clear message if subprocess.run is called with
+    "gh" as the first argument. Tests that intentionally need gh should be
+    marked @pytest.mark.integration.
+    """
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    import subprocess
+
+    _real_run = subprocess.run
+
+    def _guarded_run(*args, **kwargs):
+        cmd = args[0] if args else kwargs.get("args", [])
+        if isinstance(cmd, (list, tuple)) and cmd and cmd[0] == "gh":
+            test_id = os.environ.get("PYTEST_CURRENT_TEST", "unknown")
+            raise RuntimeError(
+                f"Blocked gh CLI call in unit test: {' '.join(cmd[:4])}\n"
+                f"Test: {test_id}\n"
+                f"If this test needs real gh, mark it with @pytest.mark.integration"
+            )
+        return _real_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", _guarded_run)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def stable_worktree_actor(monkeypatch):
-    """Avoid real git identity lookups during flow creation tests."""
+    """Avoid real git/GitHub lookups during flow creation tests."""
     monkeypatch.setattr(
         "vibe3.services.flow_write_mixin.SignatureService.get_worktree_actor",
         lambda: "test-actor",
     )
+
+    mock_gh = MagicMock()
+    mock_gh.get_pr.return_value = None
+    mock_gh.view_issue.return_value = None
+    mock_gh.list_pr.return_value = []
+    mock_gh.diff_pr.return_value = ""
+
     monkeypatch.setattr(
-        "vibe3.services.flow_read_mixin.GitHubClient.get_pr",
-        lambda self, pr_number=None, branch=None: None,
+        "vibe3.services.flow_read_mixin.GitHubClient",
+        lambda: mock_gh,
+    )
+    monkeypatch.setattr(
+        "vibe3.services.flow_transition.GitHubClient",
+        lambda: mock_gh,
     )
 
 

@@ -1,6 +1,7 @@
 """Tests for TaskService with a fresh database."""
 
 import os
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,9 +19,13 @@ def stable_flow_actor(monkeypatch):
         "vibe3.services.task_service.SignatureService.resolve_for_branch",
         lambda store, branch, explicit_actor=None: explicit_actor or "test-actor",
     )
+
+    mock_gh = MagicMock()
+    mock_gh.get_pr.return_value = None
+
     monkeypatch.setattr(
-        "vibe3.services.flow_read_mixin.GitHubClient.get_pr",
-        lambda self, pr_number=None, branch=None: None,
+        "vibe3.services.flow_read_mixin.GitHubClient",
+        lambda: mock_gh,
     )
 
 
