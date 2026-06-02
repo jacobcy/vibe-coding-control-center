@@ -163,6 +163,37 @@ def resolve_repo_agent_preset(
     return backend, model
 
 
+def resolve_repo_agent_preset_name(agent_name: str) -> str | None:
+    """Return the repo-local preset key matching ``agent_name``, if present.
+
+    This intentionally ignores environment backend/model overrides. Callers use it
+    only when they need to pass a real preset name through to codeagent-wrapper so
+    wrapper-owned fields such as ``yolo`` can be applied from models.json.
+    """
+    data = _read_models_json(repo_models_json_path())
+    agents = data.get("agents")
+    if not isinstance(agents, dict):
+        return None
+
+    raw = agents.get(agent_name)
+    if isinstance(raw, dict):
+        return agent_name
+
+    prefixed_name = f"vibe-{agent_name}"
+    raw = agents.get(prefixed_name)
+    if isinstance(raw, dict):
+        return prefixed_name
+    return None
+
+
+def has_agent_env_override(agent_name: str) -> bool:
+    """Return whether backend/model env vars override the named preset role."""
+    role = agent_name.replace("vibe-", "").upper()
+    return bool(
+        os.environ.get(f"VIBE_BACKEND_{role}") or os.environ.get(f"VIBE_MODEL_{role}")
+    )
+
+
 def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
     """Resolve repo-local agent preset mapping into explicit backend/model.
 
