@@ -51,10 +51,14 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
     github_client.update_issue_labels.return_value = True
     github_client.update_issue_body.return_value = True
 
+    # Mock label service
+    label_service = MagicMock()
+    label_service.confirm_issue_state.return_value = "advanced"
+
     # Resume: clear blocked state
     service = BlockedStateService(
         github_client=github_client,
-        label_service=None,
+        label_service=label_service,
         store=db,
     )
     result = service.unblock(
@@ -140,10 +144,14 @@ def test_resume_resets_hard_limit_counter(tmp_path):
     github_client.update_issue_labels.return_value = True
     github_client.update_issue_body.return_value = True
 
+    # Mock label service
+    label_service = MagicMock()
+    label_service.confirm_issue_state.return_value = "advanced"
+
     # Resume
     service = BlockedStateService(
         github_client=github_client,
-        label_service=None,
+        label_service=label_service,
         store=db,
     )
     result = service.unblock(
