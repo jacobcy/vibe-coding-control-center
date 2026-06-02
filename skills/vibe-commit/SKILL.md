@@ -77,6 +77,10 @@ PR 创建后停止，输出：
   │   └─ 依次验证、发 PR
   │
   ├─ Step 8: 发 PR 前复核
+  │   ├─ LOC 强制检查（Hard Block）
+  │   │   ├─ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-per-file-loc.sh
+  │   │   ├─ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-test-file-loc.sh
+  │   │   └─ 任何文件超限必须修复，禁止创建 PR
   │   ├─ 工作区已干净
   │   ├─ commit 只服务一个交付目标
   │   └─ uv run python src/vibe3/cli.py pr create --base <ref>
@@ -328,6 +332,36 @@ ls debug_*.py debug_*.sh tmp_*.py 2>/dev/null || echo "No debug files found"
 
 ### Step 8: 发 PR 前复核
 
+**LOC 强制检查（Hard Block）**：
+
+在发 PR 前，必须确认所有文件（含测试文件）未超过 LOC 限制。
+
+**执行命令**：
+
+```bash
+# 检查源代码文件 LOC
+ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-per-file-loc.sh
+
+# 检查测试文件 LOC
+ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-test-file-loc.sh
+```
+
+**Hard Block 规则**：
+
+- 任何文件超过 CI block threshold（默认 400 行）时，禁止创建 PR
+- 必须先修复（重构、拆分、或申请 exception）再继续
+- 不允许跳过此检查
+
+**修复方案**（按优先级）：
+
+1. 提取函数/类到新模块（推荐）
+2. 拆分测试文件为多个 test_*.py
+3. 在 `config/v3/loc_limits.yaml` 中申请 exception（需有合理理由）
+
+**注意**：此检查使用 `ENFORCE_LOC_LIMITS=true` 模式，与 CI 一致。即使 pre-push hook 仅 advisory，此步骤始终强制执行。
+
+---
+
 先读取：
 
 ```bash
@@ -467,6 +501,10 @@ uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind n
   - 必须在组织 commit 分组前完成 pre-commit 验证
   - 格式化流程：对所有改动统一格式化 → 提交临时 commit → 软重置（检查是否为临时 commit）→ 分组提交
   - 不得保留单独的格式化 commit，格式化修改必须分散到各功能 commit 中
+- **LOC 强制检查**：
+  - 发 PR 前必须通过 LOC 检查（`ENFORCE_LOC_LIMITS=true`）
+  - 超限文件必须修复或申请 exception，不允许跳过
+  - 此检查与 CI 保持一致，确保本地和远程行为相同
 - **主分支同步**：
   - 提交前必须检查 `origin/main` 是否有新提交
   - 冲突未解决前禁止提交
