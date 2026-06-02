@@ -21,6 +21,10 @@ tags: [workflow, vibe, git, commit, orchestration]
    - 不允许使用 `--no-verify` 跳过
    - 任何错误（mypy、shellcheck、LOC 超限等）必须修复后才能继续
    - 格式化修改将分散到后续各功能 commit 中，不保留单独的格式化 commit
+   - **LOC 强制检查**（PR 创建前 hard block）：
+     - `ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-per-file-loc.sh`
+     - `ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-test-file-loc.sh`
+     - 任何文件超限必须修复，不允许创建 PR
 4. 在任何 commit 分组前，先做最小 metadata preflight：
    - 读取 `vibe flow show --json`
    - 若存在 `current_task`，继续读取 `vibe3 task status --json`
