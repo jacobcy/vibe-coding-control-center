@@ -7,6 +7,8 @@ from pathlib import Path
 from loguru import logger
 from pydantic import BaseModel
 
+from vibe3.config.settings import _vibe3_config_root
+
 
 class TimelineCommentPolicy(BaseModel):
     """Policy for whether timeline events should write GitHub comments.
@@ -110,7 +112,8 @@ class TimelineCommentPolicy(BaseModel):
         """
         from vibe3.config.loader import load_yaml_config
 
-        yaml_path = path or Path("config/v3/timeline.yaml")
+        # Use install root for cross-project invocation support
+        yaml_path = path or _vibe3_config_root() / "config" / "v3" / "timeline.yaml"
         data = load_yaml_config(yaml_path)
 
         if not data:
