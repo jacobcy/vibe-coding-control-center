@@ -3,9 +3,12 @@
 
 import json
 from contextlib import contextmanager
-from typing import Annotated, Iterator
+from typing import TYPE_CHECKING, Annotated, Iterator
 
 import typer
+
+if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
 
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
@@ -13,6 +16,8 @@ from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.pr_branch_resolver import resolve_command_branch
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
@@ -32,6 +37,8 @@ Examples:
   vibe3 task status              # Show global task dashboard
   vibe3 task resume --blocked    # Resume all blocked issues (dry-run)
   vibe3 task resume 456 --yes    # Resume issue #456 (execute)
+  vibe3 task resume --branch task/issue-123 --yes  # Resume via branch name
+  vibe3 task resume --pr 456 --yes                 # Resume via PR number
 
 For more details: vibe3 task <command> --help
 """,
@@ -48,6 +55,43 @@ def _noop() -> Iterator[None]:
 def _build_resume_usecase() -> TaskResumeUsecase:
     """Construct a unified resume usecase."""
     return TaskResumeUsecase()
+
+
+def _parse_issue_number_from_branch(
+    branch: str, store: "SQLiteClient", flow_service: FlowService
+) -> int:
+    """Extract task issue number from a resolved branch name.
+
+    Priority:
+    1. DB links (most reliable — handles non-canonical branches)
+    2. Pattern matching (task/issue-N, dev/issue-N)
+
+    Args:
+        branch: Resolved branch name
+        store: SQLiteClient for DB queries
+        flow_service: FlowService for issue resolution
+
+    Returns:
+        Issue number
+
+    Raises:
+        UserError: If cannot parse issue number from branch
+    """
+    # Try DB links first (most reliable — handles non-canonical branches)
+    links = store.get_issue_links(branch)
+    for link in links:
+        if link.get("issue_role") == "task":
+            issue_num = link["issue_number"]
+            if isinstance(issue_num, int):
+                return issue_num
+
+    # Fall back to pattern matching (task/issue-N, dev/issue-N)
+    issue_svc = IssueFlowService(store=store)
+    num = issue_svc.parse_issue_number_any(branch)
+    if num is not None:
+        return num
+
+    raise UserError(f"无法从分支 '{branch}' 解析 issue 编号")
 
 
 @app.command()
@@ -167,6 +211,14 @@ def resume(
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
+    branch_opt: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name or issue number"),
+    ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
+    ] = None,
     label: Annotated[
         str | None,
         typer.Option(
@@ -192,6 +244,12 @@ def resume(
     Destructive scene rebuild is handled by `vibe3 flow rebuild`.
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
+
+    Examples:
+        vibe3 task resume --blocked          # Resume all blocked issues
+        vibe3 task resume 456 --yes          # Resume issue #456
+        vibe3 task resume --branch task/issue-123 --yes  # Resume via branch
+        vibe3 task resume --pr 456 --yes     # Resume via PR number
     """
     if trace:
         setup_logging(verbose=2)
@@ -202,9 +260,26 @@ def resume(
     register_event_handlers()
 
     # Validate arguments
-    if not blocked and not issue_numbers:
+    # Check for --blocked conflicts with --branch/--pr
+    if blocked and (branch_opt is not None or pr_opt is not None):
         typer.echo(
-            "Error: Must specify --blocked or provide issue numbers",
+            "Error: Cannot combine --blocked with --branch or --pr",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Check for conflicts between --branch/--pr and positional issue_numbers
+    if (branch_opt is not None or pr_opt is not None) and issue_numbers:
+        typer.echo(
+            "Error: Cannot combine --branch/--pr with positional issue numbers",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Check if at least one target is specified
+    if not blocked and not issue_numbers and not branch_opt and not pr_opt:
+        typer.echo(
+            "Error: Must specify --blocked, --branch, --pr, or provide issue numbers",
             err=True,
         )
         raise typer.Exit(1)
@@ -240,15 +315,45 @@ def resume(
             )
             raise typer.Exit(1)
 
+    # Resolve branch if --branch or --pr is provided
+    flow_service = FlowService()
+    resolved_issue_numbers: list[int] | None = None
+
+    if branch_opt is not None or pr_opt is not None:
+        # Build position_arg from issue_numbers if provided
+        position_arg = str(issue_numbers[0]) if issue_numbers else None
+
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=position_arg,
+                flow_service=flow_service,
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
+        # Parse issue number from resolved branch
+        try:
+            issue_num = _parse_issue_number_from_branch(
+                target_branch, flow_service.store, flow_service
+            )
+            resolved_issue_numbers = [issue_num]
+        except UserError as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
     target_issues: list[int] | None
     if blocked:
         target_issues = None
+    elif resolved_issue_numbers is not None:
+        target_issues = resolved_issue_numbers
     else:
         assert issue_numbers is not None
         target_issues = list(issue_numbers)
 
     usecase = _build_resume_usecase()
-    flow_service = FlowService()
 
     # Fetch all flows for candidate building
     resume_flows = flow_service.list_flows(status="active")

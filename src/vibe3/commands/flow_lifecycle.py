@@ -7,11 +7,14 @@ from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.exceptions import SystemError, UserError
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.pr_branch_resolver import resolve_command_branch
 from vibe3.utils.issue_ref import try_parse_issue_number
 
 
@@ -130,7 +133,15 @@ def blocked(
 
 
 def rebuild(
-    issue_number: Annotated[int, typer.Argument(help="Issue number to rebuild")],
+    issue_number: Annotated[
+        int | None, typer.Argument(help="Issue number to rebuild")
+    ] = None,
+    branch_opt: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
+    ] = None,
+    pr_opt: Annotated[
+        int | None, typer.Option("--pr", help="PR number to resolve branch from")
+    ] = None,
     keep_remote: Annotated[
         bool,
         typer.Option("--keep-remote", help="Keep remote branch during rebuild"),
@@ -149,29 +160,94 @@ def rebuild(
     This deletes the old task flow/worktree/branch scene, recreates the flow,
     appends a rebuild handoff event, and clears blocked state through the
     label-auto resume path.
+
+    Examples:
+        vibe3 flow rebuild 123 --yes                     # Rebuild issue #123
+        vibe3 flow rebuild --branch task/issue-123 --yes # Rebuild via branch
+        vibe3 flow rebuild --pr 456 --yes                # Rebuild via PR number
     """
-    branch = (
-        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
-    )
+    # Validate that exactly one target is provided
+    provided = [
+        name
+        for opt, name in [
+            (branch_opt, "--branch"),
+            (pr_opt, "--pr"),
+            (issue_number, "<issue-number>"),
+        ]
+        if opt is not None
+    ]
+
+    if len(provided) == 0:
+        typer.echo(
+            "Error: Must specify issue number, --branch, or --pr",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if len(provided) > 1:
+        typer.echo(
+            f"错误：不能同时使用 {', '.join(provided)}，请只指定一个目标。",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    service = FlowService()
+
+    # Resolve target branch
+    if branch_opt is not None or pr_opt is not None:
+        position_arg = str(issue_number) if issue_number is not None else None
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=position_arg,
+                flow_service=service,
+                allow_no_flow=True,  # rebuild can work even without existing flow
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
+        # Parse issue number from target_branch for output message
+        issue_svc = IssueFlowService(store=service.store)
+        resolved_issue = issue_svc.parse_issue_number_any(target_branch)
+        if resolved_issue is None:
+            typer.echo(
+                f"Error: 无法从分支 '{target_branch}' 解析 issue 编号",
+                err=True,
+            )
+            raise typer.Exit(1)
+        resolved_issue_number = resolved_issue
+    else:
+        # Use positional issue_number
+        assert issue_number is not None
+        resolved_issue_number = issue_number
+        target_branch = (
+            ConventionResolver.from_repo()
+            .resolve()
+            .branch.canonical_branch(issue_number)
+        )
+
     if not yes:
         typer.echo(
             "[dry-run mode] Would hard rebuild "
-            f"issue #{issue_number} at branch {branch}. Use --yes to execute."
+            f"issue #{resolved_issue_number} at branch {target_branch}. "
+            "Use --yes to execute."
         )
         return
 
     from vibe3.clients.github_client import GitHubClient
 
     config = load_orchestra_config()
-    issue = load_issue_info(issue_number, config=config, github=GitHubClient())
+    issue = load_issue_info(resolved_issue_number, config=config, github=GitHubClient())
     result = FlowRebuildUsecase().rebuild_issue_flow(
         issue=issue,
-        branch=branch,
+        branch=target_branch,
         reason="manual flow rebuild",
         include_remote=not keep_remote,
         ensure_worktree=not no_worktree,
     )
-    typer.echo(f"Rebuilt flow for issue #{issue_number}: {result}")
+    typer.echo(f"Rebuilt flow for issue #{resolved_issue_number}: {result}")
 
 
 def register_lifecycle_commands(app: typer.Typer) -> None:
