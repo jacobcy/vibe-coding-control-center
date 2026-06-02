@@ -44,12 +44,12 @@ docs/
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
 - **[v3/architecture-convergence-standard.md](standards/v3/architecture-convergence-standard.md)** - Vibe3 目标架构总纲
-- **[v3/role-checks-and-balances-standard.md](standards/v3/role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
+- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
 - **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
 
 **已废弃文档 (Archives)**：
-- **[vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 standards/v3/worktree-lifecycle-standard.md)
+- **[vibe3-worktree-ownership-standard.md](archive/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 standards/v3/worktree-lifecycle-standard.md)
 
 **V3 规范目录**：
 - **[standards/v3/](standards/v3/)** - V3 核心标准（handoff, git, models, registry migration）
