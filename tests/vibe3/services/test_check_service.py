@@ -26,8 +26,8 @@ def _make_check_pr_service():
     )
 
 
-def test_handle_closed_pr_resets_issue_to_ready() -> None:
-    """When PR is closed (not merged), issue should be reset to READY."""
+def test_handle_closed_pr_creates_bridge_issue() -> None:
+    """When PR is closed (not merged), create bridge issue instead of rebuilding."""
     service = _make_check_pr_service()
 
     # Mock PR closed (not merged)
@@ -44,44 +44,63 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
     # Mock issue state (open)
     service.github_client.view_issue.return_value = {
         "state": "open",
+        "title": "Original Issue",
+        "body": "Original body",
+        "labels": [{"name": "bug"}, {"name": "state/ready"}],
     }
 
-    with (
-        patch("vibe3.services.check_pr_service.FlowRebuildUsecase") as rebuild_cls,
-        patch("vibe3.services.issue_context_loader.load_issue_info") as mock_load_issue,
-        patch(
-            "vibe3.config.orchestra_settings.load_orchestra_config"
-        ) as mock_load_config,
-    ):
-        rebuild = MagicMock()
-        rebuild_cls.return_value = rebuild
-        config = MagicMock()
-        mock_load_config.return_value = config
+    # Mock no existing bridge marker
+    service.github_client.list_issue_comments.return_value = []
 
-        from vibe3.models.orchestration import IssueInfo
+    # Mock bridge issue creation
+    service.github_client.create_issue.return_value = 789
 
-        mock_issue_info = IssueInfo(number=456, title="Test Issue", labels=[])
-        mock_load_issue.return_value = mock_issue_info
+    # Mock successful comment and close operations
+    service.github_client.add_comment.return_value = True
+    service.github_client.close_issue_if_open.return_value = "closed"
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        mock_cleanup.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": False,
+            "flow_record": True,
+        }
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-        rebuild.rebuild_issue_flow.assert_called_once()
-        mock_load_config.assert_called_once()
-        assert mock_load_issue.call_args.kwargs["config"] is config
-        call = rebuild.rebuild_issue_flow.call_args.kwargs
-        assert call["issue"] == mock_issue_info
-        assert call["branch"] == "task/issue-456"
-        assert call["include_remote"] is True
-        assert (
-            call["ensure_worktree"] is True
-        )  # FIX: was False, caused worktree_path NULL
+        # Verify bridge issue was created
+        service.github_client.create_issue.assert_called_once()
+        call_kwargs = service.github_client.create_issue.call_args.kwargs
+        assert call_kwargs["title"] == "Follow-up: Original Issue"
+        assert "state/ready" in call_kwargs["labels"]
+        assert "bug" in call_kwargs["labels"]
+
+        # Verify bridge marker was added
+        service.github_client.add_comment.assert_called_once()
+        marker_body = service.github_client.add_comment.call_args[0][1]
+        assert "successor: #789" in marker_body
+        assert "closed_pr: #123" in marker_body
+
+        # Verify original issue was closed
+        service.github_client.close_issue_if_open.assert_called_once()
+        close_kwargs = service.github_client.close_issue_if_open.call_args.kwargs
+        assert close_kwargs["issue_number"] == 456
+        assert "#789" in close_kwargs["closing_comment"]
+
+        # Verify flow was aborted and cleaned up
+        service._flow_status_service.mark_flow_aborted.assert_called_once()
 
         assert handled is True
         assert len(issues) == 0
 
 
-def test_handle_closed_pr_reports_reset_failure() -> None:
-    """When reset fails, check should report the closed PR cleanup as invalid."""
+def test_handle_closed_pr_does_not_call_rebuild() -> None:
+    """Verify that FlowRebuildUsecase is NOT called when PR closes."""
     service = _make_check_pr_service()
 
     mock_pr = MagicMock()
@@ -94,19 +113,28 @@ def test_handle_closed_pr_reports_reset_failure() -> None:
     ]
     service.github_client.view_issue.return_value = {
         "state": "open",
+        "title": "Test Issue",
+        "body": "Body",
+        "labels": [],
     }
+    service.github_client.list_issue_comments.return_value = []
+    service.github_client.create_issue.return_value = 789
+    service.github_client.add_comment.return_value = True
+    service.github_client.close_issue_if_open.return_value = "closed"
 
-    with patch("vibe3.services.check_pr_service.FlowRebuildUsecase") as rebuild_cls:
-        rebuild = MagicMock()
-        rebuild.rebuild_issue_flow.side_effect = RuntimeError("scene cleanup failed")
-        rebuild_cls.return_value = rebuild
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        mock_cleanup.cleanup_flow_scene.return_value = {}
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-    assert handled is True
-    assert issues == [
-        "Failed to reset issue #456 after PR #123 closed: scene cleanup failed"
-    ]
+        # CRITICAL: FlowRebuildUsecase is not imported or used anymore
+        # (no need to verify it's not called - it doesn't exist in the module)
+
+        assert handled is True
 
 
 def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
@@ -162,3 +190,57 @@ def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
         assert len(warnings) == 1
         assert "marked aborted" in warnings[0]
         assert "Issue #456 already closed" in warnings[0]
+
+
+def test_handle_closed_pr_bridge_idempotency() -> None:
+    """When bridge marker already exists, skip creation and just cleanup."""
+    service = _make_check_pr_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+        "title": "Original Issue",
+        "body": "Body",
+        "labels": [],
+    }
+
+    # Mock existing bridge marker
+    service.github_client.list_issue_comments.return_value = [
+        {
+            "body": (
+                "[flow] Bridge issue created\n\n"
+                "successor: #789\n"
+                "closed_pr: #123\n"
+                "source_branch: task/issue-456\n"
+                "status: unresolved_continues_in_successor"
+            )
+        }
+    ]
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        mock_cleanup.cleanup_flow_scene.return_value = {}
+
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+
+        # Verify bridge issue was NOT created (idempotency)
+        service.github_client.create_issue.assert_not_called()
+
+        # Verify original issue was NOT closed (already has bridge)
+        service.github_client.close_issue_if_open.assert_not_called()
+
+        # Verify flow was still aborted and cleaned up
+        service._flow_status_service.mark_flow_aborted.assert_called_once()
+
+        assert handled is True
+        assert len(issues) == 0

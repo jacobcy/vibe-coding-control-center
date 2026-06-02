@@ -179,13 +179,14 @@ class CheckPRService:
                 return False
 
             # Look for bridge marker comment
-            marker_pattern = (
-                f"[flow] Bridge issue created\nclosed_pr: #{closed_pr_number}"
-            )
-
+            # Check for both the marker header and the specific closed_pr reference
             for comment in comments:
                 body = comment.get("body", "")
-                if marker_pattern in body:
+                # Check if this is a bridge marker for this specific PR
+                if (
+                    "[flow] Bridge issue created" in body
+                    and f"closed_pr: #{closed_pr_number}" in body
+                ):
                     logger.bind(
                         domain="check",
                         action="bridge_idempotency",
