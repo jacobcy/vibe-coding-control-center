@@ -20,7 +20,13 @@ class FlowConsistencyCode(StrEnum):
 
 @dataclass(frozen=True)
 class FlowConsistencyResult:
-    """Result of shared structural consistency detection."""
+    """Result of shared structural consistency detection.
+
+    Classification:
+    - needs_rebuild: physical scene must be destroyed and recreated
+    - fix_action: cheap local fix (e.g. backfill DB field), no rebuild needed
+    - both False: scene is consistent
+    """
 
     needs_rebuild: bool
     code: FlowConsistencyCode = FlowConsistencyCode.OK
@@ -28,6 +34,8 @@ class FlowConsistencyResult:
     severity: str = ""
     ref_field: str | None = None
     ref_value: str | None = None
+    fix_action: str | None = None
+    worktree_path: str | None = None
 
 
 def check_flow_consistency(
@@ -36,11 +44,13 @@ def check_flow_consistency(
     *,
     git_client: Any,
 ) -> FlowConsistencyResult:
-    """Check whether a flow scene is structurally rebuild-worthy.
+    """Check whether a flow scene is structurally consistent.
 
-    This is intentionally limited to local scene consistency: physical worktree,
-    recorded worktree path, and artifact refs. Remote issue/PR semantics remain
-    in CheckService and QualifyGate.
+    Classification:
+    - MISSING_WORKTREE: physical worktree gone -> needs full rebuild
+    - MISSING_RECORDED_WORKTREE: worktree exists but DB out of sync -> cheap fix
+    - MISSING_REF: artifact ref points to non-existent file -> needs rebuild
+    - OK: scene is consistent
     """
     worktree_path = git_client.find_worktree_path_for_branch(branch)
     if worktree_path is None:
@@ -52,11 +62,15 @@ def check_flow_consistency(
         )
 
     if branch.startswith("task/issue-") and not flow_state.get("worktree_path"):
+        # Worktree physically exists but DB doesn't know about it.
+        # This is a cheap fix: just backfill the DB field.
         return FlowConsistencyResult(
-            needs_rebuild=True,
+            needs_rebuild=False,
             code=FlowConsistencyCode.MISSING_RECORDED_WORKTREE,
             reason="Worktree exists but is not recorded in flow_state",
-            severity="critical",
+            severity="low",
+            fix_action="backfill_worktree_path",
+            worktree_path=str(worktree_path),
         )
 
     for ref_field in ("plan_ref", "report_ref", "audit_ref"):
@@ -79,3 +93,19 @@ def check_flow_consistency(
             )
 
     return FlowConsistencyResult(needs_rebuild=False)
+
+
+def apply_consistency_fix(
+    result: FlowConsistencyResult,
+    branch: str,
+    *,
+    store: Any,
+) -> bool:
+    """Apply a cheap fix identified by check_flow_consistency.
+
+    Returns True if fix was applied, False if no fix applicable.
+    """
+    if result.fix_action == "backfill_worktree_path" and result.worktree_path:
+        store.update_flow_state(branch, worktree_path=result.worktree_path)
+        return True
+    return False
