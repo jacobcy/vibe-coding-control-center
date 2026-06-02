@@ -8,6 +8,7 @@ This module handles reading/writing blocked state to individual sources:
 
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -150,8 +151,6 @@ class BlockedStateIO:
         )
 
         # Clear transition history to reset per-pair loop detection
-        import sqlite3
-
         try:
             with sqlite3.connect(self.store.db_path) as conn:
                 self.store.clear_transition_history(conn, branch)
