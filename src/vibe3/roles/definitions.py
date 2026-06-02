@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.role_policy import RoleOutputContract
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import SessionRole
@@ -13,25 +14,6 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
 TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
-
-
-@dataclass(frozen=True)
-class RoleOutputContract:
-    """Declarative contract for what a role must produce after execution.
-
-    Used by the unified no-op gate to validate post-execution outputs.
-    Each role declares its own contract in its definition file.
-
-    Attributes:
-        required_ref: flow_state key that must be non-empty after execution.
-            Gate blocks if the key is absent or empty, regardless of whether
-            the state label changed. None means no ref is required.
-        requires_verdict: If True, flow_state["latest_verdict"] must be set.
-            Used exclusively by the reviewer role.
-    """
-
-    required_ref: str | None = None
-    requires_verdict: bool = False
 
 
 @dataclass(frozen=True)

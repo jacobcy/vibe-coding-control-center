@@ -2,11 +2,35 @@
 
 This module provides a single source of truth for role-specific policies,
 eliminating scattered mappings across multiple modules.
+
+NOTE: This module MUST remain free of vibe3 imports to avoid circular
+imports. The import chain roles/definitions.py → execution/contracts.py →
+execution/__init__.py → codeagent_runner.py → config/role_policy.py must
+not loop back into roles/.
 """
 
+from dataclasses import dataclass
 from typing import Literal
 
-from vibe3.roles.definitions import RoleOutputContract
+
+@dataclass(frozen=True)
+class RoleOutputContract:
+    """Declarative contract for what a role must produce after execution.
+
+    Used by the unified no-op gate to validate post-execution outputs.
+    Each role declares its own contract in its TriggerableRoleDefinition.
+
+    Attributes:
+        required_ref: flow_state key that must be non-empty after execution.
+            Gate blocks if the key is absent or empty, regardless of whether
+            the state label changed. None means no ref is required.
+        requires_verdict: If True, flow_state["latest_verdict"] must be set.
+            Used exclusively by the reviewer role.
+    """
+
+    required_ref: str | None = None
+    requires_verdict: bool = False
+
 
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
