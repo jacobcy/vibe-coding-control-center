@@ -174,7 +174,7 @@ class CheckService(CheckRemote):
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
-    ) -> tuple[list[str], list[str]]:
+    ) -> tuple[list[str], list[str], IssueState | None]:
         """Check for multiple state/* labels and auto-fix the anomaly.
 
         An issue should have exactly one state/* label. Having multiple
@@ -201,7 +201,7 @@ class CheckService(CheckRemote):
         ]
 
         if len(state_labels) <= 1:
-            return ([], [])
+            return ([], [], None)
 
         # Determine which state to keep (highest priority)
         priority_order = [
@@ -235,6 +235,7 @@ class CheckService(CheckRemote):
                     f"({', '.join(state_labels)}) with unknown state, "
                     f"manual fix required"
                 ],
+                None,
             )
 
         # Auto-fix using LabelService (atomic: add new, remove old)
@@ -254,6 +255,7 @@ class CheckService(CheckRemote):
                     f"{target_state.to_label()}"
                 ],
                 [],
+                target_state,
             )
         except Exception as exc:
             logger.bind(domain="check", action="fix").warning(
@@ -265,6 +267,7 @@ class CheckService(CheckRemote):
                     f"Issue #{issue_number} has multiple state labels "
                     f"({', '.join(state_labels)}), manual fix required"
                 ],
+                None,
             )
 
     def _check_branch(self, branch: str) -> CheckResult:
@@ -333,11 +336,13 @@ class CheckService(CheckRemote):
                         task_issue_closed = True
 
                     # Check for multiple state/* labels (anomaly)
-                    label_warnings, label_issues = self._check_multiple_state_labels(
-                        task_issue, issue_payload
+                    label_warnings, label_issues, fixed_state = (
+                        self._check_multiple_state_labels(task_issue, issue_payload)
                     )
                     warnings.extend(label_warnings)
                     issues.extend(label_issues)
+                    if fixed_state is not None:
+                        orchestration_state = fixed_state
 
             # only one task issue per branch
             if len(task_issues) > 1:
