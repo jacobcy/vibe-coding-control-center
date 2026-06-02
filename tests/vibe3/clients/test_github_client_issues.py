@@ -179,3 +179,150 @@ def test_close_issue_if_open_returns_failure_when_close_fails(
         result = github_client.close_issue_if_open(issue_number=123)
 
         assert result == "failed"
+
+
+def test_create_issue_success(github_client: GitHubClient) -> None:
+    """create_issue should return issue number on success."""
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        # Mock gh issue create output
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="https://github.com/owner/repo/issues/42\n",
+        )
+
+        result = github_client.create_issue(
+            title="Test Issue",
+            body="Test body",
+        )
+
+        assert result == 42
+        mock_run.assert_called_once()
+
+
+def test_create_issue_with_labels(github_client: GitHubClient) -> None:
+    """create_issue should apply labels when provided."""
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="https://github.com/owner/repo/issues/43\n",
+        )
+
+        result = github_client.create_issue(
+            title="Labeled Issue",
+            body="Body",
+            labels=["bug", "state/ready"],
+        )
+
+        assert result == 43
+        args = mock_run.call_args[0][0]
+        assert "--label" in args
+        assert "bug" in args
+        assert "state/ready" in args
+
+
+def test_create_issue_with_repo_override(github_client: GitHubClient) -> None:
+    """create_issue should pass --repo flag when repo is provided."""
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="https://github.com/org/repo/issues/44\n",
+        )
+
+        result = github_client.create_issue(
+            title="Cross-repo Issue",
+            body="Body",
+            repo="org/repo",
+        )
+
+        assert result == 44
+        args = mock_run.call_args[0][0]
+        assert "--repo" in args
+        assert "org/repo" in args
+
+
+def test_create_issue_failure_returns_none(github_client: GitHubClient) -> None:
+    """create_issue should return None on failure."""
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stderr="Validation Failed",
+        )
+
+        result = github_client.create_issue(
+            title="Invalid Issue",
+            body="Body",
+        )
+
+        assert result is None
+
+
+def test_list_issue_comments_success(github_client: GitHubClient) -> None:
+    """list_issue_comments should return comments on success."""
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "comments": [
+                        {
+                            "id": 1,
+                            "body": "First comment",
+                            "author": {"login": "user1"},
+                        },
+                        {
+                            "id": 2,
+                            "body": "Second comment",
+                            "author": {"login": "user2"},
+                        },
+                    ]
+                }
+            ),
+        )
+
+        comments = github_client.list_issue_comments(issue_number=42)
+
+        assert len(comments) == 2
+        assert comments[0]["id"] == 1
+        assert comments[0]["body"] == "First comment"
+        assert comments[1]["id"] == 2
+
+
+def test_list_issue_comments_failure_returns_empty(github_client: GitHubClient) -> None:
+    """list_issue_comments should return empty list on failure."""
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stderr="Issue not found",
+        )
+
+        comments = github_client.list_issue_comments(issue_number=999)
+
+        assert comments == []
+
+
+def test_list_issue_comments_passes_repo(github_client: GitHubClient) -> None:
+    """list_issue_comments should pass repo override to gh CLI."""
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps({"comments": []}),
+        )
+
+        github_client.list_issue_comments(issue_number=42, repo="org/repo")
+
+        # Verify gh issue view was called with the correct repo
+        args = mock_run.call_args[0][0]
+        assert "--repo" in args
+        assert "org/repo" in args
+
+
+def test_list_issue_comments_timeout_returns_empty(github_client: GitHubClient) -> None:
+    """list_issue_comments should return empty list on timeout."""
+    import subprocess
+
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
+
+        comments = github_client.list_issue_comments(issue_number=42)
+
+        assert comments == []

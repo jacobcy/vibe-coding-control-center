@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
+from vibe3.clients.github_issue_admin_ops import GH_API_TIMEOUT, IssueAdminMixin
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -234,3 +234,63 @@ class IssuesMixin(IssueAdminMixin):
             )
             return None
         return cast("dict[str, Any] | None | str", json.loads(result.stdout))
+
+    def list_issue_comments(
+        self, issue_number: int, repo: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List comments on a GitHub issue.
+
+        Args:
+            issue_number: Issue number
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            List of comment dicts with keys: id, body, author, etc.
+        """
+        logger.bind(
+            external="github",
+            operation="list_issue_comments",
+            issue_number=issue_number,
+        ).debug("Calling GitHub API: list_issue_comments")
+
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--comments",
+            "--json",
+            "comments",
+        ]
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=GH_API_TIMEOUT,
+                env={**os.environ, "GH_PAGER": "cat"},
+            )
+        except subprocess.TimeoutExpired:
+            logger.bind(external="github", issue_number=issue_number).warning(
+                f"Timed out fetching comments for issue #{issue_number}"
+            )
+            return []
+
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                f"Failed to list comments on issue #{issue_number}"
+            )
+            return []
+
+        try:
+            data = json.loads(result.stdout)
+            comments = data.get("comments", [])
+            return cast(list[dict[str, Any]], comments)
+        except json.JSONDecodeError as exc:
+            logger.bind(external="github", error=str(exc)).error(
+                "Failed to parse comments JSON"
+            )
+            return []
