@@ -86,6 +86,10 @@ class TestPreDispatchHealthChecks:
             branch="task/issue-42",
         )
         coordinator._check_service = mock_check_service
+
+        # Mock FlowService to verify block_flow call
+        mock_flow_blocker = MagicMock()
+        coordinator._flow_blocker = mock_flow_blocker
         _setup_health_check_service(coordinator, mock_check_service, store)
 
         result = coordinator._health_check_service.check_issue_health(issue)
@@ -94,6 +98,13 @@ class TestPreDispatchHealthChecks:
         assert (
             result is False
         ), "Health check should return False for consistency failures"
+
+        # Assert - block_flow should be called with correct parameters
+        mock_flow_blocker.block_flow.assert_called_once()
+        call_args = mock_flow_blocker.block_flow.call_args
+        assert call_args[1]["branch"] == "task/issue-42"
+        assert "Health check failed" in call_args[1]["reason"]
+        assert call_args[1]["actor"] == "orchestra:dispatcher"
 
     def test_health_check_passes_for_open_issue(self) -> None:
         """Health check should return True for healthy active flows."""
