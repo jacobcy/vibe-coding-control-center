@@ -267,9 +267,19 @@ class IssuesMixin(IssueAdminMixin):
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=GH_API_TIMEOUT,
+                env={**os.environ, "GH_PAGER": "cat"},
+            )
+        except subprocess.TimeoutExpired:
+            logger.bind(external="github", issue_number=issue_number).warning(
+                f"Timed out fetching comments for issue #{issue_number}"
+            )
+            return []
 
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
