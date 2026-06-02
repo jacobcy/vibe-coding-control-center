@@ -243,6 +243,7 @@ class TestFindRepoRoot:
 
     def test_git_common_dir_success(self):
         """Primary path: git common dir resolves to main repo."""
+        find_repo_root.cache_clear()
         with patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir",
             return_value="/repos/main/.git",
@@ -252,6 +253,7 @@ class TestFindRepoRoot:
 
     def test_worktree_git_file_absolute_gitdir(self):
         """Fallback: absolute gitdir in .git file from worktree."""
+        find_repo_root.cache_clear()
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
@@ -271,6 +273,7 @@ class TestFindRepoRoot:
 
     def test_worktree_git_file_relative_gitdir(self):
         """Fallback: relative gitdir resolved against cwd."""
+        find_repo_root.cache_clear()
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
@@ -292,6 +295,7 @@ class TestFindRepoRoot:
 
     def test_main_repo_returns_cwd(self):
         """When .git is a directory, cwd IS the main repo."""
+        find_repo_root.cache_clear()
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(
@@ -307,6 +311,7 @@ class TestFindRepoRoot:
 
     def test_not_in_git_repo_raises(self):
         """Not in a git repo should raise SystemError."""
+        find_repo_root.cache_clear()
         git_common_fail = GitError("rev-parse", "failed")
         with (
             patch(

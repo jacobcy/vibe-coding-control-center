@@ -3,42 +3,10 @@
 from __future__ import annotations
 
 import atexit
-import functools
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import IO
-
-
-@functools.lru_cache(maxsize=1)
-def _repo_root() -> Path:
-    """Get the main repository root directory.
-
-    Uses git common dir to correctly handle worktrees:
-    - In worktrees, git common dir points to the main repo's .git directory
-    - In main repo, it points to the local .git directory
-    - The parent of git common dir is always the main repository root
-
-    Falls back to path-based detection if git command fails.
-
-    Cached with lru_cache to avoid repeated subprocess calls on every event.
-    """
-    import subprocess
-
-    try:
-        # Get the shared .git directory (works in both main repo and worktrees)
-        result = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        git_common_dir = Path(result.stdout.strip())
-        # The parent of .git is the main repository root
-        return git_common_dir.parent
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError, OSError):
-        # Fallback to path-based detection for non-git environments
-        return Path(__file__).resolve().parents[3]
 
 
 def orchestra_log_dir(repo_root: Path | None = None) -> Path:
@@ -46,7 +14,9 @@ def orchestra_log_dir(repo_root: Path | None = None) -> Path:
     if override_dir:
         path = Path(override_dir).expanduser().resolve() / "orchestra"
     else:
-        root = repo_root or _repo_root()
+        from vibe3.clients.git_client import find_repo_root
+
+        root = repo_root or find_repo_root()
         path = root / "temp" / "logs" / "orchestra"
     path.mkdir(parents=True, exist_ok=True)
     return path
