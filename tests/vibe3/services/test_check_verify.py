@@ -64,7 +64,11 @@ class TestVerifyCurrentFlow:
         mock_store.get_issue_links.return_value = [
             {"issue_number": 123, "issue_role": "task"}
         ]
-        mock_github_client.view_issue.return_value = {"number": 123}
+        mock_github_client.view_issue.return_value = {
+            "number": 123,
+            "state": "OPEN",
+            "labels": [{"name": "state/in-progress"}],
+        }
         pr = PRResponse(
             number=456,
             title="Test PR",
