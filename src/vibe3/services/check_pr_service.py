@@ -518,12 +518,13 @@ The unresolved work continues in #{bridge_issue_number}.
                 issue_number=task_issue_number,
             ).warning(
                 f"Failed to fetch issue #{task_issue_number} data, "
-                "marking flow as aborted"
+                "preserving flow for retry"
             )
-            return self._abort_and_cleanup(
-                branch,
-                f"Failed to fetch issue #{task_issue_number} data; "
-                f"PR #{pr_number} closed without merge",
+            # Do NOT cleanup flow - allow retry when GitHub API recovers
+            return (
+                f"Failed to fetch issue #{task_issue_number} data "
+                f"(network/auth error), please retry later",
+                [],
             )
 
         issue_state = str(gh_issue.get("state", "")).upper()
@@ -577,11 +578,31 @@ The unresolved work continues in #{bridge_issue_number}.
         )
 
         # Close original issue
-        self._close_original_issue_with_comment(
+        close_result = self._close_original_issue_with_comment(
             original_issue_number=task_issue_number,
             bridge_issue_number=bridge_number,
             closed_pr_number=pr_number,
         )
+
+        # Check if close succeeded
+        if close_result == "failed":
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+                bridge_issue=bridge_number,
+            ).warning(
+                f"Failed to close original issue #{task_issue_number}, "
+                f"preserving flow for retry"
+            )
+            # Do NOT cleanup flow - allow manual retry or intervention
+            return (
+                f"Failed to close original issue #{task_issue_number} "
+                f"(network/permission error), bridge #{bridge_number} created; "
+                f"please retry later or manually close",
+                [],
+            )
 
         # Abort and cleanup old flow
         return self._abort_and_cleanup(

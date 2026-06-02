@@ -122,17 +122,22 @@ def test_handle_closed_pr_does_not_call_rebuild() -> None:
     service.github_client.add_comment.return_value = True
     service.github_client.close_issue_if_open.return_value = "closed"
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with (
+        patch(
+            "vibe3.services.check_pr_service.FlowRebuildUsecase", create=True
+        ) as rebuild_cls,
+        patch(
+            "vibe3.services.flow_cleanup_service.FlowCleanupService"
+        ) as mock_cleanup_cls,
+    ):
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {}
 
         handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-        # CRITICAL: FlowRebuildUsecase is not imported or used anymore
-        # (no need to verify it's not called - it doesn't exist in the module)
+        # CRITICAL: Verify FlowRebuildUsecase was NOT instantiated
+        rebuild_cls.assert_not_called()
 
         assert handled is True
 
@@ -244,3 +249,87 @@ def test_handle_closed_pr_bridge_idempotency() -> None:
 
         assert handled is True
         assert len(issues) == 0
+
+
+def test_handle_closed_pr_when_view_issue_fails_does_not_cleanup() -> None:
+    """When view_issue() fails (network/auth), do not cleanup flow, allow retry."""
+    service = _make_check_pr_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+
+    # Mock view_issue failure (returns non-dict)
+    service.github_client.view_issue.return_value = "network_error"
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+
+        # Verify flow was NOT marked as aborted
+        service._flow_status_service.mark_flow_aborted.assert_not_called()
+
+        # Verify cleanup was NOT called (preserve flow for retry)
+        mock_cleanup.cleanup_flow_scene.assert_not_called()
+
+        # Verify error message returned (not empty)
+        assert handled is True
+        assert len(issues) == 1
+        assert "Failed to fetch issue #456" in issues[0]
+        assert "retry" in issues[0].lower()
+
+
+def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
+    """When close original issue fails, do not cleanup flow, preserve for retry."""
+    service = _make_check_pr_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+        "title": "Original Issue",
+        "body": "Body",
+        "labels": [],
+    }
+    service.github_client.list_issue_comments.return_value = []
+    service.github_client.create_issue.return_value = 789
+    service.github_client.add_comment.return_value = True
+
+    # Mock close failure
+    service.github_client.close_issue_if_open.return_value = "failed"
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+
+        # Verify flow was NOT marked as aborted
+        service._flow_status_service.mark_flow_aborted.assert_not_called()
+
+        # Verify cleanup was NOT called (preserve flow for retry)
+        mock_cleanup.cleanup_flow_scene.assert_not_called()
+
+        # Verify error message returned
+        assert handled is True
+        assert len(issues) == 1
+        assert "Failed to close original issue #456" in issues[0]
+        assert "bridge #789 created" in issues[0]
