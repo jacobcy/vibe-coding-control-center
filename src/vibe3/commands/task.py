@@ -7,8 +7,11 @@ from typing import Annotated, Iterator
 
 import typer
 
+from vibe3.clients import GitHubClient
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.loader import get_config_with_env_override
+from vibe3.config.manager_config import get_manager_usernames
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
 from vibe3.observability.logger import setup_logging
@@ -32,6 +35,7 @@ Examples:
   vibe3 task show                # Show current task details
   vibe3 task show 123            # Show task for issue #123
   vibe3 task status              # Show global task dashboard
+  vibe3 task intake 456          # Assign issue #456 to local manager
   vibe3 task resume --blocked    # Resume all blocked issues (dry-run)
   vibe3 task resume 456 --yes    # Resume issue #456 (execute)
 
@@ -158,6 +162,77 @@ def status(
         min_ms=None,
         json_output=json_output,
     )
+
+
+@app.command()
+def intake(
+    issue_id: Annotated[
+        int,
+        typer.Argument(help="Issue number to assign to local manager"),
+    ],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Force reassignment without confirmation"),
+    ] = False,
+) -> None:
+    """Assign an issue to the local manager account.
+
+    Reads MANAGER_USERNAMES from config and assigns the issue.
+    Refuses if the issue has non-ready state or is assigned to a
+    different manager, unless --yes is given.
+    """
+    config = get_config_with_env_override()
+    managers = get_manager_usernames(config.orchestra)
+    if not managers:
+        typer.echo("Error: No manager usernames configured.", err=True)
+        raise typer.Exit(1)
+    local_manager = managers[0]
+
+    client = GitHubClient()
+    issue = client.view_issue(issue_id)
+
+    if issue is None:
+        typer.echo(f"Error: Issue #{issue_id} not found.", err=True)
+        raise typer.Exit(1)
+    if issue == "network_error":
+        typer.echo(
+            f"Error: Could not fetch issue #{issue_id} (network/auth).",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Extract state labels and current assignees
+    assert isinstance(issue, dict)
+    labels = [label["name"] for label in issue.get("labels", [])]
+    state_labels = [label for label in labels if label.startswith("state/")]
+    assignee_logins = [assignee["login"] for assignee in issue.get("assignees", [])]
+
+    needs_guard = any(label != "state/ready" for label in state_labels) or any(
+        assignee != local_manager for assignee in assignee_logins
+    )
+
+    if needs_guard and not yes:
+        state_desc = ", ".join(state_labels) if state_labels else "no state"
+        assignee_desc = ", ".join(assignee_logins) if assignee_logins else "none"
+        typer.echo(
+            f"Issue #{issue_id} has {state_desc} (assigned to {assignee_desc}).",
+            err=True,
+        )
+        typer.echo("Use --yes to force reassignment.", err=True)
+        raise typer.Exit(1)
+
+    success = client.add_assignee(issue_id, local_manager)
+    if not success:
+        typer.echo(f"Error: Failed to assign #{issue_id}.", err=True)
+        raise typer.Exit(1)
+
+    if assignee_logins and local_manager not in assignee_logins:
+        typer.echo(
+            f"#{issue_id} reassigned to {local_manager} "
+            f"(was {', '.join(assignee_logins)})"
+        )
+    else:
+        typer.echo(f"#{issue_id} assigned to {local_manager}")
 
 
 @app.command()
