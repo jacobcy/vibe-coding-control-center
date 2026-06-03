@@ -1,6 +1,6 @@
 """Role dispatch contracts — re-exported from lower-layer homes."""
 
-from vibe3.config.role_gates import (
+from vibe3.config import (
     EXECUTOR_GATE_CONFIG,
     GOVERNANCE_GATE_CONFIG,
     MANAGER_GATE_CONFIG,

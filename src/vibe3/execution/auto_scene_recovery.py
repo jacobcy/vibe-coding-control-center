@@ -17,7 +17,7 @@ from vibe3.models import (
 from vibe3.orchestra import append_orchestra_event
 
 if TYPE_CHECKING:
-    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.environment import SessionRegistryService
 
 
 def _read_worktree_head(worktree_path: Path) -> str | None:

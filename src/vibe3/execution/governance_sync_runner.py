@@ -13,9 +13,8 @@ from loguru import logger
 from typer import echo
 
 from vibe3.agents import CodeagentBackend
-from vibe3.clients.store_context import get_store
-from vibe3.config import load_orchestra_config
-from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
+from vibe3.clients import get_store
+from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 from vibe3.services import record_dispatch_failure_if_unexpected
@@ -160,7 +159,7 @@ def run_governance_async(
         material_override: Optional governance role to override material rotation
         build_execution_name: Optional injected execution name builder (for decoupling)
     """
-    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.environment import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.issue_role_support import (
         resolve_async_cli_project_root,
