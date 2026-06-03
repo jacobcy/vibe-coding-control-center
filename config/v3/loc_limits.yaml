@@ -66,8 +66,8 @@ code_limits:
         limit: 450
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）后略微超标"
       - path: "src/vibe3/commands/task.py"
-        limit: 480
-        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
+        limit: 500
+        reason: "Task 命令聚合，包含 show/status/intake/resume 多个子命令入口；新增 vibe3 task intake 命令（issue assignee 分配 + guard 逻辑）后超标"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 560
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
