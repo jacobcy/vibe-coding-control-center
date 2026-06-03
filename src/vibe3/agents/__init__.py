@@ -33,9 +33,14 @@ Types:
 - ``PromptContextMode`` — literal type for prompt context mode
   (bootstrap/resume)
 - ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
+
+Backend Config:
+- ``sync_models_json`` — sync effective backend/model settings to
+  ``~/.codeagent/models.json``
 """
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.codeagent_config import sync_models_json
 from vibe3.agents.base import AgentBackend
 from vibe3.agents.models import (
     CodeagentCommand,
@@ -94,4 +99,5 @@ __all__ = [
     # Types
     "PromptContextMode",
     "RunPromptMode",
+    "sync_models_json",
 ]

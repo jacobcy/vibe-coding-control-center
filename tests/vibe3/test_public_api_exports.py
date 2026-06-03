@@ -58,3 +58,15 @@ def test_config_all_contains_role_symbols():
     assert "get_role_section" in __all__
     assert "GOVERNANCE_GATE_CONFIG" in __all__
     assert "resolve_effective_agent_options" in __all__
+
+
+def test_agents_sync_models_json_importable():
+    from vibe3.agents import sync_models_json
+
+    assert callable(sync_models_json)
+
+
+def test_agents_all_contains_sync_models_json():
+    from vibe3.agents import __all__
+
+    assert "sync_models_json" in __all__
