@@ -94,3 +94,15 @@ def test_clients_all_contains_get_store():
     from vibe3.clients import __all__
 
     assert "get_store" in __all__
+
+
+def test_exceptions_github_api_error_importable():
+    from vibe3.exceptions import GitHubAPIError
+
+    assert GitHubAPIError is not None
+
+
+def test_exceptions_all_contains_github_api_error():
+    from vibe3.exceptions import __all__
+
+    assert "GitHubAPIError" in __all__

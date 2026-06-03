@@ -235,3 +235,24 @@ class InvalidTransitionError(UserError):
 #
 # Error recording helper (convenience function in services layer):
 #   from vibe3.services.error_helpers import record_error
+
+
+from vibe3.exceptions.runtime_errors import GitHubAPIError  # noqa: E402
+
+__all__ = [
+    "VibeError",
+    "UserError",
+    "ConfigError",
+    "AgentPresetNotFoundError",
+    "SkillNotAvailableError",
+    "SystemError",
+    "AgentExecutionError",
+    "ModelsJsonSyncError",
+    "GitError",
+    "GitHubError",
+    "SerenaError",
+    "PRNotFoundError",
+    "CapacityDeferredError",
+    "InvalidTransitionError",
+    "GitHubAPIError",
+]
