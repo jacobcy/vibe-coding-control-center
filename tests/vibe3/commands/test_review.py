@@ -77,14 +77,17 @@ def test_review_no_arg_defaults_to_current_branch():
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
         patch("vibe3.commands.review.run_issue_role_async") as mock_async,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
         mock_flow.task_issue_number = 42
         mock_validate.return_value = (mock_flow, 42)
+        mock_resolve.return_value = "task/issue-42"
 
         result = runner.invoke(app, [])
 
     assert result.exit_code == 0
+    mock_resolve.assert_called_once_with(None)
     mock_async.assert_called_once()
 
 

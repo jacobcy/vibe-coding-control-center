@@ -76,8 +76,13 @@ def test_plan_branch_basic_flow(monkeypatch) -> None:
 def test_plan_no_arg_defaults_to_current_branch(monkeypatch) -> None:
     """Test plan without --branch uses current branch."""
     mock_runner = _patch_plan_deps(monkeypatch)
+    mock_resolve = MagicMock(return_value="task/issue-42")
+    monkeypatch.setattr("vibe3.commands.plan.resolve_branch_arg", mock_resolve)
+
     result = runner.invoke(plan_app, [])
+
     assert result.exit_code == 0
+    mock_resolve.assert_called_once_with(None)
     mock_runner.assert_called_once()
 
 
@@ -92,6 +97,21 @@ def test_plan_branch_no_flow_error(monkeypatch) -> None:
     )
 
     result = runner.invoke(plan_app, ["--branch", "42"])
+    assert result.exit_code != 0
+    assert "No flow for branch" in result.output
+
+
+def test_plan_no_arg_no_flow_error(monkeypatch) -> None:
+    """Test plan without --branch and no flow shows clear error."""
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = None
+
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "feature/no-flow"
+    )
+
+    result = runner.invoke(plan_app, [])
     assert result.exit_code != 0
     assert "No flow for branch" in result.output
 
