@@ -1,7 +1,7 @@
 """Run command."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import typer
 from loguru import logger
@@ -16,7 +16,6 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.roles.run import (
     ensure_plan_file_exists,
@@ -89,7 +88,24 @@ def run_command(
 
     register_event_handlers()
 
-    config = VibeConfig.get_defaults()
+    # Load config with CLI overrides
+    from vibe3.config.loader import load_runtime_config
+    from vibe3.exceptions import ConfigError
+
+    cli_overrides: dict[str, Any] = {}
+    if backend:
+        cli_overrides["run.agent_config.backend"] = backend
+    if model:
+        cli_overrides["run.agent_config.model"] = model
+    if agent:
+        cli_overrides["run.agent_config.agent"] = agent
+
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Configuration error: {e}", err=True)
+        raise typer.Exit(1) from e
+
     target_branch = resolve_branch_arg(branch)
 
     flow_service = FlowService()

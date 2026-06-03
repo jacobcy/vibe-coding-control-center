@@ -52,9 +52,10 @@ PLANNER_ROLE = TriggerableRoleDefinition(
 
 def resolve_plan_options(config: OrchestraConfig) -> Any:
     """Resolve planner agent options with env override support."""
+    from vibe3.config.loader import load_runtime_config
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = VibeConfig.get_defaults()
+    runtime_config = load_runtime_config()
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_PLANNER_BACKEND",
         model_env_key="VIBE3_PLANNER_MODEL",
