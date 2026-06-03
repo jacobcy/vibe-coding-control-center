@@ -221,6 +221,10 @@ def intake(
         typer.echo("Use --yes to force reassignment.", err=True)
         raise typer.Exit(1)
 
+    # Remove existing assignees before adding new one (true reassignment)
+    if assignee_logins and local_manager not in assignee_logins:
+        client.remove_assignees(issue_id, assignee_logins)
+
     success = client.add_assignee(issue_id, local_manager)
     if not success:
         typer.echo(f"Error: Failed to assign #{issue_id}.", err=True)

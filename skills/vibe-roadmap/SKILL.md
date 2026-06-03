@@ -14,7 +14,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - **审查纠正 governance 决策**：消化 assignee-pool 的 `[governance suggest]`，写 `[roadmap decision]`，打 `roadmap-reviewed`
 - **GitHub-as-truth**：所有操作通过 GitHub labels
 - **不做执行**：不处理单个 flow 执行
-- **manager_bot 解析**：分配 assignee 时（Step 0 第 5 步、Step X 场景 A）使用 `config.orchestra.manager_usernames[0]`（默认 `vibe-manager-agent`），**禁止指派人类用户名**
+- **manager_bot 解析**：分配 assignee 时使用 `vibe3 task intake <number>`（shell），命令自动从 `config.orchestra.manager_usernames[0]` 解析，**禁止手动指定人类用户名**
 
 ## Scope
 
@@ -73,8 +73,8 @@ description: Use when the user wants project-level roadmap planning, version goa
    # 1. 移除 intake 跳过标记
    gh issue edit <number> --remove-label "orchestra-scanned"
 
-   # 2. 分配 manager assignee，让 issue 进入 assignee-pool
-   gh issue edit <number> --add-assignee <manager_bot_name>
+   # 2. 分配 manager assignee，让 issue 进入 assignee-pool（自动移除旧 assignee）
+   vibe3 task intake <number> --yes
 
    # 3. 写决策评论 + 打 roadmap-reviewed
    gh issue comment <number> --body "[roadmap decision] override intake skip: <理由>"
@@ -144,7 +144,7 @@ gh issue list -l "roadmap/p1"
 
 **场景 A: 适合自动化推进**（通过全部三级审查）
 ```bash
-gh issue edit <number> --add-assignee <manager_bot_name>
+vibe3 task intake <number>
 gh issue comment <number> --body "[roadmap decision] Intake completed (scope=<bugfix|feature|refactor>)."
 gh issue edit <number> --add-label "roadmap-reviewed"
 ```

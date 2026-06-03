@@ -55,7 +55,7 @@ def test_intake_already_assigned_to_same_manager():
         result = runner.invoke(app, ["task", "intake", "123"])
 
         assert result.exit_code == 0
-        assert "#123 assigned to manager1" in result.stdout
+        assert "#123 assigned to manager1" in result.output
 
 
 def test_intake_non_ready_state_guard():
@@ -112,7 +112,7 @@ def test_intake_different_assignee_guard():
 
 
 def test_intake_force_with_yes():
-    """Force with --yes: non-ready state + different assignee + --yes → assigns."""
+    """Force with --yes: removes old assignee, adds new manager."""
     with (
         patch("vibe3.commands.task.GitHubClient") as mock_client_cls,
         patch("vibe3.commands.task.get_manager_usernames") as mock_managers,
@@ -133,6 +133,7 @@ def test_intake_force_with_yes():
 
         assert result.exit_code == 0
         assert "#123 reassigned to manager1 (was other-user)" in result.output
+        mock_client.remove_assignees.assert_called_once_with(123, ["other-user"])
         mock_client.add_assignee.assert_called_once_with(123, "manager1")
 
 

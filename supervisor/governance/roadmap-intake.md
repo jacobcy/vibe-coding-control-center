@@ -307,7 +307,7 @@ Forbidden:
    查看该 issue 最近的 2-3 条评论。如果最近已有 `[governance suggest]` 或 `[governance]` 开头的评论（无论是你自己还是其他 agent 写的），**一律跳过，不再重复写 comment**。靠事实判断，不靠猜测。
 6. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
 7. 对可纳入对象执行最小动作：
-   - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `{manager_bot}`，禁止使用人类用户名）
+   - 使用 `vibe3 task intake <issue-number>` 分配 manager assignee（命令自动从配置解析，禁止手动指定人类用户名）
    - 如有必要补最小 routing labels
 8. 对不适合纳入的对象记录简短原因
 9. **扫描 `supervisor + state/ready` issues**，对每个执行：
