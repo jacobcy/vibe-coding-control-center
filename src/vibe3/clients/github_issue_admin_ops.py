@@ -233,3 +233,71 @@ class IssueAdminMixin:
                 issue_number=issue_number,
             ).error("Failed to close issue")
             return "failed"
+
+    def create_issue(
+        self,
+        *,
+        title: str,
+        body: str,
+        labels: list[str] | None = None,
+        assignees: list[str] | None = None,
+        repo: str | None = None,
+    ) -> int | None:
+        """Create a new GitHub issue.
+
+        Args:
+            title: Issue title
+            body: Issue body/description
+            labels: Optional list of labels to apply
+            assignees: Optional list of assignees (GitHub usernames)
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            Created issue number, or None on failure
+        """
+        logger.bind(
+            external="github",
+            operation="create_issue",
+            title=title,
+        ).debug("Calling GitHub API: create_issue")
+
+        cmd = ["gh", "issue", "create", "--title", title, "--body", body]
+
+        if labels:
+            for label in labels:
+                cmd.extend(["--label", label])
+
+        if assignees:
+            for assignee in assignees:
+                cmd.extend(["--assignee", assignee])
+
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
+
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                f"Failed to create issue: {title}"
+            )
+            return None
+
+        # Parse issue number from URL
+        # Output format: https://github.com/owner/repo/issues/42
+        try:
+            issue_url = result.stdout.strip()
+            issue_number = int(issue_url.rstrip("/").split("/")[-1])
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+            ).debug("Issue created successfully")
+            return issue_number
+        except (ValueError, IndexError) as exc:
+            logger.bind(
+                external="github",
+                output=result.stdout,
+                error=str(exc),
+            ).error("Failed to parse issue number from create output")
+            return None
