@@ -70,3 +70,15 @@ def test_agents_all_contains_sync_models_json():
     from vibe3.agents import __all__
 
     assert "sync_models_json" in __all__
+
+
+def test_environment_session_registry_importable():
+    from vibe3.environment import SessionRegistryService
+
+    assert SessionRegistryService is not None
+
+
+def test_environment_all_contains_session_registry():
+    from vibe3.environment import __all__
+
+    assert "SessionRegistryService" in __all__
