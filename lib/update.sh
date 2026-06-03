@@ -6,6 +6,7 @@ set -euo pipefail
 
 # Load config and utils
 source "${0:A:h}/config.sh"
+source "${0:A:h}/install_utils.sh"
 
 vibe_update() {
     local command="${1:-help}"
@@ -150,42 +151,10 @@ _update_run() {
     fi
 
     # Migrate stale paths in existing settings.yaml
-    if [[ -f "$INSTALL_DIR/settings.yaml" ]]; then
-        if grep -q 'assets/prompts' "$INSTALL_DIR/settings.yaml" 2>/dev/null; then
-            sed -i.bak 's|assets/prompts|config/prompts|g' "$INSTALL_DIR/settings.yaml"
-            rm -f "$INSTALL_DIR/settings.yaml.bak"
-            log_info "Migrated prompts_root path in settings.yaml"
-        fi
-        if grep -q 'assets/policies' "$INSTALL_DIR/settings.yaml" 2>/dev/null; then
-            sed -i.bak 's|assets/policies|supervisor/policies|g' "$INSTALL_DIR/settings.yaml"
-            rm -f "$INSTALL_DIR/settings.yaml.bak"
-            log_info "Migrated policies_root path in settings.yaml"
-        fi
-    fi
+    _migrate_settings_yaml_paths "$INSTALL_DIR"
 
     # Sanity check: verify critical runtime assets
-    local check_files=(
-        "src/vibe3/environment/runtime_assets.py"
-        "config/prompts/prompts.yaml"
-        "config/prompts/prompt-recipes.yaml"
-        "supervisor/manager.md"
-        "supervisor/policies/run.md"
-        "supervisor/policies/plan.md"
-        "supervisor/policies/review.md"
-        "skills/vibe-commit/SKILL.md"
-    )
-    local missing=0
-    for rel in "${check_files[@]}"; do
-        if [[ ! -f "$INSTALL_DIR/$rel" ]]; then
-            log_warn "Runtime asset missing after update: $rel"
-            missing=$((missing + 1))
-        fi
-    done
-    if [[ $missing -gt 0 ]]; then
-        log_error "Runtime asset sanity check failed: $missing file(s) missing after update"
-    else
-        log_info "Runtime asset sanity check passed"
-    fi
+    _check_runtime_assets "$INSTALL_DIR"
 
     log_success "Global update complete!"
     echo ""

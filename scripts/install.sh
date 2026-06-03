@@ -8,6 +8,7 @@ set -euo pipefail
 INSTALL_DIR="$HOME/.vibe"
 SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 [[ -f "$SOURCE_ROOT/lib/utils.sh" ]] && source "$SOURCE_ROOT/lib/utils.sh" || { echo "error: missing lib/utils.sh"; exit 1; }
+[[ -f "$SOURCE_ROOT/lib/install_utils.sh" ]] && source "$SOURCE_ROOT/lib/install_utils.sh"
 
 # --- Help ---
 _usage() {
@@ -183,7 +184,7 @@ _clean_stale_in_dir() {
         local src_path="$src_dir/$rel_path"
         if [[ ! -e "$src_path" ]]; then
             rm -f "$file"
-            cleaned=$((cleaned + 1)) || true
+            cleaned=$((cleaned + 1))
         fi
     done < <(find "$dst_dir" -type f -print0 2>/dev/null)
     # Clean empty directories left behind
@@ -235,17 +236,7 @@ EOF
     chmod 644 "$INSTALL_DIR/settings.yaml"
     log_success "Global settings.yaml generated"
 else
-    # Migrate stale paths in existing settings.yaml
-    if grep -q 'assets/prompts' "$INSTALL_DIR/settings.yaml" 2>/dev/null; then
-        sed -i.bak 's|assets/prompts|config/prompts|g' "$INSTALL_DIR/settings.yaml"
-        rm -f "$INSTALL_DIR/settings.yaml.bak"
-        log_info "Migrated prompts_root path in settings.yaml"
-    fi
-    if grep -q 'assets/policies' "$INSTALL_DIR/settings.yaml" 2>/dev/null; then
-        sed -i.bak 's|assets/policies|supervisor/policies|g' "$INSTALL_DIR/settings.yaml"
-        rm -f "$INSTALL_DIR/settings.yaml.bak"
-        log_info "Migrated policies_root path in settings.yaml"
-    fi
+    _migrate_settings_yaml_paths "$INSTALL_DIR"
 fi
 
 # 4.7 Sync canonical skills manifest
@@ -372,34 +363,7 @@ if [[ -f "$SOURCE_ROOT/scripts/init.sh" ]]; then
 fi
 
 # 8.5 Sanity check: verify critical runtime assets
-_sanity_check_runtime_assets() {
-    local failed=0
-    local check_files=(
-        "src/vibe3/environment/runtime_assets.py"
-        "config/prompts/prompts.yaml"
-        "config/prompts/prompt-recipes.yaml"
-        "supervisor/manager.md"
-        "supervisor/policies/run.md"
-        "supervisor/policies/plan.md"
-        "supervisor/policies/review.md"
-        "skills/vibe-commit/SKILL.md"
-    )
-    for rel in "${check_files[@]}"; do
-        if [[ ! -f "$INSTALL_DIR/$rel" ]]; then
-            log_warn "Runtime asset missing: $rel"
-            failed=$((failed + 1))
-        fi
-    done
-    if [[ $failed -gt 0 ]]; then
-        log_error "Runtime asset sanity check failed: $failed file(s) missing"
-        log_error "Run 'vibe update run' to sync, or re-run scripts/install.sh"
-        return 1
-    fi
-    log_success "Runtime asset sanity check passed"
-    return 0
-}
-
-_sanity_check_runtime_assets
+_check_runtime_assets "$INSTALL_DIR"
 
 # 9. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
