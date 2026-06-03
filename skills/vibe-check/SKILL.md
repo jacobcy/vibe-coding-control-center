@@ -1,14 +1,14 @@
 ---
 name: vibe-check
-description: Use when the user wants to inspect the current runtime scene with vibe3 task status or vibe3 flow status, verify whether flow/task state is synchronized with vibe3 check, resume blocked issues with vibe3 task resume, or mentions "/vibe-check" or "check runtime". Do not use for roadmap prioritization or roadmap-task mapping.
+description: Use when the user wants to inspect the current runtime scene with vibe3 task status, verify whether flow/task state is synchronized with vibe3 check, resume blocked issues with vibe3 task resume, or mentions "/vibe-check" or "check runtime". Do not use for roadmap prioritization or roadmap-task mapping.
 ---
 
 # /vibe-check (/check) - task-flow 审计驱动修复
 
 现场观察与修复分三类命令：
 
-- `vibe3 task status`：看 orchestra 与 task 现场
-- `uv run python src/vibe3/cli.py flow status` / `flow show`：看当前或全局 flow 现场
+- `vibe3 task status`：看 orchestra 与 task 现场（首选入口）
+- `uv run python src/vibe3/cli.py flow status` / `flow show`：看当前或特定 flow 详细信息（补充）
 - `uv run python src/vibe3/cli.py check`：只检查 flow 与 task 是否同步
 - `uv run python src/vibe3/cli.py task resume ...`：清除 blocked 状态，恢复 issue 到 ready（非破坏性，保留 worktree）
 
@@ -67,18 +67,13 @@ description: Use when the user wants to inspect the current runtime scene with v
 优先运行：
 
 ```bash
-uv run python src/vibe3/cli.py flow status
-```
-
-如果需要看全局 task 现场，再补：
-
-```bash
 vibe3 task status
 ```
 
-如果是当前分支现场，再补：
+如果需要看当前分支或特定 flow 详细信息，再补：
 
 ```bash
+uv run python src/vibe3/cli.py flow status
 uv run python src/vibe3/cli.py flow show
 ```
 
