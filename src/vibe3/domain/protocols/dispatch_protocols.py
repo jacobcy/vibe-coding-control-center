@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo
-    from vibe3.orchestra.queue_entry import QueueEntry
+    from vibe3.models.queue_entry import QueueEntry
 
 
 class IssueCollectionServiceProtocol(Protocol):

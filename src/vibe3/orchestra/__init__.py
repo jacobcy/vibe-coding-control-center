@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from vibe3.domain.failed_gate import GateResult, GateStatus
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
+    from vibe3.models.queue_entry import QueueEntry
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
     from vibe3.orchestra.issue_loader import (
         get_flow_context,
@@ -42,7 +43,6 @@ if TYPE_CHECKING:
         IssueCollectionServiceProtocol,
         LabelDispatchCallable,
     )
-    from vibe3.orchestra.queue_entry import QueueEntry
     from vibe3.orchestra.queue_operations import (
         promote_progressed_entries,
         select_ready_issues_from_collected_issues,
@@ -62,7 +62,7 @@ def __getattr__(name: str) -> object:
     """
     # Orchestra submodule symbols
     if name == "QueueEntry":
-        from vibe3.orchestra.queue_entry import QueueEntry
+        from vibe3.models.queue_entry import QueueEntry
 
         return QueueEntry
     if name == "append_orchestra_event":

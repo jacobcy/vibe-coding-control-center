@@ -1,12 +1,8 @@
-"""Queue entry data structure."""
+"""Queue entry data structure.
 
-from dataclasses import dataclass
+.. deprecated::
+    Import from ``vibe3.models.queue_entry`` or ``vibe3.models`` instead.
+    This module is retained as a compatibility shell.
+"""
 
-
-@dataclass
-class QueueEntry:
-    """Frozen queue entry tracked only by issue identity and wait state."""
-
-    issue_number: int
-    collected_state: str | None = None
-    waiting_state: str | None = None
+from vibe3.models.queue_entry import QueueEntry  # noqa: F401 — compatibility re-export

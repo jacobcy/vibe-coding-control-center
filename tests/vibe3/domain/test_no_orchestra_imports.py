@@ -44,7 +44,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     - orchestra internal services (used via protocol injection):
       - dispatch_health_check
       - issue_loader
-      - queue_entry
       - queue_operations
       - queue_persistence_service
 
@@ -67,7 +66,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
         # Orchestra internal services (used via protocol injection)
         "vibe3.orchestra.dispatch_health_check",
         "vibe3.orchestra.issue_loader",
-        "vibe3.orchestra.queue_entry",
         "vibe3.orchestra.queue_operations",
         "vibe3.orchestra.queue_persistence_service",
     }

@@ -29,6 +29,7 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
 
 # Note: orchestra internal services remain in orchestra layer
@@ -45,7 +46,6 @@ from vibe3.orchestra.protocols import (
     FlowServiceProtocol,
     LabelDispatchCallable,
 )
-from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
