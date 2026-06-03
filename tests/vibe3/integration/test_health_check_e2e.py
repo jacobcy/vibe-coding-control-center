@@ -50,7 +50,8 @@ def test_closed_issue_flow_gets_aborted_e2e(temp_store: SQLiteClient) -> None:
     result = service.verify_branch(branch)
 
     # Verify: flow marked as aborted
-    assert result.is_valid is True  # Valid because auto-fixed
+    assert result.is_valid is False  # Closed issue = not valid for dispatch
+    assert any("CLOSED" in issue for issue in result.issues)
     assert result.branch == branch
 
     # Verify database state using SQLiteClient API
