@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # Layer mapping (6 = Infrastructure, 1 = CLI)
 # Based on docs/standards/v3-module-architecture-standard.md §2 and §3
 MODULE_LAYER_MAP: dict[str, int] = {
-    # Layer 6 - Infrastructure & Models
+    # Layer 6 - Infrastructure & Models（系统基石，严禁依赖上层）
     "adapters": 6,
     "clients": 6,
     "config": 6,
@@ -23,26 +23,29 @@ MODULE_LAYER_MAP: dict[str, int] = {
     "models": 6,
     "observability": 6,
     "utils": 6,
-    # orchestra and server are in layer 6 per architecture doc
-    "orchestra": 6,
-    "server": 6,
-    "runtime": 6,
-    # Layer 5 - Environment
+    # Layer 5 - Environment & Analysis tools（仅依赖 L6 的无状态原语/工具）
+    "analysis": 5,
     "environment": 5,
-    # Layer 4 - Execution
+    # Layer 4 - Execution primitives（被编排核心调用的无状态执行原语）
     "agents": 4,
-    "execution": 4,
     "prompts": 4,
-    "roles": 4,
-    # Layer 3 - Service & Domain
-    "analysis": 3,
+    # Layer 3 - Orchestration core（编排核心层：事件驱动的业务编排与执行控制）
+    # 这 6 个模块构成一个强连通分量（SCC），内部存在已知的循环依赖技术债，
+    # 由 test_no_circular_deps 追踪，待 epic #1987 Phase 1/2 解耦
+    # （见 #1971/#1884/#1887/#1888）。作为同一层，它们对外（L1/L2）保持盲态，
+    # 不产生向上依赖违规。
     "domain": 3,
+    "execution": 3,
+    "orchestra": 3,
+    "roles": 3,
+    "runtime": 3,
     "services": 3,
-    # Layer 2 - Command
+    # Layer 2 - Command & IO gateway（CLI 命令、HTTP 入口、输出渲染）
     "commands": 2,
-    # Layer 1 - CLI & UI
+    "server": 2,
+    "ui": 2,
+    # Layer 1 - CLI entry
     # Note: cli.py is a file, not a module directory
-    "ui": 1,
 }
 
 # Layer allowed dependencies: layer N can import from layers >= N

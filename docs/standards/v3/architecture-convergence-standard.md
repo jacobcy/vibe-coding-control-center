@@ -190,7 +190,7 @@ Vibe3 最终应收敛为六层。
 
 以下目录最终都应薄化为角色适配器，而不是通用编排器：
 
-- `manager/`
+- `roles/`（包含 manager.py, plan.py, run.py, review.py, supervisor.py, governance.py）
 - `orchestra/`
 - `agents/plan`
 - `agents/run`
@@ -299,7 +299,7 @@ Vibe3 后续收敛的核心不是继续增加抽象，而是收回主控权。
 - `domain` 只做业务编排
 - `execution` 只做统一执行控制面
 - `environment` 只做资源原语
-- `manager/governance/supervisor/plan/run/review` 只做角色逻辑
+- `roles/`（manager/governance/supervisor/plan/run/review）只做角色逻辑
 - `orchestra` 退回 adapter 与兼容层
 
 若没有完成这一步，`domain-first` 只会让系统多一层；  

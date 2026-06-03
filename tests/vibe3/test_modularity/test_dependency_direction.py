@@ -21,15 +21,17 @@ if TYPE_CHECKING:
 class TestLayerDependencies:
     """Test that dependencies follow layer rules."""
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: upward dependencies exist "
-        "(agents→analysis, commands→ui, clients→agents)"
-    )
     def test_no_upward_imports(self, module_registry: list[str]) -> None:
         """Verify no upward imports (lower layers importing from higher layers).
 
         Layer N may import from layers >= N (higher or equal layer number).
         Violations are reported as test failures.
+
+        This is now a hard gate (xfail removed): the layer map in conftest.py
+        reflects the actual architecture, including the L3 orchestration core
+        (domain/execution/orchestra/roles/runtime/services) which forms a single
+        layer. See epic #1987 (#1988/#1989/#1990/#1991) for the layer
+        redefinition that brought upward violations to zero.
         """
         violations = []
 
@@ -141,8 +143,11 @@ class TestCircularDependencies:
     """Test for circular dependencies."""
 
     @pytest.mark.xfail(
-        reason="Known architectural debt: circular dependencies exist "
-        "(cli↔commands, config↔models, etc.)"
+        reason="Known architectural debt: the L3 orchestration core forms a "
+        "single 6-module SCC {domain, execution, orchestra, roles, runtime, "
+        "services} with internal circular deps. Tracked by epic #1987 Phase "
+        "1/2 (#1971/#1884/#1887/#1888); requires code-level decoupling, not "
+        "layer remapping."
     )
     def test_no_circular_deps(self, import_graph: dict[str, list[str]]) -> None:
         """Verify no circular dependencies exist in the module graph.

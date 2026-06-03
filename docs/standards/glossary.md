@@ -593,7 +593,7 @@ related_docs:
   - `Manager` 的清理能力不等于默认自动收口 workflow
   - **不再复写通用执行框架，其执行动作应交由 Execution 层**。
 - 落点：
-  - Python 模块：`src/vibe3/manager/`
+  - Python 模块：`src/vibe3/roles/manager.py`（Manager 角色定义）
   - Skill: `skills/vibe-manager/SKILL.md`
 
 ### 5.10 `Shell 能力层`
