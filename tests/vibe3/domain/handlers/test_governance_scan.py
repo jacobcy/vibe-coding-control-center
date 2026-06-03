@@ -9,7 +9,7 @@ from vibe3.execution.contracts import ExecutionLaunchResult
 class TestGovernanceScanHandler:
     """governance_scan handler dispatches governance agent via CLI self-invocation."""
 
-    @patch("vibe3.orchestra.logging.append_governance_event")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
@@ -54,7 +54,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.orchestra.logging.append_governance_event")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     def test_normal_dispatch(
         self,
@@ -106,7 +106,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
-    @patch("vibe3.orchestra.logging.append_governance_event")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     def test_no_dispatch_when_circuit_breaker_open(
         self,
@@ -143,7 +143,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.orchestra.logging.append_governance_event")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     def test_coordinator_failure_logged(
         self,
@@ -187,7 +187,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.orchestra.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.orchestra.logging.append_governance_event")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     def test_exception_during_dispatch_logged(
         self,

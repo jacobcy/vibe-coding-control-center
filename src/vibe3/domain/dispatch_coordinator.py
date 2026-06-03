@@ -31,6 +31,7 @@ from vibe3.models import IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
+from vibe3.observability.orchestra_log import append_orchestra_event
 
 # Note: orchestra internal services remain in orchestra layer
 # GlobalDispatchCoordinator depends on them via protocols
@@ -39,7 +40,6 @@ from vibe3.orchestra.issue_loader import (
     get_flow_context,
     load_issue,
 )
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
