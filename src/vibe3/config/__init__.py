@@ -34,11 +34,19 @@ __all__ = [
     "MergeGateConfig",
     # Lazy imports
     "ConventionResolver",
+    "get_role_output_contract",
+    "get_role_section",
+    "GOVERNANCE_GATE_CONFIG",
+    "resolve_effective_agent_options",
 ]
 
 # Lazy import mapping for symbols to avoid circular dependencies
 _SYMBOL_MODULES = {
     "ConventionResolver": "vibe3.config.convention_resolver",
+    "get_role_output_contract": "vibe3.config.role_policy",
+    "get_role_section": "vibe3.config.role_policy",
+    "GOVERNANCE_GATE_CONFIG": "vibe3.config.role_gates",
+    "resolve_effective_agent_options": "vibe3.config.agent_preset",
 }
 
 
