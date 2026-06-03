@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.orchestra import IssueInfo, IssueState, append_orchestra_event
+from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.protocols import (
     CheckServiceProtocol,
     FlowServiceProtocol,
