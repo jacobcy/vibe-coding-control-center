@@ -92,15 +92,21 @@ This project has **two parallel implementations**:
 ## 🚀 Quick Start
 
 1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
-2. **检查当前 flow**: 运行 `vibe3 flow show` (或 `uv run python src/vibe3/cli.py flow show`)
-3. **查看全局状态**: 运行 `vibe3 status` (或 `uv run python src/vibe3/cli.py status`)
+2. **检查当前 flow**: 运行 `vibe3 flow show`
+3. **查看全局状态**: 运行 `vibe3 status`
 4. **了解执行规则**: 阅读 [.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)
 
 ## 🔁 Handoff 命令约定
 
-- `uv run python src/vibe3/cli.py handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
-- `uv run python src/vibe3/cli.py handoff show <artifact-path>`：读取共享 handoff artifact
+- `vibe3 handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
+- `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
 - `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
+
+## 架构层级 (Three-Tier Architecture)
+
+- **Tier 3 (Cognitive/Governance)**: Policies, rules, supervisor. (Rules and Principles)
+- **Tier 2 (Skill Layer)**: Orchestration and context management. (Workflow and Logic)
+- **Tier 1 (Shell Layer)**: Atomic capabilities and state access. (Tools and Execution)
 
 ## 🤖 Protocol
 
@@ -145,7 +151,7 @@ Install via respective tools, then create symlinks in `.agent/skills/`. See [DEV
 
 ## 代码分析工具
 
-- `uv run python src/vibe3/cli.py inspect symbols/files/base/pr/commit` — 代码结构与影响分析
+- `vibe3 inspect symbols/files/base/pr/commit` — 代码结构与影响分析
 
 - `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
 - 详细用法见 [.agent/policies/common.md](.agent/policies/common.md)

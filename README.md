@@ -27,9 +27,9 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
-- `uv run python src/vibe3/cli.py status` (兼容入口，重定向至 `task status`)
-- `uv run python src/vibe3/cli.py flow show`
-- `uv run python src/vibe3/cli.py handoff show`
+- `vibe3 status` (兼容入口，重定向至 `task status`)
+- `vibe3 flow show`
+- `vibe3 handoff show`
 - `flow update` / `flow bind` / `flow show` / `flow status`
 - `task status` / `status` 全局总览
 - `handoff` 本地协作增强
@@ -37,6 +37,7 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 - `serve` / orchestra / manager 运行时能力
 - `snapshot` 项目健康度度量
 - `inspect` 代码影响分析
+- `adapters` 逻辑适配器与集成桥接
 
 ## 快速开始
 
@@ -115,28 +116,30 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 ## 架构边界
 
-### Tier 3: Supervisor / Standards
+### Tier 3 (Cognitive/Governance): Policies, rules, supervisor
 
-- `SOUL.md`
-- `CLAUDE.md`
-- `.agent/`
+- `SOUL.md`, `CLAUDE.md`, `STRUCTURE.md`
+- `supervisor/`
 - `docs/standards/`
+- `.agent/`
 
-这一层定义规则、术语、流程边界和治理原则。
+这一层定义宪法原则、规则、术语、流程边界和治理原则。
 
-### Tier 2: Skills / Workflows
+### Tier 2 (Skill Layer): Orchestration and context management
 
 - `skills/`
 - `.agent/workflows/`
+- `src/vibe3/orchestra/`, `src/vibe3/agents/`
 
-这一层负责理解上下文、决定下一步、编排能力调用顺序。
+这一层负责理解上下文、决定下一步、编排能力调用顺序与上下文交换。
 
-### Tier 1: Capability Layer
+### Tier 1 (Shell Layer): Atomic capabilities and state access
 
-- V3: `src/vibe3/`
+- V3: `src/vibe3/` (commands, models, services, clients)
 - V2: `bin/`, `lib/`, `config/`
+- `lib3/` (V3 Hub)
 
-这一层只负责能力，不负责隐藏 workflow。
+这一层只提供原子能力与状态读写，不负责隐藏 workflow 或进行重型决策。
 
 ## V3 关键模块
 
