@@ -339,3 +339,19 @@ class TestFailedGateIntegration:
         status = gate.get_status()
         assert status.is_active, "Gate should be ACTIVE after threshold reached"
         assert status.blocked_ticks == 0, "No ticks counted yet"
+
+
+def test_dispatch_failure_does_not_trigger_failed_gate() -> None:
+    """E_DISPATCH_FAILURE must NOT count toward FailedGate threshold.
+    Infrastructure failures (worktree unavailable) should not block orchestra."""
+    from vibe3.exceptions.error_classification import ERROR_REGISTRY
+
+    contract = ERROR_REGISTRY["E_DISPATCH_FAILURE"]
+
+    assert contract.counts_toward_threshold is False, (
+        "E_DISPATCH_FAILURE must not count toward FailedGate threshold — "
+        "infrastructure failures should not block orchestra"
+    )
+    assert (
+        contract.gate_action == "ignore"
+    ), "E_DISPATCH_FAILURE gate_action must be 'ignore', not 'threshold'"
