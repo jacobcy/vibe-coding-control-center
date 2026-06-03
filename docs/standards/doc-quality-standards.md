@@ -9,7 +9,7 @@ authority:
   - document-quality
 author: Claude Sonnet 4.5
 created: 2025-01-24
-last_updated: 2026-03-08
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -24,7 +24,7 @@ related_docs:
 
 ## 概述
 
-本文档定义 Vibe Center 2.0 项目的统一文档质量标准体系。通过 YAML frontmatter 元数据为不同类型的文档建立质量标准框架，确保文档的可维护性、可追溯性和一致性。
+本文档定义 Vibe Center 项目的统一文档质量标准体系，并以 V3 作为主要实现视角。通过 YAML frontmatter 元 数据为不同类型的文档建立质量标准框架，确保文档的可维护性、可追溯性和一致性。
 
 ### 目的
 
@@ -122,8 +122,8 @@ related_docs:
 | `document_type` | string | 是 | 文档类型标识 | `core-entry`, `skill`, `template` 等 |
 | `author` | string | 是 | 文档创建者 | AI: `"Claude Sonnet 4.5"` / Human: 真实姓名 |
 | `co_writers` | array[string] | 否 | 协作署名列表 | `["GPT-5 Codex", "Chen Yi"]` |
-| `created` | string | 是 | 创建时间 | `2025-01-24` (ISO 8601) |
-| `last_updated` | string | 否 | 最后更新时间 | `2025-01-24` (ISO 8601) |
+| `created` | string | 是 | 创建时间 | `2026-06-03` (ISO 8601) |
+| `last_updated` | string | 否 | 最后更新时间 | `2026-06-03` (ISO 8601) |
 | `related_docs` | array[string] | 否 | 相关文档路径（上下文圈定） | `["SOUL.md", "docs/README.md"]` |
 
 #### 字段说明
@@ -190,8 +190,8 @@ review_frequency: on-change
 author: Claude Sonnet 4.5
 co_writers:
   - GPT-5 Codex
-created: 2025-01-24
-last_updated: 2025-01-24
+created: 2026-06-03
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -241,11 +241,11 @@ description: Use when receiving code review feedback from human reviewers
 category: process
 trigger: manual
 author: Claude Sonnet 4.5
-created: 2025-01-24
-last_updated: 2025-01-24
+created: 2026-06-03
+last_updated: 2026-06-03
 related_docs:
-  - .agent/workflows/code-review.md
-  - docs/standards/coding-standards.md
+  - .agent/workflows/vibe:commit.md
+  - .claude/rules/coding-standards.md
 ---
 ```
 
@@ -289,8 +289,8 @@ document_type: template
 template_for: prd
 description: Template for Product Requirements Documents (PRD)
 author: Claude Sonnet 4.5
-created: 2025-01-24
-last_updated: 2025-01-24
+created: 2026-06-03
+last_updated: 2026-06-03
 related_docs:
   - docs/prds/vibe-workflow-paradigm.md
   - docs/README.md
@@ -325,8 +325,8 @@ related_docs:
 document_type: workflow
 description: Detect and report project drift from original principles defined in SOUL.md
 author: Claude Sonnet 4.5
-created: 2025-01-24
-last_updated: 2025-01-24
+created: 2026-06-03
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - claude-memory MCP 工具（跨会话记忆）
@@ -359,11 +359,11 @@ document_type: prd
 title: Vibe Workflow Paradigm
 status: accepted
 author: Claude Sonnet 4.5
-created: 2025-01-15
-last_updated: 2025-01-24
+created: 2026-06-01
+last_updated: 2026-06-03
 related_docs:
-  - .agent/workflows/vibe-drift.md
-  - .agent/workflows/vibe-check.md
+  - .agent/workflows/vibe:new.md
+  - .agent/workflows/vibe:check.md
   - SOUL.md
 ---
 ```
@@ -388,7 +388,7 @@ related_docs:
 
 | 字段名 | 类型 | 必需 | 说明 | 示例值 |
 |--------|------|------|------|--------|
-| `task_id` | string | 是 | 任务 ID | `2024-01-15-feature-name` |
+| `task_id` | string | 是 | 任务 ID | `2026-06-01-feature-name` |
 | `document_type` | string | 是 | 文档类型 | `task-readme` / `task-prd` / `task-spec` / `task-plan` / `task-test` / `task-code` / `task-audit` |
 | `title` | string | 是 | 任务标题 | `Implement Document Quality Standards` |
 | `current_layer` | string | 否（README 必需） | 当前层级 | `prd` / `spec` / `plan` / `test` / `code` / `audit` |
@@ -398,7 +398,7 @@ related_docs:
 
 ```yaml
 ---
-task_id: 2024-01-15-doc-quality
+task_id: 2026-06-01-doc-quality
 document_type: task-readme
 title: Implement Document Quality Standards
 current_layer: code
@@ -406,23 +406,23 @@ status: in-progress
 author: Claude Sonnet 4.5
 co_writers:
   - GPT-5 Codex
-created: 2025-01-15
-last_updated: 2025-01-24
+created: 2026-06-01
+last_updated: 2026-06-03
 related_docs:
   - docs/standards/doc-quality-standards.md
   - CLAUDE.md
 gates:
   scope:
     status: passed
-    timestamp: 2025-01-15T10:00:00Z
+    timestamp: 2026-06-01T10:00:00Z
     reason: Requirements clearly defined
   spec:
     status: passed
-    timestamp: 2025-01-16T14:30:00Z
+    timestamp: 2026-06-02T14:30:00Z
     reason: Design approved
   plan:
     status: passed
-    timestamp: 2025-01-17T09:00:00Z
+    timestamp: 2026-06-02T09:00:00Z
     reason: Implementation plan ready
   test:
     status: pending
@@ -443,16 +443,16 @@ gates:
 
 ```yaml
 ---
-task_id: 2024-01-15-doc-quality
+task_id: 2026-06-01-doc-quality
 document_type: task-prd
 title: Document Quality Standards - PRD
 author: Claude Sonnet 4.5
 co_writers:
   - GPT-5 Codex
-created: 2025-01-15
-last_updated: 2025-01-15
+created: 2026-06-01
+last_updated: 2026-06-01
 related_docs:
-  - docs/tasks/2024-01-15-doc-quality/README.md
+  - docs/tasks/2026-06-01-doc-quality/README.md
 ---
 ```
 
@@ -518,8 +518,8 @@ authority:
   - file-organization
   - directory-structure
 author: Claude Sonnet 4.5
-created: 2025-01-20
-last_updated: 2025-01-24
+created: 2026-06-02
+last_updated: 2026-06-03
 related_docs:
   - docs/README.md
   - STRUCTURE.md
@@ -634,7 +634,8 @@ A: ISO 8601 是国际标准，无歧义，易于解析和排序。
 - [docs/standards/doc-organization.md](./doc-organization.md) - 文档组织标准
 - [YAML Specification](https://yaml.org/spec/1.2/spec.html) - YAML 格式规范
 - [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html) - 日期时间格式标准
-
 ## 版本历史
 
 - **2025-01-24**: 初始版本，定义 7 种文档类型的 frontmatter schema
+- **2026-06-03**: 语义对齐更新，更新示例日期、项目引用（V3）及 CLI 命令规范
+---
