@@ -28,7 +28,7 @@ def handle_supervisor_issue_identified(
 ) -> None:
     """Dispatch supervisor apply via CLI self-invocation."""
     from vibe3.execution.issue_role_support import build_issue_async_cli_request
-    from vibe3.orchestra.logging import append_orchestra_event
+    from vibe3.observability.orchestra_log import append_orchestra_event
     from vibe3.roles.supervisor import SUPERVISOR_APPLY_ROLE
 
     config = load_orchestra_config()

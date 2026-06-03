@@ -22,17 +22,17 @@ if TYPE_CHECKING:
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
     from vibe3.models.queue_entry import QueueEntry
+    from vibe3.observability.orchestra_log import (
+        append_orchestra_event,
+        append_orchestra_run_separator,
+        orchestra_events_log_path,
+        orchestra_log_dir,
+    )
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
     from vibe3.orchestra.issue_loader import (
         get_flow_context,
         is_auto_task_branch,
         load_issue,
-    )
-    from vibe3.orchestra.logging import (
-        append_orchestra_event,
-        append_orchestra_run_separator,
-        orchestra_events_log_path,
-        orchestra_log_dir,
     )
     from vibe3.orchestra.protocols import (
         CapacityServiceProtocol,
@@ -65,19 +65,19 @@ def __getattr__(name: str) -> object:
 
         return QueueEntry
     if name == "append_orchestra_event":
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         return append_orchestra_event
     if name == "append_orchestra_run_separator":
-        from vibe3.orchestra.logging import append_orchestra_run_separator
+        from vibe3.observability.orchestra_log import append_orchestra_run_separator
 
         return append_orchestra_run_separator
     if name == "orchestra_events_log_path":
-        from vibe3.orchestra.logging import orchestra_events_log_path
+        from vibe3.observability.orchestra_log import orchestra_events_log_path
 
         return orchestra_events_log_path
     if name == "orchestra_log_dir":
-        from vibe3.orchestra.logging import orchestra_log_dir
+        from vibe3.observability.orchestra_log import orchestra_log_dir
 
         return orchestra_log_dir
     if name == "sort_ready_issues":

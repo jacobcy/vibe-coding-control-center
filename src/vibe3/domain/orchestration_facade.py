@@ -146,7 +146,7 @@ class OrchestrationFacade(ServiceBase):
         Args:
             tick_id: Current tick number from HeartbeatServer (default: 0)
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         self.on_heartbeat_tick()
 

@@ -69,7 +69,7 @@ class QualifyGateService:
             )
             return
 
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         append_orchestra_event(
             "dispatcher",
@@ -179,6 +179,7 @@ class QualifyGateService:
         Returns:
             Target IssueState to dispatch to, or None if still blocked.
         """
+
         if issue.github_state and issue.github_state.upper() == "CLOSED":
             flow = self._flow_manager.get_flow_for_issue(issue.number)
             branch = str(flow.get("branch") or "").strip() if flow else ""
@@ -213,7 +214,7 @@ class QualifyGateService:
         Ensures local flow_state has flow_status='blocked' and blocked fields
         match the remote truth. Adds state/blocked label if missing.
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
         from vibe3.services.blocked_state_service import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
@@ -328,7 +329,7 @@ class QualifyGateService:
         Clears local blocked cache and removes state/blocked label.
         """
         from vibe3.models.flow import FlowState
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -388,7 +389,7 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         worktree_path = truth.worktree_path
         if not worktree_path or not isinstance(worktree_path, str):

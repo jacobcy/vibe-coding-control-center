@@ -71,7 +71,7 @@ def handle_governance_scan_started(
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.orchestra.logging import append_governance_event
+    from vibe3.observability.orchestra_log import append_governance_event
     from vibe3.roles.governance import build_governance_execution_name
 
     config = load_orchestra_config()

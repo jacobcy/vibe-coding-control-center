@@ -1,6 +1,6 @@
 """Test orchestra logging functions."""
 
-from vibe3.orchestra.logging import orchestra_events_log_path
+from vibe3.observability.orchestra_log import orchestra_events_log_path
 
 
 class TestOrchestraLogging:

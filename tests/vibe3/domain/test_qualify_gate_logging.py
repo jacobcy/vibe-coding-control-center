@@ -39,7 +39,9 @@ def test_blocked_skip_log_includes_truth_details() -> None:
             "resolve_coordination",
             return_value=truth,
         ),
-        patch("vibe3.orchestra.logging.append_orchestra_event") as append_event,
+        patch(
+            "vibe3.observability.orchestra_log.append_orchestra_event"
+        ) as append_event,
     ):
         result = service.run_qualify_gate(
             issue=issue,
@@ -82,7 +84,9 @@ def test_blocked_skip_log_reports_aligned_label_state() -> None:
             return_value=truth,
         ),
         patch("vibe3.services.label_service.LabelService") as label_service,
-        patch("vibe3.orchestra.logging.append_orchestra_event") as append_event,
+        patch(
+            "vibe3.observability.orchestra_log.append_orchestra_event"
+        ) as append_event,
     ):
         result = service.run_qualify_gate(
             issue=IssueInfo(
