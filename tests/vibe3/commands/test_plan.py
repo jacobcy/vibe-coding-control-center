@@ -73,6 +73,14 @@ def test_plan_branch_basic_flow(monkeypatch) -> None:
     assert call_kwargs["issue_number"] == 42
 
 
+def test_plan_no_arg_defaults_to_current_branch(monkeypatch) -> None:
+    """Test plan without --branch uses current branch."""
+    mock_runner = _patch_plan_deps(monkeypatch)
+    result = runner.invoke(plan_app, [])
+    assert result.exit_code == 0
+    mock_runner.assert_called_once()
+
+
 def test_plan_branch_no_flow_error(monkeypatch) -> None:
     """Test plan --branch with no flow shows error."""
     mock_flow_service = MagicMock()

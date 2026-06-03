@@ -99,18 +99,14 @@ def default(
     if ctx.invoked_subcommand is not None:
         return
 
-    if branch is not None or ctx.args:
-        # --branch provided or positional arg (legacy issue number)
-        target_branch = resolve_branch_arg(branch)
-        _review_branch_impl(
-            branch=target_branch,
-            trace=trace,
-            dry_run=dry_run,
-            no_async=no_async,
-            show_prompt=show_prompt,
-        )
-        return
-    typer.echo(ctx.get_help())
+    target_branch = resolve_branch_arg(branch)
+    _review_branch_impl(
+        branch=target_branch,
+        trace=trace,
+        dry_run=dry_run,
+        no_async=no_async,
+        show_prompt=show_prompt,
+    )
 
 
 @app.command(name="issue", hidden=True)

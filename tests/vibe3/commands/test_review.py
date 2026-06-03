@@ -7,7 +7,7 @@ Removal tests from test_review_help.py are in test_removed_commands.py.
 from __future__ import annotations
 
 import re
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -72,14 +72,20 @@ class TestReviewContextBuilderUsesAssembler:
 # ==============================================================================
 
 
-def test_review_no_args_shows_help():
-    """vibe review (no subcommand) -> shows help.
+def test_review_no_arg_defaults_to_current_branch():
+    """vibe review (no subcommand) -> executes review on current branch."""
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch("vibe3.commands.review.run_issue_role_async") as mock_async,
+    ):
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 42
+        mock_validate.return_value = (mock_flow, 42)
 
-    Exit 0 or 2 per typer no_args_is_help.
-    """
-    result = runner.invoke(app, [])
-    assert result.exit_code in (0, 2)
-    assert "Usage" in result.output or "base" in result.output
+        result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    mock_async.assert_called_once()
 
 
 def test_review_help_only_shows_supported_commands():

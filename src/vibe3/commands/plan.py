@@ -24,7 +24,7 @@ from vibe3.services.handoff_resolution import resolve_handoff_target
 app = typer.Typer(
     name="plan",
     help="Create implementation plans for issues or specifications.",
-    no_args_is_help=True,
+    no_args_is_help=False,
     rich_markup_mode="rich",
 )
 
