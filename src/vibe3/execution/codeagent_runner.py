@@ -24,13 +24,13 @@ if TYPE_CHECKING:
 from vibe3.config.role_policy import get_role_section
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_lifecycle import (
     execution_prefix,
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.actor_support import format_agent_actor
 from vibe3.services.handoff_service import HandoffService

@@ -6,13 +6,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+from vibe3.config.role_gates import EXECUTOR_GATE_CONFIG
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
-from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
 from vibe3.models.orchestration import IssueState
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService

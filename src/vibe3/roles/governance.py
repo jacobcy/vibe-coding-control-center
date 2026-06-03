@@ -12,10 +12,10 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.execution import ExecutionRequest
+from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,

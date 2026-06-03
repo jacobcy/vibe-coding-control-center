@@ -11,13 +11,13 @@ from vibe3.agents import (
 )
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.issue_role_support import build_issue_sync_spec
 from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
 )
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.run_helpers import (
