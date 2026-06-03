@@ -132,6 +132,9 @@ code_limits:
       - path: "src/vibe3/config/settings.py"
         limit: 520
         reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开、CheckCleanupSettings 新增配置等配置加载逻辑，拆分会破坏配置系统完整性"
+      - path: "src/vibe3/config/loader.py"
+        limit: 420
+        reason: "配置加载核心模块，包含配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、变量展开等紧密耦合的配置加载逻辑，统一环境变量覆盖框架后略微超标"
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree_lifecycle.py"
