@@ -148,7 +148,7 @@ def status(
     check: Annotated[
         bool, typer.Option("--check", help="显示前先运行完整 vibe3 check")
     ] = False,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
+    format: FormatOption = "table",
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Show task-oriented global status dashboard."""
@@ -157,10 +157,9 @@ def status(
     _full_status_dashboard(
         all_flows=all_flows,
         check=check,
-        output_format="table" if not json_output else "json",
+        output_format=format,
         trace=trace,
         min_ms=None,
-        json_output=json_output,
     )
 
 

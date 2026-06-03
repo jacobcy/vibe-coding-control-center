@@ -270,7 +270,7 @@ vibe3 flow unblock [--branch <branch>]
 vibe3 task show [<branch>] [--branch <branch>]
 
 # Global status
-vibe3 task status [--all] [--json]
+vibe3 task status [--all] [--format json]
 
 # Resume blocked tasks
 vibe3 task resume [<issue>] [--branch <branch>] [--blocked] [--label auto|ready|claimed|in-progress|handoff|review|merge-ready] [--yes]
@@ -298,19 +298,19 @@ vibe3 flow rebuild [<issue>] [--branch <branch>] [--keep-remote] [--no-worktree]
 
 
 ```bash
-vibe3 flow show [--branch <branch>] [--snapshot] [--json]
+vibe3 flow show [--branch <branch>] [--snapshot] [--format json]
 ```
 
 ### 7.5 `flow status`
 
 ```bash
-vibe3 flow status [--all] [--json]
+vibe3 flow status [--all] [--format json]
 ```
 
 ### 7.6 `status`
 
 ```bash
-vibe3 task status [--all] [--json]
+vibe3 task status [--all] [--format json]
 ```
 
 ## 8. 禁止语义

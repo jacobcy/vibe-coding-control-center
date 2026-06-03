@@ -128,7 +128,6 @@ def _full_status_dashboard(
     output_format: str = "table",
     trace: bool = False,
     min_ms: int | None = None,
-    json_output: bool = False,
 ) -> None:
     """Render full task status dashboard (system status + all progress panels)."""
     validate_trace_options(trace, min_ms)
@@ -151,12 +150,6 @@ def _full_status_dashboard(
         fetch_task_status_data,
     )
 
-    if json_output and output_format == "table":
-        typer.echo(
-            "Warning: --json is deprecated, use --format json instead",
-            err=True,
-        )
-        output_format = "json"
     if check:
         run_full_check_shortcut()
 
