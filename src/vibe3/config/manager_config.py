@@ -7,7 +7,7 @@ ConventionResolver defaults when explicit config values are not set.
 from __future__ import annotations
 
 from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
+from vibe3.models import OrchestraConfig, SupervisorHandoffConfig
 
 
 def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:

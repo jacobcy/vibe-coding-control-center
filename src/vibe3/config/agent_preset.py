@@ -14,7 +14,7 @@ from typing import Any, Final
 from loguru import logger
 
 from vibe3.exceptions import AgentPresetNotFoundError
-from vibe3.models.review_runner import AgentOptions
+from vibe3.models import AgentOptions
 
 REPO_MODELS_JSON_PATH: Final[Path] = (
     Path(__file__).resolve().parents[3] / "config" / "v3" / "models.json"
