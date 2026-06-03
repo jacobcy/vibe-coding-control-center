@@ -17,6 +17,11 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.services.orchestra_helpers import get_manager_usernames
 
 
+def _raise_system_error() -> Path:
+    """Helper function to raise SystemError for testing."""
+    raise SystemError("Cannot resolve repository root — not inside a git repository")
+
+
 class TestEnvOverrideRule:
     """Test EnvOverrideRule dataclass."""
 
@@ -180,6 +185,15 @@ class TestLoadKeysEnvFallback:
         keys_file.parent.mkdir(parents=True, exist_ok=True)
         keys_file.write_text(keys_content)
 
+        # Mock find_repo_root to return tmp_path (simulating repo root)
+        from vibe3.clients.git_client import find_repo_root
+
+        monkeypatch.setattr(find_repo_root, "cache_clear", lambda: None)
+        monkeypatch.setattr(
+            "vibe3.clients.git_client.find_repo_root",
+            lambda: tmp_path,
+        )
+
         # Change to temp directory
         monkeypatch.chdir(tmp_path)
 
@@ -191,6 +205,69 @@ class TestLoadKeysEnvFallback:
         load_keys_env_fallback()
 
         assert os.environ.get("TEST_KEY") == "test_value"
+
+    def test_warns_when_repo_root_undetectable_and_cwd_path_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test WARNING emitted when repo root cannot be detected.
+
+        Verifies WARNING is emitted when repo root detection fails and CWD
+        has no config/keys.env file.
+        """
+        from loguru import logger
+
+        warnings_captured: list[str] = []
+        handler_id = logger.add(
+            lambda msg: warnings_captured.append(str(msg)), level="WARNING"
+        )
+
+        try:
+            # Mock find_repo_root to raise SystemError (not in git repo)
+            monkeypatch.setattr(
+                "vibe3.clients.git_client.find_repo_root",
+                _raise_system_error,
+            )
+            # Ensure no home-dir keys.env interferes
+            monkeypatch.setattr(Path, "home", lambda: tmp_path)
+            # chdir to tmp_path (no config/keys.env here)
+            monkeypatch.chdir(tmp_path)
+
+            os.environ.pop("VIBE_MANAGER_GITHUB_TOKEN", None)
+            os.environ.pop("MANAGER_USERNAMES", None)
+
+            load_keys_env_fallback()
+
+            assert any("Cannot detect repo root" in w for w in warnings_captured)
+        finally:
+            logger.remove(handler_id)
+
+    def test_loads_from_repo_root_when_cwd_differs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test keys.env found via repo root even when CWD is a subdirectory."""
+        # Create keys.env in tmp_path (repo root)
+        keys_file = tmp_path / "config" / "keys.env"
+        keys_file.parent.mkdir(parents=True, exist_ok=True)
+        keys_file.write_text("REPO_KEY=from_repo_root\n")
+
+        # Create subdirectory and chdir into it (no config/keys.env there)
+        subdir = tmp_path / "src" / "vibe3"
+        subdir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.chdir(subdir)
+
+        # Mock find_repo_root to return tmp_path
+        monkeypatch.setattr(
+            "vibe3.clients.git_client.find_repo_root",
+            lambda: tmp_path,
+        )
+
+        os.environ.pop("VIBE_MANAGER_GITHUB_TOKEN", None)
+        os.environ.pop("MANAGER_USERNAMES", None)
+        os.environ.pop("REPO_KEY", None)
+
+        load_keys_env_fallback()
+
+        assert os.environ.get("REPO_KEY") == "from_repo_root"
 
 
 class TestGetManagerUsernames:
