@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe3.agents.backends.codeagent_config import (
+from vibe3.config.agent_preset import (
     resolve_effective_agent_options,
     resolve_repo_agent_preset,
 )
@@ -44,7 +44,7 @@ class TestResolveEffectiveAgentOptions:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             options = AgentOptions(agent="vibe-reviewer")
@@ -74,7 +74,7 @@ class TestAgentPresetFallback:
             )
         )
         with patch(
-            "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+            "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
             repo_models,
         ):
             options = AgentOptions(agent="unknown-preset")
@@ -91,7 +91,7 @@ class TestAgentPresetFallback:
         repo_models.parent.mkdir(parents=True)
         repo_models.write_text(json.dumps({"agents": {}}))
         with patch(
-            "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+            "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
             repo_models,
         ):
             import pytest
@@ -119,7 +119,7 @@ class TestAgentPresetFallback:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             options = AgentOptions(agent="vibe-reviewer", model="claude-opus-4-6")
@@ -137,7 +137,7 @@ class TestAgentPresetFallback:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             options = AgentOptions(agent="minimal-agent")
@@ -176,7 +176,7 @@ class TestResolveRepoAgentPreset:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             result = resolve_repo_agent_preset("test-preset")
@@ -190,7 +190,7 @@ class TestResolveRepoAgentPreset:
         repo_models.write_text(json.dumps({"agents": {}}))
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             result = resolve_repo_agent_preset("unknown-preset")
@@ -206,7 +206,7 @@ class TestResolveRepoAgentPreset:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             result = resolve_repo_agent_preset("minimal")
@@ -220,7 +220,7 @@ class TestResolveRepoAgentPreset:
         repo_models.write_text(json.dumps({}))
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             result = resolve_repo_agent_preset("any-preset")
@@ -232,7 +232,7 @@ class TestResolveRepoAgentPreset:
         repo_models = tmp_path / "config" / "models.json"
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=repo_models,
         ):
             result = resolve_repo_agent_preset("any-preset")

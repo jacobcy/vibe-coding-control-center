@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe3.agents.backends.codeagent_config import find_missing_backend_commands
+from vibe3.config.agent_preset import find_missing_backend_commands
 
 
 def test_find_missing_backend_commands_only_reports_configured_backends(
@@ -26,7 +26,7 @@ def test_find_missing_backend_commands_only_reports_configured_backends(
     def fake_which(command: str, path: str | None = None) -> str | None:
         return None if command in {"opencode", "gemini"} else f"/usr/bin/{command}"
 
-    with patch("vibe3.agents.backends.codeagent_config.shutil.which", fake_which):
+    with patch("vibe3.config.agent_preset.shutil.which", fake_which):
         missing = find_missing_backend_commands(repo_models)
 
     assert missing == {"gemini": "gemini", "opencode": "opencode"}

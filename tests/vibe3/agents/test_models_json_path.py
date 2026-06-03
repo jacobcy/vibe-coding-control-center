@@ -10,7 +10,7 @@ class TestRepoModelsJsonPath:
 
     def test_default_path_without_override(self) -> None:
         """Without override, should return default REPO_MODELS_JSON_PATH."""
-        from vibe3.agents.backends.codeagent_config import (
+        from vibe3.config.agent_preset import (
             REPO_MODELS_JSON_PATH,
             repo_models_json_path,
         )
@@ -30,7 +30,7 @@ class TestRepoModelsJsonPath:
             {"VIBE3_REPO_MODELS_ROOT": str(override_root)},
             clear=True,
         ):
-            from vibe3.agents.backends.codeagent_config import repo_models_json_path
+            from vibe3.config.agent_preset import repo_models_json_path
 
             result = repo_models_json_path()
 
@@ -48,7 +48,7 @@ class TestRepoModelsJsonPath:
             {"VIBE3_REPO_MODELS_ROOT": str(override_root)},
             clear=True,
         ):
-            from vibe3.agents.backends.codeagent_config import repo_models_json_path
+            from vibe3.config.agent_preset import repo_models_json_path
 
             result = repo_models_json_path()
 
@@ -66,7 +66,7 @@ class TestRepoModelsJsonPath:
             {"VIBE3_REPO_MODELS_ROOT": home_based},
             clear=True,
         ):
-            from vibe3.agents.backends.codeagent_config import repo_models_json_path
+            from vibe3.config.agent_preset import repo_models_json_path
 
             result = repo_models_json_path()
 
@@ -83,7 +83,7 @@ class TestRepoModelsJsonPath:
             {"VIBE3_REPO_MODELS_ROOT": relative_path},
             clear=True,
         ):
-            from vibe3.agents.backends.codeagent_config import repo_models_json_path
+            from vibe3.config.agent_preset import repo_models_json_path
 
             result = repo_models_json_path()
 

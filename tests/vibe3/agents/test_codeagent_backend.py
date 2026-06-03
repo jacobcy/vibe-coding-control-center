@@ -211,7 +211,7 @@ class TestCodeagentBackend:
         with (
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
         ):
@@ -249,7 +249,7 @@ class TestCodeagentBackend:
         with (
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
         ):
@@ -280,7 +280,7 @@ class TestCodeagentBackend:
         with (
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
         ):
@@ -308,7 +308,7 @@ class TestCodeagentBackend:
         with (
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
         ):
@@ -334,7 +334,7 @@ class TestCodeagentBackend:
         with (
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
         ):
