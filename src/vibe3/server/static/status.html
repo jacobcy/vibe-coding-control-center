@@ -258,6 +258,13 @@ async function load() {
     document.getElementById('footer').textContent =
       `interval ${d.polling_interval}s · port ${d.port} · circuit ${d.circuit_breaker_state}`;
 
+    // Sync refresh interval to orchestra polling_interval
+    const pi = safeInt(d.polling_interval);
+    if (pi && pi !== refreshInterval) {
+      refreshInterval = pi;
+      countdown = pi;
+    }
+
   } catch(e) {
     document.getElementById('status-dot').className = 'status-dot offline';
     document.getElementById('status-text').textContent = 'error';
@@ -266,12 +273,13 @@ async function load() {
   }
 }
 
+let refreshInterval = 30;
+let countdown = refreshInterval;
 load();
-let countdown = 30;
 setInterval(() => {
   countdown--;
   document.getElementById('refresh-info').textContent = `refresh in ${countdown}s`;
-  if (countdown <= 0) { countdown = 30; load(); }
+  if (countdown <= 0) { countdown = refreshInterval; load(); }
 }, 1000);
 </script>
 </body>
