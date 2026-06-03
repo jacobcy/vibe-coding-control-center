@@ -240,6 +240,7 @@ class IssueAdminMixin:
         title: str,
         body: str,
         labels: list[str] | None = None,
+        assignees: list[str] | None = None,
         repo: str | None = None,
     ) -> int | None:
         """Create a new GitHub issue.
@@ -248,6 +249,7 @@ class IssueAdminMixin:
             title: Issue title
             body: Issue body/description
             labels: Optional list of labels to apply
+            assignees: Optional list of assignees (GitHub usernames)
             repo: Optional repo override (owner/repo)
 
         Returns:
@@ -264,6 +266,10 @@ class IssueAdminMixin:
         if labels:
             for label in labels:
                 cmd.extend(["--label", label])
+
+        if assignees:
+            for assignee in assignees:
+                cmd.extend(["--assignee", assignee])
 
         if repo:
             cmd.extend(["--repo", repo])

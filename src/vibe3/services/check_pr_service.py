@@ -162,6 +162,77 @@ class CheckPRService:
             ).warning(warning_msg)
             return (None, [warning_msg])
 
+    def handle_closed_pr(
+        self,
+        branch: str,
+        pr: "PRResponse",
+    ) -> tuple[bool, list[str], list[str]]:
+        """Handle PR state changes detected during check.
+
+        Args:
+            branch: Branch name
+            pr: PR response object
+
+        Returns:
+            Tuple of (handled, issues, warnings).
+            - handled: True if PR was merged or closed (caller should return early)
+            - issues: List of error/issue messages
+            - warnings: List of warning messages
+        """
+        if pr.merged_at or pr.state == PRState.MERGED:
+            return self._handle_merged_pr(branch, pr)
+
+        if pr.state == PRState.CLOSED:
+            if self._already_handled_pr_closed(branch, pr):
+                return (False, [], [])
+            return self._handle_closed_pr(branch, pr)
+
+        # PR still open, nothing to handle
+        return (False, [], [])
+
+    def _handle_merged_pr(
+        self, branch: str, pr: "PRResponse"
+    ) -> tuple[bool, list[str], list[str]]:
+        """Handle merged PR: mark flow done, auto-close linked issues.
+
+        Returns:
+            Tuple of (handled=True, issues, warnings).
+        """
+        warnings: list[str] = []
+
+        suggestions = self._flow_status_service.mark_flow_done(
+            branch,
+            f"PR #{pr.number} merged (detected from GitHub)",
+        )
+        self._update_pr_cache(branch, pr)
+
+        if suggestions.get("issue_to_close"):
+            # Informational message, not an error
+            warnings.append(
+                f"Issue #{suggestions['issue_to_close']} was still OPEN — "
+                "auto-closed because PR was merged."
+            )
+
+        return (True, [], warnings)
+
+    def _handle_closed_pr(
+        self, branch: str, pr: "PRResponse"
+    ) -> tuple[bool, list[str], list[str]]:
+        """Handle closed PR (without merge): reset issue, clean up.
+
+        Returns:
+            Tuple of (handled=True, issues, warnings).
+        """
+        reset_error, reset_warnings = self._reset_issue_after_pr_closed(
+            branch, pr.number
+        )
+        self._update_pr_cache(branch, pr)
+
+        if reset_error:
+            return (True, [reset_error], [])
+
+        return (True, [], reset_warnings)
+
     def _find_existing_bridge_marker(
         self, issue_number: int, closed_pr_number: int
     ) -> int | None:
@@ -182,7 +253,6 @@ class CheckPRService:
                 return None
 
             # Look for bridge marker comment
-            # Check for both the marker header and the specific closed_pr reference
             for comment in comments:
                 if not isinstance(comment, dict):
                     continue
@@ -191,8 +261,7 @@ class CheckPRService:
                     continue
 
                 # Check if this is a bridge marker for this exact PR.
-                # Use a line-anchored regex instead of substring matching so
-                # closed_pr: #123 does not accidentally match closed_pr: #1234.
+                # Use line-anchored regex to prevent accidental matching.
                 closed_pr_match = re.search(
                     rf"^closed_pr:\s*#{closed_pr_number}\s*$", body, re.M
                 )
@@ -278,10 +347,21 @@ This bridge issue is the new execution target.
 """
 
         labels = self._inherit_labels_for_bridge(original_issue)
+
+        # Inherit assignees from original issue
+        assignees: list[str] = []
+        if isinstance(original_issue.get("assignees"), list):
+            for a in original_issue["assignees"]:
+                if isinstance(a, dict):
+                    login = a.get("login")
+                    if isinstance(login, str):
+                        assignees.append(login)
+
         bridge_number = self.github_client.create_issue(
             title=f"Follow-up: {original_title}",
             body=bridge_body,
             labels=labels,
+            assignees=assignees,
         )
 
         if bridge_number:
@@ -291,6 +371,7 @@ This bridge issue is the new execution target.
                 bridge_issue=bridge_number,
                 original_issue=original_issue_number,
                 closed_pr=closed_pr_number,
+                assignees=assignees,
             ).info(
                 f"Created bridge issue #{bridge_number} for "
                 f"original #{original_issue_number} after PR #{closed_pr_number} closed"
@@ -361,70 +442,12 @@ The unresolved work continues in #{bridge_issue_number}.
 
         return result
 
-    def handle_closed_pr(
-        self,
-        branch: str,
-        pr: "PRResponse",
-    ) -> tuple[bool, list[str], list[str]]:
-        """Handle PR state changes detected during check.
-
-        Returns: (handled, issues, warnings)
-        - handled: True if PR was merged or closed (caller should return early)
-        - issues: List of error messages
-        - warnings: List of warning messages
-        """
-        if pr.merged_at or pr.state == PRState.MERGED:
-            return self._handle_merged_pr(branch, pr)
-
-        if pr.state == PRState.CLOSED:
-            if self._already_handled_pr_closed(branch, pr):
-                return (False, [], [])
-            return self._handle_closed_pr(branch, pr)
-
-        # PR still open, nothing to handle
-        return (False, [], [])
-
-    def _handle_merged_pr(
-        self, branch: str, pr: "PRResponse"
-    ) -> tuple[bool, list[str], list[str]]:
-        """Handle merged PR: mark flow done, auto-close linked issues."""
-        warnings: list[str] = []
-
-        suggestions = self._flow_status_service.mark_flow_done(
-            branch,
-            f"PR #{pr.number} merged (detected from GitHub)",
-        )
-        self._update_pr_cache(branch, pr)
-
-        if suggestions.get("issue_to_close"):
-            warnings.append(
-                f"Issue #{suggestions['issue_to_close']} was still OPEN — "
-                "auto-closed because PR was merged."
-            )
-
-        return (True, [], warnings)
-
-    def _handle_closed_pr(
-        self, branch: str, pr: "PRResponse"
-    ) -> tuple[bool, list[str], list[str]]:
-        """Handle closed PR (without merge): reset issue, clean up."""
-        reset_error, reset_warnings = self._reset_issue_after_pr_closed(
-            branch, pr.number
-        )
-        self._update_pr_cache(branch, pr)
-
-        if reset_error:
-            return (True, [reset_error], [])
-
-        return (True, [], reset_warnings)
-
     def _reset_issue_after_pr_closed(
         self, branch: str, pr_number: int
     ) -> tuple[str | None, list[str]]:
         """Reset issue to READY after PR closed without merge.
 
-        Cleans up flow scene (worktree, branch, flow record) and
-        restores issue to READY state so it can be dispatched again.
+        Creates bridge issue, closes original issue, cleans up flow scene.
 
         Args:
             branch: Branch name (e.g., "task/issue-456")
@@ -538,36 +561,38 @@ The unresolved work continues in #{bridge_issue_number}.
         )
 
         if not bridge_number:
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).warning("Failed to create bridge issue, preserving flow for retry")
             return (
                 f"Failed to create bridge issue for #{task_issue_number} "
-                f"after PR #{pr_number} closed",
+                f"(network/permission error), please retry later",
                 [],
             )
 
         # Add bridge marker to original issue
-        marker_added = self._add_bridge_marker_to_original(
+        marker_success = self._add_bridge_marker_to_original(
             original_issue_number=task_issue_number,
             bridge_issue_number=bridge_number,
             closed_pr_number=pr_number,
             branch=branch,
         )
 
-        if not marker_added:
+        if not marker_success:
             logger.bind(
                 domain="check",
                 action="reset_pr_closed",
                 branch=branch,
                 issue_number=task_issue_number,
                 bridge_issue=bridge_number,
-            ).warning(
-                f"Failed to add bridge marker to issue #{task_issue_number}, "
-                f"preserving flow for retry"
-            )
-            # Do NOT cleanup flow - allow retry to add marker
+            ).warning("Failed to add bridge marker, preserving flow for retry")
             return (
-                f"Created bridge issue #{bridge_number} but failed to add marker "
-                f"to original #{task_issue_number} (network/permission error); "
-                f"please manually add marker or retry",
+                f"Created bridge issue #{bridge_number}, but failed to add "
+                f"marker to original #{task_issue_number}; "
+                "please manually add marker comment",
                 [],
             )
 
@@ -578,7 +603,6 @@ The unresolved work continues in #{bridge_issue_number}.
             closed_pr_number=pr_number,
         )
 
-        # Check if close succeeded
         if close_result == "failed":
             logger.bind(
                 domain="check",
@@ -586,23 +610,29 @@ The unresolved work continues in #{bridge_issue_number}.
                 branch=branch,
                 issue_number=task_issue_number,
                 bridge_issue=bridge_number,
-            ).warning(
-                f"Failed to close original issue #{task_issue_number}, "
-                f"preserving flow for retry"
-            )
-            # Do NOT cleanup flow - allow manual retry or intervention
+            ).warning("Failed to close original issue, preserving flow for retry")
             return (
-                f"Failed to close original issue #{task_issue_number} "
-                f"(network/permission error), bridge #{bridge_number} created; "
-                f"please retry later or manually close",
+                f"Created bridge issue #{bridge_number}, but failed to close "
+                f"original #{task_issue_number}; please manually close",
                 [],
             )
 
-        # Abort and cleanup old flow
+        # Success - abort and cleanup old flow
+        assignee_names = [
+            a.get("login", "")
+            for a in gh_issue.get("assignees", [])
+            if isinstance(a, dict)
+        ]
+        assignee_info = (
+            f"bridge issue #{bridge_number} assigned to: {', '.join(assignee_names)}"
+            if assignee_names
+            else f"bridge issue #{bridge_number} (no assignee)"
+        )
         return self._abort_and_cleanup(
             branch,
-            f"Bridge issue #{bridge_number} created; "
-            f"original #{task_issue_number} closed after PR #{pr_number} abandoned",
+            f"Created bridge issue #{bridge_number}, closed original "
+            f"#{task_issue_number} after PR #{pr_number} closed",
+            assignee_info,
         )
 
     def _update_pr_cache(self, branch: str, pr: "PRResponse") -> None:

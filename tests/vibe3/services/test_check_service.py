@@ -494,4 +494,4 @@ def test_handle_closed_pr_when_add_marker_fails_does_not_cleanup() -> None:
         assert len(issues) == 1
         assert "Created bridge issue #789" in issues[0]
         assert "failed to add marker" in issues[0]
-        assert "manually add marker or retry" in issues[0]
+        assert "manually add marker comment" in issues[0]
