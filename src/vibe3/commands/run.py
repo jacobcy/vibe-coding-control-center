@@ -16,7 +16,8 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.exceptions import UserError
+from vibe3.config.loader import load_runtime_config
+from vibe3.exceptions import ConfigError, UserError
 from vibe3.roles.run import (
     ensure_plan_file_exists,
     execute_manual_run,
@@ -88,10 +89,6 @@ def run_command(
 
     register_event_handlers()
 
-    # Load config with CLI overrides
-    from vibe3.config.loader import load_runtime_config
-    from vibe3.exceptions import ConfigError
-
     cli_overrides: dict[str, Any] = {}
     if backend:
         cli_overrides["run.agent_config.backend"] = backend
@@ -101,7 +98,9 @@ def run_command(
         cli_overrides["run.agent_config.agent"] = agent
 
     try:
-        config = load_runtime_config(cli_overrides=cli_overrides or None)
+        config = load_runtime_config(
+            cli_overrides=cli_overrides if cli_overrides else None
+        )
     except ConfigError as e:
         typer.echo(f"Configuration error: {e}", err=True)
         raise typer.Exit(1) from e

@@ -184,7 +184,11 @@ def find_config_file() -> Path | None:
 def load_config(
     config_path: Path | None = None, *, target_repo: Path | None = None
 ) -> VibeConfig:
-    """Load configuration from file or use defaults.
+    """Load configuration from file or use defaults (file layers only).
+
+    Merges configuration files in priority order. Does NOT apply environment
+    variable overrides — use get_config_with_env_override() or
+    load_runtime_config() for the full layering chain.
 
     Configuration layers (priority order):
     1. Explicit config_path (if provided)
@@ -337,11 +341,11 @@ def load_runtime_config(
     config = get_config_with_env_override(load_config(target_repo=target_repo))
 
     if cli_overrides:
-        from vibe3.config.env_override import _set_nested_value
+        from vibe3.config.env_override import set_nested_value
 
         data = config.model_dump()
         for path, value in cli_overrides.items():
-            _set_nested_value(data, path, value)
+            set_nested_value(data, path, value)
         config = VibeConfig.model_validate(data)
 
     return config
