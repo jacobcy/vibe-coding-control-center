@@ -115,6 +115,9 @@ code_limits:
         reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、debug 模式代码根覆盖、环境变量传递等紧密耦合的启动逻辑"
 
       # Shell / 脚本兼容入口
+      - path: "scripts/install.sh"
+        limit: 500
+        reason: "全局安装脚本聚合，包含目录同步、supervisor/ 同步、过期文件清理、settings.yaml 迁移、sanity check 等完整安装生命周期；PR #1993 新增 canonical path 迁移和 sanity check 后超标"
       - path: "lib/alias/worktree.sh"
         limit: 500
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
