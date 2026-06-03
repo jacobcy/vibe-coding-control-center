@@ -375,6 +375,7 @@ def execute_manual_review_sync(
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
     context_builder: Callable[..., object] = make_review_context_builder,
+    show_prompt: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
     _ = flow_service
@@ -391,6 +392,7 @@ def execute_manual_review_sync(
         config=cfg,
         branch=branch,
         issue_number=issue_number,
+        show_prompt=show_prompt,
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
