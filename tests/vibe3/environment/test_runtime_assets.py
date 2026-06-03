@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.resources.runtime_assets import resolve_runtime_asset, runtime_assets_root
+from vibe3.environment.runtime_assets import resolve_runtime_asset, runtime_assets_root
 
 
 def test_runtime_assets_root_uses_env_override(monkeypatch, tmp_path: Path) -> None:

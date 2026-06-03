@@ -20,12 +20,12 @@ from loguru import logger
 from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.config.settings import VibeConfig
+from vibe3.environment.runtime_assets import resolve_runtime_asset
 from vibe3.exceptions import VibeError
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.review import ReviewRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.resources.runtime_assets import resolve_runtime_asset
 
 ReviewPromptMode = Literal["first", "retry"]
 
