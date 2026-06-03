@@ -15,15 +15,15 @@ from vibe3.agents.backends.async_launcher import (
     AsyncExecutionHandle,
     spawn_tmux_command,
 )
-from vibe3.agents.backends.codeagent_config import (
-    has_agent_env_override,
-    resolve_effective_agent_options,
-    resolve_repo_agent_preset_name,
-    sync_models_json,
-)
+from vibe3.agents.backends.codeagent_config import sync_models_json
 from vibe3.agents.backends.session_manager import (
     extract_session_id,
     should_retry_without_session,
+)
+from vibe3.config.agent_preset import (
+    has_agent_env_override,
+    resolve_effective_agent_options,
+    resolve_repo_agent_preset_name,
 )
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult

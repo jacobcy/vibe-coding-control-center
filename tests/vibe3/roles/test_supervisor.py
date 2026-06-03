@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.roles.supervisor import (
     SUPERVISOR_APPLY_ROLE,
@@ -17,6 +18,20 @@ from vibe3.roles.supervisor import (
     iter_supervisor_identified_events,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+
+
+def _get_adapter_for_profile(profile_config):
+    """Return a focused adapter stub for supervisor profile lookup tests."""
+    if profile_config.profile != "vibe-center":
+        return None
+    return AdapterManifest(
+        name="vibe-center",
+        version="3.0.0",
+        description="Focused adapter stub for supervisor tests",
+        resources=[
+            AdapterResource(type="supervisor", name="apply", path="supervisor/apply.md")
+        ],
+    )
 
 
 def _make_config(**overrides) -> OrchestraConfig:
@@ -250,11 +265,14 @@ class TestSupervisorIdentifiedEvents:
 def test_supervisor_uses_profile_resolution() -> None:
     """Test supervisor prompt path uses profile resolution."""
     # With vibe-center profile
-    resolver = ConventionResolver(profile="vibe-center")
-    path = get_supervisor_prompt_path(resolver)
-    assert path == "supervisor/apply.md"
+    with patch(
+        "vibe3.config.profile_config.ProfileConfig._get_adapter",
+        _get_adapter_for_profile,
+    ):
+        resolver = ConventionResolver(profile="vibe-center")
+        path = get_supervisor_prompt_path(resolver)
+        resolver_minimal = ConventionResolver(profile="minimal")
+        path_minimal = get_supervisor_prompt_path(resolver_minimal)
 
-    # With minimal profile (no supervisor)
-    resolver_minimal = ConventionResolver(profile="minimal")
-    path_minimal = get_supervisor_prompt_path(resolver_minimal)
+    assert path == "supervisor/apply.md"
     assert path_minimal is None

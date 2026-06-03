@@ -62,7 +62,7 @@ class TestSyncModelsJson:
                 models_path,
             ),
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
             pytest.raises(AgentPresetNotFoundError),
@@ -135,7 +135,7 @@ class TestSyncModelsJson:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch(
@@ -148,3 +148,9 @@ class TestSyncModelsJson:
 
         data = json.loads(codeagent_models.read_text())
         assert data["default_backend"] == "resolved-backend"
+
+    def test_read_models_json_is_public_config_api(self) -> None:
+        """Backend modules should not depend on private config helpers."""
+        from vibe3.config.agent_preset import read_models_json
+
+        assert callable(read_models_json)

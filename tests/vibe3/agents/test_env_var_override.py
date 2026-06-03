@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe3.agents.backends.codeagent_config import (
+from vibe3.config.agent_preset import (
     resolve_effective_agent_options,
     resolve_repo_agent_preset,
 )
@@ -34,7 +34,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -66,7 +66,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -87,7 +87,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -111,7 +111,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -139,7 +139,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -168,7 +168,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(
@@ -201,7 +201,7 @@ class TestEnvVarOverride:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch.dict(

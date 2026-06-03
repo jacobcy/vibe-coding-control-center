@@ -3,19 +3,42 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.roles.run_command import resolve_skill_path
 from vibe3.services.convention_resolver import ConventionResolver
 
 
+def _get_adapter_for_profile(profile_config):
+    """Return a focused adapter stub for profile lookup tests."""
+    if profile_config.profile != "vibe-center":
+        return None
+    return AdapterManifest(
+        name="vibe-center",
+        version="3.0.0",
+        description="Focused adapter stub for run command tests",
+        resources=[
+            AdapterResource(
+                type="skill",
+                name="vibe-commit",
+                path="skills/vibe-commit/SKILL.md",
+            )
+        ],
+    )
+
+
 def test_skill_path_uses_profile():
     """Test skill lookup uses profile resolution."""
-    resolver = ConventionResolver(profile="vibe-center")
-    path = resolve_skill_path("vibe-commit", resolver)
+    with patch(
+        "vibe3.config.profile_config.ProfileConfig._get_adapter",
+        _get_adapter_for_profile,
+    ):
+        resolver = ConventionResolver(profile="vibe-center")
+        path = resolve_skill_path("vibe-commit", resolver)
+        resolver_minimal = ConventionResolver(profile="minimal")
+        path_minimal = resolve_skill_path("vibe-commit", resolver_minimal)
+
     assert path is not None
     assert "skills/vibe-commit/SKILL.md" in path
-
-    resolver_minimal = ConventionResolver(profile="minimal")
-    path_minimal = resolve_skill_path("vibe-commit", resolver_minimal)
     assert path_minimal is None
 
 
@@ -34,7 +57,11 @@ def test_skill_path_without_resolver_uses_default(monkeypatch):
     """
     # Force vibe-center profile to make test deterministic
     monkeypatch.setenv("VIBE_PROFILE", "vibe-center")
-    path = resolve_skill_path("vibe-commit")
+    with patch(
+        "vibe3.config.profile_config.ProfileConfig._get_adapter",
+        _get_adapter_for_profile,
+    ):
+        path = resolve_skill_path("vibe-commit")
     assert path is not None
     assert "skills/vibe-commit/SKILL.md" in path
 
