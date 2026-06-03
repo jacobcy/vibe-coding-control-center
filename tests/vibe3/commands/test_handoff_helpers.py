@@ -98,3 +98,21 @@ def test_render_handoff_events_shows_success_event_names(capsys) -> None:
     output = capsys.readouterr().out
     # Should show "Plan Handoff" (display name for handoff_plan)
     assert "Plan Handoff" in output
+
+
+def test_render_handoff_events_shows_files_without_ref_alias(capsys) -> None:
+    """File refs are display paths, not database ref aliases."""
+    event = FlowEvent(
+        branch="task/issue-417",
+        event_type="handoff_plan",
+        actor="codex/gpt-5.4",
+        detail="Plan artifact recorded",
+        refs={"files": ["src/vibe3/example.py"]},
+        created_at="2026-04-21T10:00:00",
+    )
+
+    _render_handoff_events([event], branch="task/issue-417")
+
+    output = capsys.readouterr().out
+    assert "src/vibe3/example.py" in output
+    assert "vibe3 handoff show" not in output

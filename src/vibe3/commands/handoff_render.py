@@ -117,10 +117,7 @@ def _render_handoff_events(
                         console.print("    [dim]files:[/]")
                         for f in value:
                             display_f = resolve_ref_path(f, worktree_root)
-                            console.print(
-                                f"      [dim]- "
-                                f"{_to_handoff_cmd(display_f, branch)}[/]"
-                            )
+                            console.print(f"      [dim]- {display_f}[/]")
                     elif key.endswith("_ref"):
                         # Handle explicit *_ref fields with path resolution
                         # Skip generic "ref" field as it lacks type information
@@ -139,9 +136,7 @@ def _render_handoff_events(
                 if files and isinstance(files, list):
                     for f in files:
                         display_f = resolve_ref_path(f, worktree_root)
-                        console.print(
-                            "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
-                        )
+                        console.print(f"  [dim]- {display_f}[/]")
                 # Normal mode: show explicit *_ref fields
                 # Skip generic "ref" field as it lacks type information
                 ref_keys = [
@@ -158,7 +153,6 @@ def _render_handoff_events(
                     if ref_value and isinstance(ref_value, str):
                         display_ref = resolve_ref_path(ref_value, worktree_root)
                         console.print(
-                            "  [dim]- "
-                            f"{_to_handoff_cmd(display_ref, branch, key)}[/]"
+                            f"  [dim]- {_to_handoff_cmd(display_ref, branch, key)}[/]"
                         )
         console.print()

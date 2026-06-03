@@ -331,7 +331,7 @@ class HandoffService:
 
         self.store.update_flow_state(target_branch, **flow_updates)
 
-        event_refs: dict[str, str] = {"ref": ref_value}
+        event_refs: dict[str, str] = {ref_field: ref_value}
         if verdict:
             event_refs["verdict"] = verdict
 
@@ -568,8 +568,9 @@ class HandoffService:
         else:
             ref_value = relative_ref
 
-        # Build refs including audit-specific fields
-        refs: dict[str, str | list[str]] = {"ref": ref_value}
+        # Build refs with the same database ref field used by flow_state.
+        ref_field = self._KIND_TO_REF_FIELD[normalized_kind]
+        refs: dict[str, str | list[str]] = {ref_field: ref_value}
         refs.update(extra_refs)
 
         # Add audit-specific refs if provided
