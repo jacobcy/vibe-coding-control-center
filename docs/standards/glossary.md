@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-04-20
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -495,7 +495,17 @@ related_docs:
   - 不决定执行哪个角色。
 - 落点：`src/vibe3/environment/`
 
-### 5.6 `调度`
+### 5.6 Clients 层
+
+- 正式术语：`Clients 层`
+- 别称：`客户端层`
+- 定义：负责与外部系统（Git, GitHub, SQLite, Serena 等）进行物理通信的适配与操作层。
+- 边界：
+  - 不负责业务逻辑判断。
+  - 不直接持有全局状态，仅作为原子操作的代理。
+- 落点：`src/vibe3/clients/`
+
+### 5.7 `调度`
 
 - 正式术语：`调度`
 - 别称：无
@@ -508,7 +518,7 @@ related_docs:
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
-### 5.7 `编排`
+### 5.8 `编排`
 
 - 正式术语：`编排`
 - 别称：无
@@ -521,7 +531,7 @@ related_docs:
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
-### 5.8 `执行代理`
+### 5.9 `执行代理`
 
 - 正式术语：`执行代理`
 - 别称：`执行器`
@@ -537,7 +547,7 @@ related_docs:
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
 
-### 5.9 Role Adapters (角色适配器)
+### 5.10 Role Adapters (角色适配器)
 
 - 正式术语：`Role Adapters`
 - 别称：`Skill 层`, `胶水层`
