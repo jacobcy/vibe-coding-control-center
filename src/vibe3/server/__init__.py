@@ -6,18 +6,19 @@ from vibe3.domain import FailedGate, FlowManager
 # Runtime layer re-exports
 from vibe3.runtime import CircuitBreaker, HeartbeatServer
 
-# Orchestra instance utilities
+# Orchestra instance utilities (now in runtime)
+from vibe3.runtime.orchestra_instance import (
+    OrchestraInstanceInfo,
+    read_instance_info,
+    validate_instance,
+    write_instance_info,
+)
+
 # MCP server
 from vibe3.server.mcp import (
     _serialize_snapshot,
     create_mcp_server,
     format_snapshot_for_mcp,
-)
-from vibe3.server.orchestra_instance import (
-    OrchestraInstanceInfo,
-    read_instance_info,
-    validate_instance,
-    write_instance_info,
 )
 
 # Registry

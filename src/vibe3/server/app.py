@@ -18,11 +18,11 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-
-from .orchestra_instance import (
+from vibe3.runtime.orchestra_instance import (
     OrchestraInstanceInfo,
     write_instance_info,
 )
+
 from .registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,

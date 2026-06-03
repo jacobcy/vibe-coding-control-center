@@ -16,7 +16,6 @@ from loguru import logger
 
 from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.ui.console import console
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -83,8 +82,8 @@ class ExpiredResourceCleanupService:
             f"Checking agent worktrees older than {max_age_days} days"
         )
         if not quiet:
-            console.print(
-                f"  [dim]Checking agent worktrees older than {max_age_days} days...[/]"
+            logger.bind(domain="check").info(
+                f"  Checking agent worktrees older than {max_age_days} days..."
             )
 
         base = self._get_agent_worktree_base()
@@ -127,22 +126,22 @@ class ExpiredResourceCleanupService:
                         session_count=len(live_sessions),
                     ).info("Skipped agent worktree with live runtime sessions")
                     if not quiet:
-                        console.print(
-                            f"    [cyan][skipped][/cyan] {worktree_name} "
-                            f"[dim](has {len(live_sessions)} live sessions)[/]"
+                        logger.bind(domain="check").info(
+                            f"     {worktree_name} "
+                            f"(has {len(live_sessions)} live sessions)"
                         )
                     continue
 
                 # Properly remove worktree: cleans git metadata AND directory
                 if not quiet:
-                    console.print(f"    [yellow][cleaning][/yellow] {worktree_name}...")
+                    logger.bind(domain="check").info(f"     {worktree_name}...")
                 remove_worktree(worktree_dir, force=True)
                 cleaned.append(worktree_name)
                 logger.bind(domain="check", worktree=worktree_name).info(
                     "Deleted expired agent worktree"
                 )
                 if not quiet:
-                    console.print(f"    [green][cleaned][/green]  {worktree_name}")
+                    logger.bind(domain="check").info(f"      {worktree_name}")
 
             except Exception as exc:
                 failed.append(f"{worktree_name}: {exc}")
@@ -150,8 +149,8 @@ class ExpiredResourceCleanupService:
                     f"Failed to clean agent worktree: {exc}"
                 )
                 if not quiet:
-                    console.print(
-                        f"    [red][failed][/red]   {worktree_name}: {exc}",
+                    logger.bind(domain="check").info(
+                        f"       {worktree_name}: {exc}",
                     )
 
         return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
@@ -178,8 +177,8 @@ class ExpiredResourceCleanupService:
             f"Checking remote branches older than {max_age_days} days"
         )
         if not quiet:
-            console.print(
-                f"  [dim]Checking remote branches older than {max_age_days} days...[/]"
+            logger.bind(domain="check").info(
+                f"  Checking remote branches older than {max_age_days} days..."
             )
 
         # Load protected branches from config
@@ -203,8 +202,8 @@ class ExpiredResourceCleanupService:
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get remote branches: {exc}")
             if not quiet:
-                console.print(
-                    f"    [red][error][/red] Failed to get remote branches: {exc}",
+                logger.bind(domain="check").info(
+                    f"     Failed to get remote branches: {exc}",
                 )
             return {
                 "cleaned": [],
@@ -219,8 +218,8 @@ class ExpiredResourceCleanupService:
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
             if not quiet:
-                console.print(
-                    f"    [red][error][/red] Failed to get open PRs: {exc}",
+                logger.bind(domain="check").info(
+                    f"     Failed to get open PRs: {exc}",
                 )
             return {
                 "cleaned": [],
@@ -254,9 +253,8 @@ class ExpiredResourceCleanupService:
                         "Skipped remote branch with open PR"
                     )
                     if not quiet:
-                        console.print(
-                            f"    [cyan][skipped][/cyan] {branch} "
-                            "[dim](has open PR)[/]"
+                        logger.bind(domain="check").info(
+                            f"     {branch} " "(has open PR)"
                         )
                     continue
 
@@ -266,14 +264,14 @@ class ExpiredResourceCleanupService:
 
                 # Delete remote branch
                 if not quiet:
-                    console.print(f"    [yellow][cleaning][/yellow] {branch}...")
+                    logger.bind(domain="check").info(f"     {branch}...")
                 self.git_client.delete_remote_branch(branch_name)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired remote branch"
                 )
                 if not quiet:
-                    console.print(f"    [green][cleaned][/green]  {branch}")
+                    logger.bind(domain="check").info(f"      {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
@@ -281,7 +279,7 @@ class ExpiredResourceCleanupService:
                     f"Failed to clean remote branch: {exc}"
                 )
                 if not quiet:
-                    console.print(f"    [red][failed][/red]   {branch}: {exc}")
+                    logger.bind(domain="check").info(f"       {branch}: {exc}")
 
         return {
             "cleaned": cleaned,
@@ -316,8 +314,8 @@ class ExpiredResourceCleanupService:
             f"Checking local branches older than {max_age_days} days"
         )
         if not quiet:
-            console.print(
-                f"  [dim]Checking local branches older than {max_age_days} days...[/]"
+            logger.bind(domain="check").info(
+                f"  Checking local branches older than {max_age_days} days..."
             )
 
         # Load protected branches from config
@@ -341,8 +339,8 @@ class ExpiredResourceCleanupService:
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get current branch: {exc}")
             if not quiet:
-                console.print(
-                    f"    [red][error][/red] Failed to get current branch: {exc}",
+                logger.bind(domain="check").info(
+                    f"     Failed to get current branch: {exc}",
                 )
             return {
                 "cleaned": [],
@@ -361,8 +359,8 @@ class ExpiredResourceCleanupService:
                 "Failed to get live sessions, skipping local branch cleanup"
             )
             if not quiet:
-                console.print(
-                    "    [red][error][/red] Live session query failed, skipping",
+                logger.bind(domain="check").info(
+                    "     Live session query failed, skipping",
                 )
             return {
                 "cleaned": [],
@@ -381,8 +379,8 @@ class ExpiredResourceCleanupService:
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get local branches: {exc}")
             if not quiet:
-                console.print(
-                    f"    [red][error][/red] Failed to get local branches: {exc}",
+                logger.bind(domain="check").info(
+                    f"     Failed to get local branches: {exc}",
                 )
             return {
                 "cleaned": [],
@@ -420,9 +418,8 @@ class ExpiredResourceCleanupService:
                         "Skipped local branch with live session"
                     )
                     if not quiet:
-                        console.print(
-                            f"    [cyan][skipped][/cyan] {branch} "
-                            f"[dim](has live session)[/]"
+                        logger.bind(domain="check").info(
+                            f"     {branch} " f"(has live session)"
                         )
                     continue
 
@@ -442,9 +439,8 @@ class ExpiredResourceCleanupService:
                     )
                     if worktree_path:
                         if not quiet:
-                            console.print(
-                                f"    [yellow][cleaning][/yellow] worktree for "
-                                f"{branch} [dim]at {worktree_path}...[/]"
+                            logger.bind(domain="check").info(
+                                f"     worktree for " f"{branch} at {worktree_path}..."
                             )
                         remove_worktree(worktree_path, force=True)
                         skipped_worktree.append(branch)
@@ -452,20 +448,20 @@ class ExpiredResourceCleanupService:
                             f"Deleted worktree at {worktree_path}"
                         )
                         if not quiet:
-                            console.print(
-                                f"    [green][cleaned][/green]  worktree for {branch}"
+                            logger.bind(domain="check").info(
+                                f"      worktree for {branch}"
                             )
 
                 # Delete local branch
                 if not quiet:
-                    console.print(f"    [yellow][cleaning][/yellow] {branch}...")
+                    logger.bind(domain="check").info(f"     {branch}...")
                 self.git_client.delete_branch(branch, force=force)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired local branch"
                 )
                 if not quiet:
-                    console.print(f"    [green][cleaned][/green]  {branch}")
+                    logger.bind(domain="check").info(f"      {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
@@ -473,7 +469,7 @@ class ExpiredResourceCleanupService:
                     f"Failed to clean local branch: {exc}"
                 )
                 if not quiet:
-                    console.print(f"    [red][failed][/red]   {branch}: {exc}")
+                    logger.bind(domain="check").info(f"       {branch}: {exc}")
 
         return {
             "cleaned": cleaned,
