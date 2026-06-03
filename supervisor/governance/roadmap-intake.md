@@ -203,30 +203,12 @@ Why: ...
 
 ## Assignee Selection Rule
 
-当 issue 通过三级审查并决定纳入 assignee issue pool 时，**必须明确指派给正确的 manager assignee**。
-
-### 配置来源
-
-Manager assignee 配置位于：
-- **配置文件**：`config/v3/settings.yaml`
-- **配置字段**：`orchestra.manager_usernames`
-- **默认值**：`["vibe-manager-agent"]`（从 `config.orchestra.manager_usernames` 解析，若为空则由 `ConventionResolver` 回退）
-
-### 选择规则（强制）
-
-**必须使用**：
-- ✅ `{manager_bot}`（从 `OrchestraConfig.get_manager_usernames()[0]` 解析的默认 manager）
+当 issue 通过三级审查并决定纳入 assignee issue pool 时，使用 `vibe3 task intake <issue-number>` 分配 manager assignee。
 
 **禁止使用**：
 - ❌ 仓库 owner（如 `jacobcy`、`alice`）
 - ❌ 其他人类用户名
-- ❌ 示例中的 placeholder（如 `@alice`）
-
-### 理由
-
-- **Manager Dispatch 机制**：只检测 `manager_usernames` 配置中的 assignee
-- **自动化触发**：issue 分配给配置中的 manager bot → manager dispatch 自动启动
-- **人类 assignee**：分配给人类用户不会触发自动化流程，违背 intake 的自动化目标
+- ❌ 手动调用 `gh issue edit --add-assignee`（统一走 `vibe3 task intake`）
 
 ### 示例修正
 

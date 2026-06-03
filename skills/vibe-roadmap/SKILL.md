@@ -14,7 +14,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - **审查纠正 governance 决策**：消化 assignee-pool 的 `[governance suggest]`，写 `[roadmap decision]`，打 `roadmap-reviewed`
 - **GitHub-as-truth**：所有操作通过 GitHub labels
 - **不做执行**：不处理单个 flow 执行
-- **manager_bot 解析**：分配 assignee 时使用 `vibe3 task intake <number>`（shell），命令自动从 `config.orchestra.manager_usernames[0]` 解析，**禁止手动指定人类用户名**
+- **manager assignee**：分配 assignee 时使用 `vibe3 task intake <number>`（shell），**禁止手动指定人类用户名**
 
 ## Scope
 
