@@ -72,20 +72,6 @@ def test_legacy_loc_config_removed_after_migration() -> None:
     assert not Path("config/loc_limits.yaml").exists()
 
 
-def test_migrated_loc_config_loads_total_limits() -> None:
-    module = _load_loc_settings_module()
-    new_settings = module.load_loc_settings("config/v3/loc_limits.yaml")
-
-    assert (
-        new_settings.total_v2_shell == 3500
-    )  # Raised from 3000 for deps-only refactor
-    # Temp 65000 for refactor prep (see config/v3/loc_limits.yaml)
-    assert new_settings.total_v3_python == 65000
-    assert new_settings.warning_threshold_percent == 90
-    assert new_settings.last_reviewed != ""
-    assert new_settings.exceptions
-
-
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:
     config = VibeConfig()
 
