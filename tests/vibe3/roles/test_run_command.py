@@ -3,9 +3,9 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.roles.run_command import resolve_skill_path
-from vibe3.services.convention_resolver import ConventionResolver
 
 
 def _get_adapter_for_profile(profile_config):

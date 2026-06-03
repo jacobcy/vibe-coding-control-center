@@ -25,6 +25,11 @@ def _build_vibe_center_manifest() -> AdapterManifest:
         git_common_dir = git_client.get_git_common_dir()
         if git_common_dir:
             repo_root = Path(git_common_dir).parent
+            # Verify this is a valid repo root by checking if skills directory exists
+            # This handles test environments where git_common_dir is mocked to temp dir
+            if not (repo_root / "skills").exists():
+                # Fall back to cwd if skills not found (e.g., in test isolation)
+                repo_root = Path.cwd()
         else:
             # Fallback to cwd if not in git repo
             repo_root = Path.cwd()
