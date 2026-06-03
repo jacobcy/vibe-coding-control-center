@@ -147,8 +147,8 @@ Apply agent executes
 - 记录容量管理决策
 
 **集成点**:
-- `manager/manager_executor.py` → 发布分发/排队事件
-- `manager/manager_run_service.py` → 发布执行开始/完成事件
+- `roles/manager.py` → Manager 角色事件发布（通过 domain handlers）
+- `domain/handlers/issue_state_dispatch.py` → Manager 分发意图处理
 
 **Worktree 语义**: 持久 issue-worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
@@ -222,7 +222,7 @@ publish(event)
 
 ### 4.3 发布位置
 
-**Usecase 层**: 事件发布应在 Usecase 层（`agents/`, `manager/`, `orchestra/services/`）进行，不在 Service 层或更低层发布。
+**Usecase 层**: 事件发布应在 Usecase 层（`agents/`, `roles/`, `orchestra/services/`）进行，不在 Service 层或更低层发布。
 
 **回调函数**: Agent 的 `on_success` / `on_failure` 回调中发布事件，不在执行逻辑内部硬编码。
 
