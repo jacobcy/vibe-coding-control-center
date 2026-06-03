@@ -38,7 +38,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     """Check if an import is from orchestra layer.
 
     Allowed imports (infrastructure exceptions):
-    - orchestra.logging (infrastructure service)
     - orchestra.protocols (TYPE_CHECKING only)
     - orchestra.failed_gate (TYPE_CHECKING only)
     - orchestra internal services (used via protocol injection):
