@@ -8,6 +8,7 @@ from vibe3.models.execution_request import (  # noqa: F401
     ExecutionLaunchResult,
     ExecutionRequest,
 )
+from vibe3.models.worktree import WorktreeRequirement  # noqa: F401
 
 if TYPE_CHECKING:
     from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
