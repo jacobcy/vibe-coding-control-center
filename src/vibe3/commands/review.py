@@ -148,6 +148,7 @@ def base(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -202,6 +203,7 @@ def base(
             instructions=instructions,
             issue_number=issue_number,
             branch=current_branch,
+            show_prompt=show_prompt,
         )
     else:
         result = execute_manual_review_async(
