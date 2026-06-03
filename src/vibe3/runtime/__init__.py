@@ -1,7 +1,7 @@
 """Runtime package.
 
 Public interface for runtime components including circuit breaker,
-heartbeat server, and periodic check executors.
+heartbeat server, periodic check executors, and orchestra instance management.
 
 This module serves as the unified public interface for runtime components.
 Import from vibe3.runtime instead of external modules to ensure clean dependencies.
@@ -18,6 +18,14 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
+)
+
+# Re-export orchestra instance management (runtime component)
+from vibe3.runtime.orchestra_instance import (
+    OrchestraInstanceInfo,
+    read_instance_info,
+    validate_instance,
+    write_instance_info,
 )
 
 # Lazy imports via __getattr__ for everything else to avoid circular dependencies
@@ -98,6 +106,11 @@ __all__ = [
     "execute_periodic_check",
     # Service protocol
     "ServiceBase",
+    # Orchestra instance management
+    "OrchestraInstanceInfo",
+    "read_instance_info",
+    "validate_instance",
+    "write_instance_info",
     # External dependencies
     "OrchestraConfig",
     "PeriodicCheckConfig",
