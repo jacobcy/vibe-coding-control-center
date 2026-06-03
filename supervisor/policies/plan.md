@@ -187,6 +187,45 @@ tmux display-message -p '#{session_name}'
    - 检查异常类型匹配（抛出类型与 except 捕获类型是否一致）
 3. **标注未验证风险**：如果无法确认中间层行为，用 handoff 记录"未验证：异常传播链中间层 X 可能吞没异常"
 
+#### 重构任务死代码清理范围声明
+
+对于重构类任务（标签包含 `type/refactor` 或标题含「重构」「refactor」），planner 必须显式声明死代码清理范围：
+
+**触发条件**：
+- 任务标签包含 `type/refactor`
+- 任务标题包含「重构」或「refactor」
+
+**强制声明要求**：
+
+Planner 必须在 plan 中显式回答以下问题之一：
+
+1. **本计划不包含死代码清理**（默认立场）
+   - 即使发现相关死代码，也不在当前 scope 内处理
+   - 用 `handoff append --kind finding` 记录发现的死代码，留给后续独立 issue
+
+2. **本计划包含死代码清理，范围为：`<具体文件:符号列表>`**
+   - 必须列出具体的符号名（函数、类、方法）
+   - 必须提供验证依据：`inspect symbols` 引用计数为零的证据
+   - 清理范围仅限于 plan 中显式列出的符号，不得扩展
+
+**禁止事项**：
+- ❌ 禁止「顺带清理」：如果 plan 没有显式声明死代码清理范围，executor 不得删除任何符号
+- ❌ 禁止在 plan scope 外纳入死代码清理任务
+- ❌ 禁止假设 executor 会「智能判断」哪些死代码该清理
+
+**声明模板**：
+
+```markdown
+## 死代码清理范围声明
+
+**选择以下一项**：
+
+- [ ] 本计划不包含死代码清理
+- [x] 本计划包含死代码清理，范围为：
+  - `src/vibe3/old_module.py:deprecated_function`（引用计数：0，验证命令：`vibe3 inspect symbols src/vibe3/old_module.py:deprecated_function`）
+  - `src/vibe3/legacy_service.py:OldClass`（引用计数：0，验证命令：`vibe3 inspect symbols src/vibe3/legacy_service.py:OldClass`）
+```
+
 ### 治理与 prompt 改动
 
 适用于 rules、prompt、配置文案、context builder、输出契约调整。

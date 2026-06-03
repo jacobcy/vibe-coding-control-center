@@ -62,6 +62,49 @@
    - 等待 manager 指示是否扩展 scope
    - 不要继续执行超出 scope 的变更
 
+#### Scope Enforcement: 死代码清理边界
+
+**强制约束**：Executor 不得删除 plan 范围外的函数、类、方法或符号。
+
+**执行规则**：
+
+1. **Plan 未声明死代码清理范围**：
+   - ❌ 禁止删除任何符号（即使发现引用计数为零）
+   - 如果发现死代码且不在 plan 声明范围内：
+     ```bash
+     uv run python src/vibe3/cli.py handoff append "发现死代码：符号名=<symbol>，位置=<file>:<line>，引用计数=0，不在当前 plan scope 内" --kind finding --actor "executor"
+     ```
+   - 不执行删除，留给后续独立 issue 处理
+
+2. **Plan 已声明死代码清理范围**：
+   - ✅ 只能清理 plan 中显式列出的符号
+   - ❌ 不得扩展到其他死代码（即使发现引用计数为零）
+   - 每删除一个符号前，验证其在 plan 的声明列表中
+   - 删除后，记录验证证据：
+     ```bash
+     uv run python src/vibe3/cli.py handoff append "已删除死代码：<symbol>（plan 声明范围，验证：引用计数=0）" --kind note --actor "executor"
+     ```
+
+3. **发现 plan 外的死代码**：
+   - 始终用 `handoff append --kind finding` 记录
+   - 不执行删除，无论是否「很明显该清理」
+   - 记录内容：符号名、位置、引用计数为零的证据（`inspect symbols` 输出）
+
+**验证方式**：
+
+在声称完成前，必须验证：
+```bash
+# 检查是否有被删除的函数/类/方法（在存续文件或已删除文件中）
+git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || echo "无符号删除"
+
+# 如果有删除，逐个确认是否在 plan 的死代码清理声明列表中
+```
+
+**禁止事项**：
+- ❌ 删除 plan 范围外的符号
+- ❌ 「顺手清理」看起来没用的代码
+- ❌ 假设 plan 「暗示」要清理死代码（必须显式声明）
+
 ### 指令验证要求
 
 执行 plan 前，必须回答以下问题：

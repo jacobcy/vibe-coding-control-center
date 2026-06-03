@@ -185,6 +185,48 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 - 检查 plan scope 是否覆盖了所有相关层
 - 如有遗漏层，视为 coverage 不足，至少给 MAJOR
 
+### 8. Scope Consistency 检查（重构类任务）
+
+对于重构类任务（标签包含 `type/refactor` 或标题含「重构」「refactor」），必须检查：
+
+#### 检查 plan 的死代码清理声明
+
+- **Plan 是否显式声明了死代码清理范围？**
+  - 如未声明，默认立场为「不包含死代码清理」
+  - 如已声明，确认声明内容格式正确（包含符号列表和验证依据）
+
+#### 检查实际删除的符号是否在 plan 范围内
+
+**验证步骤**：
+
+```bash
+# 检查是否有被删除的函数/类/方法（在存续文件或已删除文件中）
+git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || echo "无符号删除"
+
+# 如果有删除，对比 plan 的死代码清理声明列表
+```
+
+#### 判断标准
+
+1. **Plan 未声明死代码清理，但有符号被删除**：
+   - 至少给 MAJOR
+   - 说明：违反 scope enforcement 规则（executor 删除了 plan 外的符号）
+
+2. **Plan 已声明死代码清理，但删除的符号不在声明列表中**：
+   - 至少给 MAJOR
+   - 说明：违反 scope enforcement 规则（executor 超出声明范围删除符号）
+
+3. **Plan 已声明死代码清理，删除的符号在声明列表中**：
+   - ✅ 符合规则
+   - 验证 executor 是否提供了引用计数为零的证据
+
+#### 发现 plan 外删除的处理
+
+如果发现 executor 删除了 plan 范围外的符号：
+- 不要自行判断「是否合理」
+- 至少给 MAJOR，要求 executor 解释为何偏离 plan
+- 如果 executor 记录了 finding 且未执行删除，则符合规则
+
 **缺少任一步骤都可能导致误判。**
 
 ## 独立判断强制验证点
