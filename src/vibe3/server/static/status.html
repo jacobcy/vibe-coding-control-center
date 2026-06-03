@@ -89,21 +89,37 @@ const STATE_LABEL = {
   'ready': 'Ready', 'blocked': 'Blocked'
 };
 
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeInt(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function stateBadge(state) {
   const s = (state || '').toLowerCase().replace('state/', '').replace('-', '_');
   const cls = STATE_ORDER.includes(s) ? `state-${s}` : 'state-other';
-  return `<span class="badge ${cls}">${state || 'unknown'}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(state || 'unknown')}</span>`;
 }
 
 function roadBadge(r) {
   if (!r) return '';
   const cls = r === 'p0' ? 'road-p0' : r === 'p1' ? 'road-p1' : 'road-p2';
-  return `<span class="badge ${cls}">${r}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(r)}</span>`;
 }
 
 function normalizeState(s) {
   return (s || '').toLowerCase().replace('state/', '').replace('-', '_');
 }
+
+const BASE_URL = 'https://github.com/jacobcy/vibe-coding-control-center';
 
 function renderIssues(issues) {
   if (!issues.length) return '<div class="empty">No active issues</div>';
@@ -121,25 +137,35 @@ function renderIssues(issues) {
   keys.forEach(key => {
     const label = STATE_LABEL[key] || key;
     const rows = groups[key];
-    html += `<div class="section"><div class="section-title">${label} (${rows.length})</div>
+    html += `<div class="section"><div class="section-title">${escapeHtml(label)} (${rows.length})</div>
     <table><thead><tr>
       <th>#</th><th>Issue</th><th>Title</th><th>State</th>
       <th>Road</th><th>Pri</th><th>PR / Blocked</th>
     </tr></thead><tbody>`;
     rows.forEach(e => {
-      const rank = e.queue_rank != null ? e.queue_rank : '-';
-      const prCell = e.has_pr
-        ? `<a class="pr-link" href="https://github.com/jacobcy/vibe-coding-control-center/pull/${e.pr_number}" target="_blank">#${e.pr_number}</a>`
+      const rank = safeInt(e.queue_rank) ?? '-';
+      const issueNum = safeInt(e.number);
+      const prNum = safeInt(e.pr_number);
+
+      const issueCell = issueNum
+        ? `<a href="${BASE_URL}/issues/${issueNum}" target="_blank">#${issueNum}</a>`
+        : '';
+
+      const prCell = e.has_pr && prNum
+        ? `<a class="pr-link" href="${BASE_URL}/pull/${prNum}" target="_blank">#${prNum}</a>`
         : e.blocked_by && e.blocked_by.length
-          ? `<span class="blocked-by">blocked: ${e.blocked_by.map(n=>'#'+n).join(', ')}</span>`
+          ? `<span class="blocked-by">blocked: ${e.blocked_by.map(n => { const i = safeInt(n); return i ? '#'+i : ''; }).filter(Boolean).join(', ')}</span>`
           : '';
+
+      const pri = safeInt(e.priority) ?? '';
+
       html += `<tr>
         <td class="rank">${rank}</td>
-        <td class="issue-num"><a href="https://github.com/jacobcy/vibe-coding-control-center/issues/${e.number}" target="_blank">#${e.number}</a></td>
-        <td class="issue-title" title="${(e.title||'').replace(/"/g,'&quot;')}">${e.title || ''}</td>
+        <td class="issue-num">${issueCell}</td>
+        <td class="issue-title" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</td>
         <td>${stateBadge(e.state)}</td>
         <td>${roadBadge(e.roadmap)}</td>
-        <td style="color:#64748b;font-size:12px">${e.priority || ''}</td>
+        <td style="color:#64748b;font-size:12px">${pri}</td>
         <td>${prCell}</td>
       </tr>`;
     });
