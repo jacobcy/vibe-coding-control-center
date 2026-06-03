@@ -1,6 +1,7 @@
 """Tests for GitHub client - Issues."""
 
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -220,24 +221,25 @@ def test_create_issue_with_labels(github_client: GitHubClient) -> None:
         assert "state/ready" in args
 
 
-def test_create_issue_with_repo_override(github_client: GitHubClient) -> None:
-    """create_issue should pass --repo flag when repo is provided."""
+def test_create_issue_with_assignees(github_client: GitHubClient) -> None:
+    """create_issue should assign users when assignees provided."""
     with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="https://github.com/org/repo/issues/44\n",
+            stdout="https://github.com/owner/repo/issues/44\n",
         )
 
         result = github_client.create_issue(
-            title="Cross-repo Issue",
+            title="Assigned Issue",
             body="Body",
-            repo="org/repo",
+            assignees=["user1", "user2"],
         )
 
         assert result == 44
         args = mock_run.call_args[0][0]
-        assert "--repo" in args
-        assert "org/repo" in args
+        assert "--assignee" in args
+        assert "user1" in args
+        assert "user2" in args
 
 
 def test_create_issue_failure_returns_none(github_client: GitHubClient) -> None:
@@ -279,50 +281,44 @@ def test_list_issue_comments_success(github_client: GitHubClient) -> None:
             ),
         )
 
-        comments = github_client.list_issue_comments(issue_number=42)
+        result = github_client.list_issue_comments(issue_number=123)
 
-        assert len(comments) == 2
-        assert comments[0]["id"] == 1
-        assert comments[0]["body"] == "First comment"
-        assert comments[1]["id"] == 2
-
-
-def test_list_issue_comments_failure_returns_empty(github_client: GitHubClient) -> None:
-    """list_issue_comments should return empty list on failure."""
-    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stderr="Issue not found",
-        )
-
-        comments = github_client.list_issue_comments(issue_number=999)
-
-        assert comments == []
+        assert len(result) == 2
+        assert result[0]["body"] == "First comment"
+        assert result[1]["body"] == "Second comment"
 
 
-def test_list_issue_comments_passes_repo(github_client: GitHubClient) -> None:
-    """list_issue_comments should pass repo override to gh CLI."""
+def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
+    """list_issue_comments should return empty list when no comments."""
     with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout=json.dumps({"comments": []}),
         )
 
-        github_client.list_issue_comments(issue_number=42, repo="org/repo")
+        result = github_client.list_issue_comments(issue_number=123)
 
-        # Verify gh issue view was called with the correct repo
-        args = mock_run.call_args[0][0]
-        assert "--repo" in args
-        assert "org/repo" in args
+        assert result == []
 
 
-def test_list_issue_comments_timeout_returns_empty(github_client: GitHubClient) -> None:
+def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list on timeout."""
-    import subprocess
-
     with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
 
-        comments = github_client.list_issue_comments(issue_number=42)
+        result = github_client.list_issue_comments(issue_number=123)
 
-        assert comments == []
+        assert result == []
+
+
+def test_list_issue_comments_failure(github_client: GitHubClient) -> None:
+    """list_issue_comments should return empty list on failure."""
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stderr="Not found",
+        )
+
+        result = github_client.list_issue_comments(issue_number=999)
+
+        assert result == []

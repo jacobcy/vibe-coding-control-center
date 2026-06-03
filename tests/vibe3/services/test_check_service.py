@@ -47,6 +47,7 @@ def test_handle_closed_pr_creates_bridge_issue() -> None:
         "title": "Original Issue",
         "body": "Original body",
         "labels": [{"name": "bug"}, {"name": "state/ready"}],
+        "assignees": [{"login": "vibe-manager-agent"}, {"login": "user2"}],
     }
 
     # Mock no existing bridge marker
@@ -79,6 +80,8 @@ def test_handle_closed_pr_creates_bridge_issue() -> None:
         assert call_kwargs["title"] == "Follow-up: Original Issue"
         assert "state/ready" in call_kwargs["labels"]
         assert "bug" in call_kwargs["labels"]
+        # Verify assignees were inherited from original issue
+        assert call_kwargs["assignees"] == ["vibe-manager-agent", "user2"]
 
         # Verify bridge marker was added
         service.github_client.add_comment.assert_called_once()
@@ -494,4 +497,4 @@ def test_handle_closed_pr_when_add_marker_fails_does_not_cleanup() -> None:
         assert len(issues) == 1
         assert "Created bridge issue #789" in issues[0]
         assert "failed to add marker" in issues[0]
-        assert "manually add marker or retry" in issues[0]
+        assert "manually add marker comment" in issues[0]
