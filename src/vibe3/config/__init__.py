@@ -11,6 +11,7 @@ from vibe3.config.loader import (
     get_config,
     load_config,
     load_keys_env_fallback,
+    load_runtime_config,
     reload_config,
 )
 from vibe3.config.manager_config import get_manager_usernames
@@ -92,6 +93,7 @@ __all__ = [
     "load_config",
     "load_keys_env_fallback",
     "load_orchestra_config",
+    "load_runtime_config",
     "reload_config",
     "resolve_effective_agent_options",
 ]

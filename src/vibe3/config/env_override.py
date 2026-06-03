@@ -104,7 +104,7 @@ OVERRIDE_RULES: list[EnvOverrideRule] = [
 ]
 
 
-def _set_nested_value(obj: dict[str, Any], path: str, value: Any) -> None:
+def set_nested_value(obj: dict[str, Any], path: str, value: Any) -> None:
     """Set a value in a nested dictionary using dot-separated path.
 
     Args:
@@ -114,7 +114,7 @@ def _set_nested_value(obj: dict[str, Any], path: str, value: Any) -> None:
 
     Example:
         >>> obj = {}
-        >>> _set_nested_value(obj, "a.b.c", 42)
+        >>> set_nested_value(obj, "a.b.c", 42)
         >>> obj
         {'a': {'b': {'c': 42}}}
     """
@@ -169,7 +169,7 @@ def apply_env_overrides(
 
         try:
             converted = rule.converter(env_value)
-            _set_nested_value(result, rule.config_path, converted)
+            set_nested_value(result, rule.config_path, converted)
             logger.bind(
                 domain="config",
                 env_key=rule.env_key,

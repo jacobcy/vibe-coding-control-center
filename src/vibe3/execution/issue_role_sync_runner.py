@@ -8,6 +8,7 @@ from vibe3.agents import CodeagentBackend
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config import load_orchestra_config
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
 from vibe3.services import (
@@ -29,7 +30,8 @@ def run_issue_role_async(
     The tmux child then re-enters the sync execution path locally.
     See docs/standards/vibe3-execution-paths-standard.md.
     """
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
@@ -117,7 +119,8 @@ def run_issue_role_sync(
     the same lifecycle / handoff / pre-gate / no-op shell is used.
     See docs/standards/vibe3-execution-paths-standard.md.
     """
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()

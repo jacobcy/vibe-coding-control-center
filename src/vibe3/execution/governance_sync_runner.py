@@ -15,6 +15,7 @@ from typer import echo
 from vibe3.agents import CodeagentBackend
 from vibe3.clients import get_store
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 from vibe3.services import record_dispatch_failure_if_unexpected
@@ -56,7 +57,8 @@ def run_governance_sync(
 
         append_event = _ae
 
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     from vibe3.domain import FlowManager
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
@@ -176,7 +178,8 @@ def run_governance_async(
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
 
     # Check for concurrent governance sessions (same dedup logic as orchestra handler)
     with get_store() as store:
