@@ -14,6 +14,7 @@ from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionReque
 from vibe3.models.inspection import CallNode, CommandInspection
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.prompt_meta import PromptContextMode
+from vibe3.models.queue_entry import QueueEntry
 from vibe3.models.session_types import SessionRole
 from vibe3.models.snapshot import (
     DependencyChange,
@@ -58,6 +59,7 @@ __all__: list[str] = [
     "OrchestraConfig",
     "PRSource",
     "PromptContextMode",
+    "QueueEntry",
     "SessionRole",
     "StructureDiff",
     "StructureMetrics",
