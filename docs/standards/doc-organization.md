@@ -42,25 +42,28 @@ docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
 │   ├── doc-organization.md         # 本文档组织标准
+│   ├── glossary.md                  # 术语真源
 │   └── ...                         # 其他现行标准
-├── specs/                          # 规范文档
+├── specs/                          # 规范文档 (Issue/Feature 契约)
 ├── prds/                           # 产品需求文档（全局 PRD）
-├── plans/                         # 执行计划
-├── reports/                       # 报告与总结
+├── plans/                          # 执行计划
+├── reports/                        # 报告与总结
+├── references/                     # 外部参考资料
 ├── archive/                        # 历史文档归档
 │   └── ...                         # 已退役设计与历史任务文档
 
 核心系统目录说明：
-- `src/vibe3/` - V3 Python 核心源码 (Tier 2/3 逻辑)
-- `lib3/` - V3 核心包装器与仓库重定向中心 (Tier 1)
+- `src/vibe3/` - V3 Python 核心源码 (Tier 1/2/3 实现)
+- `lib3/` - V3 核心包装器与仓库重定向中心 (Tier 1 Hub)
 - `supervisor/` - 治理与决策指令集 (Tier 3 Governance)
-- `temp/` - 运行时临时产物 (Logs, sessions, temporary state)
-- `skills/` - 各 Agent 技能包 (Tier 2)
+- `skills/` - 各 Agent 技能包 (Tier 2 Skill Layer)
+- `.agent/` - AI 工作区 (Workflows, Rules, Templates)
 
 AI 工作区中的临时产物与模板：
-- `.agent/plans/` - AI 临时计划
-- `.agent/reports/` - AI 临时报告
+- `.agent/plans/` - AI 临时计划 (草稿)
+- `.agent/reports/` - AI 临时报告 (过程证据)
 - `.agent/templates/` - AI 工作模板
+```
 
 `.agent/templates/` 下的模板文件：
 - `prd.md` - PRD 模板

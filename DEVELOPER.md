@@ -49,12 +49,15 @@ uv tool install -e .
 如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `./scripts/init.sh`。
 
 ### 2.3 验证环境
+
 ```bash
 bin/vibe check       # 环境诊断（V2）
-vibe3 check          # V3 一致性与共享状态审计 (或 uv run python src/vibe3/cli.py check)
+vibe3 check          # V3 Handoff 存储一致性与共享状态审计
+vibe3 snapshot show  # V3 项目健康度、指标与 LOC 限制度量
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
+
 
 ### 2.4 V3 开发入口
 
@@ -363,8 +366,8 @@ bin/vibe clean                 # 清理临时文件
 # 核心运行时管理
 vibe3 serve status      # 查看 Orchestra 服务状态与门禁
 vibe3 task status       # 总览活跃 flow 与 orchestra 状态
-vibe3 check             # 共享状态审计与一致性检查
-vibe3 snapshot show     # 项目健康度度量仪表盘
+vibe3 check             # V3 Handoff 存储一致性与共享状态审计
+vibe3 snapshot show     # 项目健康度、指标与 LOC 限制度量仪表盘
 
 # Flow 与协作
 vibe3 flow show         # 查看当前 flow 上下文与绑定信息
