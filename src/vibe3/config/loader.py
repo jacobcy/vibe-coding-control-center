@@ -296,11 +296,8 @@ def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig
     # Apply centralized env overrides
     from vibe3.config.env_override import apply_env_overrides
 
-    config_dict = config.model_dump()
-    apply_env_overrides(config_dict)
-
-    # Reconstruct config with overrides
-    return config.__class__(**config_dict)
+    overridden = apply_env_overrides(config.model_dump())
+    return config.__class__.model_validate(overridden)
 
 
 # Global config instance (lazy loaded)
@@ -351,7 +348,7 @@ def load_keys_env_fallback() -> None:
     # Skip if any vibe env vars are already set (indicates shell wrapper loaded)
     if any(
         os.environ.get(key)
-        for key in ["VIBE_MANAGER_GITHUB_TOKEN", "MANAGER_USERNAMES", "GH_TOKEN"]
+        for key in ["VIBE_MANAGER_GITHUB_TOKEN", "MANAGER_USERNAMES"]
     ):
         logger.bind(domain="config").debug(
             "keys.env fallback skipped: environment variables already present"

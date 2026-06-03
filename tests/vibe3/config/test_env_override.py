@@ -75,19 +75,25 @@ class TestApplyEnvOverrides:
             "manager3",
         )
 
-    def test_invalid_env_value_logs_warning(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_invalid_env_value_logs_warning(self) -> None:
         """Test that invalid values log warnings but don't crash."""
-        config = {"code_limits": {"total_file_loc": {"v2_shell": 4000}}}
+        from loguru import logger
 
-        with patch.dict(os.environ, {"VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC": "invalid"}):
-            result = apply_env_overrides(config)
+        warnings_captured: list[str] = []
+        handler_id = logger.add(
+            lambda msg: warnings_captured.append(str(msg)), level="WARNING"
+        )
+        try:
+            config = {"code_limits": {"total_file_loc": {"v2_shell": 4000}}}
+            with patch.dict(
+                os.environ, {"VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC": "invalid"}
+            ):
+                result = apply_env_overrides(config)
+        finally:
+            logger.remove(handler_id)
 
-        # Should keep original value
         assert result["code_limits"]["total_file_loc"]["v2_shell"] == 4000
-        # Should log warning
-        assert any("Invalid env value" in record.message for record in caplog.records)
+        assert any("Invalid env value" in w for w in warnings_captured)
 
     def test_missing_env_key_no_change(self) -> None:
         """Test that missing env key doesn't change config."""
@@ -148,14 +154,21 @@ class TestGetEnvOverride:
 class TestLoadKeysEnvFallback:
     """Test load_keys_env_fallback function."""
 
-    def test_skip_if_env_already_set(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Test that fallback is skipped if env vars already present."""
-        with patch.dict(os.environ, {"VIBE_MANAGER_GITHUB_TOKEN": "existing-token"}):
-            load_keys_env_fallback()
+    def test_skip_if_env_already_set(self) -> None:
+        """Test that fallback is skipped if vibe env vars already present."""
+        from loguru import logger
 
-        assert any(
-            "keys.env fallback skipped" in record.message for record in caplog.records
-        )
+        debug_msgs: list[str] = []
+        handler_id = logger.add(lambda msg: debug_msgs.append(str(msg)), level="DEBUG")
+        try:
+            with patch.dict(
+                os.environ, {"VIBE_MANAGER_GITHUB_TOKEN": "existing-token"}
+            ):
+                load_keys_env_fallback()
+        finally:
+            logger.remove(handler_id)
+
+        assert any("keys.env fallback skipped" in m for m in debug_msgs)
 
     def test_load_from_project_keys(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -181,35 +194,30 @@ class TestLoadKeysEnvFallback:
 
 
 class TestGetManagerUsernames:
-    """Test get_manager_usernames with env override."""
+    """Test get_manager_usernames reads config (env overrides applied at load time)."""
 
-    def test_env_override_takes_precedence(self) -> None:
-        """Test that env var overrides config."""
+    def test_config_value_returned(self) -> None:
+        """Test that config value is returned directly."""
         config = OrchestraConfig(manager_usernames=("config-manager",))
-
-        with patch.dict(os.environ, {"MANAGER_USERNAMES": "env-manager"}):
-            result = get_manager_usernames(config)
-
-        assert result == ("env-manager",)
-
-    def test_config_used_when_no_env(self) -> None:
-        """Test that config is used when env var not set."""
-        config = OrchestraConfig(manager_usernames=("config-manager",))
-
-        os.environ.pop("MANAGER_USERNAMES", None)
         result = get_manager_usernames(config)
-
         assert result == ("config-manager",)
 
-    def test_multiple_usernames_from_env(self) -> None:
-        """Test comma-separated usernames from env."""
-        config = OrchestraConfig(manager_usernames=())
+    def test_env_override_reflected_when_pre_applied(self) -> None:
+        """Test that an env-overridden config value is used correctly.
 
-        with patch.dict(
-            os.environ, {"MANAGER_USERNAMES": "manager1,manager2,manager3"}
-        ):
-            result = get_manager_usernames(config)
+        Env overrides are applied at config load time (via apply_env_overrides /
+        get_config_with_env_override). Callers should pass a config that was loaded
+        through that path; get_manager_usernames does not re-read env vars.
+        """
+        # Simulate a config that was loaded with MANAGER_USERNAMES=env-manager
+        config = OrchestraConfig(manager_usernames=("env-manager",))
+        result = get_manager_usernames(config)
+        assert result == ("env-manager",)
 
+    def test_multiple_usernames_from_config(self) -> None:
+        """Test multiple usernames returned from config tuple."""
+        config = OrchestraConfig(manager_usernames=("manager1", "manager2", "manager3"))
+        result = get_manager_usernames(config)
         assert result == ("manager1", "manager2", "manager3")
 
 

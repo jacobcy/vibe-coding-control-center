@@ -13,6 +13,7 @@ Design Principles:
 
 from __future__ import annotations
 
+import copy
 import os
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -138,24 +139,28 @@ def apply_env_overrides(
 ) -> dict[str, Any]:
     """Apply environment variable overrides to configuration dictionary.
 
-    This function modifies the config_dict in-place and returns it.
+    Returns a new dictionary with overrides applied; the original is unchanged.
 
     Args:
-        config_dict: Configuration dictionary to override
+        config_dict: Configuration dictionary to base overrides on
         rules: Override rules to apply (default: OVERRIDE_RULES)
 
     Returns:
-        Modified configuration dictionary
+        New configuration dictionary with overrides applied
 
     Example:
         >>> config = {"orchestra": {"manager_usernames": ["vibe-manager-agent"]}}
         >>> os.environ["MANAGER_USERNAMES"] = "custom-manager"
-        >>> apply_env_overrides(config)
-        >>> config["orchestra"]["manager_usernames"]
+        >>> result = apply_env_overrides(config)
+        >>> result["orchestra"]["manager_usernames"]
         ('custom-manager',)
+        >>> config["orchestra"]["manager_usernames"]  # original unchanged
+        ['vibe-manager-agent']
     """
     if rules is None:
         rules = OVERRIDE_RULES
+
+    result = copy.deepcopy(config_dict)
 
     for rule in rules:
         env_value = os.environ.get(rule.env_key)
@@ -164,7 +169,7 @@ def apply_env_overrides(
 
         try:
             converted = rule.converter(env_value)
-            _set_nested_value(config_dict, rule.config_path, converted)
+            _set_nested_value(result, rule.config_path, converted)
             logger.bind(
                 domain="config",
                 env_key=rule.env_key,
@@ -179,7 +184,7 @@ def apply_env_overrides(
                 f"Invalid env value for {rule.env_key}: {env_value!r}, error: {e}"
             )
 
-    return config_dict
+    return result
 
 
 def get_env_override(
