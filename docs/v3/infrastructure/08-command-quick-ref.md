@@ -20,7 +20,7 @@ related_docs:
 ```
 全局层     vibe3 -v/-vv [COMMAND]
 命令组层   vibe3 flow/handoff/... [-h]
-子命令层   vibe3 flow update [--trace] [--json] [-y]
+子命令层   vibe3 flow update [--trace] [--format json] [-y]
 ```
 
 ---
@@ -48,14 +48,14 @@ vibe3 help
 | 参数 | 短选项 | 用途 |
 |------|--------|------|
 | `--trace` | - | 调用链路追踪 + DEBUG（比 `-vv` 更重量级） |
-| `--json` | - | JSON 格式输出到 stdout |
+| `--format` | - | 输出格式：table（默认）、json、yaml |
 | `--yes` | `-y` | 自动确认（破坏性操作） |
 | `--help` | `-h` | 显示帮助 |
 
 ```bash
 vibe3 flow show --trace
-vibe3 flow show --json | jq '.status'
-vibe3 flow show --trace --json
+vibe3 flow show --format json | jq '.status'
+vibe3 flow show --trace --format json
 vibe3 flow bind --help
 vibe3 flow show -h
 ```

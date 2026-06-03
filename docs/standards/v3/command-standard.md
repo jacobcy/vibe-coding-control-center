@@ -298,13 +298,13 @@ vibe3 flow rebuild [<issue>] [--branch <branch>] [--keep-remote] [--no-worktree]
 
 
 ```bash
-vibe3 flow show [--branch <branch>] [--snapshot] [--json]
+vibe3 flow show [--branch <branch>] [--snapshot] [--format json]
 ```
 
 ### 7.5 `flow status`
 
 ```bash
-vibe3 flow status [--all] [--json]
+vibe3 flow status [--all] [--format json]
 ```
 
 ### 7.6 `status`
