@@ -7,7 +7,7 @@ audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-06-02
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -24,7 +24,7 @@ related_docs:
 
 Vibe Center 包含**两个并行实现**：
 
-- **V3 (Python)** - 主要实现，Python 3.10+，路径 `src/vibe3/`
+- **V3 (Python)** - 主要实现，Python 3.12+，路径 `src/vibe3/`
 - **V2 (Shell)** - Shell 实现，Zsh，入口 `bin/vibe`
 
 本文档以 **V3 为主视角**进行说明。
@@ -180,7 +180,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 ### `src/vibe3/` - V3 Python 实现（主要）
 
-**职责**：Vibe 的主要实现，Python 3.10+
+**职责**：Vibe 的主要实现，Python 3.12+
 
 **规则**：
 - 使用 `uv` 进行依赖管理
