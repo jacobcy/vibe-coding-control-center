@@ -24,7 +24,6 @@ def test_soft_delete_flow_normalizes_to_tombstone() -> None:
             indicate_ref="docs/indicate/test.md",
             pr_ref="https://github.com/test/pr/456",
             blocked_reason="API design pending",
-            failed_reason="Test failure",
             blocked_by_issue=789,
             worktree_path="/tmp/worktree-123",
             planner_actor="claude/sonnet-4.6",
@@ -54,7 +53,6 @@ def test_soft_delete_flow_normalizes_to_tombstone() -> None:
 
         # CRITICAL: reasons and blocked_by must be cleared
         assert deleted_flow["blocked_reason"] is None
-        assert deleted_flow["failed_reason"] is None
         assert deleted_flow["blocked_by_issue"] is None
 
         # CRITICAL: worktree_path must be cleared

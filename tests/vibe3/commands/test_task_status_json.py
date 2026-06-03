@@ -64,7 +64,6 @@ def test_task_status_json_format(
             "assignee": "manager-bot",
             "flow": None,
             "queued": False,
-            "failed_reason": None,
             "blocked_by": None,
             "blocked_reason": None,
             "milestone": None,
