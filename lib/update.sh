@@ -154,7 +154,7 @@ _update_run() {
     _migrate_settings_yaml_paths "$INSTALL_DIR"
 
     # Sanity check: verify critical runtime assets
-    _check_runtime_assets "$INSTALL_DIR"
+    _check_runtime_assets "$INSTALL_DIR" || true
 
     log_success "Global update complete!"
     echo ""

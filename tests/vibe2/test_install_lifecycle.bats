@@ -42,6 +42,7 @@ teardown() {
     cp "$VIBE_ROOT/lib/config.sh" "$TEST_REPO/lib/"
     cp "$VIBE_ROOT/lib/utils.sh" "$TEST_REPO/lib/"
     cp "$VIBE_ROOT/lib/update.sh" "$TEST_REPO/lib/"
+    cp "$VIBE_ROOT/lib/install_utils.sh" "$TEST_REPO/lib/"
 
     export VIBE_TEST_ROOT="$TEST_REPO"
 
