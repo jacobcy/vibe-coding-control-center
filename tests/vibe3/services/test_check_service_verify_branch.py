@@ -355,8 +355,3 @@ def test_verify_branch_closed_issue_returns_invalid(tmp_path: Path) -> None:
     # Closed issue = NOT valid for dispatch
     assert result.is_valid is False
     assert any("CLOSED" in issue for issue in result.issues)
-
-    # Flow should still be aborted in DB
-    flow_data = store.get_flow_state(branch)
-    assert flow_data is not None
-    assert flow_data["flow_status"] == "aborted"
