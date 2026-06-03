@@ -6,11 +6,30 @@
 
 ## Architecture Tiers
 
-Vibe 3.0 遵循 3-tier 架构模型：
+Vibe 3.0 遵循 3-tier 架构模型，详见 [CLAUDE.md](../../../CLAUDE.md) §架构分层与 [docs/ARCHITECTURE_GUIDE.md](../../../docs/ARCHITECTURE_GUIDE.md)。
 
-- **Tier 3: Cognitive / Governance Layer** — 决策与治理层。负责 PRD/Spec/Plan 立法，以及 Audit/Review/Orchestra 司法。
-- **Tier 2: Skill Layer** — 任务执行层。Agent 通过组合不同的 Skill（位于 `skills/`）和 V3 Core Services 实现具体业务逻辑。
-- **Tier 1: Shell Layer** — 原子能力层。提供环境隔离、命令封装与基础工具集。
+### Tier 3: Cognitive / Governance Layer
+
+- **职责**：决策与治理层。负责全局策略、规则、Supervisor 治理。
+- **核心命令**：`serve`, `scan`, `check`, `mcp`
+- **执行层级**：L0/L1 (无 worktree 观察层)，L2 (Supervisor Apply 临时 worktree)
+- **组件**：
+  - Orchestra Driver (L0) - 调度主循环
+  - Governance Service (L1) - 定期扫描（cron-supervisor, roadmap-intake）
+  - Supervisor Apply (L2) - 轻量治理执行
+
+### Tier 2: Skill Layer
+
+- **职责**：任务执行层。Agent 通过组合不同的 Skill（位于 `skills/`）和 V3 Core Services 实现具体业务逻辑。
+- **核心命令**：`flow`, `task`, `run`, `plan`, `review`
+- **执行层级**：L3 (持久 worktree)
+- **组件**：Manager, Planner, Executor, Reviewer
+
+### Tier 1: Shell Layer
+
+- **职责**：原子能力层。提供环境隔离、命令封装与基础工具集。
+- **核心命令**：`handoff`, `inspect`, `pr`, `snapshot`, `ask`
+- **执行层级**：L3/L4 (原子工具)
 
 ---
 
