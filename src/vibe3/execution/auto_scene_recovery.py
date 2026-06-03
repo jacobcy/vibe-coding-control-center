@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models import ExecutionLaunchResult, ExecutionRequest, IssueInfo, IssueState, WorktreeRequirement
+from vibe3.models import (
+    ExecutionLaunchResult,
+    ExecutionRequest,
+    IssueInfo,
+    IssueState,
+    WorktreeRequirement,
+)
 from vibe3.orchestra import append_orchestra_event
 
 if TYPE_CHECKING:
