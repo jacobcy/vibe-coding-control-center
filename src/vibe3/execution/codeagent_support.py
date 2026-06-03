@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal, Sequence
 
 from vibe3.config import VibeConfig
-from vibe3.models.review_runner import AgentOptions
+from vibe3.models import AgentOptions
 
 
 def resolve_command_agent_options(

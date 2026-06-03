@@ -24,6 +24,8 @@ from vibe3.config.role_gates import (
     MANAGER_GATE_CONFIG,
     PLANNER_GATE_CONFIG,
     REVIEWER_GATE_CONFIG,
+    SUPERVISOR_APPLY_GATE_CONFIG,
+    SUPERVISOR_IDENTIFY_GATE_CONFIG,
 )
 from vibe3.config.role_policy import (
     RoleOutputContract,
@@ -71,6 +73,8 @@ __all__ = [
     "PRScoringConfig",
     "QualityConfig",
     "REVIEWER_GATE_CONFIG",
+    "SUPERVISOR_APPLY_GATE_CONFIG",
+    "SUPERVISOR_IDENTIFY_GATE_CONFIG",
     "ReviewConfig",
     "ReviewScopeConfig",
     "RoleOutputContract",

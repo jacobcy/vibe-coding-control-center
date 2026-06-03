@@ -5,7 +5,7 @@ import re
 from loguru import logger
 
 from vibe3.clients import GitClient, SQLiteClient
-from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.environment import SessionRegistryService
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models import SessionRole
 

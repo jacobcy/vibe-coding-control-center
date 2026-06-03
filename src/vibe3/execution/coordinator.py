@@ -10,8 +10,7 @@ from typing import Generator, Optional
 from loguru import logger
 
 from vibe3.clients import BackendProtocol, SQLiteClient
-from vibe3.environment import WorktreeManager
-from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.environment import SessionRegistryService, WorktreeManager
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
