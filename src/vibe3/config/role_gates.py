@@ -1,6 +1,6 @@
 """Role-specific gate configurations for worktree requirements."""
 
-from vibe3.models.worktree import WorktreeRequirement
+from vibe3.models import WorktreeRequirement
 
 MANAGER_GATE_CONFIG = WorktreeRequirement.PERMANENT
 GOVERNANCE_GATE_CONFIG = WorktreeRequirement.NONE
