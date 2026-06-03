@@ -22,7 +22,7 @@ def test_sanitize_event_detail_paths_rewrites_absolute_refs() -> None:
 
     result = sanitize_event_detail_paths(
         f"Recorded audit reference: {abs_ref}",
-        {"ref": abs_ref, "verdict": "UNKNOWN"},
+        {"audit_ref": abs_ref, "verdict": "UNKNOWN"},
         worktree_root=worktree_root,
     )
 
