@@ -55,6 +55,52 @@
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
+- 判断是否属于 Terminal Decision 场景（见下方「Planner Terminal Decision」小节）
+
+## Planner Terminal Decision
+
+plan agent 在规划前调研阶段，可能发现 issue 已无执行价值。此时必须产出明确的终局判断和证据，为 manager 提供高置信度决策依据。
+
+### 触发条件
+
+plan agent 通过以下证据之一确认 issue 已无执行价值：
+
+- **已修复**：当前代码、merged PR/commit、测试已覆盖 issue 要求
+- **已过时**：issue 依赖的模块/API/流程已被移除或替代
+- **明确重复**：已有另一个 issue/PR 覆盖同一目标
+
+### 标准输出契约
+
+plan agent 必须完成：
+
+1. **写 `[plan]` comment**，包含：
+   - 明确结论（"already-fixed" / "已过时" / "重复"）
+   - 具体证据（PR#、commit SHA、代码位置、测试引用）
+   - 验证命令（其他人可复现的 `gh`、`git`、`uv run pytest` 命令）
+
+2. **创建最小 plan_ref 文件**（`docs/plans/issue-<N>-<status>.md`），内容为：
+   - 标题标明 terminal 状态（如 `# Plan: already-fixed`）
+   - 证据摘要和验证命令
+
+3. **注册 plan_ref**：通过 `vibe3 handoff plan <path>` 注册
+
+4. **执行状态转换**：仍执行 `state/claimed → state/handoff` 转换（保持标准流程）
+
+### 禁止事项
+
+- ❌ plan agent 不得自行关闭 issue（close 决策权在 manager）
+- ❌ plan agent 不得跳过 plan_ref 注册（即使内容是 terminal 判断）
+- ❌ plan agent 不得跳过 `state/handoff` 状态转换
+
+### 与 manager Terminal Decision Contract 的对称关系
+
+plan agent 的 terminal finding 为 manager 提供**高置信度终局证据**，但：
+
+- manager 仍需独立验证（见 `supervisor/manager.md:655-659`）
+- plan agent 只做判断 + 证据输出，不做执行
+- close 决策权归属 manager，这是 plan 和 manager 的职责边界
+
+**关键**：Issue #1923 的根因之一就是 plan agent 跳过了 plan_ref 注册，导致 manager 在 `state/handoff` 无法找到 refs。即使 terminal 场景，plan_ref 注册也是强制要求。
 
 ## 环境变量/外部 API 语义验证
 
