@@ -117,15 +117,14 @@ def _render_handoff_events(
                         console.print("    [dim]files:[/]")
                         for f in value:
                             display_f = resolve_ref_path(f, worktree_root)
-                            console.print(
-                                f"      [dim]- "
-                                f"{_to_handoff_cmd(display_f, branch)}[/]"
-                            )
-                    elif key == "ref":
+                            console.print(f"      [dim]- {display_f}[/]")
+                    elif key.endswith("_ref"):
+                        # Handle explicit *_ref fields with path resolution
+                        # Skip generic "ref" field as it lacks type information
                         display_ref = resolve_ref_path(value, worktree_root)
                         console.print(
-                            "    [dim]ref: "
-                            f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                            f"    [dim]{key}: "
+                            f"{_to_handoff_cmd(display_ref, branch, key)}[/]"
                         )
                     else:
                         console.print(f"    [dim]{key}: {value}[/]")
@@ -137,13 +136,23 @@ def _render_handoff_events(
                 if files and isinstance(files, list):
                     for f in files:
                         display_f = resolve_ref_path(f, worktree_root)
-                        console.print(
-                            "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
-                        )
-                ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-                if ref:
-                    display_ref = resolve_ref_path(ref, worktree_root)
-                    console.print(
-                        "  [dim]- " f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                        console.print(f"  [dim]- {display_f}[/]")
+                # Normal mode: show explicit *_ref fields
+                # Skip generic "ref" field as it lacks type information
+                ref_keys = [
+                    "plan_ref",
+                    "audit_ref",
+                    "report_ref",
+                    "indicate_ref",
+                    "spec_ref",
+                ]
+                for key in ref_keys:
+                    ref_value = (
+                        event.refs.get(key) if isinstance(event.refs, dict) else None
                     )
+                    if ref_value and isinstance(ref_value, str):
+                        display_ref = resolve_ref_path(ref_value, worktree_root)
+                        console.print(
+                            f"  [dim]- {_to_handoff_cmd(display_ref, branch, key)}[/]"
+                        )
         console.print()

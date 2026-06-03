@@ -123,6 +123,11 @@ def render_flow_status(
             "  [dim]pr:[/] [yellow]—[/]  "
             "[dim][hint: run `vibe3 check --fix` to detect][/]"
         )
+    stage_to_ref_field = {
+        "plan": "plan_ref",
+        "execute": "report_ref",
+        "review": "audit_ref",
+    }
     for stage, actor, ref in (
         ("plan", status.planner_actor, status.plan_ref),
         ("execute", status.executor_actor, status.report_ref),
@@ -130,7 +135,9 @@ def render_flow_status(
     ):
         if ref:
             ref_display = resolve_ref_path(ref, worktree_root)
-            ref_cmd = ref_to_handoff_cmd(ref_display, status.branch)
+            ref_cmd = ref_to_handoff_cmd(
+                ref_display, status.branch, stage_to_ref_field[stage]
+            )
         else:
             ref_cmd = "—"
         console.print(f"  [dim]{stage}:[/]")

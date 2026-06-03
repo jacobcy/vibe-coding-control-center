@@ -102,6 +102,56 @@ def test_record_indicate_writes_indicate_ref(tmp_path: Path) -> None:
     assert flow_state["manager_actor"] == "codex/gpt-5.4"
 
 
+def test_record_ref_event_refs_use_database_ref_field(tmp_path: Path) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    plan_path = worktree_root / "docs" / "plans" / "test.md"
+    plan_path.parent.mkdir(parents=True)
+    plan_path.write_text("plan content", encoding="utf-8")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+    handoff_file = git_common / "vibe3" / "handoff" / "task-issue-304" / "current.md"
+    service.storage.ensure_current_handoff = MagicMock(return_value=handoff_file)
+    service.storage.append_current_handoff = MagicMock(return_value=handoff_file)
+    service.storage.normalize_ref_value = MagicMock(return_value="docs/plans/test.md")
+
+    service._record_ref("plan", "docs/plans/test.md", actor="planner")
+
+    events = service.get_handoff_events("task/issue-304")
+    assert events[0].refs == {"plan_ref": "docs/plans/test.md"}
+
+
+def test_record_passive_artifact_event_refs_use_database_ref_field(
+    tmp_path: Path,
+) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    artifact_path = service.record_passive_artifact(
+        kind="run",
+        content="### Modified Files\n- src/vibe3/example.py\n",
+        actor="executor",
+    )
+
+    assert artifact_path is not None
+    events = store.get_events("task/issue-304", event_type="report_recorded")
+    assert events[0]["refs"]["report_ref"].startswith("@task-issue-304-")
+    assert "/report-" in events[0]["refs"]["report_ref"]
+    assert "ref" not in events[0]["refs"]
+
+
 def test_record_ref_rejects_unknown_active_kind(tmp_path: Path) -> None:
     worktree_root = tmp_path / "wt"
     git_common = tmp_path / ".git"
