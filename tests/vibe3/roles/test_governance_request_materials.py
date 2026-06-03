@@ -108,6 +108,33 @@ class TestGovernanceMaterials:
         assert "直接补齐可执行的 manager assignee" in content
         assert "明确指派给一个配置中的 manager assignee" in content
 
+    def test_assignee_pool_material_defines_pre_pool_decider_boundary(self):
+        """assignee-pool should decide before manager execution starts."""
+        content = Path("supervisor/governance/assignee-pool.md").read_text()
+        assert "入池前/池内准入 decider" in content
+        assert "manager 是入池后的执行 decider" in content
+        assert "低置信度" in content
+        assert "roadmap/rfc" in content
+
+    def test_assignee_pool_epic_close_does_not_loop_on_suggest(self):
+        """Completed epics should terminalize instead of repeating suggest/cleanup."""
+        content = Path("supervisor/governance/assignee-pool.md").read_text()
+        assert "all sub-issues completed → 直接关闭 epic" in content
+        assert (
+            "不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 "
+            "`orchestra-governed`" in content
+        )
+
+    def test_manager_material_defines_post_pool_terminal_decision_contract(self):
+        """manager should own high-confidence terminal decisions after pool entry."""
+        content = Path("supervisor/manager.md").read_text()
+        assert "入池后的执行 decider" in content
+        assert "Terminal Decision Contract" in content
+        assert "state/handoff" in content
+        assert "高置信度" in content
+        assert "低置信度" in content
+        assert "roadmap/rfc" in content
+
 
 class TestRoundRobinMaterialSelection:
     """Tests that build_governance_recipe selects material from recipe catalog."""
