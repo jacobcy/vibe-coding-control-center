@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.exceptions import GitError
-from vibe3.services.convention_resolver import ConventionResolver
 
 
 def test_resolver_returns_minimal_defaults_by_default():

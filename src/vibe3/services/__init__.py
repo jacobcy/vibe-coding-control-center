@@ -79,7 +79,7 @@ _SYMBOL_MODULES = {
     "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
     "CheckResult": "vibe3.services.check_service",
     "CheckService": "vibe3.services.check_service",
-    "ConventionResolver": "vibe3.services.convention_resolver",
+    "ConventionResolver": "vibe3.config.convention_resolver",
     "CoordinationResolver": "vibe3.services.coordination_resolver",
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",

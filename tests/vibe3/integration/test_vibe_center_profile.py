@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.config.convention_resolver import ConventionResolver
 
 
 def test_vibe_center_profile_has_policies():
