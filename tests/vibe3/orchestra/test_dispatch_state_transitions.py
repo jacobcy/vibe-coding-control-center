@@ -363,3 +363,40 @@ class TestLoggingBehavior:
         assert normalized_events[1] == (
             "planner launch failed for #467: Failed to resolve permanent worktree"
         )
+
+
+def test_health_check_skips_block_flow_for_aborted_flows(tmp_path) -> None:
+    """When check_service marks flow aborted and returns is_valid=False,
+    dispatch_health_check must NOT call block_flow (already in terminal state)."""
+    from unittest.mock import MagicMock
+
+    from vibe3.clients import SQLiteClient
+    from vibe3.models.orchestration import IssueInfo, IssueState
+    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+    from vibe3.services.check_service import CheckResult, CheckService
+
+    store = SQLiteClient(db_path=tmp_path / "test.db")
+    branch = "task/issue-1629"
+    store.update_flow_state(branch, flow_status="aborted")  # pre-aborted
+
+    mock_check_service = MagicMock(spec=CheckService)
+    mock_check_service.verify_branch.return_value = CheckResult(
+        is_valid=False,
+        branch=branch,
+        issues=["Task issue #1629 is CLOSED (no open PR found)"],
+    )
+
+    mock_flow_blocker = MagicMock()
+
+    service = DispatchHealthCheckService(
+        check_service=mock_check_service,
+        flow_blocker=mock_flow_blocker,
+        store=store,
+        flow_context_resolver=lambda n: (branch, None),
+    )
+
+    issue = IssueInfo(number=1629, state=IssueState.CLAIMED, title="closed issue")
+    result = service.check_issue_health(issue)
+
+    assert result is False
+    mock_flow_blocker.block_flow.assert_not_called()  # terminal = skip, not block

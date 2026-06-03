@@ -393,7 +393,11 @@ class CheckService(CheckRemote):
                 self._flow_status_service.mark_flow_aborted(
                     branch, f"Task issue #{task_issue} is CLOSED (no open PR found)"
                 )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+                return CheckResult(
+                    is_valid=False,
+                    branch=branch,
+                    issues=[f"Task issue #{task_issue} is CLOSED (no open PR found)"],
+                )
 
             flow_status = flow_data.get("flow_status", "active")
 
@@ -413,9 +417,13 @@ class CheckService(CheckRemote):
                 self._flow_status_service.mark_flow_aborted(
                     branch, f"Branch '{branch}' no longer exists locally"
                 )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+                return CheckResult(
+                    is_valid=False,
+                    branch=branch,
+                    issues=[f"Branch '{branch}' no longer exists locally"],
+                )
 
-            # Handle orphaned active flow: no task issue + no worktree + stale
+                # Handle orphaned active flow: no task issue + no worktree + stale
             # Only clean up flows that have no issue binding and are
             # significantly behind
             if (
@@ -434,7 +442,14 @@ class CheckService(CheckRemote):
                             f"Orphaned flow '{branch}' is {behind_count} "
                             "commits behind main",
                         )
-                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                        return CheckResult(
+                            is_valid=False,
+                            branch=branch,
+                            issues=[
+                                f"Orphaned flow '{branch}' is {behind_count} "
+                                "commits behind main"
+                            ],
+                        )
                 except Exception as exc:
                     logger.bind(domain="check", branch=branch).debug(
                         f"Could not count commits behind main: {exc}"

@@ -88,17 +88,28 @@ class DispatchHealthCheckService:
         # Use CheckService for unified health check
         result = self._check_service.verify_branch(branch)
 
-        # Get flow status to determine if dispatch should proceed
+        # Get flow status BEFORE checking result.is_valid.
+        # verify_branch() may have just written an abort; reading here ensures
+        # we see the updated state and avoid calling block_flow on terminal flows.
         flow_state = self._store.get_flow_state(branch)
         flow_status = (
             flow_state.get("flow_status", "active") if flow_state else "active"
         )
 
-        # Determine dispatch eligibility:
+        # Terminal state takes priority: skip dispatch cleanly without block_flow.
+        # This handles flows auto-aborted by verify_branch (closed issue, missing
+        # branch, orphaned flow) as well as flows already in done/stale state.
+        if flow_status in ("done", "aborted", "stale"):
+            append_orchestra_event(
+                "dispatcher",
+                f"DispatchHealthCheckService: skipped #{issue.number} "
+                f"(flow is {flow_status})",
+            )
+            return False
+
+        # Determine dispatch eligibility for non-terminal flows:
         # - Fail-open for transient errors (network/auth) and missing flow records
         # - Return False for genuine consistency failures (issue closed, PR merged)
-        # - Return False if flow is done/aborted (terminal state)
-        # - Return True if flow is healthy and active
         if not result.is_valid:
             # Check if this is a transient/expected error that should fail-open
             transient_errors = [
@@ -143,14 +154,6 @@ class DispatchHealthCheckService:
                     f"DispatchHealthCheckService: blocked #{issue.number} "
                     f"(health check failed: {reason})",
                 )
-            return False
-
-        if flow_status in ("done", "aborted", "stale"):
-            append_orchestra_event(
-                "dispatcher",
-                f"DispatchHealthCheckService: skipped #{issue.number} "
-                f"(flow is {flow_status})",
-            )
             return False
 
         return True

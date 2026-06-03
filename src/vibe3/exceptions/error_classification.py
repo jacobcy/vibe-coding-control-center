@@ -274,13 +274,16 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
     ),
     E_DISPATCH_FAILURE: ErrorHandlingContract(
         code=E_DISPATCH_FAILURE,
-        severity=ErrorSeverity.ERROR,
-        counts_toward_threshold=True,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
         record_in_error_log=True,
         write_timeline_event=True,
         issue_action="record_only",
-        gate_action="threshold",
-        description="Dispatch failure (launch_failed, worktree_unavailable, etc.)",
+        gate_action="ignore",
+        description=(
+            "Dispatch infrastructure failure (worktree/launch) "
+            "— does not block orchestra"
+        ),
     ),
     E_EXEC_FLOW_FAILURE: ErrorHandlingContract(
         code=E_EXEC_FLOW_FAILURE,
