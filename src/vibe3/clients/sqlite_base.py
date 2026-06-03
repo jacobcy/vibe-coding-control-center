@@ -118,7 +118,7 @@ class SQLiteClientBase:
         with _global_lock:
             # Lightweight guard: check migration version
             # Update required_migration_version when adding new migrations
-            required_migration_version = 2  # Increment when adding
+            required_migration_version = 3  # Increment when adding
 
             try:
                 version_row = conn.execute(
