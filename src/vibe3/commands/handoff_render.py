@@ -121,11 +121,13 @@ def _render_handoff_events(
                                 f"      [dim]- "
                                 f"{_to_handoff_cmd(display_f, branch)}[/]"
                             )
-                    elif key == "ref":
+                    elif key.endswith("_ref") or key == "ref":
+                        # Handle all reference fields with path resolution
                         display_ref = resolve_ref_path(value, worktree_root)
+                        ref_field = key if key.endswith("_ref") else "ref"
                         console.print(
-                            "    [dim]ref: "
-                            f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                            f"    [dim]{key}: "
+                            f"{_to_handoff_cmd(display_ref, branch, ref_field)}[/]"
                         )
                     else:
                         console.print(f"    [dim]{key}: {value}[/]")
@@ -140,10 +142,17 @@ def _render_handoff_events(
                         console.print(
                             "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
                         )
-                ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-                if ref:
-                    display_ref = resolve_ref_path(ref, worktree_root)
-                    console.print(
-                        "  [dim]- " f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                # Normal mode: show all reference fields
+                ref_keys = ["ref", "plan_ref", "audit_ref", "report_ref"]
+                for key in ref_keys:
+                    ref_value = (
+                        event.refs.get(key) if isinstance(event.refs, dict) else None
                     )
+                    if ref_value and isinstance(ref_value, str):
+                        display_ref = resolve_ref_path(ref_value, worktree_root)
+                        ref_field = key if key.endswith("_ref") else "ref"
+                        console.print(
+                            "  [dim]- "
+                            f"{_to_handoff_cmd(display_ref, branch, ref_field)}[/]"
+                        )
         console.print()

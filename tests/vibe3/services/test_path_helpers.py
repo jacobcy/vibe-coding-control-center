@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from vibe3.services.handoff_resolution import (
     is_shared_handoff_ref,
     to_display_target,
@@ -79,49 +81,49 @@ def test_to_display_target_returns_as_is_for_absolute_path() -> None:
 def test_ref_to_handoff_cmd_shared_artifact_with_at_prefix() -> None:
     """Shared artifacts get @ prefix format."""
     path = "vibe3/handoff/task-476/run-1.md"
-    result = ref_to_handoff_cmd(path, branch=None)
-    assert result == "vibe3 handoff show @task-476/run-1.md"
+    result = ref_to_handoff_cmd(path, branch=None, ref_field="report_ref")
+    assert result == "vibe3 handoff show @report"
 
 
 def test_ref_to_handoff_cmd_docs_reports_with_branch() -> None:
     """Docs reports with branch get --branch format."""
     path = "docs/reports/audit.md"
-    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    result = ref_to_handoff_cmd(path, branch="task/issue-476", ref_field="report_ref")
     assert result == "vibe3 handoff show --branch task/issue-476 @report"
 
 
 def test_ref_to_handoff_cmd_docs_plans_with_branch() -> None:
     """Docs plans with branch get --branch format."""
     path = "docs/plans/plan.md"
-    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    result = ref_to_handoff_cmd(path, branch="task/issue-476", ref_field="plan_ref")
     assert result == "vibe3 handoff show --branch task/issue-476 @plan"
 
 
 def test_ref_to_handoff_cmd_docs_without_branch() -> None:
     """Docs refs without branch get plain format."""
     path = "docs/reports/audit.md"
-    result = ref_to_handoff_cmd(path, branch=None)
-    assert result == "vibe3 handoff show @report"
+    result = ref_to_handoff_cmd(path, branch=None, ref_field="audit_ref")
+    assert result == "vibe3 handoff show @audit"
 
 
 def test_ref_to_handoff_cmd_non_handoff_path() -> None:
-    """Non-handoff paths (temp/logs, etc.) return as-is."""
+    """Non-handoff paths now require ref_field, return handoff command."""
     path = "temp/logs/debug.log"
-    result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "temp/logs/debug.log"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476", ref_field="plan_ref")
+    assert result == "vibe3 handoff show --branch task/issue-476 @plan"
 
 
 def test_ref_to_handoff_cmd_absolute_path() -> None:
-    """Absolute paths return as-is."""
+    """Absolute paths now require ref_field, return handoff command."""
     path = "/abs/path/to/file.md"
-    result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "/abs/path/to/file.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476", ref_field="plan_ref")
+    assert result == "vibe3 handoff show --branch task/issue-476 @plan"
 
 
 def test_ref_to_handoff_cmd_empty_string() -> None:
-    """Empty string returns as-is."""
-    result = ref_to_handoff_cmd("", branch="task/issue-476")
-    assert result == ""
+    """Empty string now requires ref_field, return handoff command."""
+    result = ref_to_handoff_cmd("", branch="task/issue-476", ref_field="plan_ref")
+    assert result == "vibe3 handoff show --branch task/issue-476 @plan"
 
 
 # --- ref_to_handoff_cmd with ref_field parameter ---
@@ -200,3 +202,30 @@ def test_resolve_ref_path_non_handoff_absolute_path(tmp_path: Path) -> None:
     result = resolve_ref_path(non_handoff_path, worktree_root=str(tmp_path))
     # Should return as absolute since it doesn't match any pattern
     assert result == non_handoff_path
+
+
+# --- ref_to_handoff_cmd parameter validation ---
+
+
+def test_ref_to_handoff_cmd_requires_ref_field() -> None:
+    """ref_field is required, raises ValueError if None."""
+    with pytest.raises(ValueError, match="ref_field is required"):
+        ref_to_handoff_cmd("docs/plans/test.md", branch="task/issue-123")
+
+
+def test_ref_to_handoff_cmd_rejects_unknown_ref_field() -> None:
+    """Unknown ref_field raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown ref_field"):
+        ref_to_handoff_cmd(
+            "docs/plans/test.md", branch="task/issue-123", ref_field="unknown_ref"
+        )
+
+
+def test_ref_to_handoff_cmd_ref_field_validation() -> None:
+    """Valid ref_field values work correctly."""
+    valid_fields = ["plan_ref", "report_ref", "audit_ref", "indicate_ref", "spec_ref"]
+    for ref_field in valid_fields:
+        result = ref_to_handoff_cmd(
+            "docs/plans/test.md", branch="task/issue-123", ref_field=ref_field
+        )
+        assert "vibe3 handoff show" in result
