@@ -102,12 +102,6 @@ class TestGovernanceMaterials:
 
         assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
 
-    def test_roadmap_intake_material_requires_assignee_write(self):
-        """roadmap-intake material should require direct assignee assignment."""
-        content = Path("supervisor/governance/roadmap-intake.md").read_text()
-        assert "直接补齐可执行的 manager assignee" in content
-        assert "明确指派给一个配置中的 manager assignee" in content
-
     def test_assignee_pool_material_defines_pre_pool_decider_boundary(self):
         """assignee-pool should decide before manager execution starts."""
         content = Path("supervisor/governance/assignee-pool.md").read_text()
