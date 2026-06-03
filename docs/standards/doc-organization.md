@@ -10,7 +10,7 @@ authority:
   - task-structure
 author: Claude Sonnet 4.5
 created: 2025-01-20
-last_updated: 2025-01-24
+last_updated: 2026-06-03
 related_docs:
   - docs/README.md
   - docs/standards/agent-document-lifecycle-standard.md
@@ -18,6 +18,7 @@ related_docs:
   - docs/standards/doc-quality-standards.md
   - docs/prds/vibe-workflow-paradigm.md
   - STRUCTURE.md
+  - SOUL.md
 ---
 
 # 文档组织标准
@@ -30,10 +31,11 @@ related_docs:
 
 ## 核心原则
 
-1. **文档即规范**：文档是唯一的真理来源，代码必须符合文档
-2. **流程对齐**：文档结构与 V3 规范工作流 (Vibe Guard) 一一对应
-3. **人工优先**：标准设计为人工操作友好，不依赖自动化工具
-4. **AI 工作区分离**：模板等 AI 工具放在 `.agent/`，人类文档放在 `docs/`
+1. **单一事实来源 (Single Source of Truth)**：每个概念、规则、流程只在一个文档中详细阐述，代码必须符合文档（详见 [SOUL.md](../../SOUL.md) §0）。
+2. **渐进披露 (Progressive Disclosure)**：按“入口 -> 标准/规则 -> 细节”路径逐层展开，控制认知负担。
+3. **流程对齐**：文档结构与 V3 规范工作流 (Vibe Guard) 一一对应。
+4. **人工优先**：标准设计为人工操作友好，不依赖自动化工具。
+5. **AI 工作区分离**：工具、模板与 AI 上下文放在 `.agent/` 和 `.claude/`，人类文档放在 `docs/`。
 
 ## 目录结构
 
@@ -41,38 +43,29 @@ related_docs:
 docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
-│   ├── doc-organization.md         # 本文档组织标准
+│   ├── doc-organization.md          # 本文档组织标准
 │   ├── glossary.md                  # 术语真源
-│   └── ...                         # 其他现行标准
-├── specs/                          # 规范文档 (Issue/Feature 契约)
-├── prds/                           # 产品需求文档（全局 PRD）
-├── plans/                          # 执行计划
-├── reports/                        # 报告与总结
-├── references/                     # 外部参考资料
-├── archive/                        # 历史文档归档
-│   └── ...                         # 已退役设计与历史任务文档
+│   └── ...                          # 其他现行标准
+├── specs/                           # 规范文档 (Issue/Feature 契约)
+├── prds/                            # 产品需求文档（全局 PRD）
+├── plans/                           # 执行计划
+├── reports/                         # 报告与总结
+├── references/                      # 外部参考资料
+├── archive/                         # 历史文档归档
+│   └── ...                          # 已退役设计与历史任务文档
 
 核心系统目录说明：
-- `src/vibe3/` - V3 Python 核心源码 (Tier 1/2/3 实现)
-- `lib3/` - V3 核心包装器与仓库重定向中心 (Tier 1 Hub)
+- `src/vibe3/` - V3 Python 实现（主要实现，Tier 1/2/3）
+- `lib3/` - V3 Python 核心包装器与仓库重定向中心 (Tier 1 Hub)
 - `supervisor/` - 治理与决策指令集 (Tier 3 Governance)
-- `skills/` - 各 Agent 技能包 (Tier 2 Skill Layer)
-- `.agent/` - AI 工作区 (Workflows, Rules, Templates)
+- `skills/` - 技能定义权威来源 (Canonical Source)
+- `.agent/` - AI 工作区 (Workflows, Templates, Context/Memory)
+- `.claude/` - Claude AI 配置与规则真源 (Rules, Skills runtime)
 
 AI 工作区中的临时产物与模板：
-- `.agent/plans/` - AI 临时计划 (草稿)
-- `.agent/reports/` - AI 临时报告 (过程证据)
-- `.agent/templates/` - AI 工作模板
-```
-
-`.agent/templates/` 下的模板文件：
-- `prd.md` - PRD 模板
-- `tech-spec.md` - Spec 模板
-- `plan.md` - Plan 模板
-- `test.md` - Test 模板
-- `code.md` - Code 模板
-- `audit.md` - Audit 模板
-- `task-readme.md` - Task README 模板
+- `.agent/context/memory/` - [TRACKED] AI 上下文记忆
+- `.agent/templates/` - AI 工作模板 (prd, spec, plan, etc.)
+- `.claude/rules/` - 编码规则真源 (coding-standards, python-standards, etc.)
 ```
 
 ## 命名规范
@@ -90,8 +83,8 @@ YYYY-MM-DD-feature-name
 - 功能名称简洁明了，3-5 个单词
 
 **示例**：
-- `2024-01-15-docs-organization-standard`
-- `2024-01-16-unified-dispatcher`
+- `2026-06-01-docs-organization-standard`
+- `2026-06-02-unified-dispatcher`
 
 ### 文档命名规范
 
@@ -121,7 +114,7 @@ YYYY-MM-DD-feature-name
 audit-{YYYY-MM-DD}.md
 
 示例：
-- audit-2024-01-15.md
+- audit-2026-06-03.md
 ```
 
 ## 文档交付层级
@@ -154,9 +147,9 @@ audit-{YYYY-MM-DD}.md
 3. **替换占位符并填写内容**
 
 4. **按文档交付层级逐步推进**
-   - 临时草稿优先写入 `.agent/plans/`、`.agent/reports/`
-   - 需要长期保留的正式版本写入 `docs/plans/`、`docs/reports/`
-   - 长期结论写入 issue comment 或 PR comment
+   - 临时草稿与过程证据记录在 issue / handoff 中。
+   - 需要长期保留的正式版本写入 `docs/plans/`、`docs/reports/`。
+   - 长期结论写入 issue comment 或 PR comment。
 
 ### 更新任务状态
 
@@ -169,7 +162,7 @@ status: "in-progress"  # 任务状态
 gates:
   scope:
     status: "passed"
-    timestamp: "2024-01-15T10:00:00Z"
+    timestamp: "2026-06-03T10:00:00Z"
   spec:
     status: "in-progress"
 ```
@@ -184,12 +177,16 @@ gates:
 
 这是因为：
 - `docs/` - 人类阅读的文档（PRD、Spec、Plan、Report、归档等）
-- `.agent/` - AI 使用的工具（模板、规则、工作流、临时 plan/report 等）
+- `.agent/` - AI 使用的工具（模板、规则、工作流、上下文等）
 
 模板是 AI 用来生成文档的工具，应该放在 AI 工作区。
 
 ## 参考
 
-- [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - Vibe Guard 范式总 PRD
+- [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - Vibe Guard 范式 总 PRD
 - [Cognition Spec Dominion](cognition-spec-dominion.md) - 宪法大纲
 - [docs/archive/](../archive/) - 历史文档归档区
+- [STRUCTURE.md](../../STRUCTURE.md) - 项目结构真源
+- [SOUL.md](../../SOUL.md) - 项目宪法
+- [AGENTS.md](../../AGENTS.md) - AI Agent 入口指南
+- [Shared-State Command Standard (v3)](v3/command-standard.md) - V3 命令标准
