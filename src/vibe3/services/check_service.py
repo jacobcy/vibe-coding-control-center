@@ -386,11 +386,14 @@ class CheckService(CheckRemote):
                     )
                     issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
-            # Report closed issue (no open PR found)
-            # Semantic: Issue closed without PR = task cancelled/aborted
+            # Closed issue with no open PR = invalid; termination is QualifyGate's job.
             cached_pr = self._branch_to_pr.get(branch)
             if task_issue_closed and (not cached_pr or cached_pr.state != PRState.OPEN):
-                issues.append(f"Task issue #{task_issue} is CLOSED (no open PR found)")
+                return CheckResult(
+                    is_valid=False,
+                    branch=branch,
+                    issues=[f"Task issue #{task_issue} is CLOSED (no open PR found)"],
+                )
 
             flow_status = flow_data.get("flow_status", "active")
 

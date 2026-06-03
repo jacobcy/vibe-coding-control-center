@@ -62,22 +62,28 @@ class QualifyGateService:
 
     def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:
         """Terminalize local flow for a GitHub-closed issue."""
+        if not branch:
+            logger.debug(
+                "qualify_gate: no branch for closed issue "
+                f"#{issue.number}, skipping terminalization"
+            )
+            return
+
         from vibe3.orchestra.logging import append_orchestra_event
 
-        if branch:
-            append_orchestra_event(
-                "dispatcher",
-                f"qualify_gate skip (#{issue.number}): "
-                "issue closed on GitHub — terminalizing local flow",
-            )
-            from vibe3.services.flow_cleanup_service import FlowCleanupService
+        append_orchestra_event(
+            "dispatcher",
+            f"qualify_gate skip (#{issue.number}): "
+            "issue closed on GitHub — terminalizing local flow",
+        )
+        from vibe3.services.flow_cleanup_service import FlowCleanupService
 
-            FlowCleanupService(store=self._store).cleanup_flow_scene(
-                branch,
-                include_remote=False,
-                terminate_sessions=True,
-                keep_flow_record=True,
-            )
+        FlowCleanupService(store=self._store).cleanup_flow_scene(
+            branch,
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
 
     def run_qualify_gate(
         self,
