@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from vibe3.orchestra import IssueInfo
+from vibe3.models.orchestration import IssueInfo
 
 # Pipeline stage ordering: issues closer to completion are dispatched first.
 # Key is "<trigger_name>:<trigger_state>" matching

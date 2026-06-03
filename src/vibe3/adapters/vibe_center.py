@@ -7,7 +7,6 @@ distribution, making it an explicit adapter instead of implicit
 
 from pathlib import Path
 
-from vibe3.adapters import register_adapter
 from vibe3.adapters.resource_root import resolve_resource_root
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
@@ -126,4 +125,9 @@ def _build_vibe_center_manifest() -> AdapterManifest:
 
 # Build and register
 VIBE_CENTER_ADAPTER = _build_vibe_center_manifest()
-register_adapter(VIBE_CENTER_ADAPTER)
+
+# Self-register with parent module on import (avoids circular import)
+from . import _ADAPTERS, _LOADED  # noqa: E402
+
+_ADAPTERS[VIBE_CENTER_ADAPTER.name] = VIBE_CENTER_ADAPTER
+_LOADED.add(VIBE_CENTER_ADAPTER.name)
