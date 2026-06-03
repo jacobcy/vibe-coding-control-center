@@ -11,16 +11,6 @@ Events are organized by execution chain:
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class DomainEvent:
-    """Base class for all domain events."""
-
-    pass
-
-
 # Import from submodules
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
     ExecutorDispatchIntent,
@@ -42,6 +32,8 @@ from vibe3.domain.events.supervisor_apply import (  # noqa: E402
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
+
+from .base import DomainEvent
 
 __all__ = [
     # Base
