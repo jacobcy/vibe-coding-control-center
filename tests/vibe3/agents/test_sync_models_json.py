@@ -62,7 +62,7 @@ class TestSyncModelsJson:
                 models_path,
             ),
             patch(
-                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                "vibe3.config.agent_preset.REPO_MODELS_JSON_PATH",
                 repo_models,
             ),
             pytest.raises(AgentPresetNotFoundError),
@@ -135,7 +135,7 @@ class TestSyncModelsJson:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+                "vibe3.config.agent_preset.repo_models_json_path",
                 return_value=repo_models,
             ),
             patch(

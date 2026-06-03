@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.backends.codeagent_config import (
+from vibe3.config.agent_preset import (
     resolve_effective_agent_options,
 )
 from vibe3.models.review_runner import AgentOptions, AgentResult
@@ -49,7 +49,7 @@ class TestOpenCodeBackendVerification:
 
         # Mock repo_models_json_path to return our test config
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=models_json,
         ):
             options = AgentOptions(agent="vibe-executor")
@@ -162,7 +162,7 @@ Error: Cannot find module 'some-plugin'
         mock_result.stderr = ""
 
         with patch(
-            "vibe3.agents.backends.codeagent_config.repo_models_json_path",
+            "vibe3.config.agent_preset.repo_models_json_path",
             return_value=models_json,
         ):
             with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
