@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
-from vibe3.models.prompt_meta import PromptContextMode
+from vibe3.models import PromptContextMode
 
 
 @dataclass(frozen=True)

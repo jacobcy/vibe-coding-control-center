@@ -9,7 +9,7 @@ from vibe3.config.role_gates import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
 )
-from vibe3.models.worktree import WorktreeRequirement
+from vibe3.models import WorktreeRequirement
 
 __all__ = [
     "WorktreeRequirement",

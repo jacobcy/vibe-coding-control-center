@@ -6,11 +6,15 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
-from vibe3.models.worktree import WorktreeRequirement
-from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.clients import SQLiteClient
+from vibe3.models import (
+    ExecutionLaunchResult,
+    ExecutionRequest,
+    IssueInfo,
+    IssueState,
+    WorktreeRequirement,
+)
+from vibe3.orchestra import append_orchestra_event
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -158,10 +162,7 @@ class AutoSceneRecoveryService:
         except Exception as exc:
             append_orchestra_event(
                 "dispatcher",
-                (
-                    f"{request.role} auto-reset failed for #{request.target_id}: "
-                    f"{exc}"
-                ),
+                (f"{request.role} auto-reset failed for #{request.target_id}: {exc}"),
                 level="ERROR",
             )
             self.store.add_event(
