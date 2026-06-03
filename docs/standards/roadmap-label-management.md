@@ -1,7 +1,7 @@
 # Roadmap 标签管理工作流程
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-30
+**最后更新**: 2026-06-03
 **状态**: Active
 **文档类型**: 工作流程
 
@@ -44,12 +44,13 @@
 - **版本规划**: 通过 `roadmap/*` 标签控制
 - **Milestone 分配**: 通过 GitHub Milestone 功能控制
 - **执行状态**: 通过 `state/*` 标签控制（由执行层管理）
-  - `state/ready`: 已识别的待治理/待 intake 候选（由 `cron-supervisor` 识别或人工标记）
+  - `state/ready`: 已识别的待治理/待 intake 候选（由 `cron-supervisor` 识别或人 工标记）
   - `state/handoff`: 已通过审查、准备执行的任务（由 `roadmap-intake` 判定）
   - `state/claimed`: 已被 agent 认领
   - `state/in-progress`: 正在执行中
   - `state/done`: 已完成
   - `state/blocked`: 已阻塞
+  - `state/failed`: 已失败（需要人工介入）
 
 ### 2.3 队列排序规则
 
@@ -488,6 +489,7 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 - 开始执行 → `state/in-progress`
 - 被阻塞 → `state/blocked`
+- 失败 → `state/failed`
 - 完成 → `state/done`
 
 ### 7.3 Milestone 自动同步
