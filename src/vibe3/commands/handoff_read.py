@@ -158,26 +158,10 @@ def status(
     ] = False,
     output_format: FormatOption = "table",
     verbose: VerboseOption = False,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="[DEPRECATED] Use --format json instead",
-            hidden=True,
-        ),
-    ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
     if trace:
         enable_method_trace()
-
-    # Handle deprecated --json flag
-    if json_output and output_format == "table":
-        typer.echo(
-            "Warning: --json is deprecated, use --format json instead",
-            err=True,
-        )
-        output_format = "json"
 
     flow_service = FlowService()
     try:
