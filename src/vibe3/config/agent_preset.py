@@ -45,7 +45,7 @@ def repo_models_json_path() -> Path:
     return LEGACY_REPO_MODELS_JSON_PATH
 
 
-def _read_models_json(path: Path) -> dict[str, Any]:
+def read_models_json(path: Path) -> dict[str, Any]:
     """Read a models.json file and return a dict, or empty dict on failure.
 
     Applies global env var overrides for default_backend/default_model.
@@ -74,7 +74,7 @@ def _read_models_json(path: Path) -> dict[str, Any]:
 
 def configured_backends(path: Path | None = None) -> set[str]:
     """Return all backend names actively referenced by repo models config."""
-    data = _read_models_json(path or repo_models_json_path())
+    data = read_models_json(path or repo_models_json_path())
     backends: set[str] = set()
 
     default_backend = data.get("default_backend")
@@ -137,7 +137,7 @@ def resolve_repo_agent_preset(
         return (env_backend or None, env_model or None)
 
     # 2. Fall back to models.json
-    data = _read_models_json(repo_models_json_path())
+    data = read_models_json(repo_models_json_path())
     agents = data.get("agents")
     if not isinstance(agents, dict):
         return None
@@ -169,7 +169,7 @@ def resolve_repo_agent_preset_name(agent_name: str) -> str | None:
     only when they need to pass a real preset name through to codeagent-wrapper so
     wrapper-owned fields such as ``yolo`` can be applied from models.json.
     """
-    data = _read_models_json(repo_models_json_path())
+    data = read_models_json(repo_models_json_path())
     agents = data.get("agents")
     if not isinstance(agents, dict):
         return None
@@ -210,7 +210,7 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         return options
     resolved = resolve_repo_agent_preset(options.agent)
     if not resolved:
-        data = _read_models_json(repo_models_json_path())
+        data = read_models_json(repo_models_json_path())
         default_backend = data.get("default_backend")
         default_model = data.get("default_model")
         if default_backend and isinstance(default_backend, str):

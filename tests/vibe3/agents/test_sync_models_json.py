@@ -148,3 +148,9 @@ class TestSyncModelsJson:
 
         data = json.loads(codeagent_models.read_text())
         assert data["default_backend"] == "resolved-backend"
+
+    def test_read_models_json_is_public_config_api(self) -> None:
+        """Backend modules should not depend on private config helpers."""
+        from vibe3.config.agent_preset import read_models_json
+
+        assert callable(read_models_json)

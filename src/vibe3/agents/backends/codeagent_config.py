@@ -10,7 +10,7 @@ from typing import Any, Final
 from loguru import logger
 
 from vibe3.config.agent_preset import (
-    _read_models_json,
+    read_models_json,
     repo_models_json_path,
     resolve_effective_agent_options,
 )
@@ -44,7 +44,7 @@ def sync_models_json(options: AgentOptions) -> None:
         existing = {}
 
     # Sync complete agents presets from repo config
-    repo_data = _read_models_json(repo_models_json_path())
+    repo_data = read_models_json(repo_models_json_path())
     repo_agents = repo_data.get("agents")
     if isinstance(repo_agents, dict) and repo_agents:
         # Merge repo agents into existing agents (repo takes precedence)
