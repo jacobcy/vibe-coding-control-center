@@ -8,7 +8,10 @@ distribution, making it an explicit adapter instead of implicit
 from pathlib import Path
 
 from vibe3.adapters import register_adapter
+from vibe3.adapters.resource_root import resolve_resource_root
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+
+_SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _build_vibe_center_manifest() -> AdapterManifest:
@@ -19,23 +22,17 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     """
     from vibe3.clients.git_client import GitClient
 
-    # Get repo root for stable path resolution
+    git_common_dir = None
     try:
-        git_client = GitClient()
-        git_common_dir = git_client.get_git_common_dir()
-        if git_common_dir:
-            repo_root = Path(git_common_dir).parent
-            # Verify this is a valid repo root by checking if skills directory exists
-            # This handles test environments where git_common_dir is mocked to temp dir
-            if not (repo_root / "skills").exists():
-                # Fall back to cwd if skills not found (e.g., in test isolation)
-                repo_root = Path.cwd()
-        else:
-            # Fallback to cwd if not in git repo
-            repo_root = Path.cwd()
+        git_common_dir = GitClient().get_git_common_dir()
     except Exception:
-        # Graceful fallback for non-git environments
-        repo_root = Path.cwd()
+        pass
+
+    repo_root = resolve_resource_root(
+        required_marker="skills",
+        git_common_dir=git_common_dir,
+        additional_roots=(_SOURCE_REPO_ROOT,),
+    )
 
     resources: list[AdapterResource] = []
 
