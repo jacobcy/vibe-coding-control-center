@@ -17,9 +17,9 @@ from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
 )
+from vibe3.models import IssueInfo
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
     RUN_BRANCH_RESOLVER,

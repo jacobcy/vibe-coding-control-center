@@ -17,8 +17,8 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.models import IssueInfo
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.runtime import ServiceBase
 
 if TYPE_CHECKING:

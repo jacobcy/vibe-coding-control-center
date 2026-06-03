@@ -30,9 +30,9 @@ from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
 )
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition

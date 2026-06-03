@@ -10,9 +10,9 @@ from vibe3.commands.status_render_utils import (
     parse_epic_dependencies,
     render_task_item_details,
 )
+from vibe3.models import IssueState
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.services.task_status_classifier import TaskStatusBucket
 from vibe3.ui.console import console
 

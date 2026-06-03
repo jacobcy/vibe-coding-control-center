@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService

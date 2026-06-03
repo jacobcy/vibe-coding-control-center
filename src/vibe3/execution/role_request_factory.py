@@ -9,9 +9,9 @@ from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
 )
+from vibe3.models import IssueInfo
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.services.convention_resolver import ConventionResolver
 
 

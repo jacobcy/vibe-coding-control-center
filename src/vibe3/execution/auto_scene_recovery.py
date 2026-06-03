@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.worktree import WorktreeRequirement
 from vibe3.orchestra.logging import append_orchestra_event
 

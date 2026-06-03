@@ -31,9 +31,9 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.models.worktree import WorktreeRequirement

@@ -18,10 +18,8 @@ from vibe3.domain.state_machine import (
     validate_transition,
 )
 from vibe3.exceptions import InvalidTransitionError, SystemError
-from vibe3.models.orchestration import (
-    IssueState,
-    StateTransition,
-)
+from vibe3.models import IssueState
+from vibe3.models.orchestration import StateTransition
 
 
 class LabelService:

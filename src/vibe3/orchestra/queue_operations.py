@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Callable
 
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.orchestra.issue_loader import (
     get_flow_context,

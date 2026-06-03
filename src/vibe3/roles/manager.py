@@ -21,9 +21,9 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_orchestra_repo_root,
 )
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import (

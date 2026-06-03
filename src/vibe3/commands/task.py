@@ -10,7 +10,7 @@ import typer
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import SystemError, UserError
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService

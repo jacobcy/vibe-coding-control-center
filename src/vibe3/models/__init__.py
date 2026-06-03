@@ -13,6 +13,7 @@ from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
 from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
 from vibe3.models.inspection import CallNode, CommandInspection
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.models.session_types import SessionRole
@@ -56,6 +57,8 @@ __all__: list[str] = [
     "LayerCoverage",
     "ModuleChange",
     "ModuleSnapshot",
+    "IssueInfo",
+    "IssueState",
     "OrchestraConfig",
     "PRSource",
     "PromptContextMode",
