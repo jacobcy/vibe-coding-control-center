@@ -9,7 +9,7 @@ from vibe3.execution.execution_lifecycle import (
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
-from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 
 __all__ = [
     # Core services

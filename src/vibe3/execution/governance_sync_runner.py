@@ -12,13 +12,13 @@ from typing import Callable
 from loguru import logger
 from typer import echo
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents import CodeagentBackend
 from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
-from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
+from vibe3.services import record_dispatch_failure_if_unexpected
 
 
 def run_governance_sync(
@@ -112,8 +112,7 @@ def run_governance_sync(
 
         # Log successful completion
         append_event(
-            f"governance scan completed tick={tick_count} "
-            f"exit_code={result.exit_code}"
+            f"governance scan completed tick={tick_count} exit_code={result.exit_code}"
         )
         logger.bind(domain="governance", tick=tick_count).success(
             f"Governance scan completed: {result.exit_code}"
@@ -137,7 +136,7 @@ def run_governance_sync(
             f"Governance scan failed: {error_code} - {exc}"
         )
         append_event(
-            f"governance scan failed tick={tick_count} " f"error={error_code}: {exc}"
+            f"governance scan failed tick={tick_count} error={error_code}: {exc}"
         )
 
         # Re-raise for CLI exit code handling
@@ -295,7 +294,6 @@ def run_governance_async(
         echo(message)
     elif result:
         append_governance_event(
-            f"governance dispatch skipped: tick={tick_count} "
-            f"reason={result.reason}",
+            f"governance dispatch skipped: tick={tick_count} reason={result.reason}",
         )
         echo(f"Governance scan skipped: {result.reason}")

@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import typer
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.agents import CodeagentBackend
+from vibe3.clients import GitClient, SQLiteClient
+from vibe3.config import load_orchestra_config
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
-from vibe3.services.actor_support import format_agent_actor
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services import (
+    format_agent_actor,
+    load_issue_info,
+    record_dispatch_failure_if_unexpected,
+)
 
 
 def run_issue_role_async(
