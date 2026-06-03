@@ -13,10 +13,10 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label

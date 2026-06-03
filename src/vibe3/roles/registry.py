@@ -8,7 +8,7 @@ from vibe3.domain.events import (
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.roles.manager import HANDOFF_MANAGER_ROLE, MANAGER_ROLE
 from vibe3.roles.plan import (

@@ -27,8 +27,8 @@ from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
 

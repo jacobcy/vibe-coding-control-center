@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestration import IssueState
+    from vibe3.models import IssueState
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
 

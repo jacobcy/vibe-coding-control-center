@@ -7,7 +7,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 
 
 class FlowStatusService:
@@ -48,7 +48,7 @@ class FlowStatusService:
             if issue_number is None:
                 return False
 
-        from vibe3.models.orchestration import IssueInfo
+        from vibe3.models import IssueInfo
 
         issue = IssueInfo(
             number=issue_number,

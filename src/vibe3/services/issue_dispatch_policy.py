@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.services.label_utils import has_manager_assignee
 
 

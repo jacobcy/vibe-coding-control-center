@@ -14,7 +14,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse

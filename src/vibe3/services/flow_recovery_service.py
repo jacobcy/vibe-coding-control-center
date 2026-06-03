@@ -214,8 +214,8 @@ class FlowRecoveryService:
         Raises:
             RuntimeError: If label write fails (RC2: prevents silent failure)
         """
+        from vibe3.models import IssueState
         from vibe3.models.flow import FlowState
-        from vibe3.models.orchestration import IssueState
         from vibe3.services.blocked_state_service import BlockedStateService
         from vibe3.services.flow_resume_resolver import infer_resume_label
 
@@ -261,7 +261,7 @@ class FlowRecoveryService:
     ) -> None:
         """Hard rebuild through the canonical rebuild usecase."""
         from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.models.orchestration import IssueInfo, IssueState
+        from vibe3.models import IssueInfo, IssueState
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
         from vibe3.services.issue_context_loader import load_issue_info
 

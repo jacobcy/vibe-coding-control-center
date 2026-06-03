@@ -13,9 +13,9 @@ from vibe3.config.role_gates import (
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import use_current_branch
+from vibe3.models import IssueInfo
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_flow_service import IssueFlowService

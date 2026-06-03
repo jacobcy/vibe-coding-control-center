@@ -15,7 +15,6 @@ from vibe3.clients.git_client import GitClient
 
 # Module-level re-exports from models/ (safe, no cycle risk)
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 
 # Lazy imports via __getattr__ for everything else to avoid circular dependencies
 if TYPE_CHECKING:
@@ -178,8 +177,6 @@ def __getattr__(name: str) -> object:
 __all__ = [
     # Models
     "OrchestraConfig",
-    "IssueInfo",
-    "IssueState",
     # Orchestra submodules
     "QueueEntry",
     "append_orchestra_event",

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import promote_progressed_entries
 from vibe3.services.label_utils import should_skip_from_queue

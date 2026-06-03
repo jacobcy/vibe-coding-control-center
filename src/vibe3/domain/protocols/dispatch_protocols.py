@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestration import IssueInfo
+    from vibe3.models import IssueInfo
     from vibe3.models.queue_entry import QueueEntry
 
 

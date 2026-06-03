@@ -13,7 +13,7 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService
 

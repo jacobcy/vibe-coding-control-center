@@ -9,9 +9,9 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.models import IssueState
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService

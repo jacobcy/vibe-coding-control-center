@@ -13,7 +13,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import block_manager_noop_issue

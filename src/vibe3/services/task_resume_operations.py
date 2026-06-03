@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 from vibe3.exceptions import UserError
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient

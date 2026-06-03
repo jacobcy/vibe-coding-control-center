@@ -11,7 +11,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.models.orchestration import IssueInfo
+    from vibe3.models import IssueInfo
     from vibe3.orchestra.protocols import FlowManagerProtocol
 
 
@@ -57,7 +57,7 @@ def load_issue(
     issue_number: int, config: OrchestraConfig, github: "GitHubClient"
 ) -> "IssueInfo | None":
     """Load the current issue snapshot for an already-frozen issue."""
-    from vibe3.models.orchestration import IssueInfo
+    from vibe3.models import IssueInfo
 
     try:
         payload = github.view_issue(issue_number, repo=config.repo)
