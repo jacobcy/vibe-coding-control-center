@@ -82,3 +82,15 @@ def test_environment_all_contains_session_registry():
     from vibe3.environment import __all__
 
     assert "SessionRegistryService" in __all__
+
+
+def test_clients_get_store_importable():
+    from vibe3.clients import get_store
+
+    assert callable(get_store)
+
+
+def test_clients_all_contains_get_store():
+    from vibe3.clients import __all__
+
+    assert "get_store" in __all__
