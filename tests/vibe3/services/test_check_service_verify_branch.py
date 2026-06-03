@@ -321,3 +321,42 @@ def test_verify_branch_no_longer_reports_runtime_ownership_warnings(
     # Should NOT report any removed owner-session warnings
     assert all("owner session" not in issue for issue in result.issues)
     assert all("owner session" not in warning for warning in result.warnings)
+
+
+def test_verify_branch_closed_issue_returns_invalid(tmp_path: Path) -> None:
+    """Closed issue without open PR must return is_valid=False."""
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+
+    store = SQLiteClient(db_path=tmp_path / "test.db")
+    branch = "task/issue-1629"
+    store.update_flow_state(branch, flow_status="active")
+    store.add_issue_link(branch, 1629, "task")
+
+    mock_git = MagicMock(spec=GitClient)
+    mock_git.find_worktree_path_for_branch.return_value = None
+    mock_git.get_git_common_dir.return_value = tmp_path
+
+    mock_github = MagicMock(spec=GitHubClient)
+    mock_github.view_issue.return_value = {
+        "number": 1629,
+        "state": "CLOSED",
+        "labels": [],
+    }
+    mock_github.list_all_prs.return_value = []
+    mock_github.list_prs_for_branch.return_value = []
+    mock_github.close_issue_if_open.return_value = "already_closed"
+
+    service = CheckService(store=store, git_client=mock_git, github_client=mock_github)
+    service._initialize_pr_cache()
+
+    result = service.verify_branch(branch)
+
+    # Closed issue = NOT valid for dispatch
+    assert result.is_valid is False
+    assert any("CLOSED" in issue for issue in result.issues)
+
+    # Flow should still be aborted in DB
+    flow_data = store.get_flow_state(branch)
+    assert flow_data is not None
+    assert flow_data["flow_status"] == "aborted"
