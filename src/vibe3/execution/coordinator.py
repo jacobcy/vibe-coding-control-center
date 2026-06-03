@@ -16,14 +16,11 @@ from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
-from vibe3.execution.contracts import (
-    ExecutionLaunchResult,
-    ExecutionRequest,
-    _StartAsyncFactory,
-)
+from vibe3.execution.contracts import _StartAsyncFactory
 from vibe3.execution.execution_lifecycle import execution_prefix
-from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.worktree import WorktreeRequirement
 from vibe3.orchestra.logging import append_orchestra_event
 
 # Reason code invariant for duplicate session handling:

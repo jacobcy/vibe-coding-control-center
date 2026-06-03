@@ -18,10 +18,10 @@ from vibe3.agents import (
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.role_gates import REVIEWER_GATE_CONFIG
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
@@ -31,11 +31,12 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG, WorktreeRequirement
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
+from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.roles.review_helpers import (
     ReviewRunResult,

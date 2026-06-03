@@ -19,8 +19,8 @@ from vibe3.domain.events import (
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.roles.plan import build_plan_request
 from vibe3.roles.review import build_review_request
 from vibe3.roles.run import build_run_request

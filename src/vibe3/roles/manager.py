@@ -9,11 +9,11 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import CapacityDeferredError
-from vibe3.execution import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
@@ -21,7 +21,7 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_orchestra_repo_root,
 )
-from vibe3.execution.role_contracts import MANAGER_GATE_CONFIG
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider

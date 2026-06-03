@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable, Protocol, runtime_checkable
 
 # Import SessionRole from canonical source instead of redefining
-from vibe3.execution.session_service import SessionRole
+from vibe3.models.session_types import SessionRole
 
 
 @runtime_checkable

@@ -15,10 +15,10 @@ from loguru import logger
 
 from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
