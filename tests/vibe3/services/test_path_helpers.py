@@ -168,19 +168,17 @@ def test_ref_to_handoff_cmd_with_ref_field_shared_artifact() -> None:
 
 
 def test_ref_to_handoff_cmd_with_ref_field_unknown_field() -> None:
-    """Unknown ref_field falls back to path-based behavior."""
+    """Unknown ref_field raises ValueError."""
     path = "docs/reports/audit.md"
-    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="unknown_ref")
-    # Should fall back to path-based @report
-    assert result == "vibe3 handoff show --branch task/issue-123 @report"
+    with pytest.raises(ValueError, match="Unknown ref_field"):
+        ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="unknown_ref")
 
 
 def test_ref_to_handoff_cmd_with_ref_field_none() -> None:
-    """ref_field=None uses path-based behavior (backward compatible)."""
+    """ref_field=None raises ValueError (no path-based fallback)."""
     path = "docs/reports/audit.md"
-    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field=None)
-    # Should use path-based @report
-    assert result == "vibe3 handoff show --branch task/issue-123 @report"
+    with pytest.raises(ValueError, match="ref_field is required"):
+        ref_to_handoff_cmd(path, branch="task/issue-123", ref_field=None)
 
 
 # --- resolve_ref_path ---

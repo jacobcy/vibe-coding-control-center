@@ -121,13 +121,13 @@ def _render_handoff_events(
                                 f"      [dim]- "
                                 f"{_to_handoff_cmd(display_f, branch)}[/]"
                             )
-                    elif key.endswith("_ref") or key == "ref":
-                        # Handle all reference fields with path resolution
+                    elif key.endswith("_ref"):
+                        # Handle explicit *_ref fields with path resolution
+                        # Skip generic "ref" field as it lacks type information
                         display_ref = resolve_ref_path(value, worktree_root)
-                        ref_field = key if key.endswith("_ref") else "ref"
                         console.print(
                             f"    [dim]{key}: "
-                            f"{_to_handoff_cmd(display_ref, branch, ref_field)}[/]"
+                            f"{_to_handoff_cmd(display_ref, branch, key)}[/]"
                         )
                     else:
                         console.print(f"    [dim]{key}: {value}[/]")
@@ -142,17 +142,23 @@ def _render_handoff_events(
                         console.print(
                             "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
                         )
-                # Normal mode: show all reference fields
-                ref_keys = ["ref", "plan_ref", "audit_ref", "report_ref"]
+                # Normal mode: show explicit *_ref fields
+                # Skip generic "ref" field as it lacks type information
+                ref_keys = [
+                    "plan_ref",
+                    "audit_ref",
+                    "report_ref",
+                    "indicate_ref",
+                    "spec_ref",
+                ]
                 for key in ref_keys:
                     ref_value = (
                         event.refs.get(key) if isinstance(event.refs, dict) else None
                     )
                     if ref_value and isinstance(ref_value, str):
                         display_ref = resolve_ref_path(ref_value, worktree_root)
-                        ref_field = key if key.endswith("_ref") else "ref"
                         console.print(
                             "  [dim]- "
-                            f"{_to_handoff_cmd(display_ref, branch, ref_field)}[/]"
+                            f"{_to_handoff_cmd(display_ref, branch, key)}[/]"
                         )
         console.print()
