@@ -17,8 +17,8 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.services.orchestra_helpers import get_manager_usernames
 
 
-def _raise_system_error() -> Path:
-    """Helper function to raise SystemError for testing."""
+def _mock_repo_root_not_found() -> Path:
+    """Simulate find_repo_root() when not in a git repository."""
     raise SystemError("Cannot resolve repository root — not inside a git repository")
 
 
@@ -225,7 +225,7 @@ class TestLoadKeysEnvFallback:
             # Mock find_repo_root to raise SystemError (not in git repo)
             monkeypatch.setattr(
                 "vibe3.clients.git_client.find_repo_root",
-                _raise_system_error,
+                _mock_repo_root_not_found,
             )
             # Ensure no home-dir keys.env interferes
             monkeypatch.setattr(Path, "home", lambda: tmp_path)

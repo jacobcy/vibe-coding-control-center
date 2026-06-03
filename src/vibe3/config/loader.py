@@ -410,12 +410,14 @@ def load_keys_env_fallback() -> None:
     from pathlib import Path
 
     # Resolve project-local config/keys.env relative to repo root, not CWD
+    # Lazy import to avoid circular dependency with git_client
+    # (git_client imports from config module)
     repo_root: Path | None = None
     try:
         from vibe3.clients.git_client import find_repo_root
 
         repo_root = find_repo_root()
-    except (SystemError, Exception):
+    except SystemError:
         pass
 
     keys_paths = [
@@ -423,12 +425,6 @@ def load_keys_env_fallback() -> None:
         Path.home() / ".vibe" / "config" / "keys.env",
         Path.home() / ".vibe" / "keys.env",
     ]
-
-    if not repo_root and not Path("config/keys.env").exists():
-        logger.bind(domain="config").warning(
-            "Cannot detect repo root; project config/keys.env not found at CWD. "
-            "Set environment variables explicitly or run from project root."
-        )
 
     for keys_path in keys_paths:
         if not keys_path.exists():
@@ -466,6 +462,12 @@ def load_keys_env_fallback() -> None:
             continue
 
     # No keys.env found (this is OK, user might use direnv or manual exports)
+    # But warn if repo root detection failed and project config not found at CWD
+    if not repo_root and not Path("config/keys.env").exists():
+        logger.bind(domain="config").warning(
+            "Cannot detect repo root; project config/keys.env not found at CWD. "
+            "Set environment variables explicitly or run from project root."
+        )
     logger.bind(domain="config").debug(
         "No keys.env found in standard locations, using existing environment"
     )
