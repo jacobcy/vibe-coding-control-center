@@ -359,9 +359,10 @@ def sanitize_event_detail_paths(
 
     sanitized = detail
 
-    ref = event_refs.get("ref")
-    if isinstance(ref, str):
-        sanitized = sanitized.replace(ref, resolve_ref_path(ref, worktree_root))
+    # Process all *_ref fields (plan_ref, audit_ref, report_ref, etc.)
+    for key, value in event_refs.items():
+        if key.endswith("_ref") and isinstance(value, str):
+            sanitized = sanitized.replace(value, resolve_ref_path(value, worktree_root))
 
     files = event_refs.get("files")
     if isinstance(files, list):
