@@ -47,9 +47,22 @@
 - **Level 3 (Roadmap)**: 终审决策，结果产出后打 `roadmap-reviewed`。
 
 **核心逻辑**：
-- **决策** → 对池内 issue 做出确定性判断（不再只是”建议”）
-- **观察** → 分析当前 issue 池和队列状态，辅助决策
+- **decide（高置信度）** → 直接执行动作并写 `[governance decide]` comment，说明决策依据和执行结果
+- **suggest（低置信度）** → 写 `[governance suggest]` comment，供人类或 roadmap 层审查
 - **不确定** → 打 `roadmap/rfc`，说明需要人类判断的具体问题，然后停止；不要反复写 close/split 建议
+
+**decide vs suggest 判定标准**：
+
+| 场景 | 判定 | 依据 |
+|------|------|------|
+| blocked_reason == “state unchanged” + authoritative ref 存在 | **decide** | 物理证据确凿，agent 漏改 state |
+| 上游阻塞 issue 已关闭 + 本 issue 无其他阻塞 | **decide** | 阻塞原因已消除，恢复路径明确 |
+| 明确重复 issue（目标完全相同） | **decide** | 无歧义 |
+| 明确已解决（有 PR/commit 证据） | **decide** | 代码证据充分 |
+| 所有 sub-issues 完成的 Epic | **decide** | 终局条件满足 |
+| 不明确的重复 / 部分解决 / 架构不确定 | **suggest** | 需要人类判断 |
+| 优先级/roadmap 调整（首次评估） | **suggest** | 需要人类确认 |
+| 需要人类取舍或架构决策 | **suggest** → `roadmap/rfc` | 非池内权限 |
 
 **闭环要求**：
 - 不要把”已有历史 assignee / 历史上进过 pool”当成充分结论；必须以当前 task / flow / ready queue 现场为准
@@ -96,8 +109,8 @@ Allowed:
      触发条件：当前 issue 已在 `state/blocked`
      - `blocked_reason` 明确为 `state unchanged`
      - `flow show` 能确认 authoritative ref 已存在
-     - 使用 `vibe3 task resume --label auto` 自动恢复到正确状态
-     - 恢复后必须写 `[governance auto-recover]` comment 说明是 governance 自动补偿
+     - 使用 `vibe3 task resume <number> --label auto --yes` 自动恢复到正确状态
+     - 恢复后必须写 `[governance decide]` comment 说明决策依据和执行结果
 
 Forbidden:
 
@@ -267,8 +280,8 @@ pool 扫描有 assignee 的 issue →
   - 调用 `gh issue view 123 --json body` → blocked_reason = "state unchanged"
   - 调用 `vibe3 flow show --branch task/issue-123` → plan_ref = "docs/plans/xxx.md"
   - authoritative ref 存在，说明 agent 已完成工作但漏改 state
-  - 调用 `vibe3 task resume 123 --label auto -y`
-  - 写 `[governance auto-recover]` comment 说明已恢复
+  - 调用 `vibe3 task resume 123 --label auto --yes`
+  - 写 `[governance decide]` comment 说明决策依据和恢复结果
   - **结论**：自动恢复成功
 
 **不可自动恢复的 blocked issue**
@@ -289,10 +302,10 @@ pool 扫描有 assignee 的 issue →
   - resume：明确可恢复的 blocked issue
   - split 建议：分界清晰时
 - ready queue 排序建议
-- `[governance suggest]` 格式的决策评论
+- `[governance decide]` 和 `[governance suggest]` 格式的决策评论（见 decide/suggest 判定标准）
 - 入池评估与标签补齐：有 assignee 但无 state label → 评 priority → 补 roadmap/priority → 设 `state/ready`
 - **所有决策完成后打 `orchestra-governed` 标签**
-- 漏改恢复补偿：`state unchanged` 恢复（`vibe3 task resume --label auto`）
+- 漏改恢复补偿：`state unchanged` 恢复（`vibe3 task resume <number> --label auto --yes`，使用 `[governance decide]` 标签）
 
 ## Hard Boundary
 
@@ -373,10 +386,10 @@ Steps:
      c. 如果 `blocked_reason == "state unchanged"`：
         - 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
         - 检查 `plan_ref`、`report_ref` 或 `audit_ref` 是否存在
-        - 如果存在任意一个 authoritative ref：
-          - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
-          - 写 `[governance auto-recover]` comment 说明恢复原因和依据
-        - 如果没有任何 authoritative ref：
+        - 如果存在任意一个 authoritative ref（**高置信度 → decide**）：
+          - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto --yes`
+          - 写 `[governance decide]` comment 说明恢复原因、依据和执行结果
+        - 如果没有任何 authoritative ref（**低置信度 → suggest**）：
           - 写 `[governance suggest]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
         - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
@@ -448,8 +461,8 @@ Decision sketch:
 	  3. 如果存在任意一个，执行自动恢复；否则写建议评论
 
 	  **恢复动作**：
-	  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
-	  - 写 `[governance auto-recover]` comment 说明恢复原因和依据
+		  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto --yes`
+		  - 写 `[governance decide]` comment 说明恢复原因、依据和执行结果
 	  - **注意**：只做最小 state 纠偏，不推进后续阶段
 
   **禁止场景**（不自动恢复）：
@@ -540,7 +553,7 @@ Exit:
 
 ## Comment Contract
 
-治理建议以 `[governance suggest]` 署名写入 issue comment。
+治理建议以 `[governance decide]` 或 `[governance suggest]` 署名写入 issue comment。
 
 **去重规则（强制）**：
 
@@ -548,13 +561,13 @@ Exit:
   - **普通 issue**：如果已有 `orchestra-governed` 标签，直接跳过（已决策过）
   - **Epic issue（例外）**：不受此规则限制，每次 scan 都检查（见 Step 6 Epic 收口检查）
 - **写评论前必须检查**：读取该 issue 的现有 comments
-- **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
+- **去重检查**：若已存在相同类型的 `[governance decide]` 或 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
   - `[governance suggest] 建议关闭此 Issue` → 检查是否已有"建议关闭"
   - `[governance suggest] 建议恢复此 Issue` → 检查是否已有"建议恢复"
   - `[governance suggest] 入池评估` → 检查是否已有"入池评估"
   - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
-  - `[governance auto-recover]` → 检查是否已有相同恢复动作
+  - `[governance decide]` 恢复 → 检查是否已有相同恢复动作
   - `[governance close] 已关闭此 Epic` → 关闭前检查 issue 是否已经 CLOSED，避免重复 close
 - **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
 - **目的**：避免重复刷屏，保持 issue 讨论清洁
@@ -644,18 +657,51 @@ Exit:
 
 注意：governance 在高置信度场景下可以直接关闭，减少 manager 开销。
 
+### `decide_resume()`
+
+当 blocked issue 满足高置信度恢复条件时（如上游阻塞已关闭 + 无其他阻塞），governance 作为 decider 直接执行恢复：
+
+```
+[governance decide] 恢复此 Issue
+
+恢复理由：<上游阻塞已关闭的具体说明>
+执行命令：vibe3 task resume <issue-number> --label auto --yes
+执行结果：<成功/失败及原因>
+```
+
+**执行动作**：
+1. 执行 `vibe3 task resume <issue-number> --label auto --yes`
+2. 写 `[governance decide]` comment 说明决策依据和执行结果
+3. 添加 `orchestra-governed` 标签
+
+**正确的恢复命令**（强制格式）：
+```bash
+vibe3 task resume <issue-number> --label auto --yes
+```
+
+**禁止使用以下错误格式**：
+- ❌ `vibe3 task resume <issue-number> --blocked --label -y`
+- ❌ `vibe3 task resume <issue-number> --blocked`
+- ❌ `vibe3 task resume <issue-number> -y`
+
 ### `suggest_resume()`
 
-当 blocked issue 的依赖已解除时：
+当 blocked issue 的依赖状态不明确，或存在多种不确定信号时：
 
 ```
 [governance suggest] 建议恢复此 Issue
 
-恢复理由：<依赖已解除的具体说明>
-建议命令：vibe3 task resume <issue-number> --blocked --label -y
+恢复理由：<依赖可能已解除的具体说明>
+建议命令：vibe3 task resume <issue-number> --label auto --yes
+置信度说明：<为什么不能直接 decide>
 ```
 
 注意：只建议恢复，由人类执行 `vibe3 task resume`。
+
+**正确的建议命令格式**（强制）：
+```
+vibe3 task resume <issue-number> --label auto --yes
+```
 
 ### `suggest_pool_entry()`
 
@@ -684,10 +730,10 @@ Exit:
 执行格式：
 
 ```
-[governance auto-recover] 已自动恢复 state
+[governance decide] 已自动恢复 state
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
-恢复命令：vibe3 task resume <number> --label auto -y
+恢复命令：vibe3 task resume <number> --label auto --yes
 依据：<plan_ref 或 report_ref 或 audit_ref>
 说明：本动作只做最小一致性修正，不代表后续阶段已完成。
 ```
@@ -765,7 +811,7 @@ Sub-issues 状态：
 **Stop Point Checklist（强制）**：
 
 完成以下动作后才能停止：
-- [ ] 写完 `[governance suggest]` 或 `[governance auto-recover]` 评论
+- [ ] 写完 `[governance decide]` 或 `[governance suggest]` 评论
 - [ ] 普通 pool 决策打上 `orchestra-governed` 标签；非 manager assignee 的 partial epic 只记录 stdout
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 - [ ] **Epic 检查**：完成所有 `roadmap/epic` issues 的检查（Step 6）
