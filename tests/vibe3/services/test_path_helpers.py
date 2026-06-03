@@ -124,6 +124,63 @@ def test_ref_to_handoff_cmd_empty_string() -> None:
     assert result == ""
 
 
+# --- ref_to_handoff_cmd with ref_field parameter ---
+
+
+def test_ref_to_handoff_cmd_with_ref_field_indicate_ref() -> None:
+    """ref_field parameter uses field-to-alias mapping for indicate_ref."""
+    path = "docs/plans/issue-123-plan.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="indicate_ref")
+    assert result == "vibe3 handoff show --branch task/issue-123 @indicate"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_audit_ref() -> None:
+    """ref_field parameter uses field-to-alias mapping for audit_ref."""
+    path = "docs/reports/issue-123-audit.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="audit_ref")
+    assert result == "vibe3 handoff show --branch task/issue-123 @audit"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_plan_ref() -> None:
+    """ref_field parameter with plan_ref produces same result as path-based."""
+    path = "docs/plans/plan.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="plan_ref")
+    # Should match path-based behavior: @plan alias
+    assert result == "vibe3 handoff show --branch task/issue-123 @plan"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_report_ref() -> None:
+    """ref_field parameter with report_ref produces same result as path-based."""
+    path = "docs/reports/report.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="report_ref")
+    # Should match path-based behavior: @report alias
+    assert result == "vibe3 handoff show --branch task/issue-123 @report"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_shared_artifact() -> None:
+    """ref_field parameter works with shared artifact paths."""
+    path = "vibe3/handoff/task-1/run.md"
+    result = ref_to_handoff_cmd(path, ref_field="indicate_ref")
+    # Shared artifacts use @indicate alias without --branch
+    assert result == "vibe3 handoff show @indicate"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_unknown_field() -> None:
+    """Unknown ref_field falls back to path-based behavior."""
+    path = "docs/reports/audit.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field="unknown_ref")
+    # Should fall back to path-based @report
+    assert result == "vibe3 handoff show --branch task/issue-123 @report"
+
+
+def test_ref_to_handoff_cmd_with_ref_field_none() -> None:
+    """ref_field=None uses path-based behavior (backward compatible)."""
+    path = "docs/reports/audit.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-123", ref_field=None)
+    # Should use path-based @report
+    assert result == "vibe3 handoff show --branch task/issue-123 @report"
+
+
 # --- resolve_ref_path ---
 
 

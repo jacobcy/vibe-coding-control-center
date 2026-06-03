@@ -156,3 +156,72 @@ def test_resolve_shared_artifact_accepts_valid_branch(tmp_path: Path) -> None:
     artifact = tmp_path / "vibe3" / "handoff" / "task-123" / "current.md"
     artifact.parent.mkdir(parents=True)
     artifact.write_text("content")
+
+
+# --- @indicate alias resolution ---
+
+
+def test_resolve_handoff_target_at_indicate_alias(tmp_path: Path) -> None:
+    """@indicate resolves via flow_state.indicate_ref."""
+    from unittest.mock import patch
+
+    # Create the artifact file
+    artifact = tmp_path / "docs" / "plans" / "issue-123-indicate.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("indicate content")
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.get_current_branch.return_value = "task/issue-123"
+    client.find_worktree_path_for_branch.return_value = tmp_path
+
+    # Mock SQLiteClient to return flow_state with indicate_ref
+    mock_flow_state = {"indicate_ref": "docs/plans/issue-123-indicate.md"}
+    with patch("vibe3.clients.SQLiteClient") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client.get_flow_state.return_value = mock_flow_state
+        mock_client_class.return_value = mock_client
+
+        result = resolve_handoff_target(
+            "@indicate", branch="task/issue-123", git_client=client
+        )
+        assert result == artifact
+
+
+def test_resolve_handoff_target_at_indicate_not_set(tmp_path: Path) -> None:
+    """@indicate raises FileNotFoundError when indicate_ref not set."""
+    from unittest.mock import patch
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.get_current_branch.return_value = "task/issue-123"
+
+    # Mock SQLiteClient to return flow_state without indicate_ref
+    mock_flow_state = {"plan_ref": "docs/plans/plan.md"}  # No indicate_ref
+    with patch("vibe3.clients.SQLiteClient") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client.get_flow_state.return_value = mock_flow_state
+        mock_client_class.return_value = mock_client
+
+        with pytest.raises(FileNotFoundError, match="No indicate_ref recorded"):
+            resolve_handoff_target(
+                "@indicate", branch="task/issue-123", git_client=client
+            )
+
+
+def test_resolve_handoff_target_at_indicate_self_referential(tmp_path: Path) -> None:
+    """@indicate rejects self-referential alias to prevent infinite recursion."""
+    from unittest.mock import patch
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.get_current_branch.return_value = "task/issue-123"
+
+    # Mock SQLiteClient to return flow_state with self-referential indicate_ref
+    mock_flow_state = {"indicate_ref": "@indicate"}  # Self-referential!
+    with patch("vibe3.clients.SQLiteClient") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client.get_flow_state.return_value = mock_flow_state
+        mock_client_class.return_value = mock_client
+
+        with pytest.raises(ValueError, match="self-referential alias"):
+            resolve_handoff_target(
+                "@indicate", branch="task/issue-123", git_client=client
+            )

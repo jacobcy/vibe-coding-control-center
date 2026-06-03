@@ -267,6 +267,15 @@ def check_ref_exists(
         return (ref_value, False)
 
 
+REF_FIELD_TO_ALIAS: dict[str, str] = {
+    "plan_ref": "@plan",
+    "report_ref": "@report",
+    "audit_ref": "@audit",
+    "indicate_ref": "@indicate",
+    "spec_ref": "@spec",
+}
+
+
 def _path_to_alias(path: str) -> str:
     """Convert a ref path to shortcut alias if applicable.
 
@@ -294,7 +303,11 @@ def _path_to_alias(path: str) -> str:
     return path
 
 
-def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
+def ref_to_handoff_cmd(
+    path: str,
+    branch: str | None = None,
+    ref_field: str | None = None,
+) -> str:
     """Convert a display-form ref path to a ``vibe3 handoff show`` command.
 
     Call ``resolve_ref_path(abs_path, worktree_root)`` first to strip the
@@ -304,7 +317,25 @@ def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
     Canonical worktree refs (``docs/reports/...``, ``docs/plans/...``) get
     ``--branch <branch>`` when branch is known.
     Other relative paths and absolute paths are returned as-is (not handoff artifacts).
+
+    Args:
+        path: Display-form ref path
+        branch: Optional branch name for worktree refs
+        ref_field: Optional ref field name (e.g., "plan_ref", "indicate_ref")
+            When provided, use field-to-alias mapping instead of path-based heuristic
     """
+    # Use field-to-alias mapping if ref_field is provided
+    if ref_field and ref_field in REF_FIELD_TO_ALIAS:
+        display_target = REF_FIELD_TO_ALIAS[ref_field]
+        # Shared artifacts: use @ prefix form without --branch
+        if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
+            return f"vibe3 handoff show {display_target}"
+        # Worktree refs: use --branch when available
+        if branch:
+            return f"vibe3 handoff show --branch {branch} {display_target}"
+        return f"vibe3 handoff show {display_target}"
+
+    # Fallback to path-based heuristic
     # Determine display target with alias substitution
     if (
         path.startswith("docs/plans/")

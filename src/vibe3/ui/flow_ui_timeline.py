@@ -339,7 +339,7 @@ def _render_refs(
 
             # Use unified check_ref_exists for consistent worktree resolution
             display_path, exists = check_ref_exists(val, state.branch)
-            ref_cmd = ref_to_handoff_cmd(display_path, state.branch)
+            ref_cmd = ref_to_handoff_cmd(display_path, state.branch, ref_field=label)
             _missing = "" if exists else " [dim yellow](not found)[/]"
             console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
 
