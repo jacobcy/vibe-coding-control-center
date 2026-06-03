@@ -13,12 +13,15 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.config.settings import VibeConfig
-from vibe3.models.prompt_meta import PromptContextMode
-from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.utils.runtime_assets import resolve_runtime_asset
+from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.environment import resolve_runtime_asset
+from vibe3.models import PromptContextMode
+from vibe3.prompts import (
+    PromptContextBuilder,
+    PromptManifest,
+    PromptProvider,
+    make_context_builder,
+)
 
 
 def build_run_task_section(task_text: str | None) -> str:

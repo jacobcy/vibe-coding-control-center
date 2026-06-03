@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig
 
 ExecutionRole = Literal["planner", "executor", "reviewer", "manager"]
 

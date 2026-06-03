@@ -21,13 +21,14 @@ from vibe3.agents.backends.session_manager import (
     extract_session_id,
     should_retry_without_session,
 )
+from vibe3.config import resolve_effective_agent_options
 from vibe3.config.agent_preset import (
     has_agent_env_override,
-    resolve_effective_agent_options,
     resolve_repo_agent_preset_name,
 )
 from vibe3.exceptions import AgentExecutionError
-from vibe3.models.review_runner import AgentOptions, AgentResult
+from vibe3.models import AgentOptions
+from vibe3.models.review_runner import AgentResult
 from vibe3.utils.codeagent_helpers import (
     build_prompt_file_content,
     diagnose_backend_error,
