@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from vibe3.config import load_orchestra_config
-from vibe3.services import get_manager_usernames
+from vibe3.config.manager_config import get_manager_usernames
 from vibe3.utils import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 
 
