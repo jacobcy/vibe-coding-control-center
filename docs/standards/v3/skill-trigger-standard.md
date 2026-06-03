@@ -9,7 +9,7 @@ authority:
   - adjacent-skill-conflict-resolution
 author: GPT-5.4
 created: 2026-03-10
-last_updated: 2026-03-13
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -23,8 +23,20 @@ related_docs:
   - skills/vibe-check/SKILL.md
   - skills/vibe-new/SKILL.md
   - skills/vibe-continue/SKILL.md
+  - skills/vibe-commit/SKILL.md
+  - skills/vibe-integrate/SKILL.md
+  - skills/vibe-done/SKILL.md
+  - skills/vibe-closeout/SKILL.md
+  - skills/vibe-onboard/SKILL.md
+  - skills/vibe-project-check/SKILL.md
+  - skills/vibe-instruction/SKILL.md
   - skills/vibe-skill-audit/SKILL.md
   - skills/vibe-skills-manager/SKILL.md
+  - skills/vibe-debug-serve/SKILL.md
+  - skills/vibe-redundancy-audit/SKILL.md
+  - skills/vibe-rules/SKILL.md
+  - skills/vibe-save/SKILL.md
+  - skills/vibe-team-review/SKILL.md
 ---
 
 # Skill Trigger 与介入时机标准
@@ -45,8 +57,8 @@ related_docs:
 
 路由时按以下顺序判断：
 
-1. 用户在处理的对象属于哪一层：Issue、Roadmap、Task Registry、Runtime、Skill Governance、Installed Skills。
-2. 用户当前动作是什么：创建、规划、核对、修复、治理、同步。
+1. 用户在处理的对象属于哪一层：Issue、Roadmap、Task Registry、Runtime、Skill Governance、Installed Skills、Orchestra Service。
+2. 用户当前动作是什么：创建、规划、核对、修复、治理、同步、提交、整合、收口、调试。
 3. 如果多个 skill 都像能接，优先进入对象更窄、动作更确定的 skill。
 
 ### 2.2 高层规划优先于低层执行建议
@@ -68,18 +80,31 @@ related_docs:
 
 ## 3. 核心 Skill 触发矩阵
 
-| `vibe-orchestra` | Orchestra service health | 用户要监控 orchestra service 状态、检查 FailedGate、serve status | Issue pool 管理、RFC/blocked issues、版本规划 | "检查 serve status", "orchestra 健康状态", "FailedGate 检查" |
+| Skill | 职责层 | 适用场景 | 冲突分流 (Do NOT use if...) | 自然语言触发词 |
 |---|---|---|---|---|
+| `vibe-instruction` | Meta Guide | 快速了解项目结构、可用命令和标准开发工作流 | 已经在处理具体开发任务或调试 serve | "怎么用", "项目导览", "vibe 介绍", "instruction" |
+| `vibe-onboard` | System Setup | 安装后的引导、依赖检查、密钥配置、核心功能介绍 | 项目已就绪且处于正常开发周期 | "onboard", "安装后引导", "setup", "开始使用" |
+| `vibe-project-check` | Project Health | 检查项目配置（labels, keys, gitignore）是否完整正确 | 已经在做常规 flow/task 审计或 runtime 修复 | "project-check", "项目配置检查", "检查 label", "验证配置" |
+| `vibe-orchestra` | Orchestra Governance | Issue pool 管理、RFC/blocked issues、版本规划 | 视角是监控 orchestra service 运行状态、FailedGate | "Orchestra 治理", "RFC issues", "blocked issues", "版本规划" |
+| `vibe-debug-serve` | Service Debug | 监控 orchestra service 状态、检查 FailedGate、调试 heartbeat/dispatch | issue pool 治理建议、roadmap 规划 | "检查 serve status", "orchestra 健康状态", "FailedGate 检查", "debug serve" |
 | `vibe-issue` | Issue intake | 用户要创建、补全、查重、润色、落 GitHub issue | 已经在讨论版本归类、task 映射、runtime 修复 | "创建 issue", "提 issue", "查重", "补 issue 模板" |
 | `vibe-roadmap` | Roadmap planning | 用户要排版本、定目标、做 backlog triage、决定 issue 放哪版 | 只是在看当前 flow 该去哪，或修 runtime/registry | "版本规划", "下一个版本做什么", "这个 issue 放哪一版" |
 | `vibe-new` | Flow transition | 用户要开始新任务、确认目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft | 已经进入实现、跨 worktree 调度 | "开始新任务", "进入新 flow", "切主 issue", "vibe-new" |
 | `vibe-continue` | Execution resume | 用户要恢复已有分支的工作、重新加载当前 flow 上下文 | 创建新 issue、创建新 branch、新任务启动 | "恢复执行", "继续工作", "加载上下文", "vibe-continue" |
+| `vibe-commit` | Commit & PR | 整理变更、创建提交分组、创建 PR draft、处理 pre-commit | 要做 PR 整合决策、合并 PR 或 final closeout | "提交代码", "发 PR", "create PR", "commit" |
+| `vibe-integrate` | PR Convergence | 评估 PR 状态、检查 CI/Review 阻塞、确认合并条件 | 整理提交分组、创建 PR 或 PR 后的清理 | "integrate", "检查 CI", "可以合并吗", "PR 状态" |
+| `vibe-done` | Flow Closure | PR 合并后的终态收口：关 issue、删分支、清理资源 | 还在做业务代码开发或 PR 整合 | "任务完成", "收口", "done", "清理现场" |
+| `vibe-closeout` | Service Cleanup | 由 manager 触发的自动化现场清理、执行 cleanup 指令 | 处于人机协作的终态收口周期 | "vibe-closeout", "cleanup flow", "清理 terminal flow" |
 | `vibe-task` | RFC & Blocked issues | 用户要检查 RFC issues、blocked issues、问题 issue 状态 | 项目级版本规划、Issue intake、runtime stale repair、正常运行 issues | "检查 RFC issues", "看 blocked issues", "问题 issue 检查" |
 | `vibe-check` | Runtime / task-flow binding | 用户要解释或修复 `task <-> flow` / worktree runtime 不一致 | roadmap 归类、task registry 审计、Issue 治理 | "binding 不对", "runtime stale", "check runtime", "当前 worktree 状态不对" |
 | `vibe-review-code` | Code review | 用户要对 source changes 做 pre-PR 审查、复核 PR review feedback、检查实现风险与测试覆盖 | docs-only review、standards/changelog 审查 | "review 这段代码", "代码审查", "PR 前 review", "根据 review feedback 修代码" |
 | `vibe-review-docs` | Documentation review | 用户要审查 docs/、入口文件、standards、changelog，或检查概念漂移与文档治理问题 | source-code implementation review | "review docs", "文档审查", "审一下 CLAUDE.md", "检查标准文档" |
+| `vibe-team-review` | Team Collaboration | 多 agent 协作审查：PR、架构决策、复杂代码变动 | 单 agent 可胜任的小型审查或纯文档审查 | "team review", "团队审查", "复杂 PR 评审" |
+| `vibe-redundancy-audit` | Code Quality | 查找冗余业务逻辑、重复模式、迁移残留、过度设计 | 正常的业务代码评审或 bug 修复 | "redundancy audit", "重复代码", "冗余逻辑", "清理旧路径" |
+| `vibe-rules` | Rules Governance | 检查 rules 冲突、重复、清理过时规则 | 编写新技能或进行 flow 治理 | "vibe-rules", "规则冲突", "清理 rules", "rules check" |
 | `vibe-skill-audit` | Repo-local skill governance | 用户要创建、更新、审查、收紧 repo 内 `skills/vibe-*` 文案与边界 | 已安装 skills 的 inventory、同步、清理 | "创建 skill", "审查 skill", "skill 文案", "自动匹配语义", "vibe-skill" |
 | `vibe-skills-manager` | Installed skills management | 用户要查看已安装 skills、做同步、清理、推荐、跨 IDE 管理 | repo 内 skill 文案治理、skill 审查、skill 边界设计 | "skills 乱了", "同步 skills", "清理 skills", "推荐 skills", "/vibe-skills-manager" |
+| `vibe-save` | Session Handoff | 保存当前会话上下文、写入 handoff、记录下一步 | 正常开发过程中的常规 commit 或 PR 提交 | "save session", "保存进度", "handoff append", "vibe-save" |
 
 ## 4. 相邻 Skill 的冲突裁决
 
@@ -90,8 +115,8 @@ related_docs:
 
 ### 4.2 `vibe-roadmap` vs `vibe-task`
 
-- 用户问"项目层面下一步做什么""当前版本该装什么内容"：优先 `vibe-roadmap`。
-- 用户问"有哪些 RFC issues 需要讨论""有哪些 blocked issues 需要解除"：优先 `vibe-task`。
+- 用户问"项目层面下一步做什么""当前版本该装什么内容" | 尚未涉及具体 issue 归档 | "版本规划", "下一个版本做什么", "这个 issue 放哪一版" |
+- 用户问"有哪些 RFC issues 需要讨论""有哪些 blocked issues 需要解除" | 项目级版本规划 | "检查 RFC issues", "看 blocked issues", "问题 issue 检查" |
 
 ### 4.3 `vibe-task` vs `vibe-check`
 
@@ -103,15 +128,21 @@ related_docs:
 - 目标是 repo 内 `skills/vibe-*` 的创建、审查、收敛：优先 `vibe-skill-audit`。
 - 目标是已安装 skill 的同步、inventory、推荐、删除：优先 `vibe-skills-manager`。
 
-### 4.5 `vibe-orchestra` vs `vibe-task`
+### 4.5 `vibe-orchestra` vs `vibe-debug-serve`
 
-- 视角是"orchestra service 健康状态""FailedGate 检查""serve status 监控"：优先 `vibe-orchestra`。
-- 视角是"RFC issues""blocked issues""问题 issue 状态检查"：优先 `vibe-task`。
+- 视角是"orchestra service 治理""RFC issues""blocked issues""版本规划"：优先 `vibe-orchestra`。
+- 视角是"监控 orchestra service 运行状态""FailedGate 检查""serve status"：优先 `vibe-debug-serve`。
 
 ### 4.6 `vibe-review-code` vs `vibe-review-docs`
 
 - 审查对象是 source code diff、实现正确性、调用影响、测试回归与 review feedback：优先 `vibe-review-code`。
 - 审查对象是 docs、standards、entry docs、changelog、术语与概念漂移：优先 `vibe-review-docs`。
+
+### 4.7 `vibe-commit` vs `vibe-integrate` vs `vibe-done`
+
+- 视角是"整理当前改动并创建/更新 PR"：优先 `vibe-commit`。
+- 视角是"检查 PR 是否 ready for merge"（CI/Review 状态）：优先 `vibe-integrate`。
+- 视角是"PR 已合并，需要清理现场"：优先 `vibe-done`。
 
 ## 5. Description 写法要求
 
@@ -142,5 +173,3 @@ related_docs:
 3. 是否为真实用户会说的话提供了自然语言触发词？
 4. 是否写清了最相邻 skill 的排除边界？
 5. 如果新增短别名或 slash 入口，是否保持为同一 skill 的薄入口，而不是第二套业务逻辑？
-
-(End of file - total 137 lines)
