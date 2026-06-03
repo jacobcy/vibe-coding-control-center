@@ -304,60 +304,48 @@ def _path_to_alias(path: str) -> str:
 
 
 def ref_to_handoff_cmd(
-    path: str,
-    branch: str | None = None,
-    ref_field: str | None = None,
+    path: str, branch: str | None = None, ref_field: str | None = None
 ) -> str:
     """Convert a display-form ref path to a ``vibe3 handoff show`` command.
 
     Call ``resolve_ref_path(abs_path, worktree_root)`` first to strip the
     worktree prefix before passing the result here.
 
-    Shared artifacts (``vibe3/handoff/...``) get the ``@`` prefix form.
-    Canonical worktree refs (``docs/reports/...``, ``docs/plans/...``) get
-    ``--branch <branch>`` when branch is known.
-    Other relative paths and absolute paths are returned as-is (not handoff artifacts).
-
     Args:
         path: Display-form ref path
         branch: Optional branch name for worktree refs
-        ref_field: Optional ref field name (e.g., "plan_ref", "indicate_ref")
+        ref_field: Required ref field name (e.g., "plan_ref", "audit_ref")
             When provided, use field-to-alias mapping instead of path-based heuristic
+
+    Returns:
+        Handoff show command string
+
+    Raises:
+        ValueError: If ref_field is None or not in REF_FIELD_TO_ALIAS
     """
-    # Use field-to-alias mapping if ref_field is provided
-    if ref_field and ref_field in REF_FIELD_TO_ALIAS:
-        display_target = REF_FIELD_TO_ALIAS[ref_field]
-        # Shared artifacts: use @ prefix form without --branch
-        if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
-            return f"vibe3 handoff show {display_target}"
-        # Worktree refs: use --branch when available
-        if branch:
-            return f"vibe3 handoff show --branch {branch} {display_target}"
-        return f"vibe3 handoff show {display_target}"
+    # CRITICAL: ref_field is required, no fallback to path-based inference
+    if ref_field is None:
+        raise ValueError(
+            "ref_field is required. "
+            "Callers must pass the ref field name (e.g., 'plan_ref', 'audit_ref'). "
+            f"Expected one of: {list(REF_FIELD_TO_ALIAS.keys())}"
+        )
 
-    # Fallback to path-based heuristic
-    # Determine display target with alias substitution
-    if (
-        path.startswith("docs/plans/")
-        or path.startswith("docs/reports/")
-        or path.startswith("docs/specs/")
-    ):
-        display_target = _path_to_alias(path)
-    elif path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
-        display_target = _path_to_alias(path)
-    else:
-        display_target = path
+    if ref_field not in REF_FIELD_TO_ALIAS:
+        raise ValueError(
+            f"Unknown ref_field: {ref_field}. "
+            f"Expected one of: {list(REF_FIELD_TO_ALIAS.keys())}"
+        )
 
+    display_target = REF_FIELD_TO_ALIAS[ref_field]
+
+    # Shared artifacts: use @ prefix form without --branch
     if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
-        # Shared artifact: use @ prefix form without --branch
         return f"vibe3 handoff show {display_target}"
-    # Only treat docs/reports and docs/plans as handoff artifacts
-    if path.startswith("docs/reports/") or path.startswith("docs/plans/"):
-        if branch:
-            return f"vibe3 handoff show --branch {branch} {display_target}"
-        return f"vibe3 handoff show {display_target}"
-    # Non-handoff paths (temp/logs, etc.) return as-is
-    return path
+    # Worktree refs: use --branch when available
+    if branch:
+        return f"vibe3 handoff show --branch {branch} {display_target}"
+    return f"vibe3 handoff show {display_target}"
 
 
 def sanitize_event_detail_paths(
