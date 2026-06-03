@@ -27,13 +27,21 @@ def get_handoff_state_label(config: SupervisorHandoffConfig) -> str:
 
 
 def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
-    """Resolve manager usernames with fallback to ConventionResolver.
+    """Resolve manager usernames from config with ConventionResolver fallback.
+
+    Env variable overrides (MANAGER_USERNAMES) are applied at config load time
+    via apply_env_overrides; callers should use get_config_with_env_override to
+    obtain a config that already reflects any env overrides.
+
+    Priority:
+    1. Config value (env overrides already applied during config loading)
+    2. ConventionResolver default
 
     Args:
         config: OrchestraConfig instance
 
     Returns:
-        Tuple of manager usernames (e.g., ('vibe-manager-agent',)).
+        Tuple of manager usernames (e.g., ('vibe-manager-agent',))
 
     Example:
         >>> config = OrchestraConfig()
@@ -42,6 +50,8 @@ def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
     """
     if config.manager_usernames:
         return config.manager_usernames
+
+    # 3. Fallback to ConventionResolver
     from vibe3.services.convention_resolver import ConventionResolver
 
     resolver = ConventionResolver.from_repo()

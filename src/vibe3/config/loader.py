@@ -201,6 +201,10 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
         "Loading configuration"
     )
 
+    # Load keys.env fallback (for direct Python invocation, tests, background services)
+    # This is a no-op if shell wrapper already loaded keys.env
+    load_keys_env_fallback()
+
     # Find config file if not provided
     if config_path is None:
         config_path = find_config_file()
@@ -276,10 +280,8 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
 def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig:
     """Get configuration with environment variable overrides.
 
-    Environment variables:
-    - VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC
-    - VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC
-    - VIBE_TEST_COVERAGE_SERVICES
+    Uses centralized env_override module for all override logic.
+    See OVERRIDE_RULES for complete list of supported environment variables.
 
     Args:
         config: Optional existing config to override.
@@ -291,53 +293,11 @@ def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig
     if config is None:
         config = load_config()
 
-    # Apply environment variable overrides
-    if env_total_loc := os.getenv("VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC"):
-        try:
-            config.code_limits.total_file_loc.v2_shell = int(env_total_loc)
-            logger.debug(
-                "Applied env override",
-                key="VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC",
-                value=int(env_total_loc),
-            )
-        except ValueError:
-            logger.warning(
-                "Invalid env value, ignoring",
-                key="VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC",
-                value=env_total_loc,
-            )
+    # Apply centralized env overrides
+    from vibe3.config.env_override import apply_env_overrides
 
-    if env_total_loc := os.getenv("VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC"):
-        try:
-            config.code_limits.total_file_loc.v3_python = int(env_total_loc)
-            logger.debug(
-                "Applied env override",
-                key="VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC",
-                value=int(env_total_loc),
-            )
-        except ValueError:
-            logger.warning(
-                "Invalid env value, ignoring",
-                key="VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC",
-                value=env_total_loc,
-            )
-
-    if env_coverage := os.getenv("VIBE_TEST_COVERAGE_SERVICES"):
-        try:
-            config.quality.test_coverage.services = int(env_coverage)
-            logger.debug(
-                "Applied env override",
-                key="VIBE_TEST_COVERAGE_SERVICES",
-                value=int(env_coverage),
-            )
-        except ValueError:
-            logger.warning(
-                "Invalid env value, ignoring",
-                key="VIBE_TEST_COVERAGE_SERVICES",
-                value=env_coverage,
-            )
-
-    return config
+    overridden = apply_env_overrides(config.model_dump())
+    return config.__class__.model_validate(overridden)
 
 
 # Global config instance (lazy loaded)
@@ -365,3 +325,81 @@ def reload_config() -> VibeConfig:
     global _config
     _config = None
     return get_config()
+
+
+def load_keys_env_fallback() -> None:
+    """Load keys.env as fallback when shell wrapper hasn't loaded it.
+
+    This function provides a Python-layer fallback for loading keys.env,
+    used in scenarios where the shell wrapper isn't invoked:
+
+    1. Direct Python CLI invocation (uv run python src/vibe3/cli.py)
+    2. Test environments
+    3. Orchestra background service processes
+
+    Priority (same as shell wrapper):
+    1. Project config/keys.env
+    2. ~/.vibe/config/keys.env
+    3. ~/.vibe/keys.env (legacy)
+
+    Only loads if environment variables aren't already set.
+    Logs warning on failure (non-blocking, allows graceful degradation).
+    """
+    # Skip if any vibe env vars are already set (indicates shell wrapper loaded)
+    if any(
+        os.environ.get(key)
+        for key in ["VIBE_MANAGER_GITHUB_TOKEN", "MANAGER_USERNAMES"]
+    ):
+        logger.bind(domain="config").debug(
+            "keys.env fallback skipped: environment variables already present"
+        )
+        return
+
+    # Try loading from standard locations
+    from pathlib import Path
+
+    keys_paths = [
+        Path("config/keys.env"),  # Project-local
+        Path.home() / ".vibe" / "config" / "keys.env",  # Global config
+        Path.home() / ".vibe" / "keys.env",  # Legacy global
+    ]
+
+    for keys_path in keys_paths:
+        if not keys_path.exists():
+            continue
+
+        try:
+            with keys_path.open(encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    # Skip comments and empty lines
+                    if not stripped or stripped.startswith("#"):
+                        continue
+
+                    # Parse KEY=VALUE
+                    if "=" not in stripped:
+                        continue
+
+                    key, value = stripped.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip("\"'")
+
+                    # Only set if not already in environment
+                    if key and not os.environ.get(key):
+                        os.environ[key] = value
+
+            logger.bind(domain="config", path=str(keys_path)).info(
+                "Loaded keys.env fallback"
+            )
+            return  # Success, stop trying other paths
+
+        except (OSError, UnicodeDecodeError) as e:
+            logger.bind(domain="config", path=str(keys_path)).warning(
+                f"Failed to read keys.env: {e}"
+            )
+            continue
+
+    # No keys.env found (this is OK, user might use direnv or manual exports)
+    logger.bind(domain="config").debug(
+        "No keys.env found in standard locations, using existing environment"
+    )

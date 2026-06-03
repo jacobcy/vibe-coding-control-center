@@ -54,16 +54,17 @@ HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
 
 
 def resolve_manager_options(config: OrchestraConfig) -> Any:
-    """Resolve manager agent options with env override support."""
-    _backend_override = os.environ.get("VIBE3_MANAGER_BACKEND")
-    _model_override = os.environ.get("VIBE3_MANAGER_MODEL") or None
-    if _backend_override:
-        from vibe3.models.review_runner import AgentOptions
+    """Resolve manager agent options.
 
-        return AgentOptions(
-            backend=_backend_override,
-            model=_model_override,
-        )
+    Backend/model override uses unified env vars:
+    - VIBE_BACKEND_MANAGER
+    - VIBE_MODEL_MANAGER
+
+    These are handled by env_override.py and applied to config.
+    This function falls back to config resolution if no override.
+    """
+    # Backend/model override handled by env_override.py
+    # No need to check env vars here
 
     # Validate assignee_dispatch configuration
     ad = config.assignee_dispatch
@@ -204,20 +205,8 @@ def build_manager_request(
             "Isolation is degraded."
         )
 
-    # Inject manager backend/model if not already set
-    if not env.get("VIBE3_MANAGER_BACKEND"):
-        try:
-            options = ExecutionRolePolicyService(
-                config
-            ).resolve_effective_agent_options("manager")
-            if options.backend:
-                env["VIBE3_MANAGER_BACKEND"] = options.backend
-            if options.model:
-                env["VIBE3_MANAGER_MODEL"] = options.model
-        except Exception:
-            logger.bind(domain="manager", issue_number=issue.number).debug(
-                "Failed to resolve manager agent options, using defaults"
-            )
+    # Backend/model override handled by env_override.py at config load time
+    # No need to inject VIBE_BACKEND_MANAGER here
 
     # Check async_execution config to determine dispatch mode
     if not config.async_execution:
