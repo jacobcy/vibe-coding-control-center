@@ -34,6 +34,8 @@ from vibe3.models.snapshot import (
     StructureSnapshot,
 )
 from vibe3.models.trace import ExecutionStep, TraceOutput
+from vibe3.models.verdict import VerdictRecord
+from vibe3.models.verdict_types import VerdictValue
 from vibe3.models.worktree import WorktreeRequirement
 
 __all__: list[str] = [
@@ -74,5 +76,7 @@ __all__: list[str] = [
     "SupervisorHandoffConfig",
     "TraceOutput",
     "UncommittedSource",
+    "VerdictRecord",
+    "VerdictValue",
     "WorktreeRequirement",
 ]

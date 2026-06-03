@@ -9,6 +9,7 @@ from vibe3.clients.serena_client import (
     extract_function_names,
 )
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients.store_context import get_store
 
 __all__ = [
     "BackendProtocol",
@@ -19,4 +20,5 @@ __all__ = [
     "count_references",
     "extract_function_names",
     "find_repo_root",
+    "get_store",
 ]
