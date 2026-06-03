@@ -66,6 +66,27 @@
 
 执行 plan 前，必须回答以下问题：
 
+#### 0. 接受 repair directive 前的验证
+
+如果指令来自 audit report（repair directive），必须先验证 audit 基于正确的分支：
+
+**验证步骤**：
+
+1. 读取 audit report 中的变更文件列表
+2. 执行 `git diff --name-only origin/main..HEAD` 获取当前分支的实际变更文件列表
+3. 对比 audit 中描述的变更文件是否存在于当前分支
+4. 如果 audit 中描述的文件在当前分支的 diff 中不存在：
+   - 说明 audit 可能基于错误分支
+   - 必须用 `handoff append` 记录 finding：
+     ```bash
+     uv run python src/vibe3/cli.py handoff append "Audit 分支验证失败：audit 描述的文件 <文件> 不在当前分支变更中" --kind finding --actor "executor"
+     ```
+   - 等待 manager 指示，不要盲目执行 repair
+
+**验证证据**：
+- 在执行报告中明确说明：已验证 audit report 中的变更文件存在于当前分支
+- 如果发现不一致，明确记录并等待指示
+
 #### 1. Plan 逻辑是否清晰？
 
 - **每一步是否可执行？**

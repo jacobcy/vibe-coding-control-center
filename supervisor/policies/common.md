@@ -247,6 +247,16 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 如果 inspect 已提供足够上下文，不要再把 review 退化成机械扫代码风格。
 
+**分支一致性验证**：
+
+```bash
+# 确认当前分支身份
+git branch --show-current
+git log --oneline origin/main..HEAD | head -20
+```
+
+说明：如果 `git branch --show-current` 返回的分支名与目标分支不一致，说明工作环境有误，应立即报告。
+
 ### 写 plan 前
 
 plan 必须建立在真实影响面上，而不是凭直觉列步骤。

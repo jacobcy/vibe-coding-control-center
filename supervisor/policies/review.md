@@ -63,6 +63,49 @@ uv run python src/vibe3/cli.py handoff show <plan_ref> --branch <branch>
 - **不要继续审查细节**（scope violation 本身就是最严重的 finding）
 - 建议：回退超出 scope 的变更，或通过 manager 扩展 issue scope
 
+### 0.5. 分支身份验证
+
+在开始详细审查前，**必须验证当前 HEAD 的 commit 属于目标分支**。
+
+**验证命令**：
+
+```bash
+# 确认当前所在分支
+git branch --show-current
+
+# 获取当前分支的 commit 列表
+git log --oneline origin/main..HEAD
+
+# 对比 handoff/task show 中的目标分支名
+uv run python src/vibe3/cli.py task show
+```
+
+**验证步骤**：
+
+1. 执行 `git branch --show-current` 确认当前分支名
+2. 对比 `task show` 输出的目标分支名是否一致
+3. 如果不一致：
+   - 立即用 `handoff append` 记录 finding
+   - 给出 **REFUSE** verdict
+   - **不要继续审查**（分支错误会导致分析错误的 commit）
+
+**输出要求**：
+
+- 在审查输出的 findings 前，列出被审查的完整 commit SHA 列表
+- 便于 downstream 消费方验证分析对象是否正确
+
+**示例输出格式**：
+
+```
+## 被审查 Commits
+- abc1234 (HEAD) commit message
+- def5678 commit message
+...
+
+## Findings
+...
+```
+
 ### 1. 读取 Handoff 状态
 
 ```bash
@@ -147,6 +190,17 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 ## 独立判断强制验证点
 
 给出 verdict 前，必须回答：
+
+### 0. 当前分析的 commit 是否属于目标分支？
+
+- **是否验证了分支身份？**
+  - 必须用 `git branch --show-current` 确认当前分支
+  - 必须用 `git log --oneline origin/main..HEAD` 确认 commit 列表
+  - 避免"在错误分支上审查"
+
+- **如果发现分支不一致？**
+  - 立即记录 finding 并给出 REFUSE verdict
+  - 不要继续审查细节
 
 ### 1. 我的理解是否基于代码实际？
 
