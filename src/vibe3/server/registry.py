@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
@@ -158,6 +159,12 @@ def _build_server_with_launch_cwd(
     async def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
         return await run_in_threadpool(status_service.snapshot)
+
+    @fastapi_app.get("/web", response_class=HTMLResponse)
+    async def get_web_dashboard() -> str:
+        """Serve the Orchestra status web console."""
+        html_path = Path(__file__).parent / "static" / "status.html"
+        return html_path.read_text(encoding="utf-8")
 
     # Mount MCP server (gracefully degrades if not available)
     try:
