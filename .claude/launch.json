@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Orchestra HTTP Server",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "src/vibe3/cli.py", "serve", "start", "--no-async"],
+      "port": 8080,
+      "url": "http://localhost:8080/web"
+    }
+  ]
+}

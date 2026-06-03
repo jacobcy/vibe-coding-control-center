@@ -204,7 +204,7 @@ def start(
     instance_info, is_valid = _validate_pid_file(config.pid_file)
     if is_valid and instance_info is not None:
         typer.echo(f"Orchestra server already running (PID: {instance_info.pid})")
-        raise typer.Exit(1)
+        raise typer.Exit(0)
     elif instance_info is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {instance_info.pid})")
         config.pid_file.unlink(missing_ok=True)

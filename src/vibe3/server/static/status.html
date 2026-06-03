@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orchestra Status</title>
+<style>
+  :root {
+    --bg:        #0f1117;
+    --bg-stat:   #0f1117;
+    --bg-hover:  #161d2e;
+    --border:    #1e293b;
+    --border-td: #0d1420;
+    --text:      #e2e8f0;
+    --text-dim:  #64748b;
+    --text-mute: #334155;
+    --text-title:#cbd5e1;
+    --logo:      #f8fafc;
+    --stat-val:  #f1f5f9;
+    --link:      #60a5fa;
+    --pr-link:   #22d3ee;
+    --blocked-c: #f87171;
+    --footer-c:  #1e293b;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg:        #f8fafc;
+      --bg-stat:   #ffffff;
+      --bg-hover:  #f1f5f9;
+      --border:    #e2e8f0;
+      --border-td: #f1f5f9;
+      --text:      #0f172a;
+      --text-dim:  #64748b;
+      --text-mute: #94a3b8;
+      --text-title:#334155;
+      --logo:      #0f172a;
+      --stat-val:  #0f172a;
+      --link:      #2563eb;
+      --pr-link:   #0891b2;
+      --blocked-c: #dc2626;
+      --footer-c:  #94a3b8;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .banner { padding: 10px 20px; font-size: 13px; font-weight: 600; text-align: center; display: none; }
+  .banner.blocked { display: block; background: #7f1d1d; color: #fca5a5; border-bottom: 1px solid #991b1b; }
+
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 18px; font-weight: 700; color: var(--logo); letter-spacing: -0.5px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; flex-shrink: 0; }
+  .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+  .status-text { font-size: 13px; color: var(--text-dim); }
+  .refresh-info { margin-left: auto; font-size: 12px; color: var(--text-mute); }
+
+  .stats { display: flex; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+  .stat { flex: 1; padding: 12px 20px; background: var(--bg-stat); text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--stat-val); line-height: 1; }
+  .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .section { padding: 16px 24px 0; }
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th { text-align: left; padding: 6px 10px; font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border-td); vertical-align: middle; }
+  tr:hover td { background: var(--bg-hover); }
+
+  .rank { color: var(--text-mute); font-size: 12px; width: 32px; }
+  .issue-num { font-family: monospace; color: var(--link); font-size: 12px; white-space: nowrap; }
+  .issue-num a { color: inherit; text-decoration: none; }
+  .issue-num a:hover { text-decoration: underline; }
+  .issue-title { color: var(--text-title); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+  .state-in-progress { background: #1e3a5f; color: #60a5fa; }
+  .state-claimed     { background: #2d1f4e; color: #a78bfa; }
+  .state-ready       { background: #1c3028; color: #4ade80; }
+  .state-blocked     { background: #3b1414; color: #f87171; }
+  .state-review      { background: #2d2a10; color: #fbbf24; }
+  .state-other       { background: #1e293b; color: #94a3b8; }
+
+  @media (prefers-color-scheme: light) {
+    .state-in-progress { background: #dbeafe; color: #1d4ed8; }
+    .state-claimed     { background: #ede9fe; color: #6d28d9; }
+    .state-ready       { background: #dcfce7; color: #15803d; }
+    .state-blocked     { background: #fee2e2; color: #b91c1c; }
+    .state-review      { background: #fef9c3; color: #a16207; }
+    .state-other       { background: #f1f5f9; color: #64748b; }
+  }
+
+  .road-p0 { background: #7f1d1d; color: #fca5a5; }
+  .road-p1 { background: #1c2f4e; color: #93c5fd; }
+  .road-p2 { background: #1e293b; color: #64748b; }
+
+  @media (prefers-color-scheme: light) {
+    .road-p0 { background: #fee2e2; color: #b91c1c; }
+    .road-p1 { background: #dbeafe; color: #1d4ed8; }
+    .road-p2 { background: #f1f5f9; color: #64748b; }
+  }
+
+  .pr-link { font-family: monospace; font-size: 11px; color: var(--pr-link); text-decoration: none; }
+  .pr-link:hover { text-decoration: underline; }
+  .blocked-by { font-size: 11px; color: var(--blocked-c); }
+
+  .empty { color: var(--text-mute); font-size: 13px; padding: 20px 0; text-align: center; }
+  .error-state { color: #ef4444; padding: 40px; text-align: center; }
+
+  .footer { padding: 12px 24px; color: var(--footer-c); font-size: 11px; border-top: 1px solid var(--border); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="gate-banner" class="banner"></div>
+
+<header>
+  <div id="status-dot" class="status-dot offline"></div>
+  <div class="logo">Orchestra</div>
+  <div id="status-text" class="status-text">connecting...</div>
+  <div class="refresh-info" id="refresh-info">auto-refresh 30s</div>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val" id="s-flows">-</div><div class="stat-label">Active Flows</div></div>
+  <div class="stat"><div class="stat-val" id="s-wt">-</div><div class="stat-label">Worktrees</div></div>
+  <div class="stat"><div class="stat-val" id="s-queued">-</div><div class="stat-label">Queued</div></div>
+  <div class="stat"><div class="stat-val" id="s-total">-</div><div class="stat-label">Total Issues</div></div>
+</div>
+
+<div id="main-content"></div>
+
+<div class="footer" id="footer"></div>
+
+<script>
+const STATE_ORDER = ['in_progress', 'review', 'claimed', 'ready', 'blocked'];
+const STATE_LABEL = {
+  'in_progress': 'In Progress', 'review': 'Review', 'claimed': 'Claimed',
+  'ready': 'Ready', 'blocked': 'Blocked'
+};
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeInt(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function stateBadge(state) {
+  const s = (state || '').toLowerCase().replace('state/', '').replace('-', '_');
+  const cls = STATE_ORDER.includes(s) ? `state-${s}` : 'state-other';
+  return `<span class="badge ${cls}">${escapeHtml(state || 'unknown')}</span>`;
+}
+
+function roadBadge(r) {
+  if (!r) return '';
+  const cls = r === 'p0' ? 'road-p0' : r === 'p1' ? 'road-p1' : 'road-p2';
+  return `<span class="badge ${cls}">${escapeHtml(r)}</span>`;
+}
+
+function normalizeState(s) {
+  return (s || '').toLowerCase().replace('state/', '').replace('-', '_');
+}
+
+const BASE_URL = 'https://github.com/jacobcy/vibe-coding-control-center';
+
+function renderIssues(issues) {
+  if (!issues.length) return '<div class="empty">No active issues</div>';
+
+  const groups = {};
+  issues.forEach(e => {
+    const s = normalizeState(e.state);
+    const key = STATE_ORDER.includes(s) ? s : 'other';
+    (groups[key] = groups[key] || []).push(e);
+  });
+
+  let html = '';
+  const keys = [...STATE_ORDER.filter(k => groups[k]), ...(groups.other ? ['other'] : [])];
+
+  keys.forEach(key => {
+    const label = STATE_LABEL[key] || key;
+    const rows = groups[key];
+    html += `<div class="section"><div class="section-title">${escapeHtml(label)} (${rows.length})</div>
+    <table><thead><tr>
+      <th>#</th><th>Issue</th><th>Title</th><th>State</th>
+      <th>Road</th><th>Pri</th><th>PR / Blocked</th>
+    </tr></thead><tbody>`;
+    rows.forEach(e => {
+      const rank = safeInt(e.queue_rank) ?? '-';
+      const issueNum = safeInt(e.number);
+      const prNum = safeInt(e.pr_number);
+
+      const issueCell = issueNum
+        ? `<a href="${BASE_URL}/issues/${issueNum}" target="_blank">#${issueNum}</a>`
+        : '';
+
+      const prCell = e.has_pr && prNum
+        ? `<a class="pr-link" href="${BASE_URL}/pull/${prNum}" target="_blank">#${prNum}</a>`
+        : e.blocked_by && e.blocked_by.length
+          ? `<span class="blocked-by">blocked: ${e.blocked_by.map(n => { const i = safeInt(n); return i ? '#'+i : ''; }).filter(Boolean).join(', ')}</span>`
+          : '';
+
+      const pri = safeInt(e.priority) ?? '';
+
+      html += `<tr>
+        <td class="rank">${rank}</td>
+        <td class="issue-num">${issueCell}</td>
+        <td class="issue-title" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</td>
+        <td>${stateBadge(e.state)}</td>
+        <td>${roadBadge(e.roadmap)}</td>
+        <td style="color:#64748b;font-size:12px">${pri}</td>
+        <td>${prCell}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  });
+  return html;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/status');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+
+    // Header
+    document.getElementById('status-dot').className = 'status-dot' + (d.server_running ? '' : ' offline');
+    const ts = new Date(d.timestamp * 1000).toLocaleTimeString();
+    document.getElementById('status-text').textContent = `running · ${ts}`;
+
+    // FailedGate banner
+    const banner = document.getElementById('gate-banner');
+    if (d.dispatch_blocked) {
+      banner.className = 'banner blocked';
+      banner.textContent = `FailedGate ACTIVE — ${d.blocked_reason || 'dispatch blocked'}`;
+    } else {
+      banner.className = 'banner';
+    }
+
+    // Stats
+    document.getElementById('s-flows').textContent = d.active_flows ?? '-';
+    document.getElementById('s-wt').textContent = d.active_worktrees ?? '-';
+    document.getElementById('s-queued').textContent = (d.queued_issues || []).length;
+    document.getElementById('s-total').textContent = (d.active_issues || []).length;
+
+    // Issues
+    document.getElementById('main-content').innerHTML = renderIssues(d.active_issues || []);
+
+    // Footer
+    document.getElementById('footer').textContent =
+      `interval ${d.polling_interval}s · port ${d.port} · circuit ${d.circuit_breaker_state}`;
+
+    // Sync refresh interval to orchestra polling_interval
+    const pi = safeInt(d.polling_interval);
+    if (pi && pi !== refreshInterval) {
+      refreshInterval = pi;
+      countdown = pi;
+    }
+
+  } catch(e) {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('status-text').textContent = 'error';
+    document.getElementById('main-content').innerHTML =
+      `<div class="error-state">Failed to load status: ${e.message}</div>`;
+  }
+}
+
+let refreshInterval = 30;
+let countdown = refreshInterval;
+load();
+setInterval(() => {
+  countdown--;
+  document.getElementById('refresh-info').textContent = `refresh in ${countdown}s`;
+  if (countdown <= 0) { countdown = refreshInterval; load(); }
+}, 1000);
+</script>
+</body>
+</html>

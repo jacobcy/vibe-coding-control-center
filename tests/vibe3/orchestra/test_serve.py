@@ -528,7 +528,7 @@ def test_start_blocks_when_instance_running(monkeypatch, tmp_path: Path) -> None
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "start"])
 
-    assert result.exit_code == 1
+    assert result.exit_code == 0  # already running is idempotent (not an error)
     assert "already running" in result.stdout.lower()
 
 
