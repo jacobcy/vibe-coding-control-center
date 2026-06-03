@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from vibe3.adapters import register_adapter
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.roles.supervisor import (
     SUPERVISOR_APPLY_ROLE,
@@ -17,6 +22,95 @@ from vibe3.roles.supervisor import (
     iter_supervisor_identified_events,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+
+
+@pytest.fixture(autouse=True)
+def ensure_vibe_center_adapter():
+    """Ensure vibe-center adapter is registered with correct repo root.
+
+    The isolate_database fixture in tests/vibe3/conftest.py patches
+    GitClient.get_git_common_dir() to return a temp directory, which
+    breaks the adapter's skill/supervisor discovery. This fixture ensures
+    the adapter is registered with the correct paths for tests that need it.
+    """
+    # Get the real repo root (not the tempdir from isolate_database)
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        git_common_dir = Path(result.stdout.strip())
+        repo_root = (
+            git_common_dir.parent
+            if git_common_dir.name == ".git"
+            else git_common_dir.parent
+        )
+    else:
+        # Fallback to cwd
+        repo_root = Path.cwd()
+
+    # Build and register adapter with correct repo root
+    resources = []
+
+    # Add skills from real repo
+    skills_dir = repo_root / "skills"
+    if skills_dir.exists():
+        for skill_path in skills_dir.iterdir():
+            if skill_path.is_dir():
+                skill_md = skill_path / "SKILL.md"
+                if skill_md.exists():
+                    rel_path = skill_md.relative_to(repo_root)
+                    resources.append(
+                        AdapterResource(
+                            type="skill",
+                            name=skill_path.name,
+                            path=str(rel_path),
+                        )
+                    )
+
+    # Add policies (required for vibe-center profile)
+    resources.extend(
+        [
+            AdapterResource(
+                type="policy", name="common", path="supervisor/policies/common.md"
+            ),
+            AdapterResource(
+                type="policy", name="plan", path="supervisor/policies/plan.md"
+            ),
+            AdapterResource(
+                type="policy", name="run", path="supervisor/policies/run.md"
+            ),
+            AdapterResource(
+                type="policy", name="review", path="supervisor/policies/review.md"
+            ),
+        ]
+    )
+
+    # Add supervisor templates
+    resources.extend(
+        [
+            AdapterResource(
+                type="supervisor", name="apply", path="supervisor/apply.md"
+            ),
+            AdapterResource(
+                type="supervisor", name="manager", path="supervisor/manager.md"
+            ),
+        ]
+    )
+
+    adapter = AdapterManifest(
+        name="vibe-center",
+        version="3.0.0",
+        description="Vibe Center adapter for tests",
+        resources=resources,
+    )
+    register_adapter(adapter)
+
+    yield
 
 
 def _make_config(**overrides) -> OrchestraConfig:
@@ -216,7 +310,9 @@ class TestBuildSupervisorApplyRequest:
 class TestSupervisorIdentifiedEvents:
     """Supervisor observation filtering should stay in role layer."""
 
-    def test_iter_supervisor_identified_events_filters_matching_labels(self):
+    def test_iter_supervisor_identified_events_filters_matching_labels(
+        self, ensure_vibe_center_adapter
+    ):
         config = _make_config(
             repo="owner/repo",
             supervisor_handoff={
@@ -247,7 +343,9 @@ class TestSupervisorIdentifiedEvents:
         assert events[0].issue_title == "match"
 
 
-def test_supervisor_uses_profile_resolution() -> None:
+def test_supervisor_uses_profile_resolution(
+    ensure_vibe_center_adapter,
+) -> None:
     """Test supervisor prompt path uses profile resolution."""
     # With vibe-center profile
     resolver = ConventionResolver(profile="vibe-center")
