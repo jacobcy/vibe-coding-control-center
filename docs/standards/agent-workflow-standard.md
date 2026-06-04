@@ -4,7 +4,7 @@
 > **适用范围**：所有需要 AI 辅助的开发工作
 > **权威性**：本标准为 agent 工作流的权威依据。状态迁移与 authoritative ref 真源定义以 [v3/command-standard.md](v3/command-standard.md) 为准。
 
-相关调试方法见 [agent-debugging-standard.md](agent-debugging-standard.md)。
+相关调试方法见 [v3/serve-debugging-guide.md](v3/serve-debugging-guide.md)。
 
 ---
 
@@ -436,12 +436,15 @@ vibe3 run --plan --timeout 1800  # 30 分钟
 ## 八、参考文档
 
 - [SOUL.md](../../SOUL.md) - 项目宪法
+- [v3/command-standard.md](v3/command-standard.md) - 共享状态命令标准 (v3)
+- [v3/event-driven-standard.md](v3/event-driven-standard.md) - 事件驱动架构标准
+- [v3/serve-debugging-guide.md](v3/serve-debugging-guide.md) - Vibe3 Serve 调试指南
 - [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
 - [error-handling.md](./error-handling.md) - 错误处理规范
 - [supervisor/policies/run.md](../../supervisor/policies/run.md) - Run 命令策略
 
 ---
 
-**文档版本**：v1.0
-**最后更新**：2026-03-25
+**文档版本**：v1.1
+**最后更新**：2026-06-04
 **维护者**：Vibe Center Team

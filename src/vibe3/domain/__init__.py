@@ -5,7 +5,7 @@ This module provides domain events for all execution layers:
 - L2: Supervisor + Apply chain (lightweight governance execution)
 - L3: Agent chain (full development workflow)
 
-Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
+Reference: docs/standards/v3/worktree-lifecycle-standard.md
 """
 
 from typing import TYPE_CHECKING, Callable

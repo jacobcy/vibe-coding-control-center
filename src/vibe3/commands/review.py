@@ -15,6 +15,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
+    validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
@@ -135,6 +136,10 @@ def default(
         return
 
     target_branch = resolve_branch_arg(branch)
+
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     _review_branch_impl(
         branch=target_branch,
         trace=trace,
@@ -215,6 +220,9 @@ def base(
     """
     if trace:
         enable_method_trace()
+
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     flow_service, current_branch = ensure_flow_for_current_branch()
     try:

@@ -48,11 +48,13 @@ docs/
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
 - **[v3/architecture-convergence-standard.md](standards/v3/architecture-convergence-standard.md)** - Vibe3 目标架构总纲
-- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** - Vibe3 角色制衡架构标准
-- **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准
+- **[v3/human-mirror-architecture-philosophy.md](standards/v3/human-mirror-architecture-philosophy.md)** - Vibe3 人机对称架构哲学
+- **[v3/serve-debugging-guide.md](standards/v3/serve-debugging-guide.md)** - Vibe3 Serve 调试指南
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
 
 **已废弃文档 (Archives)**：
+- **[vibe3-role-checks-and-balances-standard.md](standards/vibe3-role-checks-and-balances-standard.md)** (DEPRECATED) - Vibe3 角色制衡架构标准 (已废弃，见 v3/human-mirror-architecture-philosophy.md)
+- **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** (DEPRECATED) - Agent 调试标准 (已废弃，见 v3/serve-debugging-guide.md)
 - **[vibe3-worktree-ownership-standard.md](archive/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 standards/v3/worktree-lifecycle-standard.md)
 
 **V3 规范目录**：
