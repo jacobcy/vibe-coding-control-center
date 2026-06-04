@@ -1,5 +1,10 @@
 """Utility modules for Vibe3."""
 
+from vibe3.clients.runtime_assets import (
+    resolve_prompt_config,
+    resolve_runtime_asset,
+    runtime_assets_root,
+)
 from vibe3.utils.codeagent_helpers import (
     build_prompt_file_content,
     diagnose_backend_error,
@@ -13,11 +18,6 @@ from vibe3.utils.constants import (
     AUTOMATED_MARKERS,
     GENERIC_AGENT_MARKER_PATTERN,
     STARTING_TIMEOUT_SECONDS,
-)
-from vibe3.utils.runtime_assets import (
-    resolve_prompt_config,
-    resolve_runtime_asset,
-    runtime_assets_root,
 )
 
 __all__ = [

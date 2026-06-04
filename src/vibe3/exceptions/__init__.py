@@ -67,7 +67,7 @@ class MissingResourceError(UserError):
     """
 
     def __init__(self, resource: str, context: DiagnosticContext) -> None:
-        from vibe3.utils.diagnostics import format_diagnostic_message
+        from vibe3.exceptions.diagnostics import format_diagnostic_message
 
         self.resource = resource
         self.diagnostic = context
