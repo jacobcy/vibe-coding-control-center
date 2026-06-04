@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.environment.runtime_assets import resolve_prompt_config
+from vibe3.utils.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPTS_PATH = Path("config/prompts/prompts.yaml")
 

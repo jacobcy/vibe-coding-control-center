@@ -67,8 +67,8 @@ class ConventionResolver:
         if detected == "vibe-center":
             logger.debug("Using Vibe Center profile defaults")
             return ProfileConvention.vibe_center()
-        elif detected == "minimal":
-            logger.debug("Using minimal profile defaults")
+        elif detected in {"minimal", "github-flow"}:
+            logger.debug(f"Using {detected} profile defaults")
             return ProfileConvention()
         else:
             # Unknown profile: warn and fallback

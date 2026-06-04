@@ -42,7 +42,7 @@ class ProfileConfig(BaseModel):
         # Map profile names to adapter names
         adapter_map: dict[str, str] = {
             "vibe-center": "vibe-center",
-            # Future: "github-flow": "github-flow-adapter",
+            "github-flow": "github-flow",
         }
 
         adapter_name = adapter_map.get(self.profile)

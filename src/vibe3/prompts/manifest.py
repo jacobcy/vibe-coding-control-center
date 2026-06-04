@@ -10,7 +10,6 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.environment.runtime_assets import resolve_prompt_config
 from vibe3.prompts.models import (
     LoadedPromptRecipeDefinition,
     PromptRecipeKind,
@@ -19,6 +18,7 @@ from vibe3.prompts.models import (
     PromptVariableSource,
     VariableSourceKind,
 )
+from vibe3.utils.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 
