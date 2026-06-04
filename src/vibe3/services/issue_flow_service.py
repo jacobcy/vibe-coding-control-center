@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from vibe3.clients import SQLiteClient
+from vibe3.exceptions import InvalidBranchLinkError
 
 if TYPE_CHECKING:
     from vibe3.services.convention_resolver import ConventionResolver
@@ -193,7 +194,6 @@ class IssueFlowService:
 
         # Guard: detect corrupted branch links
         base_branches = {"main", "master", "develop"}
-        from vibe3.exceptions import InvalidBranchLinkError
 
         for flow in flows:
             flow_branch = str(flow.get("branch") or "").strip()
