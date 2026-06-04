@@ -141,6 +141,10 @@ def _build_run_prompt_providers(
         "run.exit_contract": lambda: build_run_task_section(
             getattr(run_config, "run_task", None) if run_config else None
         ),
+        # Publish path exit contract for commit_mode execution (merge-ready → handoff).
+        "run.publish_exit_contract": lambda: build_run_task_section(
+            getattr(run_config, "publish_task", None) if run_config else None
+        ),
         # Backward-compatible alias for local recipe overrides.
         "run.task": lambda: build_run_task_section(
             getattr(run_config, "run_task", None) if run_config else None
@@ -253,6 +257,34 @@ def make_skill_context_builder(
     def build() -> str:
         return PromptManifest.load_default().render_sections(
             recipe_key="run.skill",
+            variant_key="default",
+            providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
+        )
+
+    return make_context_builder(
+        template_key="run.skill",
+        body_provider_key="run.context",
+        body_fn=build,
+        prompts_path=prompts_path,
+        variable_name="skill_content",
+    )
+
+
+def make_publish_context_builder(
+    skill_content: str,
+    config: VibeConfig | None = None,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for publish path (commit_mode) execution.
+
+    Uses run.publish recipe with publish-specific exit contract.
+    The publish path is triggered by state/merge-ready and transitions to state/handoff.
+    """
+    cfg = config or VibeConfig.get_defaults()
+
+    def build() -> str:
+        return PromptManifest.load_default().render_sections(
+            recipe_key="run.publish",
             variant_key="default",
             providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
         )

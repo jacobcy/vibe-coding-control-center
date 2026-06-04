@@ -113,6 +113,7 @@ _PROMPT_KEYS: dict[str, set[str]] = {
     "run": {
         "output_format",
         "run_task",
+        "publish_task",
         "coding_task",
         "retry_task",
         "run_prompt",

@@ -347,6 +347,57 @@ class CodeagentExecutionService:
                         ctx.branch, transition_count=flow_state["transition_count"]
                     )
 
+                # Publish path safety net: if executor ran in commit_mode and state
+                # is still merge-ready, force transition to handoff.
+                # This catches cases where the agent prompt didn't execute the
+                # exit contract correctly.
+                if (
+                    command.role == "executor"
+                    and flow_state
+                    and flow_state.get("commit_mode")
+                    and ctx.before_state_label == "state/merge-ready"
+                ):
+                    from vibe3.execution.state_verification import (
+                        StateVerificationService,
+                    )
+
+                    verifier = StateVerificationService(store=ctx.store)
+                    after_label, _ = verifier.get_issue_state_label(
+                        issue_number=command.issue_number,
+                        repo=getattr(self.config, "repo", None),
+                        branch=ctx.branch,
+                        flow_state=flow_state,
+                        tick_id=command.tick_id,
+                    )
+                    if after_label == "state/merge-ready":
+                        log.warning(
+                            "Publish path safety net: state still merge-ready "
+                            "after executor, forcing transition to handoff"
+                        )
+                        import subprocess
+
+                        repo_arg = []
+                        repo_value = getattr(self.config, "repo", None)
+                        if repo_value:
+                            repo_arg = ["--repo", str(repo_value)]
+                        subprocess.run(
+                            [
+                                "gh",
+                                "issue",
+                                "edit",
+                                str(command.issue_number),
+                                "--add-label",
+                                "state/handoff",
+                                "--remove-label",
+                                "state/merge-ready",
+                            ]
+                            + repo_arg,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            check=False,
+                        )
+
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
             if command.role == "supervisor" and command.issue_number is not None:
