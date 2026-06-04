@@ -31,7 +31,7 @@ MODULE_LAYER_MAP: dict[str, int] = {
     "prompts": 4,
     # Layer 3 - Orchestration core（编排核心层：事件驱动的业务编排与执行控制）
     # 这 6 个模块构成一个强连通分量（SCC），内部存在已知的循环依赖技术债，
-    # 由 test_no_circular_deps_within_l3_core 追踪（Phase 1/2 后仍有 10 个循环依赖）。
+    # 由 test_no_circular_deps_within_l3_core 追踪（Phase 1/2 后仍有内部循环依赖）。
     # 作为同一层，它们对外（L1/L2）保持盲态，不产生向上依赖违规。
     # Epic #1987 追踪中。
     "domain": 3,

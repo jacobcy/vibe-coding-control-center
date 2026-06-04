@@ -167,7 +167,7 @@ def _detect_cycles_dfs(
         rec_stack.add(node)
         path.append(node)
 
-        for neighbor in graph.get(node, []):
+        for neighbor in sorted(graph.get(node, [])):
             if neighbor not in visited:
                 dfs(neighbor, path)
             elif neighbor in rec_stack:
@@ -179,7 +179,7 @@ def _detect_cycles_dfs(
         path.pop()
         rec_stack.remove(node)
 
-    for module in graph:
+    for module in sorted(graph):
         if module not in visited:
             dfs(module, [])
 
@@ -195,7 +195,7 @@ class TestCircularDependencies:
         """Verify no circular dependencies outside L3 orchestration core.
 
         This is a hard gate: any cycle involving at least one non-L3 module
-        will fail immediately. All 10 remaining cycles are within L3 core
+        will fail immediately. Known remaining cycles are within L3 core
         {domain, execution, orchestra, roles, runtime, services}.
 
         L3 modules are derived from MODULE_LAYER_MAP (layer == 3).
@@ -221,7 +221,7 @@ class TestCircularDependencies:
             )
 
     @pytest.mark.xfail(
-        reason="Known architectural debt: 12 L3-internal circular deps remain in "
+        reason="Known architectural debt: L3-internal circular deps remain in "
         "{domain, execution, orchestra, roles, runtime, services} SCC. "
         "Tracked by epic #1987."
     )
@@ -230,7 +230,7 @@ class TestCircularDependencies:
     ) -> None:
         """Verify no circular dependencies within L3 orchestration core.
 
-        This is an xfail test tracking the 10 known cycles within the
+        This is an xfail test tracking known cycles within the
         L3 orchestration core {domain, execution, orchestra, roles, runtime, services}.
 
         L3 modules are derived from MODULE_LAYER_MAP (layer == 3).

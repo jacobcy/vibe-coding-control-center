@@ -15,12 +15,16 @@
 )
 ```
 
-**Problem**: The xfail reason states "10 L3-internal circular deps" but running the DFS algorithm finds **12** cycles within L3 core.
+**Problem**: The xfail reason states "10 L3-internal circular deps", but
+the DFS helper's reported count is traversal-order dependent unless the graph
+is canonicalized. A hard-coded count in the xfail reason can drift from the
+actual test output and mislead later reviews.
 
-**Fix Required**: Update the reason string to reflect the accurate count:
+**Fix Required**: Avoid hard-coding a precise cycle count in the xfail reason,
+and make DFS traversal deterministic for stable failure output:
 ```python
 @pytest.mark.xfail(
-    reason="Known architectural debt: 12 L3-internal circular deps remain in "
+    reason="Known architectural debt: L3-internal circular deps remain in "
     "{domain, execution, orchestra, roles, runtime, services} SCC. "
     "Tracked by epic #1987."
 )
@@ -28,7 +32,8 @@
 
 **Verification**:
 - Run the test and verify it still xfails correctly
-- Count should match actual cycles found by DFS
+- Run the cycle detection under multiple `PYTHONHASHSEED` values and verify the
+  hard gate still reports zero outside-L3 cycles
 
 ### Finding 2: Stale reference to old test name
 
