@@ -74,6 +74,9 @@ code_limits:
       - path: "src/vibe3/commands/flow_manage.py"
         limit: 500
         reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持"
+      - path: "src/vibe3/commands/plan.py"
+        limit: 450
+        reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/analysis/snapshot_service.py"
