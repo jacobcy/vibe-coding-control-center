@@ -137,21 +137,33 @@ def execute_manual_run(
         except OSError as e:
             raise ValueError(f"Failed to read skill file '{skill_path}': {e}") from e
         if not dry_run and not no_async:
-            dispatch_run_command_async(
-                branch=branch,
-                cli_args=[
+            cli_args = (
+                [
+                    "run",
+                    "--publish",
+                    *([instructions] if instructions else []),
+                ]
+                if publish
+                else [
                     "run",
                     "--skill",
                     skill,
                     *([instructions] if instructions else []),
-                ],
+                ]
+            )
+            handoff_metadata: dict[str, object] = {"skill": skill}
+            if publish:
+                handoff_metadata["publish"] = True
+            dispatch_run_command_async(
+                branch=branch,
+                cli_args=cli_args,
                 issue_number=issue_number,
                 execution_name=(
                     f"vibe3-executor-issue-{issue_number}"
                     if issue_number is not None
                     else f"vibe3-executor-{branch.replace('/', '-')}"
                 ),
-                handoff_metadata={"skill": skill},
+                handoff_metadata=handoff_metadata,
             )
             return None
 
