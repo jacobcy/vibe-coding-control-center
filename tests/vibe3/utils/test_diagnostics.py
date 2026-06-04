@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vibe3.exceptions.diagnostic_errors import DiagnosticContext
+from vibe3.exceptions import DiagnosticContext
 from vibe3.utils.diagnostics import format_diagnostic_message
 
 

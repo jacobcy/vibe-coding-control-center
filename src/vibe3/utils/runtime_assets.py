@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
+from vibe3.exceptions import DiagnosticContext, MissingResourceError
 
 RUNTIME_ASSETS_ROOT_ENV = "VIBE3_RUNTIME_ASSETS_ROOT"
 

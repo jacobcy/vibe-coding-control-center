@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from vibe3.exceptions import MissingResourceError, UserError
-from vibe3.exceptions.diagnostic_errors import DiagnosticContext
+from vibe3.exceptions import (
+    DiagnosticContext,
+    MissingResourceError,
+    UserError,
+)
 
 
 def test_missing_resource_error_inherits_user_error() -> None:

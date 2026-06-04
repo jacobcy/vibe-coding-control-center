@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.exceptions.diagnostic_errors import DiagnosticContext
+    from vibe3.exceptions import DiagnosticContext
 
 
 def format_diagnostic_message(resource: str, context: "DiagnosticContext") -> str:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.exceptions.diagnostic_errors import MissingResourceError
+from vibe3.exceptions import MissingResourceError
 from vibe3.prompts.manifest import (
     DEFAULT_PROMPT_RECIPES_PATH,
     PromptManifest,

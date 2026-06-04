@@ -14,8 +14,11 @@ from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.exceptions import CapacityDeferredError
-from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
+from vibe3.exceptions import (
+    CapacityDeferredError,
+    DiagnosticContext,
+    MissingResourceError,
+)
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
