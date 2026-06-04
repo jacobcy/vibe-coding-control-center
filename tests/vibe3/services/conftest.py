@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.analysis.coverage_service import CoverageService
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
@@ -36,6 +37,13 @@ def block_gh_subprocess(request, monkeypatch):
                 f"Test: {test_id}\n"
                 f"If this test needs real gh, mark it with @pytest.mark.integration"
             )
+        if isinstance(cmd, str) and cmd.strip().startswith("gh "):
+            test_id = os.environ.get("PYTEST_CURRENT_TEST", "unknown")
+            raise RuntimeError(
+                f"Blocked gh CLI call in unit test (shell=True): {cmd[:60]}\n"
+                f"Test: {test_id}\n"
+                f"If this test needs real gh, mark it with @pytest.mark.integration"
+            )
         return _real_run(*args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", _guarded_run)
@@ -50,11 +58,11 @@ def stable_worktree_actor(monkeypatch):
         lambda: "test-actor",
     )
 
-    mock_gh = MagicMock()
+    mock_gh = MagicMock(spec=GitHubClient)
     mock_gh.get_pr.return_value = None
     mock_gh.view_issue.return_value = None
-    mock_gh.list_pr.return_value = []
-    mock_gh.diff_pr.return_value = ""
+    mock_gh.list_prs_for_branch.return_value = []
+    mock_gh.get_pr_diff.return_value = ""
 
     monkeypatch.setattr(
         "vibe3.services.flow_read_mixin.GitHubClient",
