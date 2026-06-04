@@ -15,14 +15,14 @@ def validate_issue_branch_for_role(branch: str, role: str) -> None:
 
     Args:
         branch: Branch name to validate
-        role: Role of the branch link (task, dev, plan, run, review)
+        role: Role of the branch link (task, dev, plan, run, review, dependency)
 
     Raises:
         InvalidBranchLinkError: If branch is invalid for the role
     """
-    # Reject base branches
+    # Reject base branches (including remote refs like origin/main)
     base_branches = {"main", "master", "develop"}
-    if branch in base_branches:
+    if branch in base_branches or branch.endswith(("/main", "/master", "/develop")):
         raise InvalidBranchLinkError(
             f"Cannot link base branch '{branch}' to issue. "
             f"Base branches must not have worktrees or flow records."
@@ -35,7 +35,7 @@ def validate_issue_branch_for_role(branch: str, role: str) -> None:
                 f"Invalid branch '{branch}' for role='task'. "
                 f"Only task/issue-* branches allowed."
             )
-    elif role in ("dev", "plan", "run", "review"):
+    elif role in ("dev", "plan", "run", "review", "dependency"):
         valid_prefixes = ("task/issue-", "dev/issue-")
         if not branch.startswith(valid_prefixes):
             raise InvalidBranchLinkError(

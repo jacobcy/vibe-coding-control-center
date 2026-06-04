@@ -40,6 +40,14 @@ class TestValidateIssueBranchForRole:
         with pytest.raises(InvalidBranchLinkError, match="develop"):
             validate_issue_branch_for_role("develop", "dev")
 
+    def test_rejects_origin_main_branch(self) -> None:
+        with pytest.raises(InvalidBranchLinkError, match="origin/main"):
+            validate_issue_branch_for_role("origin/main", "task")
+
+    def test_rejects_upstream_develop_branch(self) -> None:
+        with pytest.raises(InvalidBranchLinkError, match="upstream/develop"):
+            validate_issue_branch_for_role("upstream/develop", "dev")
+
     def test_accepts_task_branch(self) -> None:
         # Should not raise
         validate_issue_branch_for_role("task/issue-123", "task")
@@ -48,9 +56,25 @@ class TestValidateIssueBranchForRole:
         # Should not raise
         validate_issue_branch_for_role("dev/issue-456", "dev")
 
+    def test_accepts_dependency_role_with_task_branch(self) -> None:
+        # Should not raise
+        validate_issue_branch_for_role("task/issue-789", "dependency")
+
+    def test_accepts_dependency_role_with_dev_branch(self) -> None:
+        # Should not raise
+        validate_issue_branch_for_role("dev/issue-100", "dependency")
+
+    def test_rejects_dependency_role_with_main_branch(self) -> None:
+        with pytest.raises(InvalidBranchLinkError, match="main"):
+            validate_issue_branch_for_role("main", "dependency")
+
     def test_rejects_task_role_with_wrong_prefix(self) -> None:
         with pytest.raises(InvalidBranchLinkError, match="task"):
             validate_issue_branch_for_role("dev/issue-123", "task")
+
+    def test_rejects_dependency_role_with_wrong_prefix(self) -> None:
+        with pytest.raises(InvalidBranchLinkError, match="dependency"):
+            validate_issue_branch_for_role("feature/abc", "dependency")
 
 
 class TestAddIssueLinkValidation:
