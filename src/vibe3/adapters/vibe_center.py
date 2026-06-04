@@ -82,7 +82,7 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    from vibe3.resources.runtime_assets import runtime_assets_root
+    from vibe3.environment.runtime_assets import runtime_assets_root
 
     skills_dirs = [repo_root / "skills"]
     global_skills = runtime_assets_root() / "skills"

@@ -17,6 +17,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
+from vibe3.environment.runtime_assets import resolve_runtime_asset
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
@@ -26,7 +27,6 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.worktree import WorktreeRequirement
-from vibe3.resources.runtime_assets import resolve_runtime_asset
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
