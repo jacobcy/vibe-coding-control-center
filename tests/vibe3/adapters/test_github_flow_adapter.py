@@ -22,21 +22,60 @@ def test_github_flow_adapter_registration():
 
 def test_github_flow_adapter_scans_global_skills():
     """Test GitHub Flow adapter scans skills from ~/.vibe/skills."""
-    skills = GITHUB_FLOW_ADAPTER.get_resources_by_type("skill")
-    assert len(skills) > 0
+    import tempfile
 
-    # Should include vibe-commit if global runtime is synced
-    skill_names = {s.name for s in skills}
-    assert "vibe-commit" in skill_names
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mock_root = Path(tmpdir)
+        skills_dir = mock_root / "skills"
+        skills_dir.mkdir()
+
+        # Create mock skill
+        vibe_commit_skill = skills_dir / "vibe-commit"
+        vibe_commit_skill.mkdir()
+        (vibe_commit_skill / "SKILL.md").write_text("# vibe-commit skill\n")
+
+        with patch(
+            "vibe3.adapters.github_flow.runtime_assets_root", return_value=mock_root
+        ):
+            # Rebuild manifest with mocked root
+            from vibe3.adapters.github_flow import _build_github_flow_manifest
+
+            manifest = _build_github_flow_manifest()
+            skills = manifest.get_resources_by_type("skill")
+
+            assert len(skills) > 0
+
+            # Should include vibe-commit
+            skill_names = {s.name for s in skills}
+            assert "vibe-commit" in skill_names
 
 
 def test_github_flow_adapter_skill_paths():
     """Test GitHub Flow adapter skill paths are relative to ~/.vibe."""
-    skills = GITHUB_FLOW_ADAPTER.get_resources_by_type("skill")
-    vibe_commit = next((s for s in skills if s.name == "vibe-commit"), None)
-    assert vibe_commit is not None
-    # Path should be relative to ~/.vibe
-    assert "skills/vibe-commit/SKILL.md" in vibe_commit.path
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mock_root = Path(tmpdir)
+        skills_dir = mock_root / "skills"
+        skills_dir.mkdir()
+
+        # Create mock skill
+        vibe_commit_skill = skills_dir / "vibe-commit"
+        vibe_commit_skill.mkdir()
+        (vibe_commit_skill / "SKILL.md").write_text("# vibe-commit skill\n")
+
+        with patch(
+            "vibe3.adapters.github_flow.runtime_assets_root", return_value=mock_root
+        ):
+            # Rebuild manifest with mocked root
+            from vibe3.adapters.github_flow import _build_github_flow_manifest
+
+            manifest = _build_github_flow_manifest()
+            skills = manifest.get_resources_by_type("skill")
+            vibe_commit = next((s for s in skills if s.name == "vibe-commit"), None)
+            assert vibe_commit is not None
+            # Path should be relative to ~/.vibe
+            assert "skills/vibe-commit/SKILL.md" in vibe_commit.path
 
 
 def test_github_flow_adapter_with_mocked_runtime_root():
