@@ -1,8 +1,10 @@
 """Status command - unified dashboard for flows and orchestra."""
 
 import json
+import os
 from dataclasses import asdict
 from datetime import timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -18,6 +20,7 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
+from vibe3.config.env_override import OVERRIDE_RULES
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.orchestra_helpers import get_manager_usernames
@@ -72,15 +75,137 @@ def _resolve_repo_name(config_repo: str | None) -> str:
     return "(unknown)"
 
 
+def _analyze_orchestra_config_sources(config: OrchestraConfig) -> dict[str, str]:
+    """Determine the source of each displayed orchestra config value.
+
+    Returns a dict mapping field name to source label:
+    - "default" if value matches Pydantic model default
+    - "env override" if an env var overrides this field
+    - "config override" if a YAML config file overrides the default
+    """
+    defaults = OrchestraConfig()
+    sources: dict[str, str] = {}
+
+    # Check each field
+    for field in [
+        "max_concurrent_flows",
+        "polling_interval",
+        "debug_polling_interval",
+        "scene_base_ref",
+        "repo",
+        "manager_usernames",
+    ]:
+        config_value = getattr(config, field)
+        default_value = getattr(defaults, field)
+
+        # Check if env var overrides this field
+        config_path = f"orchestra.{field}"
+        env_override_found = False
+
+        for rule in OVERRIDE_RULES:
+            if rule.config_path == config_path and os.environ.get(rule.env_key):
+                sources[field] = "env override"
+                env_override_found = True
+                break
+
+        if env_override_found:
+            continue
+
+        # Check if value differs from default
+        if config_value == default_value:
+            sources[field] = "default"
+        else:
+            sources[field] = "config override"
+
+    return sources
+
+
 def _render_configuration(config: OrchestraConfig) -> None:
     """Render Vibe3 configuration section in status output."""
+    sources = _analyze_orchestra_config_sources(config)
     manager = ", ".join(get_manager_usernames(config))
     console.print("[bold]Vibe3 Configuration[/]")
-    console.print(f"  Repo:              {_resolve_repo_name(config.repo)}")
-    console.print(f"  Manager agents:    {manager}")
-    console.print(f"  Max concurrent:    {config.max_concurrent_flows}")
-    console.print(f"  Polling interval:  {config.polling_interval}s")
-    console.print(f"  Scene base ref:    {config.scene_base_ref}")
+
+    repo_name = _resolve_repo_name(config.repo)
+    console.print(f"  Repo:              {repo_name} ({sources['repo']})")
+
+    console.print(f"  Manager agents:    {manager} ({sources['manager_usernames']})")
+
+    max_concurrent = config.max_concurrent_flows
+    console.print(
+        f"  Max concurrent:    {max_concurrent} " f"({sources['max_concurrent_flows']})"
+    )
+
+    console.print(
+        f"  Polling interval:  {config.polling_interval}s "
+        f"({sources['polling_interval']})"
+    )
+
+    # Add debug mode status
+    debug_status = "ON" if config.debug else "OFF"
+    debug_interval = config.debug_polling_interval
+    console.print(f"    Debug mode:      {debug_status} (when ON: {debug_interval}s)")
+
+    console.print(
+        f"  Scene base ref:    {config.scene_base_ref} "
+        f"({sources['scene_base_ref']})"
+    )
+    console.print()
+
+    # Add Configuration Sources section
+    console.print("[bold]Configuration Sources:[/]")
+    console.print(
+        "  Default values from: OrchestraConfig "
+        "(src/vibe3/models/orchestra_config.py)"
+    )
+
+    # Check global config
+    global_config_path = Path.home() / ".vibe" / "settings.yaml"
+    global_has_orchestra = False
+    if global_config_path.exists():
+        try:
+            import yaml
+
+            with open(global_config_path) as f:
+                global_data = yaml.safe_load(f) or {}
+                global_has_orchestra = "orchestra" in global_data
+        except Exception:
+            pass
+
+    global_status = f"{global_config_path}"
+    if not global_has_orchestra:
+        global_status += " (no orchestra overrides)"
+    console.print(f"  Global config:       {global_status}")
+
+    # Check project config
+    project_config_path = Path(".vibe/settings.yaml")
+    project_has_orchestra = False
+    if project_config_path.exists():
+        try:
+            import yaml
+
+            with open(project_config_path) as f:
+                project_data = yaml.safe_load(f) or {}
+                project_has_orchestra = "orchestra" in project_data
+        except Exception:
+            pass
+
+    project_status = f"{project_config_path}"
+    if not project_has_orchestra:
+        project_status += " (no orchestra overrides)"
+    console.print(f"  Project config:     {project_status}")
+
+    # Check env overrides
+    env_overrides = []
+    for rule in OVERRIDE_RULES:
+        if rule.config_path.startswith("orchestra.") and os.environ.get(rule.env_key):
+            env_overrides.append(rule.env_key)
+
+    if env_overrides:
+        console.print(f"  Env overrides:      {', '.join(env_overrides)}")
+    else:
+        console.print("  Env overrides:      none")
+
     console.print()
 
 
@@ -173,9 +298,6 @@ def _full_status_dashboard(
                 yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
             )
         return
-
-    # Render system status
-    _render_system_status(data.config, data.orch_snapshot, data.snapshot_found)
 
     # Classify issues for rendering
     classified = classify_task_issues_for_rendering(

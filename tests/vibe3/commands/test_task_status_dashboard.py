@@ -127,6 +127,9 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     assert "manager-bot" in output
     assert "Ready with human assignee" in output
     assert "non-manager assignee" in output
+    # Verify task status does NOT show system status sections
+    assert "Vibe3 Configuration" not in output
+    assert "Orchestra Status" not in output
 
 
 @patch(
@@ -224,9 +227,10 @@ def test_task_status_hides_missing_blocked_issue_number(
     result = runner.invoke(app, ["task", "status"])
 
     assert result.exit_code == 0
-    assert "Dispatch: FROZEN" in result.output
-    assert "Reason:  API/Exec error threshold: 3 recent errors" in result.output
-    assert "#None" not in result.output
+    # System status sections should not appear in task status
+    assert "Dispatch: FROZEN" not in result.output
+    assert "Orchestra Status" not in result.output
+    assert "Vibe3 Configuration" not in result.output
 
 
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
