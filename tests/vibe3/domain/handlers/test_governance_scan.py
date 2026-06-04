@@ -90,7 +90,9 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = mock_snapshot
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        handle_governance_scan_started(
+            GovernanceScanStarted(tick_count=5, execution_count=3)
+        )
 
         mock_coordinator.dispatch_execution.assert_called_once()
         # Verify CLI self-invocation command structure
@@ -98,9 +100,9 @@ class TestGovernanceScanHandler:
         assert call_args.role == "governance"
         assert call_args.mode == "async"
         assert call_args.cmd is not None
-        assert "internal" in call_args.cmd
-        assert "governance" in call_args.cmd
-        assert "5" in call_args.cmd  # tick_count
+        # Verify command ends with expected args
+        # Full: ["uv", "run", ..., "internal", "governance", "5", "3"]
+        assert call_args.cmd[-4:] == ["internal", "governance", "5", "3"]
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
