@@ -154,8 +154,8 @@ Install via respective tools, then create symlinks in `.agent/skills/`. See [DEV
 - `vibe3 inspect symbols/files/base/pr/commit` — 代码结构与影响分析
 
 - `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
-- 详细用法见 [.agent/policies/common.md](.agent/policies/common.md)
+- 详细用法见 [supervisor/policies/common.md](supervisor/policies/common.md)
 
 ## 🔗 Kiro Integration
 
-When using Kiro (AI IDE with spec workflow), follow rules in [.agent/policies/kiro-integration.md](.agent/policies/kiro-integration.md).
+When using Kiro (AI IDE with spec workflow), follow rules in [supervisor/policies/kiro-integration.md](supervisor/policies/kiro-integration.md).

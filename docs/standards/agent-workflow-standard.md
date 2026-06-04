@@ -438,15 +438,7 @@ vibe3 run --plan --timeout 1800  # 30 分钟
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
 - [error-handling.md](./error-handling.md) - 错误处理规范
-- [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
-
----
-
-**文档版本**：v1.0
-**最后更新**：2026-03-25
-**维护者**：Vibe Center Team
-.md) - 错误处理规范
-- [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
+- [supervisor/policies/run.md](../../supervisor/policies/run.md) - Run 命令策略
 
 ---
 
