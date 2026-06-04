@@ -47,7 +47,7 @@ Vibe 3.0 采用 3-tier 架构模型作为顶层战略划分，并辅以六层架
    - **Execution**：执行中控台。负责并发控制、Session 登记、执行生命周期审计。
    - **Roles**：角色行为定义。包含 Plan, Run, Review, Supervisor 等角色的专属逻辑。
    - **规则**：决定“做什么（What to do）”并协调“何时执行（When to execute）”。这 6 个模块构成一个**强连通分量（SCC）**，彼此存在事件驱动的双向协作，在架构上视为**同一编排核心层**；它们对 L1/L2 保持盲态，不产生向上依赖违规。
-   - **技术债**：SCC 内部的循环依赖（如 `domain ↔ runtime`、`orchestra ↔ services`）是已知技术债，由 `test_no_circular_deps` 追踪，待 epic #1987 Phase 1/2 通过 Protocol 注入与事件解耦消除（见 #1971/#1884/#1887/#1888）。
+   - **技术债**：SCC 内部的循环依赖（如 `domain ↔ runtime`、`orchestra ↔ services`）是已知技术债，由 `test_no_circular_deps_within_l3_core` 追踪（硬门禁 `test_no_circular_deps_outside_l3_core` 已激活），待 epic #1987 Phase 1/2 通过 Protocol 注入与事件解耦消除（见 #1971/#1884/#1887/#1888）。
 
 4. **Execution Primitives 层** (`agents/`, `prompts/`)
    - **Agents**：Agent 执行引擎。包含后端驱动（Claude/Codex 等）与执行流水线。

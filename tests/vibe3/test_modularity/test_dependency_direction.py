@@ -139,6 +139,53 @@ class TestLayerDependencies:
             )
 
 
+def _detect_cycles_dfs(
+    import_graph: dict[str, list[str]],
+) -> list[list[str]]:
+    """Detect all cycles in the import graph using DFS.
+
+    Args:
+        import_graph: Module dependency graph mapping module to its imports
+
+    Returns:
+        List of cycles, where each cycle is a list of module names
+        forming a path that starts and ends with the same module
+    """
+    # Build adjacency list
+    graph = defaultdict(set)
+    for module, imports in import_graph.items():
+        for imp in imports:
+            graph[module].add(imp)
+
+    # Detect cycles using DFS
+    visited = set()
+    rec_stack = set()
+    cycles = []
+
+    def dfs(node: str, path: list[str]) -> None:
+        visited.add(node)
+        rec_stack.add(node)
+        path.append(node)
+
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                dfs(neighbor, path)
+            elif neighbor in rec_stack:
+                # Found cycle
+                cycle_start = path.index(neighbor)
+                cycle = path[cycle_start:] + [neighbor]
+                cycles.append(cycle)
+
+        path.pop()
+        rec_stack.remove(node)
+
+    for module in graph:
+        if module not in visited:
+            dfs(module, [])
+
+    return cycles
+
+
 class TestCircularDependencies:
     """Test for circular dependencies."""
 
@@ -156,51 +203,18 @@ class TestCircularDependencies:
         # Get L3 modules from the layer map
         l3_modules = {name for name, layer in module_layer_map.items() if layer == 3}
 
-        # Build adjacency list
-        graph = defaultdict(set)
-        for module, imports in import_graph.items():
-            for imp in imports:
-                graph[module].add(imp)
-
         # Detect cycles using DFS
-        visited = set()
-        rec_stack = set()
-        cycles = []
-
-        def dfs(node: str, path: list[str]) -> None:
-            visited.add(node)
-            rec_stack.add(node)
-            path.append(node)
-
-            for neighbor in graph.get(node, []):
-                if neighbor not in visited:
-                    dfs(neighbor, path)
-                elif neighbor in rec_stack:
-                    # Found cycle
-                    cycle_start = path.index(neighbor)
-                    cycle = path[cycle_start:] + [neighbor]
-                    cycles.append(cycle)
-
-            path.pop()
-            rec_stack.remove(node)
-
-        for module in graph:
-            if module not in visited:
-                dfs(module, [])
+        cycles = _detect_cycles_dfs(import_graph)
 
         # Filter to only cycles outside L3 core
-        outside_l3_cycles = []
-        for cycle in cycles:
-            # Check if any module in cycle is NOT in L3
-            if any(module not in l3_modules for module in cycle):
-                outside_l3_cycles.append(cycle)
+        outside_l3_cycles = [
+            cycle
+            for cycle in cycles
+            if any(module not in l3_modules for module in cycle)
+        ]
 
         if outside_l3_cycles:
-            cycle_strs = []
-            for cycle in outside_l3_cycles:
-                cycle_str = " → ".join(cycle)
-                cycle_strs.append(cycle_str)
-
+            cycle_strs = [" → ".join(cycle) for cycle in outside_l3_cycles]
             pytest.fail(
                 "Circular dependencies outside L3 core found:\n"
                 + "\n".join(f"  - {c}" for c in cycle_strs)
@@ -224,51 +238,16 @@ class TestCircularDependencies:
         # Get L3 modules from the layer map
         l3_modules = {name for name, layer in module_layer_map.items() if layer == 3}
 
-        # Build adjacency list
-        graph = defaultdict(set)
-        for module, imports in import_graph.items():
-            for imp in imports:
-                graph[module].add(imp)
-
         # Detect cycles using DFS
-        visited = set()
-        rec_stack = set()
-        cycles = []
-
-        def dfs(node: str, path: list[str]) -> None:
-            visited.add(node)
-            rec_stack.add(node)
-            path.append(node)
-
-            for neighbor in graph.get(node, []):
-                if neighbor not in visited:
-                    dfs(neighbor, path)
-                elif neighbor in rec_stack:
-                    # Found cycle
-                    cycle_start = path.index(neighbor)
-                    cycle = path[cycle_start:] + [neighbor]
-                    cycles.append(cycle)
-
-            path.pop()
-            rec_stack.remove(node)
-
-        for module in graph:
-            if module not in visited:
-                dfs(module, [])
+        cycles = _detect_cycles_dfs(import_graph)
 
         # Filter to only cycles within L3 core
-        within_l3_cycles = []
-        for cycle in cycles:
-            # Check if ALL modules in cycle are in L3
-            if all(module in l3_modules for module in cycle):
-                within_l3_cycles.append(cycle)
+        within_l3_cycles = [
+            cycle for cycle in cycles if all(module in l3_modules for module in cycle)
+        ]
 
         if within_l3_cycles:
-            cycle_strs = []
-            for cycle in within_l3_cycles:
-                cycle_str = " → ".join(cycle)
-                cycle_strs.append(cycle_str)
-
+            cycle_strs = [" → ".join(cycle) for cycle in within_l3_cycles]
             pytest.fail(
                 "Circular dependencies within L3 core found:\n"
                 + "\n".join(f"  - {c}" for c in cycle_strs)
