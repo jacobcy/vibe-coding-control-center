@@ -159,11 +159,18 @@ def execute_manual_run(
         if branch:
             try:
                 flow_state = SQLiteClient().get_flow_state(branch)
-                if flow_state and flow_state.get("commit_mode"):
-                    is_publish_path = True
+                if flow_state:
+                    commit_mode = flow_state.get("commit_mode")
+                    # Validate commit_mode is boolean to prevent type coercion issues
+                    is_publish_path = (
+                        bool(commit_mode) if isinstance(commit_mode, bool) else False
+                    )
             except Exception as e:
-                logger.debug(
-                    f"Failed to check flow_state for publish path detection: {e}"
+                # Log unexpected errors but don't fail execution - graceful degradation
+                # Falls back to skill builder, which noop gate will catch if wrong
+                logger.warning(
+                    f"Unexpected error checking flow_state for publish path: {e}. "
+                    "Defaulting to skill builder."
                 )
 
         # Use publish-specific context builder for commit_mode execution
