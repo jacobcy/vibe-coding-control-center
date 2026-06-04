@@ -4,7 +4,11 @@ from typing import Any
 
 from vibe3.config.agent_preset import (
     find_missing_backend_commands,
+    has_agent_env_override,
+    read_models_json,
+    repo_models_json_path,
     resolve_effective_agent_options,
+    resolve_repo_agent_preset_name,
 )
 from vibe3.config.branch_convention import BranchConvention
 from vibe3.config.loader import (
@@ -90,12 +94,16 @@ __all__ = [
     "get_manager_usernames",
     "get_role_output_contract",
     "get_role_section",
+    "has_agent_env_override",
     "load_config",
     "load_keys_env_fallback",
     "load_orchestra_config",
     "load_runtime_config",
+    "read_models_json",
     "reload_config",
+    "repo_models_json_path",
     "resolve_effective_agent_options",
+    "resolve_repo_agent_preset_name",
 ]
 
 # Lazy import mapping for symbols to avoid circular dependencies

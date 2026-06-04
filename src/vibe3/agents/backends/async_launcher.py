@@ -12,7 +12,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from vibe3.models.execution_handle import AsyncExecutionHandle
+from vibe3.models import AsyncExecutionHandle
 
 CRITICAL_ENV_PASSTHROUGH = {
     "HOME",
@@ -349,8 +349,9 @@ def spawn_tmux_command(
         check=False,
     )
 
-    command_str = f"VIBE3_LOG_PATH={shlex.quote(str(log_path))} exec {
-        shlex.join(final_command)}"
+    command_str = (
+        f"VIBE3_LOG_PATH={shlex.quote(str(log_path))} exec {shlex.join(final_command)}"
+    )
     subprocess.run(
         [
             "tmux",

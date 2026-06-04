@@ -9,8 +9,11 @@ from typing import Any, Final
 
 from loguru import logger
 
-from vibe3.config import resolve_effective_agent_options
-from vibe3.config.agent_preset import read_models_json, repo_models_json_path
+from vibe3.config import (
+    read_models_json,
+    repo_models_json_path,
+    resolve_effective_agent_options,
+)
 from vibe3.models import AgentOptions
 
 # Path to codeagent models config

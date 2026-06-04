@@ -11,13 +11,16 @@ from vibe3.models.change_source import (
 )
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+from vibe3.models.execution_handle import AsyncExecutionHandle
 from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
 from vibe3.models.inspection import CallNode, CommandInspection
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.plan import PlanRequest
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.queue_entry import QueueEntry
-from vibe3.models.review_runner import AgentOptions
+from vibe3.models.review import ReviewRequest
+from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.models.session_types import SessionRole
 from vibe3.models.snapshot import (
     DependencyChange,
@@ -40,6 +43,8 @@ from vibe3.models.worktree import WorktreeRequirement
 
 __all__: list[str] = [
     "AgentOptions",
+    "AgentResult",
+    "AsyncExecutionHandle",
     "BranchConvention",
     "BranchSource",
     "CallNode",
@@ -66,9 +71,11 @@ __all__: list[str] = [
     "IssueInfo",
     "IssueState",
     "OrchestraConfig",
+    "PlanRequest",
     "PRSource",
     "PromptContextMode",
     "QueueEntry",
+    "ReviewRequest",
     "SessionRole",
     "StructureDiff",
     "StructureMetrics",

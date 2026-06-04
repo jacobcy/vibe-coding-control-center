@@ -17,12 +17,11 @@ from typing import Literal, cast
 
 from loguru import logger
 
-from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
+from vibe3.analysis import build_snapshot_diff_section
 from vibe3.config import ConventionResolver, VibeConfig
 from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
-from vibe3.models import PromptContextMode
-from vibe3.models.review import ReviewRequest
+from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
