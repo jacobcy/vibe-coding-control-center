@@ -5,11 +5,23 @@ from __future__ import annotations
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from loguru import logger
 
-from vibe3.config import VibeConfig
+# Delayed import to avoid utils → config circular dependency
+# from vibe3.config import VibeConfig
+
+if TYPE_CHECKING:
+    from vibe3.config import VibeConfig
+
+
+def get_vibe_config() -> "VibeConfig":
+    """Get VibeConfig with delayed import."""
+    from vibe3.config import VibeConfig
+
+    return VibeConfig.get_defaults()
+
 
 # Known backend-internal error patterns with suggested fixes
 KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
@@ -113,7 +125,8 @@ def build_prompt_file_content(prompt: str, include_global_notice: bool = True) -
     """Apply configured global notice to the prompt file content."""
     if not include_global_notice:
         return prompt
-    notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
+    config = get_vibe_config()
+    notice = config.agent_prompt.global_notice.strip()
     if not notice:
         return prompt
     return f"{notice}\n\n---\n\n{prompt}"

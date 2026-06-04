@@ -1,9 +1,32 @@
 """Comment filtering utilities for identifying human vs automated comments."""
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from vibe3.utils import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
+
+# Delayed import to avoid utils → config circular dependency
+# from vibe3.config import load_orchestra_config, get_manager_usernames
+
+if TYPE_CHECKING:
+    from vibe3.models.orchestra_config import OrchestraConfig
+
+
+def get_manager_usernames() -> list[str]:
+    """Get manager usernames with delayed import."""
+    from vibe3.config.manager_config import (
+        get_manager_usernames as _get_manager_usernames,
+    )
+
+    config = load_orchestra_config()
+    return list(_get_manager_usernames(config))
+
+
+def load_orchestra_config() -> "OrchestraConfig":
+    """Load orchestra config with delayed import."""
+    from vibe3.config import load_orchestra_config as _load_orchestra_config
+
+    return _load_orchestra_config()
 
 
 def is_human_comment(comment: dict[str, Any]) -> bool:
@@ -63,11 +86,6 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
 
     # Filter manager bot (if configured)
     try:
-        # Lazy import to avoid circular dependency:
-        # utils → config → clients → exceptions
-        from vibe3.config import load_orchestra_config
-        from vibe3.config.manager_config import get_manager_usernames
-
         config = load_orchestra_config()
 
         # Check bot_username
@@ -75,7 +93,7 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
             return False
 
         # Check manager_usernames list
-        manager_usernames = get_manager_usernames(config)
+        manager_usernames = get_manager_usernames()
         if manager_usernames:
             manager_logins = [u.lower() for u in manager_usernames]
             if login in manager_logins:
