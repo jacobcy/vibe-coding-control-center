@@ -188,7 +188,7 @@ code_limits:
         limit: 480
         reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测等紧密耦合场景，新增测试后略微超标"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
-        limit: 600
+        limit: 680
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
