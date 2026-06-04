@@ -163,7 +163,7 @@ class TestFlowBinding:
         assert "[codex/gpt-5.4]" in body
         assert "PR #469" in body
         assert "`task/issue-467`" in body
-        assert "`debug/new-attempt`" in body
+        assert "`dev/issue-467-v2`" in body
 
     def test_bind_task_demotes_previous_task_flow_without_remote_nudge_for_noncanonical(
         self, mock_store
