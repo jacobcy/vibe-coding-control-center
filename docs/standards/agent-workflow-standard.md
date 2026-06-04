@@ -152,37 +152,28 @@ codeagent-wrapper cleanup
 ### 3.0 vibe-new Bootstrap 流程
 
 **重要说明**：
-- `vibe-new` 不对应单一大总命令
-- Bootstrap 通过原子能力拼接完成，例如：
-  - `vibe3 flow update`
-  - `vibe3 flow bind`
-  - `vibe3 snapshot save --as-baseline`
-  - `vibe3 handoff append`
-- 若需要物理 worktree，由 `environment` 提供资源解析接口，不扩大为业务编排入口
+- **必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径**，禁止手工拼接。
+- 该命令保证幂等性、统一的 actor 签名、完整的 baseline snapshot 和 flow 关系绑定。
 
 ### 3.1 新功能开发
 
 **推荐流程**：
 ```bash
-# 1. 创建并注册 flow
-git checkout -b feature/api-v2
-vibe3 flow update
+# 1. 使用 internal bootstrap 创建并注册 flow (自动完成 git checkout + flow update + bind)
+vibe3 internal bootstrap <issue_number> --branch feature/api-v2 --worktree
 
-# 2. 绑定 task issue（同时绑定为 spec）
-vibe3 flow bind <issue_number> --role task
-
-# 3. 创建 plan
+# 2. 创建 plan
 vibe3 plan --branch <issue_number>
 
-# 4. 执行 plan（agent 实现）
+# 3. 执行 plan（agent 实现）
 vibe3 run --branch <issue_number>
 
-# 5. 验证结果
+# 4. 验证结果
 uv run pytest tests/vibe3
 vibe3 inspect base origin/main  # 查看改动影响
 
-# 6. 创建 PR
-gh pr create --draft  # 或者使用 vibe3 相关的 PR 命令（如果存在且非废弃）
+# 5. 创建 PR
+gh pr create --draft
 ```
 
 ---
@@ -191,20 +182,16 @@ gh pr create --draft  # 或者使用 vibe3 相关的 PR 命令（如果存在且
 
 **推荐流程**：
 ```bash
-# 1. 创建并注册 flow
-git checkout -b fix/login-bug
-vibe3 flow update
+# 1. 使用 internal bootstrap 创建并注册 flow
+vibe3 internal bootstrap <bug_issue_number> --branch fix/login-bug
 
-# 2. 绑定 bug issue
-vibe3 flow bind <bug_issue_number>
-
-# 3. 使用 instructions 直接描述问题
+# 2. 使用 instructions 直接描述问题
 vibe3 run "Fix the login timeout bug in auth.py"
 
-# 4. 验证修复
+# 3. 验证修复
 uv run pytest tests/vibe3/services/test_auth.py
 
-# 5. 提交修复
+# 4. 提交修复
 git commit -am "fix: resolve login timeout issue"
 ```
 

@@ -79,9 +79,9 @@ heartbeat tick 是 driver 进程内部的一次轮询循环。
 
 例如：
 
-- **Governance (L1)**: `cron-supervisor` (识别), `roadmap-intake` (审查)
-- **Governance Execution (L2)**: `supervisor-apply` (执行治理 issue)
-- **Development (L3)**: `manager`, `plan`, `run`, `review` (主开发链)
+- **Governance (Tier 3)**: `cron-supervisor` (识别), `roadmap-intake` (审查)
+- **Governance Execution (Tier 3)**: `supervisor-apply` (执行治理 issue)
+- **Development (Tier 2)**: `manager`, `plan`, `run`, `review` (主开发链)
 
 这些 child session 才是实际调用 codeagent 的执行壳。
 
