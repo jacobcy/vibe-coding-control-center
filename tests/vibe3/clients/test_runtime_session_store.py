@@ -188,3 +188,124 @@ def test_delete_flow_removes_flow_truth_and_runtime_sessions(
     assert store.get_events(branch) == []
     assert store.get_issue_links(branch) == []
     assert store.get_runtime_session(session_id) is None
+
+
+def test_get_latest_session_with_backend_id_returns_most_recent(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Should return the most recent session with backend_session_id."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-600"
+    role = "executor"
+
+    # Create older session
+    store.create_runtime_session(
+        role=role,
+        target_type="issue",
+        target_id="600",
+        branch=branch,
+        session_name="vibe3-executor-issue-600-v1",
+        status="done",
+        backend_session_id="old-session-id",
+    )
+
+    # Create newer session
+    id2 = store.create_runtime_session(
+        role=role,
+        target_type="issue",
+        target_id="600",
+        branch=branch,
+        session_name="vibe3-executor-issue-600-v2",
+        status="done",
+        backend_session_id="new-session-id",
+    )
+
+    result = store.get_latest_session_with_backend_id(branch=branch, role=role)
+    assert result is not None
+    assert result["id"] == id2
+    assert result["backend_session_id"] == "new-session-id"
+
+
+def test_get_latest_session_with_backend_id_returns_none_when_no_match(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Should return None when no sessions with backend_session_id exist."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+    # Create session without backend_session_id
+    store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="601",
+        branch="task/issue-601",
+        session_name="vibe3-executor-issue-601",
+        status="done",
+    )
+
+    result = store.get_latest_session_with_backend_id(
+        branch="task/issue-601", role="executor"
+    )
+    assert result is None
+
+
+def test_get_latest_session_with_backend_id_ignores_empty_string(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Should ignore sessions with empty string backend_session_id."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-602"
+
+    store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="602",
+        branch=branch,
+        session_name="vibe3-executor-issue-602",
+        status="done",
+        backend_session_id="",
+    )
+
+    result = store.get_latest_session_with_backend_id(branch=branch, role="executor")
+    assert result is None
+
+
+def test_get_latest_session_with_backend_id_ignores_null(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Should ignore sessions with NULL backend_session_id."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-603"
+
+    store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="603",
+        branch=branch,
+        session_name="vibe3-executor-issue-603",
+        status="done",
+    )
+
+    result = store.get_latest_session_with_backend_id(branch=branch, role="executor")
+    assert result is None
+
+
+def test_get_latest_session_with_backend_id_filters_by_role(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Should only return sessions matching the specified role."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-604"
+
+    # Create session with different role
+    store.create_runtime_session(
+        role="manager",
+        target_type="issue",
+        target_id="604",
+        branch=branch,
+        session_name="vibe3-manager-issue-604",
+        status="done",
+        backend_session_id="manager-session-id",
+    )
+
+    result = store.get_latest_session_with_backend_id(branch=branch, role="executor")
+    assert result is None

@@ -24,12 +24,14 @@ def load_session_id(role: SessionRole, branch: str | None = None) -> str | None:
     resolved_branch = branch or "unknown"
     try:
         resolved_branch = branch or GitClient().get_current_branch()
+        store = SQLiteClient()
         registry = SessionRegistryService(
-            store=SQLiteClient(),
+            store=store,
             backend=None,
         )
-        sessions = registry.get_truly_live_sessions_for_branch(resolved_branch)
 
+        # Primary: check truly live sessions (existing behavior)
+        sessions = registry.get_truly_live_sessions_for_branch(resolved_branch)
         for session in sessions:
             if session.get("role") != role:
                 continue
@@ -45,6 +47,25 @@ def load_session_id(role: SessionRole, branch: str | None = None) -> str | None:
                 )
                 continue
             return str(backend_session_id)
+
+        # Fallback: check most recent session (any status) with backend_session_id
+        recent = store.get_latest_session_with_backend_id(
+            branch=resolved_branch, role=role
+        )
+        if recent:
+            backend_session_id = recent.get("backend_session_id")
+            if (
+                backend_session_id
+                and isinstance(backend_session_id, str)
+                and _is_valid_session_id(backend_session_id)
+            ):
+                logger.bind(
+                    domain="agent_execution", role=role, branch=resolved_branch
+                ).debug(
+                    f"No live session found; reusing backend_session_id "
+                    f"from completed session (status={recent.get('status')})"
+                )
+                return str(backend_session_id)
 
         return None
     except (UserError, SystemError) as exc:
