@@ -103,7 +103,9 @@ class TestCheckCommand:
 
         assert result.exit_code == 0
         assert "Scanning merged PRs to back-fill task_issue_number" in result.output
-        assert "[yellow]Unresolvable[/yellow] (1 branches" in result.output
+        # Rich markup must be rendered, not printed literally (issue #2033)
+        assert "Unresolvable (1 branches" in result.output
+        assert "[yellow]" not in result.output
         assert "task/no-linked-issue" in result.output
 
     @patch("vibe3.commands.check.CheckService")
@@ -124,4 +126,39 @@ class TestCheckCommand:
             result = runner.invoke(app, ["check"])
 
         assert result.exit_code == 0
-        assert "[green]Fixed[/green]: 3 flows" in result.output
+        # Rich markup must be rendered, not printed literally (issue #2033)
+        assert "Fixed: 3 flows" in result.output
+        assert "[green]" not in result.output
+
+    @patch("vibe3.commands.check.CheckService")
+    def test_check_command_clean_branch_renders_markup(self, mock_service_class):
+        """clean_branch details must render Rich markup, not show literal tags."""
+        from vibe3.commands.check_support import ExecuteCheckResult
+
+        mock_service_class.return_value = MagicMock()
+        result_obj = ExecuteCheckResult(
+            mode="clean_branch",
+            success=True,
+            summary="Cleaned 1 aborted flows",
+            details={
+                "cleaned": ["task/issue-1"],
+                "local_branches": {
+                    "cleaned": ["feature-x"],
+                    "skipped_active_flow": ["dev/issue-2"],
+                    "failed": ["feature-y: boom"],
+                },
+            },
+        )
+        with patch("vibe3.commands.check.execute_check_mode", return_value=result_obj):
+            result = runner.invoke(app, ["check", "--clean-branch"], input="y\n")
+
+        assert result.exit_code == 0
+        # No literal Rich markup tags leak into output
+        assert "[green]" not in result.output
+        assert "[red]" not in result.output
+        assert "[cyan]" not in result.output
+        # Rendered content present
+        assert "Cleaned" in result.output
+        assert "feature-x" in result.output
+        assert "Local branches failed" in result.output
+        assert "feature-y: boom" in result.output

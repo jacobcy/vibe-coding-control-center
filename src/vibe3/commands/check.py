@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from vibe3.commands.check_support import execute_check_mode
 from vibe3.commands.common import enable_method_trace
@@ -16,124 +17,136 @@ app = typer.Typer(
 )
 
 
+_console = Console()
+_err_console = Console(stderr=True)
+
+
+def _emit(line: str, *, err: bool = False) -> None:
+    """Print a detail line, rendering Rich markup (typer.echo does not).
+
+    ``typer.echo`` writes raw text, so inline tags like ``[green]`` would be
+    printed literally (issue #2033). Routing through a Rich Console renders the
+    markup as colour instead.
+    """
+    console = _err_console if err else _console
+    console.print(line, highlight=False, soft_wrap=True)
+
+
+def _emit_list(label: str, items: Any, *, style: str) -> None:
+    """Emit a labelled, comma-joined list line (stdout) when non-empty.
+
+    Interpolated values are escaped so branch names never inject markup.
+    """
+    values = [str(item) for item in (items or [])]
+    if values:
+        _emit(f"  [{style}]{label}[/{style}]: {escape(', '.join(values))}")
+
+
+def _emit_failures(label: str, items: Any) -> None:
+    """Emit one stderr line per failure (red) when any are present."""
+    for failure in items or []:
+        _emit(f"  [red]{label}[/red]: {escape(str(failure))}", err=True)
+
+
+def _emit_agent_worktree_details(agent_worktrees: dict[str, Any]) -> None:
+    """Render agent worktree cleanup details."""
+    _emit_list("Agent worktrees cleaned", agent_worktrees.get("cleaned"), style="green")
+    _emit_list(
+        "Agent worktrees skipped (live)",
+        agent_worktrees.get("skipped_live"),
+        style="cyan",
+    )
+    _emit_failures("Agent worktrees failed", agent_worktrees.get("failed"))
+
+
+def _emit_remote_branch_details(remote_branches: dict[str, Any]) -> None:
+    """Render remote branch cleanup details."""
+    _emit_list("Remote branches cleaned", remote_branches.get("cleaned"), style="green")
+    _emit_list(
+        "Remote branches skipped (protected)",
+        remote_branches.get("skipped_protected"),
+        style="dim",
+    )
+    _emit_list(
+        "Remote branches skipped (open PR)",
+        remote_branches.get("skipped_pr"),
+        style="cyan",
+    )
+    _emit_failures("Remote branches failed", remote_branches.get("failed"))
+
+
+def _emit_local_branch_details(local_branches: dict[str, Any]) -> None:
+    """Render local branch cleanup details."""
+    _emit_list("Local branches cleaned", local_branches.get("cleaned"), style="green")
+    _emit_list(
+        "Local branches skipped (protected)",
+        local_branches.get("skipped_protected"),
+        style="dim",
+    )
+    _emit_list(
+        "Local branches skipped (current)",
+        local_branches.get("skipped_current"),
+        style="dim",
+    )
+    _emit_list(
+        "Local branches skipped (active/blocked flow)",
+        local_branches.get("skipped_active_flow"),
+        style="dim",
+    )
+    _emit_list(
+        "Local branches skipped (live)",
+        local_branches.get("skipped_live"),
+        style="cyan",
+    )
+    _emit_list(
+        "Local worktrees removed",
+        local_branches.get("skipped_worktree"),
+        style="cyan",
+    )
+    _emit_failures("Local branches failed", local_branches.get("failed"))
+
+
+def _emit_clean_branch_details(details: dict[str, Any]) -> None:
+    """Render --clean-branch cleanup details with rendered Rich markup."""
+    _emit_list("Cleaned", details.get("cleaned"), style="green")
+    _emit_list("Removed invalid records", details.get("removed_invalid"), style="dim")
+    _emit_failures("Failed", details.get("failed"))
+    _emit_agent_worktree_details(details.get("agent_worktrees") or {})
+    _emit_remote_branch_details(details.get("remote_branches") or {})
+    _emit_local_branch_details(details.get("local_branches") or {})
+
+
 def _emit_check_details(
     mode: Literal["init", "fix_all", "clean_branch", "branch"],
     details: dict[str, Any],
     *,
     fix_requested: bool,
 ) -> None:
-    """Render mode-specific check details for CLI visibility."""
+    """Render mode-specific check details for CLI visibility.
+
+    Uses a Rich Console so inline markup (e.g. ``[green]``) renders as colour
+    instead of being printed literally (issue #2033).
+    """
     if mode == "init":
         unresolvable = details.get("unresolvable") or []
         if unresolvable:
-            typer.echo(
+            _emit(
                 f"  [yellow]Unresolvable[/yellow] ({len(unresolvable)} branches — "
                 "no linked issues found in PR body):"
             )
             for branch in unresolvable:
-                typer.echo(f"    {branch}")
+                _emit(f"    {escape(str(branch))}")
         return
 
     if mode == "fix_all":
         fixed_count = details.get("fixed", 0)
-        failed = details.get("failed") or []
         if fixed_count:
-            typer.echo(f"  [green]Fixed[/green]: {fixed_count} flows")
-        for f in failed:
-            typer.echo(f"  [red]Failed[/red]: {f}", err=True)
+            _emit(f"  [green]Fixed[/green]: {fixed_count} flows")
+        _emit_failures("Failed", details.get("failed"))
         return
 
     if mode == "clean_branch":
-        cleaned = details.get("cleaned") or []
-        removed_invalid = details.get("removed_invalid") or []
-        failed = details.get("failed") or []
-        agent_worktrees = details.get("agent_worktrees") or {}
-        remote_branches = details.get("remote_branches") or {}
-        local_branches = details.get("local_branches") or {}
-        if cleaned:
-            typer.echo(f"  [green]Cleaned[/green]: {', '.join(cleaned)}")
-        if removed_invalid:
-            typer.echo(
-                f"  [dim]Removed invalid records[/dim]: "
-                f"{', '.join(removed_invalid)}"
-            )
-        for f in failed:
-            typer.echo(f"  [red]Failed[/red]: {f}", err=True)
-
-        if agent_worktrees:
-            cleaned_wt = agent_worktrees.get("cleaned") or []
-            skipped_live_wt = agent_worktrees.get("skipped_live") or []
-            failed_wt = agent_worktrees.get("failed") or []
-            if cleaned_wt:
-                typer.echo(
-                    f"  [green]Agent worktrees cleaned[/green]: "
-                    f"{', '.join(cleaned_wt)}"
-                )
-            if skipped_live_wt:
-                typer.echo(
-                    f"  [cyan]Agent worktrees skipped (live)[/cyan]: "
-                    f"{', '.join(skipped_live_wt)}"
-                )
-            for f in failed_wt:
-                typer.echo(f"  [red]Agent worktrees failed[/red]: {f}", err=True)
-
-        if remote_branches:
-            cleaned_remote = remote_branches.get("cleaned") or []
-            skipped_protected_remote = remote_branches.get("skipped_protected") or []
-            skipped_pr_remote = remote_branches.get("skipped_pr") or []
-            failed_remote = remote_branches.get("failed") or []
-            if cleaned_remote:
-                typer.echo(
-                    f"  [green]Remote branches cleaned[/green]: "
-                    f"{', '.join(cleaned_remote)}"
-                )
-            if skipped_protected_remote:
-                typer.echo(
-                    "  [dim]Remote branches skipped (protected)[/dim]: "
-                    f"{', '.join(skipped_protected_remote)}"
-                )
-            if skipped_pr_remote:
-                typer.echo(
-                    "  [cyan]Remote branches skipped (open PR)[/cyan]: "
-                    f"{', '.join(skipped_pr_remote)}"
-                )
-            for f in failed_remote:
-                typer.echo(f"  [red]Remote branches failed[/red]: {f}", err=True)
-
-        if local_branches:
-            cleaned_local = local_branches.get("cleaned") or []
-            skipped_protected_local = local_branches.get("skipped_protected") or []
-            skipped_current_local = local_branches.get("skipped_current") or []
-            skipped_live_local = local_branches.get("skipped_live") or []
-            skipped_worktree_local = local_branches.get("skipped_worktree") or []
-            failed_local = local_branches.get("failed") or []
-            if cleaned_local:
-                typer.echo(
-                    f"  [green]Local branches cleaned[/green]: "
-                    f"{', '.join(cleaned_local)}"
-                )
-            if skipped_protected_local:
-                typer.echo(
-                    "  [dim]Local branches skipped (protected)[/dim]: "
-                    f"{', '.join(skipped_protected_local)}"
-                )
-            if skipped_current_local:
-                typer.echo(
-                    "  [dim]Local branches skipped (current)[/dim]: "
-                    f"{', '.join(skipped_current_local)}"
-                )
-            if skipped_live_local:
-                typer.echo(
-                    "  [cyan]Local branches skipped (live)[/cyan]: "
-                    f"{', '.join(skipped_live_local)}"
-                )
-            if skipped_worktree_local:
-                typer.echo(
-                    "  [cyan]Local worktrees removed[/cyan]: "
-                    f"{', '.join(skipped_worktree_local)}"
-                )
-            for f in failed_local:
-                typer.echo(f"  [red]Local branches failed[/red]: {f}", err=True)
+        _emit_clean_branch_details(details)
         return
 
     if mode == "branch":
@@ -160,9 +173,10 @@ def check(
         typer.Option(
             "--clean-branch",
             help=(
-                "Clean residual resources: terminal flows, expired "
-                "agent worktrees (>7d), and expired non-protected "
-                "branches (>7d, remote+local)."
+                "Clean residual resources: terminal flows, expired agent "
+                "worktrees (>7d), expired remote branches (>7d), and local "
+                "branches with no active/blocked flow record (>7d, merge "
+                "status ignored)."
             ),
         ),
     ] = False,
@@ -170,7 +184,10 @@ def check(
         bool,
         typer.Option(
             "--force",
-            help="Force delete unmerged branches (use with --clean-branch).",
+            help=(
+                "With --clean-branch: bypass the 7-day age gate and delete "
+                "every eligible branch (still skips active/blocked flows)."
+            ),
         ),
     ] = False,
     branch: Annotated[
@@ -201,11 +218,12 @@ def check(
     [green]vibe3 check --init[/green]  Scan merged PRs + GitHub items,
                          back-fill task_issue_number for all flows.
 
-    [green]vibe3 check --clean-branch[/green]  Clean residual branches
-                         for done/aborted flows.
+    [green]vibe3 check --clean-branch[/green]  Clean residual branches:
+                         terminal flows + branches with no active/blocked
+                         flow record older than 7 days (merge status ignored).
 
-    [green]vibe3 check --clean-branch --force[/green]  Force delete
-                         unmerged branches.
+    [green]vibe3 check --clean-branch --force[/green]  Also delete eligible
+                         branches younger than 7 days (skips active/blocked).
 
     [green]vibe3 check --branch <name>[/green]  Verify a single branch
                          instead of all active flows.
