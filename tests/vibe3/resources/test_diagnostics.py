@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vibe3.exceptions.diagnostic_errors import DiagnosticContext
-from vibe3.resources.diagnostics import format_diagnostic_message
+from vibe3.utils.diagnostics import format_diagnostic_message
 
 
 def test_format_diagnostic_message_contains_all_fields() -> None:

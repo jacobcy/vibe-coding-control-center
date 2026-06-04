@@ -73,7 +73,7 @@ class MissingResourceError(UserError):
             resource: The missing resource identifier
             context: Diagnostic context with search paths and remediation
         """
-        from vibe3.resources.diagnostics import format_diagnostic_message
+        from vibe3.utils.diagnostics import format_diagnostic_message
 
         self.resource = resource
         self.diagnostic = context
