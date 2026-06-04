@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 from dataclasses import asdict
 from datetime import timezone
 from pathlib import Path
@@ -57,8 +58,6 @@ def _resolve_repo_name(config_repo: str | None) -> str:
     if config_repo:
         return config_repo
     try:
-        import subprocess
-
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             capture_output=True,
@@ -70,7 +69,7 @@ def _resolve_repo_name(config_repo: str | None) -> str:
             return url.split(":")[-1].removesuffix(".git")
         if "github.com" in url:
             return url.split("/")[-2] + "/" + url.split("/")[-1].removesuffix(".git")
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
     return "(unknown)"
 
@@ -207,6 +206,44 @@ def _render_configuration(config: OrchestraConfig) -> None:
         console.print("  Env overrides:      none")
 
     console.print()
+
+
+def _fetch_system_snapshot(
+    config: OrchestraConfig,
+) -> tuple["OrchestraSnapshot", bool]:
+    """Fetch orchestra snapshot with retry and PID fallback.
+
+    Returns (snapshot, snapshot_found) where snapshot_found is False only
+    when the snapshot was generated locally (server not reachable).
+    """
+    import time
+    from dataclasses import replace
+
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+    snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    if snapshot is None:
+        time.sleep(0.5)
+        snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    snapshot_found = snapshot is not None
+
+    if not snapshot:
+        _, pid_alive = _validate_pid_file(config.pid_file)
+        if pid_alive:
+            time.sleep(0.5)
+            snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+            snapshot_found = snapshot is not None
+
+    if not snapshot:
+        orch_service = OrchestraStatusService(
+            config, orchestrator=FlowOrchestratorService(config)
+        )
+        local_snap = orch_service.snapshot()
+        snapshot = replace(local_snap, server_running=False)
+
+    assert snapshot is not None
+    return snapshot, snapshot_found
 
 
 def _render_system_status(
@@ -363,48 +400,16 @@ def status(
     if check:
         run_full_check_shortcut()
 
-    import time
-
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    # Fetch config and snapshot only (no flows or issues)
     config = load_orchestra_config()
-    orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-    if orch_snapshot is None:
-        time.sleep(0.5)
-        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-    snapshot_found = orch_snapshot is not None
+    orch_snapshot, snapshot_found = _fetch_system_snapshot(config)
 
-    if not orch_snapshot:
-        _, pid_alive = _validate_pid_file(config.pid_file)
-        if pid_alive:
-            time.sleep(0.5)
-            orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-            snapshot_found = orch_snapshot is not None
-
-    if not orch_snapshot:
-        from dataclasses import replace
-
-        orch_service = OrchestraStatusService(
-            config, orchestrator=FlowOrchestratorService(config)
-        )
-        local_snap = orch_service.snapshot()
-        orch_snapshot = replace(local_snap, server_running=False)
-
-    # Assert orch_snapshot is non-None after fallback
-    assert orch_snapshot is not None
-
-    # Handle JSON/YAML output (system status only)
     if output_format in ("json", "yaml"):
-        output_data = {
-            "orchestra": asdict(orch_snapshot),
-        }
-
+        output_data = {"orchestra": asdict(orch_snapshot)}
         if output_format == "json":
             typer.echo(json.dumps(output_data, indent=2, default=str))
-        else:  # yaml
+        else:
             import yaml
 
             typer.echo(
@@ -412,10 +417,7 @@ def status(
             )
         return
 
-    # Render system status only
     _render_system_status(config, orch_snapshot, snapshot_found)
-
-    # Print hint
     typer.echo(
         "Use 'vibe3 task status' to view issue progress and ready queue",
         err=True,

@@ -250,7 +250,6 @@ def test_task_status_shows_missing_state_label_section(
 ) -> None:
     """task status should show issues without state/* in a dedicated section."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -330,7 +329,6 @@ def test_task_status_shows_active_exception_for_missing_assignee(
 ) -> None:
     """Active-state issue with missing assignee appears in Active Exceptions."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -391,7 +389,6 @@ def test_task_status_shows_governed_anomaly_section(
 ) -> None:
     """Issue with governed label but no state appears in Governed but Anomaly."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
