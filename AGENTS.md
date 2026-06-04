@@ -42,9 +42,10 @@ Follow this reading order. Each document is the authority for its domain:
 3. **[CLAUDE.md](CLAUDE.md)** — Project context, tech stack, and hard rules
 4. **[docs/standards/agent-document-lifecycle-standard.md](docs/standards/agent-document-lifecycle-standard.md)** — Temporary docs and comment retention rules
 5. **[docs/standards/glossary.md](docs/standards/glossary.md)** — Project terminology
-6. **[docs/standards/action-verbs.md](docs/standards/action-verbs.md)** — Action verb definitions
-7. **[.agent/README.md](.agent/README.md)** — AI workflows and rules
-8. **[docs/README.md](docs/README.md)** — Documentation structure
+6. **[docs/decisions/INDEX.md](docs/decisions/INDEX.md)** — Architecture Decision Records
+7. **[docs/standards/action-verbs.md](docs/standards/action-verbs.md)** — Action verb definitions
+8. **[.agent/README.md](.agent/README.md)** — AI workflows and rules
+9. **[docs/README.md](docs/README.md)** — Documentation structure
 
 ## 🔄 Key Workflows (工作流)
 

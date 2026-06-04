@@ -8,6 +8,11 @@
 - [ ] Change 2
 - [ ] Change 3
 
+## Related ADRs
+
+<!-- Optional: Link to any Architecture Decision Records this PR implements or affects -->
+<!-- Example: ADR-0001, ADR-0002 -->
+
 ## Test Plan
 
 - [ ] Test item 1

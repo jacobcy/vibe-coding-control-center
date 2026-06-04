@@ -18,6 +18,7 @@ docs/
 ├── v3/                              # V3 实施、架构、Orchestra 与 Prompt 参考
 ├── specs/                           # 规范文档 (Issue/Feature 契约)
 ├── prds/                           # 产品需求文档 (全局 PRD)
+├── decisions/                       # 架构决策记录 (ADR)
 ├── plans/                          # 执行计划 (草稿于 .agent/plans/)
 ├── reports/                        # 报告与总结 (草稿于 .agent/reports/)
 ├── design/                          # 设计文档与架构演进
@@ -62,6 +63,9 @@ docs/
 
 **核心 PRD**：
 - **[vibe-workflow-paradigm.md](prds/vibe-workflow-paradigm.md)** - 总 PRD，定义 Vibe Guard 范式
+
+### 决策文档 (`decisions/`)
+存放架构决策记录 (ADR)。每个 ADR 记录一个不可变的"为什么"决策，通过 INDEX.md 提供发现入口。详见 `docs/decisions/INDEX.md`。
 
 ### 外部参考资料 (`references/`)
 存放从外部收集的参考资料，包括但不限于：

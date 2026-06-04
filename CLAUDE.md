@@ -319,6 +319,7 @@ Vibe 3.0 提供统一的基础设施服务，支持所有执行角色（manager/
 - **[STRUCTURE.md](STRUCTURE.md)** — 项目结构定义（权威）
 - **[AGENTS.md](AGENTS.md)** — AI Agent 入口指南
 - **[docs/standards/glossary.md](docs/standards/glossary.md)** — 项目术语真源（权威）
+- **[docs/decisions/INDEX.md](docs/decisions/INDEX.md)** — 架构决策记录 (ADR)
 
 **规则与标准**：
 - **[.claude/rules/README.md](.claude/rules/README.md)** — 规则文件索引

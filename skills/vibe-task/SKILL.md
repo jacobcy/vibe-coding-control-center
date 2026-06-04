@@ -61,6 +61,8 @@ gh issue view <N>
 
 查看 issue 描述和已有 comments，理解 RFC 的具体问题。
 
+**决策前先检查 `docs/decisions/INDEX.md` 中是否有相关 `accepted` ADR**。若有，决策不得违反既有 ADR；如需偏离，必须显式提议 supersede。
+
 #### 2.2 做出决策（三选一）
 
 **方案 1：采纳并推进**
@@ -72,6 +74,17 @@ gh issue view <N>
 gh issue comment <N> --body "[decision] 采纳并推进；[reason] <理由>"
 gh issue edit <N> --remove-label roadmap/rfc --add-label state/ready
 ```
+
+**架构级 rfc 结晶为 ADR**（三条全满足时）：
+① 跨任务/跨模块的架构选型；② 有真实权衡或反直觉；③ 期望跨 PR/issue 长期有效。
+
+满足时：在 `docs/decisions/INDEX.md` 预留号（`status: proposed`），决策 comment 改为：
+```
+gh issue comment <N> --body "[decision] 采纳并结晶为 ADR-NNNN；[reason] <理由>"
+```
+然后给 issue 设 `state/ready`，流入正常执行管线（vibe-new → 分支 → 写 ADR 文件 + 更新 INDEX → PR → 合并 → ADR 转 `accepted`）。
+
+不满足时：维持原有 `[decision]` 评论流程，不产 ADR。
 
 **方案 2：转为依赖等待**
 - 明确依赖的 issue 或外部条件

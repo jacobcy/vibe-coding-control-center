@@ -47,6 +47,13 @@ Issue 创建（无 assignee，无标签）
        写 [roadmap decision] -> 打 roadmap-reviewed -> 写 memory.md
 ```
 
+### ADR 决策耐久化
+
+架构级 rfc 决策不应止步于评论。当决策满足 ADR 结晶条件时（跨任务/跨模块、有真实权衡、期望长期有效），应结晶为 `docs/decisions/` 下的 ADR 文件，确保决策理由在 PR/issue 关闭后仍可追溯。
+
+生成路径：`roadmap/rfc` → 人类决策 → 结晶为 ADR → 更新 standards。
+消费路径：读 standards（现状）→ 溯 ADR（为什么）→ 溯 RFC issue（原始问题）。
+
 ### 两层 governance 的扫描边界
 
 | | roadmap-intake | assignee-pool |
