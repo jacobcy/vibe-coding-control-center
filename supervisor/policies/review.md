@@ -133,7 +133,7 @@ gh issue view <ISSUE_NUMBER> --comments
 
 #### 检查核心逻辑是否有真实测试
 
-- 参考 @vibe/supervisor/policies/test-strategy.md 的分类矩阵
+- 参考 @vibe/supervisor/policies/test-strategy.md 的分类矩阵（使用 `vibe3 handoff show @vibe/supervisor/policies/test-strategy.md` 命令读取）
 - 核心业务逻辑（路径解析、Git 命令解析、业务规则计算等）必须有真实测试
 - 不能仅凭 mock 测试通过就认为验证充分
 

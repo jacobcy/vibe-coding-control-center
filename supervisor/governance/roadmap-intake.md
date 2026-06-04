@@ -48,7 +48,7 @@
 
 **为什么 intake 直接打 `roadmap/rfc`**：Level 0 issue 被 skip 后无 assignee，assignee-pool 只扫 has-assignee 永远看不到它。只有 intake 此刻打 `roadmap/rfc` 才能命中 task-status Rule 1（始终展示）被 /vibe-task surface；否则落入 Rule 4（无 state 无 assignee）被永久隐藏。这是 intake 唯一允许设 `roadmap/*` 的机械例外。
 
-**Level 1-3 审查框架详见 @vibe/supervisor/roadmap-common.md#三级审查框架**。
+**Level 1-3 审查框架详见 @vibe/supervisor/roadmap-common.md#三级审查框架**（使用 `vibe3 handoff show @vibe/supervisor/roadmap-common.md` 命令读取）。
 
 ### 决策逻辑
 

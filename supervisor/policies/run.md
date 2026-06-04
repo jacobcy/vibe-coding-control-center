@@ -229,7 +229,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 ### Test Strategy Compliance
 
-执行验证时，必须遵循 @vibe/supervisor/policies/test-strategy.md 中定义的 mock vs real-test 分类矩阵。
+执行验证时，必须遵循 @vibe/supervisor/policies/test-strategy.md 中定义的 mock vs real-test 分类矩阵（使用 `vibe3 handoff show @vibe/supervisor/policies/test-strategy.md` 命令读取）。
 
 #### Executor 验证清单
 
