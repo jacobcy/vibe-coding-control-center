@@ -116,15 +116,25 @@ def test_flow_blocked_auto_creates_flow_for_issue_branch() -> None:
     # Mock flow update command
     mock_update = MagicMock()
 
+    # Mock ConventionResolver to parse issue number
+    mock_convention = MagicMock()
+    mock_convention.parse_issue_number.return_value = 1212
+
     with (
         patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
         patch("vibe3.commands.flow_manage.update", mock_update),
+        patch(
+            "vibe3.commands.flow_lifecycle.ConventionResolver.from_repo"
+        ) as mock_resolver_cls,
     ):
+        mock_resolver_cls.return_value.resolve.return_value.branch = mock_convention
         result = runner.invoke(
             app, ["flow", "blocked", "--branch", "task/issue-1212", "--task", "467"]
         )
 
-    assert result.exit_code == 0
+    assert (
+        result.exit_code == 0
+    ), f"Exit code: {result.exit_code}, Output: {result.output}"
     # flow update should be called to create flow
     mock_update.assert_called_once_with(
         branch_arg="1212",

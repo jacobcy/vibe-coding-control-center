@@ -99,7 +99,7 @@ def test_flow_show_numeric_issue_resolves_branch(
         {"branch": "task/issue-436", "flow_status": "active"}
     ]
     mock_store.get_events.return_value = []
-    mock_store.get_task_issue_number.return_value = None
+    mock_store.get_task_issue_number.return_value = 436
     mock_service.store = mock_store
 
     def get_flow_status(branch: str):
