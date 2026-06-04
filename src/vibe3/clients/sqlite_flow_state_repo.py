@@ -7,6 +7,41 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.exceptions import InvalidBranchLinkError
+
+
+def validate_issue_branch_for_role(branch: str, role: str) -> None:
+    """Validate branch name before writing to flow_issue_links.
+
+    Args:
+        branch: Branch name to validate
+        role: Role of the branch link (task, dev, plan, run, review)
+
+    Raises:
+        InvalidBranchLinkError: If branch is invalid for the role
+    """
+    # Reject base branches
+    base_branches = {"main", "master", "develop"}
+    if branch in base_branches:
+        raise InvalidBranchLinkError(
+            f"Cannot link base branch '{branch}' to issue. "
+            f"Base branches must not have worktrees or flow records."
+        )
+
+    # Validate role-specific prefixes
+    if role == "task":
+        if not branch.startswith("task/issue-"):
+            raise InvalidBranchLinkError(
+                f"Invalid branch '{branch}' for role='task'. "
+                f"Only task/issue-* branches allowed."
+            )
+    elif role in ("dev", "plan", "run", "review"):
+        valid_prefixes = ("task/issue-", "dev/issue-")
+        if not branch.startswith(valid_prefixes):
+            raise InvalidBranchLinkError(
+                f"Invalid branch '{branch}' for role='{role}'. "
+                f"Only issue branches (task/issue-* or dev/issue-*) allowed."
+            )
 
 
 class SQLiteFlowStateRepo(_HasConnection):
