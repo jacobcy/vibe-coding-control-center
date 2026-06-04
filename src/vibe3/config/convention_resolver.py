@@ -8,13 +8,14 @@ the codebase.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.config.profile_convention import ProfileConvention
 
 if TYPE_CHECKING:
+    from vibe3.clients.git_client import GitClient
     from vibe3.config.profile_config import ProfileConfig
 
 
@@ -46,9 +47,9 @@ class ConventionResolver:
 
     profile: str | None = None
     _profile_cache: str | None = None
-    _git_client: Any = None
+    _git_client: GitClient | None = None
 
-    def _get_git_client(self) -> Any:
+    def _get_git_client(self) -> GitClient:
         """Get GitClient instance with lazy initialization.
 
         Uses dependency injection pattern to break circular dependency
@@ -223,7 +224,7 @@ class ConventionResolver:
 
     @classmethod
     def from_repo(
-        cls, profile: str | None = None, git_client: Any = None
+        cls, profile: str | None = None, git_client: GitClient | None = None
     ) -> "ConventionResolver":
         """Create resolver from current repo context.
 
