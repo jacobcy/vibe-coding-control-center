@@ -19,6 +19,20 @@ flow:
     - "master"
     - "develop"
 
+# 分支/Worktree 清理配置（vibe3 check --clean-branch）
+check_cleanup:
+  # 受保护的 worktree 目录名（不区分是否 detached HEAD）。
+  # 精确匹配或前缀匹配（如 wt-claude 同时保护 wt-claude-v3）。
+  # 这些 worktree 在任何自动/手动清理中都不会被删除。
+  protected_worktree_names:
+    - "main"
+    - "develop"
+    - "wt-develop"
+    - "claude"
+    - "wt-claude"
+    - "codex"
+    - "wt-codex"
+
 # AI 辅助配置
 # 用于 AI 文案辅助能力（如 pr create --ai）
 # API Key 通过环境变量配置: DEEPSEEK_API_KEY
