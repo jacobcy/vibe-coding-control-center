@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 class TestModuleExports:
     """Test that modules properly define and export public interfaces."""
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: many modules lack __all__ - "
-        "tracked as follow-up"
-    )
     def test_all_modules_have_all_defined(self, module_registry: list[str]) -> None:
         """Verify all modules have __all__ defined in __init__.py.
 
@@ -39,11 +35,19 @@ class TestModuleExports:
 
                 has_all = False
                 for node in ast.walk(tree):
+                    # Check for regular assignment: __all__ = [...]
                     if isinstance(node, ast.Assign):
                         for target in node.targets:
                             if isinstance(target, ast.Name) and target.id == "__all__":
                                 has_all = True
                                 break
+                    # Check for annotated assignment: __all__: list[str] = [...]
+                    elif isinstance(node, ast.AnnAssign):
+                        if (
+                            isinstance(node.target, ast.Name)
+                            and node.target.id == "__all__"
+                        ):
+                            has_all = True
 
                 if not has_all:
                     modules_without_all.append(module_name)
