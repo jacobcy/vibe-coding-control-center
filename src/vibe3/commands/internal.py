@@ -9,6 +9,7 @@ from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
     _SHOW_PROMPT_OPT,
+    validate_show_prompt_dependency,
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.issue_context_loader import load_issue_info
@@ -33,6 +34,9 @@ def internal_manager_dispatch(
     ] = None,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     from vibe3.execution.issue_role_sync_runner import (
         run_issue_role_async,
         run_issue_role_sync,
