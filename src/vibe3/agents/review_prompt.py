@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from loguru import logger
 
@@ -244,7 +244,7 @@ def _build_review_prompt_providers(
     def common_rules_path() -> str | None:
         if config.review.common_rules is not None:
             return config.review.common_rules
-        return resolver.get_policy_path("common")
+        return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(common_rules_path())

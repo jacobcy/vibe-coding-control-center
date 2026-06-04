@@ -9,7 +9,7 @@ Public API:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from loguru import logger
 
@@ -126,7 +126,7 @@ def _build_run_prompt_providers(
         if run_config and run_config.common_rules is not None:
             result: str | None = run_config.common_rules
             return result
-        return resolver.get_policy_path("common")
+        return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(common_rules_path())
