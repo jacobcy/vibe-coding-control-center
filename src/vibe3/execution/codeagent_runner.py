@@ -322,6 +322,31 @@ class CodeagentExecutionService:
                     execution_cwd=ctx.execution_cwd,
                 )
 
+            # Publish path safety net: if executor ran in commit_mode and state
+            # is still merge-ready, force transition to handoff.
+            # This runs BEFORE noop gate to catch the case where the agent
+            # prompt didn't execute the exit contract correctly.
+            # IMPORTANT: This must run before noop_gate transitions to blocked.
+            if (
+                command.role == "executor"
+                and command.issue_number is not None
+                and flow_state
+                and flow_state.get("commit_mode")
+                and ctx.before_state_label == "state/merge-ready"
+            ):
+                from vibe3.models import IssueState
+                from vibe3.services.label_service import LabelService
+
+                label_service = LabelService(repo=getattr(self.config, "repo", None))
+                current_state = label_service.get_state(command.issue_number)
+
+                if current_state == IssueState.MERGE_READY:
+                    log.warning(
+                        "Publish path safety net: state still merge-ready "
+                        "after executor, forcing transition to handoff"
+                    )
+                    label_service.set_state(command.issue_number, IssueState.HANDOFF)
+
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
             # Supervisor (L2) is lightweight: no flow, no state machine, skip gate.
@@ -346,57 +371,6 @@ class CodeagentExecutionService:
                     ctx.store.update_flow_state(
                         ctx.branch, transition_count=flow_state["transition_count"]
                     )
-
-                # Publish path safety net: if executor ran in commit_mode and state
-                # is still merge-ready, force transition to handoff.
-                # This catches cases where the agent prompt didn't execute the
-                # exit contract correctly.
-                if (
-                    command.role == "executor"
-                    and flow_state
-                    and flow_state.get("commit_mode")
-                    and ctx.before_state_label == "state/merge-ready"
-                ):
-                    from vibe3.execution.state_verification import (
-                        StateVerificationService,
-                    )
-
-                    verifier = StateVerificationService(store=ctx.store)
-                    after_label, _ = verifier.get_issue_state_label(
-                        issue_number=command.issue_number,
-                        repo=getattr(self.config, "repo", None),
-                        branch=ctx.branch,
-                        flow_state=flow_state,
-                        tick_id=command.tick_id,
-                    )
-                    if after_label == "state/merge-ready":
-                        log.warning(
-                            "Publish path safety net: state still merge-ready "
-                            "after executor, forcing transition to handoff"
-                        )
-                        import subprocess
-
-                        repo_arg = []
-                        repo_value = getattr(self.config, "repo", None)
-                        if repo_value:
-                            repo_arg = ["--repo", str(repo_value)]
-                        subprocess.run(
-                            [
-                                "gh",
-                                "issue",
-                                "edit",
-                                str(command.issue_number),
-                                "--add-label",
-                                "state/handoff",
-                                "--remove-label",
-                                "state/merge-ready",
-                            ]
-                            + repo_arg,
-                            capture_output=True,
-                            text=True,
-                            timeout=30,
-                            check=False,
-                        )
 
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
