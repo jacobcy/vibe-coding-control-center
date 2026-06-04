@@ -79,6 +79,10 @@ def internal_governance_dispatch(
     tick: Annotated[
         int, typer.Argument(help="Tick count for governance material rotation")
     ],
+    execution_count: Annotated[
+        int,
+        typer.Argument(help="Independent execution count for material rotation"),
+    ] = 0,
     material: Annotated[
         str | None,
         typer.Option(
@@ -98,7 +102,9 @@ def internal_governance_dispatch(
     """
     from vibe3.services.scan_service import dispatch_governance_execution
 
-    dispatch_governance_execution(tick_count=tick, material_override=material)
+    dispatch_governance_execution(
+        tick_count=tick, execution_count=execution_count, material_override=material
+    )
 
 
 @app.command("bootstrap")

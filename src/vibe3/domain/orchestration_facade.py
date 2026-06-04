@@ -78,6 +78,9 @@ class OrchestrationFacade(ServiceBase):
                 creating a new one on each tick.
         """
         self._tick_count = tick_count
+        self._governance_execution_count = (
+            0  # Independent counter for material rotation
+        )
         self._config = config or load_orchestra_config()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
@@ -258,10 +261,16 @@ class OrchestrationFacade(ServiceBase):
         # Update timestamp when actually emitting event
         self._last_governance_started_at = time.monotonic()
 
-        event = GovernanceScanStarted(tick_count=tick_count)
+        # Increment governance execution count for material rotation
+        self._governance_execution_count += 1
+
+        event = GovernanceScanStarted(
+            tick_count=tick_count, execution_count=self._governance_execution_count
+        )
         logger.bind(
             domain="orchestration_facade",
             tick_count=tick_count,
+            execution_count=self._governance_execution_count,
         ).info("Emitting GovernanceScanStarted event")
         publish(event)
 

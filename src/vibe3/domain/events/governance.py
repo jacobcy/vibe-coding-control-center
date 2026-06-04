@@ -16,6 +16,7 @@ class GovernanceScanStarted(DomainEvent):
     """
 
     tick_count: int
+    execution_count: int = 0  # Independent counter for material rotation
     actor: str = "system:governance"
     timestamp: str | None = None
 

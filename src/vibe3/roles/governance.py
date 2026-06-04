@@ -77,11 +77,11 @@ _GOVERNANCE_RUNTIME_VARS = (
 
 def _resolve_governance_material(
     config: OrchestraConfig,
-    tick_count: int,
+    execution_count: int,
 ) -> str:
     _ = config
     catalog = load_governance_material_catalog()
-    return catalog[tick_count % len(catalog)].name
+    return catalog[execution_count % len(catalog)].name
 
 
 def _load_governance_recipe_definition() -> PromptRecipeDefinition:
@@ -108,6 +108,7 @@ def build_governance_snapshot_context(
     *,
     config: OrchestraConfig | None = None,
     tick_count: int = 0,
+    execution_count: int = 0,
     material_override: str | None = None,
     github: GitHubClient | None = None,
 ) -> dict[str, Any]:
@@ -122,7 +123,7 @@ def build_governance_snapshot_context(
             )
         current_material = selected.name
     else:
-        current_material = _resolve_governance_material(config, tick_count)
+        current_material = _resolve_governance_material(config, execution_count)
     material_name = Path(current_material).name
 
     if material_name == "roadmap-intake.md":
@@ -217,7 +218,10 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
 
 
 def build_governance_recipe(
-    config: OrchestraConfig, tick_count: int = 0, material_override: str | None = None
+    config: OrchestraConfig,
+    tick_count: int = 0,
+    execution_count: int = 0,
+    material_override: str | None = None,
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
     recipe_def = _load_governance_recipe_definition()
@@ -244,8 +248,8 @@ def build_governance_recipe(
             )
         current_material = current.name
     else:
-        # Normal tick-based rotation
-        current = catalog[tick_count % len(catalog)]
+        # Use execution_count for material rotation (independent of tick_count)
+        current = catalog[execution_count % len(catalog)]
         current_material = current.name
 
     supervisor_content_source = current.source
@@ -283,12 +287,16 @@ def render_governance_prompt(
     snapshot_context: dict[str, Any],
     prompts_path: Path | None = None,
     tick_count: int = 0,
+    execution_count: int = 0,
     material_override: str | None = None,
 ) -> PromptRenderResult:
     """Render governance plan from snapshot context via PromptAssembler."""
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
     recipe = build_governance_recipe(
-        config, tick_count=tick_count, material_override=material_override
+        config,
+        tick_count=tick_count,
+        execution_count=execution_count,
+        material_override=material_override,
     )
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
@@ -314,6 +322,7 @@ def build_governance_request(
     snapshot: Any,
     repo_path: Path | None = None,
     prompts_path: Path | None = None,
+    execution_count: int = 0,
 ) -> ExecutionRequest | None:
     """Build governance execution request.
 
@@ -331,12 +340,17 @@ def build_governance_request(
         snapshot,
         config=config,
         tick_count=tick_count,
+        execution_count=execution_count,
     )
     render_result = render_governance_prompt(
-        config, snapshot_context, prompts_path, tick_count=tick_count
+        config,
+        snapshot_context,
+        prompts_path,
+        tick_count=tick_count,
+        execution_count=execution_count,
     )
     plan_content = render_result.rendered_text
-    current_material = _resolve_governance_material(config, tick_count)
+    current_material = _resolve_governance_material(config, execution_count)
 
     if config.governance.dry_run:
         root = repo_path or resolve_orchestra_repo_root()
