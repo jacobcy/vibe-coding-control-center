@@ -133,12 +133,14 @@ def test_internal_governance_dispatch_forwards_tick_and_material():
     ) as mock_dispatch:
         result = runner.invoke(
             cli_app,
-            ["internal", "governance", "8", "--material", "roadmap-intake"],
+            ["internal", "governance", "8", "0", "--material", "roadmap-intake"],
         )
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once_with(
-            tick_count=8, material_override="roadmap-intake"
+            tick_count=8,
+            execution_count=0,
+            material_override="roadmap-intake",
         )
 
 

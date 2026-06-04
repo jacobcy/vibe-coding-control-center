@@ -40,7 +40,9 @@ def extract_material_description(material_path: str) -> str:
 
 
 def dispatch_governance_execution(
-    tick_count: int = 0, material_override: str | None = None
+    tick_count: int = 0,
+    execution_count: int = 0,
+    material_override: str | None = None,
 ) -> None:
     """Execute governance scan (execution-only entry point).
 
@@ -48,6 +50,8 @@ def dispatch_governance_execution(
 
     Args:
         tick_count: Tick number for governance material rotation
+        execution_count: Independent counter for material rotation
+            (resolves tick conflict)
         material_override: Optional governance role to override material rotation
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
@@ -56,6 +60,7 @@ def dispatch_governance_execution(
 
     run_governance_sync(
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
         dry_run=False,  # Execution-only, no dry-run
         show_prompt=False,

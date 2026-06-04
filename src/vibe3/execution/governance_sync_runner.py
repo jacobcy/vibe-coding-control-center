@@ -24,6 +24,7 @@ from vibe3.services import record_dispatch_failure_if_unexpected
 def run_governance_sync(
     *,
     tick_count: int,
+    execution_count: int = 0,
     material_override: str | None = None,
     dry_run: bool = False,
     show_prompt: bool = False,
@@ -39,6 +40,8 @@ def run_governance_sync(
 
     Args:
         tick_count: Tick number for governance material rotation
+        execution_count: Independent counter for material rotation
+            (resolves tick conflict)
         material_override: Optional governance role to override material rotation
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
@@ -74,12 +77,14 @@ def run_governance_sync(
         snapshot,
         config=config,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     render_result = governance_fns.render_prompt(
         config,
         snapshot_context,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     prompt_content = render_result.rendered_text
