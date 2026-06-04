@@ -370,13 +370,7 @@ tmux ls 2>&1
 
 **Governance 治理链**：
 
-```bash
-# 手动触发 governance suggest（创建治理 issue）
-uv run python src/vibe3/cli.py run --supervisor @vibe/supervisor/issue-cleanup.md
-
-# 手动 apply 特定治理 issue
-uv run python src/vibe3/cli.py run --issue {governance_issue_number}
-```
+手动触发 governance suggest：在 issue 中发布带有 `[governance suggest]` 标记的评论来创建治理 issue。
 
 **Manager / 开发执行链**：
 
