@@ -221,7 +221,10 @@ class TestGovernanceAsyncRunnerWithInjection:
                 lambda store, backend: mock_registry,
             )
 
-            run_governance_async(tick_count=0)
+            run_governance_async(
+                tick_count=0,
+                build_execution_name=lambda tick: f"governance-tick-{tick}",
+            )
 
         # The lazy import path will still call append_governance_event
         # from orchestra.logging. We can't easily mock it without importing,
@@ -277,7 +280,10 @@ class TestGovernanceAsyncRunnerWithInjection:
                 lambda: MagicMock(),
             )
 
-            run_governance_async(tick_count=5)
+            run_governance_async(
+                tick_count=5,
+                build_execution_name=lambda tick: f"governance-tick-{tick}",
+            )
 
         # The lazy import path will still call append_governance_event
         # from orchestra.logging. We can't easily mock it without importing,

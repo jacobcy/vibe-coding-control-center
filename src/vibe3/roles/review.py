@@ -27,7 +27,6 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
-    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -38,7 +37,11 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.models.worktree import WorktreeRequirement
-from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
+from vibe3.roles.definitions import (
+    IssueRoleSyncSpec,
+    RoleOutputContract,
+    TriggerableRoleDefinition,
+)
 from vibe3.roles.review_helpers import (
     ReviewRunResult,
     finalize_review_output,
@@ -266,7 +269,7 @@ def build_review_sync_request(
     )
 
 
-REVIEW_SYNC_SPEC = build_issue_sync_spec(
+REVIEW_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
     resolve_branch=REVIEW_BRANCH_RESOLVER,
