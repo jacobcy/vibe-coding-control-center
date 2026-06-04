@@ -78,5 +78,4 @@ def create_global_dispatch_coordinator(
         flow_context_resolver=flow_context_resolver,
         queue_selector=select_ready_issues_from_collected_issues,
         check_service=check_service,
-        flow_blocker=flow_blocker,
     )

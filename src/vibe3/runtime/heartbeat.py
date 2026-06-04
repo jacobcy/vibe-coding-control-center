@@ -5,8 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
@@ -19,6 +18,9 @@ from vibe3.orchestra.logging import (
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
 
+if TYPE_CHECKING:
+    from vibe3.domain.failed_gate import GateResult
+
 
 class FailedGateProtocol(Protocol):
     """Protocol for FailedGate to avoid circular dependency.
@@ -27,15 +29,11 @@ class FailedGateProtocol(Protocol):
     allowing runtime layer to avoid importing from domain layer.
     """
 
-    def check(self) -> GateResult:  # type: ignore[override]
+    def check(self) -> GateResult:
         """Check if orchestra dispatch should be frozen.
 
         Returns:
             GateResult with blocked status and reason
-
-        Note:
-            Return type uses local GateResult to avoid domain import.
-            MyPy override allows duck-typing with domain.GateResult.
         """
         ...
 
@@ -45,18 +43,6 @@ class FailedGateProtocol(Protocol):
         Called each tick when gate is ACTIVE.
         """
         ...
-
-
-@dataclass(frozen=True)
-class GateResult:
-    """Result of a failed gate check.
-
-    This is a minimal copy to avoid importing from domain layer.
-    """
-
-    blocked: bool
-    reason: str | None = None
-    blocked_ticks: int = 0
 
 
 class HeartbeatServer:
