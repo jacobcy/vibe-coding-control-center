@@ -35,6 +35,7 @@ from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
     build_broader_repo_entries,
+    build_code_auditor_context,
     build_issue_context,
     find_material_in_catalog,
     get_governed_issue_numbers,
@@ -165,6 +166,9 @@ def build_governance_snapshot_context(
                 "目标是挑选最多 5 个需要语义对齐的过时文档对象。"
             ),
         )
+
+    if material_name == "code-auditor.md":
+        return build_code_auditor_context(snapshot, tick_count=tick_count)
 
     # Default: assignee-pool path
     github = github or GitHubClient()

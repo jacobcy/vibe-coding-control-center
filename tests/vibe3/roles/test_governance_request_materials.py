@@ -152,14 +152,14 @@ class TestRoundRobinMaterialSelection:
         assert val == "supervisor/governance/cron-supervisor.md"
 
     def test_tick_wraps_around(self):
-        """tick_count wraps around material catalog (3 materials, tick 3 -> index 0)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=3)
+        """tick_count wraps around material catalog (4 materials, tick 4 -> index 0)."""
+        recipe = build_governance_recipe(_make_config(), tick_count=4)
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """tick_count=7 wraps around 3 materials to index 1 (7 % 3 = 1)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=7)
+        """tick_count=9 wraps around 4 materials to index 1 (9 % 4 = 1)."""
+        recipe = build_governance_recipe(_make_config(), tick_count=9)
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
 
