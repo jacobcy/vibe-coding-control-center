@@ -5,7 +5,7 @@
 ## 目录职责
 
 - `.claude/rules/`：仓库长期规则、项目特定约束、实现标准
-- `.agent/policies/`：按 `plan/run/review` mode 注入的策略材料与共享工具约束
+- `supervisor/policies/`：按 `plan/run/review` mode 注入的策略材料与共享工具约束
 
 ## 规则文件说明
 

@@ -714,6 +714,21 @@ related_docs:
 - 使用规则：
   - 讨论项目一致规范、稳定定义和边界时使用 `标准文件`
 
+#### `决策文件`
+
+- 正式术语：`决策文件` / `ADR`
+- 别称：`Architecture Decision Record`
+- 定义：位于 `docs/decisions/` 的架构决策记录，承载"为什么"和"决策了什么"；accepted 后决策正文不可重写。
+- 边界：
+  - `决策文件` 不写实现细节和操作流程
+  - `决策文件` 的 `## How` 段只放链接，禁止复制实现细节
+  - `决策文件` 的决策正文不可修改，只能通过 supersede 机制被新 ADR 取代
+  - supersede 时允许更新 lifecycle metadata（如 `status` / `superseded_by`）和 INDEX
+- 落点：
+  - `docs/decisions/`（目录）、`docs/decisions/INDEX.md`（发现入口）
+- 使用规则：
+  - 讨论架构选型理由、决策权衡时使用 `决策文件`
+
 #### `参考文件`
 
 - 正式术语：`参考文件`
@@ -837,4 +852,3 @@ related_docs:
 - `执行代理` != `Shell 能力层`
 
 若后续 doc review 发现新的高频混用，应优先在本文档补充修正。
-

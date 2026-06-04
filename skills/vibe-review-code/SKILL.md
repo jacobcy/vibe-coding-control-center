@@ -17,8 +17,8 @@ This skill reviews code; it does not publish PRs, merge branches, repair CI, or 
 
 Read these before judging severity:
 
-1. `.agent/policies/review.md`
-2. `.agent/policies/common.md`
+1. `supervisor/policies/review.md`
+2. `supervisor/policies/common.md`
 3. `docs/standards/quality-control-standard.md`
 
 Use `CLAUDE.md` / `AGENTS.md` as project-level hard rules when present, but keep the review skill's required standard list to the three files above.

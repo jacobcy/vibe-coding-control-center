@@ -156,6 +156,8 @@ gh issue edit <number> --add-label "roadmap/rfc"
 # 不打 roadmap-reviewed，不分配 assignee
 ```
 
+**架构级 rfc 判据**（见 `docs/decisions/_template.md` 和 ADR 结晶条件）：如果 rfc 满足"跨任务/跨模块架构选型 + 有真实权衡 + 期望长期有效"，不要只要求后续实现 PR 顺手写 ADR；应推动一个小型 ADR PR（只含 ADR 文件、INDEX 更新和必要的最小链接更新），并在决策 comment 中写明 `ADR PR: <url>`。非架构级 rfc 维持现有流程不变。
+
 **场景 C: 建议关闭**（Level 2/3 不通过：依赖已移除/API 废弃/重复）
 ```bash
 gh issue comment <number> --body "[roadmap decision] close: <关闭原因>."
@@ -172,6 +174,8 @@ gh issue edit <issue-number> --add-label "priority/5"
 ```
 
 ### Step 4: 输出状态
+
+**审查时先参考 `docs/decisions/INDEX.md` 中已有 `accepted` ADR，再读取相关 ADR 正文**。决策不得违反当前有效 ADR；如需偏离，必须显式提议 supersede。
 
 ```text
 版本规划状态

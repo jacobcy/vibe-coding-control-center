@@ -48,6 +48,11 @@ docs/
 │   └── ...                          # 其他现行标准
 ├── specs/                           # 规范文档 (Issue/Feature 契约)
 ├── prds/                            # 产品需求文档（全局 PRD）
+├── design/                          # 设计文档
+├── decisions/                       # 架构决策记录 (ADR)
+│   ├── INDEX.md                     # 决策总表（发现入口 + supersede 追踪）
+│   ├── _template.md                 # ADR 模板
+│   └── NNNN-kebab-title.md          # 具体决策文件
 ├── plans/                           # 执行计划
 ├── reports/                         # 报告与总结
 ├── references/                      # 外部参考资料
@@ -116,6 +121,17 @@ audit-{YYYY-MM-DD}.md
 示例：
 - audit-2026-06-03.md
 ```
+
+**ADR 文档**（顺序编号命名）：
+```
+NNNN-kebab-title.md
+
+示例：
+- 0001-adopt-adr-loop.md
+- 0002-protocol-based-di.md
+```
+
+ADR 编号格式：`NNNN-kebab-title.md`（4 位顺序号，如 `0001-adopt-adr-loop.md`）。顺序号支持 supersede 链。
 
 ## 文档交付层级
 
