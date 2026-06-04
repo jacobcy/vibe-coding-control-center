@@ -115,6 +115,8 @@ class IssueTitleCacheService:
     ) -> tuple[dict[str, str], bool]:
         """Get titles for multiple branches with cache-first strategy.
 
+        Optimized to use batch GitHub API call for cache misses.
+
         Args:
             branches: List of git branch names.
 
@@ -138,12 +140,52 @@ class IssueTitleCacheService:
                 cache_misses=cache_misses,
             ).debug(f"Fetching {len(cache_misses)} branches from GitHub")
 
+            # Extract issue numbers for batch fetch
+            branch_to_issue: dict[str, int] = {}
+            issue_numbers: list[int] = []
+
             for branch in cache_misses:
-                fetched_title, err = self._fetch_and_cache_title(branch)
-                if fetched_title:
-                    titles[branch] = fetched_title
-                if err:
-                    network_error = True
+                cache = self.store.get_flow_context_cache(branch)
+                issue_number = cache.get("task_issue_number") if cache else None
+
+                if not issue_number:
+                    # Try flow_issue_links as fallback
+                    links = self.store.get_issue_links(branch)
+                    task_link = next(
+                        (link for link in links if link.get("issue_role") == "task"),
+                        None,
+                    )
+                    if task_link:
+                        issue_number = task_link.get("issue_number")
+
+                if issue_number:
+                    branch_to_issue[branch] = issue_number
+                    issue_numbers.append(issue_number)
+
+            # Try batch fetch first
+            if issue_numbers:
+                batch_titles = self.github_client.batch_get_issues(issue_numbers)
+
+                if batch_titles is not None:
+                    # Batch fetch succeeded
+                    for branch, issue_number in branch_to_issue.items():
+                        title = batch_titles.get(issue_number)
+                        if title:
+                            titles[branch] = title
+                            self.update_title(branch, title)
+                else:
+                    # Batch fetch failed, fallback to serial fetch
+                    logger.bind(
+                        domain="issue_title_cache",
+                        action="get_titles_with_fallback",
+                    ).warning("Batch fetch failed, falling back to serial fetch")
+
+                    for branch in cache_misses:
+                        fetched_title, err = self._fetch_and_cache_title(branch)
+                        if fetched_title:
+                            titles[branch] = fetched_title
+                        if err:
+                            network_error = True
 
         return titles, network_error
 

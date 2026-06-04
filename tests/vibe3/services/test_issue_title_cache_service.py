@@ -165,10 +165,9 @@ class TestIssueTitleCacheService:
 
         mock_store.get_flow_context_cache.side_effect = get_cache_side_effect
 
-        # GitHub returns title for issue 456
-        mock_github.view_issue.return_value = {
-            "number": 456,
-            "title": "Fetched Title",
+        # Batch fetch returns title for issue 456
+        mock_github.batch_get_issues.return_value = {
+            456: "Fetched Title",
         }
 
         service = IssueTitleCacheService(mock_store, mock_github)
@@ -179,8 +178,9 @@ class TestIssueTitleCacheService:
         assert titles["task/issue-123"] == "Cached Title"
         assert titles["task/issue-456"] == "Fetched Title"
         assert error is False
-        # Should only call GitHub for cache miss
-        mock_github.view_issue.assert_called_once_with(456)
+        # Should call batch API for cache miss, not individual view_issue
+        mock_github.batch_get_issues.assert_called_once_with([456])
+        mock_github.view_issue.assert_not_called()
 
     def test_fetch_and_cache_no_issue_number(self, mock_store, mock_github):
         """Test _fetch_and_cache_title returns None when no issue number."""
@@ -232,3 +232,65 @@ class TestIssueTitleCacheService:
             pr_number=456,
             pr_title="PR Title",
         )
+
+    def test_get_titles_with_fallback_uses_batch_query(self, mock_store, mock_github):
+        """Test that get_titles_with_fallback uses batch query for cache misses."""
+
+        # Setup: All cache misses
+        def get_cache_side_effect(branch):
+            return {
+                "branch": branch,
+                "task_issue_number": 123 if branch == "task/issue-123" else 456,
+                "issue_title": None,
+            }
+
+        mock_store.get_flow_context_cache.side_effect = get_cache_side_effect
+
+        # Batch fetch returns both titles
+        mock_github.batch_get_issues.return_value = {
+            123: "Issue 123",
+            456: "Issue 456",
+        }
+
+        service = IssueTitleCacheService(mock_store, mock_github)
+        titles, error = service.get_titles_with_fallback(
+            ["task/issue-123", "task/issue-456"]
+        )
+
+        assert titles["task/issue-123"] == "Issue 123"
+        assert titles["task/issue-456"] == "Issue 456"
+        assert error is False
+
+        # Should call batch API once, not individual view_issue calls
+        mock_github.batch_get_issues.assert_called_once_with([123, 456])
+        mock_github.view_issue.assert_not_called()
+
+    def test_get_titles_with_fallback_batch_failure_falls_back(
+        self, mock_store, mock_github
+    ):
+        """Test fallback to serial fetch on batch query failure."""
+        # Setup: Cache miss
+        mock_store.get_flow_context_cache.return_value = {
+            "branch": "task/issue-123",
+            "task_issue_number": 123,
+            "issue_title": None,
+        }
+
+        # Batch fetch fails
+        mock_github.batch_get_issues.return_value = None
+
+        # Fallback to serial fetch succeeds
+        mock_github.view_issue.return_value = {
+            "number": 123,
+            "title": "Fallback Title",
+        }
+
+        service = IssueTitleCacheService(mock_store, mock_github)
+        titles, error = service.get_titles_with_fallback(["task/issue-123"])
+
+        assert titles["task/issue-123"] == "Fallback Title"
+        assert error is False
+
+        # Should attempt batch first, then fallback
+        mock_github.batch_get_issues.assert_called_once_with([123])
+        mock_github.view_issue.assert_called_once_with(123)
