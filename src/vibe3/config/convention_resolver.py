@@ -55,6 +55,8 @@ class ConventionResolver:
         Uses dependency injection pattern to break circular dependency
         between config and clients layers.
 
+        Note: Not thread-safe. CLI is single-threaded so this is acceptable.
+
         Returns:
             GitClient instance (injected or lazy-loaded)
         """
@@ -148,7 +150,11 @@ class ConventionResolver:
         except yaml.YAMLError as e:
             logger.debug(f"Invalid YAML in .vibe/config.yaml: {e}")
         except Exception as e:
-            # Catch GitError and other exceptions without direct import
+            # Local import to avoid circular dep (config → exceptions)
+            from vibe3.exceptions import GitError
+
+            if not isinstance(e, GitError):
+                raise
             logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo

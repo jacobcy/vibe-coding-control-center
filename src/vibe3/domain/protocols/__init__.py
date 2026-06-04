@@ -22,7 +22,6 @@ from vibe3.domain.protocols.dispatch_protocols import (
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.protocols.infra_protocols import (
     ConfigLoaderProtocol,
-    ExceptionFactoryProtocol,
     GitClientProtocol,
 )
 
@@ -31,7 +30,6 @@ __all__ = [
     "CheckServiceProtocol",
     "ConfigLoaderProtocol",
     "DispatchHealthCheckProtocol",
-    "ExceptionFactoryProtocol",
     "FlowContextResolverProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",

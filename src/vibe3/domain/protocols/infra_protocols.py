@@ -27,16 +27,3 @@ class GitClientProtocol(Protocol):
     def get_current_branch(self) -> str:
         """Get current git branch name."""
         ...
-
-
-@runtime_checkable
-class ExceptionFactoryProtocol(Protocol):
-    """Protocol for exception creation to break utils → exceptions dependency."""
-
-    def create_git_error(self, message: str) -> Exception:
-        """Create a GitError exception."""
-        ...
-
-    def create_config_error(self, message: str) -> Exception:
-        """Create a ConfigError exception."""
-        ...
