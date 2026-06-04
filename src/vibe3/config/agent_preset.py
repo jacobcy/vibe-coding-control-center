@@ -13,7 +13,6 @@ from typing import Any, Final
 
 from loguru import logger
 
-from vibe3.exceptions import AgentPresetNotFoundError
 from vibe3.models import AgentOptions
 
 REPO_MODELS_JSON_PATH: Final[Path] = (
@@ -224,6 +223,9 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
                 model=str(default_model) if isinstance(default_model, str) else None,
                 timeout_seconds=options.timeout_seconds,
             )
+        # Delayed import to break circular dependency
+        from vibe3.exceptions import AgentPresetNotFoundError
+
         raise AgentPresetNotFoundError(options.agent)
     backend, mapped_model = resolved
     return AgentOptions(
