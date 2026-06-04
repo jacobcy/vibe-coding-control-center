@@ -17,6 +17,26 @@ from loguru import logger
 from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.clients.protocols import GitHubClientProtocol
 
+
+def _is_protected_worktree(
+    worktree_path: "str | Path", protected_names: "set[str]"
+) -> bool:
+    """Return True when the worktree's directory name is reserved.
+
+    A worktree is considered protected when its basename exactly matches a
+    protected name, or starts with a protected name followed by '-' or '_'.
+    This catches both exact names (``wt-claude``) and variant suffixes
+    (``wt-claude-v3``, ``codex_test``).
+    """
+    basename = Path(str(worktree_path)).name
+    return any(
+        basename == name
+        or basename.startswith(f"{name}-")
+        or basename.startswith(f"{name}_")
+        for name in protected_names
+    )
+
+
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
@@ -294,23 +314,31 @@ class ExpiredResourceCleanupService:
     def clean_expired_local_branches(
         self, max_age_days: int = 7, *, force: bool = False, quiet: bool = False
     ) -> dict[str, object]:
-        """Clean expired local non-protected branches older than max_age_days.
+        """Clean local branches that have no active/blocked flow record.
 
-        Safety checks:
-        - Exclude protected branches (main, master, develop)
-        - Exclude current branch
-        - Check for live session
-        - Check for worktree occupation
-        - Check branch age
+        The safety gate is the flow record, NOT git merge status: a branch is
+        considered abandoned (and therefore deletable) when no flow record
+        tracks it in status ``active`` or ``blocked``. Abandoned branches are
+        force-deleted (``git branch -D``) regardless of whether they were
+        merged, so cleanup can reclaim long-lived unmerged branches.
+
+        A branch is deleted when ALL of the following hold:
+        - not a protected branch (main, master, develop)
+        - not the current branch
+        - has no live runtime session
+        - has no flow record in status ``active`` or ``blocked``
+        - older than ``max_age_days`` (unless ``force`` bypasses the age check)
 
         Args:
             max_age_days: Max age in days before cleanup (default: 7)
-            force: If True, use force delete (git branch -D) for unmerged branches
+            force: If True, bypass the age check and delete every eligible
+                branch (still requires no active/blocked flow record)
             quiet: If True, suppress terminal output (for daemon/heartbeat use)
 
         Returns:
             Dict with 'cleaned', 'skipped_protected', 'skipped_current',
-            'skipped_live', 'skipped_worktree', 'failed' lists
+            'skipped_live', 'skipped_active_flow', 'skipped_worktree',
+            'failed' lists
         """
 
         logger.bind(domain="check", action="clean_local_branches").info(
@@ -321,11 +349,12 @@ class ExpiredResourceCleanupService:
                 f"  Checking local branches older than {max_age_days} days..."
             )
 
-        # Load protected branches from config
+        # Load protected branches and worktree names from config
         from vibe3.config.settings import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)
+        protected_wt_names = set(config.check_cleanup.protected_worktree_names)
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
@@ -333,8 +362,21 @@ class ExpiredResourceCleanupService:
         skipped_protected: list[str] = []
         skipped_current: list[str] = []
         skipped_live: list[str] = []
+        skipped_active_flow: list[str] = []
         skipped_worktree: list[str] = []
         failed: list[str] = []
+
+        def _empty_result(failure: str) -> dict[str, object]:
+            """Build a no-op result dict for an early safety abort."""
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_current": [],
+                "skipped_live": [],
+                "skipped_active_flow": [],
+                "skipped_worktree": [],
+                "failed": [failure],
+            }
 
         # Get current branch
         try:
@@ -345,14 +387,7 @@ class ExpiredResourceCleanupService:
                 logger.bind(domain="check").info(
                     f"     Failed to get current branch: {exc}",
                 )
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": [str(exc)],
-            }
+            return _empty_result(str(exc))
 
         # Get branches with live sessions
         try:
@@ -365,14 +400,22 @@ class ExpiredResourceCleanupService:
                 logger.bind(domain="check").info(
                     "     Live session query failed, skipping",
                 )
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": ["live session query failed"],
-            }
+            return _empty_result("live session query failed")
+
+        # Get branches tracked by a live flow record (status active/blocked).
+        # This is the primary safety gate: such branches are still in use and
+        # must never be deleted, regardless of age or merge status.
+        try:
+            active_flow_branches = self._get_active_flow_branches()
+        except SystemError:
+            logger.bind(domain="check").error(
+                "Failed to load flow records, skipping local branch cleanup"
+            )
+            if not quiet:
+                logger.bind(domain="check").info(
+                    "     Flow record query failed, skipping",
+                )
+            return _empty_result("flow record query failed")
 
         # Get all local branches with timestamps
         try:
@@ -385,14 +428,7 @@ class ExpiredResourceCleanupService:
                 logger.bind(domain="check").info(
                     f"     Failed to get local branches: {exc}",
                 )
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": [str(exc)],
-            }
+            return _empty_result(str(exc))
 
         # Process each branch
         for branch_info in local_branches:
@@ -426,8 +462,21 @@ class ExpiredResourceCleanupService:
                         )
                     continue
 
-                # Check age
-                if timestamp >= cutoff:
+                # Skip if tracked by a live flow record (active/blocked).
+                # This replaces git merge status as the safety gate.
+                if branch in active_flow_branches:
+                    skipped_active_flow.append(branch)
+                    logger.bind(domain="check", branch=branch).info(
+                        "Skipped local branch with active/blocked flow record"
+                    )
+                    if not quiet:
+                        logger.bind(domain="check").info(
+                            f"     {branch} (active/blocked flow)"
+                        )
+                    continue
+
+                # Check age (force bypasses the age gate)
+                if not force and timestamp >= cutoff:
                     continue
 
                 # Check if branch exists
@@ -436,14 +485,32 @@ class ExpiredResourceCleanupService:
 
                 # Check if has worktree
                 if self.git_client.is_branch_occupied_by_worktree(branch):
-                    # Delete worktree first
                     worktree_path = self.git_client.find_worktree_path_for_branch(
                         branch
                     )
+                    if worktree_path and _is_protected_worktree(
+                        worktree_path, protected_wt_names
+                    ):
+                        # Worktree basename is a reserved workspace — skip both
+                        # the worktree and the branch (e.g. wt-claude, wt-codex).
+                        skipped_protected.append(branch)
+                        wt_name = Path(str(worktree_path)).name
+                        logger.bind(domain="check", branch=branch).info(
+                            f"Skipped protected worktree: {wt_name}"
+                        )
+                        if not quiet:
+                            logger.bind(domain="check").info(
+                                f"     {branch} "
+                                f"(protected worktree: "
+                                f"{Path(str(worktree_path)).name})"
+                            )
+                        continue
+
+                    # Delete worktree first
                     if worktree_path:
                         if not quiet:
                             logger.bind(domain="check").info(
-                                f"     worktree for " f"{branch} at {worktree_path}..."
+                                f"     worktree for {branch} at {worktree_path}..."
                             )
                         remove_worktree(worktree_path, force=True)
                         skipped_worktree.append(branch)
@@ -455,10 +522,13 @@ class ExpiredResourceCleanupService:
                                 f"      worktree for {branch}"
                             )
 
-                # Delete local branch
+                # Delete local branch. Force-delete (git branch -D): the branch
+                # is abandoned (no active/blocked flow record), so merge status
+                # is irrelevant — this is what lets cleanup reclaim unmerged
+                # stale branches.
                 if not quiet:
                     logger.bind(domain="check").info(f"     {branch}...")
-                self.git_client.delete_branch(branch, force=force)
+                self.git_client.delete_branch(branch, force=True)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired local branch"
@@ -479,8 +549,41 @@ class ExpiredResourceCleanupService:
             "skipped_protected": skipped_protected,
             "skipped_current": skipped_current,
             "skipped_live": skipped_live,
+            "skipped_active_flow": skipped_active_flow,
             "skipped_worktree": skipped_worktree,
             "failed": failed,
+        }
+
+    def _get_active_flow_branches(self) -> set[str]:
+        """Return branches tracked by a live flow record (status active/blocked).
+
+        These branches are still in use and must be protected from cleanup.
+        This is the safety gate that replaces git merge status.
+
+        Returns:
+            Set of branch names whose flow record is in status
+            ``active`` or ``blocked``.
+
+        Raises:
+            SystemError: If the flow store cannot be read, preventing
+                accidental deletion of tracked branches.
+        """
+        active_statuses = {"active", "blocked"}
+        try:
+            flows = self.store.get_all_flows()
+        except Exception as exc:
+            logger.bind(domain="check").error(
+                f"Failed to load flow records: {exc}. "
+                "Cannot determine which branches are tracked."
+            )
+            raise SystemError(
+                f"Flow record query failed: {exc}. "
+                "Cleanup aborted to prevent deleting tracked branches."
+            ) from exc
+        return {
+            str(flow["branch"])
+            for flow in flows
+            if flow.get("flow_status") in active_statuses and flow.get("branch")
         }
 
     def _get_agent_worktree_base(self) -> Path:
