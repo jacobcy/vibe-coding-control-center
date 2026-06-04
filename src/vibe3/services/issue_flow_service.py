@@ -202,6 +202,12 @@ class IssueFlowService:
             return None
 
         # Guard: detect corrupted branch links
+        # Check both sources of protected branches:
+        # - scene_base_ref: OrchestraConfig's configurable base branch for current scene
+        #   (e.g., 'main', 'develop', stripped of 'origin/' prefix to match DB storage)
+        # - protected_branches: VibeConfig's hardcoded list of protected branches
+        #   (e.g., ['main', 'develop', 'release/*'])
+        # This aligns with TaskService.link_issue() write guard for consistency.
         base_branch = self.config.scene_base_ref.replace("origin/", "")
         protected_branches = set(VibeConfig.get_defaults().flow.protected_branches)
 
