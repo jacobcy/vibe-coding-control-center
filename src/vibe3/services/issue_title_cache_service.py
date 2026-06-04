@@ -115,6 +115,8 @@ class IssueTitleCacheService:
     ) -> tuple[dict[str, str], bool]:
         """Get titles for multiple branches with cache-first strategy.
 
+        Optimized to use batch GitHub API call for cache misses.
+
         Args:
             branches: List of git branch names.
 
@@ -138,12 +140,51 @@ class IssueTitleCacheService:
                 cache_misses=cache_misses,
             ).debug(f"Fetching {len(cache_misses)} branches from GitHub")
 
+            # Extract issue numbers for batch fetch
+            branch_to_issue: dict[str, int] = {}
+            issue_numbers: list[int] = []
+
             for branch in cache_misses:
-                fetched_title, err = self._fetch_and_cache_title(branch)
-                if fetched_title:
-                    titles[branch] = fetched_title
-                if err:
-                    network_error = True
+                issue_number = self._resolve_issue_number(branch)
+
+                if issue_number:
+                    branch_to_issue[branch] = issue_number
+                    issue_numbers.append(issue_number)
+
+            # Try batch fetch first
+            if issue_numbers:
+                batch_titles = self.github_client.batch_get_issues(issue_numbers)
+
+                if batch_titles is not None:
+                    # Batch fetch succeeded
+                    missing_branches: list[str] = []
+                    for branch, issue_number in branch_to_issue.items():
+                        title = batch_titles.get(issue_number)
+                        if title:
+                            titles[branch] = title
+                            self.update_title(branch, title)
+                        else:
+                            missing_branches.append(branch)
+
+                    for branch in missing_branches:
+                        fetched_title, err = self._fetch_and_cache_title(branch)
+                        if fetched_title:
+                            titles[branch] = fetched_title
+                        if err:
+                            network_error = True
+                else:
+                    # Batch fetch failed, fallback to serial fetch
+                    logger.bind(
+                        domain="issue_title_cache",
+                        action="get_titles_with_fallback",
+                    ).warning("Batch fetch failed, falling back to serial fetch")
+
+                    for branch in cache_misses:
+                        fetched_title, err = self._fetch_and_cache_title(branch)
+                        if fetched_title:
+                            titles[branch] = fetched_title
+                        if err:
+                            network_error = True
 
         return titles, network_error
 
@@ -275,18 +316,8 @@ class IssueTitleCacheService:
         Returns:
             Tuple of (title, had_network_error).
         """
-        # 1. Try get issue number from cache
-        cache = self.store.get_flow_context_cache(branch)
-        issue_number = cache.get("task_issue_number") if cache else None
-
-        # 2. Fall back to flow_issue_links if cache missing (Truth source)
-        if not issue_number:
-            links = self.store.get_issue_links(branch)
-            task_link = next(
-                (link for link in links if link.get("issue_role") == "task"), None
-            )
-            if task_link:
-                issue_number = task_link.get("issue_number")
+        # Resolve issue number from cache or issue links
+        issue_number = self._resolve_issue_number(branch)
 
         if not issue_number:
             logger.bind(
@@ -323,3 +354,28 @@ class IssueTitleCacheService:
             ).warning(f"Failed to fetch issue for branch {branch}")
 
         return None, True
+
+    def _resolve_issue_number(self, branch: str) -> int | None:
+        """Resolve issue number for a branch from cache or issue links.
+
+        Args:
+            branch: The git branch name.
+
+        Returns:
+            Issue number if found, None otherwise.
+        """
+        # Try cache first
+        cache = self.store.get_flow_context_cache(branch)
+        issue_number = cache.get("task_issue_number") if cache else None
+
+        # Fall back to flow_issue_links
+        if not issue_number:
+            links = self.store.get_issue_links(branch)
+            task_link = next(
+                (link for link in links if link.get("issue_role") == "task"),
+                None,
+            )
+            if task_link:
+                issue_number = task_link.get("issue_number")
+
+        return issue_number

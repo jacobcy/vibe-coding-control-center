@@ -5,6 +5,12 @@ from typing import Annotated
 
 import typer
 
+from vibe3.commands.command_options import (
+    _ASYNC_OPT,
+    _DRY_RUN_OPT,
+    _SHOW_PROMPT_OPT,
+    validate_show_prompt_dependency,
+)
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.issue_context_loader import load_issue_info
 
@@ -19,15 +25,18 @@ app = typer.Typer(
 @app.command("manager")
 def internal_manager_dispatch(
     issue: Annotated[int, typer.Argument(help="Issue number to manage")],
-    no_async: Annotated[
-        bool,
-        typer.Option(
-            "--no-async",
-            help="Run synchronously (blocking) instead of async tmux session",
-        ),
-    ] = False,
+    no_async: _ASYNC_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name or issue number"),
+    ] = None,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     from vibe3.execution.issue_role_sync_runner import (
         run_issue_role_async,
         run_issue_role_sync,
@@ -37,16 +46,18 @@ def internal_manager_dispatch(
     if no_async:
         run_issue_role_sync(
             issue_number=issue,
-            dry_run=False,  # Execution-only, no dry-run
+            dry_run=dry_run,
             fresh_session=False,
-            show_prompt=False,
+            show_prompt=show_prompt,
             spec=MANAGER_SYNC_SPEC,
+            branch=branch,
         )
     else:
         run_issue_role_async(
             issue_number=issue,
-            dry_run=False,  # Execution-only, no dry-run
+            dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
+            branch=branch,
         )
 
 
@@ -72,6 +83,10 @@ def internal_governance_dispatch(
     tick: Annotated[
         int, typer.Argument(help="Tick count for governance material rotation")
     ],
+    execution_count: Annotated[
+        int,
+        typer.Argument(help="Independent execution count for material rotation"),
+    ] = 0,
     material: Annotated[
         str | None,
         typer.Option(
@@ -91,7 +106,9 @@ def internal_governance_dispatch(
     """
     from vibe3.services.scan_service import dispatch_governance_execution
 
-    dispatch_governance_execution(tick_count=tick, material_override=material)
+    dispatch_governance_execution(
+        tick_count=tick, execution_count=execution_count, material_override=material
+    )
 
 
 @app.command("bootstrap")

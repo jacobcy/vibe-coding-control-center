@@ -432,6 +432,20 @@ run:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
+  # Static: executor exit contract for publish path (commit_mode).
+  # Used when executor is dispatched from state/merge-ready.
+  # Recipe section name: run.publish_exit_contract
+  publish_task: |
+    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/merge-ready"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
   # Static: coding-mode guidance.
   # Recipe section name: run.coding_task
   # Injected only for plan/flow_plan/lightweight executor modes.
@@ -440,6 +454,21 @@ run:
     Before starting, read the current task context:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest plan ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
+
+    ### Pre-Coding Plan Validation (MANDATORY)
+    Before writing any code, scan the plan for `REQUIRED:BEFORE_CODING` markers:
+    1. **Extract**: Find all lines containing `REQUIRED:BEFORE_CODING` in the plan
+    2. **Verify**: For each marker, run the verification command specified
+    3. **Decision**:
+       - **All markers satisfied**: Proceed with implementation
+       - **Any marker NOT satisfied**:
+         - Execute the "If not met" action specified in the marker
+         - If the action is "rebase": run `git fetch origin main && git rebase origin/main`
+         - If rebase fails or the condition cannot be satisfied:
+           - Write blocker: `uv run python src/vibe3/cli.py handoff append "Pre-coding precondition failed: <description>" --kind blocker --actor "executor"`
+           - Block issue: `vibe3 flow blocked --reason "Plan pre-condition not met: <description>"`
+           - **Then exit** — do not start implementation on a branch that doesn't meet pre-conditions
+    4. **If plan has NO `REQUIRED:BEFORE_CODING` markers**: Skip this check and proceed
 
     ### Pre-Sync Check (MANDATORY for architectural refactors)
     **If issue involves architectural refactoring** (labels: component/*, type/refactor; or title contains "refactor"/"重构"):
@@ -462,6 +491,14 @@ run:
        - If work is already complete: document this in your report, skip redundant execution, still run verification tests
        - If work is partially done: identify what remains, only execute the missing parts
     3. If unsure whether existing commits are related: run `git diff --name-only <commit>~1 <commit>` on suspicious commits
+
+    ### General Rebase Awareness
+    Even without explicit REQUIRED:BEFORE_CODING markers:
+    1. Run `git fetch origin main`
+    2. Check `git log HEAD..origin/main --oneline | wc -l`
+    3. If main is ahead by > 0 commits AND the plan mentions import path changes, file moves, or dependency on recent main changes:
+       - Rebase before proceeding: `git rebase origin/main`
+       - If rebase has conflicts: block and request human intervention
 
     ### Post-Implementation Test Scope
     After completing implementation, determine test scope based on changed files:
@@ -583,6 +620,11 @@ plan:
     ## Implementation Steps
     1. Step one with details
     2. Step two with details
+
+    ## Mandatory Pre-Conditions
+    List any steps that MUST be completed before code changes begin:
+    - **REQUIRED:BEFORE_CODING** <description> — Verify: <command> — If not met: <action>
+    If no mandatory pre-conditions: write "No mandatory pre-conditions."
 
     ## Test Scope
     - Direct: tests/vibe3/<module>/test_<specific>.py

@@ -8,15 +8,29 @@ than concrete implementations, following the dependency inversion principle.
 """
 
 from vibe3.domain.protocols.dispatch_protocols import (
+    CapacityServiceProtocol,
+    CheckServiceProtocol,
     DispatchHealthCheckProtocol,
+    FlowContextResolverProtocol,
+    FlowServiceProtocol,
     IssueCollectionServiceProtocol,
+    IssueLoaderProtocol,
+    LabelDispatchCallable,
     QueuePersistenceServiceProtocol,
+    QueueSelectorProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
 __all__ = [
+    "CapacityServiceProtocol",
+    "CheckServiceProtocol",
     "DispatchHealthCheckProtocol",
-    "IssueCollectionServiceProtocol",
-    "QueuePersistenceServiceProtocol",
+    "FlowContextResolverProtocol",
+    "FlowServiceProtocol",
     "FlowManagerProtocol",
+    "IssueCollectionServiceProtocol",
+    "IssueLoaderProtocol",
+    "LabelDispatchCallable",
+    "QueuePersistenceServiceProtocol",
+    "QueueSelectorProtocol",
 ]

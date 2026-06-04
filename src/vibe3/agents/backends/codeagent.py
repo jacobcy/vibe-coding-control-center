@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Final, cast
 
 from loguru import logger
+from typer import echo
 
 from vibe3.agents.backends.async_launcher import (
     AsyncExecutionHandle,
@@ -20,14 +21,14 @@ from vibe3.agents.backends.session_manager import (
     extract_session_id,
     should_retry_without_session,
 )
-from vibe3.config.agent_preset import (
+from vibe3.config import (
     has_agent_env_override,
     resolve_effective_agent_options,
     resolve_repo_agent_preset_name,
 )
 from vibe3.exceptions import AgentExecutionError
-from vibe3.models.review_runner import AgentOptions, AgentResult
-from vibe3.utils.codeagent_helpers import (
+from vibe3.models import AgentOptions, AgentResult
+from vibe3.utils import (
     build_prompt_file_content,
     diagnose_backend_error,
     prepare_prompt_file,
@@ -282,21 +283,20 @@ class CodeagentBackend:
 
             if dry_run:
                 if dry_run_summary:
-                    logger.debug("=== Dry Run Summary ===")
+                    echo("=== Dry Run Summary ===")
                     for key, value in dry_run_summary.items():
-                        logger.debug("{}: {}", key, value)
-                logger.debug("command: {}", " ".join(command))
+                        echo(f"{key}: {value}")
+                echo(f"command: {' '.join(command)}")
                 if show_prompt and prompt_file_path:
-                    logger.debug("prompt_file: {}", prompt_file_path)
+                    echo(f"prompt_file: {prompt_file_path}")
                     prompt_content = build_prompt_file_content(
                         prompt, include_global_notice=include_global_notice
                     )
-                    logger.debug(
-                        "prompt_content:\n{}",
-                        sanitize_prompt_for_display(prompt_content),
+                    echo(
+                        f"prompt_content:\n{sanitize_prompt_for_display(prompt_content)}"
                     )
                 if task:
-                    logger.debug("task:\n{}", task)
+                    echo(f"task:\n{task}")
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             wrapper_log_path: Path | None = None

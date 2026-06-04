@@ -9,16 +9,19 @@ Public API:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from loguru import logger
 
-from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.config.settings import VibeConfig
-from vibe3.environment.runtime_assets import resolve_runtime_asset
-from vibe3.models.prompt_meta import PromptContextMode
-from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.environment import resolve_runtime_asset
+from vibe3.models import PromptContextMode
+from vibe3.prompts import (
+    PromptContextBuilder,
+    PromptManifest,
+    PromptProvider,
+    make_context_builder,
+)
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -48,7 +51,7 @@ def build_run_task_section(task_text: str | None) -> str:
 def build_run_output_contract_section(output_format: str | None) -> str:
     """Build execution output contract section."""
     if output_format:
-        return "## Output format requirements\n" f"{output_format}"
+        return f"## Output format requirements\n{output_format}"
 
     return """## Output format requirements
 
@@ -123,7 +126,8 @@ def _build_run_prompt_providers(
         if run_config and run_config.common_rules is not None:
             result: str | None = run_config.common_rules
             return result
-        return resolver.get_policy_path("common")
+        # Cast needed: lazy __getattr__ import loses type info
+        return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(common_rules_path())
@@ -140,6 +144,10 @@ def _build_run_prompt_providers(
         ),
         "run.exit_contract": lambda: build_run_task_section(
             getattr(run_config, "run_task", None) if run_config else None
+        ),
+        # Publish path exit contract for commit_mode execution (merge-ready → handoff).
+        "run.publish_exit_contract": lambda: build_run_task_section(
+            getattr(run_config, "publish_task", None) if run_config else None
         ),
         # Backward-compatible alias for local recipe overrides.
         "run.task": lambda: build_run_task_section(
@@ -253,6 +261,34 @@ def make_skill_context_builder(
     def build() -> str:
         return PromptManifest.load_default().render_sections(
             recipe_key="run.skill",
+            variant_key="default",
+            providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
+        )
+
+    return make_context_builder(
+        template_key="run.skill",
+        body_provider_key="run.context",
+        body_fn=build,
+        prompts_path=prompts_path,
+        variable_name="skill_content",
+    )
+
+
+def make_publish_context_builder(
+    skill_content: str,
+    config: VibeConfig | None = None,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for publish path (commit_mode) execution.
+
+    Uses run.publish recipe with publish-specific exit contract.
+    The publish path is triggered by state/merge-ready and transitions to state/handoff.
+    """
+    cfg = config or VibeConfig.get_defaults()
+
+    def build() -> str:
+        return PromptManifest.load_default().render_sections(
+            recipe_key="run.publish",
             variant_key="default",
             providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
         )

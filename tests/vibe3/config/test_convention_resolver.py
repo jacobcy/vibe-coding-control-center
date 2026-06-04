@@ -57,6 +57,18 @@ def test_resolver_returns_minimal_when_profile_specified():
     assert convention.manager_usernames == ()
 
 
+def test_resolver_accepts_github_flow_without_unknown_profile_warning():
+    """Test github-flow is a known portable profile."""
+    resolver = ConventionResolver.from_repo(profile="github-flow")
+
+    with patch("vibe3.config.convention_resolver.logger.warning") as mock_warning:
+        convention = resolver.resolve()
+
+    assert convention.branch.task_prefix == "issue-"
+    assert convention.manager_usernames == ()
+    mock_warning.assert_not_called()
+
+
 def test_resolver_unknown_profile_falls_back_to_minimal():
     """Test resolver falls back to minimal for unknown profile."""
     resolver = ConventionResolver.from_repo(profile="unknown")
@@ -132,3 +144,64 @@ def test_convention_no_prefix_state_label():
 
     convention = ProfileConvention(state_prefix="")
     assert convention.state_label("handoff") == "handoff"
+
+
+def test_detect_profile_is_cached():
+    """Test that _detect_profile result is cached to avoid repeated subprocess calls."""
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists") as mock_exists,
+    ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="https://github.com/other/repo.git\n"
+        )
+        mock_exists.return_value = False
+
+        resolver = ConventionResolver.from_repo()
+
+        # Call resolve twice
+        convention1 = resolver.resolve()
+        convention2 = resolver.resolve()
+
+        # Both should succeed
+        assert convention1.branch.task_prefix == "issue-"
+        assert convention2.branch.task_prefix == "issue-"
+
+        # subprocess.run should only be called once due to caching
+        # (once for git remote, not for each resolve call)
+        assert mock_run.call_count == 1
+
+
+def test_detect_profile_cache_invalidation():
+    """Test that cache can be cleared by creating a new resolver instance."""
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists") as mock_exists,
+    ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="https://github.com/other/repo.git\n"
+        )
+        mock_exists.return_value = False
+
+        # First resolver instance
+        resolver1 = ConventionResolver.from_repo()
+        convention1 = resolver1.resolve()
+
+        # Second resolver instance (fresh cache)
+        resolver2 = ConventionResolver.from_repo()
+        convention2 = resolver2.resolve()
+
+        # Both should work independently
+        assert convention1.branch.task_prefix == "issue-"
+        assert convention2.branch.task_prefix == "issue-"
+
+        # Each instance should call subprocess once
+        assert mock_run.call_count == 2

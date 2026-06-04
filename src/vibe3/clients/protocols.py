@@ -242,6 +242,7 @@ class IssueReadPort(Protocol):
         assignee: str | None = None,
         repo: str | None = None,
         label: str | None = None,
+        search: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -250,6 +251,7 @@ class IssueReadPort(Protocol):
             state: Issue state filter (open, closed, all)
             assignee: Filter by assignee username
             label: Server-side label filter (reduces payload vs client-side filtering)
+            search: Server-side GitHub issue search query
         """
         ...
 

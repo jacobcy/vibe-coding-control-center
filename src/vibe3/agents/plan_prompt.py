@@ -10,18 +10,20 @@ Section builders (build_plan_policy_section, etc.) remain available for direct u
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from loguru import logger
 
-from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.config.settings import VibeConfig
-from vibe3.environment.runtime_assets import resolve_runtime_asset
+from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
-from vibe3.models.plan import PlanRequest
-from vibe3.models.prompt_meta import PromptContextMode
-from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.models import PlanRequest, PromptContextMode
+from vibe3.prompts import (
+    PromptContextBuilder,
+    PromptManifest,
+    PromptProvider,
+    make_context_builder,
+)
 
 PlanPromptMode = Literal["first", "retry"]
 
@@ -98,7 +100,7 @@ def build_plan_task_section(
 def build_plan_output_contract_section(output_format: str | None) -> str:
     """Build plan output contract section."""
     if output_format:
-        return "## Output format requirements\n" f"{output_format}"
+        return f"## Output format requirements\n{output_format}"
 
     return """## Output format requirements
 
@@ -187,7 +189,8 @@ def _build_plan_prompt_providers(
         if plan_config and plan_config.common_rules is not None:
             result: str | None = plan_config.common_rules
             return result
-        return resolver.get_policy_path("common")
+        # Cast needed: lazy __getattr__ import loses type info
+        return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(common_rules_path())

@@ -61,6 +61,8 @@ gh issue view <N>
 
 查看 issue 描述和已有 comments，理解 RFC 的具体问题。
 
+**决策前先检查 `docs/decisions/INDEX.md` 中是否有相关 `accepted` ADR，并读取相关 ADR 正文**。若有，决策不得违反当前有效 ADR；如需偏离，必须显式提议 supersede。
+
 #### 2.2 做出决策（三选一）
 
 **方案 1：采纳并推进**
@@ -72,6 +74,17 @@ gh issue view <N>
 gh issue comment <N> --body "[decision] 采纳并推进；[reason] <理由>"
 gh issue edit <N> --remove-label roadmap/rfc --add-label state/ready
 ```
+
+**架构级 rfc 结晶为 ADR**（三条全满足时）：
+① 跨任务/跨模块的架构选型；② 有真实权衡或反直觉；③ 期望跨 PR/issue 长期有效。
+
+满足时：不要只要求后续实现 PR 顺手写 ADR。应直接推动一个小型 ADR PR（只包含 `docs/decisions/NNNN-*.md`、`docs/decisions/INDEX.md`，以及必要的最小链接更新），并在原 RFC issue comment 中指向该 ADR PR：
+```
+gh issue comment <N> --body "[decision] 采纳并形成 ADR 决议；ADR PR: <url>; [reason] <理由>"
+```
+ADR PR 合并后，RFC 才算 durable resolved。若该 RFC 后续仍需要实现工作，再为实现工作保留或创建独立 issue/PR，避免 ADR 决策文件和实现改动混在一个 PR 中。
+
+不满足时：维持原有 `[decision]` 评论流程，不产 ADR。
 
 **方案 2：转为依赖等待**
 - 明确依赖的 issue 或外部条件

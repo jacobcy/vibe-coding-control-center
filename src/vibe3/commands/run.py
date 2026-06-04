@@ -1,7 +1,7 @@
 """Run command."""
 
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Optional
 
 import typer
 from loguru import logger
@@ -11,9 +11,12 @@ from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
+    _FRESH_SESSION_OPT,
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    build_role_cli_overrides,
+    validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.loader import load_runtime_config
@@ -68,13 +71,7 @@ def run_command(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    fresh_session: Annotated[
-        bool,
-        typer.Option(
-            "--fresh-session",
-            help="Skip session resume and start a fresh agent session",
-        ),
-    ] = False,
+    fresh_session: _FRESH_SESSION_OPT = False,
     publish: Annotated[
         bool,
         typer.Option("--publish", help="Publish mode: create commit + PR"),
@@ -84,18 +81,15 @@ def run_command(
     if trace:
         enable_method_trace()
 
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     # Register EDA event handlers for run command (may publish events)
     from vibe3.domain.handlers import register_event_handlers
 
     register_event_handlers()
 
-    cli_overrides: dict[str, Any] = {}
-    if backend:
-        cli_overrides["run.agent_config.backend"] = backend
-    if model:
-        cli_overrides["run.agent_config.model"] = model
-    if agent:
-        cli_overrides["run.agent_config.agent"] = agent
+    cli_overrides = build_role_cli_overrides("run", agent, backend, model)
 
     try:
         config = load_runtime_config(
@@ -150,6 +144,7 @@ def run_command(
             backend=backend,
             model=model,
             fresh_session=fresh_session,
+            publish=publish,
         )
         return
 

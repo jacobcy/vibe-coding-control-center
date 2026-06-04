@@ -169,7 +169,9 @@ class TestBuildSnapshotContext:
         ]
         mock_github_cls.return_value = mock_github
 
-        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+        ctx = build_governance_snapshot_context(
+            snapshot, config=config, tick_count=0, execution_count=1
+        )
 
         assert ctx["issue_scope_name"] == "broader repo issue pool"
         assert ctx["active_count"] == 1
@@ -179,7 +181,7 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
-        # tick_count=2 selects cron-supervisor from recipe catalog
+        # execution_count=2 selects cron-supervisor from recipe catalog
         config = _make_config()
         mock_github = MagicMock()
         mock_github.list_issues.return_value = [
@@ -202,7 +204,9 @@ class TestBuildSnapshotContext:
         ]
         mock_github_cls.return_value = mock_github
 
-        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=2)
+        ctx = build_governance_snapshot_context(
+            snapshot, config=config, tick_count=0, execution_count=2
+        )
 
         # After migration, scope and filtering work based on recipe catalog material
         assert ctx["issue_scope_name"] == "broader repo docs scope"
@@ -344,8 +348,10 @@ class TestBuildSnapshotContext:
         ]
         mock_github_cls.return_value = mock_github
 
-        # Use roadmap-intake material
-        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+        # Use roadmap-intake material (execution_count=1)
+        ctx = build_governance_snapshot_context(
+            snapshot, config=config, tick_count=0, execution_count=1
+        )
 
         assert ctx["issue_scope_name"] == "broader repo issue pool"
         assert ctx["active_count"] == 1

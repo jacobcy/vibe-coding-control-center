@@ -59,9 +59,9 @@ Vibe 3.0 采用 3-tier 架构模型作为顶层战略划分，并辅以六层架
    - **Analysis**：架构洞察工具。负责代码依赖扫描、风险审计与治理分析；仅依赖 L6，作为无状态分析工具被多层调用。
    - **规则**：仅处理物理资源或静态分析，不感知业务语义。
 
-6. **Infrastructure & Models 层** (`adapters/`, `clients/`, `config/`, `exceptions/`, `observability/`, `resources/`, `utils/`, `models/`)
+6. **Infrastructure & Models 层** (`adapters/`, `clients/`, `config/`, `exceptions/`, `observability/`, `utils/`, `models/`)
    - **Models**：全系统的类型真源（Entities/DTOs）。
-   - **Infrastructure**：底层系统服务。负责配置、日志、调用链追踪、异常定义、外部客户端封装、发行版适配（adapters）、静态资源管理（resources）。
+   - **Infrastructure**：底层系统服务。负责配置、日志、调用链追踪、异常定义、外部客户端封装、发行版适配（adapters）。
    - **规则**：作为全系统的基石，严禁依赖上述任何上层模块。
 
 

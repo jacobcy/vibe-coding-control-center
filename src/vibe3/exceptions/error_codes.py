@@ -10,6 +10,9 @@ Error categories:
 
 from typing import Final
 
+# Configuration/asset missing errors - WARNING, recorded to error_log
+E_CONFIG_MISSING: Final[str] = "E_CONFIG_MISSING"
+
 # Model configuration errors - immediate failed gate
 E_MODEL_NOT_FOUND: Final[str] = "E_MODEL_NOT_FOUND"
 E_MODEL_PERMISSION: Final[str] = "E_MODEL_PERMISSION"
@@ -33,6 +36,9 @@ E_EXEC_FLOW_FAILURE: Final[str] = "E_EXEC_FLOW_FAILURE"
 
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
+
+# Data integrity errors - corruption detection
+E_INVALID_BRANCH_LINK: Final[str] = "E_INVALID_BRANCH_LINK"
 
 
 def is_model_error(error_code: str) -> bool:

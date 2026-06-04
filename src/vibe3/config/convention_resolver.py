@@ -32,6 +32,7 @@ class ConventionResolver:
 
     Attributes:
         profile: Optional profile name override (vibe-center, minimal, github-flow)
+        _profile_cache: Internal cache for detected profile
 
     Example:
         >>> resolver = ConventionResolver.from_repo()
@@ -43,6 +44,7 @@ class ConventionResolver:
     """
 
     profile: str | None = None
+    _profile_cache: str | None = None
 
     def resolve(self) -> ProfileConvention:
         """Resolve the effective convention for current repo.
@@ -67,8 +69,8 @@ class ConventionResolver:
         if detected == "vibe-center":
             logger.debug("Using Vibe Center profile defaults")
             return ProfileConvention.vibe_center()
-        elif detected == "minimal":
-            logger.debug("Using minimal profile defaults")
+        elif detected in {"minimal", "github-flow"}:
+            logger.debug(f"Using {detected} profile defaults")
             return ProfileConvention()
         else:
             # Unknown profile: warn and fallback
@@ -81,9 +83,15 @@ class ConventionResolver:
         Single source of truth for profile detection logic, used by both
         resolve() and _get_profile_config().
 
+        Result is cached per instance to avoid repeated subprocess calls.
+
         Returns:
             Profile name (vibe-center or minimal)
         """
+        # Check cache first
+        if self._profile_cache is not None:
+            return self._profile_cache
+
         import os
         import subprocess
 
@@ -91,11 +99,14 @@ class ConventionResolver:
 
         # Step 1: Check explicit override
         if self.profile:
-            return self.profile
+            result = self.profile
+            self._profile_cache = result
+            return result
 
         # Step 2: Check environment variable
         env_profile = os.getenv("VIBE_PROFILE")
         if env_profile:
+            self._profile_cache = env_profile
             return env_profile
 
         # Step 3: Check .vibe/config.yaml for profile field
@@ -114,7 +125,9 @@ class ConventionResolver:
                 with config_path.open(encoding="utf-8") as f:
                     config_yaml = yaml.safe_load(f)
                     if isinstance(config_yaml, dict) and "profile" in config_yaml:
-                        return str(config_yaml["profile"])
+                        result = str(config_yaml["profile"])
+                        self._profile_cache = result
+                        return result
         except OSError as e:
             logger.debug(f"Failed to read .vibe/config.yaml: {e}")
         except yaml.YAMLError as e:
@@ -124,24 +137,26 @@ class ConventionResolver:
 
         # Step 4: Check git remote to detect Vibe Center repo
         try:
-            result = subprocess.run(
+            git_result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
                 capture_output=True,
                 text=True,
                 timeout=2,
                 check=False,
             )
-            if result.returncode == 0:
-                remote_url = result.stdout.strip().lower()
+            if git_result.returncode == 0:
+                remote_url = git_result.stdout.strip().lower()
                 if (
                     "vibe-center" in remote_url
                     or "vibe-coding-control-center" in remote_url
                 ):
+                    self._profile_cache = "vibe-center"
                     return "vibe-center"
         except Exception as e:
             logger.debug(f"Git remote check failed: {e}")
 
         # Step 5: Default to minimal
+        self._profile_cache = "minimal"
         return "minimal"
 
     def get_policy_path(self, name: str) -> str | None:
@@ -212,3 +227,16 @@ class ConventionResolver:
             f"Creating ConventionResolver from repo context (profile={profile})"
         )
         return cls(profile=profile)
+
+
+def diagnose_profile() -> str:
+    """Get current profile name for diagnostic context.
+
+    Returns:
+        Profile name or "unknown" if resolution fails
+    """
+    try:
+        resolver = ConventionResolver.from_repo()
+        return resolver._detect_profile()
+    except Exception:
+        return "unknown"

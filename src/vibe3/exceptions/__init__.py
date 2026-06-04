@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -43,6 +44,36 @@ class UserError(VibeError):
         super().__init__(message, recoverable=True)
 
 
+@dataclass(frozen=True)
+class DiagnosticContext:
+    """Diagnostic context for missing resource errors.
+
+    Provides structured information about what was searched,
+    what profile was active, and how to fix the issue.
+    """
+
+    resource_type: str  # e.g. "prompt-recipes", "supervisor-template"
+    search_paths: list[str]  # paths that were searched
+    profile: str | None  # current profile name
+    remediation: str  # suggested fix command or action
+    ref_issue: int | None  # related issue number for more info
+
+
+class MissingResourceError(UserError):
+    """Missing configuration or runtime asset with diagnostic context.
+
+    This error provides user-friendly information about what resource
+    is missing, where it was searched, and how to fix it.
+    """
+
+    def __init__(self, resource: str, context: DiagnosticContext) -> None:
+        from vibe3.utils.diagnostics import format_diagnostic_message
+
+        self.resource = resource
+        self.diagnostic = context
+        super().__init__(format_diagnostic_message(resource, context))
+
+
 class ConfigError(UserError):
     """Configuration file or setting error."""
 
@@ -50,20 +81,9 @@ class ConfigError(UserError):
 
 
 class AgentPresetNotFoundError(UserError):
-    """Agent preset not found in repo config/v3/models.json.
-
-    Raised when an agent preset name is specified but cannot be resolved
-    to backend/model from config/v3/models.json.
-
-    This indicates a configuration error that must be fixed before execution.
-    """
+    """Agent preset not found in repo config/v3/models.json."""
 
     def __init__(self, preset_name: str) -> None:
-        """Initialize AgentPresetNotFoundError.
-
-        Args:
-            preset_name: The agent preset name that was not found
-        """
         super().__init__(
             f"Agent preset '{preset_name}' not found in config/v3/models.json"
         )
@@ -73,15 +93,14 @@ class AgentPresetNotFoundError(UserError):
 class SkillNotAvailableError(UserError):
     """Skill not available — no adapter provides it in current profile."""
 
-    def __init__(self, skill: str) -> None:
-        """Initialize SkillNotAvailableError.
-
-        Args:
-            skill: The skill name that was not found
-        """
-        super().__init__(
-            f"Skill '{skill}' not found (no adapter provides it in current profile)"
+    def __init__(self, skill: str, profile: str | None = None) -> None:
+        profile_hint = (
+            f" (current profile: {profile!r})" if profile else " (no profile detected)"
         )
+        fix_hint = (
+            "Set VIBE_PROFILE=vibe-center or github-flow to enable skill resolution."
+        )
+        super().__init__(f"Skill '{skill}' not found{profile_hint}. {fix_hint}")
         self.skill = skill
 
 
@@ -89,18 +108,9 @@ class SkillNotAvailableError(UserError):
 
 
 class SystemError(VibeError):
-    """System-level error that requires manual intervention.
-
-    These errors indicate problems with the system environment,
-    external dependencies, or unexpected failures.
-    """
+    """System-level error that requires manual intervention."""
 
     def __init__(self, message: str) -> None:
-        """Initialize SystemError.
-
-        Args:
-            message: Error message describing the system failure
-        """
         super().__init__(message, recoverable=False)
 
 
@@ -113,20 +123,9 @@ class AgentExecutionError(SystemError):
 
 
 class ModelsJsonSyncError(SystemError):
-    """Failed to sync ~/.codeagent/models.json for wrapper execution.
-
-    Raised when the resolved backend/model cannot be synced to the
-    wrapper's config file, preventing proper execution.
-
-    This indicates a sync or permissions issue.
-    """
+    """Failed to sync ~/.codeagent/models.json for wrapper execution."""
 
     def __init__(self, reason: str) -> None:
-        """Initialize ModelsJsonSyncError.
-
-        Args:
-            reason: The reason why sync failed
-        """
         super().__init__(f"Failed to sync ~/.codeagent/models.json: {reason}")
         self.reason = reason
 
@@ -135,12 +134,6 @@ class GitError(SystemError):
     """Git operation failed."""
 
     def __init__(self, operation: str, details: str) -> None:
-        """Initialize GitError.
-
-        Args:
-            operation: Git operation that failed (e.g., 'commit', 'push')
-            details: Error details from git command
-        """
         super().__init__(f"Git {operation} failed: {details}")
         self.operation = operation
         self.details = details
@@ -150,12 +143,6 @@ class GitHubError(SystemError):
     """GitHub API error."""
 
     def __init__(self, status_code: int, message: str) -> None:
-        """Initialize GitHubError.
-
-        Args:
-            status_code: HTTP status code from GitHub API
-            message: Error message from GitHub API
-        """
         super().__init__(f"GitHub API error ({status_code}): {message}")
         self.status_code = status_code
 
@@ -164,12 +151,6 @@ class SerenaError(SystemError):
     """Serena code analysis error."""
 
     def __init__(self, operation: str, details: str) -> None:
-        """Initialize SerenaError.
-
-        Args:
-            operation: Serena operation that failed
-            details: Error details
-        """
         super().__init__(f"Serena {operation} failed: {details}")
         self.operation = operation
 
@@ -181,11 +162,6 @@ class PRNotFoundError(VibeError):
     """PR does not exist."""
 
     def __init__(self, pr_number: int) -> None:
-        """Initialize PRNotFoundError.
-
-        Args:
-            pr_number: PR number that was not found
-        """
         super().__init__(f"PR #{pr_number} not found", recoverable=False)
         self.pr_number = pr_number
 
@@ -197,8 +173,7 @@ class CapacityDeferredError(VibeError):
     """Dispatch deferred due to capacity limits.
 
     This is not a failure — it signals that the dispatch should be
-    retried later when capacity becomes available. Handlers should
-    treat this as a skip/defer, not a blocking failure.
+    retried later when capacity becomes available.
     """
 
     def __init__(self, message: str) -> None:
@@ -209,31 +184,28 @@ class InvalidTransitionError(UserError):
     """Invalid state transition in orchestration state machine."""
 
     def __init__(self, from_state: str | None, to_state: str) -> None:
-        """Initialize InvalidTransitionError.
-
-        Args:
-            from_state: Source state (or None if no prior state)
-            to_state: Target state
-        """
         self.from_state = from_state
         self.to_state = to_state
         super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
 
 
-# ========== Error Classification ==========
-# This module provides error classification utilities.
-# For error tracking service, see vibe3.services.error_tracking_service.
-#
-# Classification utilities (lazy import to avoid circular dependencies):
+class InvalidBranchLinkError(SystemError):
+    """Base branch illegally linked to issue in flow_issue_links."""
+
+    def __init__(self, branch: str, issue_number: int) -> None:
+        self.branch = branch
+        self.issue_number = issue_number
+        super().__init__(
+            f"Invalid branch '{branch}' linked to issue #{issue_number}. "
+            f"Base branches cannot have flow records. "
+            f'Fix: sqlite3 <db> "DELETE FROM flow_issue_links '
+            f"WHERE branch='{branch}' AND issue_number={issue_number}\""
+        )
+
+
+# Error classification and tracking references:
 #   from vibe3.exceptions.error_classification import classify_error
-#   from vibe3.exceptions.error_codes import (
-#       E_MODEL_NOT_FOUND, E_API_RATE_LIMIT, etc.
-#   )
-#
-# Error tracking service (in services layer):
-#   from vibe3.services.error_tracking_service import ErrorTrackingService
-#
-# Error recording helper (convenience function in services layer):
+#   from vibe3.exceptions.error_codes import E_MODEL_NOT_FOUND, ...
 #   from vibe3.services.error_helpers import record_error
 
 
@@ -242,6 +214,8 @@ from vibe3.exceptions.runtime_errors import GitHubAPIError  # noqa: E402
 __all__ = [
     "VibeError",
     "UserError",
+    "DiagnosticContext",
+    "MissingResourceError",
     "ConfigError",
     "AgentPresetNotFoundError",
     "SkillNotAvailableError",
@@ -254,5 +228,6 @@ __all__ = [
     "PRNotFoundError",
     "CapacityDeferredError",
     "InvalidTransitionError",
+    "InvalidBranchLinkError",
     "GitHubAPIError",
 ]

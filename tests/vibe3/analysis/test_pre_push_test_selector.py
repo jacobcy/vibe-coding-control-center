@@ -92,3 +92,19 @@ def test_top_level_unmapped_source_skips_full_suite() -> None:
     assert selection.tests == []
     assert selection.unmapped_sources == ["src/vibe3/__init__.py"]
     assert "tests/vibe3" not in selection.tests
+
+
+def test_excludes_init_py_from_v3_test_files() -> None:
+    """__init__.py under tests/vibe3/ must not be selected as a test target."""
+    selection = select_pre_push_tests(["tests/vibe3/agents/__init__.py"])
+
+    assert "tests/vibe3/agents/__init__.py" not in selection.tests
+
+
+def test_excludes_init_py_from_source_to_test_mapping() -> None:
+    """Changing src/vibe3/.../__init__.py must not map to tests/.../__init__.py."""
+    selection = select_pre_push_tests(
+        ["src/vibe3/agents/__init__.py"],
+    )
+
+    assert "tests/vibe3/agents/__init__.py" not in selection.tests

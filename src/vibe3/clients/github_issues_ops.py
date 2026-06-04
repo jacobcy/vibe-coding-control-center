@@ -118,6 +118,7 @@ class IssuesMixin(IssueAdminMixin):
         assignee: str | None = None,
         repo: str | None = None,
         label: str | None = None,
+        search: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -128,6 +129,7 @@ class IssuesMixin(IssueAdminMixin):
             label: Server-side label filter — passed as ``--label`` to the GitHub
                 CLI so GitHub returns only matching issues, reducing both network
                 payload and client-side filtering work.
+            search: Server-side GitHub issue search query.
         """
         logger.bind(
             external="github",
@@ -136,6 +138,7 @@ class IssuesMixin(IssueAdminMixin):
             state=state,
             assignee=assignee,
             label=label,
+            search=search,
         ).debug("Calling GitHub API: list_issues")
         cmd = [
             "gh",
@@ -152,6 +155,8 @@ class IssuesMixin(IssueAdminMixin):
             cmd.extend(["--assignee", assignee])
         if label:
             cmd.extend(["--label", label])
+        if search:
+            cmd.extend(["--search", search])
         if repo:
             cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -161,6 +166,52 @@ class IssuesMixin(IssueAdminMixin):
             )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
+
+    def batch_get_issues(
+        self: Any,
+        issue_numbers: list[int],
+        repo: str | None = None,
+    ) -> dict[int, str] | None:
+        """Batch fetch issue titles by issue number.
+
+        This uses the existing issue-list path as a best-effort batch lookup,
+        then filters results back to the requested issue numbers because GitHub
+        search may also return issues that merely mention those numbers.
+        """
+        if not issue_numbers:
+            return {}
+
+        requested = set(issue_numbers)
+        search_terms = " ".join(f"#{n}" for n in issue_numbers)
+        try:
+            issues = self.list_issues(
+                limit=max(len(requested) * 2, 30),
+                state="all",
+                repo=repo,
+                search=search_terms,
+            )
+        except Exception as e:
+            logger.bind(
+                external="github",
+                operation="batch_get_issues",
+                error=str(e),
+            ).warning("Unexpected error during batch fetch")
+            return None
+
+        titles: dict[int, str] = {}
+        for issue in issues:
+            num = issue.get("number")
+            title = issue.get("title")
+            if isinstance(num, int) and num in requested and isinstance(title, str):
+                titles[num] = title
+
+        logger.bind(
+            external="github",
+            operation="batch_get_issues",
+            fetched=len(titles),
+            requested=len(requested),
+        ).debug("Batch fetch completed")
+        return titles
 
     def view_issue(
         self: Any, issue_number: int, repo: str | None = None

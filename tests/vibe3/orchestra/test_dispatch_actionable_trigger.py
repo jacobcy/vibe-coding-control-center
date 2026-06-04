@@ -45,6 +45,14 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     flow_manager = MagicMock()
     flow_manager.get_flow_for_issue = MagicMock(return_value=None)
 
+    health_check_service = MagicMock()
+    health_check_service.check_issue_health.return_value = True
+    queue_persistence = MagicMock()
+    queue_persistence.frozen_queue = None
+    queue_persistence.restore.return_value = None
+    queue_persistence.promote.return_value = False
+    queue_persistence.get_queued_issue_numbers.return_value = set()
+
     coordinator = GlobalDispatchCoordinator(
         config=config,
         capacity=capacity,
@@ -52,6 +60,11 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
         store=store,
         flow_manager=flow_manager,
         registry=None,
+        health_check_service=health_check_service,
+        queue_persistence=queue_persistence,
+        issue_loader=lambda issue_number: None,
+        flow_context_resolver=lambda issue_number: (f"task/issue-{issue_number}", None),
+        queue_selector=lambda *args, **kwargs: [],
     )
 
     # Mock methods that would require complex setup

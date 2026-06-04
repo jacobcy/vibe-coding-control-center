@@ -9,11 +9,16 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.exceptions import CapacityDeferredError
+from vibe3.exceptions import (
+    CapacityDeferredError,
+    DiagnosticContext,
+    MissingResourceError,
+)
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
@@ -21,11 +26,9 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_orchestra_repo_root,
 )
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.execution_request import ExecutionRequest
+from vibe3.models import ExecutionRequest, IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -33,6 +36,7 @@ from vibe3.roles.definitions import (
 )
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
+from vibe3.utils.runtime_assets import check_runtime_asset, runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -53,7 +57,10 @@ HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_manager_options(config: OrchestraConfig) -> Any:
+def resolve_manager_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve manager agent options.
 
     Backend/model override uses unified env vars:
@@ -63,16 +70,28 @@ def resolve_manager_options(config: OrchestraConfig) -> Any:
     These are handled by env_override.py and applied to config.
     This function falls back to config resolution if no override.
     """
+    _ = cli_overrides
     # Backend/model override handled by env_override.py
     # No need to check env vars here
 
     # Validate assignee_dispatch configuration
     ad = config.assignee_dispatch
     if not ad.agent and not ad.backend:
-        raise ValueError(
-            "No assignee dispatch agent configuration found in "
-            "orchestra.assignee_dispatch. Configure assignee_dispatch.agent or "
-            "orchestra.assignee_dispatch.backend in settings.yaml."
+        raise MissingResourceError(
+            resource="orchestra.assignee_dispatch (agent or backend)",
+            context=DiagnosticContext(
+                resource_type="orchestra-config",
+                search_paths=[
+                    str(Path("config/v3/settings.yaml")),
+                    str(runtime_assets_root() / "config/v3/settings.yaml"),
+                ],
+                profile=diagnose_profile(),
+                remediation=(
+                    "Configure assignee_dispatch.agent or "
+                    "assignee_dispatch.backend in config/v3/settings.yaml"
+                ),
+                ref_issue=1925,
+            ),
         )
 
     return ExecutionRolePolicyService(config).resolve_effective_agent_options("manager")
@@ -140,6 +159,7 @@ def build_manager_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     *,
+    branch: str | None = None,
     registry: SessionRegistryService | None = None,
     repo_path: Path | None = None,
     actor: str = "orchestra:manager",
@@ -183,7 +203,7 @@ def build_manager_request(
     if not flow:
         return None
 
-    flow_branch = str(flow.get("branch") or "").strip()
+    flow_branch = branch or str(flow.get("branch") or "").strip()
     if not flow_branch:
         return None
 
@@ -272,7 +292,7 @@ def build_manager_sync_request(
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
     # Load prompts.yaml for static sections
-    prompts_path = resolve_prompts_path()
+    prompts_path = check_runtime_asset("config/prompts/prompts.yaml")
     with open(prompts_path) as f:
         prompts_data = yaml.safe_load(f)
     manager_sections = prompts_data.get("manager", {})
@@ -359,9 +379,10 @@ MANAGER_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="manager",
     resolve_options=resolve_manager_options,
     resolve_branch=MANAGER_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_manager_request(
+    build_async_request=lambda config, issue, actor, branch: build_manager_request(
         config,
         issue,
+        branch=branch,
         repo_path=resolve_orchestra_repo_root(),
         actor=actor,
     ),

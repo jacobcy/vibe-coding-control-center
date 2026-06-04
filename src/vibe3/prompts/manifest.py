@@ -10,7 +10,8 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.environment.runtime_assets import resolve_prompt_config
+from vibe3.config.convention_resolver import diagnose_profile
+from vibe3.exceptions import DiagnosticContext, MissingResourceError
 from vibe3.prompts.models import (
     LoadedPromptRecipeDefinition,
     PromptRecipeKind,
@@ -19,6 +20,7 @@ from vibe3.prompts.models import (
     PromptVariableSource,
     VariableSourceKind,
 )
+from vibe3.utils.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 
@@ -75,10 +77,21 @@ class PromptManifest:
             ValueError: If recipes_path exists but contains invalid YAML.
         """
         if not recipes_path.exists():
-            raise FileNotFoundError(
-                f"Prompt recipes file not found: {recipes_path}. "
-                "Please ensure config/prompts/prompt-recipes.yaml exists "
-                "in the repository."
+            raise MissingResourceError(
+                resource=str(recipes_path),
+                context=DiagnosticContext(
+                    resource_type="prompt-recipes",
+                    search_paths=[
+                        str(recipes_path),
+                        str(resolve_prompt_config("prompts/prompt-recipes.yaml")),
+                    ],
+                    profile=diagnose_profile(),
+                    remediation=(
+                        "Run `vibe update run` from vibe-center repo or "
+                        "re-run `scripts/install.sh`"
+                    ),
+                    ref_issue=1924,
+                ),
             )
 
         recipes_raw = _read_yaml(recipes_path).get("recipes", {})
@@ -180,7 +193,19 @@ class PromptManifest:
         try:
             return self.recipes[key]
         except KeyError as exc:
-            raise KeyError(f"Prompt recipe not found: {key}") from exc
+            raise MissingResourceError(
+                resource=f"recipe '{key}'",
+                context=DiagnosticContext(
+                    resource_type="prompt-recipe-key",
+                    search_paths=[str(DEFAULT_PROMPT_RECIPES_PATH)],
+                    profile=diagnose_profile(),
+                    remediation=(
+                        "Check config/prompts/prompt-recipes.yaml for "
+                        f"available recipes. Expected '{key}'."
+                    ),
+                    ref_issue=1907,
+                ),
+            ) from exc
 
     def render_sections(
         self,

@@ -134,37 +134,53 @@ class TestRoundRobinMaterialSelection:
     """Tests that build_governance_recipe selects material from recipe catalog."""
 
     def test_tick_0_selects_first(self):
-        """tick_count=0 selects first material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=0)
+        """execution_count=0 selects first material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=0
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_tick_1_selects_second(self):
-        """tick_count=1 selects second material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=1)
+        """execution_count=1 selects second material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=1
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_tick_2_selects_third(self):
-        """tick_count=2 selects third material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=2)
+        """execution_count=2 selects third material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=2
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/cron-supervisor.md"
 
     def test_tick_wraps_around(self):
-        """tick_count wraps around material catalog (3 materials, tick 3 -> index 0)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=3)
+        """execution_count wraps around material catalog.
+
+        (4 materials, count 4 -> index 0).
+        """
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=4
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """tick_count=7 wraps around 3 materials to index 1 (7 % 3 = 1)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=7)
+        """execution_count=9 wraps around 4 materials to index 1 (9 % 4 = 1)."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=9
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_build_governance_request_uses_round_robin(self):
-        """build_governance_request picks material per tick from recipe catalog."""
+        """build_governance_request picks material per execution_count.
+
+        from recipe catalog.
+        """
         config = _make_config()
         snapshot = _make_snapshot()
         with (
@@ -175,14 +191,14 @@ class TestRoundRobinMaterialSelection:
             mock_github = MagicMock()
             mock_github.list_issues.return_value = []
             mock_github_cls.return_value = mock_github
-            req_tick0 = build_governance_request(config, 0, snapshot)
-            req_tick1 = build_governance_request(config, 1, snapshot)
+            req_tick0 = build_governance_request(config, 0, snapshot, execution_count=0)
+            req_tick1 = build_governance_request(config, 0, snapshot, execution_count=1)
         # Both should produce valid requests (circuit breaker closed, dry_run=False)
         assert req_tick0 is not None
         assert req_tick1 is not None
         # Execution names reflect different ticks
         assert req_tick0.execution_name.endswith("-t0")
-        assert req_tick1.execution_name.endswith("-t1")
+        assert req_tick1.execution_name.endswith("-t0")
 
 
 class TestGovernanceRoleDefinition:

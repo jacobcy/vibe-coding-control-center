@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 
 import typer
 
+from vibe3.config.cli_overrides import (
+    build_role_cli_overrides as _build_role_cli_overrides,
+)
+
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
 
@@ -23,6 +27,23 @@ _SHOW_PROMPT_OPT = Annotated[
         ),
     ),
 ]
+
+
+def validate_show_prompt_dependency(dry_run: bool, show_prompt: bool) -> None:
+    """Validate that --show-prompt is only used with --dry-run.
+
+    Args:
+        dry_run: Whether --dry-run flag is set
+        show_prompt: Whether --show-prompt flag is set
+
+    Raises:
+        typer.Exit: If --show-prompt is used without --dry-run
+    """
+    if show_prompt and not dry_run:
+        typer.echo("Error: --show-prompt requires --dry-run", err=True)
+        raise typer.Exit(1)
+
+
 _ASYNC_OPT = Annotated[
     bool,
     typer.Option(
@@ -37,6 +58,13 @@ _BACKEND_OPT = Annotated[
     Optional[str], typer.Option("--backend", help="Override backend")
 ]
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
+_FRESH_SESSION_OPT = Annotated[
+    bool,
+    typer.Option(
+        "--fresh-session",
+        help="Skip session resume and start a fresh agent session",
+    ),
+]
 
 # Output format options
 AllOption = Annotated[
@@ -103,3 +131,13 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
         raise typer.Exit(1)
 
     return flow_service, branch
+
+
+def build_role_cli_overrides(
+    role: str,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> dict[str, str]:
+    """Build cli_overrides dict for load_runtime_config."""
+    return _build_role_cli_overrides(role, agent, backend, model)

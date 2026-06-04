@@ -40,15 +40,14 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     Allowed imports (infrastructure exceptions):
     - orchestra.protocols (TYPE_CHECKING only)
     - orchestra.failed_gate (TYPE_CHECKING only)
-    - orchestra internal services (used via protocol injection):
-      - dispatch_health_check
-      - issue_loader
-      - queue_operations
-      - queue_persistence_service
 
     Disallowed:
     - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
+    - orchestra.dispatch_health_check
+    - orchestra.issue_loader
+    - orchestra.queue_operations
+    - orchestra.queue_persistence_service
     - Other orchestra modules
 
     Note: protocols and failed_gate are allowed but must be in TYPE_CHECKING blocks.
@@ -57,23 +56,20 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     if not import_str.startswith("vibe3.orchestra"):
         return False
 
-    # Allowed imports (infrastructure services)
-    allowed_orchestra_modules = {
-        "vibe3.orchestra.protocols",  # TYPE_CHECKING only (checked by caller)
-        "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only (checked by caller)
-        # Orchestra internal services (used via protocol injection)
-        "vibe3.orchestra.dispatch_health_check",
-        "vibe3.orchestra.issue_loader",
-        "vibe3.orchestra.queue_operations",
-        "vibe3.orchestra.queue_persistence_service",
-    }
-
-    # Check if import is in allowed list
-    if import_str in allowed_orchestra_modules:
-        return False
-
-    # All other orchestra imports are violations
     return True
+
+
+def is_allowed_type_checking_import(
+    import_str: str, filepath: Path, node: ast.AST
+) -> bool:
+    """Return True for the narrow TYPE_CHECKING-only orchestra exceptions."""
+    allowed_orchestra_modules = {
+        "vibe3.orchestra.protocols",
+        "vibe3.orchestra.failed_gate",
+    }
+    return import_str in allowed_orchestra_modules and is_in_type_checking_block(
+        filepath, node
+    )
 
 
 def is_in_type_checking_block(filepath: Path, node: ast.AST) -> bool:
@@ -126,19 +122,25 @@ def test_domain_layer_no_orchestra_imports():
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if is_orchestra_import(alias.name, py_file):
+                    if is_orchestra_import(alias.name, py_file) and not (
+                        is_allowed_type_checking_import(alias.name, py_file, node)
+                    ):
                         violations.append(
                             f"{py_file.relative_to(domain_dir.parent)}: "
                             f"import {alias.name}"
                         )
             elif isinstance(node, ast.ImportFrom):
-                if node.module and is_orchestra_import(node.module, py_file):
-                    # Check if in TYPE_CHECKING block
-                    if not is_in_type_checking_block(py_file, node):
-                        violations.append(
-                            f"{py_file.relative_to(domain_dir.parent)}: "
-                            f"from {node.module} import ..."
-                        )
+                if (
+                    node.module
+                    and is_orchestra_import(node.module, py_file)
+                    and not (
+                        is_allowed_type_checking_import(node.module, py_file, node)
+                    )
+                ):
+                    violations.append(
+                        f"{py_file.relative_to(domain_dir.parent)}: "
+                        f"from {node.module} import ..."
+                    )
 
     if violations:
         violation_list = "\n".join(violations)

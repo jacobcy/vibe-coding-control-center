@@ -50,6 +50,16 @@ from vibe3.analysis.serena_service import SerenaService
 # Snapshot diff
 from vibe3.analysis.snapshot_diff import compute_diff
 
+# Snapshot diff section
+from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
+
+# Snapshot service
+from vibe3.analysis.snapshot_service import (
+    SnapshotError,
+    build_snapshot,
+    find_snapshot_by_branch,
+)
+
 __all__ = [
     # Core services
     "SerenaService",
@@ -80,4 +90,8 @@ __all__ = [
     "pr_analysis_summary",
     # Snapshot diff
     "compute_diff",
+    "SnapshotError",
+    "build_snapshot",
+    "find_snapshot_by_branch",
+    "build_snapshot_diff_section",
 ]

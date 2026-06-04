@@ -261,13 +261,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added blocked_reason column to flow_state"
         )
 
-    # Migration: add failed_reason field for fail_flow() support
-    if "failed_reason" not in existing:
-        cursor.execute("ALTER TABLE flow_state ADD COLUMN failed_reason TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added failed_reason column to flow_state"
-        )
-
     # Migration: add latest_verdict field for verdict tracking
     if "latest_verdict" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_verdict TEXT")

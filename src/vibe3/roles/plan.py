@@ -22,7 +22,6 @@ from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -36,7 +35,11 @@ from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.models.worktree import WorktreeRequirement
-from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
+from vibe3.roles.definitions import (
+    IssueRoleSyncSpec,
+    RoleOutputContract,
+    TriggerableRoleDefinition,
+)
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import fail_planner_issue
@@ -51,11 +54,14 @@ PLANNER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_plan_options(config: OrchestraConfig) -> Any:
+def resolve_plan_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve planner agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = load_runtime_config()
+    runtime_config = load_runtime_config(cli_overrides=cli_overrides)
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_PLANNER_BACKEND",
         model_env_key="VIBE3_PLANNER_MODEL",
@@ -244,13 +250,14 @@ def build_plan_sync_request(
     )
 
 
-PLAN_SYNC_SPEC = build_issue_sync_spec(
+PLAN_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="planner",
     resolve_options=resolve_plan_options,
     resolve_branch=PLAN_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_plan_request(
+    build_async_request=lambda config, issue, actor, branch: build_plan_request(
         config,
         issue,
+        branch=branch,
         actor=actor,
     ),
     build_sync_request=build_plan_sync_request,
@@ -351,6 +358,10 @@ def execute_spec_plan_async(
     issue_number: int | None,
     branch: str,
     cli_args: list[str],
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
     config: VibeConfig | None = None,
 ) -> CodeagentResult:
     """Execute spec plan in async mode (tmux wrapper).
@@ -359,8 +370,11 @@ def execute_spec_plan_async(
     the CLI via ``cli_args`` inside a tmux session, so all configuration is
     re-resolved from scratch by the child process. Passing a custom ``request``
     or ``config`` here has no effect.
+
+    ``agent``, ``backend``, ``model``, and ``fresh_session`` are also unused here
+    because they should already be included in ``cli_args`` by the caller.
     """
-    _ = request, config
+    _ = request, config, agent, backend, model, fresh_session
     from vibe3.clients.sqlite_client import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
@@ -412,18 +426,33 @@ def execute_spec_plan_sync(
     request: PlanRequest,
     issue_number: int | None,
     branch: str,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
     config: VibeConfig | None = None,
+    dry_run: bool = False,
+    show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
+    from vibe3.execution.session_service import load_session_id
+
     cfg = config or VibeConfig.get_defaults()
+    session_id = None if fresh_session else load_session_id("planner", branch)
     command = create_codeagent_command(
         role="planner",
         context_builder=make_plan_context_builder(request, cfg),
         task=request.task_guidance,
+        dry_run=dry_run,
+        show_prompt=show_prompt,
         handoff_kind="plan",
         branch=branch,
         issue_number=issue_number,
         cwd=None,  # Sync execution uses agent's built-in cwd resolution
         config=cfg,
+        agent=agent,
+        backend=backend,
+        model=model,
+        session_id=session_id,
     )
     return CodeagentExecutionService(cfg).execute_sync(command)

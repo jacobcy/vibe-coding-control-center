@@ -13,10 +13,10 @@ description: Use when the user wants heartbeat-style governance over the issue p
 
 - **governance**：无临时 worktree 的 scan agent，只观察和建议，不执行代码修改。
 - **supervisor/apply**：有临时 worktree 的治理执行 agent，负责实际治理执行动作。
-- **`supervisor/governance/assignee-pool.md`（原 orchestra.md）**：governance supervisor material，是 governance agent 的角色材料，不是 runtime orchestra 本体。
+- **`@vibe/supervisor/governance/assignee-pool.md`（原 orchestra.md，使用 `vibe3 handoff show @vibe/supervisor/governance/assignee-pool.md` 命令读取）**：governance supervisor material，是 governance agent 的角色材料，不是 runtime orchestra 本体。
 - **runtime orchestra / governance supervisor material / supervisor apply 是三个独立概念，不可混淆。**
 
-优先级判断口径必须对齐 `supervisor/governance/assignee-pool.md`。可以把 `vibe-orchestra` 视为自动治理 supervisor 在人机协作环节的落地判断器：它不发明另一套优先级规则，只读取当前现场并按 supervisor 已定义的排序模型，指导人类如何找到下一个需要处理的 issue。
+优先级判断口径必须对齐 `@vibe/supervisor/governance/assignee-pool.md`（使用 `vibe3 handoff show @vibe/supervisor/governance/assignee-pool.md` 命令读取）。可以把 `vibe-orchestra` 视为自动治理 supervisor 在人机协作环节的落地判断器：它不发明另一套优先级规则，只读取当前现场并按 supervisor 已定义的排序模型，指导人类如何找到下一个需要处理的 issue。
 
 术语、对象边界与触发分流以以下标准为准：
 
@@ -58,7 +58,7 @@ description: Use when the user wants heartbeat-style governance over the issue p
 - assignee issue pool 中 issue 的 state labels
 - dependency information such as blocked_by
 - orchestra heartbeat status 与相关文档
-- `supervisor/governance/assignee-pool.md` 中的 queue guidance 与治理边界
+- `@vibe/supervisor/governance/assignee-pool.md` 中的 queue guidance 与治理边界（使用 `vibe3 handoff show @vibe/supervisor/governance/assignee-pool.md` 命令读取）
 
 ## What It Produces
 
@@ -89,7 +89,7 @@ description: Use when the user wants heartbeat-style governance over the issue p
 1. 查看当前 assignee issue pool 中的 running issues 与 queue / flow 现场
 2. 补捞 assignee issue pool 中已满足 assignee 条件但尚未进入调度的候选 issue
 3. 判断 assignee issue pool 中是否已经存在足够明确的执行现场
-4. 参考 `supervisor/governance/assignee-pool.md`，按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对 assignee issue pool 的自动 ready queue 做人机治理判断
+4. 参考 `@vibe/supervisor/governance/assignee-pool.md`（使用 `vibe3 handoff show @vibe/supervisor/governance/assignee-pool.md` 命令读取），按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对 assignee issue pool 的自动 ready queue 做人机治理判断
 5. 结合当前人工上下文，识别 assignee issue pool 中哪些 issue 虽然不在自动顺位最前，但更适合现在先处理
 6. 如有必要，提出最小 non-state label 调整建议（仅作用于 assignee issue pool 内）
 7. 在治理结论处停止

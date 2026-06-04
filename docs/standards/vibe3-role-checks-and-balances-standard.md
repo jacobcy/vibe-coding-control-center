@@ -1,6 +1,6 @@
 # Vibe3 Role Checks and Balances Standard
 
-状态: Active
+状态: Deprecated (见 [v3/human-mirror-architecture-philosophy.md](v3/human-mirror-architecture-philosophy.md))
 
 ## 1. 目的
 

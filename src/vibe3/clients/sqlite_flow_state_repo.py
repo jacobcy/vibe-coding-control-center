@@ -30,8 +30,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         "latest_actor",
         "initiated_by",
         "blocked_by_issue",  # NEW: Dependency issue number (INT)
-        "blocked_reason",  # NEW: Block reason text (TEXT)
-        "failed_reason",  # NEW: Fail reason text (TEXT)
+        "blocked_reason",  # Block reason text (TEXT)
         "next_step",
         "flow_status",
         "updated_at",
@@ -280,7 +279,6 @@ class SQLiteFlowStateRepo(_HasConnection):
                     indicate_ref = NULL,
                     pr_ref = NULL,
                     blocked_reason = NULL,
-                    failed_reason = NULL,
                     blocked_by_issue = NULL,
                     blocked_by = NULL,
                     worktree_path = NULL,

@@ -51,6 +51,7 @@ class TestOrchestrationFacade:
         event = mock_publish.call_args.args[0]
         assert isinstance(event, GovernanceScanStarted)
         assert event.tick_count == 1
+        assert event.execution_count == 1  # First execution
 
         mock_publish.reset_mock()
         facade.on_heartbeat_tick()
@@ -58,6 +59,7 @@ class TestOrchestrationFacade:
         event2 = mock_publish.call_args.args[0]
         assert isinstance(event2, GovernanceScanStarted)
         assert event2.tick_count == 2
+        assert event2.execution_count == 2  # Second execution
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
@@ -145,6 +147,7 @@ class TestOrchestrationFacade:
         facade = OrchestrationFacade(
             capacity=capacity,
             failed_gate=gate,
+            coordinator_factory=lambda **kwargs: MagicMock(),
         )
         facade.on_supervisor_scan = AsyncMock()
         facade._coordinator = MagicMock()

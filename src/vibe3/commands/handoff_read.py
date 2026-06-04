@@ -65,6 +65,7 @@ Usage: vibe3 handoff show <target> [--branch <branch>]
 Show a handoff artifact by target reference.
 
 Target formats:
+  @vibe/<path>       Vibe3 installation materials (governance docs, prompts, skills)
   @key               Shared artifact key (e.g. @task-476/run-1.md)
   @plan              Flow plan ref (resolved from flow_state.plan_ref)
   @report            Flow report ref (resolved from flow_state.report_ref)
@@ -74,6 +75,8 @@ Target formats:
   /abs/path          Absolute filesystem path (debug fallback)
 
 Examples:
+  vibe3 handoff show @vibe/supervisor/apply.md
+  vibe3 handoff show @vibe/prompts/vibe-commit.md --vibe-dir /path/to/vibe3
   vibe3 handoff show @task-476/run-1.md
   vibe3 handoff show @plan --branch task/issue-822
   vibe3 handoff show @plan
@@ -96,17 +99,28 @@ def _get_yaml() -> ModuleType:
 def show(
     target: Annotated[
         str | None,
-        typer.Argument(help="Handoff target: @key, relative/path, or /abs/path"),
+        typer.Argument(
+            help="Handoff target: @vibe/<path>, @key, relative/path, or /abs/path"
+        ),
     ] = None,
     branch: Annotated[
         str | None,
         typer.Option("--branch", help="Branch for canonical ref resolution"),
     ] = None,
+    vibe_dir: Annotated[
+        str | None,
+        typer.Option(
+            "--vibe-dir", help="Explicit vibe3 installation path for @vibe/ targets"
+        ),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
-    """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    """Show a handoff artifact.
+
+    Supports @vibe/<path>, @key, relative/path, and /abs/path targets.
+    """
     if trace:
         enable_method_trace()
 
@@ -128,7 +142,7 @@ def show(
             raise typer.Exit(1)
     try:
         resolved_artifact = resolve_handoff_target(
-            target, resolved_branch, git_client=GitClient()
+            target, resolved_branch, git_client=GitClient(), vibe_dir=vibe_dir
         )
     except FileNotFoundError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -158,26 +172,10 @@ def status(
     ] = False,
     output_format: FormatOption = "table",
     verbose: VerboseOption = False,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="[DEPRECATED] Use --format json instead",
-            hidden=True,
-        ),
-    ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
     if trace:
         enable_method_trace()
-
-    # Handle deprecated --json flag
-    if json_output and output_format == "table":
-        typer.echo(
-            "Warning: --json is deprecated, use --format json instead",
-            err=True,
-        )
-        output_format = "json"
 
     flow_service = FlowService()
     try:

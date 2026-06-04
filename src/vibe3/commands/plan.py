@@ -5,13 +5,23 @@ from typing import Annotated
 
 import typer
 
+from vibe3.agents import create_codeagent_command, make_plan_context_builder
 from vibe3.commands.command_options import (
+    _AGENT_OPT,
     _ASYNC_OPT,
+    _BACKEND_OPT,
     _DRY_RUN_OPT,
+    _FRESH_SESSION_OPT,
+    _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    build_role_cli_overrides,
+    validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.loader import load_runtime_config
+from vibe3.exceptions import ConfigError
+from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.roles.plan import (
     execute_spec_plan_async,
     execute_spec_plan_sync,
@@ -40,6 +50,10 @@ def _plan_for_branch(
     dry_run: bool,
     no_async: bool,
     show_prompt: bool,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> None:
     """Create implementation plan for a branch with spec_ref."""
     if trace:
@@ -78,19 +92,69 @@ def _plan_for_branch(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Config error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Handle dry_run early return
+    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
+    # (aligned with run command's proven dry_run handling)
+    if dry_run:
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=make_plan_context_builder(spec_input.request, config),
+            task=spec_input.request.task_guidance,
+            dry_run=True,
+            show_prompt=show_prompt,
+            handoff_kind="plan",
+            branch=branch,
+            issue_number=issue_number,
+            config=config,
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        CodeagentExecutionService(config).execute_sync(command)
+        return
+
     if no_async:
         execute_spec_plan_sync(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
+            config=config,
         )
     else:
-        execute_spec_plan_async(
+        cli_args = ["plan"]
+        if agent:
+            cli_args += ["--agent", agent]
+        if backend:
+            cli_args += ["--backend", backend]
+        if model:
+            cli_args += ["--model", model]
+        if fresh_session:
+            cli_args += ["--fresh-session"]
+
+        result = execute_spec_plan_async(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
-            cli_args=["plan"],
+            cli_args=cli_args,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
         )
+        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"log: {result.log_path}")
 
 
 def _plan_spec_impl(
@@ -99,6 +163,11 @@ def _plan_spec_impl(
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> None:
     """Create implementation plan from a specification file."""
     if trace:
@@ -173,10 +242,6 @@ def _plan_spec_impl(
             spec_file = Path(flow.spec_ref)
             typer.echo(f"Using flow spec: {flow.spec_ref}")
 
-    if dry_run:
-        typer.echo("Plan dry run for specification")
-        return
-
     issue_number = flow.task_issue_number
 
     if not issue_number:
@@ -195,23 +260,71 @@ def _plan_spec_impl(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Config error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Handle dry_run early return
+    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
+    # (aligned with run command's proven dry_run handling)
+    if dry_run:
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=make_plan_context_builder(spec_input.request, config),
+            task=spec_input.request.task_guidance,
+            dry_run=True,
+            show_prompt=show_prompt,
+            handoff_kind="plan",
+            branch=branch,
+            issue_number=issue_number,
+            config=config,
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        CodeagentExecutionService(config).execute_sync(command)
+        return
+
     if no_async:
         execute_spec_plan_sync(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
+            config=config,
         )
     else:
-        spec_arg = str(spec_path) if spec_path else None
-        execute_spec_plan_async(
+        cli_args = ["plan"]
+        if spec_path:
+            cli_args += ["--spec", spec_path]
+        if agent:
+            cli_args += ["--agent", agent]
+        if backend:
+            cli_args += ["--backend", backend]
+        if model:
+            cli_args += ["--model", model]
+        if fresh_session:
+            cli_args += ["--fresh-session"]
+
+        result = execute_spec_plan_async(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
-            cli_args=[
-                "plan",
-                *(["--spec", spec_arg] if spec_arg else []),
-            ],
+            cli_args=cli_args,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
         )
+        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"log: {result.log_path}")
 
 
 @app.callback(invoke_without_command=True)
@@ -237,11 +350,18 @@ def default(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
 
     target_branch = resolve_branch_arg(branch)
+
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     # --task is alias for --spec (backward compatibility)
     spec_path = spec or task
@@ -253,6 +373,11 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
         )
         return
 
@@ -263,6 +388,10 @@ def default(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
     )
 
 
@@ -274,6 +403,10 @@ def issue_command(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
     """Legacy alias: plan --branch <issue>."""
     default(
@@ -284,4 +417,8 @@ def issue_command(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
     )

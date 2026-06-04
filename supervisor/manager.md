@@ -985,7 +985,7 @@ Steps:
 1. 调用 `read_context()`
 2. 检查最新评论是否已经解除 blocker
 3. 检查依赖或同类 issue
-4. 若 blocker 已解除（人类已通过 `vibe3 task resume` 恢复）：
+4. 若 blocker 已解除（人类已通过 `vibe3 task resume <issue-number> --label auto` 恢复）：
    - 不需要操作，状态已由 human resume 处理
    - `exit()`
 5. 若 blocker 未解除：
@@ -994,7 +994,7 @@ Steps:
    - 不重复刷同类长 comment
    - `exit()`
 
-注意：`state/blocked` 不能由 manager 自动转出。只有人类通过 `vibe3 task resume --blocked` 才能解除 blocked 状态。
+注意：`state/blocked` 不能由 manager 自动转出。只有人类通过 `vibe3 task resume <issue-number> --label auto` 才能解除 blocked 状态。禁止使用 `vibe3 task resume --blocked`（会恢复所有 blocked issues，未经同意不可扩大范围）。
 
 ### `handle_merge_ready()`
 

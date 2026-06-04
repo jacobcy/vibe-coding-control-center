@@ -51,6 +51,11 @@ def test_plan_help_shows_options() -> None:
     clean_output = result.output.replace("\x1b[1m", "").replace("\x1b[0m", "")
     assert "--branch" in clean_output
     assert "--spec" in clean_output
+    # New options from issue #2023
+    assert "--agent" in clean_output
+    assert "--backend" in clean_output
+    assert "--model" in clean_output
+    assert "--fresh-session" in clean_output
 
 
 def test_plan_spec_uses_flow_spec_ref(monkeypatch) -> None:
@@ -149,6 +154,11 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
         "vibe3.commands.plan.resolve_spec_plan_input",
         MagicMock(),
     )
+    # Mock load_runtime_config since we added it in issue #2023
+    monkeypatch.setattr(
+        "vibe3.commands.plan.load_runtime_config",
+        MagicMock(),
+    )
 
     with patch.object(Path, "exists", return_value=True):
         with patch.object(Path, "is_file", return_value=True):
@@ -166,3 +176,198 @@ def test_plan_issue_subcommand_works(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["issue", "42"])
     assert result.exit_code == 0
     mock_runner.assert_called_once()
+
+
+def test_plan_dry_run_branch(monkeypatch) -> None:
+    """Test plan --branch --dry-run returns exit_code=0 without async dispatch."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_async = MagicMock()
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    # Mock create_codeagent_command and CodeagentExecutionService
+    mock_command = MagicMock()
+    mock_result = MagicMock()
+    mock_result.success = True
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+    monkeypatch.setattr("vibe3.commands.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.CodeagentExecutionService",
+        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--dry-run"])
+    assert result.exit_code == 0
+    # Should NOT call async dispatch
+    mock_async.assert_not_called()
+    # Should create command with dry_run=True
+    mock_command.assert_called_once()
+    call_kwargs = mock_command.call_args[1]
+    assert call_kwargs["dry_run"] is True
+
+
+def test_plan_show_prompt_propagates(monkeypatch) -> None:
+    """Test plan --branch --dry-run --show-prompt passes show_prompt=True."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_resolve = MagicMock()
+
+    # Mock create_codeagent_command and CodeagentExecutionService
+    mock_command = MagicMock()
+    mock_result = MagicMock()
+    mock_result.success = True
+
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+    monkeypatch.setattr("vibe3.commands.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.CodeagentExecutionService",
+        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--dry-run", "--show-prompt"])
+    assert result.exit_code == 0
+    # Should create command with show_prompt=True
+    mock_command.assert_called_once()
+    call_kwargs = mock_command.call_args[1]
+    assert call_kwargs["show_prompt"] is True
+
+
+def test_plan_async_shows_tmux_info(monkeypatch) -> None:
+    """Test plan --branch (async) shows tmux session and log path."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_result = MagicMock()
+    mock_result.tmux_session = "vibe3-planner-issue-42"
+    mock_result.log_path = "/path/to/log.md"
+
+    mock_async = MagicMock(return_value=mock_result)
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42"])
+    assert result.exit_code == 0
+    # Should display tmux and log info
+    assert "tmux: vibe3-planner-issue-42" in result.output
+    assert "log: /path/to/log.md" in result.output
+
+
+def test_plan_agent_option_propagates(monkeypatch) -> None:
+    """Test plan --agent foo propagates to execute_spec_plan_sync."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--no-async", "--agent", "foo"])
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["agent"] == "foo"
+
+
+def test_plan_backend_option_propagates(monkeypatch) -> None:
+    """Test plan --backend claude propagates to execute_spec_plan_sync."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(
+        plan_app, ["--branch", "42", "--no-async", "--backend", "claude"]
+    )
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["backend"] == "claude"
+
+
+def test_plan_model_option_propagates(monkeypatch) -> None:
+    """Test plan --model claude-opus-4-8 propagates to execute_spec_plan_sync."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(
+        plan_app, ["--branch", "42", "--no-async", "--model", "claude-opus-4-8"]
+    )
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["model"] == "claude-opus-4-8"
+
+
+def test_plan_fresh_session_propagates(monkeypatch) -> None:
+    """Test plan --fresh-session propagates to execute_spec_plan_sync."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(
+        plan_app, ["--branch", "42", "--no-async", "--fresh-session"]
+    )
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["fresh_session"] is True

@@ -85,6 +85,15 @@ recipes:
           - run.skill_content
           - run.exit_contract
 
+  run.publish:
+    template_key: run.skill
+    description: Executor prompt for publish path (commit_mode, merge-ready → handoff).
+    variants:
+      default:
+        sections:
+          - run.skill_content
+          - run.publish_exit_contract
+
   # Planner role assembly.
   #
   # Design intent:
@@ -223,6 +232,10 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/cron-supervisor.md
+      - name: supervisor/governance/code-auditor.md
+        source:
+          kind: file
+          path: supervisor/governance/code-auditor.md
     variables:
       server_status:
         kind: provider

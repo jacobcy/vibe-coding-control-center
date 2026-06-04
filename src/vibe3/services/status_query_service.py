@@ -294,7 +294,6 @@ class StatusQueryService:
                 continue
 
             # Get blocked_by and blocked_reason from flow state
-            # (Note: failed_reason is deprecated, now unified to blocked_reason)
             blocked_by: tuple[int, ...] | None = None
             blocked_reason: str | None = None
             if state == IssueState.BLOCKED:
@@ -443,8 +442,7 @@ class StatusQueryService:
 
         Returns:
             List of resumable issue dicts with number, title, state, flow,
-            failed_reason (if applicable), and resume_kind ("failed",
-            "blocked", or "aborted")
+            and resume_kind ("failed", "blocked", or "aborted")
         """
         all_issues = self.fetch_orchestrated_issues(
             flows, queued_set=set(), stale_flows=stale_flows

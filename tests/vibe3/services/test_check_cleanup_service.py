@@ -212,37 +212,36 @@ def test_clean_residual_branches_integrates_all_cleanups() -> None:
 
 
 def test_cleanup_detached_worktrees_removes_orphaned_worktrees() -> None:
-    """Detached HEAD worktrees should be removed during cleanup."""
+    """Detached HEAD worktrees inside repo root should be removed during cleanup."""
     store = MagicMock()
     git_client = MagicMock()
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    # Mock git worktree list --porcelain output
-    porcelain_output = """worktree /tmp/wt1
+    repo_root = "/repo/main"
+    # Both detached worktrees are inside the repo root
+    porcelain_output = f"""worktree {repo_root}/.worktrees/wt1
 HEAD abc123def456
 detached
 
-worktree /tmp/wt2
-branch refs/heads/main
+worktree {repo_root}/.worktrees/wt2
+branch refs/heads/feature
 
-worktree /tmp/wt3
+worktree {repo_root}/.worktrees/wt3
 HEAD def456abc123
 detached
 """
 
     # Mock git client methods
     git_client._run.return_value = porcelain_output
-    git_client.get_worktree_root.return_value = "/tmp/current"
-    store.get_all_flows.return_value = [
-        {"branch": "HEAD", "flow_status": "aborted"},
-    ]
+    git_client.get_worktree_root.return_value = repo_root
+    store.get_all_flows.return_value = []
 
     result = service._cleanup_detached_worktrees()
 
-    # Verify: 2 detached worktrees removed
+    # Verify: 2 detached worktrees (inside repo) removed
     assert len(result["cleaned"]) == 2
-    assert "/tmp/wt1" in result["cleaned"]
-    assert "/tmp/wt3" in result["cleaned"]
+    assert f"{repo_root}/.worktrees/wt1" in result["cleaned"]
+    assert f"{repo_root}/.worktrees/wt3" in result["cleaned"]
     assert len(result["failed"]) == 0
 
 
@@ -255,12 +254,14 @@ def test_cleanup_detached_worktrees_skips_current_cwd() -> None:
     service = CheckCleanupService(store=store, git_client=git_client)
 
     current_cwd = os.getcwd()
+    # other-wt is inside the same root so it IS eligible for cleanup
+    other_wt = current_cwd + "/.worktrees/orphan-wt"
 
     porcelain_output = f"""worktree {current_cwd}
 HEAD abc123def456
 detached
 
-worktree /tmp/other-wt
+worktree {other_wt}
 HEAD def456abc123
 detached
 """
@@ -268,14 +269,12 @@ detached
     # Mock git client methods
     git_client._run.return_value = porcelain_output
     git_client.get_worktree_root.return_value = current_cwd
-    store.get_all_flows.return_value = [
-        {"branch": "HEAD", "flow_status": "aborted"},
-    ]
+    store.get_all_flows.return_value = []
 
     result = service._cleanup_detached_worktrees()
 
     # Verify: only non-CWD worktree removed
-    assert result["cleaned"] == ["/tmp/other-wt"]
+    assert other_wt in result["cleaned"]
     assert current_cwd in result["skipped_self"]
     # Verify: only one remove call (not for CWD)
     remove_calls = [
@@ -509,3 +508,158 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
         call = operations.reset_issue_to_ready.call_args.kwargs
         assert call["issue_number"] == 300
         assert call["label_state"] == ""
+
+
+def test_check_cleanup_service_accepts_backend_parameter():
+    """CheckCleanupService should accept BackendProtocol in constructor."""
+    from unittest.mock import MagicMock
+
+    from vibe3.clients.protocols import BackendProtocol
+
+    mock_backend = MagicMock(spec=BackendProtocol)
+    mock_store = MagicMock()
+    mock_git = MagicMock()
+
+    service = CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git,
+        backend=mock_backend,
+    )
+
+    assert service._backend is mock_backend
+
+
+def test_backend_propagated_to_session_registry():
+    """Backend should be passed to SessionRegistryService."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.clients.protocols import BackendProtocol
+
+    mock_backend = MagicMock(spec=BackendProtocol)
+    mock_store = MagicMock()
+    mock_git = MagicMock()
+
+    service = CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git,
+        backend=mock_backend,
+    )
+
+    with patch(
+        "vibe3.environment.session_registry.SessionRegistryService"
+    ) as mock_registry_class:
+        mock_registry = MagicMock()
+        mock_registry_class.return_value = mock_registry
+        mock_registry.get_all_branches_with_live_sessions.return_value = set()
+
+        service._get_branches_with_live_sessions()
+
+        mock_registry_class.assert_called_once_with(
+            store=mock_store, backend=mock_backend
+        )
+
+
+def test_backend_passed_to_expired_resource_service():
+    """Backend should be passed to ExpiredResourceCleanupService."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.clients.protocols import BackendProtocol
+
+    mock_backend = MagicMock(spec=BackendProtocol)
+    service = CheckCleanupService(
+        store=MagicMock(),
+        git_client=MagicMock(),
+        backend=mock_backend,
+    )
+
+    with patch(
+        "vibe3.services.expired_resource_cleanup_service.ExpiredResourceCleanupService"
+    ) as mock_class:
+        mock_instance = MagicMock()
+        mock_class.return_value = mock_instance
+        mock_instance.clean_expired_agent_worktrees.return_value = {"cleaned": []}
+        mock_instance.clean_expired_remote_branches.return_value = {"cleaned": []}
+        mock_instance.clean_expired_local_branches.return_value = {"cleaned": []}
+
+        # Trigger creation via clean_residual_branches
+        with patch.object(
+            service, "_clean_terminal_flows", return_value={"summary": ""}
+        ):
+            with patch("vibe3.config.settings.VibeConfig.get_defaults"):
+                service.clean_residual_branches()
+
+                # Verify backend was passed to constructor
+                mock_class.assert_called_once()
+                call_kwargs = mock_class.call_args.kwargs
+                assert call_kwargs.get("backend") is mock_backend
+
+
+def test_cleanup_detached_worktrees_removes_non_flow_managed() -> None:
+    """Detached worktrees not in flow records should also be cleaned (repo-internal)."""
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    repo_root = "/repo/main"
+    # wt-orphan is detached and NOT in any flow record
+    porcelain_output = f"""worktree {repo_root}
+branch refs/heads/main
+
+worktree {repo_root}/.worktrees/wt-orphan
+HEAD abc123def456
+detached
+
+"""
+    git_client._run.return_value = porcelain_output
+    git_client.get_worktree_root.return_value = repo_root
+    # No flow records at all
+    store.get_all_flows.return_value = []
+
+    result = service._cleanup_detached_worktrees()
+
+    # non-flow-managed detached worktree within repo → should be cleaned
+    assert f"{repo_root}/.worktrees/wt-orphan" in result["cleaned"]
+
+
+def test_cleanup_detached_worktrees_skips_protected_names() -> None:
+    """Protected worktree names (wt-claude, codex, etc.) must never be deleted."""
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    repo_root = "/repo/main"
+    porcelain_output = f"""worktree {repo_root}
+branch refs/heads/main
+
+worktree {repo_root}/.worktrees/wt-claude
+HEAD aaa111bbb222
+detached
+
+worktree {repo_root}/.worktrees/wt-codex
+HEAD bbb222ccc333
+detached
+
+worktree {repo_root}/.worktrees/wt-orphan
+HEAD ccc333ddd444
+detached
+
+"""
+    git_client._run.return_value = porcelain_output
+    git_client.get_worktree_root.return_value = repo_root
+    store.get_all_flows.return_value = []
+
+    result = service._cleanup_detached_worktrees()
+
+    # Protected names must be skipped
+    protected_paths = [
+        f"{repo_root}/.worktrees/wt-claude",
+        f"{repo_root}/.worktrees/wt-codex",
+    ]
+    for p in protected_paths:
+        assert p not in result["cleaned"], f"{p} should be protected"
+    assert "skipped_protected" in result
+    assert any("wt-claude" in s for s in result["skipped_protected"])
+    assert any("wt-codex" in s for s in result["skipped_protected"])
+
+    # wt-orphan is not protected → cleaned
+    assert f"{repo_root}/.worktrees/wt-orphan" in result["cleaned"]

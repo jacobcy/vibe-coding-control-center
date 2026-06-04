@@ -56,9 +56,9 @@ def test_flow_projection_falls_back_to_github_on_cache_miss() -> None:
         # Mock GitHub client
         with patch("vibe3.services.flow_projection_service.GitHubClient") as mock_gh:
             mock_gh_instance = MagicMock()
-            mock_gh_instance.view_issue.return_value = {
-                "number": 999,
-                "title": "Fetched from GitHub",
+            # Mock batch_get_issues to return issue title
+            mock_gh_instance.batch_get_issues.return_value = {
+                999: "Fetched from GitHub"
             }
             mock_gh.return_value = mock_gh_instance
 
@@ -70,8 +70,8 @@ def test_flow_projection_falls_back_to_github_on_cache_miss() -> None:
             # Should have fetched from GitHub
             assert titles.get(999) == "Fetched from GitHub"
             assert net_err is False  # GitHub call succeeded
-            # GitHub API should have been called
-            mock_gh_instance.view_issue.assert_called_once_with(999)
+            # GitHub batch API should have been called
+            mock_gh_instance.batch_get_issues.assert_called_once_with([999])
 
 
 def test_flow_projection_returns_empty_on_github_failure() -> None:
@@ -86,6 +86,9 @@ def test_flow_projection_returns_empty_on_github_failure() -> None:
         # Mock GitHub client to fail
         with patch("vibe3.services.flow_projection_service.GitHubClient") as mock_gh:
             mock_gh_instance = MagicMock()
+            # batch_get_issues returns None on failure
+            mock_gh_instance.batch_get_issues.return_value = None
+            # view_issue also fails in fallback
             mock_gh_instance.view_issue.side_effect = Exception("GitHub error")
             mock_gh.return_value = mock_gh_instance
 

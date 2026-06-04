@@ -21,7 +21,16 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.domain.protocols.dispatch_protocols import (
+    CapacityServiceProtocol,
+    CheckServiceProtocol,
+    DispatchHealthCheckProtocol,
+    FlowContextResolverProtocol,
+    FlowServiceProtocol,
     IssueCollectionServiceProtocol,
+    IssueLoaderProtocol,
+    LabelDispatchCallable,
+    QueuePersistenceServiceProtocol,
+    QueueSelectorProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.publisher import publish
@@ -32,22 +41,6 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.observability.orchestra_log import append_orchestra_event
-
-# Note: orchestra internal services remain in orchestra layer
-# GlobalDispatchCoordinator depends on them via protocols
-from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
-from vibe3.orchestra.issue_loader import (
-    get_flow_context,
-    load_issue,
-)
-from vibe3.orchestra.protocols import (
-    CapacityServiceProtocol,
-    CheckServiceProtocol,
-    FlowServiceProtocol,
-    LabelDispatchCallable,
-)
-from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
-from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
@@ -79,6 +72,11 @@ class GlobalDispatchCoordinator:
     _executor: ThreadPoolExecutor
     _owns_executor: bool
     _frozen_queue: list[QueueEntry] | None
+    _health_check_service: DispatchHealthCheckProtocol
+    _queue_persistence: QueuePersistenceServiceProtocol
+    _load_issue: IssueLoaderProtocol
+    _flow_context: FlowContextResolverProtocol
+    _queue_selector: QueueSelectorProtocol
     _check_service: CheckServiceProtocol
     _flow_blocker: FlowServiceProtocol
     _issue_collector_factory: Callable[[], IssueCollectionServiceProtocol]
@@ -96,6 +94,11 @@ class GlobalDispatchCoordinator:
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
         *,
+        health_check_service: DispatchHealthCheckProtocol,
+        queue_persistence: QueuePersistenceServiceProtocol,
+        issue_loader: IssueLoaderProtocol,
+        flow_context_resolver: FlowContextResolverProtocol,
+        queue_selector: QueueSelectorProtocol,
         check_service: CheckServiceProtocol | None = None,
         flow_blocker: FlowServiceProtocol | None = None,
         issue_collector_factory: (
@@ -116,20 +119,19 @@ class GlobalDispatchCoordinator:
         self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
 
+        # Injected runtime services
+        self._health_check_service = health_check_service
+        self._queue_persistence = queue_persistence
+        self._load_issue = issue_loader
+        self._flow_context = flow_context_resolver
+        self._queue_selector = queue_selector
+
         # Optional dependency injection with backward-compatible fallback
         self._check_service = check_service or CheckService(
             store=store, git_client=flow_manager.git, github_client=github
         )
         self._flow_blocker = flow_blocker or FlowService(
             store=store, git_client=flow_manager.git
-        )
-
-        # Initialize health check service with flow context resolver
-        self._health_check_service = DispatchHealthCheckService(
-            check_service=self._check_service,
-            flow_blocker=self._flow_blocker,
-            store=store,
-            flow_context_resolver=self._flow_context,
         )
 
         # Fallback: create default factory or use default dispatcher
@@ -144,16 +146,6 @@ class GlobalDispatchCoordinator:
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
 
-        # Initialize queue persistence service
-        self._queue_persistence = QueuePersistenceService(
-            store=store,
-            config=config,
-            github=github,
-            registry=registry,
-            supervisor_label=self._supervisor_label,
-            load_issue=self._load_issue,
-        )
-
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
         # coordinate() as the single queue-lifecycle owner)
@@ -167,6 +159,11 @@ class GlobalDispatchCoordinator:
         """Get the set of issue numbers currently in the frozen queue."""
         self._queue_persistence.frozen_queue = self._frozen_queue
         return self._queue_persistence.get_queued_issue_numbers()
+
+    def _sync_queue_persistence_issue_loader(self) -> None:
+        """Keep queue persistence aligned with the coordinator issue loader."""
+        if hasattr(self._queue_persistence, "load_issue"):
+            self._queue_persistence.load_issue = self._load_issue
 
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
@@ -190,20 +187,6 @@ class GlobalDispatchCoordinator:
                 self._label_dispatcher(role, issue, branch=branch, tick_id=tick_id),
             )
         )
-
-    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
-        """Get flow context for an issue (backward compatibility)."""
-        return get_flow_context(
-            issue_number, self._config, self._github, self._store, self._flow_manager
-        )
-
-    def _load_issue(self, issue_number: int) -> IssueInfo | None:
-        """Load issue snapshot (backward compatibility)."""
-        return load_issue(issue_number, self._config, self._github)
-
-    def _ensure_load_issue_attribute(self) -> None:
-        """Ensure persistence service has current _load_issue reference."""
-        self._queue_persistence.load_issue = self._load_issue
 
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
         """Collect a new frozen queue only when the current one is empty."""
@@ -237,7 +220,7 @@ class GlobalDispatchCoordinator:
             IssueState.READY,
         ):
             try:
-                issues = select_ready_issues_from_collected_issues(
+                issues = self._queue_selector(
                     collected_issues,
                     state,
                     self._config,
@@ -523,7 +506,7 @@ class GlobalDispatchCoordinator:
         # Step 1: Restore queue from persistence if None
         if self._frozen_queue is None:
             self._queue_persistence.frozen_queue = None
-            self._ensure_load_issue_attribute()
+            self._sync_queue_persistence_issue_loader()
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
@@ -532,7 +515,7 @@ class GlobalDispatchCoordinator:
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
-        self._ensure_load_issue_attribute()
+        self._sync_queue_persistence_issue_loader()
         cleared_all = self._queue_persistence.promote()
         if cleared_all:
             # Invalidate PR cache when queue is cleared

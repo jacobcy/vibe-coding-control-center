@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
@@ -20,7 +21,7 @@ def stable_flow_actor(monkeypatch):
         lambda store, branch, explicit_actor=None: explicit_actor or "test-actor",
     )
 
-    mock_gh = MagicMock()
+    mock_gh = MagicMock(spec=GitHubClient)
     mock_gh.get_pr.return_value = None
 
     monkeypatch.setattr(

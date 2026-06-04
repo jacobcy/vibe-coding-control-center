@@ -122,7 +122,7 @@ def handle_governance_scan_started(
     execution_name = build_governance_execution_name(event.tick_count)
 
     # Build CLI self-invocation request (cmd field, no prompt)
-    # This ensures the tmux wrapper calls 'internal governance <tick>'
+    # This ensures the tmux wrapper calls 'internal governance <tick> <execution_count>'
     # which enters governance_sync_runner with ErrorTrackingService
     command_root = resolve_async_cli_project_root(root)
     cmd = [
@@ -136,6 +136,7 @@ def handle_governance_scan_started(
         "internal",
         "governance",
         str(event.tick_count),
+        str(event.execution_count),
     ]
 
     env = dict(os.environ)

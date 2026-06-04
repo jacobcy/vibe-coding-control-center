@@ -24,12 +24,13 @@ from vibe3.services import record_dispatch_failure_if_unexpected
 def run_governance_sync(
     *,
     tick_count: int,
+    execution_count: int = 0,
     material_override: str | None = None,
     dry_run: bool = False,
     show_prompt: bool = False,
     session_id: str | None = None,
-    governance_fns: GovernanceFunctions | None = None,
-    append_event: GovernanceEventLogger | None = None,
+    governance_fns: GovernanceFunctions,
+    append_event: GovernanceEventLogger,
 ) -> None:
     """Run governance scan synchronously with error tracking.
 
@@ -39,24 +40,15 @@ def run_governance_sync(
 
     Args:
         tick_count: Tick number for governance material rotation
+        execution_count: Independent counter for material rotation
+            (resolves tick conflict)
         material_override: Optional governance role to override material rotation
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
         session_id: Optional session ID for resume
-        governance_fns: Optional injected governance functions (for decoupling)
-        append_event: Optional injected event logger (for decoupling)
+        governance_fns: Injected governance functions (required)
+        append_event: Injected event logger (required)
     """
-    # Default fallback via lazy import for backward compatibility
-    if governance_fns is None:
-        from vibe3.roles.governance_factory import build_default_governance_fns
-
-        governance_fns = build_default_governance_fns()
-
-    if append_event is None:
-        from vibe3.orchestra.logging import append_governance_event as _ae
-
-        append_event = _ae
-
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
     from vibe3.domain import FlowManager
@@ -74,12 +66,14 @@ def run_governance_sync(
         snapshot,
         config=config,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     render_result = governance_fns.render_prompt(
         config,
         snapshot_context,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     prompt_content = render_result.rendered_text
@@ -148,7 +142,7 @@ def run_governance_async(
     *,
     tick_count: int = 0,
     material_override: str | None = None,
-    build_execution_name: Callable[[int], str] | None = None,
+    build_execution_name: Callable[[int], str],
 ) -> None:
     """Run governance scan in background tmux session (async).
 
@@ -159,22 +153,15 @@ def run_governance_async(
     Args:
         tick_count: Tick number for governance material rotation
         material_override: Optional governance role to override material rotation
-        build_execution_name: Optional injected execution name builder (for decoupling)
+        build_execution_name: Injected execution name builder (required)
     """
+    from vibe3.domain import FlowManager
     from vibe3.environment import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.issue_role_support import (
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-
-    # Default fallback via lazy import
-    if build_execution_name is None:
-        from vibe3.roles.governance import build_governance_execution_name as _ben
-
-        build_execution_name = _ben
-
-    from vibe3.domain import FlowManager
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 

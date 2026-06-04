@@ -43,8 +43,16 @@ def is_v3_source_file(filepath: str) -> bool:
 
 
 def is_v3_test_file(filepath: str) -> bool:
-    """Return True for Python tests under tests/vibe3."""
-    return filepath.startswith("tests/vibe3/") and filepath.endswith(".py")
+    """Return True for Python tests under tests/vibe3.
+
+    __init__.py files are excluded because they contain no tests,
+    preventing misleading "no tests ran" warnings in pre-push hooks.
+    """
+    return (
+        filepath.startswith("tests/vibe3/")
+        and filepath.endswith(".py")
+        and Path(filepath).name != "__init__.py"
+    )
 
 
 def is_hook_file(filepath: str) -> bool:

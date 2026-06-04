@@ -24,7 +24,7 @@ class GitHubClient(
     - Base operations (auth check, command execution)
     - PR operations (create, get, update, merge, query)
     - Review operations (comments, reviews, diff)
-    - Issues operations (list, view)
+    - Issues operations (list, view, batch fetch)
     - Issue admin operations (close, add comment)
     - Issue body operations (read, update)
     """

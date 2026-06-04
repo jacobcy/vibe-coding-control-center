@@ -18,13 +18,13 @@ related_docs:
 ## 架构变化
 
 **V2 架构**：
-- 本地 `roadmap.json` 作为规划层
+- 本地 `roadmap.json` 作为过时或备份镜像
 - `roadmap item` 包含依赖关系
 
 **V3 架构**：
 - GitHub Issues API 作为工作项真源
 - SQLite `flow_issue_links` 表记录 Flow 与 Issue 的关系
-- 无本地 `roadmap.json`，依赖关系通过 issue role 表达
+- 无本地 `roadmap.json`（主规划真源为 GitHub Issues），依赖关系通过 issue role 表达
 
 ## 依赖关系建模
 
@@ -319,7 +319,7 @@ vibe3 flow blocked --task 218
 
 | 维度 | V2 | V3 |
 |------|----|----|
-| **规划层** | 本地 `roadmap.json` | GitHub Issues API |
+| **规划层** | 本地 `roadmap.json` (过时/备份) | GitHub Issues API (主真源) |
 | **依赖建模** | `roadmap item` 层 | `flow_issue_links` 表 |
 | **阻塞验证** | 强制 PR merged 证据 | 不强制验证 |
 | **查询方式** | `roadmap show` | `flow show` |

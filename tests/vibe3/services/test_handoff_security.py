@@ -178,3 +178,98 @@ def test_resolve_shared_artifact_accepts_valid_key(tmp_path: Path) -> None:
     client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
     result = resolve_handoff_target("@task-123/run.md", git_client=client)
     assert result == artifact
+
+
+# --- Security Tests: @vibe/ namespace ---
+
+
+def test_resolve_vibe_material_rejects_path_traversal(tmp_path: Path) -> None:
+    """@vibe/../etc/passwd should be rejected."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target("@vibe/../etc/passwd", vibe_dir=str(vibe_root))
+
+
+def test_resolve_vibe_material_rejects_path_traversal_in_segment(
+    tmp_path: Path,
+) -> None:
+    """@vibe/supervisor/../../etc/passwd should be rejected."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target(
+            "@vibe/supervisor/../../etc/passwd", vibe_dir=str(vibe_root)
+        )
+
+
+def test_resolve_vibe_material_boundary_check(tmp_path: Path) -> None:
+    """@vibe/<path> should not escape vibe root after resolution."""
+    # This test ensures that even if symlinks or other tricks are used,
+    # the resolved path stays within vibe root
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    # Try to escape using a symlink (if supported by filesystem)
+    try:
+        escape_target = tmp_path / "etc" / "passwd"
+        escape_target.parent.mkdir()
+        escape_target.write_text("root:x:0:0:root:/root:/bin/bash")
+
+        symlink = vibe_root / "malicious"
+        symlink.symlink_to(tmp_path / "etc")
+
+        # This should fail because after resolving the symlink,
+        # the path escapes the vibe root
+        with pytest.raises(ValueError, match="Security violation"):
+            resolve_handoff_target("@vibe/malicious/passwd", vibe_dir=str(vibe_root))
+    except OSError:
+        # Skip if symlink creation fails (e.g., on Windows without admin)
+        pass
+
+
+def test_resolve_vibe_material_rejects_empty_path(tmp_path: Path) -> None:
+    """@vibe/ (empty path) should be rejected."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    with pytest.raises(ValueError, match="path cannot be empty"):
+        resolve_handoff_target("@vibe/", vibe_dir=str(vibe_root))
+
+
+def test_resolve_vibe_material_rejects_invalid_chars(tmp_path: Path) -> None:
+    """@vibe/<path> with invalid characters should be rejected."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    with pytest.raises(ValueError, match="invalid characters"):
+        resolve_handoff_target("@vibe/skills/test\x00skill.md", vibe_dir=str(vibe_root))
+
+
+def test_resolve_vibe_material_accepts_valid_path(tmp_path: Path) -> None:
+    """Valid @vibe/<path> should resolve successfully."""
+    vibe_root = tmp_path / "vibe3-install"
+    material_file = vibe_root / "skills" / "test-skill" / "SKILL.md"
+    material_file.parent.mkdir(parents=True)
+    material_file.write_text("skill content")
+
+    result = resolve_handoff_target(
+        "@vibe/skills/test-skill/SKILL.md", vibe_dir=str(vibe_root)
+    )
+    assert result == material_file
+
+
+def test_resolve_vibe_material_rejects_very_long_path(tmp_path: Path) -> None:
+    """@vibe/<path> with very long path should be rejected by OS/filesystem."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    # Create a path longer than typical OS limits (4096 characters)
+    long_segment = "a" * 100
+    long_path = "/".join([long_segment] * 50)  # 5000+ characters
+
+    # OS/filesystem will reject this with OSError
+    with pytest.raises(OSError):  # OSError is the parent of FileNotFoundError
+        resolve_handoff_target(f"@vibe/{long_path}", vibe_dir=str(vibe_root))

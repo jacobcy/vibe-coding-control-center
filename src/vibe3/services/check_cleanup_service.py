@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.clients.protocols import BackendProtocol
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
@@ -40,10 +41,12 @@ class CheckCleanupService:
         store: "SQLiteClient",
         git_client: "GitClient",
         github_client: "GitHubClient | None" = None,
+        backend: BackendProtocol | None = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
         self._github_client = github_client
+        self._backend = backend
 
     def clean_residual_branches(self, *, force: bool = False) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
@@ -76,6 +79,7 @@ class CheckCleanupService:
             store=self.store,
             git_client=self.git_client,
             github_client=self._github_client,
+            backend=self._backend,
         )
 
         if cleanup_config.enable_agent_worktree_cleanup:
@@ -213,10 +217,11 @@ class CheckCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
-            backend = CodeagentBackend()
+            # Use injected backend, fallback to None (read-only mode)
+            backend = self._backend
+
             registry = SessionRegistryService(store=self.store, backend=backend)
 
             # Reuse existing method: batch query + liveness verification
@@ -422,19 +427,22 @@ class CheckCleanupService:
             return None
 
     def _cleanup_detached_worktrees(self) -> dict[str, list[str]]:
-        """Clean up orphaned detached HEAD worktrees from invalid flow records.
+        """Clean up orphaned detached HEAD worktrees within the repo.
 
-        This method only removes worktrees that correspond to flow records with
-        invalid branch names (e.g., "HEAD", "HEAD~1"). It does NOT remove
-        arbitrary detached worktrees created by users for other purposes.
+        Removes ALL detached-HEAD worktrees that reside inside the main repo
+        directory, EXCEPT:
+        - The current working directory / worktree root
+        - Worktrees whose basename matches a protected name or prefix
+          (e.g. wt-claude, wt-codex — see CheckCleanupSettings.protected_worktree_names)
 
         Safety:
-        - Protected by user confirmation in check command
-        - Skips worktree containing current working directory
-        - Only removes flow-managed worktrees
+        - Protected by user confirmation in the check command
+        - Skips current working directory / worktree root
+        - Skips protected worktree names (configurable)
+        - Only removes worktrees inside the repo root (no external /tmp paths)
 
         Returns:
-            Dict with 'cleaned', 'skipped_self', and 'failed' lists.
+            Dict with 'cleaned', 'skipped_self', 'skipped_protected', 'failed' lists.
         """
         import os
 
@@ -480,7 +488,12 @@ class CheckCleanupService:
             ]
 
             if not detached_worktrees:
-                return {"cleaned": [], "skipped_self": [], "failed": []}
+                return {
+                    "cleaned": [],
+                    "skipped_self": [],
+                    "skipped_protected": [],
+                    "failed": [],
+                }
 
             logger.bind(domain="check").info(
                 f"Found {len(detached_worktrees)} detached HEAD worktrees"
@@ -491,47 +504,58 @@ class CheckCleanupService:
             current_wt_root = self.git_client.get_worktree_root()
             current_cwd = os.getcwd()
 
-            # Get all invalid branch flows (HEAD, HEAD~N)
-            all_flows = self.store.get_all_flows()
-            invalid_branches = {
-                f["branch"]
-                for f in all_flows
-                if self._is_invalid_branch_name(f.get("branch", ""))
-            }
+            # Load protected worktree names from config
+            from vibe3.config.settings import VibeConfig
+            from vibe3.services.expired_resource_cleanup_service import (
+                _is_protected_worktree,
+            )
 
-            # Remove detached worktrees (only if flow-managed)
+            check_cfg = VibeConfig.get_defaults().check_cleanup
+            protected_wt_names = set(check_cfg.protected_worktree_names)
+
             cleaned: list[str] = []
             skipped_self: list[str] = []
+            skipped_protected: list[str] = []
             failed: list[str] = []
 
             for wt_path, head_sha in detached_worktrees:
-                # SAFETY CHECK 1: Never delete current worktree
                 wt_abs = os.path.abspath(wt_path)
+
+                # SAFETY CHECK 1: Never delete current worktree
                 if wt_abs == current_wt_root or current_cwd.startswith(wt_abs + os.sep):
                     skipped_self.append(wt_path)
-                    logger.bind(
-                        domain="check",
-                        worktree=wt_path,
-                    ).warning(
-                        "Skipping detached worktree:"
-                        " it is the current working directory"
+                    logger.bind(domain="check", worktree=wt_path).warning(
+                        "Skipping detached worktree: is the current working directory"
                     )
                     continue
 
-                # SAFETY CHECK 2: Only remove if flow-managed
-                # Check if this worktree path exists in any flow record
-                # (including those with invalid branch names)
-                is_flow_managed = any(wt_path in str(f) for f in all_flows)
+                # SAFETY CHECK 2: Only process worktrees in the repo root OR in
+                # the system temp directory (PR review worktrees live in /tmp).
+                # This naturally excludes tool-managed directories like ~/.codex
+                # or ~/.claude that should never be touched.
+                tmp_root = os.path.realpath("/tmp")  # /private/tmp on macOS
+                in_repo = wt_abs.startswith(current_wt_root + os.sep)
+                in_tmp = wt_abs.startswith(tmp_root + os.sep) or wt_abs.startswith(
+                    "/tmp" + os.sep
+                )
+                if not in_repo and not in_tmp:
+                    logger.bind(domain="check", worktree=wt_path).debug(
+                        "Skipping detached worktree: outside repo root and temp dir"
+                    )
+                    continue
 
-                if not is_flow_managed and not invalid_branches:
-                    logger.bind(
-                        domain="check",
-                        worktree=wt_path,
-                    ).debug("Skipping detached worktree:" " not managed by flow")
+                # SAFETY CHECK 3: Skip reserved named workspaces
+                if _is_protected_worktree(wt_path, protected_wt_names):
+                    skipped_protected.append(wt_path)
+                    logger.bind(domain="check", worktree=wt_path).info(
+                        "Skipping protected worktree name"
+                    )
                     continue
 
                 try:
-                    self.git_client._run(["worktree", "remove", "--force", wt_path])
+                    self.git_client._run(
+                        ["worktree", "remove", "--force", "--force", wt_path]
+                    )
                     cleaned.append(wt_path)
                     logger.bind(
                         domain="check",
@@ -539,13 +563,17 @@ class CheckCleanupService:
                         head_sha=head_sha[:7],
                     ).info("Removed orphaned detached HEAD worktree")
                 except Exception as exc:
-                    error_msg = f"{wt_path}: {exc}"
-                    failed.append(error_msg)
+                    failed.append(f"{wt_path}: {exc}")
                     logger.bind(domain="check", worktree=wt_path).warning(
                         f"Failed to remove detached worktree: {exc}"
                     )
 
-            return {"cleaned": cleaned, "skipped_self": skipped_self, "failed": failed}
+            return {
+                "cleaned": cleaned,
+                "skipped_self": skipped_self,
+                "skipped_protected": skipped_protected,
+                "failed": failed,
+            }
 
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to scan worktrees: {exc}")

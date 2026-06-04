@@ -201,3 +201,25 @@ class SQLiteSessionRepo(_HasConnection):
                 except (ValueError, TypeError):
                     pass
         return result
+
+    def get_latest_session_with_backend_id(
+        self, *, branch: str, role: str
+    ) -> dict[str, Any] | None:
+        """Return the most recent session for branch+role with a backend_session_id.
+
+        Queries across all statuses (live and terminal), ordered by created_at DESC.
+        Used by load_session_id() as a fallback when no live session has a
+        backend_session_id.
+        """
+        query = (
+            "SELECT * FROM runtime_session "
+            "WHERE branch = ? AND role = ? AND backend_session_id IS NOT NULL "
+            "AND backend_session_id != '' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, (branch, role))
+        row = cursor.fetchone()
+        return dict(row) if row else None

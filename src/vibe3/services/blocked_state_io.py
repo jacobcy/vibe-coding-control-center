@@ -144,7 +144,6 @@ class BlockedStateIO:
             branch,
             flow_status="active",
             blocked_reason=None,
-            failed_reason=None,  # Also clear failed_reason for consistency
             blocked_by_issue=None,
             transition_count=0,  # Reset loop protection counter
             latest_actor=actor,
