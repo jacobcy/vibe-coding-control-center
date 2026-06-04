@@ -79,6 +79,7 @@ class CheckCleanupService:
             store=self.store,
             git_client=self.git_client,
             github_client=self._github_client,
+            backend=self._backend,
         )
 
         if cleanup_config.enable_agent_worktree_cleanup:
