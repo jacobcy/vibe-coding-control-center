@@ -40,15 +40,14 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     Allowed imports (infrastructure exceptions):
     - orchestra.protocols (TYPE_CHECKING only)
     - orchestra.failed_gate (TYPE_CHECKING only)
-    - orchestra internal services (used via protocol injection):
-      - dispatch_health_check
-      - issue_loader
-      - queue_operations
-      - queue_persistence_service
 
     Disallowed:
     - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
+    - orchestra.dispatch_health_check
+    - orchestra.issue_loader
+    - orchestra.queue_operations
+    - orchestra.queue_persistence_service
     - Other orchestra modules
 
     Note: protocols and failed_gate are allowed but must be in TYPE_CHECKING blocks.
@@ -61,11 +60,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     allowed_orchestra_modules = {
         "vibe3.orchestra.protocols",  # TYPE_CHECKING only (checked by caller)
         "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only (checked by caller)
-        # Orchestra internal services (used via protocol injection)
-        "vibe3.orchestra.dispatch_health_check",
-        "vibe3.orchestra.issue_loader",
-        "vibe3.orchestra.queue_operations",
-        "vibe3.orchestra.queue_persistence_service",
     }
 
     # Check if import is in allowed list
@@ -105,6 +99,58 @@ def is_in_type_checking_block(filepath: Path, node: ast.AST) -> bool:
     return False
 
 
+def build_parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST | None]:
+    """Build a map from each node to its parent.
+
+    Args:
+        tree: AST tree to traverse
+
+    Returns:
+        Dictionary mapping each node to its parent node
+    """
+    parent_map = {tree: None}
+
+    def _walk(node: ast.AST, parent: ast.AST | None) -> None:
+        parent_map[node] = parent
+        for child in ast.iter_child_nodes(node):
+            _walk(child, node)
+
+    for child in ast.iter_child_nodes(tree):
+        _walk(child, tree)
+
+    return parent_map
+
+
+def is_module_level_import(
+    node: ast.AST, parent_map: dict[ast.AST, ast.AST | None]
+) -> bool:
+    """Check if an import is at module level (not inside a function/class).
+
+    Module-level imports create hard dependencies at import time.
+    Function-level imports are lazy and used for dependency injection.
+
+    Args:
+        node: AST node to check
+        parent_map: Map from nodes to their parents
+
+    Returns:
+        True if import is at module level
+    """
+    # Walk up the parent chain to check if we're inside a function/class
+    current = node
+    while current is not None:
+        current = parent_map.get(current)
+        if current is not None:
+            # If we find a function or class definition, this is not module-level
+            if isinstance(
+                current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                return False
+
+    # If we reached the module without finding function/class, it's module-level
+    return True
+
+
 def test_domain_layer_no_orchestra_imports():
     """Verify domain layer does not import from orchestra (with exceptions)."""
     domain_dir = Path("src/vibe3/domain")
@@ -122,23 +168,30 @@ def test_domain_layer_no_orchestra_imports():
         except Exception:
             continue
 
+        # Build parent map for this file
+        parent_map = build_parent_map(tree)
+
         # Check all imports
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     if is_orchestra_import(alias.name, py_file):
-                        violations.append(
-                            f"{py_file.relative_to(domain_dir.parent)}: "
-                            f"import {alias.name}"
-                        )
+                        # Only flag module-level imports (not function-level for DI)
+                        if is_module_level_import(node, parent_map):
+                            violations.append(
+                                f"{py_file.relative_to(domain_dir.parent)}: "
+                                f"import {alias.name}"
+                            )
             elif isinstance(node, ast.ImportFrom):
                 if node.module and is_orchestra_import(node.module, py_file):
                     # Check if in TYPE_CHECKING block
                     if not is_in_type_checking_block(py_file, node):
-                        violations.append(
-                            f"{py_file.relative_to(domain_dir.parent)}: "
-                            f"from {node.module} import ..."
-                        )
+                        # Only flag module-level imports (not function-level for DI)
+                        if is_module_level_import(node, parent_map):
+                            violations.append(
+                                f"{py_file.relative_to(domain_dir.parent)}: "
+                                f"from {node.module} import ..."
+                            )
 
     if violations:
         violation_list = "\n".join(violations)

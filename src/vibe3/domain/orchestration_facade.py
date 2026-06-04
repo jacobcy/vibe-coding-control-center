@@ -96,6 +96,14 @@ class OrchestrationFacade(ServiceBase):
         if self._capacity is not None:
             from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
             from vibe3.environment.session_registry import SessionRegistryService
+            from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+            from vibe3.orchestra.issue_loader import get_flow_context, load_issue
+            from vibe3.orchestra.queue_operations import (
+                select_ready_issues_from_collected_issues,
+            )
+            from vibe3.orchestra.queue_persistence_service import (
+                QueuePersistenceService,
+            )
             from vibe3.services.check_service import CheckService
             from vibe3.services.flow_service import FlowService
 
@@ -115,6 +123,24 @@ class OrchestrationFacade(ServiceBase):
                 git_client=self._flow_manager.git,
             )
 
+            # Construct runtime services for injection
+            health_check_service = DispatchHealthCheckService(
+                check_service=check_service,
+                flow_blocker=flow_blocker,
+                store=actual_store,
+                flow_context_resolver=lambda n: get_flow_context(
+                    n, self._config, self._github, actual_store, self._flow_manager
+                ),
+            )
+            queue_persistence = QueuePersistenceService(
+                store=actual_store,
+                config=self._config,
+                github=self._github,
+                registry=self._registry,
+                supervisor_label=self._config.supervisor_handoff.issue_label,
+                load_issue=lambda n: load_issue(n, self._config, self._github),
+            )
+
             self._coordinator = GlobalDispatchCoordinator(
                 config=self._config,
                 capacity=self._capacity,
@@ -122,6 +148,13 @@ class OrchestrationFacade(ServiceBase):
                 store=actual_store,
                 flow_manager=self._flow_manager,
                 registry=self._registry,
+                health_check_service=health_check_service,
+                queue_persistence=queue_persistence,
+                issue_loader=lambda n: load_issue(n, self._config, self._github),
+                flow_context_resolver=lambda n: get_flow_context(
+                    n, self._config, self._github, actual_store, self._flow_manager
+                ),
+                queue_selector=select_ready_issues_from_collected_issues,
                 check_service=check_service,
                 flow_blocker=flow_blocker,
             )

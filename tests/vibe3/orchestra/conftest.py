@@ -96,6 +96,20 @@ def make_coordinator() -> callable:
         flow_manager.get_flow_for_issue = MagicMock(return_value=None)
         flow_manager.git.branch_exists = MagicMock(return_value=True)
 
+        # Create mock injected services
+        health_check_service = MagicMock()
+        queue_persistence = MagicMock()
+        queue_persistence.frozen_queue = None
+
+        def mock_issue_loader(issue_number: int):
+            return None
+
+        def mock_flow_context_resolver(issue_number: int):
+            return (f"task/issue-{issue_number}", None)
+
+        def mock_queue_selector(*args, **kwargs):
+            return []
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
@@ -103,6 +117,11 @@ def make_coordinator() -> callable:
             store=store,
             flow_manager=flow_manager,
             registry=None,
+            health_check_service=health_check_service,
+            queue_persistence=queue_persistence,
+            issue_loader=mock_issue_loader,
+            flow_context_resolver=mock_flow_context_resolver,
+            queue_selector=mock_queue_selector,
         )
 
         # Mock health check to bypass CheckService for queue operation tests

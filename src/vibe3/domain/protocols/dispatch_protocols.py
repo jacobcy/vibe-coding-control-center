@@ -3,8 +3,15 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from vibe3.models import IssueInfo
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.domain.qualify_gate import QualifyGateService
+    from vibe3.models import IssueInfo, IssueState
+    from vibe3.models.orchestra_config import OrchestraConfig
     from vibe3.models.queue_entry import QueueEntry
+    from vibe3.services.check_service import CheckResult
+
+    from .flow_protocols import FlowManagerProtocol
 
 
 class IssueCollectionServiceProtocol(Protocol):
@@ -68,5 +75,157 @@ class DispatchHealthCheckProtocol(Protocol):
         Returns:
             True if issue can be dispatched (healthy or transient error)
             False if issue should be skipped (genuine failure or terminal state)
+        """
+        ...
+
+
+class IssueLoaderProtocol(Protocol):
+    """Protocol for loading issue snapshots."""
+
+    def __call__(self, issue_number: int) -> "IssueInfo | None":
+        """Load issue snapshot.
+
+        Args:
+            issue_number: Issue number to load
+
+        Returns:
+            IssueInfo if found, None otherwise
+        """
+        ...
+
+
+class FlowContextResolverProtocol(Protocol):
+    """Protocol for resolving flow context (branch, state) for an issue."""
+
+    def __call__(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
+        """Resolve flow context for an issue.
+
+        Args:
+            issue_number: Issue number to resolve
+
+        Returns:
+            Tuple of (branch_name, flow_state_dict or None)
+        """
+        ...
+
+
+class QueueSelectorProtocol(Protocol):
+    """Protocol for selecting ready issues from collected issues."""
+
+    def __call__(
+        self,
+        issues: list["IssueInfo"],
+        trigger_state: "IssueState",
+        config: "OrchestraConfig",
+        github: "GitHubClient",
+        store: "SQLiteClient",
+        flow_manager: "FlowManagerProtocol",
+        qualify_gate: "QualifyGateService",
+        supervisor_label: str,
+    ) -> list["IssueInfo"]:
+        """Select ready issues from collected issues.
+
+        Args:
+            issues: Collected issues
+            trigger_state: Target state to filter for
+            config: Orchestra config
+            github: GitHub client
+            store: SQLite client
+            flow_manager: Flow manager
+            qualify_gate: Qualify gate service
+            supervisor_label: Supervisor label
+
+        Returns:
+            List of issues ready for the target state
+        """
+        ...
+
+
+class CapacityServiceProtocol(Protocol):
+    """Protocol for capacity service operations."""
+
+    def get_capacity_status(self, role: str) -> dict[str, int]:
+        """Get current capacity status.
+
+        Args:
+            role: Role name for logging/context
+
+        Returns:
+            Dict with capacity metrics (e.g., {"remaining": int, "active": int})
+        """
+        ...
+
+
+class CheckServiceProtocol(Protocol):
+    """Protocol for health check service operations."""
+
+    def verify_branch(self, branch: str) -> "CheckResult":
+        """Verify branch flow consistency.
+
+        Args:
+            branch: Branch name to verify
+
+        Returns:
+            CheckResult with validation status and issues/warnings
+        """
+        ...
+
+    def invalidate_pr_cache(self) -> None:
+        """Invalidate PR cache to force refresh on next check.
+
+        Should be called when:
+        - Queue is restored from persistence
+        - Queue is cleared after promote()
+        - Fresh queue collection occurs
+        """
+        ...
+
+
+class FlowServiceProtocol(Protocol):
+    """Protocol for flow service lifecycle operations."""
+
+    def block_flow(
+        self,
+        branch: str,
+        reason: str | None = None,
+        blocked_by_issue: int | None = None,
+        actor: str | None = None,
+        repo: str | None = None,
+        event_type: str = "flow_blocked",
+    ) -> None:
+        """Mark flow as blocked.
+
+        Args:
+            branch: Branch name
+            reason: Blocking reason
+            blocked_by_issue: Dependency issue number
+            actor: Actor performing the block
+            repo: Repository (defaults to current repo)
+            event_type: Event type for timeline
+        """
+        ...
+
+
+class LabelDispatchCallable(Protocol):
+    """Protocol for label dispatch event builder callable."""
+
+    def __call__(
+        self,
+        role: object,  # TriggerableRoleDefinition (avoid importing from roles)
+        issue: "IssueInfo",
+        *,
+        branch: str,
+        tick_id: int = 0,
+    ) -> object:  # DispatchIntent union type (avoid importing from domain)
+        """Build dispatch intent event for a role.
+
+        Args:
+            role: Triggerable role definition
+            issue: Issue info
+            branch: Branch name
+            tick_id: Heartbeat tick number
+
+        Returns:
+            DispatchIntent event object
         """
         ...
