@@ -36,8 +36,8 @@ Examples:
   vibe3 task show 123            # Show task for issue #123
   vibe3 task status              # Show global task dashboard
   vibe3 task intake 456          # Assign issue #456 to local manager
-  vibe3 task resume --blocked    # Resume all blocked issues (dry-run)
   vibe3 task resume 456 --yes    # Resume issue #456 (execute)
+  vibe3 task resume 456 --label auto --yes  # Resume with auto-detected state
 
 For more details: vibe3 task <command> --help
 """,
