@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.clients.protocols import BackendProtocol
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
@@ -40,10 +41,12 @@ class CheckCleanupService:
         store: "SQLiteClient",
         git_client: "GitClient",
         github_client: "GitHubClient | None" = None,
+        backend: BackendProtocol | None = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
         self._github_client = github_client
+        self._backend = backend
 
     def clean_residual_branches(self, *, force: bool = False) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
@@ -213,10 +216,11 @@ class CheckCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
-            backend = CodeagentBackend()
+            # Use injected backend, fallback to None (read-only mode)
+            backend = self._backend
+
             registry = SessionRegistryService(store=self.store, backend=backend)
 
             # Reuse existing method: batch query + liveness verification

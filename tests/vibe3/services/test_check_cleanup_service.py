@@ -509,3 +509,52 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
         call = operations.reset_issue_to_ready.call_args.kwargs
         assert call["issue_number"] == 300
         assert call["label_state"] == ""
+
+
+def test_check_cleanup_service_accepts_backend_parameter():
+    """CheckCleanupService should accept BackendProtocol in constructor."""
+    from unittest.mock import MagicMock
+
+    from vibe3.clients.protocols import BackendProtocol
+
+    mock_backend = MagicMock(spec=BackendProtocol)
+    mock_store = MagicMock()
+    mock_git = MagicMock()
+
+    service = CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git,
+        backend=mock_backend,
+    )
+
+    assert service._backend is mock_backend
+
+
+def test_backend_propagated_to_session_registry():
+    """Backend should be passed to SessionRegistryService."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.clients.protocols import BackendProtocol
+
+    mock_backend = MagicMock(spec=BackendProtocol)
+    mock_store = MagicMock()
+    mock_git = MagicMock()
+
+    service = CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git,
+        backend=mock_backend,
+    )
+
+    with patch(
+        "vibe3.environment.session_registry.SessionRegistryService"
+    ) as mock_registry_class:
+        mock_registry = MagicMock()
+        mock_registry_class.return_value = mock_registry
+        mock_registry.get_all_branches_with_live_sessions.return_value = set()
+
+        service._get_branches_with_live_sessions()
+
+        mock_registry_class.assert_called_once_with(
+            store=mock_store, backend=mock_backend
+        )
