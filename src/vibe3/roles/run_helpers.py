@@ -69,7 +69,10 @@ EXECUTOR_PUBLISH_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_run_options(config: OrchestraConfig) -> Any:
+def resolve_run_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve executor agent options with env override support."""
     from vibe3.execution.agent_resolver import resolve_executor_agent_options
 
@@ -77,7 +80,7 @@ def resolve_run_options(config: OrchestraConfig) -> Any:
         backend_env_key="VIBE3_EXECUTOR_BACKEND",
         model_env_key="VIBE3_EXECUTOR_MODEL",
         fallback_resolver=lambda: resolve_executor_agent_options(
-            config, load_runtime_config()
+            config, load_runtime_config(cli_overrides=cli_overrides)
         ),
     )
 

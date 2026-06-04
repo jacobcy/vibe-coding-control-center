@@ -54,11 +54,14 @@ PLANNER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_plan_options(config: OrchestraConfig) -> Any:
+def resolve_plan_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve planner agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = load_runtime_config()
+    runtime_config = load_runtime_config(cli_overrides=cli_overrides)
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_PLANNER_BACKEND",
         model_env_key="VIBE3_PLANNER_MODEL",
@@ -251,9 +254,10 @@ PLAN_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="planner",
     resolve_options=resolve_plan_options,
     resolve_branch=PLAN_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_plan_request(
+    build_async_request=lambda config, issue, actor, branch: build_plan_request(
         config,
         issue,
+        branch=branch,
         actor=actor,
     ),
     build_sync_request=build_plan_sync_request,

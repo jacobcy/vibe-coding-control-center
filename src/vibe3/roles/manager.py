@@ -57,7 +57,10 @@ HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_manager_options(config: OrchestraConfig) -> Any:
+def resolve_manager_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve manager agent options.
 
     Backend/model override uses unified env vars:
@@ -67,6 +70,7 @@ def resolve_manager_options(config: OrchestraConfig) -> Any:
     These are handled by env_override.py and applied to config.
     This function falls back to config resolution if no override.
     """
+    _ = cli_overrides
     # Backend/model override handled by env_override.py
     # No need to check env vars here
 
@@ -155,6 +159,7 @@ def build_manager_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     *,
+    branch: str | None = None,
     registry: SessionRegistryService | None = None,
     repo_path: Path | None = None,
     actor: str = "orchestra:manager",
@@ -198,7 +203,7 @@ def build_manager_request(
     if not flow:
         return None
 
-    flow_branch = str(flow.get("branch") or "").strip()
+    flow_branch = branch or str(flow.get("branch") or "").strip()
     if not flow_branch:
         return None
 
@@ -374,9 +379,10 @@ MANAGER_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="manager",
     resolve_options=resolve_manager_options,
     resolve_branch=MANAGER_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_manager_request(
+    build_async_request=lambda config, issue, actor, branch: build_manager_request(
         config,
         issue,
+        branch=branch,
         repo_path=resolve_orchestra_repo_root(),
         actor=actor,
     ),

@@ -113,6 +113,7 @@ def _review_branch_impl(
             agent=agent,
             backend=backend,
             model=model,
+            fresh_session=fresh_session,
         )
 
 

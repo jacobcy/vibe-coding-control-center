@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 
 import typer
 
+from vibe3.config.cli_overrides import (
+    build_role_cli_overrides as _build_role_cli_overrides,
+)
+
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
 
@@ -118,22 +122,5 @@ def build_role_cli_overrides(
     backend: str | None,
     model: str | None,
 ) -> dict[str, str]:
-    """Build cli_overrides dict for load_runtime_config.
-
-    Args:
-        role: Role name ("plan", "review", or "run")
-        agent: Agent override (optional)
-        backend: Backend override (optional)
-        model: Model override (optional)
-
-    Returns:
-        Dict of config key -> value for load_runtime_config
-    """
-    overrides: dict[str, str] = {}
-    if backend:
-        overrides[f"{role}.agent_config.backend"] = backend
-    if model:
-        overrides[f"{role}.agent_config.model"] = model
-    if agent:
-        overrides[f"{role}.agent_config.agent"] = agent
-    return overrides
+    """Build cli_overrides dict for load_runtime_config."""
+    return _build_role_cli_overrides(role, agent, backend, model)

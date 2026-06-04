@@ -99,11 +99,14 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_review_options(config: OrchestraConfig) -> Any:
+def resolve_review_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve reviewer agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = load_runtime_config()
+    runtime_config = load_runtime_config(cli_overrides=cli_overrides)
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_REVIEWER_BACKEND",
         model_env_key="VIBE3_REVIEWER_MODEL",
@@ -273,8 +276,9 @@ REVIEW_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
     resolve_branch=REVIEW_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_issue_review_request(
+    build_async_request=lambda config, issue, actor, branch: build_issue_review_request(
         issue,
+        branch=branch,
         actor=actor,
     ),
     build_sync_request=build_review_sync_request,
@@ -394,7 +398,7 @@ def execute_manual_review_sync(
     show_prompt: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
-    from vibe3.services.session_service import load_session_id
+    from vibe3.execution.session_service import load_session_id
 
     _ = flow_service
     cfg = config or VibeConfig.get_defaults()
