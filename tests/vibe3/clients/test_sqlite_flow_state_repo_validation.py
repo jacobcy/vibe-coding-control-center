@@ -1,6 +1,8 @@
 # tests/vibe3/clients/test_sqlite_flow_state_repo_validation.py
 import sqlite3
 import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
@@ -72,3 +74,63 @@ class TestAddIssueLinkValidation:
             links = repo.get_issue_links("task/issue-123")
             assert len(links) == 1
             assert links[0]["issue_number"] == 123
+
+
+class TestGetFlowsByIssueValidation:
+    def test_get_flows_by_issue_detects_invalid_branch(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        repo = TestRepo(db_path=str(db_path))
+
+        # Manually insert invalid data (simulating existing pollution)
+        # Need both flow_state and flow_issue_links records
+        conn = repo._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO flow_state
+            (branch, flow_slug, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            ("main", "main", datetime.now(timezone.utc).isoformat()),
+        )
+        cursor.execute(
+            """
+            INSERT INTO flow_issue_links
+            (branch, issue_number, issue_role, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("main", 999, "task", datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+
+        # Should raise when detecting invalid branch
+        with pytest.raises(InvalidBranchLinkError, match="main"):
+            repo.get_flows_by_issue(999, "task")
+
+    def test_get_flows_by_issue_accepts_valid_branches(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "test.db"
+        repo = TestRepo(db_path=str(db_path))
+
+        # Insert valid data (both flow_state and flow_issue_links)
+        conn = repo._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO flow_state
+            (branch, flow_slug, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                "task/issue-888",
+                "task-issue-888",
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+
+        repo.add_issue_link("task/issue-888", 888, "task")
+
+        # Should not raise
+        flows = repo.get_flows_by_issue(888, "task")
+        assert len(flows) == 1
+        assert flows[0]["branch"] == "task/issue-888"

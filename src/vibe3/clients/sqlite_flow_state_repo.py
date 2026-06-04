@@ -425,7 +425,18 @@ class SQLiteFlowStateRepo(_HasConnection):
         return None
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
-        """Get flows linked to an issue with specified role (excludes soft-deleted)."""
+        """Get flows linked to an issue with specified role (excludes soft-deleted).
+
+        Args:
+            issue_number: GitHub issue number
+            role: Role filter (task, dev, plan, run, review)
+
+        Returns:
+            List of flow dicts with branch and flow_slug
+
+        Raises:
+            InvalidBranchLinkError: If any linked branch is invalid for the role
+        """
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -438,6 +449,22 @@ class SQLiteFlowStateRepo(_HasConnection):
             (issue_number, role),
         )
         flows = [dict(row) for row in cursor.fetchall()]
+
+        # Validate all branches before returning
+        for flow in flows:
+            branch = str(flow.get("branch") or "").strip()
+            if branch:
+                try:
+                    validate_issue_branch_for_role(branch, role)
+                except InvalidBranchLinkError as e:
+                    # Add context about which issue has the problem
+                    raise InvalidBranchLinkError(
+                        f"Invalid branch '{branch}' linked to issue #{issue_number}. "
+                        f"Base branches cannot have flow records. "
+                        f"Fix: DELETE FROM flow_issue_links WHERE branch='{branch}' "
+                        f"AND issue_number={issue_number};"
+                    ) from e
+
         logger.bind(
             external="sqlite",
             operation="get_flows_by_issue",
