@@ -159,6 +159,8 @@ Forbidden:
 
 **验证失败处理**：
 
+**防重复（强制）**：在执行 cleanup comment 前，检查该 issue 最新评论。如果最新评论已是相同的 `[governance auto-cleanup]` 内容（相同清理原因），跳过评论，仅在 stdout 记录。
+
 ```bash
 gh issue edit <issue-number> --remove-label "orchestra-governed"
 gh issue comment <issue-number> --body "[governance auto-cleanup] 移除 orchestra-governed：issue 不再满足持有条件（无 assignee / assignee 非 manager / 已关闭），允许重新进入评估"
@@ -412,6 +414,9 @@ Steps:
      f. **所有 sub-issues 已完成**：
         - 这是高置信度终局条件：all sub-issues completed → 直接关闭 epic
         - 关闭前执行未完成工作检查；如有剩余工作，创建 follow-up issue 并在关闭评论中引用
+        - **防重复（强制）**：
+          - 所有 sub-issues 已完成 → 直接关闭 epic，写 `[governance close]` 评论（不要写 suggest）
+          - 写评论前检查最新评论：如果最新评论已是 `[governance close]` 或 `[governance suggest] 建议关闭此 Epic`，跳过评论
         - 写 `[governance close]` 评论说明 sub-issues 状态和关闭理由
         - 关闭原 epic；不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 `orchestra-governed`
      g. **部分 sub-issues 未完成**：
@@ -564,10 +569,12 @@ Exit:
 - **去重检查**：若已存在相同类型的 `[governance decide]` 或 `[governance suggest]` 评论（关键字匹配），跳过该评论
 - **类型匹配规则**：
   - `[governance suggest] 建议关闭此 Issue` → 检查是否已有"建议关闭"
+  - `[governance suggest] 建议关闭此 Epic` → 检查最新评论是否已建议关闭此 Epic
   - `[governance suggest] 建议恢复此 Issue` → 检查是否已有"建议恢复"
   - `[governance suggest] 入池评估` → 检查是否已有"入池评估"
   - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
   - `[governance decide]` 恢复 → 检查是否已有相同恢复动作
+  - `[governance auto-cleanup] 移除 orchestra-governed` → 检查最新评论是否已是相同的 auto-cleanup 动作（比对清理原因）
   - `[governance close] 已关闭此 Epic` → 关闭前检查 issue 是否已经 CLOSED，避免重复 close
 - **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
 - **目的**：避免重复刷屏，保持 issue 讨论清洁
