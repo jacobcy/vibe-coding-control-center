@@ -9,6 +9,14 @@ This skill handles cleanup of flow scenes when they reach terminal states (done/
 
 **Trigger Condition**: Manager has written handoff indicate with cleanup instructions for a terminal flow.
 
+## Related Skills
+
+- **vibe-done**: Human-initiated manual cleanup after PR merge (for human collaboration)
+- **vibe-integrate**: PR merge workflow
+
+Use `vibe-closeout` for **automated** cleanup triggered by Manager signal.
+Use `vibe-done` for human-initiated cleanup after confirming PR merge.
+
 ## Purpose
 
 Execute cleanup of flow resources (worktree, branches, handoff files, flow records) based on manager's cleanup instructions.

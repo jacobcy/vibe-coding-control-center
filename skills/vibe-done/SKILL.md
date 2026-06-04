@@ -7,6 +7,14 @@ description: Use when the current human-collaboration flow has reached terminal 
 
 PR 合并后的完整收口流程。
 
+## Related Skills
+
+- **vibe-closeout**: Automated cleanup triggered by Manager signal (for Orchestra automation)
+- **vibe-integrate**: PR merge workflow before final closeout
+
+Use `vibe-done` for **human-initiated** manual cleanup after PR merge.
+Use `vibe-closeout` only when Manager has written handoff indicate with cleanup instructions.
+
 ## 核心原则
 
 - **只做收口**：不修业务代码，不做 review follow-up
