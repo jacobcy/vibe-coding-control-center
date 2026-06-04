@@ -23,7 +23,7 @@ _migrate_settings_yaml_paths() {
 _check_runtime_assets() {
     local install_dir="$1"
     local check_files=(
-        "src/vibe3/environment/runtime_assets.py"
+        "src/vibe3/utils/runtime_assets.py"
         "config/prompts/prompts.yaml"
         "config/prompts/prompt-recipes.yaml"
         "supervisor/manager.md"

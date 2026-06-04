@@ -245,3 +245,77 @@ def test_execute_manual_run_uses_resolve_runtime_asset():
             mock_resolve.assert_called_once_with("skills/vibe-commit/SKILL.md")
             # Verify skill content was read from resolved path
             mock_skill_path.read_text.assert_called_once_with(encoding="utf-8")
+
+
+def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """External repos using github-flow should discover and read global skills."""
+    external_repo = tmp_path / "external-repo"
+    external_repo.mkdir()
+    git_dir = external_repo / ".git"
+    git_dir.mkdir()
+    config_dir = external_repo / ".vibe"
+    config_dir.mkdir()
+    (config_dir / "config.yaml").write_text("profile: github-flow\n", encoding="utf-8")
+
+    runtime_root = tmp_path / "runtime"
+    skill_dir = runtime_root / "skills" / "ship-it"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("# Ship It\n\nDo the work.\n", encoding="utf-8")
+
+    monkeypatch.chdir(external_repo)
+    monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(runtime_root))
+
+    import vibe3.adapters as adapter_registry
+    from vibe3.adapters import github_flow
+
+    previous_adapter = adapter_registry._ADAPTERS.pop("github-flow", None)
+    was_loaded = "github-flow" in adapter_registry._LOADED
+    adapter_registry._LOADED.discard("github-flow")
+    adapter_registry.register_adapter(github_flow._build_github_flow_manifest())
+
+    captured_prompt: dict[str, str] = {}
+
+    def fake_execute_sync(command):
+        captured_prompt["text"] = command.context_builder()
+        return CodeagentResult(success=True)
+
+    try:
+        with (
+            patch(
+                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                return_value=str(git_dir),
+            ),
+            patch("vibe3.roles.run_command.CodeagentExecutionService") as service_cls,
+        ):
+            service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            assert resolve_skill_path("ship-it") == "skills/ship-it/SKILL.md"
+
+            result = execute_manual_run(
+                config=MagicMock(),
+                branch="issue-123",
+                issue_number=123,
+                instructions=None,
+                plan_file=None,
+                skill="ship-it",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+    finally:
+        adapter_registry._ADAPTERS.pop("github-flow", None)
+        if previous_adapter is not None:
+            adapter_registry._ADAPTERS["github-flow"] = previous_adapter
+        if was_loaded:
+            adapter_registry._LOADED.add("github-flow")
+        else:
+            adapter_registry._LOADED.discard("github-flow")
+
+    assert result == CodeagentResult(success=True)
+    assert "# Ship It" in captured_prompt["text"]
