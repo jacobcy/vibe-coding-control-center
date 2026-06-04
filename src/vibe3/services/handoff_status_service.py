@@ -85,8 +85,10 @@ class HandoffStatusService:
         self.handoff_service = HandoffService(store=self.store)
         self.verdict_service = VerdictService(store=self.store)
 
-        # Session registry requires backend; we'll instantiate on-demand
-        # to avoid coupling to CodeagentBackend at construction time
+        # Backend is optional for read-only use cases:
+        # - backend=None: SessionRegistryService assumes all tmux sessions exist
+        #   (safe for status queries, but not capacity/dispatch logic)
+        # - backend=CodeagentBackend(): Verifies actual tmux liveness
         self._backend = backend
         self.session_registry = None
 
