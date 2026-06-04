@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Final, cast
 
 from loguru import logger
+from typer import echo
 
 from vibe3.agents.backends.async_launcher import (
     AsyncExecutionHandle,
@@ -282,21 +283,20 @@ class CodeagentBackend:
 
             if dry_run:
                 if dry_run_summary:
-                    logger.debug("=== Dry Run Summary ===")
+                    echo("=== Dry Run Summary ===")
                     for key, value in dry_run_summary.items():
-                        logger.debug("{}: {}", key, value)
-                logger.debug("command: {}", " ".join(command))
+                        echo(f"{key}: {value}")
+                echo(f"command: {' '.join(command)}")
                 if show_prompt and prompt_file_path:
-                    logger.debug("prompt_file: {}", prompt_file_path)
+                    echo(f"prompt_file: {prompt_file_path}")
                     prompt_content = build_prompt_file_content(
                         prompt, include_global_notice=include_global_notice
                     )
-                    logger.debug(
-                        "prompt_content:\n{}",
-                        sanitize_prompt_for_display(prompt_content),
+                    echo(
+                        f"prompt_content:\n{sanitize_prompt_for_display(prompt_content)}"
                     )
                 if task:
-                    logger.debug("task:\n{}", task)
+                    echo(f"task:\n{task}")
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             wrapper_log_path: Path | None = None
