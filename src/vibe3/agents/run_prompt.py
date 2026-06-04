@@ -51,7 +51,7 @@ def build_run_task_section(task_text: str | None) -> str:
 def build_run_output_contract_section(output_format: str | None) -> str:
     """Build execution output contract section."""
     if output_format:
-        return "## Output format requirements\n" f"{output_format}"
+        return f"## Output format requirements\n{output_format}"
 
     return """## Output format requirements
 

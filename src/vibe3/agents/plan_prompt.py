@@ -17,8 +17,7 @@ from loguru import logger
 from vibe3.config import ConventionResolver, VibeConfig
 from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
-from vibe3.models import PromptContextMode
-from vibe3.models.plan import PlanRequest
+from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
@@ -101,7 +100,7 @@ def build_plan_task_section(
 def build_plan_output_contract_section(output_format: str | None) -> str:
     """Build plan output contract section."""
     if output_format:
-        return "## Output format requirements\n" f"{output_format}"
+        return f"## Output format requirements\n{output_format}"
 
     return """## Output format requirements
 

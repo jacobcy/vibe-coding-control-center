@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from vibe3.models import AgentOptions
-from vibe3.models.review_runner import AgentResult
+from vibe3.models import AgentOptions, AgentResult
 
 
 @runtime_checkable

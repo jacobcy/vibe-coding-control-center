@@ -7,10 +7,10 @@ from typing import Any
 import typer
 from loguru import logger
 
-from vibe3.analysis import compute_diff
-from vibe3.analysis.snapshot_service import (
+from vibe3.analysis import (
     SnapshotError,
     build_snapshot,
+    compute_diff,
     find_snapshot_by_branch,
 )
 from vibe3.models import StructureDiff
