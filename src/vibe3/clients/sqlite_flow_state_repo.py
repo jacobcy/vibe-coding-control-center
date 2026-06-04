@@ -137,6 +137,19 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Updated flow state")
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
+        """Add a link between branch and issue in flow_issue_links table.
+
+        Args:
+            branch: Branch name
+            issue_number: GitHub issue number
+            role: Role of the link (task, dev, plan, run, review, dependency)
+
+        Raises:
+            InvalidBranchLinkError: If branch is invalid for the role
+        """
+        # Validate branch before writing to database
+        validate_issue_branch_for_role(branch, role)
+
         # Use UTC-aware datetime for consistency
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         conn = self._get_connection()
