@@ -253,6 +253,9 @@ code_limits:
       - path: "tests/vibe3/services/test_handoff_service.py"
         limit: 500
         reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）"
+      - path: "tests/vibe3/roles/test_run_command.py"
+        limit: 420
+        reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
       - path: "tests/vibe3/config/test_loader.py"
         limit: 430
         reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"

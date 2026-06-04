@@ -150,6 +150,7 @@ def run_command(
             backend=backend,
             model=model,
             fresh_session=fresh_session,
+            publish=publish,
         )
         return
 

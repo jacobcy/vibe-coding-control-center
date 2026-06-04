@@ -5,11 +5,14 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+from loguru import logger
+
 from vibe3.agents import (
     CodeagentResult,
     RunPromptMode,
     create_codeagent_command,
     describe_run_plan_sections,
+    make_publish_context_builder,
     make_run_context_builder,
     make_skill_context_builder,
 )
@@ -119,6 +122,7 @@ def execute_manual_run(
     backend: str | None,
     model: str | None,
     fresh_session: bool = False,
+    publish: bool = False,
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
@@ -133,26 +137,74 @@ def execute_manual_run(
         except OSError as e:
             raise ValueError(f"Failed to read skill file '{skill_path}': {e}") from e
         if not dry_run and not no_async:
-            dispatch_run_command_async(
-                branch=branch,
-                cli_args=[
+            cli_args = (
+                [
+                    "run",
+                    "--publish",
+                    *([instructions] if instructions else []),
+                ]
+                if publish
+                else [
                     "run",
                     "--skill",
                     skill,
                     *([instructions] if instructions else []),
-                ],
+                ]
+            )
+            handoff_metadata: dict[str, object] = {"skill": skill}
+            if publish:
+                handoff_metadata["publish"] = True
+            dispatch_run_command_async(
+                branch=branch,
+                cli_args=cli_args,
                 issue_number=issue_number,
                 execution_name=(
                     f"vibe3-executor-issue-{issue_number}"
                     if issue_number is not None
                     else f"vibe3-executor-{branch.replace('/', '-')}"
                 ),
-                handoff_metadata={"skill": skill},
+                handoff_metadata=handoff_metadata,
             )
             return None
+
+        # Check if this is a publish path execution
+        # Two entry points:
+        # 1. Manual: --publish flag (publish=True)
+        # 2. Automatic: commit_mode from flow_state
+        is_publish_path = False
+
+        # Manual channel: explicit --publish flag
+        if publish:
+            is_publish_path = True
+        # Automatic channel: commit_mode detection from flow_state
+        elif branch:
+            try:
+                flow_state = SQLiteClient().get_flow_state(branch)
+                if flow_state:
+                    commit_mode = flow_state.get("commit_mode")
+                    # Validate commit_mode is boolean to prevent type coercion issues
+                    is_publish_path = (
+                        bool(commit_mode) if isinstance(commit_mode, bool) else False
+                    )
+            except Exception as e:
+                # Log unexpected errors but don't fail execution - graceful degradation
+                # Falls back to skill builder, which noop gate will catch if wrong
+                logger.warning(
+                    f"Unexpected error checking flow_state for publish path: {e}. "
+                    "Defaulting to skill builder. Noop gate will catch if "
+                    "wrong recipe used."
+                )
+
+        # Use publish-specific context builder for commit_mode execution
+        context_builder = (
+            make_publish_context_builder(skill_content)
+            if is_publish_path
+            else make_skill_context_builder(skill_content)
+        )
+
         command = create_codeagent_command(
             role="executor",
-            context_builder=make_skill_context_builder(skill_content),
+            context_builder=context_builder,
             task=instructions or f"Execute skill: {skill}",
             dry_run=dry_run,
             handoff_kind="run",
