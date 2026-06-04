@@ -53,11 +53,12 @@ issues:
 1. 复制此模板创建新 ADR 文件，命名为 NNNN-kebab-title.md
 2. 填写 frontmatter 和正文各段
 3. 在 INDEX.md 中登记新 ADR（status: proposed）
-4. PR 合并后更新 INDEX.md（status: accepted）
-5. 如需取代旧 ADR，填写 supersedes/superseded_by 并更新 INDEX
+4. ADR PR 合并后更新 INDEX.md（status: accepted）
+5. 如需取代旧 ADR，新 ADR 填写 supersedes；旧 ADR 只允许更新 lifecycle metadata（status/superseded_by）并更新 INDEX
 
 关键原则：
 - ADR 记录"为什么"，不记录"怎么做"
 - How 段只放链接，不复制实现细节
-- ADR 一旦 accepted 即不可修改，只能通过 supersede 机制被新 ADR 取代
+- ADR 一旦 accepted，决策正文不可重写；只能通过 supersede 机制被新 ADR 取代
+- supersede 时允许更新旧 ADR 的 lifecycle metadata，以保持追溯链可读
 -->

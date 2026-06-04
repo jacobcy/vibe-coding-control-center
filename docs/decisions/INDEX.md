@@ -27,8 +27,10 @@ document_type: index
 
 当新决策取代旧决策时：
 1. 在新 ADR 的 frontmatter 中填写 `supersedes: ADR-NNNN`
-2. 在旧 ADR 的 frontmatter 中填写 `superseded_by: ADR-MMMM`
+2. 在旧 ADR 的 frontmatter 中填写 `status: superseded` 和 `superseded_by: ADR-MMMM`
 3. 在本 INDEX 中更新旧 ADR 状态为 `superseded`
+
+ADR 的决策正文一旦 accepted 不得重写；supersede 只允许更新 lifecycle metadata 和 INDEX，以保持当前有效决策可追溯。
 
 ## 相关文档
 

@@ -48,7 +48,7 @@
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动
 - **如果是命名一致性/文档同步/API 签名变更任务**：使用 `inspect symbols` 和 `rg` 搜索所有层（service/UI/command/tests/docs），确认需要同步更新的完整文件列表，再圈定 plan 范围
-- **检查 ADR 约束**：读取 `docs/decisions/INDEX.md`，确认计划不违反任何 `accepted` ADR。若需偏离，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号及理由），而非静默违反。
+- **检查 ADR 约束**：先读取 `docs/decisions/INDEX.md`，再读取相关 `accepted` ADR 正文，确认计划不违反任何当前有效 ADR。若需偏离，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号及理由），而非静默违反。
 
 优先工具见公共规则；规划阶段通常至少会用到：
 - `uv run python src/vibe3/cli.py handoff status`

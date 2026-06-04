@@ -33,13 +33,13 @@ issues:
 采纳薄决策层 + 链接式 ADR 体系，三层按生命周期定位：
 
 1. **RFC（问题/易失）**：提出问题、讨论方案、决策选型
-2. **ADR（为什么/不可变）**：记录决策理由、权衡过程、关键结论
+2. **ADR（为什么/正文语义不可变）**：记录决策理由、权衡过程、关键结论
 3. **Standards（怎么做/living）**：规定实现细节、操作流程、验收标准
 
 核心原则：
 - ADR 只写"为什么"和"决策了什么"，不写实现细节
 - ADR 的 How 段只放链接，禁止复制 Standards 内容
-- ADR 一旦 accepted 即不可修改，只能通过 supersede 机制被新 ADR 取代
+- ADR 一旦 accepted，决策正文不可重写；只能通过 supersede 机制被新 ADR 取代
 
 ## Consequences
 
@@ -51,7 +51,7 @@ issues:
 
 负面影响：
 - 增加一层文档结构，需要维护 INDEX
-- RFC → ADR 结晶需要额外步骤
+- RFC → ADR 结晶需要一个独立的小型 ADR PR
 
 风险：
 - ADR 约定可能被忽略（纯 policy，无 CI 门禁）
@@ -65,7 +65,7 @@ issues:
 
 - [docs/standards/doc-organization.md](../standards/doc-organization.md) — 目录结构和命名规范
 - [docs/governance/governance-roadmap-closed-loop.md](../governance/governance-roadmap-closed-loop.md) — RFC→ADR→Standards 闭环机制
-- [skills/vibe-task/SKILL.md](../../skills/vibe-task/SKILL.md) — 任务执行中的 ADR 结晶流程
-- [skills/vibe-roadmap/SKILL.md](../../skills/vibe-roadmap/SKILL.md) — RFC intake 中的 ADR 判据
+- [skills/vibe-task/SKILL.md](../../skills/vibe-task/SKILL.md) — 任务执行中的 ADR PR 结晶流程
+- [skills/vibe-roadmap/SKILL.md](../../skills/vibe-roadmap/SKILL.md) — RFC intake 中的 ADR PR 判据
 - [supervisor/policies/plan.md](../../supervisor/policies/plan.md) — 规划前的 ADR 消费检查
 - [RFC issue #2015](https://github.com/jacobcy/vibe-coding-control-center/issues/2015) — 原始问题讨论
