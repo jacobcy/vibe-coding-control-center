@@ -21,6 +21,9 @@ from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.dispatch_coordinator_factory import (
+    create_global_dispatch_coordinator,
+)
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime import CircuitBreaker, HeartbeatServer
 from vibe3.runtime.orchestra_instance import (
@@ -133,6 +136,7 @@ def _build_server_with_launch_cwd(
         capacity=shared_capacity,
         failed_gate=failed_gate,
         store=shared_store,
+        coordinator_factory=create_global_dispatch_coordinator,
     )
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)

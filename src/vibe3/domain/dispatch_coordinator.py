@@ -160,6 +160,11 @@ class GlobalDispatchCoordinator:
         self._queue_persistence.frozen_queue = self._frozen_queue
         return self._queue_persistence.get_queued_issue_numbers()
 
+    def _sync_queue_persistence_issue_loader(self) -> None:
+        """Keep queue persistence aligned with the coordinator issue loader."""
+        if hasattr(self._queue_persistence, "load_issue"):
+            self._queue_persistence.load_issue = self._load_issue
+
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
     ) -> None:
@@ -501,6 +506,7 @@ class GlobalDispatchCoordinator:
         # Step 1: Restore queue from persistence if None
         if self._frozen_queue is None:
             self._queue_persistence.frozen_queue = None
+            self._sync_queue_persistence_issue_loader()
             restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
             self._queue_persistence.frozen_queue = self._frozen_queue
@@ -509,6 +515,7 @@ class GlobalDispatchCoordinator:
 
         # Step 2: Promote progressed entries (state changes)
         self._queue_persistence.frozen_queue = self._frozen_queue
+        self._sync_queue_persistence_issue_loader()
         cleared_all = self._queue_persistence.promote()
         if cleared_all:
             # Invalidate PR cache when queue is cleared

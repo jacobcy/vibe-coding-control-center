@@ -7,6 +7,12 @@ import pytest
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 
 
+def _mock_coordinator_factory(**kwargs: object) -> MagicMock:
+    coordinator = MagicMock()
+    coordinator.coordinate = AsyncMock()
+    return coordinator
+
+
 class TestOrchestrationFacadeDispatchServices:
     """Tests for GlobalDispatchCoordinator integration (refactored in issue-462)."""
 
@@ -42,6 +48,7 @@ class TestOrchestrationFacadeDispatchServices:
         facade = OrchestrationFacade(
             tick_count=0,
             capacity=mock_capacity,
+            coordinator_factory=_mock_coordinator_factory,
         )
 
         # Mock GlobalDispatchCoordinator.coordinate to track calls
@@ -115,6 +122,7 @@ class TestOrchestrationFacadeDispatchServices:
         facade = OrchestrationFacade(
             tick_count=0,
             capacity=mock_capacity,
+            coordinator_factory=_mock_coordinator_factory,
         )
 
         with (
@@ -174,6 +182,7 @@ class TestOrchestrationFacadeDispatchServices:
             config=mock_config,
             capacity=mock_capacity,
             registry=mock_registry,
+            coordinator_factory=_mock_coordinator_factory,
         )
 
         with (

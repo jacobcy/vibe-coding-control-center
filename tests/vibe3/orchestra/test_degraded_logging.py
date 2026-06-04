@@ -16,6 +16,26 @@ from vibe3.orchestra.global_dispatch_coordinator import (
 )
 
 
+def _make_coordinator_dependencies(
+    issue: IssueInfo,
+    branch: str,
+) -> dict[str, object]:
+    health_check_service = MagicMock()
+    health_check_service.check_issue_health.return_value = True
+    queue_persistence = MagicMock()
+    queue_persistence.frozen_queue = None
+    queue_persistence.restore.return_value = None
+    queue_persistence.promote.return_value = False
+    queue_persistence.get_queued_issue_numbers.return_value = set()
+    return {
+        "health_check_service": health_check_service,
+        "queue_persistence": queue_persistence,
+        "issue_loader": lambda issue_number: issue,
+        "flow_context_resolver": lambda issue_number: (branch, None),
+        "queue_selector": lambda *args, **kwargs: [],
+    }
+
+
 @pytest.fixture(autouse=True)
 def reset_degraded_manager():
     """Reset degraded mode manager before and after each test."""
@@ -73,68 +93,60 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
         manager.enter_degraded_mode(DegradedModeReason.GITHUB_API_TIMEOUT)
         return IssueState.READY  # Return a valid state
 
-    with patch("vibe3.domain.dispatch_coordinator.load_issue") as mock_load_issue:
-        with patch(
-            "vibe3.domain.dispatch_coordinator.get_flow_context"
-        ) as mock_flow_context:
-            with patch("vibe3.domain.dispatch_coordinator.publish"):
-                # Configure mock_store methods
-                mock_store.load_frozen_queue.return_value = []
-                mock_store.save_frozen_queue = MagicMock()
-                mock_store.clear_frozen_queue = MagicMock()
-                mock_store.remove_from_frozen_queue = MagicMock()
+    with patch("vibe3.domain.dispatch_coordinator.publish"):
+        # Configure mock_store methods
+        mock_store.load_frozen_queue.return_value = []
+        mock_store.save_frozen_queue = MagicMock()
+        mock_store.clear_frozen_queue = MagicMock()
+        mock_store.remove_from_frozen_queue = MagicMock()
 
-                mock_load_issue.return_value = blocked_issue
-                mock_flow_context.return_value = ("task/issue-123", None)
+        # Create coordinator
+        coordinator = GlobalDispatchCoordinator(
+            config=mock_config,
+            capacity=mock_capacity,
+            github=mock_github,
+            store=mock_store,
+            flow_manager=mock_flow_manager,
+            **_make_coordinator_dependencies(
+                blocked_issue,
+                "task/issue-123",
+            ),
+        )
 
-                # Create coordinator
-                coordinator = GlobalDispatchCoordinator(
-                    config=mock_config,
-                    capacity=mock_capacity,
-                    github=mock_github,
-                    store=mock_store,
-                    flow_manager=mock_flow_manager,
-                )
+        # Set frozen queue
+        coordinator._frozen_queue = frozen_queue
 
-                # Set frozen queue
-                coordinator._frozen_queue = frozen_queue
+        # Mock qualify_gate
+        coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
-                # Mock qualify_gate
-                coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+        # Mock health check to pass
+        coordinator._health_check_service.check_issue_health = lambda issue: True
 
-                # Mock health check to pass
-                coordinator._health_check_service.check_issue_health = (
-                    lambda issue: True
-                )
+        # Run coordination with log capture
+        import asyncio
 
-                # Run coordination with log capture
-                import asyncio
+        with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
+            asyncio.run(coordinator.coordinate(tick_id=1))
 
-                with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
-                    asyncio.run(coordinator.coordinate(tick_id=1))
+            # Verify degraded mode warning was logged
+            degraded_calls = [
+                call
+                for call in mock_logger.bind.call_args_list
+                if "degraded_mode" in str(call)
+            ]
 
-                    # Verify degraded mode warning was logged
-                    degraded_calls = [
-                        call
-                        for call in mock_logger.bind.call_args_list
-                        if "degraded_mode" in str(call)
-                    ]
+            # Should have at least one call with degraded_mode=True
+            assert len(degraded_calls) > 0
 
-                    # Should have at least one call with degraded_mode=True
-                    assert len(degraded_calls) > 0
+            # Verify the degraded mode warning was emitted
+            warning_calls = [
+                call for call in mock_logger.bind.return_value.warning.call_args_list
+            ]
+            assert len(warning_calls) > 0
 
-                    # Verify the degraded mode warning was emitted
-                    warning_calls = [
-                        call
-                        for call in mock_logger.bind.return_value.warning.call_args_list
-                    ]
-                    assert len(warning_calls) > 0
-
-                    # Check that the log contains issue number
-                    any_call_has_issue_123 = any(
-                        "123" in str(call) for call in warning_calls
-                    )
-                    assert any_call_has_issue_123
+            # Check that the log contains issue number
+            any_call_has_issue_123 = any("123" in str(call) for call in warning_calls)
+            assert any_call_has_issue_123
 
 
 @patch(
@@ -184,52 +196,47 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
         # Do NOT enter degraded mode
         return IssueState.READY
 
-    with patch("vibe3.domain.dispatch_coordinator.load_issue") as mock_load_issue:
-        with patch(
-            "vibe3.domain.dispatch_coordinator.get_flow_context"
-        ) as mock_flow_context:
-            with patch("vibe3.domain.dispatch_coordinator.publish"):
-                # Configure mock_store methods
-                mock_store.load_frozen_queue.return_value = []
-                mock_store.save_frozen_queue = MagicMock()
-                mock_store.clear_frozen_queue = MagicMock()
-                mock_store.remove_from_frozen_queue = MagicMock()
+    with patch("vibe3.domain.dispatch_coordinator.publish"):
+        # Configure mock_store methods
+        mock_store.load_frozen_queue.return_value = []
+        mock_store.save_frozen_queue = MagicMock()
+        mock_store.clear_frozen_queue = MagicMock()
+        mock_store.remove_from_frozen_queue = MagicMock()
 
-                mock_load_issue.return_value = blocked_issue
-                mock_flow_context.return_value = ("task/issue-456", None)
+        # Create coordinator
+        coordinator = GlobalDispatchCoordinator(
+            config=mock_config,
+            capacity=mock_capacity,
+            github=mock_github,
+            store=mock_store,
+            flow_manager=mock_flow_manager,
+            **_make_coordinator_dependencies(
+                blocked_issue,
+                "task/issue-456",
+            ),
+        )
 
-                # Create coordinator
-                coordinator = GlobalDispatchCoordinator(
-                    config=mock_config,
-                    capacity=mock_capacity,
-                    github=mock_github,
-                    store=mock_store,
-                    flow_manager=mock_flow_manager,
-                )
+        # Set frozen queue
+        coordinator._frozen_queue = frozen_queue
 
-                # Set frozen queue
-                coordinator._frozen_queue = frozen_queue
+        # Mock qualify_gate
+        coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
-                # Mock qualify_gate
-                coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+        # Mock health check to pass
+        coordinator._health_check_service.check_issue_health = lambda issue: True
 
-                # Mock health check to pass
-                coordinator._health_check_service.check_issue_health = (
-                    lambda issue: True
-                )
+        # Run coordination with log capture
+        import asyncio
 
-                # Run coordination with log capture
-                import asyncio
+        with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
+            asyncio.run(coordinator.coordinate(tick_id=1))
 
-                with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
-                    asyncio.run(coordinator.coordinate(tick_id=1))
+            # Verify NO degraded mode warning was logged
+            degraded_calls = [
+                call
+                for call in mock_logger.bind.call_args_list
+                if "degraded_mode" in str(call)
+            ]
 
-                    # Verify NO degraded mode warning was logged
-                    degraded_calls = [
-                        call
-                        for call in mock_logger.bind.call_args_list
-                        if "degraded_mode" in str(call)
-                    ]
-
-                    # Should have NO calls with degraded_mode=True
-                    assert len(degraded_calls) == 0
+            # Should have NO calls with degraded_mode=True
+            assert len(degraded_calls) == 0
