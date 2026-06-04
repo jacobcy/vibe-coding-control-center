@@ -331,9 +331,7 @@ cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 
 #### 第二步：手动触发 supervisor suggest
 
-```bash
-uv run python src/vibe3/cli.py run --supervisor supervisor/issue-cleanup.md
-```
+通过在 issue 中发布带有 `[governance suggest]` 标记的评论来手动触发治理建议：
 
 检查点：
 

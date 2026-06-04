@@ -17,11 +17,13 @@ Examples:
   vibe3 handoff status             # Show handoff chain for current flow
   vibe3 handoff append "Update"    # Add a handoff record
   vibe3 handoff show @task-123/run-1.md  # Show specific artifact
+  vibe3 handoff show @vibe/supervisor/apply.md  # Show vibe3 governance material
 
-Handoff targets support three namespaces:
-  @key              Shared artifact (.git/vibe3/handoff/)
-  relative/path     Worktree ref (requires --branch for other branches)
-  /abs/path         Absolute path (debugging fallback)
+Handoff targets support four namespaces:
+  @vibe/<path>     Vibe3 installation materials (governance docs, prompts, skills)
+  @key             Shared artifact (.git/vibe3/handoff/)
+  relative/path    Worktree ref (requires --branch for other branches)
+  /abs/path        Absolute path (debugging fallback)
 
 For more details: vibe3 handoff <command> --help
 """,

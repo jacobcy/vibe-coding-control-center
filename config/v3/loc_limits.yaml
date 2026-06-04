@@ -79,6 +79,9 @@ code_limits:
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
 
       # Services 层 —— 允许 410-540
+      - path: "src/vibe3/services/handoff_resolution.py"
+        limit: 650
+        reason: "Handoff target resolution service, 包含 @vibe/ 命名空间解析（三层 fallback：显式参数 → repo 自动检测 → 全局 ~/.vibe）、路径验证与安全检查（正则校验 + 路径遍历防护 + 边界检查）、四个命名空间统一解析逻辑（@key/@vibe/relative/absolute）等紧密耦合功能；新增 @vibe/ 命名空间支持后从 371 行增至 544 行（+173 行核心代码）"
       - path: "src/vibe3/analysis/snapshot_service.py"
         limit: 480
         reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑"

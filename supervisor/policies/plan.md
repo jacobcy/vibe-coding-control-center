@@ -97,7 +97,7 @@ plan agent 必须完成：
 
 plan agent 的 terminal finding 为 manager 提供**高置信度终局证据**，但：
 
-- manager 仍需独立验证（见 `supervisor/manager.md:655-659`）
+- manager 仍需独立验证（见 @vibe/supervisor/manager.md:655-659，使用 `vibe3 handoff show @vibe/supervisor/manager.md` 命令读取）
 - plan agent 只做判断 + 证据输出，不做执行
 - close 决策权归属 manager，这是 plan 和 manager 的职责边界
 

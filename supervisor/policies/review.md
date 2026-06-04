@@ -133,7 +133,7 @@ gh issue view <ISSUE_NUMBER> --comments
 
 #### 检查核心逻辑是否有真实测试
 
-- 参考 `supervisor/policies/test-strategy.md` 的分类矩阵
+- 参考 @vibe/supervisor/policies/test-strategy.md 的分类矩阵（使用 `vibe3 handoff show @vibe/supervisor/policies/test-strategy.md` 命令读取）
 - 核心业务逻辑（路径解析、Git 命令解析、业务规则计算等）必须有真实测试
 - 不能仅凭 mock 测试通过就认为验证充分
 
@@ -253,7 +253,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 - **是否验证了执行效果？**
   - 检查测试是否真的覆盖了变更点
   - 检查 type check/lint 是否通过
-  - **检查核心逻辑是否有真实测试（参考 `supervisor/policies/test-strategy.md`）**
+  - **检查核心逻辑是否有真实测试（参考 @vibe/supervisor/policies/test-strategy.md）**
   - 不要因为"测试全部通过"就认为实现正确（核心逻辑可能只有 mock 测试）
 
 ### 2. 我的 verdict 是否有足够证据？
