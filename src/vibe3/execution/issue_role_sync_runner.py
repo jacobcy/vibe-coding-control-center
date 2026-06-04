@@ -25,13 +25,21 @@ def run_issue_role_async(
     dry_run: bool,
     spec: IssueRoleSyncSpec,
     branch: str | None = None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Run a role asynchronously via tmux wrapper.
 
     Launches tmux session and returns immediately.
     The tmux child then re-enters the sync execution path locally.
     See docs/standards/vibe3-execution-paths-standard.md.
+
+    Note: agent/backend/model params are currently unused in async mode
+    because the child process re-invokes CLI and resolves config from scratch.
+    They are accepted for API consistency with sync mode.
     """
+    _ = agent, backend, model  # Unused in async mode
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
@@ -45,8 +53,8 @@ def run_issue_role_async(
 
     options = spec.resolve_options(config)
     actor = format_agent_actor(options)
-    backend = CodeagentBackend()
-    coordinator = ExecutionCoordinator(config, store, backend)
+    backend_instance = CodeagentBackend()
+    coordinator = ExecutionCoordinator(config, store, backend_instance)
 
     # Early capacity check to avoid wasteful request preparation
     if not dry_run:
@@ -119,6 +127,9 @@ def run_issue_role_sync(
     show_prompt: bool,
     spec: IssueRoleSyncSpec,
     branch: str | None = None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Run a role synchronously (direct execution without tmux wrapper).
 
@@ -126,7 +137,12 @@ def run_issue_role_sync(
     Worker roles still enter codeagent_runner via ExecutionCoordinator, so
     the same lifecycle / handoff / pre-gate / no-op shell is used.
     See docs/standards/vibe3-execution-paths-standard.md.
+
+    Note: agent/backend/model params are currently unused in this runner
+    because options are resolved via spec.resolve_options(). They are accepted
+    for API consistency with the command layer.
     """
+    _ = agent, backend, model  # Unused - options resolved via spec
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
@@ -144,8 +160,8 @@ def run_issue_role_sync(
 
     options = spec.resolve_options(config)
     actor = format_agent_actor(options)
-    backend = CodeagentBackend()
-    coordinator = ExecutionCoordinator(config, store, backend)
+    backend_instance = CodeagentBackend()
+    coordinator = ExecutionCoordinator(config, store, backend_instance)
 
     sync_request = spec.build_sync_request(
         config,

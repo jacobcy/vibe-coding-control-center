@@ -354,6 +354,10 @@ def execute_spec_plan_async(
     issue_number: int | None,
     branch: str,
     cli_args: list[str],
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
     config: VibeConfig | None = None,
 ) -> CodeagentResult:
     """Execute spec plan in async mode (tmux wrapper).
@@ -362,8 +366,11 @@ def execute_spec_plan_async(
     the CLI via ``cli_args`` inside a tmux session, so all configuration is
     re-resolved from scratch by the child process. Passing a custom ``request``
     or ``config`` here has no effect.
+
+    ``agent``, ``backend``, ``model``, and ``fresh_session`` are also unused here
+    because they should already be included in ``cli_args`` by the caller.
     """
-    _ = request, config
+    _ = request, config, agent, backend, model, fresh_session
     from vibe3.clients.sqlite_client import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
@@ -415,12 +422,19 @@ def execute_spec_plan_sync(
     request: PlanRequest,
     issue_number: int | None,
     branch: str,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
     config: VibeConfig | None = None,
     dry_run: bool = False,
     show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
+    from vibe3.services.session_service import load_session_id
+
     cfg = config or VibeConfig.get_defaults()
+    session_id = None if fresh_session else load_session_id("planner", branch)
     command = create_codeagent_command(
         role="planner",
         context_builder=make_plan_context_builder(request, cfg),
@@ -432,5 +446,9 @@ def execute_spec_plan_sync(
         issue_number=issue_number,
         cwd=None,  # Sync execution uses agent's built-in cwd resolution
         config=cfg,
+        agent=agent,
+        backend=backend,
+        model=model,
+        session_id=session_id,
     )
     return CodeagentExecutionService(cfg).execute_sync(command)

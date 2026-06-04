@@ -6,8 +6,12 @@ import typer
 from loguru import logger
 
 from vibe3.commands.command_options import (
+    _AGENT_OPT,
     _ASYNC_OPT,
+    _BACKEND_OPT,
     _DRY_RUN_OPT,
+    _FRESH_SESSION_OPT,
+    _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
@@ -58,6 +62,10 @@ def _review_branch_impl(
     dry_run: bool,
     no_async: bool,
     show_prompt: bool,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> None:
     """Review implementation for a branch via role sync runner."""
     if trace:
@@ -77,9 +85,12 @@ def _review_branch_impl(
         run_issue_role_sync(
             issue_number=issue_number,
             dry_run=True,
-            fresh_session=False,
+            fresh_session=fresh_session,
             show_prompt=show_prompt,
             spec=REVIEW_SYNC_SPEC,
+            agent=agent,
+            backend=backend,
+            model=model,
         )
         return
 
@@ -87,15 +98,21 @@ def _review_branch_impl(
         run_issue_role_sync(
             issue_number=issue_number,
             dry_run=False,
-            fresh_session=False,
+            fresh_session=fresh_session,
             show_prompt=show_prompt,
             spec=REVIEW_SYNC_SPEC,
+            agent=agent,
+            backend=backend,
+            model=model,
         )
     else:
         run_issue_role_async(
             issue_number=issue_number,
             dry_run=False,
             spec=REVIEW_SYNC_SPEC,
+            agent=agent,
+            backend=backend,
+            model=model,
         )
 
 
@@ -107,6 +124,10 @@ def default(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
     """Review with --branch for orchestra-driven review, or use base subcommand."""
     if ctx.invoked_subcommand is not None:
@@ -119,6 +140,10 @@ def default(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
     )
 
 
@@ -130,6 +155,10 @@ def issue_command(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
     """Legacy alias: review --branch <issue>."""
     default(
@@ -139,6 +168,10 @@ def issue_command(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
     )
 
 
@@ -158,6 +191,10 @@ def base(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -213,6 +250,10 @@ def base(
             issue_number=issue_number,
             branch=current_branch,
             show_prompt=show_prompt,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
         )
     else:
         result = execute_manual_review_async(
@@ -220,6 +261,10 @@ def base(
             instructions=instructions,
             issue_number=issue_number,
             branch=current_branch,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
         )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
