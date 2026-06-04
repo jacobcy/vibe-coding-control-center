@@ -5,7 +5,13 @@ from typing import Annotated
 
 import typer
 
+from vibe3.commands.command_options import (
+    _ASYNC_OPT,
+    _DRY_RUN_OPT,
+    _SHOW_PROMPT_OPT,
+)
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.issue_context_loader import load_issue_info
 
 app = typer.Typer(
@@ -19,13 +25,13 @@ app = typer.Typer(
 @app.command("manager")
 def internal_manager_dispatch(
     issue: Annotated[int, typer.Argument(help="Issue number to manage")],
-    no_async: Annotated[
-        bool,
-        typer.Option(
-            "--no-async",
-            help="Run synchronously (blocking) instead of async tmux session",
-        ),
-    ] = False,
+    no_async: _ASYNC_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name or issue number"),
+    ] = None,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
     from vibe3.execution.issue_role_sync_runner import (
@@ -34,19 +40,23 @@ def internal_manager_dispatch(
     )
     from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
+    resolved_branch = resolve_branch_arg(branch) if branch is not None else None
+
     if no_async:
         run_issue_role_sync(
             issue_number=issue,
-            dry_run=False,  # Execution-only, no dry-run
+            dry_run=dry_run,
             fresh_session=False,
-            show_prompt=False,
+            show_prompt=show_prompt,
             spec=MANAGER_SYNC_SPEC,
+            branch=resolved_branch,
         )
     else:
         run_issue_role_async(
             issue_number=issue,
-            dry_run=False,  # Execution-only, no dry-run
+            dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
+            branch=resolved_branch,
         )
 
 

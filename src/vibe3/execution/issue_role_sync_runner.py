@@ -23,6 +23,7 @@ def run_issue_role_async(
     issue_number: int,
     dry_run: bool,
     spec: IssueRoleSyncSpec,
+    branch: str | None = None,
 ) -> None:
     """Run a role asynchronously via tmux wrapper.
 
@@ -35,8 +36,9 @@ def run_issue_role_async(
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    current_branch = GitClient().get_current_branch()
-    branch = spec.resolve_branch(store, issue_number, current_branch)
+    if branch is None:
+        current_branch = GitClient().get_current_branch()
+        branch = spec.resolve_branch(store, issue_number, current_branch)
 
     options = spec.resolve_options(config)
     actor = format_agent_actor(options)
@@ -102,6 +104,8 @@ def run_issue_role_async(
             raise typer.Exit(1) from exc
 
     typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (async dry-run)")
+    typer.echo(f"   branch: {branch}")
+    typer.echo(f"   actor:  {actor}")
 
 
 def run_issue_role_sync(
@@ -111,6 +115,7 @@ def run_issue_role_sync(
     fresh_session: bool,
     show_prompt: bool,
     spec: IssueRoleSyncSpec,
+    branch: str | None = None,
 ) -> None:
     """Run a role synchronously (direct execution without tmux wrapper).
 
@@ -124,8 +129,9 @@ def run_issue_role_sync(
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    current_branch = GitClient().get_current_branch()
-    branch = spec.resolve_branch(store, issue_number, current_branch)
+    if branch is None:
+        current_branch = GitClient().get_current_branch()
+        branch = spec.resolve_branch(store, issue_number, current_branch)
     flow_state = store.get_flow_state(branch) if branch else None
     session_id = (
         None if fresh_session else load_session_id(spec.role_name, branch=branch)
@@ -157,6 +163,8 @@ def run_issue_role_sync(
 
     if dry_run:
         typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (dry-run)")
+        typer.echo(f"   branch: {branch}")
+        typer.echo(f"   actor:  {actor}")
         return
 
     if not sync_result.launched:
