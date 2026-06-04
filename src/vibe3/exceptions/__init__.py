@@ -73,15 +73,20 @@ class AgentPresetNotFoundError(UserError):
 class SkillNotAvailableError(UserError):
     """Skill not available — no adapter provides it in current profile."""
 
-    def __init__(self, skill: str) -> None:
+    def __init__(self, skill: str, profile: str | None = None) -> None:
         """Initialize SkillNotAvailableError.
 
         Args:
             skill: The skill name that was not found
+            profile: Optional current profile name for context
         """
-        super().__init__(
-            f"Skill '{skill}' not found (no adapter provides it in current profile)"
+        profile_hint = (
+            f" (current profile: {profile!r})" if profile else " (no profile detected)"
         )
+        fix_hint = (
+            "Set VIBE_PROFILE=vibe-center or github-flow " "to enable skill resolution."
+        )
+        super().__init__(f"Skill '{skill}' not found{profile_hint}. {fix_hint}")
         self.skill = skill
 
 

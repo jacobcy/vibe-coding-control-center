@@ -82,21 +82,34 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    skills_dir = repo_root / "skills"
-    if skills_dir.exists():
+    from vibe3.resources.runtime_assets import runtime_assets_root
+
+    skills_dirs = [repo_root / "skills"]
+    global_skills = runtime_assets_root() / "skills"
+    if global_skills.exists() and global_skills.resolve() not in [
+        d.resolve() for d in skills_dirs if d.exists()
+    ]:
+        skills_dirs.append(global_skills)
+
+    for skills_dir in skills_dirs:
+        if not skills_dir.exists():
+            continue
+        base = repo_root if skills_dir == repo_root / "skills" else skills_dir.parent
         for skill_path in skills_dir.iterdir():
             if skill_path.is_dir():
                 skill_md = skill_path / "SKILL.md"
                 if skill_md.exists():
-                    # Store relative path for portability
-                    rel_path = skill_md.relative_to(repo_root)
-                    resources.append(
-                        AdapterResource(
-                            type="skill",
-                            name=skill_path.name,
-                            path=str(rel_path),
+                    rel_path = skill_md.relative_to(base)
+                    # Avoid duplicates
+                    existing_names = {r.name for r in resources if r.type == "skill"}
+                    if skill_path.name not in existing_names:
+                        resources.append(
+                            AdapterResource(
+                                type="skill",
+                                name=skill_path.name,
+                                path=str(rel_path),
+                            )
                         )
-                    )
 
     # Workflows (from .agent/workflows)
     workflows_dir = repo_root / ".agent/workflows"

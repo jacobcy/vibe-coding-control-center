@@ -3,8 +3,11 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.agents.models import CodeagentResult
 from vibe3.config.convention_resolver import ConventionResolver
+from vibe3.exceptions import SkillNotAvailableError
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.roles.run_command import execute_manual_run, resolve_skill_path
 
@@ -171,3 +174,74 @@ class TestDispatchRunCommandAsyncWorktreeRequirement:
             exec_request = mock_coord.dispatch_execution.call_args[0][0]
             assert exec_request.worktree_requirement == WorktreeRequirement.PERMANENT
             assert exec_request.target_id == 0
+
+
+def test_skill_not_available_error_includes_profile():
+    """Test SkillNotAvailableError includes current profile in error message."""
+    with patch("vibe3.roles.run_command.resolve_skill_path", return_value=None):
+        with patch(
+            "vibe3.roles.run_command.ConventionResolver._detect_profile",
+            return_value="minimal",
+        ):
+            with pytest.raises(SkillNotAvailableError) as exc_info:
+                execute_manual_run(
+                    config=MagicMock(),
+                    branch="test/branch",
+                    issue_number=123,
+                    instructions=None,
+                    plan_file=None,
+                    skill="nonexistent-skill",
+                    summary=MagicMock(),
+                    dry_run=True,
+                    no_async=True,
+                    show_prompt=False,
+                    agent=None,
+                    backend=None,
+                    model=None,
+                )
+
+    error_msg = str(exc_info.value)
+    assert "nonexistent-skill" in error_msg
+    assert "minimal" in error_msg
+    assert "VIBE_PROFILE" in error_msg
+
+
+def test_execute_manual_run_uses_resolve_runtime_asset():
+    """Test execute_manual_run uses resolve_runtime_asset for skill file reading."""
+    with patch(
+        "vibe3.roles.run_command.resolve_skill_path",
+        return_value="skills/vibe-commit/SKILL.md",
+    ):
+        with patch("vibe3.roles.run_command.resolve_runtime_asset") as mock_resolve:
+            # Mock resolve_runtime_asset to return a path with skill content
+            mock_skill_path = MagicMock(spec=Path)
+            mock_skill_path.read_text.return_value = "# Test Skill\n"
+            mock_resolve.return_value = mock_skill_path
+
+            with patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls:
+                mock_service_cls.return_value.execute_sync.return_value = (
+                    CodeagentResult(success=True)
+                )
+
+                execute_manual_run(
+                    config=MagicMock(),
+                    branch="test/branch",
+                    issue_number=123,
+                    instructions=None,
+                    plan_file=None,
+                    skill="vibe-commit",
+                    summary=MagicMock(),
+                    dry_run=False,
+                    no_async=True,
+                    show_prompt=False,
+                    agent=None,
+                    backend=None,
+                    model=None,
+                )
+
+            # Verify resolve_runtime_asset was called with skill path
+            mock_resolve.assert_called_once_with("skills/vibe-commit/SKILL.md")
+            # Verify skill content was read from resolved path
+            mock_skill_path.read_text.assert_called_once_with(encoding="utf-8")

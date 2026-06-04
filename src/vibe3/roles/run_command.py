@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
-from vibe3.adapters.resource_root import resolve_resource_root
 from vibe3.agents import (
     CodeagentResult,
     RunPromptMode,
@@ -27,6 +26,7 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.prompt_meta import PromptContextMode
 from vibe3.models.worktree import WorktreeRequirement
+from vibe3.resources.runtime_assets import resolve_runtime_asset
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
@@ -124,11 +124,11 @@ def execute_manual_run(
     if skill:
         skill_path = resolve_skill_path(skill)
         if not skill_path:
-            raise SkillNotAvailableError(skill)
+            detected_profile = ConventionResolver(profile=None)._detect_profile()
+            raise SkillNotAvailableError(skill, profile=detected_profile)
 
         try:
-            repo_root = resolve_resource_root(required_marker="skills")
-            abs_skill_path = repo_root / skill_path
+            abs_skill_path = resolve_runtime_asset(skill_path)
             skill_content = abs_skill_path.read_text(encoding="utf-8")
         except OSError as e:
             raise ValueError(f"Failed to read skill file '{skill_path}': {e}") from e
