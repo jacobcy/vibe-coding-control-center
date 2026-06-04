@@ -28,6 +28,7 @@ config/keys.env
 # Logs & Temporary Files
 # =============================================================================
 *.log
+*.lock
 temp/
 tmpvibe-*
 vibe-init-test*
