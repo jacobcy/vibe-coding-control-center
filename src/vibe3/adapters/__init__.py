@@ -47,3 +47,11 @@ def list_adapters() -> list[str]:
         List of adapter names
     """
     return list(_ADAPTERS.keys())
+
+
+__all__ = [
+    "AdapterManifest",
+    "register_adapter",
+    "get_adapter",
+    "list_adapters",
+]
