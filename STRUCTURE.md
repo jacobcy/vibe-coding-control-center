@@ -194,6 +194,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `agents/` - AI Agent 调用层（plan/review/run pipeline + backends）
 - `analysis/` - 代码智能（symbol 分析、结构快照、变更范围）
 - `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
+  - `clients/protocols/` - Protocol 定义层（依赖注入接口，支持 mock 测试和解耦）
 - `commands/` - CLI 子命令实现（flow, handoff, pr, task, status, inspect 等）
 - `config/` - 配置加载、Profile 管理与 Pydantic schema 验证
 - `environment/` - 环境资源管理（Session 和 Worktree 统一抽象层）
@@ -225,6 +226,41 @@ vibe3 inspect symbols <file>:<symbol>     # 符号引用分析
 vibe3 inspect files <file>                # 文件结构 + 依赖关系
 vibe3 inspect commit <sha>                # 改动影响范围
 ```
+
+#### `clients/protocols/` - Protocol 定义层
+
+**职责**：依赖注入接口定义，支持 mock 测试和架构解耦
+
+**设计原因**：
+- **依赖注入**：通过 Protocol 定义接口，允许 services 层依赖抽象而非具体实现
+- **可测试性**：方便在测试中注入 mock 对象，隔离外部依赖
+- **架构清晰**：明确区分接口契约（clients/protocols/）和具体实现（clients/）
+- **向后兼容**：通过 `__init__.py` 重导出，保持所有现有导入路径有效
+
+**模块组成**：
+- `backend.py` - Backend 协议（tmux, 执行控制）
+- `github.py` - GitHub 客户端协议（PR, Issue, 认证）
+- `flow.py` - Flow 读取协议
+- `git.py` - Git 路径操作协议
+- `pr.py` - PR 创建协议
+
+**导入示例**：
+```python
+# 推荐：从子模块导入（明确来源）
+from vibe3.clients.protocols.github import GitHubClientProtocol
+
+# 兼容：从包根导入（向后兼容）
+from vibe3.clients.protocols import GitHubClientProtocol
+
+# 兼容：从旧位置导入（shim 重导出）
+from vibe3.services.flow_reader import FlowReader
+```
+
+**规则**：
+- 只包含 Protocol 定义（`typing.Protocol`）
+- 不包含具体实现
+- 通过 `__init__.py` 重导出所有公共符号
+- 各模块添加 `py.typed` 标记支持类型检查器
 
 ### `lib/` - V2 Shell 核心逻辑
 

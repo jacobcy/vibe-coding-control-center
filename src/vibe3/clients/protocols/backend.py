@@ -1,4 +1,12 @@
-"""BackendProtocol — Protocol for backend operations (tmux, execution)."""
+"""BackendProtocol — Protocol for backend operations (tmux, execution).
+
+Import paths:
+    # Recommended (explicit source)
+    from vibe3.clients.protocols.backend import BackendProtocol
+
+    # Backward compatible (package re-export)
+    from vibe3.clients.protocols import BackendProtocol
+"""
 
 from pathlib import Path
 from typing import Protocol

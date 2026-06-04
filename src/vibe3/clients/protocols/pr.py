@@ -1,4 +1,15 @@
-"""BaseResolver — Protocol for base branch resolution."""
+"""BaseResolver — Protocol for base branch resolution.
+
+Import paths:
+    # Recommended (explicit source)
+    from vibe3.clients.protocols.pr import BaseResolver
+
+    # Backward compatible (package re-export)
+    from vibe3.clients.protocols import BaseResolver
+
+    # Legacy (services shim re-export)
+    from vibe3.services.pr_create_usecase import BaseResolver
+"""
 
 from typing import Protocol
 

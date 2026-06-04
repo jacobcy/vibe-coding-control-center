@@ -1,4 +1,15 @@
-"""GitPathProtocol — Protocol for Git path-related operations."""
+"""GitPathProtocol — Protocol for Git path-related operations.
+
+Import paths:
+    # Recommended (explicit source)
+    from vibe3.clients.protocols.git import GitPathProtocol
+
+    # Backward compatible (package re-export)
+    from vibe3.clients.protocols import GitPathProtocol
+
+    # Legacy (services shim re-export)
+    from vibe3.services.git_path_client import GitPathProtocol
+"""
 
 from pathlib import Path
 from typing import Protocol
