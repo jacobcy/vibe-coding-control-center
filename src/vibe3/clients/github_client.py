@@ -1,5 +1,6 @@
 """GitHub client implementation."""
 
+from vibe3.clients.github_batch_issues_mixin import BatchIssuesMixin
 from vibe3.clients.github_client_base import GitHubClientBase
 from vibe3.clients.github_comment_ops import CommentMixin
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
@@ -17,6 +18,7 @@ class GitHubClient(
     CommentMixin,
     IssueAdminMixin,
     IssueBodyMixin,
+    BatchIssuesMixin,
 ):
     """GitHub client for interacting with GitHub via gh CLI.
 
@@ -27,6 +29,7 @@ class GitHubClient(
     - Issues operations (list, view)
     - Issue admin operations (close, add comment)
     - Issue body operations (read, update)
+    - Batch operations (batch issue fetch)
     """
 
     pass
