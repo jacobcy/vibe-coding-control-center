@@ -17,6 +17,7 @@ from vibe3.agents import (
     run_inspect_json,
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
+from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.config.loader import load_runtime_config
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.role_gates import REVIEWER_GATE_CONFIG
@@ -497,19 +498,15 @@ def _build_manual_review_async_cli_args(
     model: str | None = None,
     fresh_session: bool = False,
 ) -> list[str]:
+    overrides = RoleCliOverrides(
+        agent=agent, backend=backend, model=model, fresh_session=fresh_session
+    )
     args = ["review", "base"]
     if request.scope.base_branch:
         args.append(request.scope.base_branch)
     if instructions:
         args.append(instructions)
-    if agent:
-        args += ["--agent", agent]
-    if backend:
-        args += ["--backend", backend]
-    if model:
-        args += ["--model", model]
-    if fresh_session:
-        args += ["--fresh-session"]
+    args += overrides.to_argv()
     return args
 
 

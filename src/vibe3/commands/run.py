@@ -15,10 +15,10 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
-    build_role_cli_overrides,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.cli_overrides import build_role_cli_overrides
 from vibe3.config.loader import load_runtime_config
 from vibe3.exceptions import ConfigError, UserError
 from vibe3.roles.run import (

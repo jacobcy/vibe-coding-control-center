@@ -15,10 +15,10 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
-    build_role_cli_overrides,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.cli_overrides import RoleCliOverrides, build_role_cli_overrides
 from vibe3.config.loader import load_runtime_config
 from vibe3.exceptions import ConfigError
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -133,15 +133,10 @@ def _plan_for_branch(
             config=config,
         )
     else:
-        cli_args = ["plan"]
-        if agent:
-            cli_args += ["--agent", agent]
-        if backend:
-            cli_args += ["--backend", backend]
-        if model:
-            cli_args += ["--model", model]
-        if fresh_session:
-            cli_args += ["--fresh-session"]
+        overrides = RoleCliOverrides(
+            agent=agent, backend=backend, model=model, fresh_session=fresh_session
+        )
+        cli_args = ["plan"] + overrides.to_argv()
 
         result = execute_spec_plan_async(
             request=spec_input.request,
@@ -301,17 +296,13 @@ def _plan_spec_impl(
             config=config,
         )
     else:
+        overrides = RoleCliOverrides(
+            agent=agent, backend=backend, model=model, fresh_session=fresh_session
+        )
         cli_args = ["plan"]
         if spec_path:
             cli_args += ["--spec", spec_path]
-        if agent:
-            cli_args += ["--agent", agent]
-        if backend:
-            cli_args += ["--backend", backend]
-        if model:
-            cli_args += ["--model", model]
-        if fresh_session:
-            cli_args += ["--fresh-session"]
+        cli_args += overrides.to_argv()
 
         result = execute_spec_plan_async(
             request=spec_input.request,
