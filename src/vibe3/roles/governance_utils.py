@@ -215,6 +215,37 @@ def resolve_test_path(module_path: Path, repo_root: Path | None = None) -> Path:
     return root / "tests" / "vibe3" / rel.parent
 
 
+def build_code_auditor_context(
+    snapshot: Any,
+    *,
+    tick_count: int = 0,
+) -> dict[str, Any]:
+    """Build governance context for code-auditor material.
+
+    Selects a module via tick-based rotation and returns a minimal context
+    containing only the module and test paths — the agent reads the code
+    itself using its own tools (Read/Grep), avoiding prompt bloat.
+    """
+    module_path = select_audit_module(tick_count)
+    test_path = resolve_test_path(module_path)
+    return build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="代码质量审计",
+        scope_note=(
+            f"## 本次审计目标\n"
+            f"- 模块路径：`{module_path}`\n"
+            f"- 对应测试目录：`{test_path}`\n\n"
+            "请使用 Read、Grep 等工具检查该模块，寻找代码质量反模式。"
+        ),
+    )
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 

@@ -127,7 +127,7 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
 
         with (
             patch(
-                "vibe3.roles.governance.select_audit_module",
+                "vibe3.roles.governance_utils.select_audit_module",
                 return_value=tmp_path
                 / "src"
                 / "vibe3"
@@ -135,7 +135,7 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
                 / "flow_service.py",
             ),
             patch(
-                "vibe3.roles.governance.resolve_test_path",
+                "vibe3.roles.governance_utils.resolve_test_path",
                 return_value=tmp_path / "tests" / "vibe3" / "services",
             ),
         ):
@@ -155,10 +155,11 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
 
         with (
             patch(
-                "vibe3.roles.governance.select_audit_module", return_value=module_path
+                "vibe3.roles.governance_utils.select_audit_module",
+                return_value=module_path,
             ),
             patch(
-                "vibe3.roles.governance.resolve_test_path",
+                "vibe3.roles.governance_utils.resolve_test_path",
                 return_value=tmp_path / "tests" / "vibe3" / "services",
             ),
         ):
@@ -179,9 +180,12 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
 
         with (
             patch(
-                "vibe3.roles.governance.select_audit_module", return_value=module_path
+                "vibe3.roles.governance_utils.select_audit_module",
+                return_value=module_path,
             ),
-            patch("vibe3.roles.governance.resolve_test_path", return_value=test_path),
+            patch(
+                "vibe3.roles.governance_utils.resolve_test_path", return_value=test_path
+            ),
         ):
             result = build_governance_snapshot_context(
                 snapshot,
@@ -198,11 +202,11 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
 
         with (
             patch(
-                "vibe3.roles.governance.select_audit_module",
+                "vibe3.roles.governance_utils.select_audit_module",
                 return_value=tmp_path / "src" / "vibe3" / "cli.py",
             ),
             patch(
-                "vibe3.roles.governance.resolve_test_path",
+                "vibe3.roles.governance_utils.resolve_test_path",
                 return_value=tmp_path / "tests" / "vibe3",
             ),
         ):
@@ -221,11 +225,11 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
 
         with (
             patch(
-                "vibe3.roles.governance.select_audit_module",
+                "vibe3.roles.governance_utils.select_audit_module",
                 return_value=tmp_path / "src" / "vibe3" / "cli.py",
             ),
             patch(
-                "vibe3.roles.governance.resolve_test_path",
+                "vibe3.roles.governance_utils.resolve_test_path",
                 return_value=tmp_path / "tests" / "vibe3",
             ),
             patch("vibe3.roles.governance.GitHubClient") as mock_github,

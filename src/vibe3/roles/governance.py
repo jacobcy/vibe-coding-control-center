@@ -35,11 +35,10 @@ from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
     build_broader_repo_entries,
+    build_code_auditor_context,
     build_issue_context,
     find_material_in_catalog,
     get_governed_issue_numbers,
-    resolve_test_path,
-    select_audit_module,
 )
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
@@ -169,24 +168,7 @@ def build_governance_snapshot_context(
         )
 
     if material_name == "code-auditor.md":
-        module_path = select_audit_module(tick_count)
-        test_path = resolve_test_path(module_path)
-        return build_issue_context(
-            (),
-            server_running=snapshot.server_running,
-            active_flows=snapshot.active_flows,
-            active_worktrees=snapshot.active_worktrees,
-            queued_issues=snapshot.queued_issues,
-            circuit_breaker_state=snapshot.circuit_breaker_state,
-            circuit_breaker_failures=snapshot.circuit_breaker_failures,
-            issue_scope_name="代码质量审计",
-            scope_note=(
-                f"## 本次审计目标\n"
-                f"- 模块路径：`{module_path}`\n"
-                f"- 对应测试目录：`{test_path}`\n\n"
-                f"请使用 Read、Grep 等工具检查该模块，寻找代码质量反模式。"
-            ),
-        )
+        return build_code_auditor_context(snapshot, tick_count=tick_count)
 
     # Default: assignee-pool path
     github = github or GitHubClient()
