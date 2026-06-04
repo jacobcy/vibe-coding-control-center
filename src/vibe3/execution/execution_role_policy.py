@@ -11,9 +11,9 @@ from vibe3.config import load_orchestra_config
 from vibe3.config import (
     resolve_effective_agent_options as resolve_backend_effective_agent_options,
 )
+from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
 from vibe3.models import AgentOptions, OrchestraConfig
-from vibe3.utils.diagnostics import diagnose_profile
 
 
 @dataclass(frozen=True)

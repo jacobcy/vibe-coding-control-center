@@ -29,19 +29,3 @@ def format_diagnostic_message(resource: str, context: "DiagnosticContext") -> st
     if context.ref_issue:
         lines.append(f"See issue #{context.ref_issue} for details")
     return "\n".join(lines)
-
-
-def diagnose_profile() -> str:
-    """Get current profile name for diagnostic context.
-
-    Returns:
-        Profile name or "unknown" if resolution fails
-    """
-    try:
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        # Use internal detection method to get profile name
-        return resolver._detect_profile()
-    except Exception:
-        return "unknown"

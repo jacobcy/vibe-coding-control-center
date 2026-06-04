@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
@@ -32,7 +33,6 @@ from vibe3.roles.definitions import (
 )
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
-from vibe3.utils.diagnostics import diagnose_profile
 from vibe3.utils.runtime_assets import check_runtime_asset, runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(

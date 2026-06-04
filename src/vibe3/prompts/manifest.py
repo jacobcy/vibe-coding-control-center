@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
 from vibe3.prompts.models import (
     LoadedPromptRecipeDefinition,
@@ -19,7 +20,6 @@ from vibe3.prompts.models import (
     PromptVariableSource,
     VariableSourceKind,
 )
-from vibe3.utils.diagnostics import diagnose_profile
 from vibe3.utils.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
