@@ -44,7 +44,9 @@
 # 恢复所有 failed issue (dry-run)
 vibe3 task resume --failed --reason "quota resumed"
 
-# 恢复所有 stale blocked issue (dry-run)
+# ⚠️ WARNING: --blocked 会恢复所有 blocked issues，未经同意不可扩大范围
+# 推荐使用指定 issue number 的方式：vibe3 task resume <issue-number> --label auto --yes
+# 恢复所有 stale blocked issue (dry-run) - 仅在明确授权时使用
 vibe3 task resume --blocked --reason "dependency available"
 
 # 恢复指定的 issue (dry-run)
