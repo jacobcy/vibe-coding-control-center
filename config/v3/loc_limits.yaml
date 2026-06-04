@@ -265,6 +265,9 @@ code_limits:
       - path: "tests/vibe3/config/test_loader.py"
         limit: 430
         reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"
+      - path: "tests/vibe3/integration/test_session_reuse.py"
+        limit: 420
+        reason: "Session reuse 集成测试集，覆盖完整生命周期验证、NULL/empty 过滤、无效 ID 验证、live preference、branch/role 隔离、安全网、race condition、多 session 选择等 9 个紧密耦合场景，每个测试使用真实 SQLite 数据库（非 mock）需要完整 setup，拆分会破坏测试场景完整性（#2060）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
