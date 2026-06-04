@@ -348,6 +348,44 @@ class TestRegistrySync:
         assert session["backend_session_id"] == "abort-session-456"
         assert session["status"] == "aborted"
 
+    def test_empty_session_id_does_not_backfill(self, tmp_path: Path) -> None:
+        """Empty string session_id should be treated as invalid and skip backfill."""
+        import sqlite3
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+        # Start session
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-60",
+            role="executor",
+            lifecycle="started",
+            actor="agent:test",
+            detail="Run started",
+        )
+
+        # Complete with empty session_id
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-60",
+            role="executor",
+            lifecycle="completed",
+            actor="agent:test",
+            detail="Run completed",
+            session_id="",  # Empty string should be skipped
+        )
+
+        # Verify backend_session_id remains NULL
+        conn = store._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM runtime_session WHERE branch = ?", ("task/issue-60",)
+        )
+        session = dict(cursor.fetchone())
+        assert session["backend_session_id"] is None
+        assert session["status"] == "done"
+
 
 class TestExtendedRoles:
     """Tests for extended execution roles (manager, supervisor, governance)."""

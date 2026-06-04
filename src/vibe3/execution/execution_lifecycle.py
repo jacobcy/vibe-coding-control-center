@@ -140,7 +140,15 @@ def _sync_registry_from_lifecycle_event(
     session_id: str | None,
     refs: dict[str, str] | None = None,
 ) -> None:
-    """Sync runtime_session registry based on lifecycle event."""
+    """Sync runtime_session registry based on lifecycle event.
+
+    For terminal events (completed/aborted/failed), backfills backend_session_id
+    if the session doesn't already have one. This ensures data completeness for
+    sessions that completed before the caller had a chance to set backend_session_id
+    during live session.
+
+    Idempotency: Only writes backend_session_id if currently NULL/empty.
+    """
     if lifecycle == "started":
         tmux_session = None
         if refs:
@@ -195,6 +203,11 @@ def _sync_registry_from_lifecycle_event(
             }
             if session_id and not session.get("backend_session_id"):
                 updates["backend_session_id"] = session_id
+                logger.bind(
+                    domain="execution_lifecycle",
+                    branch=branch,
+                    role=role,
+                ).debug(f"Backfilling backend_session_id for session {session['id']}")
             store.update_runtime_session(session["id"], **updates)
 
 
