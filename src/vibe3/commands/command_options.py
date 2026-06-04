@@ -27,6 +27,23 @@ _SHOW_PROMPT_OPT = Annotated[
         ),
     ),
 ]
+
+
+def validate_show_prompt_dependency(dry_run: bool, show_prompt: bool) -> None:
+    """Validate that --show-prompt is only used with --dry-run.
+
+    Args:
+        dry_run: Whether --dry-run flag is set
+        show_prompt: Whether --show-prompt flag is set
+
+    Raises:
+        typer.Exit: If --show-prompt is used without --dry-run
+    """
+    if show_prompt and not dry_run:
+        typer.echo("Error: --show-prompt requires --dry-run", err=True)
+        raise typer.Exit(1)
+
+
 _ASYNC_OPT = Annotated[
     bool,
     typer.Option(

@@ -16,6 +16,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     build_role_cli_overrides,
+    validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.loader import load_runtime_config
@@ -79,6 +80,9 @@ def run_command(
     """Execute implementation plan or skill."""
     if trace:
         enable_method_trace()
+
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for run command (may publish events)
     from vibe3.domain.handlers import register_event_handlers

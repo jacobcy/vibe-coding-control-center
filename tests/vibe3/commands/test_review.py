@@ -190,7 +190,7 @@ def test_review_base_help_mentions_show_prompt_option():
 
 def test_review_base_show_prompt_forwarded_to_sync():
     """review base --show-prompt should forward the flag to
-    execute_manual_review_sync."""
+    execute_manual_review_sync (requires --dry-run)."""
     with (
         patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
         patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
@@ -210,7 +210,9 @@ def test_review_base_show_prompt_forwarded_to_sync():
             {"verdict": "MINOR", "handoff_file": None},
         )()
 
-        result = runner.invoke(app, ["base", "main", "--no-async", "--show-prompt"])
+        result = runner.invoke(
+            app, ["base", "main", "--no-async", "--dry-run", "--show-prompt"]
+        )
 
     assert result.exit_code == 0
     assert mock_execute.call_args.kwargs["show_prompt"] is True

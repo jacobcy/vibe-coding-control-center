@@ -16,6 +16,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     build_role_cli_overrides,
+    validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.config.loader import load_runtime_config
@@ -358,6 +359,9 @@ def default(
         return
 
     target_branch = resolve_branch_arg(branch)
+
+    # Validate --show-prompt requires --dry-run
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     # --task is alias for --spec (backward compatibility)
     spec_path = spec or task
