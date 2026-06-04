@@ -9,7 +9,6 @@ import yaml
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig, _vibe3_config_root
-from vibe3.exceptions import ConfigError
 
 
 def _expand_variables(
@@ -108,6 +107,9 @@ def load_yaml_config(path: Path, strict: bool = False) -> dict[str, Any]:
             return {}
     except yaml.YAMLError as exc:
         if strict:
+            # Delayed import to break circular dependency
+            from vibe3.exceptions import ConfigError
+
             raise ConfigError(f"Invalid YAML in {path}: {exc}") from exc
         logger.bind(domain="config", action="load", path=str(path)).warning(
             f"Invalid YAML in config file: {exc}"
@@ -115,6 +117,9 @@ def load_yaml_config(path: Path, strict: bool = False) -> dict[str, Any]:
         return {}
     except OSError as exc:
         if strict:
+            # Delayed import to break circular dependency
+            from vibe3.exceptions import ConfigError
+
             raise ConfigError(f"Cannot read config file {path}: {exc}") from exc
         logger.bind(domain="config", action="load", path=str(path)).warning(
             f"Cannot read config file: {exc}"
@@ -288,6 +293,9 @@ def load_config(
                 path=str(config_path),
                 error=str(e),
             )
+            # Delayed import to break circular dependency
+            from vibe3.exceptions import ConfigError
+
             raise ConfigError(f"Failed to load config file {config_path}: {e}") from e
 
     # Return default config (from migrated config paths when available)

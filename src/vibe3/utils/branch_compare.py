@@ -5,6 +5,9 @@ from typing import Protocol
 
 from loguru import logger
 
+# Delayed import to avoid utils → exceptions circular dependency
+# from vibe3.exceptions import GitError
+
 
 class _GitRunner(Protocol):
     def _run(self, args: list[str]) -> str: ...

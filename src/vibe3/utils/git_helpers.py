@@ -6,7 +6,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from vibe3.exceptions import GitError
+# Delayed import to avoid utils → exceptions circular dependency
+# from vibe3.exceptions import GitError
 
 
 def get_branch_handoff_dir(git_dir: str, branch: str) -> Path:
@@ -66,6 +67,8 @@ def get_commit_message(sha: str) -> str:
     Raises:
         GitError: If unable to get commit message
     """
+    from vibe3.exceptions import GitError
+
     try:
         result = subprocess.run(
             ["git", "log", "-1", "--format=%s", sha],
@@ -90,6 +93,8 @@ def get_current_branch() -> str:
     Raises:
         GitError: If unable to get current branch
     """
+    from vibe3.exceptions import GitError
+
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],

@@ -20,14 +20,20 @@ from vibe3.domain.protocols.dispatch_protocols import (
     QueueSelectorProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
+from vibe3.domain.protocols.infra_protocols import (
+    ConfigLoaderProtocol,
+    GitClientProtocol,
+)
 
 __all__ = [
     "CapacityServiceProtocol",
     "CheckServiceProtocol",
+    "ConfigLoaderProtocol",
     "DispatchHealthCheckProtocol",
     "FlowContextResolverProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",
+    "GitClientProtocol",
     "IssueCollectionServiceProtocol",
     "IssueLoaderProtocol",
     "LabelDispatchCallable",
