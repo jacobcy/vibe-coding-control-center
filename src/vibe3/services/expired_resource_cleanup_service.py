@@ -17,6 +17,26 @@ from loguru import logger
 from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.clients.protocols import GitHubClientProtocol
 
+
+def _is_protected_worktree(
+    worktree_path: "str | Path", protected_names: "set[str]"
+) -> bool:
+    """Return True when the worktree's directory name is reserved.
+
+    A worktree is considered protected when its basename exactly matches a
+    protected name, or starts with a protected name followed by '-' or '_'.
+    This catches both exact names (``wt-claude``) and variant suffixes
+    (``wt-claude-v3``, ``codex_test``).
+    """
+    basename = Path(str(worktree_path)).name
+    return any(
+        basename == name
+        or basename.startswith(f"{name}-")
+        or basename.startswith(f"{name}_")
+        for name in protected_names
+    )
+
+
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
@@ -329,11 +349,12 @@ class ExpiredResourceCleanupService:
                 f"  Checking local branches older than {max_age_days} days..."
             )
 
-        # Load protected branches from config
+        # Load protected branches and worktree names from config
         from vibe3.config.settings import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)
+        protected_wt_names = set(config.check_cleanup.protected_worktree_names)
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
@@ -464,14 +485,32 @@ class ExpiredResourceCleanupService:
 
                 # Check if has worktree
                 if self.git_client.is_branch_occupied_by_worktree(branch):
-                    # Delete worktree first
                     worktree_path = self.git_client.find_worktree_path_for_branch(
                         branch
                     )
+                    if worktree_path and _is_protected_worktree(
+                        worktree_path, protected_wt_names
+                    ):
+                        # Worktree basename is a reserved workspace — skip both
+                        # the worktree and the branch (e.g. wt-claude, wt-codex).
+                        skipped_protected.append(branch)
+                        wt_name = Path(str(worktree_path)).name
+                        logger.bind(domain="check", branch=branch).info(
+                            f"Skipped protected worktree: {wt_name}"
+                        )
+                        if not quiet:
+                            logger.bind(domain="check").info(
+                                f"     {branch} "
+                                f"(protected worktree: "
+                                f"{Path(str(worktree_path)).name})"
+                            )
+                        continue
+
+                    # Delete worktree first
                     if worktree_path:
                         if not quiet:
                             logger.bind(domain="check").info(
-                                f"     worktree for " f"{branch} at {worktree_path}..."
+                                f"     worktree for {branch} at {worktree_path}..."
                             )
                         remove_worktree(worktree_path, force=True)
                         skipped_worktree.append(branch)

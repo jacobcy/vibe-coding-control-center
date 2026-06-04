@@ -24,3 +24,19 @@ class CheckCleanupSettings(BaseModel):
     enable_local_branch_cleanup: bool = Field(
         default=True, description="Enable local branch cleanup"
     )
+    protected_worktree_names: list[str] = Field(
+        default_factory=lambda: [
+            "main",
+            "develop",
+            "wt-develop",
+            "claude",
+            "wt-claude",
+            "codex",
+            "wt-codex",
+        ],
+        description=(
+            "Worktree directory names (or name prefixes) that are never deleted. "
+            "A worktree is protected when its basename exactly matches or starts "
+            "with one of these names followed by '-' or '_'."
+        ),
+    )

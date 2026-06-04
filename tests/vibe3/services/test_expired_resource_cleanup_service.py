@@ -243,6 +243,75 @@ def test_clean_expired_local_branches_force_flag_bypasses_age(
     assert "feature-recent-abandoned" in res_force["cleaned"]
 
 
+def test_clean_expired_local_branches_skips_protected_worktree_name(
+    mock_store, mock_git_client
+) -> None:
+    """Branches whose worktree basename is in the protected list are skipped."""
+    from pathlib import Path
+
+    service = ExpiredResourceCleanupService(
+        store=mock_store, git_client=mock_git_client
+    )
+
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    mock_git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "wt-claude", "timestamp": old_date},
+        {"branch": "feature-old", "timestamp": old_date},
+    ]
+    mock_git_client.get_current_branch.return_value = "main"
+    mock_git_client.branch_exists.return_value = True
+    mock_store.get_all_flows.return_value = []
+
+    # wt-claude branch has a worktree at .worktrees/wt-claude (protected name)
+    def worktree_occupied(branch: str) -> bool:
+        return branch == "wt-claude"
+
+    def worktree_path(branch: str) -> Path | None:
+        if branch == "wt-claude":
+            return Path("/repo/.worktrees/wt-claude")
+        return None
+
+    mock_git_client.is_branch_occupied_by_worktree.side_effect = worktree_occupied
+    mock_git_client.find_worktree_path_for_branch.side_effect = worktree_path
+
+    result = service.clean_expired_local_branches(max_age_days=7)
+
+    # wt-claude: worktree name is protected → skip branch and worktree
+    assert "wt-claude" in result["skipped_protected"]
+    assert "wt-claude" not in result["cleaned"]
+    # feature-old: no worktree, not protected → cleaned
+    assert "feature-old" in result["cleaned"]
+
+
+def test_clean_expired_local_branches_skips_protected_worktree_name_prefix(
+    mock_store, mock_git_client
+) -> None:
+    """Worktree names matching protected prefixes (e.g. wt-claude-v3) are skipped."""
+    from pathlib import Path
+
+    service = ExpiredResourceCleanupService(
+        store=mock_store, git_client=mock_git_client
+    )
+
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    mock_git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "some-branch", "timestamp": old_date},
+    ]
+    mock_git_client.get_current_branch.return_value = "main"
+    mock_git_client.branch_exists.return_value = True
+    mock_store.get_all_flows.return_value = []
+    # Worktree basename wt-claude-v3 starts with protected prefix "wt-claude"
+    mock_git_client.is_branch_occupied_by_worktree.return_value = True
+    mock_git_client.find_worktree_path_for_branch.return_value = Path(
+        "/repo/.worktrees/wt-claude-v3"
+    )
+
+    result = service.clean_expired_local_branches(max_age_days=7)
+
+    assert "some-branch" in result["skipped_protected"]
+    assert "some-branch" not in result["cleaned"]
+
+
 def test_clean_expired_local_branches_aborts_when_flow_query_fails(
     mock_store, mock_git_client
 ) -> None:
