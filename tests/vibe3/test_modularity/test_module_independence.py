@@ -56,8 +56,8 @@ class TestIndependentImport:
 
     @pytest.mark.slow
     @pytest.mark.xfail(
-        reason="Known architectural debt: modules trigger cross-module imports "
-        "(commands imports analysis, services, agents, etc.)"
+        reason="Known architectural debt: 5 modules trigger unexpected cross-module "
+        "imports (agents, commands, execution, prompts, server)"
     )
     def test_no_cross_module_side_effects(self, module_registry: list[str]) -> None:
         """Verify modules don't trigger unexpected cross-module imports.
@@ -139,10 +139,6 @@ class TestMockFeasibility:
     """Test that classes can be mocked for unit testing."""
 
     @pytest.mark.slow
-    @pytest.mark.xfail(
-        reason="Known architectural debt: some classes have complex __init__ "
-        "that prevent mocking"
-    )
     def test_classes_are_mockable(self, module_registry: list[str]) -> None:
         """Verify classes exported via __all__ can be mocked.
 

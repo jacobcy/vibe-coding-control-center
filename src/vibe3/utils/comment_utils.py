@@ -3,8 +3,6 @@
 import re
 from typing import Any
 
-from vibe3.config import load_orchestra_config
-from vibe3.config.manager_config import get_manager_usernames
 from vibe3.utils import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 
 
@@ -65,6 +63,11 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
 
     # Filter manager bot (if configured)
     try:
+        # Lazy import to avoid circular dependency:
+        # utils → config → clients → exceptions
+        from vibe3.config import load_orchestra_config
+        from vibe3.config.manager_config import get_manager_usernames
+
         config = load_orchestra_config()
 
         # Check bot_username

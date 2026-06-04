@@ -1,5 +1,10 @@
 """Environment isolation modules (worktree, session, runtime assets)."""
 
+from vibe3.clients.runtime_assets import (
+    resolve_prompt_config,
+    resolve_runtime_asset,
+    runtime_assets_root,
+)
 from vibe3.environment.session import (
     CodeagentSessionContext,
     SessionManager,
@@ -8,11 +13,6 @@ from vibe3.environment.session import (
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.environment.worktree_context import WorktreeContext
-from vibe3.utils.runtime_assets import (
-    resolve_prompt_config,
-    resolve_runtime_asset,
-    runtime_assets_root,
-)
 
 __all__ = [
     "WorktreeContext",

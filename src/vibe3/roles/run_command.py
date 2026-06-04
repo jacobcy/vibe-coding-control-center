@@ -16,6 +16,7 @@ from vibe3.agents import (
     make_run_context_builder,
     make_skill_context_builder,
 )
+from vibe3.clients.runtime_assets import resolve_runtime_asset
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.config.orchestra_settings import load_orchestra_config
@@ -34,7 +35,6 @@ from vibe3.roles.run_helpers import (
     publish_run_command_success,
 )
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.utils.runtime_assets import resolve_runtime_asset
 
 
 def resolve_skill_path(
