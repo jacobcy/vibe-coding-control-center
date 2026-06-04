@@ -212,3 +212,16 @@ class ConventionResolver:
             f"Creating ConventionResolver from repo context (profile={profile})"
         )
         return cls(profile=profile)
+
+
+def diagnose_profile() -> str:
+    """Get current profile name for diagnostic context.
+
+    Returns:
+        Profile name or "unknown" if resolution fails
+    """
+    try:
+        resolver = ConventionResolver.from_repo()
+        return resolver._detect_profile()
+    except Exception:
+        return "unknown"

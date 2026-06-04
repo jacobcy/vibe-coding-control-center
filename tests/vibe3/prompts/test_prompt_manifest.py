@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from vibe3.exceptions import MissingResourceError
 from vibe3.prompts.manifest import (
     DEFAULT_PROMPT_RECIPES_PATH,
     PromptManifest,
@@ -75,15 +76,20 @@ recipes:
 
 
 def test_prompt_manifest_raises_on_missing_file(tmp_path: Path) -> None:
-    """Verify FileNotFoundError when recipes file is missing."""
+    """Verify MissingResourceError when recipes file is missing."""
     missing_path = tmp_path / "missing-recipes.yaml"
 
-    with pytest.raises(FileNotFoundError, match="Prompt recipes file not found"):
+    with pytest.raises(MissingResourceError) as exc_info:
         PromptManifest.load(missing_path)
+
+    error = exc_info.value
+    assert error.diagnostic.resource_type == "prompt-recipes"
+    assert "Searched paths:" in error.message
+    assert "Suggested fix:" in error.message
 
 
 def test_prompt_manifest_raises_on_missing_recipe(tmp_path: Path) -> None:
-    """Verify KeyError when recipe key is not found."""
+    """Verify MissingResourceError when recipe key is not found."""
     recipes_path = tmp_path / "prompt-recipes.yaml"
     recipes_path.write_text(
         """
@@ -98,8 +104,13 @@ recipes:
 
     manifest = PromptManifest.load(recipes_path)
 
-    with pytest.raises(KeyError, match="Prompt recipe not found: missing.recipe"):
+    with pytest.raises(MissingResourceError) as exc_info:
         manifest.recipe("missing.recipe")
+
+    error = exc_info.value
+    assert error.diagnostic.resource_type == "prompt-recipe-key"
+    assert "missing.recipe" in error.resource
+    assert "Suggested fix:" in error.message
 
 
 def test_prompt_manifest_raises_on_missing_variant(tmp_path: Path) -> None:

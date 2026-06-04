@@ -10,6 +10,9 @@ Error categories:
 
 from typing import Final
 
+# Configuration/asset missing errors - WARNING, recorded to error_log
+E_CONFIG_MISSING: Final[str] = "E_CONFIG_MISSING"
+
 # Model configuration errors - immediate failed gate
 E_MODEL_NOT_FOUND: Final[str] = "E_MODEL_NOT_FOUND"
 E_MODEL_PERMISSION: Final[str] = "E_MODEL_PERMISSION"

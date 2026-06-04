@@ -9,11 +9,16 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.exceptions import CapacityDeferredError
+from vibe3.exceptions import (
+    CapacityDeferredError,
+    DiagnosticContext,
+    MissingResourceError,
+)
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
@@ -21,11 +26,9 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_orchestra_repo_root,
 )
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.execution_request import ExecutionRequest
+from vibe3.models import ExecutionRequest, IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -33,6 +36,7 @@ from vibe3.roles.definitions import (
 )
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
+from vibe3.utils.runtime_assets import check_runtime_asset, runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -69,10 +73,21 @@ def resolve_manager_options(config: OrchestraConfig) -> Any:
     # Validate assignee_dispatch configuration
     ad = config.assignee_dispatch
     if not ad.agent and not ad.backend:
-        raise ValueError(
-            "No assignee dispatch agent configuration found in "
-            "orchestra.assignee_dispatch. Configure assignee_dispatch.agent or "
-            "orchestra.assignee_dispatch.backend in settings.yaml."
+        raise MissingResourceError(
+            resource="orchestra.assignee_dispatch (agent or backend)",
+            context=DiagnosticContext(
+                resource_type="orchestra-config",
+                search_paths=[
+                    str(Path("config/v3/settings.yaml")),
+                    str(runtime_assets_root() / "config/v3/settings.yaml"),
+                ],
+                profile=diagnose_profile(),
+                remediation=(
+                    "Configure assignee_dispatch.agent or "
+                    "assignee_dispatch.backend in config/v3/settings.yaml"
+                ),
+                ref_issue=1925,
+            ),
         )
 
     return ExecutionRolePolicyService(config).resolve_effective_agent_options("manager")
@@ -272,7 +287,7 @@ def build_manager_sync_request(
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
     # Load prompts.yaml for static sections
-    prompts_path = resolve_prompts_path()
+    prompts_path = check_runtime_asset("config/prompts/prompts.yaml")
     with open(prompts_path) as f:
         prompts_data = yaml.safe_load(f)
     manager_sections = prompts_data.get("manager", {})

@@ -14,6 +14,7 @@ from vibe3.exceptions import (
     AgentExecutionError,
     AgentPresetNotFoundError,
     InvalidBranchLinkError,
+    MissingResourceError,
 )
 from vibe3.exceptions.error_codes import (
     E_API_NETWORK,
@@ -22,6 +23,7 @@ from vibe3.exceptions.error_codes import (
     E_API_UNAVAILABLE,
     E_API_UNKNOWN,
     E_CAPACITY_SKIP,
+    E_CONFIG_MISSING,
     E_DISPATCH_FAILURE,
     E_EXEC_FLOW_FAILURE,
     E_EXEC_NO_OUTPUT,
@@ -48,6 +50,7 @@ EXCEPTION_TO_ERROR_CODE: dict[type[BaseException], str] = {
     AgentExecutionError: E_EXEC_UNKNOWN,
     AgentPresetNotFoundError: E_MODEL_CONFIG,
     InvalidBranchLinkError: E_INVALID_BRANCH_LINK,
+    MissingResourceError: E_CONFIG_MISSING,
     # Runtime infrastructure errors
     GitHubAPIError: E_API_UNAVAILABLE,
     APIError: E_API_UNKNOWN,
@@ -169,6 +172,17 @@ def classify_error(error_output: str) -> str:
 
 # Error registry: maps error codes to handling contracts
 ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
+    # WARNING: Configuration/asset missing errors - recorded to error_log
+    E_CONFIG_MISSING: ErrorHandlingContract(
+        code=E_CONFIG_MISSING,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="ignore",
+        description="Required configuration or runtime asset missing",
+    ),
     # CRITICAL: Model configuration errors - immediate failed gate
     # NOTE: CRITICAL severity only affects FailedGate, NOT flow block
     # Flow block is determined by business logic, not runtime errors
