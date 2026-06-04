@@ -39,7 +39,7 @@ class TestDatabaseErrorDoesNotTriggerBlock:
 
     def test_sqlite_error_recorded_not_blocked(self, temp_db):
         """Database error should record to error_log, not blocked_reason."""
-        branch = "test-branch"
+        branch = "task/issue-123"
         issue_number = 123
 
         temp_db.update_flow_state(branch, flow_slug="test")
@@ -67,7 +67,7 @@ class TestDatabaseErrorDoesNotTriggerBlock:
 
     def test_fail_issue_no_blocked_reason(self, temp_db):
         """fail_issue() should NOT write blocked_reason."""
-        branch = "test-branch"
+        branch = "task/issue-123"
         issue_number = 123
 
         temp_db.update_flow_state(branch, flow_slug="test")
@@ -93,7 +93,7 @@ class TestAgentNoopTriggersBlock:
 
     def test_state_unchanged_triggers_block(self, temp_db):
         """Agent noop should trigger block_flow."""
-        branch = "test-branch"
+        branch = "task/issue-123"
         issue_number = 123
 
         temp_db.update_flow_state(branch, flow_slug="test")
@@ -131,7 +131,7 @@ class TestGitHubAPIFailureNoBlock:
 
     def test_github_api_failure_raises_error_not_block(self, temp_db):
         """GitHub API failure should raise GitHubAPIError, not block."""
-        branch = "test-branch"
+        branch = "task/issue-123"
         issue_number = 123
 
         temp_db.update_flow_state(branch, flow_slug="test")
@@ -161,7 +161,7 @@ class TestGitHubAPIFailureNoBlock:
 
     def test_github_api_failure_records_error_log(self, temp_db):
         """GitHub API failure after retries should record to error_log."""
-        branch = "test-branch"
+        branch = "task/issue-123"
         issue_number = 123
 
         temp_db.update_flow_state(
@@ -199,7 +199,7 @@ class TestDependencyNotSatisfiedTriggersBlock:
         """FlowService.block_flow() should write blocked_reason."""
         from vibe3.services.flow_service import FlowService
 
-        branch = "test-branch"
+        branch = "task/issue-123"
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
@@ -224,7 +224,7 @@ class TestErrorBlockOrthogonality:
         """Runtime errors should be stored in error_log, not block flow."""
         from vibe3.services.error_tracking_service import ErrorTrackingService
 
-        branch = "test-branch"
+        branch = "task/issue-123"
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
@@ -243,7 +243,7 @@ class TestErrorBlockOrthogonality:
         """block_flow() should write blocked_reason."""
         from vibe3.services.flow_service import FlowService
 
-        branch = "test-branch"
+        branch = "task/issue-123"
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
