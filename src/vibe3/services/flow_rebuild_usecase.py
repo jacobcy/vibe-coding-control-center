@@ -15,9 +15,9 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models import IssueInfo
 from vibe3.services.flow_cleanup_service import FlowCleanupService
-from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.flow_rebuild_postconditions import assert_rebuild_postconditions
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
 
 LabelResume = Callable[..., None]
 
@@ -31,19 +31,32 @@ class FlowRebuildUsecase:
         store: SQLiteClient | None = None,
         git_client: GitClient | None = None,
         github_client: GitHubClient | None = None,
-        orchestrator: FlowOrchestratorService | None = None,
+        orchestrator: FlowBootstrapProtocol | None = None,
         label_resume: LabelResume | None = None,
     ) -> None:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
-        config = load_orchestra_config()
-        self.orchestrator = orchestrator or FlowOrchestratorService(
-            config,
-            store=self.store,
-            git=self.git_client,
-            github=self.github_client,
-        )
+        if orchestrator is not None:
+            self.orchestrator = orchestrator
+        else:
+            try:
+                from vibe3.services.flow_orchestrator_service import (
+                    FlowOrchestratorService,
+                )
+
+                config = load_orchestra_config()
+                self.orchestrator = FlowOrchestratorService(
+                    config,
+                    store=self.store,
+                    git=self.git_client,
+                    github=self.github_client,
+                )
+            except ImportError as e:
+                raise SystemError(
+                    f"Failed to import FlowOrchestratorService: {e}. "
+                    "Provide orchestrator parameter explicitly."
+                ) from e
         self._label_resume = label_resume or self._default_label_resume
 
     def rebuild_issue_flow(
