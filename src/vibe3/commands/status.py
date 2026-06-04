@@ -1,8 +1,11 @@
 """Status command - unified dashboard for flows and orchestra."""
 
 import json
+import os
+import subprocess
 from dataclasses import asdict
 from datetime import timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -18,6 +21,7 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
+from vibe3.config.env_override import OVERRIDE_RULES
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.orchestra_helpers import get_manager_usernames
@@ -54,8 +58,6 @@ def _resolve_repo_name(config_repo: str | None) -> str:
     if config_repo:
         return config_repo
     try:
-        import subprocess
-
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             capture_output=True,
@@ -67,21 +69,181 @@ def _resolve_repo_name(config_repo: str | None) -> str:
             return url.split(":")[-1].removesuffix(".git")
         if "github.com" in url:
             return url.split("/")[-2] + "/" + url.split("/")[-1].removesuffix(".git")
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
     return "(unknown)"
 
 
+def _analyze_orchestra_config_sources(config: OrchestraConfig) -> dict[str, str]:
+    """Determine the source of each displayed orchestra config value.
+
+    Returns a dict mapping field name to source label:
+    - "default" if value matches Pydantic model default
+    - "env override" if an env var overrides this field
+    - "config override" if a YAML config file overrides the default
+    """
+    defaults = OrchestraConfig()
+    sources: dict[str, str] = {}
+
+    # Check each field
+    for field in [
+        "max_concurrent_flows",
+        "polling_interval",
+        "debug_polling_interval",
+        "scene_base_ref",
+        "repo",
+        "manager_usernames",
+    ]:
+        config_value = getattr(config, field)
+        default_value = getattr(defaults, field)
+
+        # Check if env var overrides this field
+        config_path = f"orchestra.{field}"
+        env_override_found = False
+
+        for rule in OVERRIDE_RULES:
+            if rule.config_path == config_path and os.environ.get(rule.env_key):
+                sources[field] = "env override"
+                env_override_found = True
+                break
+
+        if env_override_found:
+            continue
+
+        # Check if value differs from default
+        if config_value == default_value:
+            sources[field] = "default"
+        else:
+            sources[field] = "config override"
+
+    return sources
+
+
 def _render_configuration(config: OrchestraConfig) -> None:
     """Render Vibe3 configuration section in status output."""
+    sources = _analyze_orchestra_config_sources(config)
     manager = ", ".join(get_manager_usernames(config))
     console.print("[bold]Vibe3 Configuration[/]")
-    console.print(f"  Repo:              {_resolve_repo_name(config.repo)}")
-    console.print(f"  Manager agents:    {manager}")
-    console.print(f"  Max concurrent:    {config.max_concurrent_flows}")
-    console.print(f"  Polling interval:  {config.polling_interval}s")
-    console.print(f"  Scene base ref:    {config.scene_base_ref}")
+
+    repo_name = _resolve_repo_name(config.repo)
+    console.print(f"  Repo:              {repo_name} ({sources['repo']})")
+
+    console.print(f"  Manager agents:    {manager} ({sources['manager_usernames']})")
+
+    max_concurrent = config.max_concurrent_flows
+    console.print(
+        f"  Max concurrent:    {max_concurrent} " f"({sources['max_concurrent_flows']})"
+    )
+
+    console.print(
+        f"  Polling interval:  {config.polling_interval}s "
+        f"({sources['polling_interval']})"
+    )
+
+    # Add debug mode status
+    debug_status = "ON" if config.debug else "OFF"
+    debug_interval = config.debug_polling_interval
+    console.print(f"    Debug mode:      {debug_status} (when ON: {debug_interval}s)")
+
+    console.print(
+        f"  Scene base ref:    {config.scene_base_ref} "
+        f"({sources['scene_base_ref']})"
+    )
     console.print()
+
+    # Add Configuration Sources section
+    console.print("[bold]Configuration Sources:[/]")
+    console.print(
+        "  Default values from: OrchestraConfig "
+        "(src/vibe3/models/orchestra_config.py)"
+    )
+
+    # Check global config
+    global_config_path = Path.home() / ".vibe" / "settings.yaml"
+    global_has_orchestra = False
+    if global_config_path.exists():
+        try:
+            import yaml
+
+            with open(global_config_path) as f:
+                global_data = yaml.safe_load(f) or {}
+                global_has_orchestra = "orchestra" in global_data
+        except Exception:
+            pass
+
+    global_status = f"{global_config_path}"
+    if not global_has_orchestra:
+        global_status += " (no orchestra overrides)"
+    console.print(f"  Global config:       {global_status}")
+
+    # Check project config
+    project_config_path = Path(".vibe/settings.yaml")
+    project_has_orchestra = False
+    if project_config_path.exists():
+        try:
+            import yaml
+
+            with open(project_config_path) as f:
+                project_data = yaml.safe_load(f) or {}
+                project_has_orchestra = "orchestra" in project_data
+        except Exception:
+            pass
+
+    project_status = f"{project_config_path}"
+    if not project_has_orchestra:
+        project_status += " (no orchestra overrides)"
+    console.print(f"  Project config:     {project_status}")
+
+    # Check env overrides
+    env_overrides = []
+    for rule in OVERRIDE_RULES:
+        if rule.config_path.startswith("orchestra.") and os.environ.get(rule.env_key):
+            env_overrides.append(rule.env_key)
+
+    if env_overrides:
+        console.print(f"  Env overrides:      {', '.join(env_overrides)}")
+    else:
+        console.print("  Env overrides:      none")
+
+    console.print()
+
+
+def _fetch_system_snapshot(
+    config: OrchestraConfig,
+) -> tuple["OrchestraSnapshot", bool]:
+    """Fetch orchestra snapshot with retry and PID fallback.
+
+    Returns (snapshot, snapshot_found) where snapshot_found is False only
+    when the snapshot was generated locally (server not reachable).
+    """
+    import time
+    from dataclasses import replace
+
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+    snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    if snapshot is None:
+        time.sleep(0.5)
+        snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+    snapshot_found = snapshot is not None
+
+    if not snapshot:
+        _, pid_alive = _validate_pid_file(config.pid_file)
+        if pid_alive:
+            time.sleep(0.5)
+            snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+            snapshot_found = snapshot is not None
+
+    if not snapshot:
+        orch_service = OrchestraStatusService(
+            config, orchestrator=FlowOrchestratorService(config)
+        )
+        local_snap = orch_service.snapshot()
+        snapshot = replace(local_snap, server_running=False)
+
+    assert snapshot is not None
+    return snapshot, snapshot_found
 
 
 def _render_system_status(
@@ -129,7 +291,7 @@ def _full_status_dashboard(
     trace: bool = False,
     min_ms: int | None = None,
 ) -> None:
-    """Render full task status dashboard (system status + all progress panels)."""
+    """Render task status dashboard with issue progress panels."""
     validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
@@ -173,9 +335,6 @@ def _full_status_dashboard(
                 yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
             )
         return
-
-    # Render system status
-    _render_system_status(data.config, data.orch_snapshot, data.snapshot_found)
 
     # Classify issues for rendering
     classified = classify_task_issues_for_rendering(
@@ -241,48 +400,16 @@ def status(
     if check:
         run_full_check_shortcut()
 
-    import time
-
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    # Fetch config and snapshot only (no flows or issues)
     config = load_orchestra_config()
-    orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-    if orch_snapshot is None:
-        time.sleep(0.5)
-        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-    snapshot_found = orch_snapshot is not None
+    orch_snapshot, snapshot_found = _fetch_system_snapshot(config)
 
-    if not orch_snapshot:
-        _, pid_alive = _validate_pid_file(config.pid_file)
-        if pid_alive:
-            time.sleep(0.5)
-            orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
-            snapshot_found = orch_snapshot is not None
-
-    if not orch_snapshot:
-        from dataclasses import replace
-
-        orch_service = OrchestraStatusService(
-            config, orchestrator=FlowOrchestratorService(config)
-        )
-        local_snap = orch_service.snapshot()
-        orch_snapshot = replace(local_snap, server_running=False)
-
-    # Assert orch_snapshot is non-None after fallback
-    assert orch_snapshot is not None
-
-    # Handle JSON/YAML output (system status only)
     if output_format in ("json", "yaml"):
-        output_data = {
-            "orchestra": asdict(orch_snapshot),
-        }
-
+        output_data = {"orchestra": asdict(orch_snapshot)}
         if output_format == "json":
             typer.echo(json.dumps(output_data, indent=2, default=str))
-        else:  # yaml
+        else:
             import yaml
 
             typer.echo(
@@ -290,10 +417,7 @@ def status(
             )
         return
 
-    # Render system status only
     _render_system_status(config, orch_snapshot, snapshot_found)
-
-    # Print hint
     typer.echo(
         "Use 'vibe3 task status' to view issue progress and ready queue",
         err=True,

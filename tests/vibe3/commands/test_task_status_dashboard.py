@@ -127,6 +127,9 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     assert "manager-bot" in output
     assert "Ready with human assignee" in output
     assert "non-manager assignee" in output
+    # Verify task status does NOT show system status sections
+    assert "Vibe3 Configuration" not in output
+    assert "Orchestra Status" not in output
 
 
 @patch(
@@ -194,14 +197,17 @@ def test_task_status_shows_flows_with_prs(
 )
 @patch("vibe3.services.task_status_service.FlowService")
 @patch("vibe3.services.task_status_service.StatusQueryService")
-def test_task_status_hides_missing_blocked_issue_number(
+def test_task_status_excludes_system_status_sections(
     mock_status_service_cls,
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
     mock_get_manager_usernames,
 ) -> None:
-    """task status should not render '#None' when failed gate has no issue number."""
+    """task status should not render system status sections.
+
+    This includes Orchestra Status and Vibe3 Configuration sections.
+    """
     mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -224,9 +230,10 @@ def test_task_status_hides_missing_blocked_issue_number(
     result = runner.invoke(app, ["task", "status"])
 
     assert result.exit_code == 0
-    assert "Dispatch: FROZEN" in result.output
-    assert "Reason:  API/Exec error threshold: 3 recent errors" in result.output
-    assert "#None" not in result.output
+    # System status sections should not appear in task status
+    assert "Dispatch: FROZEN" not in result.output
+    assert "Orchestra Status" not in result.output
+    assert "Vibe3 Configuration" not in result.output
 
 
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
@@ -243,7 +250,6 @@ def test_task_status_shows_missing_state_label_section(
 ) -> None:
     """task status should show issues without state/* in a dedicated section."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -323,7 +329,6 @@ def test_task_status_shows_active_exception_for_missing_assignee(
 ) -> None:
     """Active-state issue with missing assignee appears in Active Exceptions."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -384,7 +389,6 @@ def test_task_status_shows_governed_anomaly_section(
 ) -> None:
     """Issue with governed label but no state appears in Governed but Anomaly."""
     config_mock = _make_config_mock()
-    config_mock.get_manager_usernames.return_value = ["manager-bot"]
     mock_load_orchestra_config.return_value = config_mock
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
