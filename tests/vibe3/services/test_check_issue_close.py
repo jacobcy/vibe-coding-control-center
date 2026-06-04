@@ -105,7 +105,7 @@ class TestMarkFlowDoneIssueClose:
         store.add_issue_link(branch_done, issue_number, role="task")
 
         # Another active flow for the same issue
-        branch_active = "dev/issue-123"
+        branch_active = "task/issue-123-v2"
         store.update_flow_state(branch_active, flow_status="active")
         store.add_issue_link(branch_active, issue_number, role="task")
 
@@ -141,7 +141,7 @@ class TestMarkFlowDoneIssueClose:
         store.add_issue_link(branch_done, issue_number, role="task")
 
         # Another flow for the same issue, but already done
-        branch_done2 = "dev/issue-123"
+        branch_done2 = "task/issue-123-v2"
         store.update_flow_state(branch_done2, flow_status="done")
         store.add_issue_link(branch_done2, issue_number, role="task")
 
@@ -260,7 +260,7 @@ class TestMarkFlowDoneIssueClose:
         """Branch dev/issue-123 with task issue → issue closed (no branch check)."""
         # ARRANGE
         store = SQLiteClient(db_path=tmp_path / "test.db")
-        branch = "dev/issue-123"  # Non-canonical branch name
+        branch = "task/issue-123-v2"  # Non-canonical branch name
         issue_number = 123
 
         store.update_flow_state(branch, flow_status="active")
