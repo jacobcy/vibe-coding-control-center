@@ -12,7 +12,7 @@ class ErrorSeverity(str, Enum):
     Severity answers: "Does this signal indicate system unavailability,
     unstable infrastructure, or only a diagnostic warning?"
 
-    See: docs/standards/vibe3-error-severity-and-blocking-standard.md
+    See: docs/standards/v3/error-severity-and-blocking-standard.md
     """
 
     CRITICAL = "CRITICAL"  # Configuration unusable, stop immediately
