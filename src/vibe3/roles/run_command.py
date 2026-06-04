@@ -170,7 +170,8 @@ def execute_manual_run(
                 # Falls back to skill builder, which noop gate will catch if wrong
                 logger.warning(
                     f"Unexpected error checking flow_state for publish path: {e}. "
-                    "Defaulting to skill builder."
+                    "Defaulting to skill builder. Noop gate will catch if "
+                    "wrong recipe used."
                 )
 
         # Use publish-specific context builder for commit_mode execution

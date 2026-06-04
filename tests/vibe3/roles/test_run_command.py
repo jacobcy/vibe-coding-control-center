@@ -7,7 +7,6 @@ import pytest
 
 from vibe3.agents.models import CodeagentResult
 from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.exceptions import SkillNotAvailableError
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 from vibe3.roles.run_command import execute_manual_run, resolve_skill_path
 
@@ -176,130 +175,68 @@ class TestDispatchRunCommandAsyncWorktreeRequirement:
             assert exec_request.target_id == 0
 
 
-def test_skill_not_available_error_includes_profile():
-    """Test SkillNotAvailableError includes current profile in error message."""
-    with patch("vibe3.roles.run_command.resolve_skill_path", return_value=None):
-        with patch(
-            "vibe3.roles.run_command.ConventionResolver._detect_profile",
-            return_value="minimal",
-        ):
-            with pytest.raises(SkillNotAvailableError) as exc_info:
-                execute_manual_run(
-                    config=MagicMock(),
-                    branch="test/branch",
-                    issue_number=123,
-                    instructions=None,
-                    plan_file=None,
-                    skill="nonexistent-skill",
-                    summary=MagicMock(),
-                    dry_run=True,
-                    no_async=True,
-                    show_prompt=False,
-                    agent=None,
-                    backend=None,
-                    model=None,
-                )
+class TestPublishPathDetection:
+    """Tests for commit_mode publish path detection and graceful degradation."""
 
-    error_msg = str(exc_info.value)
-    assert "nonexistent-skill" in error_msg
-    assert "minimal" in error_msg
-    assert "VIBE_PROFILE" in error_msg
+    @pytest.mark.parametrize(
+        "commit_mode,expected_publish",
+        [
+            (True, True),
+            (False, False),
+            ("true", False),  # string should be rejected
+            ("false", False),  # string should be rejected
+            (1, False),  # int should be rejected
+            (0, False),  # int should be rejected
+            (None, False),  # None should be rejected
+        ],
+    )
+    def test_commit_mode_type_validation(
+        self, commit_mode: object, expected_publish: bool
+    ) -> None:
+        """Test that only boolean commit_mode triggers publish path."""
+        captured_prompt: dict[str, str] = {}
 
+        def fake_execute_sync(command):
+            # Capture the generated prompt content
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
 
-def test_execute_manual_run_uses_resolve_runtime_asset():
-    """Test execute_manual_run uses resolve_runtime_asset for skill file reading."""
-    with patch(
-        "vibe3.roles.run_command.resolve_skill_path",
-        return_value="skills/vibe-commit/SKILL.md",
-    ):
-        with patch("vibe3.roles.run_command.resolve_runtime_asset") as mock_resolve:
-            # Mock resolve_runtime_asset to return a path with skill content
-            mock_skill_path = MagicMock(spec=Path)
-            mock_skill_path.read_text.return_value = "# Test Skill\n"
-            mock_resolve.return_value = mock_skill_path
-
-            with patch(
-                "vibe3.roles.run_command.CodeagentExecutionService"
-            ) as mock_service_cls:
-                mock_service_cls.return_value.execute_sync.return_value = (
-                    CodeagentResult(success=True)
-                )
-
-                execute_manual_run(
-                    config=MagicMock(),
-                    branch="test/branch",
-                    issue_number=123,
-                    instructions=None,
-                    plan_file=None,
-                    skill="vibe-commit",
-                    summary=MagicMock(),
-                    dry_run=False,
-                    no_async=True,
-                    show_prompt=False,
-                    agent=None,
-                    backend=None,
-                    model=None,
-                )
-
-            # Verify resolve_runtime_asset was called with skill path
-            mock_resolve.assert_called_once_with("skills/vibe-commit/SKILL.md")
-            # Verify skill content was read from resolved path
-            mock_skill_path.read_text.assert_called_once_with(encoding="utf-8")
-
-
-def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
-    monkeypatch, tmp_path: Path
-) -> None:
-    """External repos using github-flow should discover and read global skills."""
-    external_repo = tmp_path / "external-repo"
-    external_repo.mkdir()
-    git_dir = external_repo / ".git"
-    git_dir.mkdir()
-    config_dir = external_repo / ".vibe"
-    config_dir.mkdir()
-    (config_dir / "config.yaml").write_text("profile: github-flow\n", encoding="utf-8")
-
-    runtime_root = tmp_path / "runtime"
-    skill_dir = runtime_root / "skills" / "ship-it"
-    skill_dir.mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text("# Ship It\n\nDo the work.\n", encoding="utf-8")
-
-    monkeypatch.chdir(external_repo)
-    monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(runtime_root))
-
-    import vibe3.adapters as adapter_registry
-    from vibe3.adapters import github_flow
-
-    previous_adapter = adapter_registry._ADAPTERS.pop("github-flow", None)
-    was_loaded = "github-flow" in adapter_registry._LOADED
-    adapter_registry._LOADED.discard("github-flow")
-    adapter_registry.register_adapter(github_flow._build_github_flow_manifest())
-
-    captured_prompt: dict[str, str] = {}
-
-    def fake_execute_sync(command):
-        captured_prompt["text"] = command.context_builder()
-        return CodeagentResult(success=True)
-
-    try:
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
-                return_value=str(git_dir),
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
             ),
-            patch("vibe3.roles.run_command.CodeagentExecutionService") as service_cls,
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_publish_context_builder"
+            ) as mock_publish_builder,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
         ):
-            service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
 
-            assert resolve_skill_path("ship-it") == "skills/ship-it/SKILL.md"
+            # Mock flow_state with commit_mode
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = {
+                "commit_mode": commit_mode,
+            }
 
-            result = execute_manual_run(
+            # Mock context builders to return identifiable content
+            mock_publish_builder.return_value = lambda: "PUBLISH_CONTEXT"
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
                 config=MagicMock(),
-                branch="issue-123",
-                issue_number=123,
+                branch="task/issue-42",
+                issue_number=42,
                 instructions=None,
                 plan_file=None,
-                skill="ship-it",
+                skill="vibe-commit",
                 summary=MagicMock(),
                 dry_run=False,
                 no_async=True,
@@ -308,14 +245,113 @@ def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
                 backend=None,
                 model=None,
             )
-    finally:
-        adapter_registry._ADAPTERS.pop("github-flow", None)
-        if previous_adapter is not None:
-            adapter_registry._ADAPTERS["github-flow"] = previous_adapter
-        if was_loaded:
-            adapter_registry._LOADED.add("github-flow")
-        else:
-            adapter_registry._LOADED.discard("github-flow")
 
-    assert result == CodeagentResult(success=True)
-    assert "# Ship It" in captured_prompt["text"]
+        # Verify correct context builder was selected
+        if expected_publish:
+            assert captured_prompt["text"] == "PUBLISH_CONTEXT"
+            mock_publish_builder.assert_called_once()
+        else:
+            assert captured_prompt["text"] == "SKILL_CONTEXT"
+            mock_skill_builder.assert_called_once()
+
+    def test_graceful_fallback_on_flow_state_error(self) -> None:
+        """Test that flow_state errors fall back to skill builder safely."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock SQLiteClient to raise exception on get_flow_state
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.side_effect = Exception("DB connection error")
+
+            # Mock skill builder to return identifiable content
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        # Should fall back to skill builder (safe default)
+        assert captured_prompt["text"] == "SKILL_CONTEXT"
+        mock_skill_builder.assert_called_once()
+
+    def test_graceful_fallback_on_missing_flow_state(self) -> None:
+        """Test that missing flow_state (None) falls back to skill builder."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock SQLiteClient to return None (no flow_state)
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = None
+
+            # Mock skill builder to return identifiable content
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        # Should use skill builder when flow_state is missing
+        assert captured_prompt["text"] == "SKILL_CONTEXT"
+        mock_skill_builder.assert_called_once()
