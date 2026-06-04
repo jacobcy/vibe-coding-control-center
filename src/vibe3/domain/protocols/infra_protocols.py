@@ -1,13 +1,13 @@
 """Infrastructure layer protocol interfaces to break circular dependencies."""
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class ConfigLoaderProtocol(Protocol):
     """Protocol for config loading to break utils → config dependency."""
 
-    def load_orchestra_config(self) -> dict:
+    def load_orchestra_config(self) -> dict[str, Any]:
         """Load orchestra configuration."""
         ...
 
