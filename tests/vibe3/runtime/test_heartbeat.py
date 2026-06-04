@@ -191,13 +191,11 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
     cleanup_service = MagicMock()
     cleanup_service.cleanup_old_errors.side_effect = RuntimeError("db locked")
 
-    from vibe3.runtime import heartbeat
-
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    # Mock ErrorTrackingService at its actual module location
     monkeypatch.setattr(
-        heartbeat.ErrorTrackingService,
-        "get_instance",
+        "vibe3.services.error_tracking_service.ErrorTrackingService.get_instance",
         staticmethod(lambda: cleanup_service),
     )
     server._running = True

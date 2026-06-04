@@ -41,7 +41,6 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.observability.orchestra_log import append_orchestra_event
-from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_collection_service import IssueCollectionService
@@ -139,9 +138,14 @@ class GlobalDispatchCoordinator:
             issue_collector_factory
             or (lambda: IssueCollectionService(github, config.repo))
         )
-        self._label_dispatcher: LabelDispatchCallable = (
-            label_dispatcher or build_label_dispatch_event  # type: ignore[assignment]
-        )
+
+        # Lazy default for label_dispatcher to avoid module-level import
+        if label_dispatcher is None:
+            from vibe3.roles.registry import build_label_dispatch_event
+
+            self._label_dispatcher: LabelDispatchCallable = build_label_dispatch_event  # type: ignore[assignment]
+        else:
+            self._label_dispatcher = label_dispatcher
 
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
@@ -175,6 +179,7 @@ class GlobalDispatchCoordinator:
             issue: Issue info
             tick_id: Heartbeat tick number for error tracking
         """
+
         # Pre-dispatch cleanup: remove conflicting state/* labels
         clean_old_state_labels(issue, role, self._config)
 

@@ -7,6 +7,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -26,6 +27,7 @@ from vibe3.orchestra.dispatch_coordinator_factory import (
 )
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime import CircuitBreaker, HeartbeatServer
+from vibe3.runtime.heartbeat import FailedGateProtocol
 from vibe3.runtime.orchestra_instance import (
     OrchestraInstanceInfo,
     read_instance_info,
@@ -139,7 +141,9 @@ def _build_server_with_launch_cwd(
         coordinator_factory=create_global_dispatch_coordinator,
     )
 
-    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
+    heartbeat = HeartbeatServer(
+        config, failed_gate=cast(FailedGateProtocol | None, failed_gate)
+    )
     heartbeat.register(facade)
 
     # Combined shutdown callback for all services
