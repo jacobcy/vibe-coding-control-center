@@ -11,6 +11,8 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.global_dispatch_coordinator import (
     GlobalDispatchCoordinator,
 )
+from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
+from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 
 
 @pytest.fixture
@@ -96,6 +98,23 @@ def make_coordinator() -> callable:
         flow_manager.get_flow_for_issue = MagicMock(return_value=None)
         flow_manager.git.branch_exists = MagicMock(return_value=True)
 
+        health_check_service = MagicMock()
+
+        def mock_issue_loader(issue_number: int):
+            return None
+
+        def mock_flow_context_resolver(issue_number: int):
+            return (f"task/issue-{issue_number}", None)
+
+        queue_persistence = QueuePersistenceService(
+            store=store,
+            config=config,
+            github=github,
+            registry=None,
+            supervisor_label=config.supervisor_handoff.issue_label,
+            load_issue=mock_issue_loader,
+        )
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
@@ -103,6 +122,11 @@ def make_coordinator() -> callable:
             store=store,
             flow_manager=flow_manager,
             registry=None,
+            health_check_service=health_check_service,
+            queue_persistence=queue_persistence,
+            issue_loader=mock_issue_loader,
+            flow_context_resolver=mock_flow_context_resolver,
+            queue_selector=select_ready_issues_from_collected_issues,
         )
 
         # Mock health check to bypass CheckService for queue operation tests
@@ -154,16 +178,19 @@ def install_issue_loader() -> callable:
         coordinator: GlobalDispatchCoordinator,
         states: dict[int, IssueState | None],
     ) -> None:
-        coordinator._load_issue = lambda issue_number: (
-            None
-            if states.get(issue_number) is None
-            else IssueInfo(
+        def loader(issue_number: int):
+            if states.get(issue_number) is None:
+                return None
+            return IssueInfo(
                 number=issue_number,
                 title=f"Issue {issue_number}",
                 state=states[issue_number],
                 labels=[states[issue_number].to_label()],
                 assignees=["manager-bot"],
             )
-        )
+
+        coordinator._load_issue = loader
+        if hasattr(coordinator._queue_persistence, "load_issue"):
+            coordinator._queue_persistence.load_issue = loader
 
     return _install_issue_loader

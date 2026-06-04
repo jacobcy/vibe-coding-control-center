@@ -16,6 +16,23 @@ if TYPE_CHECKING:
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 
 
+def _make_mock_coordinator_dependencies():
+    """Create mock dependencies for GlobalDispatchCoordinator construction."""
+    health_check_service = MagicMock()
+    queue_persistence = MagicMock()
+    queue_persistence.frozen_queue = None
+    issue_loader = MagicMock(return_value=None)
+    flow_context_resolver = MagicMock(return_value=("task/issue-42", None))
+    queue_selector = MagicMock(return_value=[])
+    return {
+        "health_check_service": health_check_service,
+        "queue_persistence": queue_persistence,
+        "issue_loader": issue_loader,
+        "flow_context_resolver": flow_context_resolver,
+        "queue_selector": queue_selector,
+    }
+
+
 def _setup_health_check_service(
     coordinator: "GlobalDispatchCoordinator",
     check_service: MagicMock,
@@ -53,12 +70,16 @@ class TestPreDispatchHealthChecks:
         store.db_path = ":memory:"
         flow_manager = MagicMock()
 
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **mock_deps,
         )
 
         issue = IssueInfo(
@@ -124,12 +145,16 @@ class TestPreDispatchHealthChecks:
         store.db_path = ":memory:"
         flow_manager = MagicMock()
 
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **mock_deps,
         )
 
         issue = IssueInfo(
@@ -187,6 +212,7 @@ class TestPreDispatchHealthChecks:
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **_make_mock_coordinator_dependencies(),
         )
 
         issue = IssueInfo(
@@ -245,6 +271,7 @@ class TestPreDispatchHealthChecks:
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **_make_mock_coordinator_dependencies(),
         )
 
         issue = IssueInfo(
@@ -302,6 +329,7 @@ class TestPreDispatchHealthChecks:
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **_make_mock_coordinator_dependencies(),
         )
 
         issue = IssueInfo(
@@ -361,6 +389,7 @@ class TestPreDispatchHealthChecks:
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **_make_mock_coordinator_dependencies(),
         )
 
         issue = IssueInfo(
@@ -433,6 +462,7 @@ class TestPreDispatchHealthChecks:
             github=github,
             store=store,
             flow_manager=flow_manager,
+            **_make_mock_coordinator_dependencies(),
         )
 
         issue = IssueInfo(

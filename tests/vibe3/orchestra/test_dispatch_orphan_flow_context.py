@@ -11,6 +11,23 @@ if TYPE_CHECKING:
     pass
 
 
+def _make_mock_coordinator_dependencies():
+    """Create mock dependencies for GlobalDispatchCoordinator construction."""
+    health_check_service = MagicMock()
+    queue_persistence = MagicMock()
+    queue_persistence.frozen_queue = None
+    issue_loader = MagicMock(return_value=None)
+    flow_context_resolver = MagicMock(return_value=("", None))
+    queue_selector = MagicMock(return_value=[])
+    return {
+        "health_check_service": health_check_service,
+        "queue_persistence": queue_persistence,
+        "issue_loader": issue_loader,
+        "flow_context_resolver": flow_context_resolver,
+        "queue_selector": queue_selector,
+    }
+
+
 def _setup_health_check_service(
     coordinator: "GlobalDispatchCoordinator",
     check_service: MagicMock,
@@ -32,12 +49,14 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     config.max_concurrent_flows = 10
     config.supervisor_handoff.issue_label = "supervisor"
     store = MagicMock(db_path=":memory:")
+    mock_deps = _make_mock_coordinator_dependencies()
     coordinator = GlobalDispatchCoordinator(
         config=config,
         capacity=MagicMock(),
         github=MagicMock(),
         store=store,
         flow_manager=MagicMock(),
+        **mock_deps,
     )
     issue = IssueInfo(
         number=1013,
@@ -70,12 +89,14 @@ def test_dispatch_loop_logs_missing_flow_context_once(
     config.max_concurrent_flows = 10
     config.supervisor_handoff.issue_label = "supervisor"
     config.manager_usernames = []
+    mock_deps = _make_mock_coordinator_dependencies()
     coordinator = GlobalDispatchCoordinator(
         config=config,
         capacity=MagicMock(),
         github=MagicMock(),
         store=MagicMock(db_path=":memory:"),
         flow_manager=MagicMock(),
+        **mock_deps,
     )
     coordinator._capacity.get_capacity_status.return_value = {"remaining": 1}
     coordinator._frozen_queue = [

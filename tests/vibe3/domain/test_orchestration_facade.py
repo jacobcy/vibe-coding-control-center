@@ -147,6 +147,7 @@ class TestOrchestrationFacade:
         facade = OrchestrationFacade(
             capacity=capacity,
             failed_gate=gate,
+            coordinator_factory=lambda **kwargs: MagicMock(),
         )
         facade.on_supervisor_scan = AsyncMock()
         facade._coordinator = MagicMock()
