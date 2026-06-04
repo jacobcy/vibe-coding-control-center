@@ -82,6 +82,8 @@ def _plan_for_branch(
         raise typer.Exit(1)
 
     # Handle dry_run early return
+    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
+    # (aligned with run command's proven dry_run handling)
     if dry_run:
         cfg = VibeConfig.get_defaults()
         command = create_codeagent_command(
@@ -215,6 +217,8 @@ def _plan_spec_impl(
         raise typer.Exit(1)
 
     # Handle dry_run early return
+    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
+    # (aligned with run command's proven dry_run handling)
     if dry_run:
         cfg = VibeConfig.get_defaults()
         command = create_codeagent_command(

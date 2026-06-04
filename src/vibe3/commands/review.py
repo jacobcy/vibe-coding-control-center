@@ -71,7 +71,8 @@ def _review_branch_impl(
         raise typer.Exit(1) from error
 
     # Handle dry_run early return (align with plan command pattern)
-    # dry_run is for debugging: verify paths and prompts, independent of async/sync
+    # dry_run early-return: bypasses async/sync execution
+    # to display command/prompt for verification
     if dry_run:
         run_issue_role_sync(
             issue_number=issue_number,
