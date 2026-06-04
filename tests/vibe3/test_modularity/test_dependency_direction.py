@@ -221,7 +221,7 @@ class TestCircularDependencies:
             )
 
     @pytest.mark.xfail(
-        reason="Known architectural debt: 10 L3-internal circular deps remain in "
+        reason="Known architectural debt: 12 L3-internal circular deps remain in "
         "{domain, execution, orchestra, roles, runtime, services} SCC. "
         "Tracked by epic #1987."
     )
