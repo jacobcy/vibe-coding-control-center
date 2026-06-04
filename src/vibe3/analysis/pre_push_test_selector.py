@@ -204,6 +204,7 @@ def _map_source_to_tests(source_path: str, root: Path) -> list[str]:
     resolved: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
+        # __init__.py files contain no tests; skip to avoid "no tests ran" warnings
         if candidate.name == "__init__.py":
             continue
         if candidate.exists():
