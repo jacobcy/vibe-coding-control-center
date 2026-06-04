@@ -20,8 +20,93 @@ def test_internal_manager_dispatch():
         assert result.exit_code == 0
         assert mock_run.call_args.kwargs["issue_number"] == 123
         assert mock_run.call_args.kwargs["dry_run"] is False
+        assert mock_run.call_args.kwargs["show_prompt"] is False
         assert mock_run.call_args.kwargs["fresh_session"] is False
         assert mock_run.call_args.kwargs["spec"].role_name == "manager"
+
+
+def test_internal_manager_dry_run():
+    """测试 internal manager --dry-run 参数透传."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app, ["internal", "manager", "123", "--no-async", "--dry-run"]
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+        assert mock_run.call_args.kwargs["dry_run"] is True
+        assert mock_run.call_args.kwargs["show_prompt"] is False
+
+
+def test_internal_manager_show_prompt():
+    """测试 internal manager --show-prompt 参数透传."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app,
+            ["internal", "manager", "123", "--no-async", "--dry-run", "--show-prompt"],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+        assert mock_run.call_args.kwargs["dry_run"] is True
+        assert mock_run.call_args.kwargs["show_prompt"] is True
+
+
+def test_internal_manager_branch_override():
+    """测试 internal manager --branch 参数透传 (sync path)."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app,
+            [
+                "internal",
+                "manager",
+                "123",
+                "--no-async",
+                "--dry-run",
+                "--branch",
+                "task/issue-1905",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+        assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
+
+
+def test_internal_manager_branch_override_async():
+    """测试 internal manager --branch 参数透传 (async path)."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app,
+            ["internal", "manager", "123", "--branch", "task/issue-1905"],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+        assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
+        assert mock_run.call_args.kwargs["dry_run"] is False
+
+
+def test_internal_manager_branch_numeric():
+    """测试 --branch 接受 issue number，CLI 层透传原始值由 runner 解析."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app,
+            ["internal", "manager", "123", "--no-async", "--branch", "1905"],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["branch"] == "1905"
 
 
 def test_internal_apply_dispatch():
