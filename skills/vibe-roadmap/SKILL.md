@@ -7,7 +7,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护版本路线图，同时作为三层治理架构的 Layer 3 审查者，消化 pool 层的 `[governance suggest]` 并形成最终 `[roadmap decision]`。
 
-三层架构、标签语义（orchestra-scanned / orchestra-governed / roadmap-reviewed）和三级审查框架（Level 1/2/3）见 [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md)。
+三层架构、标签语义（orchestra-scanned / orchestra-governed / roadmap-reviewed）和三级审查框架（Level 1/2/3）见 @vibe/supervisor/roadmap-common.md（使用 `vibe3 handoff show @vibe/supervisor/roadmap-common.md` 命令读取）。
 
 ## 核心原则
 

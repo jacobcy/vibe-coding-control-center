@@ -318,7 +318,7 @@ cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 
 检查点：
 
-- prompt 是否使用了 `supervisor/governance/assignee-pool.md`（governance 链）或 `supervisor/manager.md`（manager 链）
+- prompt 是否使用了 `@vibe/supervisor/governance/assignee-pool.md`（governance 链，使用 `vibe3 handoff show @vibe/supervisor/governance/assignee-pool.md` 命令读取）或 `@vibe/supervisor/manager.md`（manager 链，使用 `vibe3 handoff show @vibe/supervisor/manager.md` 命令读取）
 - runtime vars 是否正确注入（active_count、issue_list 等）
 - 业务判断是否错误下沉到底层（见标准 §2.1）
 
@@ -372,7 +372,7 @@ tmux ls 2>&1
 
 ```bash
 # 手动触发 governance suggest（创建治理 issue）
-uv run python src/vibe3/cli.py run --supervisor supervisor/issue-cleanup.md
+uv run python src/vibe3/cli.py run --supervisor @vibe/supervisor/issue-cleanup.md
 
 # 手动 apply 特定治理 issue
 uv run python src/vibe3/cli.py run --issue {governance_issue_number}
