@@ -529,11 +529,18 @@ class CheckCleanupService:
                     )
                     continue
 
-                # SAFETY CHECK 2: Skip worktrees outside the repo root (e.g. /tmp,
-                # ~/.codex) — only clean up repo-internal orphaned worktrees.
-                if not wt_abs.startswith(current_wt_root + os.sep):
+                # SAFETY CHECK 2: Only process worktrees in the repo root OR in
+                # the system temp directory (PR review worktrees live in /tmp).
+                # This naturally excludes tool-managed directories like ~/.codex
+                # or ~/.claude that should never be touched.
+                tmp_root = os.path.realpath("/tmp")  # /private/tmp on macOS
+                in_repo = wt_abs.startswith(current_wt_root + os.sep)
+                in_tmp = wt_abs.startswith(tmp_root + os.sep) or wt_abs.startswith(
+                    "/tmp" + os.sep
+                )
+                if not in_repo and not in_tmp:
                     logger.bind(domain="check", worktree=wt_path).debug(
-                        "Skipping detached worktree: outside repo root"
+                        "Skipping detached worktree: outside repo root and temp dir"
                     )
                     continue
 
