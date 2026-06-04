@@ -148,7 +148,7 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.get_vibe_config",
             return_value=config,
         ):
             content = build_prompt_file_content("prompt body")
@@ -158,7 +158,7 @@ class TestCodeagentBackend:
 
     def test_build_prompt_file_content_keeps_prompt_when_notice_empty(self) -> None:
         with patch(
-            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.get_vibe_config",
             return_value=VibeConfig(),
         ):
             content = build_prompt_file_content("prompt body")
@@ -171,7 +171,7 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.get_vibe_config",
             return_value=config,
         ):
             content = build_prompt_file_content(
@@ -389,7 +389,7 @@ class TestCodeagentBackend:
 
         with (
             patch(
-                "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+                "vibe3.utils.codeagent_helpers.get_vibe_config",
                 return_value=config,
             ),
             patch("pathlib.Path.home", return_value=tmp_path),
