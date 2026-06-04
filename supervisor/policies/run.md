@@ -164,6 +164,22 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
   uv run python src/vibe3/cli.py handoff append "Plan 优化建议：<优化点>" --kind note --actor "<actor>"
   ```
 
+#### 4. Plan 是否包含未满足的 REQUIRED:BEFORE_CODING 前置条件？
+
+- **扫描 Plan 中的 REQUIRED:BEFORE_CODING 标记**
+  - 查找所有包含 `REQUIRED:BEFORE_CODING` 的行
+  - 对每个标记，执行其 Verify 命令确认条件已满足
+
+- **如果发现未满足的前置条件**：
+  - **不要开始任何代码修改**
+  - 尝试执行标记中指定的补救动作（如 rebase）
+  - 如果补救失败：
+    ```bash
+    uv run python src/vibe3/cli.py handoff append "Plan 前置条件未满足：<标记描述> - <失败原因>" --kind blocker --actor "executor"
+    ```
+    - 进入 blocked 状态，等待 manager 指示
+    - 不要绕过前置条件继续执行
+
 ### 独立判断强制验证点
 
 执行每一步前，必须回答：

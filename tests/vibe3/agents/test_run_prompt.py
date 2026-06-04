@@ -125,3 +125,13 @@ def test_build_run_prompt_body_includes_commit_before_report(tmp_path: Path) -> 
     assert "git commit" in context
     assert "git log -1 --oneline" in context
     assert "do NOT proceed to report" in context
+
+
+def test_build_run_prompt_body_includes_pre_coding_validation(tmp_path: Path) -> None:
+    """Run prompt must instruct executor to validate REQUIRED:BEFORE_CODING markers."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+    context = build_run_prompt_body(str(plan_file), config)
+    assert "REQUIRED:BEFORE_CODING" in context
+    assert "Pre-Coding Plan Validation" in context
