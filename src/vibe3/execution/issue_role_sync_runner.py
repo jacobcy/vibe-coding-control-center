@@ -16,6 +16,7 @@ from vibe3.services import (
     load_issue_info,
     record_dispatch_failure_if_unexpected,
 )
+from vibe3.services.branch_arg import resolve_branch_arg
 
 
 def run_issue_role_async(
@@ -36,7 +37,9 @@ def run_issue_role_async(
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    if branch is None:
+    if branch is not None:
+        branch = resolve_branch_arg(branch)
+    else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
 
@@ -129,7 +132,9 @@ def run_issue_role_sync(
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    if branch is None:
+    if branch is not None:
+        branch = resolve_branch_arg(branch)
+    else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
     flow_state = store.get_flow_state(branch) if branch else None

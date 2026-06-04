@@ -11,7 +11,6 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.issue_context_loader import load_issue_info
 
 app = typer.Typer(
@@ -40,8 +39,6 @@ def internal_manager_dispatch(
     )
     from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
-    resolved_branch = resolve_branch_arg(branch) if branch is not None else None
-
     if no_async:
         run_issue_role_sync(
             issue_number=issue,
@@ -49,14 +46,14 @@ def internal_manager_dispatch(
             fresh_session=False,
             show_prompt=show_prompt,
             spec=MANAGER_SYNC_SPEC,
-            branch=resolved_branch,
+            branch=branch,
         )
     else:
         run_issue_role_async(
             issue_number=issue,
             dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
-            branch=resolved_branch,
+            branch=branch,
         )
 
 

@@ -57,7 +57,7 @@ def test_internal_manager_show_prompt():
 
 
 def test_internal_manager_branch_override():
-    """测试 internal manager --branch 参数透传."""
+    """测试 internal manager --branch 参数透传 (sync path)."""
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -79,22 +79,34 @@ def test_internal_manager_branch_override():
         assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
 
 
-def test_internal_manager_dry_run_summary_output():
-    """测试 internal manager --dry-run 输出包含 branch 和 actor 信息."""
+def test_internal_manager_branch_override_async():
+    """测试 internal manager --branch 参数透传 (async path)."""
     with patch(
-        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
     ) as mock_run:
-        # Mock the actual dry-run output
-        mock_run.return_value = None
         result = runner.invoke(
-            cli_app, ["internal", "manager", "1905", "--no-async", "--dry-run"]
+            cli_app,
+            ["internal", "manager", "123", "--branch", "task/issue-1905"],
         )
 
         assert result.exit_code == 0
-        # Verify dry_run=True is passed
-        assert mock_run.call_args.kwargs["dry_run"] is True
-        # The actual output verification would require running the real function
-        # which is tested in test_issue_role_sync_runner.py
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+        assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
+        assert mock_run.call_args.kwargs["dry_run"] is False
+
+
+def test_internal_manager_branch_numeric():
+    """测试 --branch 接受 issue number，CLI 层透传原始值由 runner 解析."""
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app,
+            ["internal", "manager", "123", "--no-async", "--branch", "1905"],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["branch"] == "1905"
 
 
 def test_internal_apply_dispatch():
