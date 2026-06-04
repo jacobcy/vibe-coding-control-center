@@ -10,6 +10,7 @@ from vibe3.agents import (
     RunPromptMode,
     create_codeagent_command,
     describe_run_plan_sections,
+    make_publish_context_builder,
     make_run_context_builder,
     make_skill_context_builder,
 )
@@ -150,9 +151,27 @@ def execute_manual_run(
                 handoff_metadata={"skill": skill},
             )
             return None
+
+        # Check if this is a publish path execution (commit_mode from flow_state)
+        is_publish_path = False
+        if branch:
+            try:
+                flow_state = SQLiteClient().get_flow_state(branch)
+                if flow_state and flow_state.get("commit_mode"):
+                    is_publish_path = True
+            except Exception:
+                pass
+
+        # Use publish-specific context builder for commit_mode execution
+        context_builder = (
+            make_publish_context_builder(skill_content)
+            if is_publish_path
+            else make_skill_context_builder(skill_content)
+        )
+
         command = create_codeagent_command(
             role="executor",
-            context_builder=make_skill_context_builder(skill_content),
+            context_builder=context_builder,
             task=instructions or f"Execute skill: {skill}",
             dry_run=dry_run,
             handoff_kind="run",
