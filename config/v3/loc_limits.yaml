@@ -99,6 +99,9 @@ code_limits:
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；Task #9 重构后新增 TaskResumeOperations 集成，略微超标"
 
       # Roles 层 —— 允许 480-600
+      - path: "src/vibe3/roles/governance.py"
+        limit: 450
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability"
       - path: "src/vibe3/roles/review.py"
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
