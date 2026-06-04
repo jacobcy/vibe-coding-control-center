@@ -7,15 +7,12 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from vibe3.clients import SQLiteClient
-from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.models import (
     AgentOptions,
     ExecutionRequest,
     IssueInfo,
-    SessionRole,
     WorktreeRequirement,
 )
-from vibe3.roles.definitions import IssueRoleSyncSpec as IssueRoleSyncSpecImpl
 
 
 def resolve_orchestra_repo_root() -> Path:
@@ -227,36 +224,3 @@ def resolve_env_overridable_agent_options(
     if backend_override:
         return AgentOptions(backend=backend_override, model=model_override)
     return fallback_resolver()
-
-
-def build_issue_sync_spec(
-    *,
-    role_name: SessionRole,
-    resolve_options: Callable[[Any], Any],
-    resolve_branch: Callable[[SQLiteClient, int, str], str],
-    build_async_request: Callable[[Any, IssueInfo, str], ExecutionRequest | None],
-    build_sync_request: Callable[
-        [
-            Any,
-            IssueInfo,
-            str,
-            dict[str, object] | None,
-            str | None,
-            Any,
-            str,
-            bool,
-            bool,
-        ],
-        ExecutionRequest,
-    ],
-    failure_handler: Callable[..., None],
-) -> IssueRoleSyncSpec:
-    """Build the minimal sync spec shared by issue-scoped roles."""
-    return IssueRoleSyncSpecImpl(
-        role_name=role_name,
-        resolve_options=resolve_options,
-        resolve_branch=resolve_branch,
-        build_async_request=build_async_request,
-        build_sync_request=build_sync_request,
-        failure_handler=failure_handler,
-    )

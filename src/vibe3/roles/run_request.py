@@ -11,7 +11,6 @@ from vibe3.agents import (
 )
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.execution.issue_role_support import build_issue_sync_spec
 from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
@@ -20,6 +19,7 @@ from vibe3.execution.role_request_factory import (
 from vibe3.models import IssueInfo
 from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
     RUN_BRANCH_RESOLVER,
@@ -160,7 +160,7 @@ def build_run_sync_request(
     )
 
 
-RUN_SYNC_SPEC = build_issue_sync_spec(
+RUN_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="executor",
     resolve_options=resolve_run_options,
     resolve_branch=RUN_BRANCH_RESOLVER,

@@ -49,8 +49,13 @@ def _run_governance_scan(
         logger.bind(domain="orchestra").info("Governance scan completed")
     else:
         from vibe3.execution.governance_sync_runner import run_governance_async
+        from vibe3.roles.governance import build_governance_execution_name
 
-        run_governance_async(tick_count=0, material_override=material_override)
+        run_governance_async(
+            tick_count=0,
+            material_override=material_override,
+            build_execution_name=build_governance_execution_name,
+        )
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:

@@ -22,7 +22,6 @@ from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -36,7 +35,11 @@ from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.models.worktree import WorktreeRequirement
-from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
+from vibe3.roles.definitions import (
+    IssueRoleSyncSpec,
+    RoleOutputContract,
+    TriggerableRoleDefinition,
+)
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import fail_planner_issue
@@ -244,7 +247,7 @@ def build_plan_sync_request(
     )
 
 
-PLAN_SYNC_SPEC = build_issue_sync_spec(
+PLAN_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="planner",
     resolve_options=resolve_plan_options,
     resolve_branch=PLAN_BRANCH_RESOLVER,
