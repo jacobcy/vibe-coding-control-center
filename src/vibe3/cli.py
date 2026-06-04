@@ -39,7 +39,7 @@ from vibe3.commands import (  # noqa: E402
     task,
 )
 from vibe3.commands.command_options import FormatOption  # noqa: E402
-from vibe3.exceptions import SystemError, UserError  # noqa: E402
+from vibe3.exceptions import MissingResourceError, SystemError, UserError  # noqa: E402
 from vibe3.observability import setup_logging  # noqa: E402
 from vibe3.server import app as serve  # noqa: E402
 
@@ -282,6 +282,17 @@ def main() -> None:
     except UserError as e:
         # User error: concise message
         logger.error(e.message)
+        # Record MissingResourceError to error_log
+        if isinstance(e, MissingResourceError):
+            try:
+                from vibe3.services.error_helpers import record_error
+
+                record_error(
+                    error_code="E_CONFIG_MISSING",
+                    error_message=e.message,
+                )
+            except Exception:
+                pass  # Don't let recording failure mask the original error
         if e.recoverable:
             logger.info("Please check your input and try again")
         sys.exit(1)

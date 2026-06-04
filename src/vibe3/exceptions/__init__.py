@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from vibe3.exceptions.diagnostic_errors import (
+    DiagnosticContext as DiagnosticContext,
+)
+from vibe3.exceptions.diagnostic_errors import (
+    MissingResourceError as MissingResourceError,
+)
+
 
 class VibeError(Exception):
     """Base exception for all Vibe errors.

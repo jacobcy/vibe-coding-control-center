@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
+
 RUNTIME_ASSETS_ROOT_ENV = "VIBE3_RUNTIME_ASSETS_ROOT"
 
 
@@ -63,3 +65,36 @@ def resolve_runtime_asset(path: str | Path) -> Path:
 def resolve_prompt_config(path: str | Path) -> Path:
     """Resolve prompt configuration through the runtime asset model."""
     return resolve_runtime_asset(path)
+
+
+def check_runtime_asset(path: str | Path) -> Path:
+    """Resolve a runtime asset and raise MissingResourceError if not found.
+
+    Args:
+        path: Asset path to resolve
+
+    Returns:
+        Resolved path if it exists
+
+    Raises:
+        MissingResourceError: If the resolved path does not exist
+    """
+    resolved = resolve_runtime_asset(path)
+    if not resolved.exists():
+        raise MissingResourceError(
+            resource=str(path),
+            context=DiagnosticContext(
+                resource_type="runtime-asset",
+                search_paths=[
+                    str(bundled_project_root() / path),
+                    str(runtime_assets_root() / path),
+                ],
+                profile=None,
+                remediation=(
+                    "Run `vibe update run` from vibe-center repo or "
+                    "re-run `scripts/install.sh`"
+                ),
+                ref_issue=1924,
+            ),
+        )
+    return resolved

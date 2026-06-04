@@ -1,6 +1,7 @@
 """Execution role policy service."""
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from loguru import logger
@@ -10,8 +11,10 @@ from vibe3.agents.backends.codeagent_config import (
 )
 from vibe3.agents.backends.codeagent_config import sync_models_json
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.exceptions.diagnostic_errors import DiagnosticContext, MissingResourceError
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.review_runner import AgentOptions
+from vibe3.resources.diagnostics import diagnose_profile
 
 
 @dataclass(frozen=True)
@@ -128,11 +131,34 @@ class ExecutionRolePolicyService:
 
         section = getattr(self._config, section_name, None)
         if not section:
-            raise ValueError(f"No config section for role: {role}")
+            raise MissingResourceError(
+                resource=f"config section for role '{role}'",
+                context=DiagnosticContext(
+                    resource_type="role-config",
+                    search_paths=[str(Path("config/v3/settings.yaml"))],
+                    profile=diagnose_profile(),
+                    remediation=(
+                        f"Add {section_name} configuration to config/v3/settings.yaml"
+                    ),
+                    ref_issue=1925,
+                ),
+            )
 
         template = getattr(section, "prompt_template", None)
         if not template:
-            raise ValueError(f"No prompt_template for role: {role}")
+            raise MissingResourceError(
+                resource=f"prompt_template for role '{role}'",
+                context=DiagnosticContext(
+                    resource_type="role-config",
+                    search_paths=[str(Path("config/v3/settings.yaml"))],
+                    profile=diagnose_profile(),
+                    remediation=(
+                        f"Add prompt_template to {section_name} in "
+                        "config/v3/settings.yaml"
+                    ),
+                    ref_issue=1907,
+                ),
+            )
 
         return PromptContract(template=template)
 
