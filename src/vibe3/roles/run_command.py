@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+from loguru import logger
+
 from vibe3.agents import (
     CodeagentResult,
     RunPromptMode,
@@ -159,8 +161,10 @@ def execute_manual_run(
                 flow_state = SQLiteClient().get_flow_state(branch)
                 if flow_state and flow_state.get("commit_mode"):
                     is_publish_path = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    f"Failed to check flow_state for publish path detection: {e}"
+                )
 
         # Use publish-specific context builder for commit_mode execution
         context_builder = (
