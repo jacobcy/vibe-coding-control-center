@@ -254,7 +254,7 @@ def _full_status_dashboard(
     trace: bool = False,
     min_ms: int | None = None,
 ) -> None:
-    """Render full task status dashboard (system status + all progress panels)."""
+    """Render task status dashboard with issue progress panels."""
     validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)

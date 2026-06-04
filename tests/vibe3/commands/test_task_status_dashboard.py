@@ -197,14 +197,17 @@ def test_task_status_shows_flows_with_prs(
 )
 @patch("vibe3.services.task_status_service.FlowService")
 @patch("vibe3.services.task_status_service.StatusQueryService")
-def test_task_status_hides_missing_blocked_issue_number(
+def test_task_status_excludes_system_status_sections(
     mock_status_service_cls,
     mock_flow_service_cls,
     mock_fetch_live_snapshot,
     mock_load_orchestra_config,
     mock_get_manager_usernames,
 ) -> None:
-    """task status should not render '#None' when failed gate has no issue number."""
+    """task status should not render system status sections.
+
+    This includes Orchestra Status and Vibe3 Configuration sections.
+    """
     mock_load_orchestra_config.return_value = _make_config_mock()
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
