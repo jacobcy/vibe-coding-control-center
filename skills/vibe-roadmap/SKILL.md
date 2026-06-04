@@ -115,6 +115,52 @@ uv run python src/vibe3/cli.py inspect files <相关路径>
 
 处理完后打 `roadmap-reviewed`，结果写入 `.agent/context/memory.md` 缓存。
 
+### Step 0.6: 反模式检查
+
+Step 0.5 处理完后，对候选 issue 执行反模式识别（定义见 roadmap-common.md「反模式 Issue 识别标准」）。
+
+**扫描范围**：
+- Step 0 处理完的未决策 governance suggest（已排除 roadmap-reviewed 和 roadmap/rfc）
+- Step 0.5 漏网检查中发现的 issue
+
+**评估流程**：
+
+对照 roadmap-common.md 的 5 条反模式特征逐项评分：
+1. 无明确痛点
+2. 高复杂度低 ROI
+3. 与现有能力重叠
+4. 违反项目原则
+5. 边缘场景驱动
+
+对每个特征，给出具体证据（如："缺少用户场景描述"、"改动涉及 3 个模块但收益仅为边缘场景"）。
+
+**评分 >= 2 的处理**（判定为反模式）：
+
+```bash
+# 写决策评论（必须逐条写评分理由）
+gh issue comment <number> --body "[roadmap decision] close: 反模式
+- #1: <是否满足 + 具体证据>
+- #2: <是否满足 + 具体证据>
+- ...
+评分: <总数> 条，判定为反模式"
+
+# 打审查标签
+gh issue edit <number> --add-label "roadmap-reviewed"
+
+# 关闭 issue
+gh issue close <number>
+```
+
+**评分 < 2 的处理**：
+
+继续走正常 roadmap 流程（Step 1 检查版本目标）。
+
+**与现有 Step 的关系**：
+
+- Step 0.6 是 Step 0.5 的补充，不替代任何现有检查
+- 反模式检查只适用于 roadmap 层（Layer 3 decider），intake 和 pool 层参照 roadmap-common.md 中的各层处理方式
+- close 动作遵循现有 Comment Marker Contract，写 `[roadmap decision] close`
+
 ---
 
 ### Step 1: 检查版本目标

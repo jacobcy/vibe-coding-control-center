@@ -60,6 +60,30 @@ gh issue list --search "<标题>" --state all --json number,title,state
 
 建议拆分为主 issue + sub-issues，或记录 `## Scope estimate`。
 
+### Step 5.5: Anti-Pattern Risk Check
+
+对照以下 5 条反模式特征，检查 issue 是否存在反模式风险（定义详见 [roadmap-common.md](../../supervisor/roadmap-common.md#反模式-issue-识别标准)）：
+
+**检查清单**：
+
+- [ ] **有明确痛点**：描述具体使用场景和痛点
+- [ ] **已验证问题存在**：提供证据或复现步骤
+- [ ] **技术复杂度合理**：评估修改范围和影响
+- [ ] **不与现有能力重叠**：确认 CI/skill 无法解决
+- [ ] **符合项目原则**：最小变更、验证优先、Skill-First
+
+**风险评估**：
+
+如果命中 >= 2 条未通过项，向用户展示警告：
+
+> ⚠️ **反模式风险提示**
+>
+> 此 issue 可能被标记为反模式并关闭。建议补充痛点描述、验证证据，或说明为何现有能力无法满足需求。
+>
+> 详见 [反模式识别标准](../../supervisor/roadmap-common.md#反模式-issue-识别标准)。
+
+**注意**：此步骤只提供警告，不阻止创建（vibe-issue 是 human-facing，不自动拒绝）。
+
 ### Step 6: Create
 
 ```bash
