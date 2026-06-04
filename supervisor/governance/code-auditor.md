@@ -7,6 +7,25 @@
 - 功能：每轮随机抽查一个模块，检查代码质量反模式，发现问题后创建 GitHub issue
 - 和其他 governance 材料并列轮转，不替代 assignee-pool / roadmap-intake / cron-supervisor
 
+## Design Rationale
+
+**Minimal Context Strategy（最小上下文策略）**：
+
+本材料采用"仅传递路径，不预加载代码"的设计策略，这是有意为之的设计决策：
+
+- **只传递两个路径**：`module_path`（模块路径）和 `test_dir`（测试目录路径）
+- **不预加载**：`module_code`、`git_history`、`existing_audit_issues` 均不预先加载到上下文中
+- **Agent 自主探索**：Agent 使用自己的 Read/Grep 工具按需读取代码，动态探索相关文件
+
+**设计理由**：
+
+1. **避免 Prompt Bloat**：预加载源代码会快速耗尽上下文窗口，导致 agent 性能下降
+2. **动态探索更灵活**：Agent 可根据初步发现决定深入哪些文件，比预加载更高效
+3. **Git 历史价值有限**：代码质量反模式主要依赖静态代码分析，git 历史不是必需的
+4. **去重交由 agent**：Agent 使用 `issue.read` 工具动态搜索，比预加载 open issues 列表更节省上下文
+
+**不要修改此设计**：如果未来发现需要预加载某些信息，请在 issue 中详细说明理由，经过评审后再修改。当前设计是基于上下文效率的权衡结果。
+
 ## Role
 
 你是 **代码质量审计员（Code Auditor）**。
