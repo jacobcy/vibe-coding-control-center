@@ -99,11 +99,14 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
 )
 
 
-def resolve_review_options(config: OrchestraConfig) -> Any:
+def resolve_review_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
     """Resolve reviewer agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = load_runtime_config()
+    runtime_config = load_runtime_config(cli_overrides=cli_overrides)
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_REVIEWER_BACKEND",
         model_env_key="VIBE3_REVIEWER_MODEL",
@@ -273,8 +276,9 @@ REVIEW_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
     resolve_branch=REVIEW_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_issue_review_request(
+    build_async_request=lambda config, issue, actor, branch: build_issue_review_request(
         issue,
+        branch=branch,
         actor=actor,
     ),
     build_sync_request=build_review_sync_request,
@@ -335,6 +339,10 @@ def execute_manual_review_async(
     issue_number: int | None = None,
     pr_number: int | None = None,
     branch: str,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in async mode (tmux wrapper)."""
     launch = _dispatch_async_manual_review(
@@ -343,6 +351,10 @@ def execute_manual_review_async(
         issue_number=issue_number,
         pr_number=pr_number,
         instructions=instructions,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
     )
     record_dispatch_failure_if_unexpected(
         result=launch,
@@ -376,16 +388,23 @@ def execute_manual_review_sync(
     issue_number: int | None = None,
     pr_number: int | None = None,
     branch: str | None = None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
     context_builder: Callable[..., object] = make_review_context_builder,
     show_prompt: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
+    from vibe3.execution.session_service import load_session_id
+
     _ = flow_service
     cfg = config or VibeConfig.get_defaults()
     log = logger.bind(domain="review", scope=request.scope.kind)
     task = _build_manual_review_task(cfg, instructions, request, pr_number, log)
+    session_id = None if fresh_session else load_session_id("reviewer", branch)
     command = create_codeagent_command(
         role="reviewer",
         context_builder=cast(Callable[[], str], context_builder(request, cfg)),
@@ -397,6 +416,10 @@ def execute_manual_review_sync(
         branch=branch,
         issue_number=issue_number,
         show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        session_id=session_id,
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
@@ -417,8 +440,14 @@ def _dispatch_async_manual_review(
     issue_number: int | None,
     pr_number: int | None,
     instructions: str | None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> Any:
-    cli_args = _build_manual_review_async_cli_args(request, instructions)
+    cli_args = _build_manual_review_async_cli_args(
+        request, instructions, agent, backend, model, fresh_session
+    )
     target_id = pr_number or issue_number or 0
     execution_name = (
         f"vibe3-reviewer-issue-{target_id}"
@@ -463,12 +492,24 @@ def _dispatch_async_manual_review(
 def _build_manual_review_async_cli_args(
     request: ReviewRequest,
     instructions: str | None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> list[str]:
     args = ["review", "base"]
     if request.scope.base_branch:
         args.append(request.scope.base_branch)
     if instructions:
         args.append(instructions)
+    if agent:
+        args += ["--agent", agent]
+    if backend:
+        args += ["--backend", backend]
+    if model:
+        args += ["--model", model]
+    if fresh_session:
+        args += ["--fresh-session"]
     return args
 
 

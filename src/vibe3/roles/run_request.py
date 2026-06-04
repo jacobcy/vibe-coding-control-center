@@ -164,9 +164,10 @@ RUN_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="executor",
     resolve_options=resolve_run_options,
     resolve_branch=RUN_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_run_request(
+    build_async_request=lambda config, issue, actor, branch: build_run_request(
         config,
         issue,
+        branch=branch,
         actor=actor,
     ),
     build_sync_request=build_run_sync_request,

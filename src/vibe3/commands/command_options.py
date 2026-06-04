@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 
 import typer
 
+from vibe3.config.cli_overrides import (
+    build_role_cli_overrides as _build_role_cli_overrides,
+)
+
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
 
@@ -37,6 +41,13 @@ _BACKEND_OPT = Annotated[
     Optional[str], typer.Option("--backend", help="Override backend")
 ]
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
+_FRESH_SESSION_OPT = Annotated[
+    bool,
+    typer.Option(
+        "--fresh-session",
+        help="Skip session resume and start a fresh agent session",
+    ),
+]
 
 # Output format options
 AllOption = Annotated[
@@ -103,3 +114,13 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
         raise typer.Exit(1)
 
     return flow_service, branch
+
+
+def build_role_cli_overrides(
+    role: str,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> dict[str, str]:
+    """Build cli_overrides dict for load_runtime_config."""
+    return _build_role_cli_overrides(role, agent, backend, model)

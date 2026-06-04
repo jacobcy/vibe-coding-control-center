@@ -214,3 +214,105 @@ def test_review_base_show_prompt_forwarded_to_sync():
 
     assert result.exit_code == 0
     assert mock_execute.call_args.kwargs["show_prompt"] is True
+
+
+def test_review_help_shows_new_options():
+    """review --help should show --agent, --backend, --model, --fresh-session."""
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "--agent" in output
+    assert "--backend" in output
+    assert "--model" in output
+    assert "--fresh-session" in output
+
+
+def test_review_base_help_shows_new_options():
+    """review base --help should show --agent, --backend, --model, --fresh-session."""
+    result = runner.invoke(app, ["base", "--help"])
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "--agent" in output
+    assert "--backend" in output
+    assert "--model" in output
+    assert "--fresh-session" in output
+
+
+def test_review_fresh_session_propagates():
+    """review --fresh-session should propagate to run_issue_role_sync."""
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+    ):
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 42
+        mock_validate.return_value = (mock_flow, 42)
+        mock_resolve.return_value = "task/issue-42"
+
+        result = runner.invoke(app, ["--no-async", "--fresh-session"])
+
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args.kwargs
+    assert call_kwargs["fresh_session"] is True
+
+
+def test_review_agent_option_propagates():
+    """review --agent foo should propagate to run_issue_role_sync."""
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+    ):
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 42
+        mock_validate.return_value = (mock_flow, 42)
+        mock_resolve.return_value = "task/issue-42"
+
+        result = runner.invoke(app, ["--no-async", "--agent", "foo"])
+
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args.kwargs
+    assert call_kwargs["agent"] == "foo"
+
+
+def test_review_backend_option_propagates():
+    """review --backend claude should propagate to run_issue_role_sync."""
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+    ):
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 42
+        mock_validate.return_value = (mock_flow, 42)
+        mock_resolve.return_value = "task/issue-42"
+
+        result = runner.invoke(app, ["--no-async", "--backend", "claude"])
+
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args.kwargs
+    assert call_kwargs["backend"] == "claude"
+
+
+def test_review_model_option_propagates():
+    """review --model claude-opus-4-8 should propagate to run_issue_role_sync."""
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+    ):
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 42
+        mock_validate.return_value = (mock_flow, 42)
+        mock_resolve.return_value = "task/issue-42"
+
+        result = runner.invoke(app, ["--no-async", "--model", "claude-opus-4-8"])
+
+    assert result.exit_code == 0
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args.kwargs
+    assert call_kwargs["model"] == "claude-opus-4-8"

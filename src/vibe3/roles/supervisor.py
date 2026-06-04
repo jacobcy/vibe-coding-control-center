@@ -186,6 +186,7 @@ def build_supervisor_cli_request(
     config: OrchestraConfig,
     issue_number: int,
     issue_title: str | None = None,
+    branch: str | None = None,
     actor: str = "cli:supervisor",
 ) -> ExecutionRequest:
     """Build supervisor apply request for CLI-driven invocation (no temp worktree).
@@ -204,9 +205,10 @@ def build_supervisor_cli_request(
     """
     import os
 
-    # Use IssueFlowService for canonical branch name
-    issue_flow_service = IssueFlowService()
-    branch = issue_flow_service.canonical_branch_name(issue_number)
+    if branch is None:
+        # Use IssueFlowService for canonical branch name
+        issue_flow_service = IssueFlowService()
+        branch = issue_flow_service.canonical_branch_name(issue_number)
 
     prompt, options, task = build_supervisor_handoff_payload(
         config,
@@ -271,17 +273,29 @@ def build_supervisor_cli_sync_request(
     )
 
 
+def resolve_supervisor_cli_options(
+    config: OrchestraConfig,
+    cli_overrides: dict[str, str] | None = None,
+) -> Any:
+    """Resolve supervisor options for issue-role CLI execution."""
+    _ = cli_overrides
+    return ExecutionRolePolicyService(config).resolve_effective_agent_options(
+        "supervisor"
+    )
+
+
 SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="supervisor",
-    resolve_options=lambda c: ExecutionRolePolicyService(
-        c
-    ).resolve_effective_agent_options("supervisor"),
+    resolve_options=resolve_supervisor_cli_options,
     resolve_branch=use_current_branch,
-    build_async_request=lambda config, issue, actor: build_supervisor_cli_request(
-        config,
-        issue.number,
-        issue.title,
-        actor=actor,
+    build_async_request=(
+        lambda config, issue, actor, branch: build_supervisor_cli_request(
+            config,
+            issue.number,
+            issue.title,
+            branch=branch,
+            actor=actor,
+        )
     ),
     build_sync_request=build_supervisor_cli_sync_request,
 )

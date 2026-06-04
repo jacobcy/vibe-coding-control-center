@@ -56,10 +56,10 @@ class IssueRoleSyncSpec:
     """Role-owned hooks for the generic issue sync runner."""
 
     role_name: SessionRole
-    resolve_options: Callable[[OrchestraConfig], Any]
+    resolve_options: Callable[[OrchestraConfig, dict[str, str] | None], Any]
     resolve_branch: Callable[[SQLiteClient, int, str], str]
     build_async_request: Callable[
-        [OrchestraConfig, IssueInfo, str], ExecutionRequest | None
+        [OrchestraConfig, IssueInfo, str, str], ExecutionRequest | None
     ]
     build_sync_request: Callable[
         [

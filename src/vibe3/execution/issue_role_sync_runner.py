@@ -7,6 +7,7 @@ import typer
 from vibe3.agents import CodeagentBackend
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config import load_orchestra_config
+from vibe3.config.cli_overrides import build_issue_role_cli_overrides
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
@@ -25,12 +26,19 @@ def run_issue_role_async(
     dry_run: bool,
     spec: IssueRoleSyncSpec,
     branch: str | None = None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    fresh_session: bool = False,
 ) -> None:
     """Run a role asynchronously via tmux wrapper.
 
     Launches tmux session and returns immediately.
     The tmux child then re-enters the sync execution path locally.
     See docs/standards/vibe3-execution-paths-standard.md.
+
+    CLI override params are appended to the child self-invocation so the
+    no-async child resolves the same runtime configuration.
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
@@ -43,10 +51,13 @@ def run_issue_role_async(
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
 
-    options = spec.resolve_options(config)
+    cli_overrides = build_issue_role_cli_overrides(
+        spec.role_name, agent, backend, model
+    )
+    options = spec.resolve_options(config, cli_overrides or None)
     actor = format_agent_actor(options)
-    backend = CodeagentBackend()
-    coordinator = ExecutionCoordinator(config, store, backend)
+    backend_instance = CodeagentBackend()
+    coordinator = ExecutionCoordinator(config, store, backend_instance)
 
     # Early capacity check to avoid wasteful request preparation
     if not dry_run:
@@ -55,7 +66,7 @@ def run_issue_role_async(
             return
 
     if not dry_run:
-        request = spec.build_async_request(config, issue, actor)
+        request = spec.build_async_request(config, issue, actor, branch)
         if request is None:
             if spec.failure_handler is not None:
                 spec.failure_handler(
@@ -63,6 +74,14 @@ def run_issue_role_async(
                     f"{spec.role_name} async request preparation failed",
                 )
             raise typer.Exit(1)
+
+        _append_child_cli_overrides(
+            request,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
+        )
 
         try:
             result = coordinator.dispatch_execution(request)
@@ -119,6 +138,9 @@ def run_issue_role_sync(
     show_prompt: bool,
     spec: IssueRoleSyncSpec,
     branch: str | None = None,
+    agent: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Run a role synchronously (direct execution without tmux wrapper).
 
@@ -126,6 +148,9 @@ def run_issue_role_sync(
     Worker roles still enter codeagent_runner via ExecutionCoordinator, so
     the same lifecycle / handoff / pre-gate / no-op shell is used.
     See docs/standards/vibe3-execution-paths-standard.md.
+
+    CLI override params are passed into role option resolution so command-layer
+    overrides are reflected in the ExecutionRequest options.
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
@@ -142,10 +167,13 @@ def run_issue_role_sync(
         None if fresh_session else load_session_id(spec.role_name, branch=branch)
     )
 
-    options = spec.resolve_options(config)
+    cli_overrides = build_issue_role_cli_overrides(
+        spec.role_name, agent, backend, model
+    )
+    options = spec.resolve_options(config, cli_overrides or None)
     actor = format_agent_actor(options)
-    backend = CodeagentBackend()
-    coordinator = ExecutionCoordinator(config, store, backend)
+    backend_instance = CodeagentBackend()
+    coordinator = ExecutionCoordinator(config, store, backend_instance)
 
     sync_request = spec.build_sync_request(
         config,
@@ -186,3 +214,25 @@ def run_issue_role_sync(
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
+
+
+def _append_child_cli_overrides(
+    request: object,
+    *,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+    fresh_session: bool,
+) -> None:
+    """Append role CLI overrides to an async self-invocation command."""
+    cmd = getattr(request, "cmd", None)
+    if not isinstance(cmd, list):
+        return
+    if agent:
+        cmd.extend(["--agent", agent])
+    if backend:
+        cmd.extend(["--backend", backend])
+    if model:
+        cmd.extend(["--model", model])
+    if fresh_session:
+        cmd.append("--fresh-session")
