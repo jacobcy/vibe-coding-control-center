@@ -431,7 +431,7 @@ def execute_spec_plan_sync(
     show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
-    from vibe3.services.session_service import load_session_id
+    from vibe3.execution.session_service import load_session_id
 
     cfg = config or VibeConfig.get_defaults()
     session_id = None if fresh_session else load_session_id("planner", branch)
