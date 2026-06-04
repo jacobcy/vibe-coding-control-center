@@ -65,15 +65,28 @@ def _review_branch_impl(
 
     flow_service = FlowService()
     try:
-        flow, issue_number = validate_review_prerequisites(flow_service, branch)
+        _, issue_number = validate_review_prerequisites(flow_service, branch)
     except UserError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
+    # Handle dry_run early return (align with plan command pattern)
+    # dry_run early-return: bypasses async/sync execution
+    # to display command/prompt for verification
+    if dry_run:
+        run_issue_role_sync(
+            issue_number=issue_number,
+            dry_run=True,
+            fresh_session=False,
+            show_prompt=show_prompt,
+            spec=REVIEW_SYNC_SPEC,
+        )
+        return
+
     if no_async:
         run_issue_role_sync(
             issue_number=issue_number,
-            dry_run=dry_run,
+            dry_run=False,
             fresh_session=False,
             show_prompt=show_prompt,
             spec=REVIEW_SYNC_SPEC,
@@ -81,7 +94,7 @@ def _review_branch_impl(
     else:
         run_issue_role_async(
             issue_number=issue_number,
-            dry_run=dry_run,
+            dry_run=False,
             spec=REVIEW_SYNC_SPEC,
         )
 
