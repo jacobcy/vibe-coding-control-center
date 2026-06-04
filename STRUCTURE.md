@@ -396,12 +396,17 @@ ls ~/.vibe/
 
 **详细结构**：见 [docs/README.md](docs/README.md)
 
-#### `docs/standards/` - 标准和规范
+#### docs/standards/ - 标准和规范
 
-| 文件 | 职责 |
-|------|------|
-| `doc-organization.md` | 文档组织标准 |
-| `cognition-spec-dominion.md` | 宪法大纲：Vibe Guard 流程定义 |
+| 文件 | 职责 | 状态 |
+|------|------|------|
+| [doc-organization.md](docs/standards/doc-organization.md) | 文档组织标准 | Active |
+| [glossary.md](docs/standards/glossary.md) | 项目术语真源 | Active |
+| [cognition-spec-dominion.md](docs/standards/cognition-spec-dominion.md) | 宪法大纲：Vibe Guard 流程定义 | Active |
+| [v3/command-standard.md](docs/standards/v3/command-standard.md) | 共享状态命令标准 (V3) | Active |
+| [v3/orchestra-runtime-standard.md](docs/standards/v3/orchestra-runtime-standard.md) | Orchestra 运行时与层级标准 | Active |
+| [vibe3-role-checks-and-balances-standard.md](docs/standards/vibe3-role-checks-and-balances-standard.md) | 角色制衡架构标准 | Deprecated |
+| [vibe3-command-standard.md](docs/archive/v3/vibe3-command-standard.md) | 旧版命令标准 | Archived |
 
 #### `docs/archive/` - 历史文档归档
 
