@@ -322,31 +322,6 @@ class CodeagentExecutionService:
                     execution_cwd=ctx.execution_cwd,
                 )
 
-            # Publish path safety net: if executor ran in commit_mode and state
-            # is still merge-ready, force transition to handoff.
-            # This runs BEFORE noop gate to catch the case where the agent
-            # prompt didn't execute the exit contract correctly.
-            # IMPORTANT: This must run before noop_gate transitions to blocked.
-            if (
-                command.role == "executor"
-                and command.issue_number is not None
-                and flow_state
-                and flow_state.get("commit_mode")
-                and ctx.before_state_label == "state/merge-ready"
-            ):
-                from vibe3.models import IssueState
-                from vibe3.services.label_service import LabelService
-
-                label_service = LabelService(repo=getattr(self.config, "repo", None))
-                current_state = label_service.get_state(command.issue_number)
-
-                if current_state == IssueState.MERGE_READY:
-                    log.warning(
-                        "Publish path safety net: state still merge-ready "
-                        "after executor, forcing transition to handoff"
-                    )
-                    label_service.set_state(command.issue_number, IssueState.HANDOFF)
-
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
             # Supervisor (L2) is lightweight: no flow, no state machine, skip gate.
