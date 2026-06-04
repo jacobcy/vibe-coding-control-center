@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.protocols import BackendProtocol
     from vibe3.services.pr_service import PRService
 
 
@@ -39,11 +40,13 @@ class ExpiredResourceCleanupService:
         git_client: "GitClient",
         github_client: "GitHubClient | None" = None,
         pr_service: "PRService | None" = None,
+        backend: "BackendProtocol | None" = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
         self._github_client = github_client
         self._pr_service = pr_service
+        self._backend = backend
 
     @property
     def pr_service(self) -> "PRService":
@@ -503,10 +506,9 @@ class ExpiredResourceCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
-            backend = CodeagentBackend()
+            backend = self._backend
             registry = SessionRegistryService(store=self.store, backend=backend)
 
             # Reuse existing method: batch query + liveness verification

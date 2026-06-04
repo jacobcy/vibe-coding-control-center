@@ -11,24 +11,25 @@ from vibe3.services.flow_cleanup_service import (
 
 
 def test_terminate_task_sessions_raises_when_live_sessions_exist() -> None:
+    backend = MagicMock()
     service = FlowCleanupService(
         git_client=MagicMock(),
         store=MagicMock(),
         issue_flow_service=MagicMock(),
+        backend=backend,
     )
     service.issue_flow_service.parse_issue_number.return_value = 123
 
-    with (
-        patch("vibe3.agents.CodeagentBackend") as backend_cls,
-        patch("vibe3.environment.session_registry.SessionRegistryService") as registry,
-    ):
-        registry.return_value.get_truly_live_sessions_for_branch.return_value = [
+    with patch(
+        "vibe3.environment.session_registry.SessionRegistryService"
+    ) as registry_cls:
+        registry_cls.return_value.get_truly_live_sessions_for_branch.return_value = [
             {"session_id": "vibe3-run-issue-123"}
         ]
 
         with pytest.raises(LiveSessionsDetectedError, match="live sessions found"):
             service._terminate_task_sessions("task/issue-123")
-        backend_cls.assert_called_once_with()
+        registry_cls.assert_called_once_with(store=service.store, backend=backend)
 
 
 def test_cleanup_flow_scene_aborts_when_live_sessions_exist() -> None:
