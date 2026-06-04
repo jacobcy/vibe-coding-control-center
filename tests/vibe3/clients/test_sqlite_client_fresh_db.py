@@ -49,19 +49,23 @@ def test_get_flow_dependents_on_fresh_db(tmp_path):
     db_path = tmp_path / "fresh.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    # Setup: feature/A (task #101)
-    client.update_flow_state("feature/A", flow_slug="A", flow_status="active")
-    client.add_issue_link("feature/A", 101, "task")
+    # Setup: task/issue-101 (task #101)
+    client.update_flow_state(
+        "task/issue-101", flow_slug="task-issue-101", flow_status="active"
+    )
+    client.add_issue_link("task/issue-101", 101, "task")
 
-    # Setup: feature/B depends on task #101
-    client.update_flow_state("feature/B", flow_slug="B", flow_status="active")
-    client.add_issue_link("feature/B", 101, "dependency")
+    # Setup: dev/issue-999 depends on task #101
+    client.update_flow_state(
+        "dev/issue-999", flow_slug="dev-issue-999", flow_status="active"
+    )
+    client.add_issue_link("dev/issue-999", 101, "dependency")
 
     # ACT
-    dependents = client.get_flow_dependents("feature/A")
+    dependents = client.get_flow_dependents("task/issue-101")
 
     # ASSERT
-    assert dependents == ["feature/B"]
+    assert dependents == ["dev/issue-999"]
 
 
 def test_default_db_path_uses_shared_git_common_dir(tmp_path, monkeypatch):

@@ -36,21 +36,21 @@ def test_link_issue_task_on_fresh_db(tmp_path):
     service = TaskService(store=store)
 
     # Setup a flow
-    store.update_flow_state("task/test", flow_slug="test")
+    store.update_flow_state("task/issue-220", flow_slug="issue-220")
 
     # ACT: link issue as task
     # This used to write task_issue_number to flow_state.
     # Now it should only use flow_issue_links.
-    service.link_issue("task/test", 220, role="task")
+    service.link_issue("task/issue-220", 220, role="task")
 
     # ASSERT
-    links = store.get_issue_links("task/test")
+    links = store.get_issue_links("task/issue-220")
     assert any(
         link["issue_number"] == 220 and link["issue_role"] == "task" for link in links
     )
 
     # Hydrate should find it
-    status = service._flow_service.get_flow_status("task/test")
+    status = service._flow_service.get_flow_status("task/issue-220")
     assert status.task_issue_number == 220
 
 
@@ -60,18 +60,18 @@ def test_reclassify_issue_moves_task_link_to_related_on_fresh_db(tmp_path):
     store = SQLiteClient(db_path=str(db_path))
     service = TaskService(store=store)
 
-    store.update_flow_state("debug/vibe-server-fix", flow_slug="debug-vibe-server-fix")
-    service.link_issue("debug/vibe-server-fix", 467, role="task")
+    store.update_flow_state("task/issue-467", flow_slug="issue-467")
+    service.link_issue("task/issue-467", 467, role="task")
 
     result = service.reclassify_issue(
-        "debug/vibe-server-fix",
+        "task/issue-467",
         467,
         old_role="task",
         new_role="related",
     )
 
     assert result.issue_role == "related"
-    links = store.get_issue_links("debug/vibe-server-fix")
+    links = store.get_issue_links("task/issue-467")
     assert any(
         link["issue_number"] == 467 and link["issue_role"] == "related"
         for link in links
@@ -80,7 +80,7 @@ def test_reclassify_issue_moves_task_link_to_related_on_fresh_db(tmp_path):
         link["issue_number"] == 467 and link["issue_role"] == "task" for link in links
     )
 
-    status = service._flow_service.get_flow_status("debug/vibe-server-fix")
+    status = service._flow_service.get_flow_status("task/issue-467")
     assert status.task_issue_number is None
 
 
@@ -99,7 +99,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path, monkeypatch)
 
     store.update_flow_state("task/issue-467", flow_slug="issue-467", flow_status="done")
     store.add_issue_link("task/issue-467", 467, "task")
-    store.update_flow_state("debug/new-attempt", flow_slug="new-attempt")
+    store.update_flow_state("task/issue-467-v2", flow_slug="issue-467-v2")
 
     class FakeGitHub:
         def list_prs_for_branch(
@@ -203,12 +203,12 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path, monkeypatch)
         ),
     )
 
-    service.link_issue("debug/new-attempt", 467, role="task")
+    service.link_issue("task/issue-467-v2", 467, role="task")
 
     task_flows = store.get_flows_by_issue(467, role="task")
     related_flows = store.get_flows_by_issue(467, role="related")
 
-    assert [flow["branch"] for flow in task_flows] == ["debug/new-attempt"]
+    assert [flow["branch"] for flow in task_flows] == ["task/issue-467-v2"]
     assert any(flow["branch"] == "task/issue-467" for flow in related_flows)
     assert ("add", 467, "supervisor") in label_port.calls
     assert ("add", 467, "state/handoff") in label_port.calls

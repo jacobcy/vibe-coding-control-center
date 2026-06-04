@@ -35,10 +35,10 @@ def test_link_issue_as_task_adds_vibe_task_label(tmp_path, monkeypatch):
     )
 
     # Setup a flow
-    store.update_flow_state("task/test-branch", flow_slug="test")
+    store.update_flow_state("task/issue-123", flow_slug="issue-123")
 
     # ACT: link issue as task
-    service.link_issue("task/test-branch", 123, role="task")
+    service.link_issue("task/issue-123", 123, role="task")
 
     # ASSERT: confirm_vibe_task was called with should_exist=True
     mock_label_service.confirm_vibe_task.assert_called_once_with(123, should_exist=True)
@@ -55,10 +55,10 @@ def test_link_issue_as_related_does_not_add_vibe_task_label(tmp_path, monkeypatc
     service._get_label_service = lambda: mock_label_service
 
     # Setup a flow
-    store.update_flow_state("task/test-branch", flow_slug="test")
+    store.update_flow_state("task/issue-456", flow_slug="issue-456")
 
     # ACT: link issue as related
-    service.link_issue("task/test-branch", 456, role="related")
+    service.link_issue("task/issue-456", 456, role="related")
 
     # ASSERT: confirm_vibe_task was NOT called
     mock_label_service.confirm_vibe_task.assert_not_called()
@@ -75,10 +75,10 @@ def test_link_issue_as_dependency_does_not_add_vibe_task_label(tmp_path, monkeyp
     service._get_label_service = lambda: mock_label_service
 
     # Setup a flow
-    store.update_flow_state("task/test-branch", flow_slug="test")
+    store.update_flow_state("task/issue-789", flow_slug="issue-789")
 
     # ACT: link issue as dependency
-    service.link_issue("task/test-branch", 789, role="dependency")
+    service.link_issue("task/issue-789", 789, role="dependency")
 
     # ASSERT: confirm_vibe_task was NOT called
     mock_label_service.confirm_vibe_task.assert_not_called()
@@ -101,10 +101,10 @@ def test_link_issue_as_task_without_branch_does_not_add_label(tmp_path, monkeypa
     )
 
     # Setup a flow
-    store.update_flow_state("task/test-branch", flow_slug="test")
+    store.update_flow_state("task/issue-999", flow_slug="issue-999")
 
     # ACT: link issue as task
-    service.link_issue("task/test-branch", 999, role="task")
+    service.link_issue("task/issue-999", 999, role="task")
 
     # ASSERT: confirm_vibe_task was NOT called (no real branch)
     mock_label_service.confirm_vibe_task.assert_not_called()
