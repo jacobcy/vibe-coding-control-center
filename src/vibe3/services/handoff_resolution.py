@@ -2,21 +2,25 @@
 
 This module handles the resolution of handoff targets into absolute file paths.
 
-Three namespaces are supported:
+Four namespaces are supported:
 
-1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+1. ``@vibe/<path>`` → vibe3 installation materials.
+   Resolves to governance materials under the vibe3 installation root.
+
+2. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
    The ``@`` is stripped and the remainder is joined to the handoff dir.
    Special case: ``@current`` with ``--branch`` resolves to per-branch current.md.
    Special case: ``@plan/@report/@audit`` resolve from flow_state refs.
 
-2. ``relative/path`` → canonical worktree ref.
+3. ``relative/path`` → canonical worktree ref.
    Resolved against the target branch's worktree root (or current worktree
    when ``branch`` is None).
 
-3. ``/abs/path`` → absolute path passthrough (debug fallback).
+4. ``/abs/path`` → absolute path passthrough (debug fallback).
 """
 
 import re
+import tomllib
 from pathlib import Path
 
 from vibe3.services.git_path_client import (
@@ -32,6 +36,10 @@ from vibe3.services.git_path_client import (
 # characters like trailing newlines from being accepted
 _BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
 _SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
+
+# Vibe path validation regex: alphanumeric, slash, underscore, hyphen, period, colon
+# Used for @vibe/<path> namespace to prevent path traversal attacks
+_VIBE_PATH_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
 
 
 def _validate_branch_name(branch: str) -> None:
@@ -58,6 +66,30 @@ def _validate_branch_name(branch: str) -> None:
         )
 
 
+def _validate_vibe_path(path: str) -> None:
+    """Validate @vibe/<path> to prevent path traversal attacks.
+
+    Args:
+        path: Path component after @vibe/ to validate
+
+    Raises:
+        ValueError: If path is invalid (contains .., control chars, or empty)
+    """
+    if not path or not path.strip():
+        raise ValueError("Invalid @vibe target: path cannot be empty")
+
+    if ".." in path.split("/"):
+        raise ValueError(
+            f"Invalid @vibe target {path!r}: contains path traversal sequence '..'"
+        )
+
+    if not _VIBE_PATH_PATTERN.fullmatch(path):
+        raise ValueError(
+            f"Invalid @vibe target {path!r}: contains invalid characters. "
+            f"Only alphanumeric, '/', '_', '-', '.', and ':' are allowed."
+        )
+
+
 def _verify_handoff_dir_boundary(handoff_dir: Path, git_common: str) -> None:
     """Verify that resolved handoff directory stays within handoff root.
 
@@ -79,6 +111,117 @@ def _verify_handoff_dir_boundary(handoff_dir: Path, git_common: str) -> None:
             f"Security violation: resolved handoff directory {resolved_handoff} "
             f"escapes handoff root {resolved_root}"
         )
+
+
+def _find_vibe_installation_root(vibe_dir: str | None = None) -> Path:
+    """Find vibe3 installation root directory.
+
+    Priority:
+    1. Explicit vibe_dir parameter
+    2. Current repo's pyproject.toml if name is vibe3/vibe-center/
+       vibe-coding-control-center
+    3. ~/.vibe (global installation)
+
+    Args:
+        vibe_dir: Optional explicit vibe3 installation path
+
+    Returns:
+        Path to vibe3 installation root
+
+    Raises:
+        FileNotFoundError: If vibe3 installation cannot be found
+    """
+    # Priority 1: Explicit vibe_dir parameter
+    if vibe_dir:
+        vibe_path = Path(vibe_dir)
+        if not vibe_path.exists():
+            raise FileNotFoundError(
+                f"Specified vibe_dir does not exist: {vibe_dir}\n\n"
+                "The --vibe-dir path must point to an existing vibe3 installation."
+            )
+        return vibe_path
+
+    # Priority 2: Check if current repo is vibe3
+    cwd = Path.cwd()
+    pyproject_path = cwd / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, "rb") as f:
+                pyproject = tomllib.load(f)
+                project_name = pyproject.get("project", {}).get("name", "")
+                if project_name in (
+                    "vibe3",
+                    "vibe-center",
+                    "vibe-coding-control-center",
+                ):
+                    return cwd
+        except Exception:
+            # Silently ignore parse errors and continue fallback chain
+            pass
+
+    # Priority 3: ~/.vibe global installation
+    global_vibe = Path.home() / ".vibe"
+    if global_vibe.exists():
+        return global_vibe
+
+    raise FileNotFoundError(
+        "Cannot find vibe3 installation directory.\n\n"
+        "vibe3 installation not found in any of:\n"
+        "  1. --vibe-dir parameter (not specified)\n"
+        "  2. Current repository (not a vibe3 project)\n"
+        "  3. ~/.vibe global installation (does not exist)\n\n"
+        "Specify installation: vibe3 handoff show @vibe/<path> --vibe-dir <path>\n"
+        "Or run from within vibe3 repository"
+    )
+
+
+def _resolve_vibe_material(
+    target: str,
+    vibe_dir: str | None = None,
+) -> Path:
+    """Resolve @vibe/<path> to vibe3 installation directory.
+
+    Args:
+        target: Target string with @vibe/ prefix
+        vibe_dir: Optional explicit vibe3 installation path
+
+    Returns:
+        Absolute path to the material file
+
+    Raises:
+        ValueError: If path validation fails
+        FileNotFoundError: If file not found or is a directory
+    """
+    # Extract path after @vibe/ prefix
+    material_path = target[6:]  # len("@vibe/") == 6
+    _validate_vibe_path(material_path)
+
+    vibe_root = _find_vibe_installation_root(vibe_dir)
+    resolved = (vibe_root / material_path).resolve()
+    vibe_root_resolved = vibe_root.resolve()
+
+    # Boundary check: ensure resolved path stays within vibe root
+    try:
+        resolved.relative_to(vibe_root_resolved)
+    except ValueError:
+        raise ValueError(
+            f"Security violation: resolved path escapes vibe root: {resolved}"
+        )
+
+    if not resolved.exists():
+        raise FileNotFoundError(
+            f"Material not found: {target}\n\n"
+            f"File does not exist: {resolved}\n"
+            "Check the path or view available materials in the vibe3 installation."
+        )
+    if not resolved.is_file():
+        raise FileNotFoundError(
+            f"Not a file: {target}\n\n"
+            f"Path points to a directory: {resolved}\n"
+            "Materials must be files, not directories."
+        )
+
+    return resolved
 
 
 def _resolve_shared_artifact(
@@ -321,28 +464,42 @@ def resolve_handoff_target(
     target: str,
     branch: str | None = None,
     git_client: GitPathProtocol | None = None,
+    vibe_dir: str | None = None,
 ) -> Path:
     """Resolve a handoff show target into an absolute file path.
 
-    Three namespaces:
+    Four namespaces:
 
-    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+    1. ``@vibe/<path>`` → vibe3 installation materials.
+       Resolves to governance materials under the vibe3 installation root.
+
+    2. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
        The ``@`` is stripped and the remainder is joined to the handoff dir.
        Special cases requiring branch context (explicit or current):
        - ``@current`` → per-branch current.md
        - ``@plan/@report/@audit/@spec`` → resolved from flow_state refs
        Other shared artifacts (``@task-xxx/run.md``) ignore branch.
 
-    2. ``relative/path`` → canonical worktree ref.
+    3. ``relative/path`` → canonical worktree ref.
        Resolved against the target branch's worktree root (or current worktree
        when ``branch`` is None).
 
-    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+    4. ``/abs/path`` → absolute path passthrough (debug fallback).
+
+    Args:
+        target: Target string to resolve
+        branch: Optional branch for per-branch artifact resolution
+        git_client: Git client for path resolution
+        vibe_dir: Optional explicit vibe3 installation path for @vibe/ targets
 
     Raises:
         FileNotFoundError: If the resolved path does not exist.
     """
     git_client = _get_git_client(git_client)
+
+    # Namespace 0: @vibe/<path> → vibe3 installation materials
+    if target.startswith("@vibe/"):
+        return _resolve_vibe_material(target, vibe_dir)
 
     # Namespace 1: @ prefix → shared handoff store
     if target.startswith("@"):

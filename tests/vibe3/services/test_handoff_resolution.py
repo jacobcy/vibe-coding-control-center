@@ -225,3 +225,92 @@ def test_resolve_handoff_target_at_indicate_self_referential(tmp_path: Path) -> 
             resolve_handoff_target(
                 "@indicate", branch="task/issue-123", git_client=client
             )
+
+
+# --- @vibe/ namespace resolution ---
+
+
+def test_resolve_vibe_material_in_vibe3_repo(tmp_path: Path) -> None:
+    """@vibe/<path> resolves when current repo is vibe3."""
+    from unittest.mock import patch
+
+    # Create a file in the vibe3 installation
+    material_file = tmp_path / "skills" / "test-skill" / "SKILL.md"
+    material_file.parent.mkdir(parents=True)
+    material_file.write_text("skill content")
+
+    # Mock cwd to simulate running from vibe3 repo
+    with patch("pathlib.Path.cwd", return_value=tmp_path):
+        # Create pyproject.toml to identify as vibe3
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "vibe3"\n')
+
+        result = resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
+        assert result == material_file
+
+
+def test_resolve_vibe_material_with_explicit_vibe_dir(tmp_path: Path) -> None:
+    """@vibe/<path> resolves with explicit --vibe-dir."""
+    # Create a vibe installation directory
+    vibe_root = tmp_path / "vibe3-install"
+    material_file = vibe_root / "skills" / "test-skill" / "SKILL.md"
+    material_file.parent.mkdir(parents=True)
+    material_file.write_text("skill content")
+
+    result = resolve_handoff_target(
+        "@vibe/skills/test-skill/SKILL.md", vibe_dir=str(vibe_root)
+    )
+    assert result == material_file
+
+
+def test_resolve_vibe_material_fallback_global(tmp_path: Path) -> None:
+    """@vibe/<path> falls back to ~/.vibe when not in vibe3 repo."""
+    from unittest.mock import patch
+
+    # Create a global installation
+    global_vibe = tmp_path / "home" / ".vibe"
+    material_file = global_vibe / "skills" / "test-skill" / "SKILL.md"
+    material_file.parent.mkdir(parents=True)
+    material_file.write_text("skill content")
+
+    # Mock Path.home() to return our temp home
+    with patch("pathlib.Path.home", return_value=tmp_path / "home"):
+        # Mock cwd to return non-vibe3 directory
+        with patch("pathlib.Path.cwd", return_value=tmp_path / "other"):
+            result = resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
+            assert result == material_file
+
+
+def test_resolve_vibe_material_not_found(tmp_path: Path) -> None:
+    """@vibe/<path> raises FileNotFoundError when file does not exist."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="Material not found"):
+        resolve_handoff_target(
+            "@vibe/skills/nonexistent/SKILL.md", vibe_dir=str(vibe_root)
+        )
+
+
+def test_resolve_vibe_material_not_a_file(tmp_path: Path) -> None:
+    """@vibe/<path> raises FileNotFoundError when path is a directory."""
+    vibe_root = tmp_path / "vibe3-install"
+    material_dir = vibe_root / "skills" / "test-skill"
+    material_dir.mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="Not a file"):
+        resolve_handoff_target("@vibe/skills/test-skill", vibe_dir=str(vibe_root))
+
+
+def test_resolve_vibe_material_vibe_installation_not_found(tmp_path: Path) -> None:
+    """@vibe/<path> raises FileNotFoundError when vibe installation not found."""
+    from unittest.mock import patch
+
+    # Mock cwd to return non-vibe3 directory
+    # Mock Path.home() to return temp without .vibe
+    with patch("pathlib.Path.cwd", return_value=tmp_path / "other"):
+        with patch("pathlib.Path.home", return_value=tmp_path / "home"):
+            with pytest.raises(
+                FileNotFoundError, match="Cannot find vibe3 installation"
+            ):
+                resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
