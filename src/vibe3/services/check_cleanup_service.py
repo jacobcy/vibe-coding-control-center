@@ -546,7 +546,9 @@ class CheckCleanupService:
                     continue
 
                 try:
-                    self.git_client._run(["worktree", "remove", "--force", wt_path])
+                    self.git_client._run(
+                        ["worktree", "remove", "--force", "--force", wt_path]
+                    )
                     cleaned.append(wt_path)
                     logger.bind(
                         domain="check",
