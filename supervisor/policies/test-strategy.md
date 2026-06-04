@@ -229,5 +229,5 @@ def test_get_git_root_incomplete():
 
 ## 7. 参考链接
 
-- 本文档被 `supervisor/policies/run.md` 引用：executor 验证原则
-- 本文档被 `supervisor/policies/review.md` 引用：审查检查清单
+- 本文档被 @vibe/supervisor/policies/run.md 引用：executor 验证原则
+- 本文档被 @vibe/supervisor/policies/review.md 引用：审查检查清单

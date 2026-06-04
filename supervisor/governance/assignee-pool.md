@@ -549,7 +549,7 @@ Exit:
 - 完成 issue 决策后（不管结论是 rfc/epic/ready/close），**必须**立即添加 `orchestra-governed` 标签
 - `orchestra-governed` 标签表示该 issue 已经过 assignee-pool 层决策或检查，作为"已决策/已检查"标记
 - 如果需要重新决策某个 issue，应先移除 `orchestra-governed` 标签（人类也可以手动移除）
-- 与三层标签配合实现治理闭环（详见 [../../supervisor/roadmap-common.md](../../supervisor/roadmap-common.md#三标签语义)）
+- 与三层标签配合实现治理闭环（详见 @vibe/supervisor/roadmap-common.md#三标签语义）
 - **Epic 特殊处理**：
   - Epic 检查不受 Step 1 的 `orchestra-governed` 过滤限制
   - 对于已完成的 Epic：直接关闭，不依赖 `orchestra-governed` 做半闭环

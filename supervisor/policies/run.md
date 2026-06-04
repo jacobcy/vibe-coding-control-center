@@ -229,7 +229,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 ### Test Strategy Compliance
 
-执行验证时，必须遵循 `supervisor/policies/test-strategy.md` 中定义的 mock vs real-test 分类矩阵。
+执行验证时，必须遵循 @vibe/supervisor/policies/test-strategy.md 中定义的 mock vs real-test 分类矩阵。
 
 #### Executor 验证清单
 
@@ -362,7 +362,7 @@ git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
 
 ### 环境依赖代码的验证要求
 
-如果实现依赖环境变量或外部 API，验证必须遵循 `supervisor/policies/test-strategy.md` 的分类矩阵：
+如果实现依赖环境变量或外部 API，验证必须遵循 @vibe/supervisor/policies/test-strategy.md 的分类矩阵：
 
 ### 1. 至少一个真实环境测试
 
