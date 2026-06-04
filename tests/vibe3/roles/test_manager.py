@@ -207,6 +207,113 @@ manager:
 
         assert request.repo_path == "/test/repos/vibe-center/main"
 
+    def test_first_bootstrap_generates_dry_run_summary(self, tmp_path, monkeypatch):
+        """first.bootstrap variant produces a dry_run_summary with correct fields."""
+        from vibe3.prompts import manifest
+
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text("""
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.target
+          - key: manager.quick_commands
+      retry.resume:
+        sections:
+          - manager.retry_task
+""")
+
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text("""
+manager:
+  target: "target section"
+  quick_commands: "quick commands"
+  retry_task: "retry task"
+""")
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+        )
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id=None,
+            options=object(),
+            actor="test",
+            dry_run=True,
+            show_prompt=False,
+        )
+
+        assert request.dry_run_summary["prompt_mode"] == "first"
+        assert request.dry_run_summary["context_mode"] == "bootstrap"
+        assert request.dry_run_summary["session_reused"] is False
+        assert request.dry_run_summary["session_id"] == ""
+        assert "manager.target" in request.dry_run_summary["sections"]
+        assert "manager.quick_commands" in request.dry_run_summary["sections"]
+
+    def test_retry_resume_generates_dry_run_summary(self, tmp_path, monkeypatch):
+        """retry.resume variant produces a dry_run_summary with retry fields."""
+        from vibe3.prompts import manifest
+
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text("""
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: literal
+              value: "SUPERVISOR CONTENT"
+          - key: manager.target
+      retry.resume:
+        sections:
+          - manager.retry_task
+""")
+
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text("""
+manager:
+  target: "target section"
+  retry_task: "retry task"
+""")
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+        )
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id="session-1",
+            options=object(),
+            actor="test",
+            dry_run=True,
+            show_prompt=False,
+        )
+
+        assert request.dry_run_summary["prompt_mode"] == "retry"
+        assert request.dry_run_summary["context_mode"] == "resume"
+        assert request.dry_run_summary["session_reused"] is True
+        assert request.dry_run_summary["session_id"] == "session-1"
+        assert request.dry_run_summary["sections"] == ["manager.retry_task"]
+
 
 class TestManagerBlockedToHandoffTransitionBlocked:
     """blocked → handoff 转换应该被阻止"""

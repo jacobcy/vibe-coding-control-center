@@ -349,6 +349,25 @@ def build_manager_sync_request(
         providers=providers,
     )
 
+    # Derive summary fields from variant_key and recipe sections
+    prompt_mode = "retry" if session_id else "first"
+    context_mode = "resume" if session_id else "bootstrap"
+    variant_sections = []
+    if recipe_def.loaded_definition is not None:
+        variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
+        if variant_spec is not None:
+            variant_sections = [
+                s.key if hasattr(s, "key") else str(s) for s in variant_spec.sections
+            ]
+    dry_run_summary = {
+        "prompt_mode": prompt_mode,
+        "context_mode": context_mode,
+        "session_reused": bool(session_id),
+        "session_id": session_id or "",
+        "sections": variant_sections,
+        "refs": {"role": "manager", "issue": str(issue.number), "branch": branch},
+    }
+
     manager_task = (
         "Act as the manager state controller. "
         "Inspect the scene, read issue comments and handoff, "
@@ -371,6 +390,7 @@ def build_manager_sync_request(
         dry_run=dry_run,
         show_prompt=show_prompt,
         worktree_requirement=MANAGER_ROLE.worktree,
+        dry_run_summary=dry_run_summary,
         tick_id=tick_id,
     )
 

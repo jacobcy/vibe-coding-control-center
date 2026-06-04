@@ -108,6 +108,9 @@ code_limits:
       - path: "src/vibe3/roles/governance.py"
         limit: 450
         reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability"
+      - path: "src/vibe3/roles/manager.py"
+        limit: 480
+        reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
       - path: "src/vibe3/roles/review.py"
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
