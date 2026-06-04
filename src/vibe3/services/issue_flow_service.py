@@ -191,6 +191,15 @@ class IssueFlowService:
         if not flows:
             return None
 
+        # Guard: detect corrupted branch links
+        base_branches = {"main", "master", "develop"}
+        from vibe3.exceptions import InvalidBranchLinkError
+
+        for flow in flows:
+            flow_branch = str(flow.get("branch") or "").strip()
+            if flow_branch in base_branches:
+                raise InvalidBranchLinkError(flow_branch, issue_number)
+
         canonical_branch = self.canonical_branch_name(issue_number)
 
         # Priority 1: Active canonical flow

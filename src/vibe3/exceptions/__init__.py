@@ -220,6 +220,26 @@ class InvalidTransitionError(UserError):
         super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
 
 
+class InvalidBranchLinkError(SystemError):
+    """Base branch illegally linked to issue in flow_issue_links."""
+
+    def __init__(self, branch: str, issue_number: int) -> None:
+        """Initialize InvalidBranchLinkError.
+
+        Args:
+            branch: The invalid branch name
+            issue_number: The issue number incorrectly linked
+        """
+        self.branch = branch
+        self.issue_number = issue_number
+        super().__init__(
+            f"Invalid branch '{branch}' linked to issue #{issue_number}. "
+            f"Base branches cannot have flow records. "
+            f'Fix: sqlite3 <db> "DELETE FROM flow_issue_links '
+            f"WHERE branch='{branch}' AND issue_number={issue_number}\""
+        )
+
+
 # ========== Error Classification ==========
 # This module provides error classification utilities.
 # For error tracking service, see vibe3.services.error_tracking_service.
@@ -254,5 +274,6 @@ __all__ = [
     "PRNotFoundError",
     "CapacityDeferredError",
     "InvalidTransitionError",
+    "InvalidBranchLinkError",
     "GitHubAPIError",
 ]
