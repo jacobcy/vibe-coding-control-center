@@ -4,6 +4,7 @@ from vibe3.analysis.change_scope_service import (
     classify_changed_files,
     count_changed_lines,
     is_test_file,
+    is_v3_test_file,
 )
 
 
@@ -64,3 +65,10 @@ def test_count_changed_lines_supports_optional_path_filter() -> None:
 
     assert count_changed_lines(diff_text) == 3
     assert count_changed_lines(diff_text, code_paths=["src/"]) == 2
+
+
+def test_is_v3_test_file_excludes_init_py() -> None:
+    assert not is_v3_test_file("tests/vibe3/agents/__init__.py")
+    assert not is_v3_test_file("tests/vibe3/__init__.py")
+    assert is_v3_test_file("tests/vibe3/agents/test_agent.py")
+    assert is_v3_test_file("tests/vibe3/services/test_check_service.py")

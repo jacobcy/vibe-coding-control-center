@@ -204,6 +204,8 @@ def _map_source_to_tests(source_path: str, root: Path) -> list[str]:
     resolved: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
+        if candidate.name == "__init__.py":
+            continue
         if candidate.exists():
             rel_path = candidate.relative_to(root).as_posix()
             if rel_path not in seen:
