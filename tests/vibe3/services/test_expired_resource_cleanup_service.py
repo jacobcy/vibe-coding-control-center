@@ -8,6 +8,7 @@ import pytest
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.protocols import BackendProtocol
 from vibe3.services.expired_resource_cleanup_service import (
     ExpiredResourceCleanupService,
 )
@@ -26,6 +27,21 @@ def mock_git_client():
     client.get_current_branch.return_value = "feature/test-branch"
     client._run.return_value = "/path/to/.git"
     return client
+
+
+def test_expired_resource_service_accepts_backend():
+    """ExpiredResourceCleanupService should accept BackendProtocol."""
+    mock_backend = MagicMock(spec=BackendProtocol)
+    mock_store = MagicMock(spec=SQLiteClient)
+    mock_git_client = MagicMock(spec=GitClient)
+
+    service = ExpiredResourceCleanupService(
+        store=mock_store,
+        git_client=mock_git_client,
+        backend=mock_backend,
+    )
+
+    assert service._backend is mock_backend
 
 
 def test_clean_expired_local_branches_deletes_old(mock_store, mock_git_client) -> None:
