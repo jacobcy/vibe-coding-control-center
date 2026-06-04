@@ -126,6 +126,7 @@ def _build_run_prompt_providers(
         if run_config and run_config.common_rules is not None:
             result: str | None = run_config.common_rules
             return result
+        # Cast needed: lazy __getattr__ import loses type info
         return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:

@@ -244,6 +244,7 @@ def _build_review_prompt_providers(
     def common_rules_path() -> str | None:
         if config.review.common_rules is not None:
             return config.review.common_rules
+        # Cast needed: lazy __getattr__ import loses type info
         return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:

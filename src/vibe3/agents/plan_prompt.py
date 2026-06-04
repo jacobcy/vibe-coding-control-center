@@ -190,6 +190,7 @@ def _build_plan_prompt_providers(
         if plan_config and plan_config.common_rules is not None:
             result: str | None = plan_config.common_rules
             return result
+        # Cast needed: lazy __getattr__ import loses type info
         return cast(str | None, resolver.get_policy_path("common"))
 
     def common_rules_section() -> str | None:
