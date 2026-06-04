@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from loguru import logger
 
@@ -189,11 +189,13 @@ def _sync_registry_from_lifecycle_event(
     live_sessions = store.list_live_runtime_sessions(role=role)
     for session in live_sessions:
         if session.get("branch") == branch:
-            store.update_runtime_session(
-                session["id"],
-                status=terminal_status,
-                ended_at=datetime.now().isoformat(),
-            )
+            updates: dict[str, Any] = {
+                "status": terminal_status,
+                "ended_at": datetime.now().isoformat(),
+            }
+            if session_id and not session.get("backend_session_id"):
+                updates["backend_session_id"] = session_id
+            store.update_runtime_session(session["id"], **updates)
 
 
 def persist_execution_lifecycle_event(
