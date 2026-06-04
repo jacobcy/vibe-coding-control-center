@@ -324,6 +324,64 @@ VIBE_CI_SIMULATE=1 bash scripts/hooks/pre-push.sh
 uv run pytest tests/vibe3/integration/test_ci_parity.py -v
 ```
 
+## 文件大小限制（LOC Limits）处理原则
+
+当实现过程中遇到文件行数超过 `config/v3/loc_limits.yaml` 定义的限制时：
+
+### 处理流程
+
+1. **评估拆分可能性**
+   - 检查文件职责是否可以合理拆分
+   - 评估拆分是否会破坏内聚性
+   - 考虑拆分后的维护成本
+
+2. **如果可以合理拆分**
+   - 在 plan 中明确拆分策略
+   - 说明拆分后的职责边界
+   - 验证拆分不会破坏现有功能
+
+3. **如果无法合理拆分**
+   - **立即**在 `config/v3/loc_limits.yaml` 的 `exceptions` 中添加例外
+   - **不要让 LOC 限制阻碍开发进度**
+   - 必须提供合理的理由（reason 字段）
+   - 说明为什么该文件必须保持较大规模
+
+### 例外申请模板
+
+```yaml
+- path: "src/vibe3/path/to/file.py"
+  limit: 650
+  reason: |
+    文件职责说明，包含：
+    - 核心功能 A（紧密耦合，不宜拆分）
+    - 核心功能 B（依赖 A 的内部状态）
+    - 核心功能 C（共享基础设施）
+
+    拆分会破坏：
+    - 数据一致性保证
+    - 事务原子性
+    - 代码可读性
+```
+
+### 判断标准
+
+**值得拆分**：
+- 文件包含多个独立职责
+- 功能之间耦合度低
+- 拆分后可独立测试和维护
+
+**不应拆分**：
+- 核心业务聚合（如 dispatcher、coordinator）
+- 强耦合逻辑链（如 validation chain、state machine）
+- 共享状态的紧密耦合（如 session registry）
+- 测试集（fixture 共享，拆分收益低）
+
+### 相关文档
+
+- 配置文件：`config/v3/loc_limits.yaml`
+- 项目规则：`CLAUDE.md` HARD RULES 第 12 条
+- 详细标准：`.claude/rules/coding-standards.md` Size And Complexity
+
 ## 必须使用 Handoff Append 的触发场景
 
 以下情况**必须**立即 `handoff append`：
