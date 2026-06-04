@@ -122,6 +122,7 @@ def execute_manual_run(
     backend: str | None,
     model: str | None,
     fresh_session: bool = False,
+    publish: bool = False,
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
@@ -154,9 +155,17 @@ def execute_manual_run(
             )
             return None
 
-        # Check if this is a publish path execution (commit_mode from flow_state)
+        # Check if this is a publish path execution
+        # Two entry points:
+        # 1. Manual: --publish flag (publish=True)
+        # 2. Automatic: commit_mode from flow_state
         is_publish_path = False
-        if branch:
+
+        # Manual channel: explicit --publish flag
+        if publish:
+            is_publish_path = True
+        # Automatic channel: commit_mode detection from flow_state
+        elif branch:
             try:
                 flow_state = SQLiteClient().get_flow_state(branch)
                 if flow_state:

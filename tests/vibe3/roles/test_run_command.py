@@ -355,3 +355,61 @@ class TestPublishPathDetection:
         # Should use skill builder when flow_state is missing
         assert captured_prompt["text"] == "SKILL_CONTEXT"
         mock_skill_builder.assert_called_once()
+
+    def test_manual_publish_flag_uses_publish_context(self) -> None:
+        """Test that --publish flag uses publish context builder (manual channel)."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_publish_context_builder"
+            ) as mock_publish_builder,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock flow_state - no commit_mode (manual channel doesn't need it)
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = None
+
+            # Mock context builders to return identifiable content
+            mock_publish_builder.return_value = lambda: "PUBLISH_CONTEXT"
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+                publish=True,  # Manual channel: explicit --publish flag
+            )
+
+        # Should use publish builder when --publish flag is set
+        assert captured_prompt["text"] == "PUBLISH_CONTEXT"
+        mock_publish_builder.assert_called_once()
+        # Should NOT call skill builder
+        mock_skill_builder.assert_not_called()
