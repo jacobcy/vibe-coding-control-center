@@ -7,6 +7,13 @@ This enables the domain layer to depend on abstractions (protocols) rather
 than concrete implementations, following the dependency inversion principle.
 """
 
+from vibe3.domain.protocols.core_protocols import (
+    ExecutionCoordinatorProtocol,
+    RoleFactoryProtocol,
+)
+from vibe3.domain.protocols.core_protocols import (
+    FlowServiceProtocol as CoreFlowServiceProtocol,
+)
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
@@ -29,7 +36,9 @@ __all__ = [
     "CapacityServiceProtocol",
     "CheckServiceProtocol",
     "ConfigLoaderProtocol",
+    "CoreFlowServiceProtocol",
     "DispatchHealthCheckProtocol",
+    "ExecutionCoordinatorProtocol",
     "FlowContextResolverProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",
@@ -39,4 +48,5 @@ __all__ = [
     "LabelDispatchCallable",
     "QueuePersistenceServiceProtocol",
     "QueueSelectorProtocol",
+    "RoleFactoryProtocol",
 ]
