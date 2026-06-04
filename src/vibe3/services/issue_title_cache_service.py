@@ -157,11 +157,21 @@ class IssueTitleCacheService:
 
                 if batch_titles is not None:
                     # Batch fetch succeeded
+                    missing_branches: list[str] = []
                     for branch, issue_number in branch_to_issue.items():
                         title = batch_titles.get(issue_number)
                         if title:
                             titles[branch] = title
                             self.update_title(branch, title)
+                        else:
+                            missing_branches.append(branch)
+
+                    for branch in missing_branches:
+                        fetched_title, err = self._fetch_and_cache_title(branch)
+                        if fetched_title:
+                            titles[branch] = fetched_title
+                        if err:
+                            network_error = True
                 else:
                     # Batch fetch failed, fallback to serial fetch
                     logger.bind(

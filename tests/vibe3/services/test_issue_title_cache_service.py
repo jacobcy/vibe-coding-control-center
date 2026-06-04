@@ -294,3 +294,36 @@ class TestIssueTitleCacheService:
         # Should attempt batch first, then fallback
         mock_github.batch_get_issues.assert_called_once_with([123])
         mock_github.view_issue.assert_called_once_with(123)
+
+    def test_get_titles_with_fallback_partial_batch_result_falls_back(
+        self, mock_store, mock_github
+    ):
+        """Test serial fallback for issues omitted from a successful batch result."""
+
+        def get_cache_side_effect(branch):
+            issue_number = 123 if branch == "task/issue-123" else 456
+            return {
+                "branch": branch,
+                "task_issue_number": issue_number,
+                "issue_title": None,
+            }
+
+        mock_store.get_flow_context_cache.side_effect = get_cache_side_effect
+        mock_github.batch_get_issues.return_value = {
+            123: "Batch Title",
+        }
+        mock_github.view_issue.return_value = {
+            "number": 456,
+            "title": "Fallback Title",
+        }
+
+        service = IssueTitleCacheService(mock_store, mock_github)
+        titles, error = service.get_titles_with_fallback(
+            ["task/issue-123", "task/issue-456"]
+        )
+
+        assert titles["task/issue-123"] == "Batch Title"
+        assert titles["task/issue-456"] == "Fallback Title"
+        assert error is False
+        mock_github.batch_get_issues.assert_called_once_with([123, 456])
+        mock_github.view_issue.assert_called_once_with(456)
