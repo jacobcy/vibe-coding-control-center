@@ -4,10 +4,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from vibe3.clients import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import InvalidBranchLinkError
 
 if TYPE_CHECKING:
+    from vibe3.models.orchestra_config import OrchestraConfig
     from vibe3.services.convention_resolver import ConventionResolver
 
 
@@ -21,6 +23,11 @@ def _default_resolver() -> "ConventionResolver":
     from vibe3.services.convention_resolver import ConventionResolver
 
     return ConventionResolver.from_repo()
+
+
+def _default_config() -> "OrchestraConfig":
+    """Default factory for orchestra config."""
+    return load_orchestra_config()
 
 
 @dataclass
@@ -42,6 +49,7 @@ class IssueFlowService:
 
     store: SQLiteClient = field(default_factory=_default_store)
     resolver: "ConventionResolver" = field(default_factory=_default_resolver)
+    config: "OrchestraConfig" = field(default_factory=_default_config)
 
     def canonical_branch_name(self, issue_number: int) -> str:
         """Return canonical task branch name.
@@ -194,11 +202,12 @@ class IssueFlowService:
             return None
 
         # Guard: detect corrupted branch links
-        base_branches = set(VibeConfig.get_defaults().flow.protected_branches)
+        base_branch = self.config.scene_base_ref.replace("origin/", "")
+        protected_branches = set(VibeConfig.get_defaults().flow.protected_branches)
 
         for flow in flows:
             flow_branch = str(flow.get("branch") or "").strip()
-            if flow_branch in base_branches:
+            if flow_branch == base_branch or flow_branch in protected_branches:
                 raise InvalidBranchLinkError(flow_branch, issue_number)
 
         canonical_branch = self.canonical_branch_name(issue_number)
