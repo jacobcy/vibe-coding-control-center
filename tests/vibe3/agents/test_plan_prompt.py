@@ -46,3 +46,11 @@ def test_build_plan_task_section_can_carry_ref_guidance() -> None:
 
     assert "docs/plans/" in result
     assert "handoff plan" in result
+
+
+def test_build_plan_prompt_body_includes_before_coding_marker_convention() -> None:
+    """Plan prompt must guide planners to use REQUIRED:BEFORE_CODING markers."""
+    request = PlanRequest(scope=PlanScope.for_task(42))
+    result = build_plan_prompt_body(request)
+    assert "REQUIRED:BEFORE_CODING" in result
+    assert "Mandatory Pre-Conditions" in result
