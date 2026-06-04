@@ -13,10 +13,9 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.clients import BackendProtocol, SQLiteClient
+from vibe3.environment import SessionRegistryService
+from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     pass

@@ -148,8 +148,8 @@ def _resolve_shared_artifact(
             raise FileNotFoundError(f"Not a file: {target}")
         return current_md
 
-    # Special handling for @plan/@report/@audit/@spec aliases
-    if key in ("plan", "report", "audit", "spec"):
+    # Special handling for @plan/@report/@audit/@spec/@indicate aliases
+    if key in ("plan", "report", "audit", "spec", "indicate"):
         return _resolve_artifact_alias(key, f"{key}_ref", branch, git_client)
 
     # Standard shared artifact (not @current, @plan, @report, or @audit)
@@ -245,7 +245,7 @@ def _resolve_artifact_alias(
 
     # Guard against self-referential alias values (e.g., plan_ref='@plan')
     # which would cause infinite recursion via resolve_handoff_target
-    if ref_value in ("@plan", "@report", "@audit", "@spec", "@current"):
+    if ref_value in ("@plan", "@report", "@audit", "@spec", "@current", "@indicate"):
         raise ValueError(
             f"Invalid {ref_field}: self-referential alias {ref_value!r} "
             f"would cause infinite recursion"

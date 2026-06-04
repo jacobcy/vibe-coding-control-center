@@ -4,7 +4,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
-from vibe3.clients import SQLiteClient
+from vibe3.clients import BackendProtocol, SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.flow import FlowEvent, FlowState
@@ -63,6 +63,7 @@ class HandoffStatusService:
         store: SQLiteClient | None = None,
         git_client: GitClient | None = None,
         flow_service: FlowService | None = None,
+        backend: BackendProtocol | None = None,
     ) -> None:
         """Initialize handoff status service.
 
@@ -84,8 +85,11 @@ class HandoffStatusService:
         self.handoff_service = HandoffService(store=self.store)
         self.verdict_service = VerdictService(store=self.store)
 
-        # Session registry requires backend; we'll instantiate on-demand
-        # to avoid coupling to CodeagentBackend at construction time
+        # Backend is optional for read-only use cases:
+        # - backend=None: SessionRegistryService assumes all tmux sessions exist
+        #   (safe for status queries, but not capacity/dispatch logic)
+        # - backend=CodeagentBackend(): Verifies actual tmux liveness
+        self._backend = backend
         self.session_registry = None
 
     def get_handoff_status(
@@ -152,12 +156,11 @@ class HandoffStatusService:
         Returns:
             List of session dicts that are truly live
         """
-        from vibe3.agents import CodeagentBackend
 
         if self.session_registry is None:
             with self._registry_lock:
                 if self.session_registry is None:
-                    backend = CodeagentBackend()
+                    backend = self._backend
                     self.session_registry = SessionRegistryService(
                         store=self.store, backend=backend
                     )

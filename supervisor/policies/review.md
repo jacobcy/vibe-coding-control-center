@@ -63,6 +63,49 @@ uv run python src/vibe3/cli.py handoff show <plan_ref> --branch <branch>
 - **不要继续审查细节**（scope violation 本身就是最严重的 finding）
 - 建议：回退超出 scope 的变更，或通过 manager 扩展 issue scope
 
+### 0.5. 分支身份验证
+
+在开始详细审查前，**必须验证当前 HEAD 的 commit 属于目标分支**。
+
+**验证命令**：
+
+```bash
+# 确认当前所在分支
+git branch --show-current
+
+# 获取当前分支的 commit 列表
+git log --oneline origin/main..HEAD
+
+# 对比 handoff/task show 中的目标分支名
+uv run python src/vibe3/cli.py task show
+```
+
+**验证步骤**：
+
+1. 执行 `git branch --show-current` 确认当前分支名
+2. 对比 `task show` 输出的目标分支名是否一致
+3. 如果不一致：
+   - 立即用 `handoff append` 记录 finding
+   - 给出 **REFUSE** verdict
+   - **不要继续审查**（分支错误会导致分析错误的 commit）
+
+**输出要求**：
+
+- 在审查输出的 findings 前，列出被审查的完整 commit SHA 列表
+- 便于 downstream 消费方验证分析对象是否正确
+
+**示例输出格式**：
+
+```
+## 被审查 Commits
+- abc1234 (HEAD) commit message
+- def5678 commit message
+...
+
+## Findings
+...
+```
+
 ### 1. 读取 Handoff 状态
 
 ```bash
@@ -142,11 +185,64 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 - 检查 plan scope 是否覆盖了所有相关层
 - 如有遗漏层，视为 coverage 不足，至少给 MAJOR
 
+### 8. Scope Consistency 检查（重构类任务）
+
+对于重构类任务（标签包含 `type/refactor` 或标题含「重构」「refactor」），必须检查：
+
+#### 检查 plan 的死代码清理声明
+
+- **Plan 是否显式声明了死代码清理范围？**
+  - 如未声明，默认立场为「不包含死代码清理」
+  - 如已声明，确认声明内容格式正确（包含符号列表和验证依据）
+
+#### 检查实际删除的符号是否在 plan 范围内
+
+**验证步骤**：
+
+```bash
+# 检查是否有被删除的函数/类/方法（在存续文件或已删除文件中）
+git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || echo "无符号删除"
+
+# 如果有删除，对比 plan 的死代码清理声明列表
+```
+
+#### 判断标准
+
+1. **Plan 未声明死代码清理，但有符号被删除**：
+   - 至少给 MAJOR
+   - 说明：违反 scope enforcement 规则（executor 删除了 plan 外的符号）
+
+2. **Plan 已声明死代码清理，但删除的符号不在声明列表中**：
+   - 至少给 MAJOR
+   - 说明：违反 scope enforcement 规则（executor 超出声明范围删除符号）
+
+3. **Plan 已声明死代码清理，删除的符号在声明列表中**：
+   - ✅ 符合规则
+   - 验证 executor 是否提供了引用计数为零的证据
+
+#### 发现 plan 外删除的处理
+
+如果发现 executor 删除了 plan 范围外的符号：
+- 不要自行判断「是否合理」
+- 至少给 MAJOR，要求 executor 解释为何偏离 plan
+- 如果 executor 记录了 finding 且未执行删除，则符合规则
+
 **缺少任一步骤都可能导致误判。**
 
 ## 独立判断强制验证点
 
 给出 verdict 前，必须回答：
+
+### 0. 当前分析的 commit 是否属于目标分支？
+
+- **是否验证了分支身份？**
+  - 必须用 `git branch --show-current` 确认当前分支
+  - 必须用 `git log --oneline origin/main..HEAD` 确认 commit 列表
+  - 避免"在错误分支上审查"
+
+- **如果发现分支不一致？**
+  - 立即记录 finding 并给出 REFUSE verdict
+  - 不要继续审查细节
 
 ### 1. 我的理解是否基于代码实际？
 

@@ -15,10 +15,10 @@ from loguru import logger
 
 from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ def handle_governance_scan_started(
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.orchestra.logging import append_governance_event
+    from vibe3.observability.orchestra_log import append_governance_event
     from vibe3.roles.governance import build_governance_execution_name
 
     config = load_orchestra_config()
@@ -122,7 +122,7 @@ def handle_governance_scan_started(
     execution_name = build_governance_execution_name(event.tick_count)
 
     # Build CLI self-invocation request (cmd field, no prompt)
-    # This ensures the tmux wrapper calls 'internal governance <tick>'
+    # This ensures the tmux wrapper calls 'internal governance <tick> <execution_count>'
     # which enters governance_sync_runner with ErrorTrackingService
     command_root = resolve_async_cli_project_root(root)
     cmd = [
@@ -136,6 +136,7 @@ def handle_governance_scan_started(
         "internal",
         "governance",
         str(event.tick_count),
+        str(event.execution_count),
     ]
 
     env = dict(os.environ)

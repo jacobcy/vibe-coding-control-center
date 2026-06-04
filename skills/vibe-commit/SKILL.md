@@ -168,8 +168,8 @@ git log HEAD..origin/main --oneline
 # 记录原因
 uv run python src/vibe3/cli.py handoff append "vibe-commit: 不再需要提交，理由：<具体原因>" --kind note
 
-# 更新 issue 标签为 state/handoff
-gh issue edit <issue-number> --add-label "state/handoff"
+# 更新 issue 标签为 state/handoff (移除 state/merge-ready)
+gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/merge-ready"
 
 # 停止，等待 manager 决定
 ```

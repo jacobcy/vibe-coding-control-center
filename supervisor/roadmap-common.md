@@ -36,11 +36,12 @@ broader repo --> Layer 1: roadmap-intake (入口层)
                     跳过 -> 打 orchestra-scanned -> 不再看
                           |
                           v
-                 Layer 2: assignee-pool (池内决策层)
+                 Layer 2: assignee-pool (入池前/池内准入决策层)
                     扫描范围: 有 assignee 的 issue
                     过滤: 无 orchestra-governed
                     例外: roadmap/epic 收口检查每次独立扫描，不受 governed 过滤
-                    决策(close/split/rfc/epic/ready/resume) -> 打 orchestra-governed -> 不再看
+                    高置信度决策(close/split/rfc/epic/ready/resume) -> 直接执行/打闭环标签
+                    低置信度 -> roadmap/rfc 交人类
                           |
                           v
                  Layer 3: vibe-roadmap (上层审查/纠偏层)
@@ -54,7 +55,7 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 | 角色 | 文件 | Marker | 职责 | 标签 |
 |------|------|--------|------|------|
 | **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
-| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest]` | 池内决策者：对 pool 中 issue 做 rfc/epic/ready 决策 | 决策后打 `orchestra-governed` |
+| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest]` / `[governance close]` | 入池前/池内准入 decider：对 pool 中 issue 做 rfc/epic/ready/close 决策 | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
 | **vibe-roadmap** | skills/vibe-roadmap/SKILL.md | `[roadmap decision]` | 上层审查者：审查 governance 决策，纠正和补全 | 审查后打 `roadmap-reviewed` |
 
 ---
@@ -113,9 +114,9 @@ intake 扫描 -> 跳过有 assignee 的 issue（已在 pool 中）
 ### 2. orchestra-governed（池内层闭环）
 
 **谁打**：assignee-pool
-**何时打**：完成决策后（不管结论是 rfc、epic、ready、建议关闭）
+**何时打**：完成普通 pool 决策后（rfc、epic、ready、close）。高置信度 close 直接关闭；低置信度打 `roadmap/rfc` 交人类，不把 close 建议留给 manager 反复判断。
 
-**语义**："已决策，不再重复检查"
+**语义**："已决策，不再重复检查"。它不能替代 issue close，也不能用于 completed epic 的半闭环；completed epic 应直接关闭。
 
 **命令**：
 ```bash
@@ -234,9 +235,9 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 
 ### Assignee Pool（池内决策层）
 
-**决策范围**：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复）、`roadmap/rfc`（不确定）、resume（明确可恢复）、split（清晰分界）
-**标签**：所有决策完成后打 `orchestra-governed`
-**边界**：pool 是 assignee pool 内的决策 OWNER
+**决策范围**：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复/已完成）、`roadmap/rfc`（低置信度或不确定）、resume（明确可恢复）、split（清晰分界）
+**标签**：普通决策完成后打 `orchestra-governed`；completed epic 直接 close，不依赖 `orchestra-governed` 防重复
+**边界**：pool 是入池前/池内准入 decider；manager 是入池后的执行 decider。pool 不把低置信度判断交给 manager 循环复核，而是 `roadmap/rfc` 交人类。
 
 ### Vibe Roadmap（审查纠正层）
 

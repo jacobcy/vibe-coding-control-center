@@ -1,18 +1,13 @@
 """Execution session resume helpers."""
 
 import re
-from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.clients import GitClient, SQLiteClient
+from vibe3.environment import SessionRegistryService
 from vibe3.exceptions import SystemError, UserError
-
-SessionRole = Literal[
-    "manager", "planner", "executor", "reviewer", "supervisor", "governance"
-]
+from vibe3.models import SessionRole
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 

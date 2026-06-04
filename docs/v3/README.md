@@ -93,9 +93,9 @@ src/vibe3/
 
 ---
 
-### Phase 2: Trace（调试追踪层）⏸️ 待启动
+### Phase 2: Trace（调试追踪层）⏸️ Optional/Pending
 
-**目标**: 实现 `--trace` 参数，帮助 agent 在开发和 review 过程中获得明确上下文
+**状态**: ⏸️ **Optional/Pending** - 非阻塞阶段，可根据实际需求启动
 
 **设计原则**:
 - **调试友好** - 追踪输出人类可读，帮助理解"代码执行到哪一步了"

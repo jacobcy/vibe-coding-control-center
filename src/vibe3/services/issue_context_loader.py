@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
+from vibe3.models import IssueInfo
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 
 
 def load_issue_info(

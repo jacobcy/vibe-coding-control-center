@@ -49,6 +49,43 @@ class IssueAdminMixin:
             return False
         return True
 
+    def add_assignee(
+        self,
+        issue_number: int,
+        assignee: str,
+        repo: str | None = None,
+    ) -> bool:
+        """Add an assignee to a GitHub issue.
+
+        Args:
+            issue_number: Issue number
+            assignee: GitHub username to assign
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        logger.bind(
+            external="github",
+            operation="add_assignee",
+            issue_number=issue_number,
+            assignee=assignee,
+        ).debug("Calling GitHub API: add_assignee")
+
+        cmd = ["gh", "issue", "edit", str(issue_number), "--add-assignee", assignee]
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                f"Failed to add assignee to issue #{issue_number}"
+            )
+            return False
+        return True
+
     def list_issues_with_assignees(
         self,
         limit: int = 100,

@@ -5,93 +5,98 @@ import subprocess
 from loguru import logger
 
 
+def _run_git(args: list[str]) -> str:
+    """Run a git command and return stripped stdout.
+
+    Raises subprocess.CalledProcessError on non-zero exit.
+    """
+    result = subprocess.run(
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
 def find_parent_branch(current_branch: str | None = None) -> str | None:
     """Find the closest parent branch for the current branch.
 
     This function analyzes the git branch topology to find the most likely
     parent branch - the branch that the current branch was forked from.
 
-    The algorithm:
-    1. Get all local and remote branches
-    2. Calculate merge-base and commit distance for each branch
-    3. Return the branch with minimum commits (closest parent)
+    The algorithm walks the current branch history from newest to oldest and
+    returns the first local branch (other than the current one) that contains
+    a commit but not the current tip. That commit is the merge-base with the
+    closest parent, so its distance from the tip is the minimum positive
+    commit count - exactly the "closest parent" semantics.
+
+    This costs O(N) ``git for-each-ref`` calls where N is how far the current
+    branch is ahead of its parent (typically a handful), instead of O(K) calls
+    where K is the total number of local branches. With hundreds of stale local
+    branches the old O(K) loop spawned hundreds of subprocesses (~40s); this
+    version resolves the same parent in well under a second.
 
     Args:
         current_branch: Current branch name (optional, auto-detected if None)
 
     Returns:
-        Parent branch name (e.g., "feature/A", "origin/main") or None if not found
+        Parent branch name (e.g., "feature/A") or None if not found
 
     Example:
-        Given: main → feature/A → refactor/B (current)
+        Given: main -> feature/A -> refactor/B (current)
         Returns: feature/A (not main)
     """
     try:
         # Get current branch if not provided
         if not current_branch:
-            result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            current_branch = result.stdout.strip()
+            current_branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"])
 
-        # Get all branches
-        result = subprocess.run(
-            ["git", "branch", "-l", "--format=%(refname:short)"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        all_branches = [b.strip() for b in result.stdout.splitlines() if b.strip()]
+        # Resolve the current tip so we can exclude branches that already
+        # contain it (those have commit distance 0 and are not "parents").
+        tip = _run_git(["rev-parse", current_branch])
 
-        # Exclude current branch and HEAD
-        candidates = [
-            b for b in all_branches if b != current_branch and not b.startswith("HEAD")
-        ]
+        # Commits reachable from current, newest first.
+        commits = _run_git(["rev-list", current_branch]).splitlines()
 
-        # Calculate distance for each candidate
-        distances: list[tuple[str, int]] = []
-        for branch in candidates:
-            try:
-                # Get merge-base
-                base_result = subprocess.run(
-                    ["git", "merge-base", branch, current_branch],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                merge_base = base_result.stdout.strip()
-
-                # Count commits from merge-base to current branch
-                count_result = subprocess.run(
-                    ["git", "rev-list", "--count", f"{merge_base}..{current_branch}"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                count = int(count_result.stdout.strip())
-
-                # Only consider branches with commits ahead
-                if count > 0:
-                    distances.append((branch, count))
-
-            except subprocess.CalledProcessError:
+        # Walk from the commit just below the tip toward the root. The first
+        # commit contained by some other local branch (but not by the current
+        # tip) marks the merge-base with the closest parent.
+        for index, commit in enumerate(commits):
+            if index == 0:
+                # Skip the tip itself; a parent must be strictly behind it.
                 continue
 
-        # Sort by distance (ascending) and return closest
-        if distances:
-            distances.sort(key=lambda x: x[1])
-            parent = distances[0][0]
-            logger.bind(
-                domain="git",
-                action="find_parent_branch",
-                current_branch=current_branch,
-                parent_branch=parent,
-                distance=distances[0][1],
-            ).info("Found parent branch")
-            return parent
+            refs = _run_git(
+                [
+                    "for-each-ref",
+                    "--format=%(refname:short)",
+                    "--contains",
+                    commit,
+                    "--no-contains",
+                    tip,
+                    "refs/heads",
+                ]
+            ).splitlines()
+
+            candidates = sorted(
+                ref.strip()
+                for ref in refs
+                if ref.strip()
+                and ref.strip() != current_branch
+                and not ref.strip().startswith("HEAD")
+            )
+
+            if candidates:
+                parent = candidates[0]
+                logger.bind(
+                    domain="git",
+                    action="find_parent_branch",
+                    current_branch=current_branch,
+                    parent_branch=parent,
+                    distance=index,
+                ).info("Found parent branch")
+                return parent
 
         logger.bind(
             domain="git",

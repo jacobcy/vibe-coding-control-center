@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.models import IssueState
 from vibe3.models.flow import IssueLink
-from vibe3.models.orchestration import IssueState
 
 
 @dataclass

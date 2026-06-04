@@ -29,8 +29,8 @@ code_limits:
 
       # Exceptions 聚合 —— 允许 480-590
       - path: "src/vibe3/domain/qualify_gate.py"
-        limit: 530
-        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard 等紧密耦合逻辑；Task #8 重构后新增 TaskResumeOperations 集成，略微超标"
+        limit: 560
+        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）"
       - path: "src/vibe3/services/handoff_service.py"
         limit: 650
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）"
@@ -66,8 +66,8 @@ code_limits:
         limit: 450
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）后略微超标"
       - path: "src/vibe3/commands/task.py"
-        limit: 480
-        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
+        limit: 500
+        reason: "Task 命令聚合，包含 show/status/intake/resume 多个子命令入口；新增 vibe3 task intake 命令（issue assignee 分配 + guard 逻辑）后超标"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 560
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
@@ -89,16 +89,19 @@ code_limits:
         limit: 410
         reason: "Task show 服务聚合，包含 task detail 查询、issue comment 处理、PR summary 构建、ref 选择逻辑（state machine）、resolve_branch 统一入口（支持 --pr 选项）等紧密耦合逻辑"
       - path: "src/vibe3/services/expired_resource_cleanup_service.py"
-        limit: 540
-        reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑，新增 quiet 模式和颜色高亮输出后略微超标"
+        limit: 650
+        reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑；新增 quiet 模式、颜色高亮输出，以及 flow-record 安全闸（active/blocked 分支保护 + _get_active_flow_branches，替代 merge 状态作为删除依据，issue #2033）后略微超标"
       - path: "src/vibe3/services/flow_cleanup_service.py"
         limit: 420
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤"
       - path: "src/vibe3/services/check_cleanup_service.py"
-        limit: 560
+        limit: 590
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；Task #9 重构后新增 TaskResumeOperations 集成，略微超标"
 
       # Roles 层 —— 允许 480-600
+      - path: "src/vibe3/roles/governance.py"
+        limit: 450
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability"
       - path: "src/vibe3/roles/review.py"
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
@@ -115,6 +118,9 @@ code_limits:
         reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、debug 模式代码根覆盖、环境变量传递等紧密耦合的启动逻辑"
 
       # Shell / 脚本兼容入口
+      - path: "scripts/install.sh"
+        limit: 500
+        reason: "全局安装脚本聚合，包含目录同步、supervisor/ 同步、过期文件清理、settings.yaml 迁移、sanity check 等完整安装生命周期；PR #1993 新增 canonical path 迁移和 sanity check 后超标"
       - path: "lib/alias/worktree.sh"
         limit: 500
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
@@ -133,10 +139,13 @@ code_limits:
         limit: 520
         reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开、CheckCleanupSettings 新增配置等配置加载逻辑，拆分会破坏配置系统完整性"
       - path: "src/vibe3/config/loader.py"
-        limit: 420
-        reason: "配置加载核心模块，包含配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、变量展开等紧密耦合的配置加载逻辑，统一环境变量覆盖框架后略微超标"
+        limit: 500
+        reason: "配置加载核心模块，包含配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback（repo root 相对路径解析）、变量展开等紧密耦合的配置加载逻辑；新增 load_runtime_config() 统一入口（issue #1925）、target_repo 参数支持、lazy import 注释和 repo root 检测逻辑后略微超标"
 
       # 基础设施核心模块
+      - path: "src/vibe3/agents/backends/async_launcher.py"
+        limit: 410
+        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；新增 VIBE3_ASYNC_CHILD 到 CRITICAL_ENV_PASSTHROUGH 修复 pre-push hook 测试失败"
       - path: "src/vibe3/environment/worktree_lifecycle.py"
         limit: 500
         reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
@@ -185,8 +194,8 @@ code_limits:
         limit: 480
         reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测等紧密耦合场景，新增测试后略微超标"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
-        limit: 540
-        reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 2 个测试后略微超标"
+        limit: 680
+        reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
@@ -213,7 +222,7 @@ code_limits:
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 540
-        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206)、github_state CLOSED guard 等场景，共享 fixture，拆分收益低；PR #1818 重构后略微超标"
+        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py，当前 ~536 行"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 480
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
@@ -244,6 +253,15 @@ code_limits:
       - path: "tests/vibe3/services/test_check_service.py"
         limit: 520
         reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）"
+      - path: "tests/vibe3/services/test_handoff_service.py"
+        limit: 500
+        reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）"
+      - path: "tests/vibe3/roles/test_run_command.py"
+        limit: 420
+        reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
+      - path: "tests/vibe3/config/test_loader.py"
+        limit: 430
+        reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
@@ -252,13 +270,13 @@ code_limits:
   total_file_loc:
     v2_shell: 3500         # Shell 核心代码总行数
     # Python LOC reduction milestones (Issue #274)
-    # Current: 45,894 LOC (as of 2026-05-01)
-    # Milestone 1: 45,000 LOC (intermediate target)
-    # Milestone 2: 40,000 LOC (stretch target)
-    # Final target: 35,000 LOC (governance goal)
-    v3_python: 65000        # Python 核心代码总行数（临时提升 5000，待模块化重构后清理）
+    # Current: 67,130 LOC (as of 2026-06-04)
+    # Milestone 1: 65,000 LOC (intermediate target)
+    # Milestone 2: 60,000 LOC (stretch target)
+    # Final target: 55,000 LOC (governance goal)
+    v3_python: 68000        # Python 核心代码总行数（临时提升 3000，待模块化重构后清理）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
-    last_reviewed: "2026-05-01"    # Track last governance review (Issue #625)
+    last_reviewed: "2026-06-04"    # Track last governance review (Issue #625)
 
   # 统计口径（路径定义）
   code_paths:

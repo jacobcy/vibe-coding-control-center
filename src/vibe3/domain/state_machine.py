@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 from vibe3.exceptions import InvalidTransitionError
-from vibe3.models.orchestration import (
-    ALLOWED_TRANSITIONS,
-    FORBIDDEN_TRANSITIONS,
-    IssueState,
-)
+from vibe3.models import IssueState
+from vibe3.models.orchestration import ALLOWED_TRANSITIONS, FORBIDDEN_TRANSITIONS
 
 VIBE_TASK_LABEL = "vibe-task"
 

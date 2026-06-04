@@ -13,7 +13,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_lock import check_lock
 from vibe3.services.check_pr_service import CheckPRService
@@ -348,7 +348,30 @@ class CheckService(CheckRemote):
             if len(task_issues) > 1:
                 issues.append(f"Multiple task issues for branch '{branch}'")
 
-            # PR verification (Remote-first) - use cached PR data
+            # ==== Issue & Flow State Validation ====
+            # Priority 1: Check issue state against flow state
+            flow_status = flow_data.get("flow_status", "active")
+            is_active_flow = flow_status not in self.INACTIVE_FLOW_STATUSES
+
+            if task_issue_closed:
+                if is_active_flow:
+                    # Active flow with closed issue = anomaly
+                    # Need to check PR status to determine if it's a real error
+                    cached_pr = self._branch_to_pr.get(branch)
+                    has_open_pr = cached_pr and cached_pr.state == PRState.OPEN
+
+                    if not has_open_pr:
+                        return CheckResult(
+                            is_valid=False,
+                            branch=branch,
+                            issues=[
+                                f"Task issue #{task_issue} is CLOSED (no open PR found)"
+                            ],
+                        )
+                # Inactive flow with closed issue = expected terminal state, continue
+
+            # ==== PR State Handling ====
+            # Priority 2: Handle PR state changes (merged/closed)
             pr = self._branch_to_pr.get(branch)
             if pr:
                 handled, pr_issues, pr_warnings = (
@@ -362,8 +385,7 @@ class CheckService(CheckRemote):
                         branch=branch,
                     )
             else:
-                # No PR found in recent cache; ask PRService for branch status so
-                # all-state branch resolution still uses the shared cache path first.
+                # No PR found in recent cache; ask PRService for branch status
                 try:
                     cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
                     if cached_or_remote_pr:
@@ -385,21 +407,6 @@ class CheckService(CheckRemote):
                         f"Failed to verify PR status from GitHub: {e}"
                     )
                     issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
-
-            # Auto-abort when task issue is closed (no open PR found)
-            # Semantic: Issue closed without PR = task cancelled/aborted
-            cached_pr = self._branch_to_pr.get(branch)
-            if task_issue_closed and (not cached_pr or cached_pr.state != PRState.OPEN):
-                self._flow_status_service.mark_flow_aborted(
-                    branch, f"Task issue #{task_issue} is CLOSED (no open PR found)"
-                )
-                return CheckResult(
-                    is_valid=False,
-                    branch=branch,
-                    issues=[f"Task issue #{task_issue} is CLOSED (no open PR found)"],
-                )
-
-            flow_status = flow_data.get("flow_status", "active")
 
             # Handle stale ready flow rebuild
             if (

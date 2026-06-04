@@ -19,6 +19,7 @@ setup() {
     cp "$VIBE_ROOT/lib/config.sh" "$TEST_REPO/lib/"
     cp "$VIBE_ROOT/lib/utils.sh" "$TEST_REPO/lib/"
     cp "$VIBE_ROOT/lib/update.sh" "$TEST_REPO/lib/"
+    cp "$VIBE_ROOT/lib/install_utils.sh" "$TEST_REPO/lib/"
     cp -R "$VIBE_ROOT/config/shell" "$TEST_REPO/config/"
 
     # Create mock files to sync
@@ -91,7 +92,7 @@ teardown() {
 @test "global vibe update from external repo fails before self-syncing ~/.vibe" {
     cp "$VIBE_ROOT/bin/vibe" "$TEST_HOME/.vibe/bin/"
     cp "$VIBE_ROOT/lib/config.sh" "$VIBE_ROOT/lib/utils.sh" "$VIBE_ROOT/lib/update.sh" \
-        "$TEST_HOME/.vibe/lib/"
+        "$VIBE_ROOT/lib/install_utils.sh" "$TEST_HOME/.vibe/lib/"
 
     run env HOME="$TEST_HOME" zsh -lc 'cd "'"$EXTERNAL_REPO"'" && "$HOME/.vibe/bin/vibe" update run'
     [ "$status" -eq 1 ]

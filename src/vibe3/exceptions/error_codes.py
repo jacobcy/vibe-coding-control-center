@@ -37,6 +37,9 @@ E_EXEC_FLOW_FAILURE: Final[str] = "E_EXEC_FLOW_FAILURE"
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
 
+# Data integrity errors - corruption detection
+E_INVALID_BRANCH_LINK: Final[str] = "E_INVALID_BRANCH_LINK"
+
 
 def is_model_error(error_code: str) -> bool:
     """Check if error is a model configuration error."""

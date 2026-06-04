@@ -31,6 +31,7 @@ def build_default_governance_fns() -> GovernanceFunctions:
             *,
             config: Any = None,
             tick_count: int = 0,
+            execution_count: int = 0,
             material_override: str | None = None,
             **kwargs: Any,
         ) -> dict[str, Any]:
@@ -38,6 +39,7 @@ def build_default_governance_fns() -> GovernanceFunctions:
                 snapshot,
                 config=config,
                 tick_count=tick_count,
+                execution_count=execution_count,
                 material_override=material_override,
                 **kwargs,
             )
@@ -48,6 +50,7 @@ def build_default_governance_fns() -> GovernanceFunctions:
             snapshot_context: dict[str, Any],
             *,
             tick_count: int = 0,
+            execution_count: int = 0,
             material_override: str | None = None,
             **kwargs: Any,
         ) -> Any:
@@ -55,6 +58,7 @@ def build_default_governance_fns() -> GovernanceFunctions:
                 config,
                 snapshot_context,
                 tick_count=tick_count,
+                execution_count=execution_count,
                 material_override=material_override,
                 **kwargs,
             )

@@ -12,7 +12,7 @@ from loguru import logger
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
-from vibe3.resources.runtime_assets import resolve_runtime_asset
+from vibe3.utils.runtime_assets import resolve_runtime_asset
 
 
 def resolve_skill_content(

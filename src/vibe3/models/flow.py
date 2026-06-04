@@ -88,8 +88,7 @@ class FlowState(BaseModel):
     blocked_by_issue: int | None = (
         None  # NEW: Dependency issue number (semantic clarity)
     )
-    blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
-    failed_reason: str | None = None  # Deprecated: use blocked_reason instead
+    blocked_reason: str | None = None  # Block reason text
     next_step: str | None = None
     flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
     # Note: "blocked" restored for remote sync semantics.
@@ -262,8 +261,7 @@ class FlowStatusResponse(BaseModel):
     latest_actor: str | None = None
     initiated_by: str | None = None
     blocked_by_issue: int | None = None  # NEW: Dependency issue number
-    blocked_reason: str | None = None  # NEW: Block reason text
-    failed_reason: str | None = None  # Deprecated: use blocked_reason instead
+    blocked_reason: str | None = None  # Block reason text
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
     planner_status: ExecutionStatus | None = None
@@ -357,7 +355,6 @@ class FlowStatusResponse(BaseModel):
             initiated_by=data.get("initiated_by"),
             blocked_by_issue=data.get("blocked_by_issue"),
             blocked_reason=data.get("blocked_reason"),
-            failed_reason=data.get("failed_reason"),
             next_step=data.get("next_step"),
             issues=issues,
             planner_status=data.get("planner_status"),

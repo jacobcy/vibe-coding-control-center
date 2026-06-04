@@ -102,48 +102,85 @@ class TestGovernanceMaterials:
 
         assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
 
-    def test_roadmap_intake_material_requires_assignee_write(self):
-        """roadmap-intake material should require direct assignee assignment."""
-        content = Path("supervisor/governance/roadmap-intake.md").read_text()
-        assert "直接补齐可执行的 manager assignee" in content
-        assert "明确指派给一个配置中的 manager assignee" in content
+    def test_assignee_pool_material_defines_pre_pool_decider_boundary(self):
+        """assignee-pool should decide before manager execution starts."""
+        content = Path("supervisor/governance/assignee-pool.md").read_text()
+        assert "入池前/池内准入 decider" in content
+        assert "manager 是入池后的执行 decider" in content
+        assert "低置信度" in content
+        assert "roadmap/rfc" in content
+
+    def test_assignee_pool_epic_close_does_not_loop_on_suggest(self):
+        """Completed epics should terminalize instead of repeating suggest/cleanup."""
+        content = Path("supervisor/governance/assignee-pool.md").read_text()
+        assert "all sub-issues completed → 直接关闭 epic" in content
+        assert (
+            "不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 "
+            "`orchestra-governed`" in content
+        )
+
+    def test_manager_material_defines_post_pool_terminal_decision_contract(self):
+        """manager should own high-confidence terminal decisions after pool entry."""
+        content = Path("supervisor/manager.md").read_text()
+        assert "入池后的执行 decider" in content
+        assert "Terminal Decision Contract" in content
+        assert "state/handoff" in content
+        assert "高置信度" in content
+        assert "低置信度" in content
+        assert "roadmap/rfc" in content
 
 
 class TestRoundRobinMaterialSelection:
     """Tests that build_governance_recipe selects material from recipe catalog."""
 
     def test_tick_0_selects_first(self):
-        """tick_count=0 selects first material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=0)
+        """execution_count=0 selects first material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=0
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_tick_1_selects_second(self):
-        """tick_count=1 selects second material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=1)
+        """execution_count=1 selects second material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=1
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_tick_2_selects_third(self):
-        """tick_count=2 selects third material from recipe catalog."""
-        recipe = build_governance_recipe(_make_config(), tick_count=2)
+        """execution_count=2 selects third material from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=2
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/cron-supervisor.md"
 
     def test_tick_wraps_around(self):
-        """tick_count wraps around material catalog (3 materials, tick 3 -> index 0)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=3)
+        """execution_count wraps around material catalog.
+
+        (4 materials, count 4 -> index 0).
+        """
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=4
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """tick_count=7 wraps around 3 materials to index 1 (7 % 3 = 1)."""
-        recipe = build_governance_recipe(_make_config(), tick_count=7)
+        """execution_count=9 wraps around 4 materials to index 1 (9 % 4 = 1)."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=9
+        )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_build_governance_request_uses_round_robin(self):
-        """build_governance_request picks material per tick from recipe catalog."""
+        """build_governance_request picks material per execution_count.
+
+        from recipe catalog.
+        """
         config = _make_config()
         snapshot = _make_snapshot()
         with (
@@ -154,14 +191,14 @@ class TestRoundRobinMaterialSelection:
             mock_github = MagicMock()
             mock_github.list_issues.return_value = []
             mock_github_cls.return_value = mock_github
-            req_tick0 = build_governance_request(config, 0, snapshot)
-            req_tick1 = build_governance_request(config, 1, snapshot)
+            req_tick0 = build_governance_request(config, 0, snapshot, execution_count=0)
+            req_tick1 = build_governance_request(config, 0, snapshot, execution_count=1)
         # Both should produce valid requests (circuit breaker closed, dry_run=False)
         assert req_tick0 is not None
         assert req_tick1 is not None
         # Execution names reflect different ticks
         assert req_tick0.execution_name.endswith("-t0")
-        assert req_tick1.execution_name.endswith("-t1")
+        assert req_tick1.execution_name.endswith("-t0")
 
 
 class TestGovernanceRoleDefinition:

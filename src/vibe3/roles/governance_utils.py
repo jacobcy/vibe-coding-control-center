@@ -179,6 +179,73 @@ def get_governed_issue_numbers(
     return numbers
 
 
+def select_audit_module(tick_count: int, repo_root: Path | None = None) -> Path:
+    """Select a module from src/vibe3/ for audit using tick-based rotation.
+
+    Excludes __init__.py files and __pycache__ directories.
+    Returns a deterministic but rotating selection based on tick_count.
+    """
+    root = repo_root or Path(".").resolve()
+    src_root = root / "src" / "vibe3"
+    candidates = sorted(
+        p
+        for p in src_root.rglob("*.py")
+        if p.name != "__init__.py" and "__pycache__" not in p.parts
+    )
+    if not candidates:
+        return src_root / "cli.py"
+    return candidates[tick_count % len(candidates)]
+
+
+def resolve_test_path(module_path: Path, repo_root: Path | None = None) -> Path:
+    """Resolve the test directory for a given module path.
+
+    Maps src/vibe3/{subdir}/foo.py -> tests/vibe3/{subdir}/
+    so the agent knows where to look for corresponding tests.
+    """
+    root = repo_root or Path(".").resolve()
+    src_vibe3 = root / "src" / "vibe3"
+    try:
+        rel = module_path.relative_to(src_vibe3)
+    except ValueError:
+        try:
+            rel = module_path.relative_to("src/vibe3")
+        except ValueError:
+            return root / "tests" / "vibe3"
+    return root / "tests" / "vibe3" / rel.parent
+
+
+def build_code_auditor_context(
+    snapshot: Any,
+    *,
+    tick_count: int = 0,
+) -> dict[str, Any]:
+    """Build governance context for code-auditor material.
+
+    Selects a module via tick-based rotation and returns a minimal context
+    containing only the module and test paths — the agent reads the code
+    itself using its own tools (Read/Grep), avoiding prompt bloat.
+    """
+    module_path = select_audit_module(tick_count)
+    test_path = resolve_test_path(module_path)
+    return build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="代码质量审计",
+        scope_note=(
+            f"## 本次审计目标\n"
+            f"- 模块路径：`{module_path}`\n"
+            f"- 对应测试目录：`{test_path}`\n\n"
+            "请使用 Read、Grep 等工具检查该模块，寻找代码质量反模式。"
+        ),
+    )
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 

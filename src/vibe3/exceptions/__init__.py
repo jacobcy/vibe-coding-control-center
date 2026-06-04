@@ -110,15 +110,20 @@ class AgentPresetNotFoundError(UserError):
 class SkillNotAvailableError(UserError):
     """Skill not available — no adapter provides it in current profile."""
 
-    def __init__(self, skill: str) -> None:
+    def __init__(self, skill: str, profile: str | None = None) -> None:
         """Initialize SkillNotAvailableError.
 
         Args:
             skill: The skill name that was not found
+            profile: Optional current profile name for context
         """
-        super().__init__(
-            f"Skill '{skill}' not found (no adapter provides it in current profile)"
+        profile_hint = (
+            f" (current profile: {profile!r})" if profile else " (no profile detected)"
         )
+        fix_hint = (
+            "Set VIBE_PROFILE=vibe-center or github-flow " "to enable skill resolution."
+        )
+        super().__init__(f"Skill '{skill}' not found{profile_hint}. {fix_hint}")
         self.skill = skill
 
 
@@ -257,6 +262,26 @@ class InvalidTransitionError(UserError):
         super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
 
 
+class InvalidBranchLinkError(SystemError):
+    """Base branch illegally linked to issue in flow_issue_links."""
+
+    def __init__(self, branch: str, issue_number: int) -> None:
+        """Initialize InvalidBranchLinkError.
+
+        Args:
+            branch: The invalid branch name
+            issue_number: The issue number incorrectly linked
+        """
+        self.branch = branch
+        self.issue_number = issue_number
+        super().__init__(
+            f"Invalid branch '{branch}' linked to issue #{issue_number}. "
+            f"Base branches cannot have flow records. "
+            f'Fix: sqlite3 <db> "DELETE FROM flow_issue_links '
+            f"WHERE branch='{branch}' AND issue_number={issue_number}\""
+        )
+
+
 # ========== Error Classification ==========
 # This module provides error classification utilities.
 # For error tracking service, see vibe3.services.error_tracking_service.
@@ -272,3 +297,25 @@ class InvalidTransitionError(UserError):
 #
 # Error recording helper (convenience function in services layer):
 #   from vibe3.services.error_helpers import record_error
+
+
+from vibe3.exceptions.runtime_errors import GitHubAPIError  # noqa: E402
+
+__all__ = [
+    "VibeError",
+    "UserError",
+    "ConfigError",
+    "AgentPresetNotFoundError",
+    "SkillNotAvailableError",
+    "SystemError",
+    "AgentExecutionError",
+    "ModelsJsonSyncError",
+    "GitError",
+    "GitHubError",
+    "SerenaError",
+    "PRNotFoundError",
+    "CapacityDeferredError",
+    "InvalidTransitionError",
+    "InvalidBranchLinkError",
+    "GitHubAPIError",
+]

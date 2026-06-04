@@ -2,7 +2,6 @@
 
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.execution_lifecycle import (
     execution_prefix,
@@ -10,6 +9,7 @@ from vibe3.execution.execution_lifecycle import (
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 
 __all__ = [
     # Core services

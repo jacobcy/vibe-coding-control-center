@@ -17,11 +17,12 @@ from vibe3.agents import (
     run_inspect_json,
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
+from vibe3.config.loader import load_runtime_config
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.role_gates import REVIEWER_GATE_CONFIG
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
@@ -31,11 +32,12 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG, WorktreeRequirement
+from vibe3.models import IssueInfo, IssueState
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
+from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.roles.review_helpers import (
     ReviewRunResult,
@@ -98,7 +100,7 @@ def resolve_review_options(config: OrchestraConfig) -> Any:
     """Resolve reviewer agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = VibeConfig.get_defaults()
+    runtime_config = load_runtime_config()
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_REVIEWER_BACKEND",
         model_env_key="VIBE3_REVIEWER_MODEL",
@@ -374,6 +376,7 @@ def execute_manual_review_sync(
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
     context_builder: Callable[..., object] = make_review_context_builder,
+    show_prompt: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
     _ = flow_service
@@ -390,6 +393,7 @@ def execute_manual_review_sync(
         config=cfg,
         branch=branch,
         issue_number=issue_number,
+        show_prompt=show_prompt,
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:

@@ -1,21 +1,23 @@
-"""Role dispatch contracts for unified role execution."""
+"""Role dispatch contracts — re-exported from lower-layer homes."""
 
-from enum import Enum
+from vibe3.config import (
+    EXECUTOR_GATE_CONFIG,
+    GOVERNANCE_GATE_CONFIG,
+    MANAGER_GATE_CONFIG,
+    PLANNER_GATE_CONFIG,
+    REVIEWER_GATE_CONFIG,
+    SUPERVISOR_APPLY_GATE_CONFIG,
+    SUPERVISOR_IDENTIFY_GATE_CONFIG,
+)
+from vibe3.models import WorktreeRequirement
 
-
-class WorktreeRequirement(str, Enum):
-    """Worktree requirement for a role execution."""
-
-    NONE = "none"  # No worktree needed (governance)
-    PERMANENT = "permanent"  # Permanent worktree (manager)
-    TEMPORARY = "temporary"  # Temporary worktree (supervisor apply)
-
-
-# Role-specific gate configurations
-MANAGER_GATE_CONFIG = WorktreeRequirement.PERMANENT
-GOVERNANCE_GATE_CONFIG = WorktreeRequirement.NONE
-PLANNER_GATE_CONFIG = WorktreeRequirement.PERMANENT
-EXECUTOR_GATE_CONFIG = WorktreeRequirement.PERMANENT
-REVIEWER_GATE_CONFIG = WorktreeRequirement.PERMANENT
-SUPERVISOR_IDENTIFY_GATE_CONFIG = WorktreeRequirement.NONE
-SUPERVISOR_APPLY_GATE_CONFIG = WorktreeRequirement.TEMPORARY
+__all__ = [
+    "WorktreeRequirement",
+    "EXECUTOR_GATE_CONFIG",
+    "GOVERNANCE_GATE_CONFIG",
+    "MANAGER_GATE_CONFIG",
+    "PLANNER_GATE_CONFIG",
+    "REVIEWER_GATE_CONFIG",
+    "SUPERVISOR_APPLY_GATE_CONFIG",
+    "SUPERVISOR_IDENTIFY_GATE_CONFIG",
+]

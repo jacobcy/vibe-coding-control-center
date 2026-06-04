@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.models import IssueState
 from vibe3.services.blocked_state_io import BlockedStateIO
 from vibe3.services.blocked_state_types import (
     BlockedState,

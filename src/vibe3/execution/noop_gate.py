@@ -5,12 +5,11 @@ from typing import cast
 
 from loguru import logger
 
-from vibe3.agents.models import ExecutionRole
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.config.role_policy import get_role_output_contract
-from vibe3.models.verdict import VerdictRecord
-from vibe3.models.verdict_types import VerdictValue
-from vibe3.services.role_policy_helpers import get_role_block_function
+from vibe3.agents import ExecutionRole
+from vibe3.clients import SQLiteClient
+from vibe3.config import get_role_output_contract
+from vibe3.models import VerdictRecord, VerdictValue
+from vibe3.services import get_role_block_function
 
 # Loop prevention constants
 SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
@@ -108,7 +107,7 @@ def apply_unified_noop_gate(
             branch,
             EVENT_STATE_TRANSITIONED,
             actor,
-            detail=(f"Issue #{issue_number} closed by {role} " "(terminal transition)"),
+            detail=(f"Issue #{issue_number} closed by {role} (terminal transition)"),
             refs={
                 "before_state": str(before_state_label or ""),
                 "issue": str(issue_number),
@@ -261,8 +260,7 @@ def apply_unified_noop_gate(
                 issue_number=issue_number,
                 repo=repo,
                 reason=(
-                    f"transition count exceeded: {new_count} >= "
-                    f"{TRANSITION_LIMIT_HARD}"
+                    f"transition count exceeded: {new_count} >= {TRANSITION_LIMIT_HARD}"
                 ),
                 actor=actor,
             )
@@ -346,7 +344,7 @@ def apply_unified_noop_gate(
             issue_number=issue_number,
             branch=branch,
         ).warning(
-            f"No-op gate BLOCK: state unchanged after {role} " f"(still {state_desc})"
+            f"No-op gate BLOCK: state unchanged after {role} (still {state_desc})"
         )
         store.add_event(
             branch,
@@ -372,8 +370,7 @@ def apply_unified_noop_gate(
         issue_number=issue_number,
         branch=branch,
     ).info(
-        f"No-op gate PASS: state changed {before_state_label} -> "
-        f"{after_state_label}"
+        f"No-op gate PASS: state changed {before_state_label} -> {after_state_label}"
     )
     store.add_event(
         branch,

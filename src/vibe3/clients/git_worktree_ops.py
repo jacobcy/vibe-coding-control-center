@@ -245,7 +245,11 @@ def remove_worktree(wt_path: Path, force: bool = False) -> None:
 
     cmd = ["git", "worktree", "remove", str(wt_path)]
     if force:
-        cmd.append("--force")
+        # Two --force flags are required to remove a *locked* worktree.
+        # A single --force only handles dirty/untracked files; locked worktrees
+        # (e.g. claude agent worktrees with a .git/worktrees/<name>/locked file)
+        # need the second flag per `git worktree remove --help`.
+        cmd.extend(["--force", "--force"])
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:

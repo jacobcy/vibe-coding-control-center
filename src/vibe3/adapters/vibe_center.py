@@ -7,8 +7,10 @@ distribution, making it an explicit adapter instead of implicit
 
 from pathlib import Path
 
-from vibe3.adapters import register_adapter
+from vibe3.adapters.resource_root import resolve_resource_root
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+
+_SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _build_vibe_center_manifest() -> AdapterManifest:
@@ -19,18 +21,17 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     """
     from vibe3.clients.git_client import GitClient
 
-    # Get repo root for stable path resolution
+    git_common_dir = None
     try:
-        git_client = GitClient()
-        git_common_dir = git_client.get_git_common_dir()
-        if git_common_dir:
-            repo_root = Path(git_common_dir).parent
-        else:
-            # Fallback to cwd if not in git repo
-            repo_root = Path.cwd()
+        git_common_dir = GitClient().get_git_common_dir()
     except Exception:
-        # Graceful fallback for non-git environments
-        repo_root = Path.cwd()
+        pass
+
+    repo_root = resolve_resource_root(
+        required_marker="skills",
+        git_common_dir=git_common_dir,
+        additional_roots=(_SOURCE_REPO_ROOT,),
+    )
 
     resources: list[AdapterResource] = []
 
@@ -81,21 +82,34 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    skills_dir = repo_root / "skills"
-    if skills_dir.exists():
+    from vibe3.utils.runtime_assets import runtime_assets_root
+
+    skills_dirs = [repo_root / "skills"]
+    global_skills = runtime_assets_root() / "skills"
+    if global_skills.exists() and global_skills.resolve() not in [
+        d.resolve() for d in skills_dirs if d.exists()
+    ]:
+        skills_dirs.append(global_skills)
+
+    for skills_dir in skills_dirs:
+        if not skills_dir.exists():
+            continue
+        base = repo_root if skills_dir == repo_root / "skills" else skills_dir.parent
         for skill_path in skills_dir.iterdir():
             if skill_path.is_dir():
                 skill_md = skill_path / "SKILL.md"
                 if skill_md.exists():
-                    # Store relative path for portability
-                    rel_path = skill_md.relative_to(repo_root)
-                    resources.append(
-                        AdapterResource(
-                            type="skill",
-                            name=skill_path.name,
-                            path=str(rel_path),
+                    rel_path = skill_md.relative_to(base)
+                    # Avoid duplicates
+                    existing_names = {r.name for r in resources if r.type == "skill"}
+                    if skill_path.name not in existing_names:
+                        resources.append(
+                            AdapterResource(
+                                type="skill",
+                                name=skill_path.name,
+                                path=str(rel_path),
+                            )
                         )
-                    )
 
     # Workflows (from .agent/workflows)
     workflows_dir = repo_root / ".agent/workflows"
@@ -124,4 +138,9 @@ def _build_vibe_center_manifest() -> AdapterManifest:
 
 # Build and register
 VIBE_CENTER_ADAPTER = _build_vibe_center_manifest()
-register_adapter(VIBE_CENTER_ADAPTER)
+
+# Self-register with parent module on import (avoids circular import)
+from . import _ADAPTERS, _LOADED  # noqa: E402
+
+_ADAPTERS[VIBE_CENTER_ADAPTER.name] = VIBE_CENTER_ADAPTER
+_LOADED.add(VIBE_CENTER_ADAPTER.name)

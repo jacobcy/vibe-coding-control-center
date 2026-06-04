@@ -3,35 +3,38 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from types import SimpleNamespace
+
+from loguru import logger
 
 from vibe3.agents import (
     CodeagentResult,
     RunPromptMode,
     create_codeagent_command,
     describe_run_plan_sections,
+    make_publish_context_builder,
     make_run_context_builder,
     make_skill_context_builder,
 )
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import load_session_id
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.prompt_meta import PromptContextMode
+from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
 )
-from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.utils.runtime_assets import resolve_runtime_asset
 
 
 def resolve_skill_path(
@@ -119,49 +122,89 @@ def execute_manual_run(
     backend: str | None,
     model: str | None,
     fresh_session: bool = False,
+    publish: bool = False,
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
         skill_path = resolve_skill_path(skill)
         if not skill_path:
-            raise SkillNotAvailableError(skill)
-
-        # Resolve relative path against repo root for CWD-independent access
-        from vibe3.clients.git_client import GitClient
+            detected_profile = ConventionResolver(profile=None)._detect_profile()
+            raise SkillNotAvailableError(skill, profile=detected_profile)
 
         try:
-            git_client = GitClient()
-            git_common_dir = git_client.get_git_common_dir()
-            if git_common_dir:
-                repo_root = Path(git_common_dir).parent
-                abs_skill_path = repo_root / skill_path
-            else:
-                # Fallback to cwd-relative if not in git repo
-                abs_skill_path = Path(skill_path)
+            abs_skill_path = resolve_runtime_asset(skill_path)
             skill_content = abs_skill_path.read_text(encoding="utf-8")
         except OSError as e:
             raise ValueError(f"Failed to read skill file '{skill_path}': {e}") from e
         if not dry_run and not no_async:
-            dispatch_run_command_async(
-                branch=branch,
-                cli_args=[
+            cli_args = (
+                [
+                    "run",
+                    "--publish",
+                    *([instructions] if instructions else []),
+                ]
+                if publish
+                else [
                     "run",
                     "--skill",
                     skill,
                     *([instructions] if instructions else []),
-                ],
+                ]
+            )
+            handoff_metadata: dict[str, object] = {"skill": skill}
+            if publish:
+                handoff_metadata["publish"] = True
+            dispatch_run_command_async(
+                branch=branch,
+                cli_args=cli_args,
                 issue_number=issue_number,
                 execution_name=(
                     f"vibe3-executor-issue-{issue_number}"
                     if issue_number is not None
                     else f"vibe3-executor-{branch.replace('/', '-')}"
                 ),
-                handoff_metadata={"skill": skill},
+                handoff_metadata=handoff_metadata,
             )
             return None
+
+        # Check if this is a publish path execution
+        # Two entry points:
+        # 1. Manual: --publish flag (publish=True)
+        # 2. Automatic: commit_mode from flow_state
+        is_publish_path = False
+
+        # Manual channel: explicit --publish flag
+        if publish:
+            is_publish_path = True
+        # Automatic channel: commit_mode detection from flow_state
+        elif branch:
+            try:
+                flow_state = SQLiteClient().get_flow_state(branch)
+                if flow_state:
+                    commit_mode = flow_state.get("commit_mode")
+                    # Validate commit_mode is boolean to prevent type coercion issues
+                    is_publish_path = (
+                        bool(commit_mode) if isinstance(commit_mode, bool) else False
+                    )
+            except Exception as e:
+                # Log unexpected errors but don't fail execution - graceful degradation
+                # Falls back to skill builder, which noop gate will catch if wrong
+                logger.warning(
+                    f"Unexpected error checking flow_state for publish path: {e}. "
+                    "Defaulting to skill builder. Noop gate will catch if "
+                    "wrong recipe used."
+                )
+
+        # Use publish-specific context builder for commit_mode execution
+        context_builder = (
+            make_publish_context_builder(skill_content)
+            if is_publish_path
+            else make_skill_context_builder(skill_content)
+        )
+
         command = create_codeagent_command(
             role="executor",
-            context_builder=make_skill_context_builder(skill_content),
+            context_builder=context_builder,
             task=instructions or f"Execute skill: {skill}",
             dry_run=dry_run,
             handoff_kind="run",

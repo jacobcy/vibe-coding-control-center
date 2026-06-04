@@ -14,11 +14,12 @@ from vibe3.agents import (
     make_plan_context_builder,
 )
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.loader import load_runtime_config
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.role_gates import PLANNER_GATE_CONFIG
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_sync_spec,
@@ -26,14 +27,15 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import PLANNER_GATE_CONFIG, WorktreeRequirement
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
 )
+from vibe3.models import IssueInfo, IssueState
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
+from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
@@ -53,7 +55,7 @@ def resolve_plan_options(config: OrchestraConfig) -> Any:
     """Resolve planner agent options with env override support."""
     from vibe3.models.review_runner import AgentOptions
 
-    runtime_config = VibeConfig.get_defaults()
+    runtime_config = load_runtime_config()
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_PLANNER_BACKEND",
         model_env_key="VIBE3_PLANNER_MODEL",
@@ -411,6 +413,8 @@ def execute_spec_plan_sync(
     issue_number: int | None,
     branch: str,
     config: VibeConfig | None = None,
+    dry_run: bool = False,
+    show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
     cfg = config or VibeConfig.get_defaults()
@@ -418,6 +422,8 @@ def execute_spec_plan_sync(
         role="planner",
         context_builder=make_plan_context_builder(request, cfg),
         task=request.task_guidance,
+        dry_run=dry_run,
+        show_prompt=show_prompt,
         handoff_kind="plan",
         branch=branch,
         issue_number=issue_number,

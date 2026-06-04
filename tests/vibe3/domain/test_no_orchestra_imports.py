@@ -38,13 +38,11 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     """Check if an import is from orchestra layer.
 
     Allowed imports (infrastructure exceptions):
-    - orchestra.logging (infrastructure service)
     - orchestra.protocols (TYPE_CHECKING only)
     - orchestra.failed_gate (TYPE_CHECKING only)
     - orchestra internal services (used via protocol injection):
       - dispatch_health_check
       - issue_loader
-      - queue_entry
       - queue_operations
       - queue_persistence_service
 
@@ -61,13 +59,11 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
 
     # Allowed imports (infrastructure services)
     allowed_orchestra_modules = {
-        "vibe3.orchestra.logging",  # Infrastructure logging
         "vibe3.orchestra.protocols",  # TYPE_CHECKING only (checked by caller)
         "vibe3.orchestra.failed_gate",  # TYPE_CHECKING only (checked by caller)
         # Orchestra internal services (used via protocol injection)
         "vibe3.orchestra.dispatch_health_check",
         "vibe3.orchestra.issue_loader",
-        "vibe3.orchestra.queue_entry",
         "vibe3.orchestra.queue_operations",
         "vibe3.orchestra.queue_persistence_service",
     }
@@ -150,8 +146,7 @@ def test_domain_layer_no_orchestra_imports():
             f"Found {len(violations)} orchestra imports in domain layer:\n"
             f"{violation_list}\n\n"
             "Domain layer should not import from orchestra layer.\n"
-            "Allowed exceptions: orchestra.logging (infrastructure), "
-            "orchestra.protocols/failed_gate (TYPE_CHECKING only)."
+            "Allowed exceptions: orchestra.protocols/failed_gate (TYPE_CHECKING only)."
         )
 
     print(f"✓ Verified {len(list(domain_dir.rglob('*.py')))} domain files")

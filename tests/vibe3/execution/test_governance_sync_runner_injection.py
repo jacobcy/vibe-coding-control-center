@@ -33,7 +33,7 @@ class TestGovernanceSyncRunnerWithInjection:
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
-                lambda: MagicMock(),
+                lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
                 "vibe3.orchestra.flow_dispatch.FlowManager",
@@ -82,7 +82,7 @@ class TestGovernanceSyncRunnerWithInjection:
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
-                lambda: MagicMock(),
+                lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
                 "vibe3.orchestra.flow_dispatch.FlowManager",
@@ -133,7 +133,7 @@ class TestGovernanceSyncRunnerWithInjection:
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
-                lambda: MagicMock(),
+                lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
                 "vibe3.orchestra.flow_dispatch.FlowManager",
@@ -202,7 +202,7 @@ class TestGovernanceAsyncRunnerWithInjection:
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
-                lambda: mock_config,
+                lambda *, target_repo=None: mock_config,
             )
             mock_store_ctx = MagicMock()
             mock_store = MagicMock()
@@ -246,7 +246,7 @@ class TestGovernanceAsyncRunnerWithInjection:
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
-                lambda: mock_config,
+                lambda *, target_repo=None: mock_config,
             )
             mock_store_ctx = MagicMock()
             mock_store = MagicMock()

@@ -7,11 +7,11 @@ from typing import Any, Callable, Literal
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.role_policy import RoleOutputContract
-from vibe3.execution.contracts import ExecutionRequest
-from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.execution.session_service import SessionRole
+from vibe3.models import IssueInfo, IssueState
+from vibe3.models.execution_request import ExecutionRequest
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.session_types import SessionRole
+from vibe3.models.worktree import WorktreeRequirement
 
 TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
 

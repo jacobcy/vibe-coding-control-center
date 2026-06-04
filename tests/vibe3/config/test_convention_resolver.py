@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.exceptions import GitError
-from vibe3.services.convention_resolver import ConventionResolver
 
 
 def test_resolver_returns_minimal_defaults_by_default():
@@ -55,6 +55,18 @@ def test_resolver_returns_minimal_when_profile_specified():
     convention = resolver.resolve()
     assert convention.branch.task_prefix == "issue-"
     assert convention.manager_usernames == ()
+
+
+def test_resolver_accepts_github_flow_without_unknown_profile_warning():
+    """Test github-flow is a known portable profile."""
+    resolver = ConventionResolver.from_repo(profile="github-flow")
+
+    with patch("vibe3.config.convention_resolver.logger.warning") as mock_warning:
+        convention = resolver.resolve()
+
+    assert convention.branch.task_prefix == "issue-"
+    assert convention.manager_usernames == ()
+    mock_warning.assert_not_called()
 
 
 def test_resolver_unknown_profile_falls_back_to_minimal():

@@ -17,7 +17,8 @@ Prompt Builders:
 - ``build_plan_prompt_body`` / ``make_plan_context_builder`` — plan agent
   prompt construction
 - ``build_run_prompt_body`` / ``make_run_context_builder`` /
-  ``make_skill_context_builder`` — run agent prompt construction
+  ``make_skill_context_builder`` / ``make_publish_context_builder`` — run
+  agent prompt construction
 - ``build_review_prompt_body`` / ``make_review_context_builder`` — review
   agent prompt construction
 - ``build_tools_guide_section`` — shared utility for building tools guide
@@ -33,9 +34,14 @@ Types:
 - ``PromptContextMode`` — literal type for prompt context mode
   (bootstrap/resume)
 - ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
+
+Backend Config:
+- ``sync_models_json`` — sync effective backend/model settings to
+  ``~/.codeagent/models.json``
 """
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.codeagent_config import sync_models_json
 from vibe3.agents.base import AgentBackend
 from vibe3.agents.models import (
     CodeagentCommand,
@@ -62,10 +68,11 @@ from vibe3.agents.run_prompt import (
     RunPromptMode,
     build_run_prompt_body,
     describe_run_plan_sections,
+    make_publish_context_builder,
     make_run_context_builder,
     make_skill_context_builder,
 )
-from vibe3.models.prompt_meta import PromptContextMode
+from vibe3.models import PromptContextMode
 
 __all__ = [
     # Protocols & Models
@@ -82,6 +89,7 @@ __all__ = [
     "build_run_prompt_body",
     "make_run_context_builder",
     "make_skill_context_builder",
+    "make_publish_context_builder",
     "build_review_prompt_body",
     "make_review_context_builder",
     "build_tools_guide_section",
@@ -94,4 +102,5 @@ __all__ = [
     # Types
     "PromptContextMode",
     "RunPromptMode",
+    "sync_models_json",
 ]

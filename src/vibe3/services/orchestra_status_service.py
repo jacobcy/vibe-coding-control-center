@@ -12,8 +12,8 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.models import IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService

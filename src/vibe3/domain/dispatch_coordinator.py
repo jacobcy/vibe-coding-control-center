@@ -20,16 +20,18 @@ from typing import TYPE_CHECKING, Callable, cast
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.domain import publish
 from vibe3.domain.protocols.dispatch_protocols import (
     IssueCollectionServiceProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
+from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
+from vibe3.observability.orchestra_log import append_orchestra_event
 
 # Note: orchestra internal services remain in orchestra layer
 # GlobalDispatchCoordinator depends on them via protocols
@@ -38,14 +40,12 @@ from vibe3.orchestra.issue_loader import (
     get_flow_context,
     load_issue,
 )
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
     FlowServiceProtocol,
     LabelDispatchCallable,
 )
-from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
@@ -182,7 +182,7 @@ class GlobalDispatchCoordinator:
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        from vibe3.domain.events import DomainEvent
+        from vibe3.domain.events.base import DomainEvent
 
         publish(
             cast(

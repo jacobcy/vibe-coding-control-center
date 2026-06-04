@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueInfo
+from vibe3.models import IssueInfo
 
 
 class IssueCollectionService:

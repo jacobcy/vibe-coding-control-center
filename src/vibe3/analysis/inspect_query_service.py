@@ -12,7 +12,6 @@ from typing import Union
 
 from loguru import logger
 
-from vibe3.analysis import dag_service as dag_service_module
 from vibe3.analysis.change_scope_service import (
     classify_changed_files,
     collect_changed_symbols,
@@ -27,6 +26,8 @@ from vibe3.models import (
     PRSource,
     UncommittedSource,
 )
+
+from . import dag_service as dag_service_module
 
 
 def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:

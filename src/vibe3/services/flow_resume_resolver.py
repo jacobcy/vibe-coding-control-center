@@ -4,8 +4,8 @@ Provides pure logic to infer the correct GitHub state label for a flow based
 on its local reference states (pr_ref, audit_ref, plan_ref, report_ref).
 """
 
+from vibe3.models import IssueState
 from vibe3.models.flow import FlowState
-from vibe3.models.orchestration import IssueState
 from vibe3.models.verdict_types import VerdictValue
 from vibe3.services.verdict_policy import passes_review
 

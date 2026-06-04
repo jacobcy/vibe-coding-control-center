@@ -51,6 +51,7 @@ class TestOrchestrationFacade:
         event = mock_publish.call_args.args[0]
         assert isinstance(event, GovernanceScanStarted)
         assert event.tick_count == 1
+        assert event.execution_count == 1  # First execution
 
         mock_publish.reset_mock()
         facade.on_heartbeat_tick()
@@ -58,6 +59,7 @@ class TestOrchestrationFacade:
         event2 = mock_publish.call_args.args[0]
         assert isinstance(event2, GovernanceScanStarted)
         assert event2.tick_count == 2
+        assert event2.execution_count == 2  # Second execution
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
@@ -128,7 +130,7 @@ class TestOrchestrationFacade:
         assert "Manual review required" in call_args.args[1]
 
     @pytest.mark.asyncio
-    @patch("vibe3.orchestra.logging.append_orchestra_event")
+    @patch("vibe3.observability.orchestra_log.append_orchestra_event")
     async def test_on_tick_blocks_dispatch_when_failed_gate_is_closed(
         self,
         mock_append_event: MagicMock,

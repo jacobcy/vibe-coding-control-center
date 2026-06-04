@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.queue_entry import QueueEntry
 from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
-from vibe3.orchestra.queue_entry import QueueEntry
 
 
 @pytest.fixture

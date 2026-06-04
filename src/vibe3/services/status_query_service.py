@@ -14,7 +14,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,
@@ -294,7 +294,6 @@ class StatusQueryService:
                 continue
 
             # Get blocked_by and blocked_reason from flow state
-            # (Note: failed_reason is deprecated, now unified to blocked_reason)
             blocked_by: tuple[int, ...] | None = None
             blocked_reason: str | None = None
             if state == IssueState.BLOCKED:
@@ -443,8 +442,7 @@ class StatusQueryService:
 
         Returns:
             List of resumable issue dicts with number, title, state, flow,
-            failed_reason (if applicable), and resume_kind ("failed",
-            "blocked", or "aborted")
+            and resume_kind ("failed", "blocked", or "aborted")
         """
         all_issues = self.fetch_orchestrated_issues(
             flows, queued_set=set(), stale_flows=stale_flows

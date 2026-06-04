@@ -15,7 +15,7 @@ from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.handler_registry import register_handler
-from vibe3.models.orchestration import IssueInfo
+from vibe3.models import IssueInfo
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ def handle_supervisor_issue_identified(
 ) -> None:
     """Dispatch supervisor apply via CLI self-invocation."""
     from vibe3.execution.issue_role_support import build_issue_async_cli_request
-    from vibe3.orchestra.logging import append_orchestra_event
+    from vibe3.observability.orchestra_log import append_orchestra_event
     from vibe3.roles.supervisor import SUPERVISOR_APPLY_ROLE
 
     config = load_orchestra_config()

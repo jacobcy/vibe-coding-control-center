@@ -6,13 +6,15 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.execution.contracts import ExecutionRequest
-from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.clients import SQLiteClient
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
-from vibe3.execution.session_service import SessionRole
-from vibe3.models.orchestration import IssueInfo
-from vibe3.models.review_runner import AgentOptions
+from vibe3.models import (
+    AgentOptions,
+    ExecutionRequest,
+    IssueInfo,
+    SessionRole,
+    WorktreeRequirement,
+)
 from vibe3.roles.definitions import IssueRoleSyncSpec as IssueRoleSyncSpecImpl
 
 

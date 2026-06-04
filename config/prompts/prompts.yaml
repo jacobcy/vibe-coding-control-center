@@ -432,6 +432,20 @@ run:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
+  # Static: executor exit contract for publish path (commit_mode).
+  # Used when executor is dispatched from state/merge-ready.
+  # Recipe section name: run.publish_exit_contract
+  publish_task: |
+    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/merge-ready"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
   # Static: coding-mode guidance.
   # Recipe section name: run.coding_task
   # Injected only for plan/flow_plan/lightweight executor modes.

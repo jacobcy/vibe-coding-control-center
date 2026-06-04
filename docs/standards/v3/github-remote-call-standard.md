@@ -1,7 +1,7 @@
 ---
 document_type: standard
 title: GitHub Remote Call Standard
-status: proposed
+status: active
 scope: github-remote-calls
 authority:
   - github-cli-boundary
@@ -10,7 +10,7 @@ authority:
   - github-project-write-rules
 author: GPT-5 Codex
 created: 2026-03-14
-last_updated: 2026-03-14
+last_updated: 2026-06-03
 related_docs:
   - docs/standards/v3/command-standard.md
   - docs/standards/vibe3-handoff-store-standard.md

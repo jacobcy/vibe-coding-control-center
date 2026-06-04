@@ -145,7 +145,7 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 - `agents/`: plan / run / review agent pipeline
 - `analysis/`: symbol、snapshot、change scope
-- `clients/`: Git、GitHub、SQLite、AI 客户端
+- `clients/`: 外部系统客户端（Git, GitHub, SQLite, Serena 等）
 - `commands/`: CLI 子命令
 - `config/`: 配置加载、Profile 管理与 Pydantic schema 验证
 - `domain/`: 领域事件与 handlers（events, handlers, orchestration_facade）
@@ -156,7 +156,6 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - `observability/`: 日志、链路追踪、审计
 - `orchestra/`: 多 issue / 多 flow 的事实观察、排队与调度入口
 - `prompts/`: prompt 组装与 provenance
-- `resources/`: 运行时资产与静态资源
 - `roles/`: 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/`: heartbeat、event bus、executor
 - `server/`: webhook、MCP、health check

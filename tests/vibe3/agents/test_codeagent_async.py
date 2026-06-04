@@ -109,6 +109,9 @@ class TestStartAsyncCommand:
     def test_start_async_command_embeds_env_overrides_in_tmux_command(
         self, monkeypatch, tmp_path
     ) -> None:
+        # Clean up environment pollution from previous tests
+        monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
         monkeypatch.setattr(
@@ -179,6 +182,9 @@ class TestStartAsyncCommand:
     def test_start_async_command_preserves_path_for_tmux_session(
         self, monkeypatch, tmp_path
     ) -> None:
+        # Clean up environment pollution from previous tests
+        monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
         monkeypatch.setattr(

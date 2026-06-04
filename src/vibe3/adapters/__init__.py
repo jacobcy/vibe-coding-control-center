@@ -34,6 +34,9 @@ def get_adapter(name: str) -> AdapterManifest | None:
     if name == "vibe-center" and "vibe-center" not in _LOADED:
         import vibe3.adapters.vibe_center  # noqa: F401
 
+    if name == "github-flow" and "github-flow" not in _LOADED:
+        import vibe3.adapters.github_flow  # noqa: F401
+
     return _ADAPTERS.get(name)
 
 

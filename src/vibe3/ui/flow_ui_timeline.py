@@ -226,17 +226,16 @@ def _render_event_refs(
 
     # Do not render log_path for temp/logs (tmux debug logs, not actionable)
 
-    # Render ref if not already in detail
-    ref = event.refs.get("ref")
-    detail_contains_ref = bool(
-        isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
-    )
-    if ref and isinstance(ref, str) and not detail_contains_ref:
-        # Use unified check_ref_exists for consistent worktree resolution
-        display_path, exists = check_ref_exists(ref, branch)
-        ref_cmd = ref_to_handoff_cmd(display_path, branch)
-        _ref_suffix = "" if exists else " [dim yellow](not found)[/]"
-        console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
+    # Render explicit *_ref fields (plan_ref, audit_ref, etc.)
+    # Skip generic "ref" field as it lacks type information
+    ref_keys = ["plan_ref", "report_ref", "audit_ref", "indicate_ref"]
+    for key in ref_keys:
+        ref_value = event.refs.get(key)
+        if ref_value and isinstance(ref_value, str):
+            display_path, exists = check_ref_exists(ref_value, branch)
+            ref_cmd = ref_to_handoff_cmd(display_path, branch, ref_field=key)
+            _ref_suffix = "" if exists else " [dim yellow](not found)[/]"
+            console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
 
 
 def _render_timeline(
@@ -339,7 +338,7 @@ def _render_refs(
 
             # Use unified check_ref_exists for consistent worktree resolution
             display_path, exists = check_ref_exists(val, state.branch)
-            ref_cmd = ref_to_handoff_cmd(display_path, state.branch)
+            ref_cmd = ref_to_handoff_cmd(display_path, state.branch, ref_field=label)
             _missing = "" if exists else " [dim yellow](not found)[/]"
             console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
 

@@ -181,8 +181,14 @@ def find_config_file() -> Path | None:
     return None
 
 
-def load_config(config_path: Path | None = None) -> VibeConfig:
-    """Load configuration from file or use defaults.
+def load_config(
+    config_path: Path | None = None, *, target_repo: Path | None = None
+) -> VibeConfig:
+    """Load configuration from file or use defaults (file layers only).
+
+    Merges configuration files in priority order. Does NOT apply environment
+    variable overrides — use get_config_with_env_override() or
+    load_runtime_config() for the full layering chain.
 
     Configuration layers (priority order):
     1. Explicit config_path (if provided)
@@ -193,6 +199,10 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
     Args:
         config_path: Optional explicit path to config file.
                      If None, searches standard locations.
+        target_repo: Optional target repository path for project config
+                     resolution. When provided, resolves .vibe/settings.yaml
+                     relative to this path instead of CWD. Useful for worktree
+                     or external directory invocation.
 
     Returns:
         VibeConfig instance with loaded or default values
@@ -214,7 +224,11 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
         # Determine the base config path
         # If explicit config_path is provided, treat it as highest priority
         # Otherwise, use repo fallback as base
-        repo_config_path = Path("config/v3/settings.yaml")
+        repo_config_path = (
+            target_repo / "config" / "v3" / "settings.yaml"
+            if target_repo is not None
+            else Path("config/v3/settings.yaml")
+        )
         if not repo_config_path.exists():
             repo_config_path = _vibe3_config_root() / "config" / "v3" / "settings.yaml"
 
@@ -229,7 +243,11 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
 
         # Load and merge other layers
         global_config_path = Path.home() / ".vibe" / "settings.yaml"
-        project_config_path = Path(".vibe/settings.yaml")
+        project_config_path = (
+            target_repo / ".vibe" / "settings.yaml"
+            if target_repo is not None
+            else Path(".vibe/settings.yaml")
+        )
 
         # Start with base config
         config_data = base_config_data
@@ -300,6 +318,39 @@ def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig
     return config.__class__.model_validate(overridden)
 
 
+def load_runtime_config(
+    *,
+    target_repo: Path | None = None,
+    cli_overrides: dict[str, Any] | None = None,
+) -> VibeConfig:
+    """Load runtime config with full layering: install -> global ->
+    project -> env -> CLI.
+
+    Single entry point for vibe3 plan/run/review/manager commands.
+    Combines load_config(), environment overrides, and CLI argument overrides
+    in the correct priority order.
+
+    Args:
+        target_repo: Optional target repository path for project config resolution.
+        cli_overrides: Optional dict of CLI override paths and values.
+                       Example: {"run.agent_config.backend": "codex"}
+
+    Returns:
+        VibeConfig with all layers applied
+    """
+    config = get_config_with_env_override(load_config(target_repo=target_repo))
+
+    if cli_overrides:
+        from vibe3.config.env_override import set_nested_value
+
+        data = config.model_dump()
+        for path, value in cli_overrides.items():
+            set_nested_value(data, path, value)
+        config = VibeConfig.model_validate(data)
+
+    return config
+
+
 # Global config instance (lazy loaded)
 _config: VibeConfig | None = None
 
@@ -358,10 +409,21 @@ def load_keys_env_fallback() -> None:
     # Try loading from standard locations
     from pathlib import Path
 
+    # Resolve project-local config/keys.env relative to repo root, not CWD
+    # Lazy import to avoid circular dependency with git_client
+    # (git_client imports from config module)
+    repo_root: Path | None = None
+    try:
+        from vibe3.clients.git_client import find_repo_root
+
+        repo_root = find_repo_root()
+    except SystemError:
+        pass
+
     keys_paths = [
-        Path("config/keys.env"),  # Project-local
-        Path.home() / ".vibe" / "config" / "keys.env",  # Global config
-        Path.home() / ".vibe" / "keys.env",  # Legacy global
+        (repo_root / "config" / "keys.env") if repo_root else Path("config/keys.env"),
+        Path.home() / ".vibe" / "config" / "keys.env",
+        Path.home() / ".vibe" / "keys.env",
     ]
 
     for keys_path in keys_paths:
@@ -400,6 +462,12 @@ def load_keys_env_fallback() -> None:
             continue
 
     # No keys.env found (this is OK, user might use direnv or manual exports)
+    # But warn if repo root detection failed and project config not found at CWD
+    if not repo_root and not Path("config/keys.env").exists():
+        logger.bind(domain="config").warning(
+            "Cannot detect repo root; project config/keys.env not found at CWD. "
+            "Set environment variables explicitly or run from project root."
+        )
     logger.bind(domain="config").debug(
         "No keys.env found in standard locations, using existing environment"
     )

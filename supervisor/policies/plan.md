@@ -55,6 +55,52 @@
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
+- 判断是否属于 Terminal Decision 场景（见下方「Planner Terminal Decision」小节）
+
+## Planner Terminal Decision
+
+plan agent 在规划前调研阶段，可能发现 issue 已无执行价值。此时必须产出明确的终局判断和证据，为 manager 提供高置信度决策依据。
+
+### 触发条件
+
+plan agent 通过以下证据之一确认 issue 已无执行价值：
+
+- **已修复**：当前代码、merged PR/commit、测试已覆盖 issue 要求
+- **已过时**：issue 依赖的模块/API/流程已被移除或替代
+- **明确重复**：已有另一个 issue/PR 覆盖同一目标
+
+### 标准输出契约
+
+plan agent 必须完成：
+
+1. **写 `[plan]` comment**，包含：
+   - 明确结论（"already-fixed" / "已过时" / "重复"）
+   - 具体证据（PR#、commit SHA、代码位置、测试引用）
+   - 验证命令（其他人可复现的 `gh`、`git`、`uv run pytest` 命令）
+
+2. **创建最小 plan_ref 文件**（`docs/plans/issue-<N>-<status>.md`），内容为：
+   - 标题标明 terminal 状态（如 `# Plan: already-fixed`）
+   - 证据摘要和验证命令
+
+3. **注册 plan_ref**：通过 `vibe3 handoff plan <path>` 注册
+
+4. **执行状态转换**：仍执行 `state/claimed → state/handoff` 转换（保持标准流程）
+
+### 禁止事项
+
+- ❌ plan agent 不得自行关闭 issue（close 决策权在 manager）
+- ❌ plan agent 不得跳过 plan_ref 注册（即使内容是 terminal 判断）
+- ❌ plan agent 不得跳过 `state/handoff` 状态转换
+
+### 与 manager Terminal Decision Contract 的对称关系
+
+plan agent 的 terminal finding 为 manager 提供**高置信度终局证据**，但：
+
+- manager 仍需独立验证（见 `supervisor/manager.md:655-659`）
+- plan agent 只做判断 + 证据输出，不做执行
+- close 决策权归属 manager，这是 plan 和 manager 的职责边界
+
+**关键**：Issue #1923 的根因之一就是 plan agent 跳过了 plan_ref 注册，导致 manager 在 `state/handoff` 无法找到 refs。即使 terminal 场景，plan_ref 注册也是强制要求。
 
 ## 环境变量/外部 API 语义验证
 
@@ -186,6 +232,45 @@ tmux display-message -p '#{session_name}'
    - 检查中间层 except 是否会吞没异常（导致目标处理器不可达）
    - 检查异常类型匹配（抛出类型与 except 捕获类型是否一致）
 3. **标注未验证风险**：如果无法确认中间层行为，用 handoff 记录"未验证：异常传播链中间层 X 可能吞没异常"
+
+#### 重构任务死代码清理范围声明
+
+对于重构类任务（标签包含 `type/refactor` 或标题含「重构」「refactor」），planner 必须显式声明死代码清理范围：
+
+**触发条件**：
+- 任务标签包含 `type/refactor`
+- 任务标题包含「重构」或「refactor」
+
+**强制声明要求**：
+
+Planner 必须在 plan 中显式回答以下问题之一：
+
+1. **本计划不包含死代码清理**（默认立场）
+   - 即使发现相关死代码，也不在当前 scope 内处理
+   - 用 `handoff append --kind finding` 记录发现的死代码，留给后续独立 issue
+
+2. **本计划包含死代码清理，范围为：`<具体文件:符号列表>`**
+   - 必须列出具体的符号名（函数、类、方法）
+   - 必须提供验证依据：`inspect symbols` 引用计数为零的证据
+   - 清理范围仅限于 plan 中显式列出的符号，不得扩展
+
+**禁止事项**：
+- ❌ 禁止「顺带清理」：如果 plan 没有显式声明死代码清理范围，executor 不得删除任何符号
+- ❌ 禁止在 plan scope 外纳入死代码清理任务
+- ❌ 禁止假设 executor 会「智能判断」哪些死代码该清理
+
+**声明模板**：
+
+```markdown
+## 死代码清理范围声明
+
+**选择以下一项**：
+
+- [ ] 本计划不包含死代码清理
+- [x] 本计划包含死代码清理，范围为：
+  - `src/vibe3/old_module.py:deprecated_function`（引用计数：0，验证命令：`vibe3 inspect symbols src/vibe3/old_module.py:deprecated_function`）
+  - `src/vibe3/legacy_service.py:OldClass`（引用计数：0，验证命令：`vibe3 inspect symbols src/vibe3/legacy_service.py:OldClass`）
+```
 
 ### 治理与 prompt 改动
 

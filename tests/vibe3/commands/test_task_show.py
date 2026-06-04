@@ -65,7 +65,9 @@ def test_task_show_renders_quick_summary(
     assert "Current Task" in output
     assert "Task:   #123  Task show quick summary" in output
     assert "Latest Work" in output
-    assert "notes/report.md" in output
+    # After refactor: ref displayed as handoff command, not path
+    assert "vibe3 handoff show" in output
+    assert "@report" in output
     assert "PR / CI" in output
     assert "#479" in output
     assert "pending" in output

@@ -9,7 +9,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.exceptions.error_severity import ErrorSeverity
-    from vibe3.execution.contracts import ExecutionLaunchResult
+    from vibe3.models.execution_request import ExecutionLaunchResult
 
 
 def has_recent_specific_error(

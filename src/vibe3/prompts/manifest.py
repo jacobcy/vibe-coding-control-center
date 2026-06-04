@@ -19,8 +19,8 @@ from vibe3.prompts.models import (
     PromptVariableSource,
     VariableSourceKind,
 )
-from vibe3.resources.diagnostics import diagnose_profile
-from vibe3.resources.runtime_assets import resolve_prompt_config
+from vibe3.utils.diagnostics import diagnose_profile
+from vibe3.utils.runtime_assets import resolve_prompt_config
 
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 

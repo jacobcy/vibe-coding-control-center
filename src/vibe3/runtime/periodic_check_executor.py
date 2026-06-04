@@ -9,7 +9,8 @@ Runs two phases on each interval tick:
 
 from loguru import logger
 
-from vibe3.runtime import PeriodicCheckConfig, append_orchestra_event
+from vibe3.config.orchestra_config import PeriodicCheckConfig
+from vibe3.orchestra.logging import append_orchestra_event
 
 
 async def execute_periodic_check(

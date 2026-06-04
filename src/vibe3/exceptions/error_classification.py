@@ -13,6 +13,7 @@ from loguru import logger
 from vibe3.exceptions import (
     AgentExecutionError,
     AgentPresetNotFoundError,
+    InvalidBranchLinkError,
     MissingResourceError,
 )
 from vibe3.exceptions.error_codes import (
@@ -27,6 +28,7 @@ from vibe3.exceptions.error_codes import (
     E_EXEC_FLOW_FAILURE,
     E_EXEC_NO_OUTPUT,
     E_EXEC_UNKNOWN,
+    E_INVALID_BRANCH_LINK,
     E_MODEL_CONFIG,
     E_MODEL_NOT_FOUND,
     E_MODEL_PERMISSION,
@@ -47,6 +49,7 @@ EXCEPTION_TO_ERROR_CODE: dict[type[BaseException], str] = {
     # vibe3 exceptions
     AgentExecutionError: E_EXEC_UNKNOWN,
     AgentPresetNotFoundError: E_MODEL_CONFIG,
+    InvalidBranchLinkError: E_INVALID_BRANCH_LINK,
     MissingResourceError: E_CONFIG_MISSING,
     # Runtime infrastructure errors
     GitHubAPIError: E_API_UNAVAILABLE,
@@ -318,6 +321,16 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         issue_action="record_only",
         gate_action="ignore",
         description="Capacity control skip (not an error)",
+    ),
+    E_INVALID_BRANCH_LINK: ErrorHandlingContract(
+        code=E_INVALID_BRANCH_LINK,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="threshold",
+        description="Invalid branch linked to issue in flow_issue_links",
     ),
 }
 

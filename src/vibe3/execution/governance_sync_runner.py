@@ -12,18 +12,19 @@ from typing import Callable
 from loguru import logger
 from typer import echo
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.agents import CodeagentBackend
+from vibe3.clients import get_store
+from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
+from vibe3.services import record_dispatch_failure_if_unexpected
 
 
 def run_governance_sync(
     *,
     tick_count: int,
+    execution_count: int = 0,
     material_override: str | None = None,
     dry_run: bool = False,
     show_prompt: bool = False,
@@ -39,6 +40,8 @@ def run_governance_sync(
 
     Args:
         tick_count: Tick number for governance material rotation
+        execution_count: Independent counter for material rotation
+            (resolves tick conflict)
         material_override: Optional governance role to override material rotation
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
@@ -57,7 +60,8 @@ def run_governance_sync(
 
         append_event = _ae
 
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     from vibe3.domain import FlowManager
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
@@ -73,12 +77,14 @@ def run_governance_sync(
         snapshot,
         config=config,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     render_result = governance_fns.render_prompt(
         config,
         snapshot_context,
         tick_count=tick_count,
+        execution_count=execution_count,
         material_override=material_override,
     )
     prompt_content = render_result.rendered_text
@@ -112,8 +118,7 @@ def run_governance_sync(
 
         # Log successful completion
         append_event(
-            f"governance scan completed tick={tick_count} "
-            f"exit_code={result.exit_code}"
+            f"governance scan completed tick={tick_count} exit_code={result.exit_code}"
         )
         logger.bind(domain="governance", tick=tick_count).success(
             f"Governance scan completed: {result.exit_code}"
@@ -137,7 +142,7 @@ def run_governance_sync(
             f"Governance scan failed: {error_code} - {exc}"
         )
         append_event(
-            f"governance scan failed tick={tick_count} " f"error={error_code}: {exc}"
+            f"governance scan failed tick={tick_count} error={error_code}: {exc}"
         )
 
         # Re-raise for CLI exit code handling
@@ -161,7 +166,7 @@ def run_governance_async(
         material_override: Optional governance role to override material rotation
         build_execution_name: Optional injected execution name builder (for decoupling)
     """
-    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.environment import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.issue_role_support import (
         resolve_async_cli_project_root,
@@ -178,7 +183,8 @@ def run_governance_async(
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
 
     # Check for concurrent governance sessions (same dedup logic as orchestra handler)
     with get_store() as store:
@@ -295,7 +301,6 @@ def run_governance_async(
         echo(message)
     elif result:
         append_governance_event(
-            f"governance dispatch skipped: tick={tick_count} "
-            f"reason={result.reason}",
+            f"governance dispatch skipped: tick={tick_count} reason={result.reason}",
         )
         echo(f"Governance scan skipped: {result.reason}")

@@ -3,6 +3,7 @@
 Tests for core run_qualify_gate, qualify_blocked_issue, and dependency checking.
 Remote coordination and blocked state tests are in test_qualify_gate_remote.py
 and test_qualify_gate_service_calls.py respectively.
+GitHub closed-state (Step 0) tests are in test_qualify_gate_closed.py.
 """
 
 from unittest.mock import MagicMock, Mock, patch

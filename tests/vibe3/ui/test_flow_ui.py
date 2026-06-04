@@ -28,7 +28,7 @@ def test_render_flow_timeline_shows_run_lifecycle_events(capsys) -> None:
             event_type="run_completed",
             actor="executor",
             detail="Run completed (status: completed)",
-            refs={"ref": "/tmp/run-report.md"},
+            refs={"report_ref": "docs/reports/run-report.md"},
         ),
     ]
 
@@ -38,7 +38,7 @@ def test_render_flow_timeline_shows_run_lifecycle_events(capsys) -> None:
     assert "run_started" in output
     assert "in_progress" in output
     assert "run_completed" in output
-    assert "/tmp/run-report.md" in output
+    assert "vibe3 handoff show" in output or "docs/reports/run-report.md" in output
 
 
 def test_render_flow_timeline_shows_verdict_without_duplicate_audit_ref(
@@ -84,7 +84,7 @@ def test_render_flow_timeline_prefers_handoff_ref_over_log_path(capsys) -> None:
             actor="opencode/my-provider/gpt-4o",
             detail="Run completed: run-2026-04-22T14:24:02.md",
             refs={
-                "ref": artifact_path,
+                "report_ref": artifact_path,
                 "log_path": log_path,
                 "session_id": "ses_bad",
             },
@@ -94,8 +94,8 @@ def test_render_flow_timeline_prefers_handoff_ref_over_log_path(capsys) -> None:
     render_flow_timeline(state, events)
 
     output = capsys.readouterr().out
-    # After refactor: should show alias instead of full path
-    assert "@task-issue-304-a97faeda" in output
+    # After refactor: shared artifact shows as @report alias, not full path
+    assert "vibe3 handoff show @report" in output
     assert artifact_path not in output
     assert log_path not in output
 

@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Any, cast
 
+from vibe3.models import IssueState
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
@@ -52,9 +52,13 @@ def fetch_task_status_data(
     snapshot_found = orch_snapshot is not None
 
     if not orch_snapshot:
-        from vibe3.server.registry import _validate_pid_file
+        from vibe3.runtime.orchestra_instance import (
+            read_instance_info,
+            validate_instance,
+        )
 
-        _, pid_alive = _validate_pid_file(config.pid_file)
+        info = read_instance_info(config.pid_file)
+        pid_alive = validate_instance(info) if info else False
         if pid_alive:
             time.sleep(0.5)
             orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)

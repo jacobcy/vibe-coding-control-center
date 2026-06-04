@@ -11,7 +11,7 @@ from vibe3.clients.github_labels import GhIssueLabelPort
 from vibe3.models.orchestra_config import OrchestraConfig
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestration import IssueInfo
+    from vibe3.models import IssueInfo
     from vibe3.roles import TriggerableRoleDefinition
 
 

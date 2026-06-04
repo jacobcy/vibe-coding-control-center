@@ -9,9 +9,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.exceptions import InvalidBranchLinkError
+from vibe3.models import IssueState
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
@@ -103,6 +104,15 @@ class TaskService:
                     for flow in task_flows
                     if str(flow.get("branch") or "").strip() != normalized_branch
                 ]
+
+        # Guard: prevent base branches from being linked to issues
+        base_branch = self._get_orchestra_config().scene_base_ref.replace("origin/", "")
+        if normalized_branch == base_branch or normalized_branch in (
+            "main",
+            "master",
+            "develop",
+        ):
+            raise InvalidBranchLinkError(normalized_branch, issue_number)
 
         # Now add the new link
         self.store.add_issue_link(normalized_branch, issue_number, role)

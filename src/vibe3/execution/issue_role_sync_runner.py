@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import typer
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.agents import CodeagentBackend
+from vibe3.clients import GitClient, SQLiteClient
+from vibe3.config import load_orchestra_config
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
-from vibe3.services.actor_support import format_agent_actor
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services import (
+    format_agent_actor,
+    load_issue_info,
+    record_dispatch_failure_if_unexpected,
+)
+from vibe3.services.branch_arg import resolve_branch_arg
 
 
 def run_issue_role_async(
@@ -21,6 +24,7 @@ def run_issue_role_async(
     issue_number: int,
     dry_run: bool,
     spec: IssueRoleSyncSpec,
+    branch: str | None = None,
 ) -> None:
     """Run a role asynchronously via tmux wrapper.
 
@@ -28,12 +32,16 @@ def run_issue_role_async(
     The tmux child then re-enters the sync execution path locally.
     See docs/standards/vibe3-execution-paths-standard.md.
     """
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    current_branch = GitClient().get_current_branch()
-    branch = spec.resolve_branch(store, issue_number, current_branch)
+    if branch is not None:
+        branch = resolve_branch_arg(branch)
+    else:
+        current_branch = GitClient().get_current_branch()
+        branch = spec.resolve_branch(store, issue_number, current_branch)
 
     options = spec.resolve_options(config)
     actor = format_agent_actor(options)
@@ -99,6 +107,8 @@ def run_issue_role_async(
             raise typer.Exit(1) from exc
 
     typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (async dry-run)")
+    typer.echo(f"   branch: {branch}")
+    typer.echo(f"   actor:  {actor}")
 
 
 def run_issue_role_sync(
@@ -108,6 +118,7 @@ def run_issue_role_sync(
     fresh_session: bool,
     show_prompt: bool,
     spec: IssueRoleSyncSpec,
+    branch: str | None = None,
 ) -> None:
     """Run a role synchronously (direct execution without tmux wrapper).
 
@@ -116,12 +127,16 @@ def run_issue_role_sync(
     the same lifecycle / handoff / pre-gate / no-op shell is used.
     See docs/standards/vibe3-execution-paths-standard.md.
     """
-    config = load_orchestra_config()
+    repo = resolve_orchestra_repo_root()
+    config = load_orchestra_config(target_repo=repo)
     issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
-    current_branch = GitClient().get_current_branch()
-    branch = spec.resolve_branch(store, issue_number, current_branch)
+    if branch is not None:
+        branch = resolve_branch_arg(branch)
+    else:
+        current_branch = GitClient().get_current_branch()
+        branch = spec.resolve_branch(store, issue_number, current_branch)
     flow_state = store.get_flow_state(branch) if branch else None
     session_id = (
         None if fresh_session else load_session_id(spec.role_name, branch=branch)
@@ -153,6 +168,8 @@ def run_issue_role_sync(
 
     if dry_run:
         typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (dry-run)")
+        typer.echo(f"   branch: {branch}")
+        typer.echo(f"   actor:  {actor}")
         return
 
     if not sync_result.launched:

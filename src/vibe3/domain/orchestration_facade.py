@@ -17,8 +17,8 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.models import IssueInfo
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.runtime import ServiceBase
 
 if TYPE_CHECKING:
@@ -78,6 +78,9 @@ class OrchestrationFacade(ServiceBase):
                 creating a new one on each tick.
         """
         self._tick_count = tick_count
+        self._governance_execution_count = (
+            0  # Independent counter for material rotation
+        )
         self._config = config or load_orchestra_config()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
@@ -146,7 +149,7 @@ class OrchestrationFacade(ServiceBase):
         Args:
             tick_id: Current tick number from HeartbeatServer (default: 0)
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         self.on_heartbeat_tick()
 
@@ -258,10 +261,16 @@ class OrchestrationFacade(ServiceBase):
         # Update timestamp when actually emitting event
         self._last_governance_started_at = time.monotonic()
 
-        event = GovernanceScanStarted(tick_count=tick_count)
+        # Increment governance execution count for material rotation
+        self._governance_execution_count += 1
+
+        event = GovernanceScanStarted(
+            tick_count=tick_count, execution_count=self._governance_execution_count
+        )
         logger.bind(
             domain="orchestration_facade",
             tick_count=tick_count,
+            execution_count=self._governance_execution_count,
         ).info("Emitting GovernanceScanStarted event")
         publish(event)
 

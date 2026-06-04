@@ -8,6 +8,7 @@ set -euo pipefail
 INSTALL_DIR="$HOME/.vibe"
 SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 [[ -f "$SOURCE_ROOT/lib/utils.sh" ]] && source "$SOURCE_ROOT/lib/utils.sh" || { echo "error: missing lib/utils.sh"; exit 1; }
+[[ -f "$SOURCE_ROOT/lib/install_utils.sh" ]] && source "$SOURCE_ROOT/lib/install_utils.sh"
 
 # --- Help ---
 _usage() {
@@ -160,7 +161,7 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_D
 
 # 3. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib lib3 config scripts alias src skills; do
+for dir in bin lib lib3 config scripts alias src skills supervisor; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
@@ -173,6 +174,32 @@ for file in pyproject.toml uv.lock; do
 done
 log_success "Core modules synced"
 
+# 3.5 Clean stale files in synced directories
+_clean_stale_in_dir() {
+    local src_dir="$1"
+    local dst_dir="$2"
+    local cleaned=0
+    while IFS= read -r -d '' file; do
+        local rel_path="${file#$dst_dir/}"
+        local src_path="$src_dir/$rel_path"
+        if [[ ! -e "$src_path" ]]; then
+            rm -f "$file"
+            cleaned=$((cleaned + 1))
+        fi
+    done < <(find "$dst_dir" -type f -print0 2>/dev/null)
+    # Clean empty directories left behind
+    find "$dst_dir" -type d -empty -delete 2>/dev/null || true
+    if [[ $cleaned -gt 0 ]]; then
+        log_info "Cleaned $cleaned stale file(s)"
+    fi
+}
+
+for dir in bin lib lib3 config scripts src skills supervisor; do
+    if [[ -d "$SOURCE_ROOT/$dir" && -d "$INSTALL_DIR/$dir" ]]; then
+        _clean_stale_in_dir "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir"
+    fi
+done
+
 # NOTE: install.sh only handles first-time setup (bootstrap).
 # Subsequent global updates use: vibe update
 # Project/worktree initialization uses: scripts/init.sh
@@ -184,24 +211,8 @@ if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
     chmod 600 "$INSTALL_DIR/config/keys.env"
 fi
 
-# 4.5 Sync runtime assets (policies)
-log_info "Syncing runtime assets..."
-if [[ -d "$SOURCE_ROOT/.agent/policies" ]]; then
-    mkdir -p "$INSTALL_DIR/assets/policies"
-    cp -R "$SOURCE_ROOT/.agent/policies/." "$INSTALL_DIR/assets/policies/"
-    log_success "Runtime assets (policies) synced"
-else
-    log_warn "No .agent/policies directory found, skipping runtime assets sync"
-fi
-
-# 4.5b Sync prompt templates
-if [[ -d "$SOURCE_ROOT/config/prompts" ]]; then
-    mkdir -p "$INSTALL_DIR/assets/prompts"
-    cp -R "$SOURCE_ROOT/config/prompts/." "$INSTALL_DIR/assets/prompts/"
-    log_success "Prompt templates synced"
-else
-    log_warn "No config/prompts directory found, skipping prompt templates sync"
-fi
+# 4.5 Runtime assets (supervisor/policies, config/prompts) are now synced as core components
+# No separate sync needed - supervisor/ and config/ are in the core sync list above
 
 # 4.6 Generate global settings.yaml with path overrides
 if [[ ! -f "$INSTALL_DIR/settings.yaml" ]]; then
@@ -213,10 +224,10 @@ if [[ ! -f "$INSTALL_DIR/settings.yaml" ]]; then
 # 项目级配置（.vibe/settings.yaml）优先级高于此文件
 
 # Paths Configuration
-# 安装后运行时资源路径（覆盖 repo 默认的 .agent/policies 和 config/prompts）
+# Canonical runtime asset paths (synced from supervisor/ and config/)
 paths:
-  policies_root: "$HOME/.vibe/assets/policies"
-  prompts_root: "$HOME/.vibe/assets/prompts"
+  policies_root: "$HOME/.vibe/supervisor/policies"
+  prompts_root: "$HOME/.vibe/config/prompts"
 
 # 其他配置项继承自 repo 的 config/v3/settings.yaml
 EOF
@@ -224,6 +235,8 @@ EOF
     sed -i.bak "s|\$HOME|$HOME|g" "$INSTALL_DIR/settings.yaml" && rm -f "$INSTALL_DIR/settings.yaml.bak"
     chmod 644 "$INSTALL_DIR/settings.yaml"
     log_success "Global settings.yaml generated"
+else
+    _migrate_settings_yaml_paths "$INSTALL_DIR"
 fi
 
 # 4.7 Sync canonical skills manifest
@@ -348,6 +361,9 @@ if [[ -f "$SOURCE_ROOT/scripts/init.sh" ]]; then
             bash "$SOURCE_ROOT/scripts/init.sh"
     ) || log_warn "Project initialization failed during install; you can rerun zsh scripts/init.sh later."
 fi
+
+# 8.5 Sanity check: verify critical runtime assets
+_check_runtime_assets "$INSTALL_DIR"
 
 # 9. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"

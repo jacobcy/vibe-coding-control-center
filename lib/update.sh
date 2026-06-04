@@ -6,6 +6,7 @@ set -euo pipefail
 
 # Load config and utils
 source "${0:A:h}/config.sh"
+source "${0:A:h}/install_utils.sh"
 
 vibe_update() {
     local command="${1:-help}"
@@ -148,6 +149,12 @@ _update_run() {
             fi
         fi
     fi
+
+    # Migrate stale paths in existing settings.yaml
+    _migrate_settings_yaml_paths "$INSTALL_DIR"
+
+    # Sanity check: verify critical runtime assets
+    _check_runtime_assets "$INSTALL_DIR" || true
 
     log_success "Global update complete!"
     echo ""

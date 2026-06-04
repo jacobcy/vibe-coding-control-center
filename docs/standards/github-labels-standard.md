@@ -1,7 +1,7 @@
 # GitHub 标签标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-30
+**最后更新**: 2026-06-03
 **状态**: Active
 **文档类型**: 标准规范
 
@@ -33,7 +33,7 @@
 | SQLite `flow_issue_links.issue_role` | issue 与 flow 的关系真源 | 本地存储，离线可用 |
 | GitHub `state/*` labels | 编排状态真源 | 多 agent 协作状态 |
 | GitHub `roadmap/*` labels | 路线图规划真源 | 迭代规划状态 |
-| GitHub `priority/*` labels | 优先级真源 | 紧急度排序 |
+| GitHub `priority/*` labels | 优先级真源 | 优先级排序 |
 | GitHub `vibe-task` | 可视化辅助标签 | 辅助 Project 视图识别 Flow 任务 |
 | GitHub Project | UI 展示 | 不是真源 |
 
@@ -43,7 +43,7 @@
 2. **`task/related/dependency` 是关系，不是状态**
 3. **`state/*` 是状态，不是类型**
 4. **`roadmap/*` 是规划，不是执行状态**
-5. **`priority/*` 是紧急度，不是规划**
+5. **`priority/*` 是优先级，不是规划**
 6. 不允许再引入 `repo` 旧语义
 
 ---
@@ -162,6 +162,7 @@
 | `state/claimed` | 已认领，待进入执行 | 已认领，准备执行 |
 | `state/in-progress` | 执行中 | 正在执行 |
 | `state/blocked` | 阻塞中 | 被阻塞，无法继续 |
+| `state/failed` | 执行失败 | 执行过程中发生不可恢复错误，需要人工干预 |
 | `state/handoff` | 待交接 | 需要交接 |
 | `state/review` | 待 review | 等待 review |
 | `state/merge-ready` | 已满足合并条件 | 可合并 |

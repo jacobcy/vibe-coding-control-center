@@ -22,6 +22,7 @@ CRITICAL_ENV_PASSTHROUGH = {
     "SHELL",
     "TMPDIR",
     "USER",
+    "VIBE3_ASYNC_CHILD",
 }
 
 

@@ -68,27 +68,11 @@ def show(
         bool, typer.Option("--show-all", help="Show orchestra actor events")
     ] = False,
     actor_filter: ActorFilterOption = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="[DEPRECATED] Use --format json instead",
-            hidden=True,
-        ),
-    ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
     validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
-
-    # Handle deprecated --json flag
-    if json_output and output_format == "table":
-        typer.echo(
-            "Warning: --json is deprecated, use --format json instead",
-            err=True,
-        )
-        output_format = "json"
 
     service = FlowService()
 
@@ -307,14 +291,6 @@ def status(
     output_format: FormatOption = "table",
     trace: TraceOption = False,
     min_ms: TraceMinMsOption = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="[DEPRECATED] Use --format json instead",
-            hidden=True,
-        ),
-    ] = False,
 ) -> None:
     """Show dashboard of all active flows.
 
@@ -324,13 +300,6 @@ def status(
     if trace:
         enable_method_trace(min_ms=min_ms)
 
-    # Handle deprecated --json flag
-    if json_output and output_format == "table":
-        typer.echo(
-            "Warning: --json is deprecated, use --format json instead",
-            err=True,
-        )
-        output_format = "json"
     if check:
         run_full_check_shortcut()
 

@@ -217,7 +217,8 @@ def render_task_show(
         latest_ref = task_result.latest_ref
         worktree_root = task.worktree_root if hasattr(task, "worktree_root") else None
         display_ref = resolve_ref_path(latest_ref.ref, worktree_root)
-        ref_cmd = ref_to_handoff_cmd(display_ref, task.branch)
+        ref_field = f"{latest_ref.kind}_ref"
+        ref_cmd = ref_to_handoff_cmd(display_ref, task.branch, ref_field)
         console.print("\n[bold]Latest Work[/]")
         console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
 

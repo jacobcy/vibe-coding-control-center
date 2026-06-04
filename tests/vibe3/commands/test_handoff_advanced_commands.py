@@ -14,16 +14,21 @@ class TestHandoffAdvancedCommands:
     """Tests for advanced handoff CLI commands."""
 
     def test_to_handoff_cmd_wraps_relative_refs(self):
-        # Canonical refs get alias substitution
-        assert _to_handoff_cmd("docs/plans/test-plan.md") == "vibe3 handoff show @plan"
-        # Shared artifacts get @ prefix
+        # Canonical refs get alias substitution (now requires ref_field)
         assert (
-            _to_handoff_cmd("vibe3/handoff/task-123/current.md")
-            == "vibe3 handoff show @task-123/current.md"
+            _to_handoff_cmd("docs/plans/test-plan.md", ref_field="plan_ref")
+            == "vibe3 handoff show @plan"
+        )
+        # Shared artifacts get @ alias (not full path)
+        assert (
+            _to_handoff_cmd("vibe3/handoff/task-123/current.md", ref_field="report_ref")
+            == "vibe3 handoff show @report"
         )
         # Canonical ref with branch uses --branch flag and alias
         assert (
-            _to_handoff_cmd("docs/plans/test-plan.md", branch="task/issue-123")
+            _to_handoff_cmd(
+                "docs/plans/test-plan.md", branch="task/issue-123", ref_field="plan_ref"
+            )
             == "vibe3 handoff show --branch task/issue-123 @plan"
         )
 

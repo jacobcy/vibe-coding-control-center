@@ -5,11 +5,7 @@ Events for governance service lifecycle and periodic scans.
 
 from dataclasses import dataclass
 
-# Import base class from parent module
-from vibe3.domain.events import DomainEvent as _DomainEvent
-
-# Re-export for convenience
-DomainEvent = _DomainEvent
+from .base import DomainEvent
 
 
 @dataclass(frozen=True)
@@ -20,6 +16,7 @@ class GovernanceScanStarted(DomainEvent):
     """
 
     tick_count: int
+    execution_count: int = 0  # Independent counter for material rotation
     actor: str = "system:governance"
     timestamp: str | None = None
 

@@ -13,10 +13,10 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models import IssueInfo, IssueState
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
@@ -60,6 +60,31 @@ class QualifyGateService:
         self._convention = resolver.resolve()
         self._coordination_resolver = CoordinationResolver(store=store)
 
+    def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:
+        """Terminalize local flow for a GitHub-closed issue."""
+        if not branch:
+            logger.debug(
+                "qualify_gate: no branch for closed issue "
+                f"#{issue.number}, skipping terminalization"
+            )
+            return
+
+        from vibe3.observability.orchestra_log import append_orchestra_event
+
+        append_orchestra_event(
+            "dispatcher",
+            f"qualify_gate skip (#{issue.number}): "
+            "issue closed on GitHub — terminalizing local flow",
+        )
+        from vibe3.services.flow_cleanup_service import FlowCleanupService
+
+        FlowCleanupService(store=self._store).cleanup_flow_scene(
+            branch,
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
     def run_qualify_gate(
         self,
         issue: IssueInfo,
@@ -71,6 +96,7 @@ class QualifyGateService:
         """Run the Qualify Gate for an issue to resolve dependencies and blocking.
 
         Decision order:
+        0. GitHub closed check (ALL states)
         1. Resolve body/local truth
         2. Align blocked cache/label if needed
         3. If still blocked after alignment, skip
@@ -87,6 +113,11 @@ class QualifyGateService:
             Target IssueState if the issue passes the gate and can be dispatched,
             None if the issue is blocked and should be skipped.
         """
+        # Step 0: GitHub closed check (ALL states)
+        if issue.github_state and issue.github_state.upper() == "CLOSED":
+            self._terminalize_closed_issue(issue, branch)
+            return None
+
         # Step 1: Resolve body/local truth (remote-first)
         truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
 
@@ -148,25 +179,11 @@ class QualifyGateService:
         Returns:
             Target IssueState to dispatch to, or None if still blocked.
         """
-        from vibe3.orchestra.logging import append_orchestra_event
 
         if issue.github_state and issue.github_state.upper() == "CLOSED":
             flow = self._flow_manager.get_flow_for_issue(issue.number)
             branch = str(flow.get("branch") or "").strip() if flow else ""
-            if branch:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"qualify_gate skip_blocked (#{issue.number}): "
-                    "issue closed on GitHub — terminalizing local flow",
-                )
-                from vibe3.services.flow_cleanup_service import FlowCleanupService
-
-                FlowCleanupService(store=self._store).cleanup_flow_scene(
-                    branch,
-                    include_remote=False,
-                    terminate_sessions=True,
-                    keep_flow_record=True,
-                )
+            self._terminalize_closed_issue(issue, branch)
             return None
 
         flow = self._flow_manager.get_flow_for_issue(issue.number)
@@ -197,7 +214,7 @@ class QualifyGateService:
         Ensures local flow_state has flow_status='blocked' and blocked fields
         match the remote truth. Adds state/blocked label if missing.
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
         from vibe3.services.blocked_state_service import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
@@ -312,7 +329,7 @@ class QualifyGateService:
         Clears local blocked cache and removes state/blocked label.
         """
         from vibe3.models.flow import FlowState
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -372,7 +389,7 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
-        from vibe3.orchestra.logging import append_orchestra_event
+        from vibe3.observability.orchestra_log import append_orchestra_event
 
         worktree_path = truth.worktree_path
         if not worktree_path or not isinstance(worktree_path, str):

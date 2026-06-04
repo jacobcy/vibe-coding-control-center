@@ -3,19 +3,45 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.roles.run_command import resolve_skill_path
-from vibe3.services.convention_resolver import ConventionResolver
+import pytest
+
+from vibe3.agents.models import CodeagentResult
+from vibe3.config.convention_resolver import ConventionResolver
+from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+from vibe3.roles.run_command import execute_manual_run, resolve_skill_path
+
+
+def _get_adapter_for_profile(profile_config):
+    """Return a focused adapter stub for profile lookup tests."""
+    if profile_config.profile != "vibe-center":
+        return None
+    return AdapterManifest(
+        name="vibe-center",
+        version="3.0.0",
+        description="Focused adapter stub for run command tests",
+        resources=[
+            AdapterResource(
+                type="skill",
+                name="vibe-commit",
+                path="skills/vibe-commit/SKILL.md",
+            )
+        ],
+    )
 
 
 def test_skill_path_uses_profile():
     """Test skill lookup uses profile resolution."""
-    resolver = ConventionResolver(profile="vibe-center")
-    path = resolve_skill_path("vibe-commit", resolver)
+    with patch(
+        "vibe3.config.profile_config.ProfileConfig._get_adapter",
+        _get_adapter_for_profile,
+    ):
+        resolver = ConventionResolver(profile="vibe-center")
+        path = resolve_skill_path("vibe-commit", resolver)
+        resolver_minimal = ConventionResolver(profile="minimal")
+        path_minimal = resolve_skill_path("vibe-commit", resolver_minimal)
+
     assert path is not None
     assert "skills/vibe-commit/SKILL.md" in path
-
-    resolver_minimal = ConventionResolver(profile="minimal")
-    path_minimal = resolve_skill_path("vibe-commit", resolver_minimal)
     assert path_minimal is None
 
 
@@ -34,9 +60,54 @@ def test_skill_path_without_resolver_uses_default(monkeypatch):
     """
     # Force vibe-center profile to make test deterministic
     monkeypatch.setenv("VIBE_PROFILE", "vibe-center")
-    path = resolve_skill_path("vibe-commit")
+    with patch(
+        "vibe3.config.profile_config.ProfileConfig._get_adapter",
+        _get_adapter_for_profile,
+    ):
+        path = resolve_skill_path("vibe-commit")
     assert path is not None
     assert "skills/vibe-commit/SKILL.md" in path
+
+
+def test_execute_manual_run_reads_skill_from_real_repo_root_under_git_isolation(
+    monkeypatch,
+) -> None:
+    """Skill execution should not trust an isolated git common dir for resources."""
+    monkeypatch.chdir(Path.cwd() / "src")
+
+    captured_prompt: dict[str, str] = {}
+
+    def fake_execute_sync(command):
+        captured_prompt["text"] = command.context_builder()
+        return CodeagentResult(success=True)
+
+    with (
+        patch(
+            "vibe3.roles.run_command.resolve_skill_path",
+            return_value="skills/vibe-commit/SKILL.md",
+        ),
+        patch("vibe3.roles.run_command.CodeagentExecutionService") as mock_service_cls,
+    ):
+        mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+        result = execute_manual_run(
+            config=MagicMock(),
+            branch="task/issue-1885",
+            issue_number=1885,
+            instructions=None,
+            plan_file=None,
+            skill="vibe-commit",
+            summary=MagicMock(),
+            dry_run=False,
+            no_async=True,
+            show_prompt=False,
+            agent=None,
+            backend=None,
+            model=None,
+        )
+
+    assert result == CodeagentResult(success=True)
+    assert "vibe-commit" in captured_prompt["text"]
 
 
 class TestDispatchRunCommandAsyncWorktreeRequirement:
@@ -102,3 +173,243 @@ class TestDispatchRunCommandAsyncWorktreeRequirement:
             exec_request = mock_coord.dispatch_execution.call_args[0][0]
             assert exec_request.worktree_requirement == WorktreeRequirement.PERMANENT
             assert exec_request.target_id == 0
+
+
+class TestPublishPathDetection:
+    """Tests for commit_mode publish path detection and graceful degradation."""
+
+    @pytest.mark.parametrize(
+        "commit_mode,expected_publish",
+        [
+            (True, True),
+            (False, False),
+            ("true", False),  # string should be rejected
+            ("false", False),  # string should be rejected
+            (1, False),  # int should be rejected
+            (0, False),  # int should be rejected
+            (None, False),  # None should be rejected
+        ],
+    )
+    def test_commit_mode_type_validation(
+        self, commit_mode: object, expected_publish: bool
+    ) -> None:
+        """Test that only boolean commit_mode triggers publish path."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            # Capture the generated prompt content
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_publish_context_builder"
+            ) as mock_publish_builder,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock flow_state with commit_mode
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = {
+                "commit_mode": commit_mode,
+            }
+
+            # Mock context builders to return identifiable content
+            mock_publish_builder.return_value = lambda: "PUBLISH_CONTEXT"
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        # Verify correct context builder was selected
+        if expected_publish:
+            assert captured_prompt["text"] == "PUBLISH_CONTEXT"
+            mock_publish_builder.assert_called_once()
+        else:
+            assert captured_prompt["text"] == "SKILL_CONTEXT"
+            mock_skill_builder.assert_called_once()
+
+    def test_graceful_fallback_on_flow_state_error(self) -> None:
+        """Test that flow_state errors fall back to skill builder safely."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock SQLiteClient to raise exception on get_flow_state
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.side_effect = Exception("DB connection error")
+
+            # Mock skill builder to return identifiable content
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        # Should fall back to skill builder (safe default)
+        assert captured_prompt["text"] == "SKILL_CONTEXT"
+        mock_skill_builder.assert_called_once()
+
+    def test_graceful_fallback_on_missing_flow_state(self) -> None:
+        """Test that missing flow_state (None) falls back to skill builder."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock SQLiteClient to return None (no flow_state)
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = None
+
+            # Mock skill builder to return identifiable content
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        # Should use skill builder when flow_state is missing
+        assert captured_prompt["text"] == "SKILL_CONTEXT"
+        mock_skill_builder.assert_called_once()
+
+    def test_manual_publish_flag_uses_publish_context(self) -> None:
+        """Test that --publish flag uses publish context builder (manual channel)."""
+        captured_prompt: dict[str, str] = {}
+
+        def fake_execute_sync(command):
+            captured_prompt["text"] = command.context_builder()
+            return CodeagentResult(success=True)
+
+        with (
+            patch(
+                "vibe3.roles.run_command.resolve_skill_path",
+                return_value="skills/vibe-commit/SKILL.md",
+            ),
+            patch(
+                "vibe3.roles.run_command.CodeagentExecutionService"
+            ) as mock_service_cls,
+            patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+            patch(
+                "vibe3.roles.run_command.make_publish_context_builder"
+            ) as mock_publish_builder,
+            patch(
+                "vibe3.roles.run_command.make_skill_context_builder"
+            ) as mock_skill_builder,
+        ):
+            mock_service_cls.return_value.execute_sync.side_effect = fake_execute_sync
+
+            # Mock flow_state - no commit_mode (manual channel doesn't need it)
+            mock_sqlite = MagicMock()
+            mock_sqlite_cls.return_value = mock_sqlite
+            mock_sqlite.get_flow_state.return_value = None
+
+            # Mock context builders to return identifiable content
+            mock_publish_builder.return_value = lambda: "PUBLISH_CONTEXT"
+            mock_skill_builder.return_value = lambda: "SKILL_CONTEXT"
+
+            execute_manual_run(
+                config=MagicMock(),
+                branch="task/issue-42",
+                issue_number=42,
+                instructions=None,
+                plan_file=None,
+                skill="vibe-commit",
+                summary=MagicMock(),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+                publish=True,  # Manual channel: explicit --publish flag
+            )
+
+        # Should use publish builder when --publish flag is set
+        assert captured_prompt["text"] == "PUBLISH_CONTEXT"
+        mock_publish_builder.assert_called_once()
+        # Should NOT call skill builder
+        mock_skill_builder.assert_not_called()

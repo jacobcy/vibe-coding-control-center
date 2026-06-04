@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-04-20
+last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -52,9 +52,38 @@ related_docs:
 
 禁止把不同维度的术语当作同一层概念使用。
 
-## 3. Shared-State Terms
+## 3. Architecture Tiers
 
-### 3.1 GitHub Issue
+### 3.0.1 Tier 3 (Cognitive / Governance Layer)
+
+- 正式术语：`Tier 3`
+- 别称：`认知治理层`、`Cognitive Layer`、`Governance Layer`
+- 定义：负责全局策略、规则、Supervisor 治理的系统层级。
+- 核心命令：`serve`, `scan`, `check`, `mcp`
+- 执行层级：L0/L1 (无 worktree)，L2 (临时 worktree)
+- 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
+
+### 3.0.2 Tier 2 (Skill Layer)
+
+- 正式术语：`Tier 2`
+- 别称：`技能层`、`编排层`、`Skill Layer`
+- 定义：负责 Flow 状态机、任务编排、Agent 执行的系统层级。
+- 核心命令：`flow`, `task`, `run`, `plan`, `review`
+- 执行层级：L3 (持久 worktree)
+- 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
+
+### 3.0.3 Tier 1 (Shell Layer)
+
+- 正式术语：`Tier 1`
+- 别称：`壳层`、`原子能力层`、`Shell Layer`
+- 定义：提供原子级能力访问、状态读取与项目信息检索的系统层级。
+- 核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`
+- 执行层级：L3/L4 (原子工具)
+- 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
+
+## 4. Shared-State Terms
+
+### 4.1 GitHub Issue
 
 - 正式术语：`GitHub issue` 或简称 `issue`
 - 别称：无（不再使用 “repo issue”）
@@ -466,7 +495,17 @@ related_docs:
   - 不决定执行哪个角色。
 - 落点：`src/vibe3/environment/`
 
-### 5.6 `调度`
+### 5.6 Clients 层
+
+- 正式术语：`Clients 层`
+- 别称：`客户端层`
+- 定义：负责与外部系统（Git, GitHub, SQLite, Serena 等）进行物理通信的适配与操作层。
+- 边界：
+  - 不负责业务逻辑判断。
+  - 不直接持有全局状态，仅作为原子操作的代理。
+- 落点：`src/vibe3/clients/`
+
+### 5.7 `调度`
 
 - 正式术语：`调度`
 - 别称：无
@@ -479,7 +518,7 @@ related_docs:
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
-### 5.7 `编排`
+### 5.8 `编排`
 
 - 正式术语：`编排`
 - 别称：无
@@ -492,7 +531,7 @@ related_docs:
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
-### 5.8 `执行代理`
+### 5.9 `执行代理`
 
 - 正式术语：`执行代理`
 - 别称：`执行器`
@@ -508,7 +547,7 @@ related_docs:
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
 
-### 5.9 Role Adapters (角色适配器)
+### 5.10 Role Adapters (角色适配器)
 
 - 正式术语：`Role Adapters`
 - 别称：`Skill 层`, `胶水层`
@@ -554,7 +593,7 @@ related_docs:
   - `Manager` 的清理能力不等于默认自动收口 workflow
   - **不再复写通用执行框架，其执行动作应交由 Execution 层**。
 - 落点：
-  - Python 模块：`src/vibe3/manager/`
+  - Python 模块：`src/vibe3/roles/manager.py`（Manager 角色定义）
   - Skill: `skills/vibe-manager/SKILL.md`
 
 ### 5.10 `Shell 能力层`
@@ -754,6 +793,35 @@ related_docs:
   - `initiated_by` 回答“什么发起了流程”，与 `actor` 维度不同。
 - 落点：
   - SQLite `flow_state` 中的 `initiated_by` 字段。
+
+### 8.5 `FailedGate`
+
+- 正式术语：`FailedGate`
+- 别称：`失败门禁`
+- 定义：Orchestra 系统中的失败门禁机制，当执行过程中发生基础设施错误或连续失败达到阈值时触发，阻止继续派发新任务。
+- 边界：
+  - `FailedGate` 属于 ERROR 系统，记录执行错误但不直接改变 `flow_status`。
+  - `FailedGate` 触发后，系统暂停调度，需要人工干预或通过 `vibe3 serve resume` 清除。
+- 落点：
+  - SQLite `error_log` 表记录错误详情。
+  - Orchestra Driver 定期检查 FailedGate 状态。
+- 使用规则：
+  - 讨论系统级错误防护、自动恢复机制时使用 `FailedGate`。
+  - 区别于 `blocked` 状态（BLOCK 系统）。
+
+### 8.6 `QualifyGate`
+
+- 正式术语：`QualifyGate`
+- 别称：`合格门禁`
+- 定义：Orchestra 系统中的合格门禁机制，用于检查 Flow 是否满足继续推进的条件（如依赖满足、阻塞解除）。
+- 边界：
+  - `QualifyGate` 检查 `blocked_reason` 是否存在，以及依赖 issue 是否已关闭。
+  - 通过 `QualifyGate` 后，Flow 自动恢复到正确状态（如从 `blocked` → `active`）。
+- 落点：
+  - Orchestra Heartbeat 每轮轮询时检查 QualifyGate。
+  - 自动恢复逻辑见 [command-standard.md](v3/command-standard.md)。
+- 使用规则：
+  - 讨论自动恢复、依赖解除时使用 `QualifyGate`。
 
 ## 9. Common Confusions
 

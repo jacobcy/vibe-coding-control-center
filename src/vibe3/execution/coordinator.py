@@ -9,22 +9,20 @@ from typing import Generator, Optional
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.environment.worktree import WorktreeManager
+from vibe3.clients import BackendProtocol, SQLiteClient
+from vibe3.environment import SessionRegistryService, WorktreeManager
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
-from vibe3.execution.contracts import (
+from vibe3.execution.contracts import _StartAsyncFactory
+from vibe3.execution.execution_lifecycle import execution_prefix
+from vibe3.models import (
     ExecutionLaunchResult,
     ExecutionRequest,
-    _StartAsyncFactory,
+    OrchestraConfig,
+    WorktreeRequirement,
 )
-from vibe3.execution.execution_lifecycle import execution_prefix
-from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra import append_orchestra_event
 
 # Reason code invariant for duplicate session handling:
 #
