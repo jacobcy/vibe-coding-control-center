@@ -40,15 +40,23 @@ class FlowRebuildUsecase:
         if orchestrator is not None:
             self.orchestrator = orchestrator
         else:
-            from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+            try:
+                from vibe3.services.flow_orchestrator_service import (
+                    FlowOrchestratorService,
+                )
 
-            config = load_orchestra_config()
-            self.orchestrator = FlowOrchestratorService(
-                config,
-                store=self.store,
-                git=self.git_client,
-                github=self.github_client,
-            )
+                config = load_orchestra_config()
+                self.orchestrator = FlowOrchestratorService(
+                    config,
+                    store=self.store,
+                    git=self.git_client,
+                    github=self.github_client,
+                )
+            except ImportError as e:
+                raise SystemError(
+                    f"Failed to import FlowOrchestratorService: {e}. "
+                    "Provide orchestrator parameter explicitly."
+                ) from e
         self._label_resume = label_resume or self._default_label_resume
 
     def rebuild_issue_flow(

@@ -31,6 +31,16 @@ class FlowBootstrapProtocol(Protocol):
     ) -> dict[str, Any]:
         """Bootstrap a flow for an issue.
 
+        Default values (matched by concrete implementation):
+            slug: None (resolved to issue-{number})
+            source: "dispatch"
+            actor: None
+            initiated_by: None
+            ensure_worktree: False
+            reactivate_existing: False
+            related_issue_numbers: ()
+            dependency_issue_numbers: ()
+
         Args:
             issue: The issue to create a flow for
             branch: Target branch name
