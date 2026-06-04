@@ -226,9 +226,9 @@ class TestGovernanceAsyncRunnerWithInjection:
                 build_execution_name=lambda tick: f"governance-tick-{tick}",
             )
 
-        # The lazy import path will still call append_governance_event
-        # from orchestra.logging. We can't easily mock it without importing,
-        # so we skip the assertion (verification is done via integration tests)
+        # append_governance_event is a local import inside run_governance_async
+        # and not injected, so we can't mock it via setattr. We skip the
+        # assertion (verification is done via integration tests)
 
     def test_skip_when_circuit_breaker_open(self) -> None:
         """Async dispatch should be skipped when circuit breaker is open."""
@@ -285,6 +285,6 @@ class TestGovernanceAsyncRunnerWithInjection:
                 build_execution_name=lambda tick: f"governance-tick-{tick}",
             )
 
-        # The lazy import path will still call append_governance_event
-        # from orchestra.logging. We can't easily mock it without importing,
-        # so we skip the assertion (verification is done via integration tests)
+        # append_governance_event is a local import inside run_governance_async
+        # and not injected, so we can't mock it via setattr. We skip the
+        # assertion (verification is done via integration tests)
