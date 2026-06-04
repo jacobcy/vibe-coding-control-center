@@ -174,6 +174,17 @@ class SerenaError(SystemError):
         self.operation = operation
 
 
+class InvalidBranchLinkError(SystemError):
+    """Invalid branch linked to issue in flow_issue_links table.
+
+    This error is raised when a base branch (main, master, develop) is
+    incorrectly linked to an issue number, which would cause dispatcher
+    failures when trying to create worktrees for these branches.
+    """
+
+    error_code = "E_INVALID_BRANCH_LINK"
+
+
 # ========== Business Errors ==========
 
 
@@ -251,6 +262,7 @@ __all__ = [
     "GitError",
     "GitHubError",
     "SerenaError",
+    "InvalidBranchLinkError",
     "PRNotFoundError",
     "CapacityDeferredError",
     "InvalidTransitionError",
