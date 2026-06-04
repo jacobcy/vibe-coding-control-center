@@ -63,7 +63,7 @@ class TestHandoffAdvancedCommands:
     def test_handoff_append_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff append command."""
         mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service.get_current_branch.return_value = "task/issue-123"
         mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
@@ -89,7 +89,7 @@ class TestHandoffAdvancedCommands:
             "Need to align event taxonomy",
             "codex/gpt-5.4",
             "finding",
-            branch="task/test-branch",
+            branch="task/issue-123",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -97,7 +97,7 @@ class TestHandoffAdvancedCommands:
     def test_handoff_plan_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff plan command."""
         mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service.get_current_branch.return_value = "task/issue-123"
         mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
@@ -120,7 +120,7 @@ class TestHandoffAdvancedCommands:
         mock_service.record_plan.assert_called_once_with(
             "docs/plans/test-plan.md",
             "claude/sonnet-4.6",
-            branch="task/test-branch",
+            branch="task/issue-123",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -128,7 +128,7 @@ class TestHandoffAdvancedCommands:
     def test_handoff_report_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff report command."""
         mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service.get_current_branch.return_value = "task/issue-123"
         mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
@@ -151,7 +151,7 @@ class TestHandoffAdvancedCommands:
         mock_service.record_report.assert_called_once_with(
             "docs/reports/test-report.md",
             "claude/sonnet-4.6",
-            branch="task/test-branch",
+            branch="task/issue-123",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -159,7 +159,7 @@ class TestHandoffAdvancedCommands:
     def test_handoff_audit_command(self, mock_flow_service_class, mock_service_class):
         """Test handoff audit command."""
         mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service.get_current_branch.return_value = "task/issue-123"
         mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
@@ -182,7 +182,7 @@ class TestHandoffAdvancedCommands:
         mock_service.record_audit.assert_called_once_with(
             "docs/audits/test-audit.md",
             "claude/sonnet-4.6",
-            branch="task/test-branch",
+            branch="task/issue-123",
         )
 
     def test_handoff_plan_rejects_legacy_next_step_option(self):

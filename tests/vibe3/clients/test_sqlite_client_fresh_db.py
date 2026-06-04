@@ -33,14 +33,14 @@ def test_update_flow_state_success_on_fresh_db(tmp_path):
 
     # Should NOT raise OperationalError
     client.update_flow_state(
-        "task/test",
+        "task/issue-999",
         flow_slug="test",
         flow_status="active",
     )
 
-    state = client.get_flow_state("task/test")
+    state = client.get_flow_state("task/issue-999")
     assert state is not None
-    assert state["branch"] == "task/test"
+    assert state["branch"] == "task/issue-999"
     assert state["flow_slug"] == "test"
 
 

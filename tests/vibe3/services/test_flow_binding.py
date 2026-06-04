@@ -64,7 +64,7 @@ class TestFlowBinding:
         service = TaskService(store=mock_store)
 
         result = service.reclassify_issue(
-            "debug/vibe-server-fix",
+            "dev/issue-467",
             467,
             old_role="task",
             new_role="related",
@@ -72,17 +72,17 @@ class TestFlowBinding:
 
         assert result.issue_role == "related"
         mock_store.update_issue_link_role.assert_called_once_with(
-            "debug/vibe-server-fix",
+            "dev/issue-467",
             467,
             "task",
             "related",
         )
         mock_store.update_flow_state.assert_called_once_with(
-            "debug/vibe-server-fix",
+            "dev/issue-467",
             latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
-            "debug/vibe-server-fix",
+            "dev/issue-467",
             "issue_reclassified",
             "test-actor",
             "Issue #467 reclassified: task -> related",
@@ -94,7 +94,7 @@ class TestFlowBinding:
         mock_store.get_events.return_value = []
         mock_store.update_issue_link_role.return_value = True
         mock_store.get_flows_by_issue.return_value = [
-            {"branch": "debug/new-attempt", "flow_status": "active"},
+            {"branch": "dev/issue-467-v2", "flow_status": "active"},
             {"branch": "task/issue-467", "flow_status": "active"},
         ]
         mock_github = MagicMock()
@@ -131,7 +131,7 @@ class TestFlowBinding:
         )
 
         result = service.link_issue(
-            branch="debug/new-attempt",
+            branch="dev/issue-467-v2",
             issue_number=467,
             role="task",
             actor="codex/gpt-5.4",
@@ -172,7 +172,7 @@ class TestFlowBinding:
         mock_store.update_issue_link_role.return_value = True
         mock_store.get_flows_by_issue.return_value = [
             {"branch": "task/issue-467", "flow_status": "active"},
-            {"branch": "debug/vibe-server-fix", "flow_status": "done"},
+            {"branch": "dev/issue-467", "flow_status": "done"},
         ]
         mock_github = MagicMock()
         mock_label_port = MagicMock()
@@ -195,7 +195,7 @@ class TestFlowBinding:
         )
 
         mock_store.update_issue_link_role.assert_called_once_with(
-            "debug/vibe-server-fix",
+            "dev/issue-467",
             467,
             "task",
             "related",

@@ -11,7 +11,7 @@ def test_flow_projection_basic():
     """Test basic projection creation from local flow state."""
     mock_flow_service = MagicMock()
     mock_flow_status = FlowStatusResponse(
-        branch="task/test-branch",
+        branch="task/issue-123",
         flow_slug="test-branch",
         flow_status="active",
         task_issue_number=123,
@@ -30,9 +30,9 @@ def test_flow_projection_basic():
         pr_service=mock_pr_service,
     )
 
-    projection = service.get_projection("task/test-branch", include_remote=False)
+    projection = service.get_projection("task/issue-123", include_remote=False)
 
-    assert projection.branch == "task/test-branch"
+    assert projection.branch == "task/issue-123"
     assert projection.flow_slug == "test-branch"
     assert projection.flow_status == "active"
     assert projection.task_issue_number == 123
@@ -48,7 +48,7 @@ def test_flow_projection_with_remote_pr_data():
     """Test projection with remote PR data."""
     mock_flow_service = MagicMock()
     mock_flow_status = FlowStatusResponse(
-        branch="task/test-branch",
+        branch="task/issue-123",
         flow_slug="test-branch",
         flow_status="active",
         task_issue_number=123,
@@ -62,7 +62,7 @@ def test_flow_projection_with_remote_pr_data():
         state=PRState.OPEN,
         draft=False,
         url="https://github.com/test/repo/pull/456",
-        head_branch="task/test-branch",
+        head_branch="task/issue-123",
         base_branch="main",
         body="PR body",
         created_at="2024-01-01T00:00:00Z",
@@ -76,13 +76,13 @@ def test_flow_projection_with_remote_pr_data():
         pr_service=mock_pr_service,
     )
 
-    projection = service.get_projection("task/test-branch")
+    projection = service.get_projection("task/issue-123")
 
     assert projection.pr_number == 456
     assert projection.pr_status == "OPEN"
     assert projection.pr_is_draft is False
     assert projection.pr_url == "https://github.com/test/repo/pull/456"
-    mock_pr_service.get_branch_pr_status.assert_called_once_with("task/test-branch")
+    mock_pr_service.get_branch_pr_status.assert_called_once_with("task/issue-123")
 
 
 def test_get_issue_titles_uses_actual_flow_branch():

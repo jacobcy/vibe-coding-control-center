@@ -32,7 +32,7 @@ def mock_git_client_base() -> Generator[None, None, None]:
         ),
         patch(
             "vibe3.clients.git_client.GitClient.get_current_branch",
-            return_value="task/test-branch",
+            return_value="task/issue-123",
         ),
     ):
         yield
@@ -130,7 +130,7 @@ def mock_flow_service() -> MagicMock:
         patch("vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service)
     """
     service = MagicMock()
-    service.get_current_branch.return_value = "task/test-branch"
+    service.get_current_branch.return_value = "task/issue-123"
     service.store = MagicMock()
     return service
 
@@ -144,7 +144,7 @@ def mock_git_client() -> MagicMock:
         patch("vibe3.services.branch_arg.GitClient", return_value=mock_git_client)
     """
     client = MagicMock()
-    client.get_current_branch.return_value = "task/test-branch"
+    client.get_current_branch.return_value = "task/issue-123"
     client.get_git_common_dir.return_value = "/tmp/.git"
     client.get_worktree_root.return_value = "/tmp"
     return client
@@ -198,7 +198,7 @@ def mock_status_result() -> HandoffStatusResult:
 def mock_flow_status_response() -> FlowStatusResponse:
     """Create a default FlowStatusResponse for testing."""
     return FlowStatusResponse(
-        branch="task/test-branch",
+        branch="task/issue-123",
         state=FlowState.ACTIVE,
         flow_id="test-flow",
         created_at="2024-01-01T00:00:00Z",

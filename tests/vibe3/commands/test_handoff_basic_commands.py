@@ -23,7 +23,7 @@ class TestHandoffBasicCommands:
     ):
         """Test handoff init command."""
         mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service.get_current_branch.return_value = "task/issue-123"
         mock_flow_service_class.return_value = mock_flow_service
 
         mock_service = MagicMock()
@@ -39,7 +39,7 @@ class TestHandoffBasicCommands:
         assert "✓" in result.output
         assert "Handoff file ready" in result.output
         mock_service.storage.ensure_current_handoff.assert_called_once_with(
-            force=expected_force, branch="task/test-branch"
+            force=expected_force, branch="task/issue-123"
         )
 
     @patch("vibe3.commands.handoff_read.HandoffStatusService")

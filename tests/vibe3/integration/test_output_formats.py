@@ -18,7 +18,7 @@ def stub_pr_show_service(monkeypatch):
     target = SimpleNamespace(
         pr_number=123,
         branch=None,
-        current_branch="task/test",
+        current_branch="task/issue-999",
         from_flow=False,
     )
     pr = SimpleNamespace(
@@ -26,7 +26,7 @@ def stub_pr_show_service(monkeypatch):
         title="Test PR",
         body="Body",
         state="open",
-        head_branch="task/test",
+        head_branch="task/issue-999",
         base_branch="main",
         url="https://example.test/pr/123",
         draft=True,
@@ -35,7 +35,7 @@ def stub_pr_show_service(monkeypatch):
             "title": "Test PR",
             "body": "Body",
             "state": "open",
-            "head_branch": "task/test",
+            "head_branch": "task/issue-999",
             "base_branch": "main",
             "url": "https://example.test/pr/123",
             "draft": True,

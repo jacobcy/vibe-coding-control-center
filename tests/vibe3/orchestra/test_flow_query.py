@@ -26,12 +26,12 @@ class TestFlowQuery:
         with patch.object(
             manager.store,
             "get_flows_by_issue",
-            return_value=[{"branch": "task/test", "pr_number": 123}],
+            return_value=[{"branch": "task/issue-999", "pr_number": 123}],
         ):
             flow = manager.get_flow_for_issue(42)
 
         assert flow is not None
-        assert flow["branch"] == "task/test"
+        assert flow["branch"] == "task/issue-999"
 
     def test_get_flow_for_issue_prefers_active_canonical_flow(self):
         config = OrchestraConfig()
@@ -41,7 +41,7 @@ class TestFlowQuery:
             manager.store,
             "get_flows_by_issue",
             return_value=[
-                {"branch": "debug/vibe-server-fix", "flow_status": "done"},
+                {"branch": "dev/issue-467", "flow_status": "done"},
                 {"branch": "task/issue-467", "flow_status": "active"},
             ],
         ):
@@ -66,7 +66,7 @@ class TestFlowQuery:
         with patch.object(
             manager,
             "get_flow_for_issue",
-            return_value={"branch": "task/test", "pr_number": 789},
+            return_value={"branch": "task/issue-999", "pr_number": 789},
         ):
             pr_number = manager.get_pr_for_issue(42)
 

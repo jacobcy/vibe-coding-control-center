@@ -126,7 +126,7 @@ class TestIssueFlowServiceFlowLookup:
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
 
-            debug_branch = "debug/vibe-server-fix"
+            debug_branch = "dev/issue-467"
             canonical_branch = "task/issue-467"
 
             store.update_flow_state(

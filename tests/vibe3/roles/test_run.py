@@ -275,10 +275,7 @@ class TestEnsurePlanFileExists:
 
         def mock_resolve(target, branch=None, git_client=None):
             calls.append((target, branch))
-            if (
-                str(target) == "docs/plans/test-plan.md"
-                and branch == "task/test-branch"
-            ):
+            if str(target) == "docs/plans/test-plan.md" and branch == "task/issue-123":
                 return plan_file
             raise FileNotFoundError(f"Mock: {target}")
 
@@ -289,8 +286,8 @@ class TestEnsurePlanFileExists:
         )
 
         # Should call resolve_handoff_target with branch
-        ensure_plan_file_exists("docs/plans/test-plan.md", branch="task/test-branch")
+        ensure_plan_file_exists("docs/plans/test-plan.md", branch="task/issue-123")
 
         # Verify it was called with correct args
         assert len(calls) == 1
-        assert calls[0] == ("docs/plans/test-plan.md", "task/test-branch")
+        assert calls[0] == ("docs/plans/test-plan.md", "task/issue-123")
