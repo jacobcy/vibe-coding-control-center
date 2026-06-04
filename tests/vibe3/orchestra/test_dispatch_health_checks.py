@@ -37,16 +37,24 @@ def _setup_health_check_service(
     coordinator: "GlobalDispatchCoordinator",
     check_service: MagicMock,
     store: MagicMock,
-) -> None:
+    flow_blocker: MagicMock | None = None,
+) -> MagicMock:
     """Helper to re-create health check service with mocked dependencies."""
+    from unittest.mock import MagicMock
+
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+
+    # Use provided flow_blocker or create default mock
+    if flow_blocker is None:
+        flow_blocker = MagicMock()
 
     coordinator._health_check_service = DispatchHealthCheckService(
         check_service=check_service,
-        flow_blocker=coordinator._flow_blocker,
+        flow_blocker=flow_blocker,
         store=store,
         flow_context_resolver=coordinator._flow_context,
     )
+    return flow_blocker
 
 
 class TestPreDispatchHealthChecks:
@@ -110,8 +118,9 @@ class TestPreDispatchHealthChecks:
 
         # Mock FlowService to verify block_flow call
         mock_flow_blocker = MagicMock()
-        coordinator._flow_blocker = mock_flow_blocker
-        _setup_health_check_service(coordinator, mock_check_service, store)
+        _setup_health_check_service(
+            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
+        )
 
         result = coordinator._health_check_service.check_issue_health(issue)
 
@@ -423,8 +432,9 @@ class TestPreDispatchHealthChecks:
 
         # Mock FlowService to verify block_flow call
         mock_flow_blocker = MagicMock()
-        coordinator._flow_blocker = mock_flow_blocker
-        _setup_health_check_service(coordinator, mock_check_service, store)
+        _setup_health_check_service(
+            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
+        )
 
         result = coordinator._health_check_service.check_issue_health(issue)
 
@@ -493,9 +503,9 @@ class TestPreDispatchHealthChecks:
 
         # Mock FlowService.block_flow to ensure it's NOT called
         mock_flow_blocker = MagicMock()
-        coordinator._flow_blocker = mock_flow_blocker
-
-        _setup_health_check_service(coordinator, mock_check_service, store)
+        _setup_health_check_service(
+            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
+        )
         result = coordinator._health_check_service.check_issue_health(issue)
 
         # Assert - block_flow should NOT be called for transient errors
