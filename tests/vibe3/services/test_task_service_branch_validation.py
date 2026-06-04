@@ -89,3 +89,25 @@ def test_link_issue_accepts_valid_branch(tmp_path, monkeypatch):
     assert result.branch == "task/issue-999"
     assert result.issue_number == 999
     assert result.issue_role == "task"
+
+
+def test_link_issue_rejects_custom_protected_branch(tmp_path, monkeypatch):
+    """link_issue raises InvalidBranchLinkError for custom protected branch."""
+    from vibe3.config.settings import FlowConfig, VibeConfig
+
+    custom_config = VibeConfig(
+        flow=FlowConfig(protected_branches=["staging", "production"])
+    )
+    monkeypatch.setattr(VibeConfig, "get_defaults", lambda: custom_config)
+
+    db_path = tmp_path / "fresh.db"
+    store = SQLiteClient(db_path=str(db_path))
+    service = TaskService(
+        store=store,
+        orchestra_config=OrchestraConfig(scene_base_ref="origin/main"),
+    )
+
+    with pytest.raises(InvalidBranchLinkError) as exc_info:
+        service.link_issue("staging", 999, role="task")
+
+    assert exc_info.value.branch == "staging"
