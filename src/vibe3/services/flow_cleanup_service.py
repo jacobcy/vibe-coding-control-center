@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients import BackendProtocol
+
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.git_client import GitClient
@@ -50,6 +52,7 @@ class FlowCleanupService:
         flow_service: FlowService | None = None,
         issue_flow_service: IssueFlowService | None = None,
         pr_service: PRService | None = None,
+        backend: BackendProtocol | None = None,
     ) -> None:
         """Initialize flow cleanup service.
 
@@ -58,6 +61,7 @@ class FlowCleanupService:
             store: SQLite client for database operations
             flow_service: Service for flow lifecycle
             issue_flow_service: Service for issue-flow mapping
+            backend: Backend protocol for tmux session checks
         """
         from vibe3.clients import SQLiteClient
         from vibe3.clients.git_client import GitClient
@@ -67,6 +71,7 @@ class FlowCleanupService:
         self._flow_service = flow_service
         self._issue_flow_service = issue_flow_service
         self._pr_service = pr_service
+        self._backend = backend
 
     @property
     def flow_service(self) -> FlowService:
@@ -329,10 +334,9 @@ class FlowCleanupService:
         # DEFENSIVE LAYER 2: Query runtime_session table for live sessions
         # This catches race conditions where sessions started after pre-filter
         try:
-            from vibe3.agents import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
 
-            backend = CodeagentBackend()
+            backend = self._backend
             registry = SessionRegistryService(store=self.store, backend=backend)
             live_sessions = registry.get_truly_live_sessions_for_branch(branch)
 

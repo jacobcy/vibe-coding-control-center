@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
+from vibe3.clients import BackendProtocol
 from vibe3.exceptions import UserError
 from vibe3.models import IssueState
 
@@ -33,12 +34,14 @@ class TaskResumeOperations:
         flow_service: FlowService,
         label_service: LabelService,
         issue_flow_service: IssueFlowService,
+        backend: BackendProtocol | None = None,
     ) -> None:
         self.git_client = git_client
         self.github_client = github_client
         self.flow_service = flow_service
         self.label_service = label_service
         self.issue_flow_service = issue_flow_service
+        self._backend = backend
 
     def reset_issue_to_ready(
         self,
@@ -92,12 +95,15 @@ class TaskResumeOperations:
         emit_progress("recovery complete", status="done")
 
     def _guard_no_live_sessions(self, branch: str) -> None:
-        from vibe3.agents import CodeagentBackend
+        if self._backend is None:
+            # Skip session check if backend not provided (e.g., manual CLI use)
+            return
+
         from vibe3.environment.session_registry import SessionRegistryService
 
         registry = SessionRegistryService(
             store=self.flow_service.store,
-            backend=CodeagentBackend(),
+            backend=self._backend,
         )
         live_sessions = registry.get_truly_live_sessions_for_branch(branch)
         if live_sessions:
