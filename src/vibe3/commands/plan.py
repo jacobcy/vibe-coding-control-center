@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from vibe3.agents import create_codeagent_command, make_plan_context_builder
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
@@ -12,6 +13,8 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.config.settings import VibeConfig
+from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.roles.plan import (
     execute_spec_plan_async,
     execute_spec_plan_sync,
@@ -78,6 +81,23 @@ def _plan_for_branch(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
+    # Handle dry_run early return
+    if dry_run:
+        cfg = VibeConfig.get_defaults()
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=make_plan_context_builder(spec_input.request, cfg),
+            task=spec_input.request.task_guidance,
+            dry_run=True,
+            show_prompt=show_prompt,
+            handoff_kind="plan",
+            branch=branch,
+            issue_number=issue_number,
+            config=cfg,
+        )
+        CodeagentExecutionService(cfg).execute_sync(command)
+        return
+
     if no_async:
         execute_spec_plan_sync(
             request=spec_input.request,
@@ -85,12 +105,14 @@ def _plan_for_branch(
             branch=branch,
         )
     else:
-        execute_spec_plan_async(
+        result = execute_spec_plan_async(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
             cli_args=["plan"],
         )
+        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"log: {result.log_path}")
 
 
 def _plan_spec_impl(
@@ -99,6 +121,7 @@ def _plan_spec_impl(
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
 ) -> None:
     """Create implementation plan from a specification file."""
     if trace:
@@ -173,10 +196,6 @@ def _plan_spec_impl(
             spec_file = Path(flow.spec_ref)
             typer.echo(f"Using flow spec: {flow.spec_ref}")
 
-    if dry_run:
-        typer.echo("Plan dry run for specification")
-        return
-
     issue_number = flow.task_issue_number
 
     if not issue_number:
@@ -195,6 +214,23 @@ def _plan_spec_impl(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
+    # Handle dry_run early return
+    if dry_run:
+        cfg = VibeConfig.get_defaults()
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=make_plan_context_builder(spec_input.request, cfg),
+            task=spec_input.request.task_guidance,
+            dry_run=True,
+            show_prompt=show_prompt,
+            handoff_kind="plan",
+            branch=branch,
+            issue_number=issue_number,
+            config=cfg,
+        )
+        CodeagentExecutionService(cfg).execute_sync(command)
+        return
+
     if no_async:
         execute_spec_plan_sync(
             request=spec_input.request,
@@ -203,7 +239,7 @@ def _plan_spec_impl(
         )
     else:
         spec_arg = str(spec_path) if spec_path else None
-        execute_spec_plan_async(
+        result = execute_spec_plan_async(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
@@ -212,6 +248,8 @@ def _plan_spec_impl(
                 *(["--spec", spec_arg] if spec_arg else []),
             ],
         )
+        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"log: {result.log_path}")
 
 
 @app.callback(invoke_without_command=True)
@@ -253,6 +291,7 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
         )
         return
 

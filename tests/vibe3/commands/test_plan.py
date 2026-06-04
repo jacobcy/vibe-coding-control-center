@@ -166,3 +166,100 @@ def test_plan_issue_subcommand_works(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["issue", "42"])
     assert result.exit_code == 0
     mock_runner.assert_called_once()
+
+
+def test_plan_dry_run_branch(monkeypatch) -> None:
+    """Test plan --branch --dry-run returns exit_code=0 without async dispatch."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_async = MagicMock()
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    # Mock create_codeagent_command and CodeagentExecutionService
+    mock_command = MagicMock()
+    mock_result = MagicMock()
+    mock_result.success = True
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+    monkeypatch.setattr("vibe3.commands.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.CodeagentExecutionService",
+        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--dry-run"])
+    assert result.exit_code == 0
+    # Should NOT call async dispatch
+    mock_async.assert_not_called()
+    # Should create command with dry_run=True
+    mock_command.assert_called_once()
+    call_kwargs = mock_command.call_args[1]
+    assert call_kwargs["dry_run"] is True
+
+
+def test_plan_show_prompt_propagates(monkeypatch) -> None:
+    """Test plan --branch --dry-run --show-prompt passes show_prompt=True."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_resolve = MagicMock()
+
+    # Mock create_codeagent_command and CodeagentExecutionService
+    mock_command = MagicMock()
+    mock_result = MagicMock()
+    mock_result.success = True
+
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+    monkeypatch.setattr("vibe3.commands.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.CodeagentExecutionService",
+        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--dry-run", "--show-prompt"])
+    assert result.exit_code == 0
+    # Should create command with show_prompt=True
+    mock_command.assert_called_once()
+    call_kwargs = mock_command.call_args[1]
+    assert call_kwargs["show_prompt"] is True
+
+
+def test_plan_async_shows_tmux_info(monkeypatch) -> None:
+    """Test plan --branch (async) shows tmux session and log path."""
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_result = MagicMock()
+    mock_result.tmux_session = "vibe3-planner-issue-42"
+    mock_result.log_path = "/path/to/log.md"
+
+    mock_async = MagicMock(return_value=mock_result)
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    result = runner.invoke(plan_app, ["--branch", "42"])
+    assert result.exit_code == 0
+    # Should display tmux and log info
+    assert "tmux: vibe3-planner-issue-42" in result.output
+    assert "log: /path/to/log.md" in result.output

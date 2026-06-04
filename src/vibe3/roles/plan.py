@@ -413,6 +413,8 @@ def execute_spec_plan_sync(
     issue_number: int | None,
     branch: str,
     config: VibeConfig | None = None,
+    dry_run: bool = False,
+    show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
     cfg = config or VibeConfig.get_defaults()
@@ -420,6 +422,8 @@ def execute_spec_plan_sync(
         role="planner",
         context_builder=make_plan_context_builder(request, cfg),
         task=request.task_guidance,
+        dry_run=dry_run,
+        show_prompt=show_prompt,
         handoff_kind="plan",
         branch=branch,
         issue_number=issue_number,
