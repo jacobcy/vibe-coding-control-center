@@ -108,56 +108,6 @@ def test_resolve_handoff_target_branch_no_worktree_raises(tmp_path: Path) -> Non
         )
 
 
-# --- Security Tests: Path Traversal Prevention ---
-
-
-def test_resolve_shared_artifact_rejects_path_traversal_dot_dot(
-    tmp_path: Path,
-) -> None:
-    """Branch name with '..' should be rejected."""
-    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
-
-    with pytest.raises(ValueError, match="path traversal sequence"):
-        resolve_handoff_target(
-            "@current", branch="../../../etc/passwd", git_client=client
-        )
-
-
-def test_resolve_shared_artifact_rejects_relative_traversal(tmp_path: Path) -> None:
-    """Branch name containing '..' anywhere should be rejected."""
-    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
-
-    with pytest.raises(ValueError, match="path traversal sequence"):
-        resolve_handoff_target(
-            "@current", branch="task/../../etc/passwd", git_client=client
-        )
-
-
-def test_resolve_shared_artifact_rejects_trailing_newline(
-    tmp_path: Path,
-) -> None:
-    """Branch name with trailing newline should be rejected."""
-    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
-
-    with pytest.raises(ValueError, match="invalid characters"):
-        resolve_handoff_target("@current", branch="task-123\n", git_client=client)
-
-
-def test_resolve_shared_artifact_rejects_control_chars(tmp_path: Path) -> None:
-    """Branch name with control characters should be rejected."""
-    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
-
-    with pytest.raises(ValueError, match="invalid characters"):
-        resolve_handoff_target("@current", branch="task\x00-123", git_client=client)
-
-
-def test_resolve_shared_artifact_accepts_valid_branch(tmp_path: Path) -> None:
-    """Valid branch names should be accepted."""
-    artifact = tmp_path / "vibe3" / "handoff" / "task-123" / "current.md"
-    artifact.parent.mkdir(parents=True)
-    artifact.write_text("content")
-
-
 # --- @indicate alias resolution ---
 
 

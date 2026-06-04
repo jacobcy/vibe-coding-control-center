@@ -259,3 +259,17 @@ def test_resolve_vibe_material_accepts_valid_path(tmp_path: Path) -> None:
         "@vibe/skills/test-skill/SKILL.md", vibe_dir=str(vibe_root)
     )
     assert result == material_file
+
+
+def test_resolve_vibe_material_rejects_very_long_path(tmp_path: Path) -> None:
+    """@vibe/<path> with very long path should be rejected by OS/filesystem."""
+    vibe_root = tmp_path / "vibe3-install"
+    vibe_root.mkdir()
+
+    # Create a path longer than typical OS limits (4096 characters)
+    long_segment = "a" * 100
+    long_path = "/".join([long_segment] * 50)  # 5000+ characters
+
+    # OS/filesystem will reject this with OSError
+    with pytest.raises(OSError):  # OSError is the parent of FileNotFoundError
+        resolve_handoff_target(f"@vibe/{long_path}", vibe_dir=str(vibe_root))
