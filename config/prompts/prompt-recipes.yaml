@@ -223,6 +223,10 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/cron-supervisor.md
+      - name: supervisor/governance/code-auditor.md
+        source:
+          kind: file
+          path: supervisor/governance/code-auditor.md
     variables:
       server_status:
         kind: provider

@@ -179,6 +179,42 @@ def get_governed_issue_numbers(
     return numbers
 
 
+def select_audit_module(tick_count: int, repo_root: Path | None = None) -> Path:
+    """Select a module from src/vibe3/ for audit using tick-based rotation.
+
+    Excludes __init__.py files and __pycache__ directories.
+    Returns a deterministic but rotating selection based on tick_count.
+    """
+    root = repo_root or Path(".").resolve()
+    src_root = root / "src" / "vibe3"
+    candidates = sorted(
+        p
+        for p in src_root.rglob("*.py")
+        if p.name != "__init__.py" and "__pycache__" not in p.parts
+    )
+    if not candidates:
+        return src_root / "cli.py"
+    return candidates[tick_count % len(candidates)]
+
+
+def resolve_test_path(module_path: Path, repo_root: Path | None = None) -> Path:
+    """Resolve the test directory for a given module path.
+
+    Maps src/vibe3/{subdir}/foo.py -> tests/vibe3/{subdir}/
+    so the agent knows where to look for corresponding tests.
+    """
+    root = repo_root or Path(".").resolve()
+    src_vibe3 = root / "src" / "vibe3"
+    try:
+        rel = module_path.relative_to(src_vibe3)
+    except ValueError:
+        try:
+            rel = module_path.relative_to("src/vibe3")
+        except ValueError:
+            return root / "tests" / "vibe3"
+    return root / "tests" / "vibe3" / rel.parent
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 
