@@ -248,6 +248,144 @@ class TestRegistrySync:
         assert sessions[0]["target_id"] == "123"
         assert sessions[0]["target_type"] == "issue"
 
+    def test_completed_event_backfills_backend_session_id(self, tmp_path: Path) -> None:
+        """completed event should backfill backend_session_id on terminal."""
+        import sqlite3
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="started",
+            actor="agent:test",
+            detail="Run started",
+        )
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="completed",
+            actor="agent:test",
+            detail="Run completed",
+            session_id="real-backend-session-123",
+        )
+
+        # Find the session (no longer live, so query all)
+        conn = store._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM runtime_session WHERE branch = ?", ("task/issue-42",)
+        )
+        session = dict(cursor.fetchone())
+        assert session["backend_session_id"] == "real-backend-session-123"
+        assert session["status"] == "done"
+
+    def test_completed_event_does_not_overwrite_existing_backend_session_id(
+        self, tmp_path: Path
+    ) -> None:
+        """completed event should NOT overwrite an already-set backend_session_id."""
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+        # Create session with backend_session_id already set
+        sid = store.create_runtime_session(
+            role="executor",
+            target_type="issue",
+            target_id="42",
+            branch="task/issue-42",
+            session_name="vibe3-executor-issue-42",
+            status="running",
+            backend_session_id="original-session-id",
+        )
+
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="completed",
+            actor="agent:test",
+            detail="Run completed",
+            session_id="new-session-id",
+        )
+
+        session = store.get_runtime_session(sid)
+        assert session is not None
+        assert session["backend_session_id"] == "original-session-id"
+
+    def test_aborted_event_backfills_backend_session_id(self, tmp_path: Path) -> None:
+        """aborted event should also backfill backend_session_id."""
+        import sqlite3
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-55",
+            role="reviewer",
+            lifecycle="started",
+            actor="agent:test",
+            detail="Review started",
+        )
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-55",
+            role="reviewer",
+            lifecycle="aborted",
+            actor="agent:test",
+            detail="Review aborted",
+            session_id="abort-session-456",
+        )
+
+        conn = store._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM runtime_session WHERE branch = ?", ("task/issue-55",)
+        )
+        session = dict(cursor.fetchone())
+        assert session["backend_session_id"] == "abort-session-456"
+        assert session["status"] == "aborted"
+
+    def test_empty_session_id_does_not_backfill(self, tmp_path: Path) -> None:
+        """Empty string session_id should be treated as invalid and skip backfill."""
+        import sqlite3
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+        # Start session
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-60",
+            role="executor",
+            lifecycle="started",
+            actor="agent:test",
+            detail="Run started",
+        )
+
+        # Complete with empty session_id
+        persist_execution_lifecycle_event(
+            store=store,
+            branch="task/issue-60",
+            role="executor",
+            lifecycle="completed",
+            actor="agent:test",
+            detail="Run completed",
+            session_id="",  # Empty string should be skipped
+        )
+
+        # Verify backend_session_id remains NULL
+        conn = store._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM runtime_session WHERE branch = ?", ("task/issue-60",)
+        )
+        session = dict(cursor.fetchone())
+        assert session["backend_session_id"] is None
+        assert session["status"] == "done"
+
 
 class TestExtendedRoles:
     """Tests for extended execution roles (manager, supervisor, governance)."""
