@@ -197,17 +197,36 @@ class TestDependencyNotSatisfiedTriggersBlock:
 
     def test_flow_service_block_flow_writes_blocked_reason(self, temp_db):
         """FlowService.block_flow() should write blocked_reason."""
+        from unittest.mock import MagicMock, patch
+
         from vibe3.services.flow_service import FlowService
 
         branch = "task/issue-123"
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
-        FlowService(store=temp_db).block_flow(
-            branch=branch,
-            reason="Blocked by unresolved dependencies",
-            actor="test",
-        )
+        # Mock BlockedStateService to avoid GitHub API calls
+        mock_blocked_service = MagicMock()
+
+        def mock_block(branch, reason, blocked_by_issue=None, actor="system", **kw):
+            temp_db.update_flow_state(
+                branch,
+                flow_status="blocked",
+                blocked_reason=reason,
+                blocked_by_issue=blocked_by_issue,
+                latest_actor=actor,
+            )
+
+        mock_blocked_service.block.side_effect = mock_block
+        with patch(
+            "vibe3.services.blocked_state_service.BlockedStateService",
+            return_value=mock_blocked_service,
+        ):
+            FlowService(store=temp_db).block_flow(
+                branch=branch,
+                reason="Blocked by unresolved dependencies",
+                actor="test",
+            )
 
         flow_state_after = temp_db.get_flow_state(branch)
         assert flow_state_after is not None
@@ -241,17 +260,36 @@ class TestErrorBlockOrthogonality:
 
     def test_block_flow_writes_blocked_reason(self, temp_db):
         """block_flow() should write blocked_reason."""
+        from unittest.mock import MagicMock, patch
+
         from vibe3.services.flow_service import FlowService
 
         branch = "task/issue-123"
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
-        FlowService(store=temp_db).block_flow(
-            branch=branch,
-            reason="Business logic block",
-            actor="test",
-        )
+        # Mock BlockedStateService to avoid GitHub API calls
+        mock_blocked_service = MagicMock()
+
+        def mock_block(branch, reason, blocked_by_issue=None, actor="system", **kw):
+            temp_db.update_flow_state(
+                branch,
+                flow_status="blocked",
+                blocked_reason=reason,
+                blocked_by_issue=blocked_by_issue,
+                latest_actor=actor,
+            )
+
+        mock_blocked_service.block.side_effect = mock_block
+        with patch(
+            "vibe3.services.blocked_state_service.BlockedStateService",
+            return_value=mock_blocked_service,
+        ):
+            FlowService(store=temp_db).block_flow(
+                branch=branch,
+                reason="Business logic block",
+                actor="test",
+            )
 
         flow_state_after = temp_db.get_flow_state(branch)
         assert flow_state_after is not None
