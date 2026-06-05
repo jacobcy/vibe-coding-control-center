@@ -159,21 +159,28 @@ class TestGetEnvOverride:
 class TestLoadKeysEnvFallback:
     """Test load_keys_env_fallback function."""
 
-    def test_skip_if_env_already_set(self) -> None:
-        """Test that fallback is skipped if vibe env vars already present."""
-        from loguru import logger
+    def test_loads_missing_manager_usernames_when_token_already_set(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Existing token env must not prevent keys.env from supplying managers."""
+        keys_file = tmp_path / "config" / "keys.env"
+        keys_file.parent.mkdir(parents=True, exist_ok=True)
+        keys_file.write_text(
+            "VIBE_MANAGER_GITHUB_TOKEN=from-file\n" "MANAGER_USERNAMES=keys-manager\n"
+        )
 
-        debug_msgs: list[str] = []
-        handler_id = logger.add(lambda msg: debug_msgs.append(str(msg)), level="DEBUG")
-        try:
-            with patch.dict(
-                os.environ, {"VIBE_MANAGER_GITHUB_TOKEN": "existing-token"}
-            ):
-                load_keys_env_fallback()
-        finally:
-            logger.remove(handler_id)
+        monkeypatch.setattr(
+            "vibe3.clients.git_client.find_repo_root",
+            lambda: tmp_path,
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE_MANAGER_GITHUB_TOKEN", "existing-token")
+        monkeypatch.delenv("MANAGER_USERNAMES", raising=False)
 
-        assert any("keys.env fallback skipped" in m for m in debug_msgs)
+        load_keys_env_fallback()
+
+        assert os.environ.get("VIBE_MANAGER_GITHUB_TOKEN") == "existing-token"
+        assert os.environ.get("MANAGER_USERNAMES") == "keys-manager"
 
     def test_load_from_project_keys(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

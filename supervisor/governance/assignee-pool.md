@@ -18,7 +18,7 @@
 - 被 orchestra/governance 视为运行池或 ready queue 候选
 - **不是** repo 全量 open issues，**不是** supervisor issue 池
 
-**当前 governance 的观察范围只限于 assignee issue pool**。它不对 broader repo backlog 做 triage，也不决定哪些 issue 应该进入 assignee issue pool。后者属于 `governance/roadmap-intake` 的职责。
+**当前 governance 的观察范围只限于本机 manager 的 assignee issue pool**。它不对 broader repo backlog 做 triage，也不决定哪些 issue 应该进入 assignee issue pool。后者属于 `governance/roadmap-intake` 的职责。
 
 **supervisor issues 由 roadmap-intake 层处理**，不在 assignee-pool 观察范围内。
 
@@ -47,8 +47,8 @@
 - **Level 3 (Roadmap)**: 终审决策，结果产出后打 `roadmap-reviewed`。
 
 **核心逻辑**：
-- **decide（高置信度）** → 直接执行动作并写 `[governance decide]` comment，说明决策依据和执行结果
-- **suggest（低置信度）** → 写 `[governance suggest]` comment，供人类或 roadmap 层审查
+- **decide（高置信度）** → 直接执行动作并写 `[governance decide][assignee-pool]` comment，说明决策依据和执行结果
+- **suggest（低置信度）** → 写 `[governance suggest][assignee-pool]` comment，供人类或 roadmap 层审查
 - **不确定** → 打 `roadmap/rfc`，说明需要人类判断的具体问题，然后停止；不要反复写 close/split 建议
 
 **decide vs suggest 判定标准**：
@@ -68,7 +68,7 @@
 - 不要把”已有历史 assignee / 历史上进过 pool”当成充分结论；必须以当前 task / flow / ready queue 现场为准
 - 如果 ready queue 很浅，而 broader intake 最近持续没有新增 issue，需在结论中明确指出是”入口收缩”还是”池内真实无候选”
 - 不要输出只有静态归档价值、但对下一步 dispatch 没帮助的 `already in assignee pool` 列表
-- 每个决策产出 `[governance suggest]`，供 vibe-roadmap 审查纠正
+- 每个低置信度决策产出 `[governance suggest][assignee-pool]`，供 vibe-roadmap 审查纠正
 
 **Intake 原则**：
 - **实质判断优先**：不只看标签类型，要实质检查 issue 范围和代码缺口
@@ -85,13 +85,14 @@ Allowed:
 - `labels.read`: 读取所有 labels
 - `labels.write`: 非 state labels（`milestone`、`roadmap/*`、`priority/[0-9]`、`orchestra-governed`）
   - **设置**：决策后打标签（如 `roadmap/rfc`、`roadmap/epic`、`priority/*`、`orchestra-governed`）
-  - **移除**：仅限 `orchestra-governed` 的验证清理（见「标签验证与清理」）
+  - **禁止删除 `orchestra-scanned`**：这是 roadmap-intake 层闭环标签，assignee-pool 不得清理
+  - **不清理 `orchestra-governed`**：已有 governed 的 issue 直接过滤；需要重判时由人类或上层先移除标签并提供证据
   - **不移除 `roadmap/rfc`**：rfc 的清理是人类/vibe-roadmap 职责，不在 pool
 - `flow`: read（读取 flow/worktree 现场信息）
 - `task`: read（读取 task 状态）
 - `handoff`: read（读取交接上下文）
 - `scene`: read（读取现场信息）
-- `comment.write`: 写治理建议评论（格式为 `[governance suggest]` 或 `[governance close]`）
+- `comment.write`: 写治理建议评论（格式为 `[governance suggest][assignee-pool]` 或 `[governance decide][assignee-pool]`）
 - `state/labels.write`: 两项动作，性质不同：
 
   1. **入池评估与标签补齐**（本职工作）：
@@ -101,8 +102,8 @@ Allowed:
      - 检查并补齐 `priority/*` 标签（如缺失）
      - 最后才设置 `state/ready`
      - **禁止**在 priority 评估完成前设置 `state/ready`
-     - 设置后必须写 `[governance suggest]` comment 说明评估依据
-     - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
+     - 设置后必须写 `[governance suggest][assignee-pool]` comment 说明评估依据
+     - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest][assignee-pool]` 建议而非直接拒绝
      - **关键要求**：优先级 label 是 assignee pool 评估的证据。有 priority = 已经过 assignee pool 评估，只是漏改 state；无 priority = 还没经过 assignee pool，应走完整评估流程
 
   2. **漏改 blocked 恢复**（唯一补偿动作）：
@@ -110,7 +111,7 @@ Allowed:
      - `blocked_reason` 明确为 `state unchanged`
      - `flow show` 能确认 authoritative ref 已存在
      - 使用 `vibe3 task resume <number> --label auto --yes` 自动恢复到正确状态
-     - 恢复后必须写 `[governance decide]` comment 说明决策依据和执行结果
+     - 恢复后必须写 `[governance decide][assignee-pool]` comment 说明决策依据和执行结果
 
 Forbidden:
 
@@ -127,7 +128,7 @@ Forbidden:
 规则：
 
 - 如果某个动作没有被明确允许，视为 forbidden
-- 治理建议以 `[governance suggest]` 署名写入 issue comment
+- 治理建议以 `[governance suggest][assignee-pool]` 署名写入 issue comment
 - 上述两项动作之外，state/labels 的修改只能由 manager 或人类执行
 
 ## What It Reads
@@ -146,27 +147,31 @@ Forbidden:
 - epic issues（有 `roadmap/epic` 标签的 open issue，用于收口检查）
 - epic sub-issues 状态（通过 `gh issue view <number> --json state,stateReason,labels` 查询）
 
-## 标签验证与清理（强制执行）
+## 候选边界验证（强制执行）
 
-**每次 scan 时，在 Step 1 过滤前，必须先验证 `orchestra-governed` 标签的正确性**，防止标签永久残留导致 issue 被过滤后无法被重新处理。
+**每次 scan 时，在 Step 1 过滤前，必须先确认本机 manager 边界**，防止 assignee-pool 处理 roadmap-intake 或其他机器负责的 issue。
 
-### `orchestra-governed` 标签验证
+### 候选边界验证
 
-**验证条件**（必须全部满足，否则标签过时）：
-- Issue 有 assignee
-- Assignee 在 `manager_usernames` 配置列表中
-- Issue 是 open 状态
-
-**验证失败处理**：
-
-**防重复（强制）**：在执行 cleanup comment 前，检查该 issue 最新评论。如果最新评论已是相同的 `[governance auto-cleanup]` 内容（相同清理原因），跳过评论，仅在 stdout 记录。
+先运行：
 
 ```bash
-gh issue edit <issue-number> --remove-label "orchestra-governed"
-gh issue comment <issue-number> --body "[governance auto-cleanup] 移除 orchestra-governed：issue 不再满足持有条件（无 assignee / assignee 非 manager / 已关闭），允许重新进入评估"
+vibe3 status
 ```
 
-记录到 Actions：`Cleanup: #XXX removed orchestra-governed (no manager assignee)`
+从 `Manager agents` 读取本机 manager 列表。assignee-pool 只处理同时满足以下条件的 issue：
+
+- Issue 是 open 状态
+- Issue 有 assignee
+- Assignee 在本机 `Manager agents` 列表中
+- Issue 没有 `orchestra-governed`
+- Issue 没有 `roadmap-reviewed`
+
+**验证失败处理**：
+- 未分配 assignee 的 issue 属于 roadmap-intake；不得处理或评论未分配给本机 manager 的 issue。
+- 分配给其他 manager / 人类的 issue 只在 stdout 记录，不写 comment、不改 label。
+- 已有 `orchestra-governed` 的 issue 直接过滤；不要删除 `orchestra-governed`，也不要删除 `orchestra-scanned`。
+- 如果要修改上一条 `[governance suggest][assignee-pool]`，必须提交新的证据；如果不修改上一条 suggest，不得 comment。
 
 ### pool 不清理 `roadmap/rfc`
 
@@ -180,13 +185,16 @@ pool **不**验证或移除 `roadmap/rfc`。原因：
 在 Execution Pattern 的 Step 1（标签过滤）**之前**先跑本验证：
 
 ```
-for issue in all_open_issues_with_orchestra_governed:
-    if not (has_assignee and assignee in manager_usernames and is_open):
-        remove orchestra-governed + write [governance auto-cleanup] comment
+manager_usernames = parse(vibe3 status Manager agents)
+for issue in active_issue_snapshot:
+    if issue.assignee not in manager_usernames:
+        skip + stdout only
+    if issue has orchestra-governed:
+        skip + stdout only
 # 然后才进入 Step 1 的正常过滤
 ```
 
-**目的**：防止标签永久残留导致过滤失效；让 assignee 漂移/决策半完成的 issue 能被重新处理。
+**目的**：防止 assignee-pool 绕过 roadmap-intake 或跨机器处理不属于本机 manager 的 issue。
 
 ## Issue Intake 策略
 
@@ -202,7 +210,7 @@ for issue in all_open_issues_with_orchestra_governed:
 ### 灵活处理
 
 **范围过大 → 拆分**
-- 若 issue 范围过大（如涉及多个独立模块），写 `[governance suggest]` 建议 manager 拆分为多个小 issue
+- 若 issue 范围过大（如涉及多个独立模块），写 `[governance suggest][assignee-pool]` 建议 manager 拆分为多个小 issue
 - 不要直接拒绝大范围 issue
 
 **范围明确 → 可处理重构**
@@ -216,10 +224,10 @@ for issue in all_open_issues_with_orchestra_governed:
 
 **不确定 → 优先交给 manager 或标记 RFC**
 - 若 issue 目标明确，只是 scope 偏大或拆分选择未定：
-  - 写 `[governance suggest]` 建议 manager 拆分或继续单 issue
+  - 写 `[governance suggest][assignee-pool]` 建议 manager 拆分或继续单 issue
   - 不把普通拆分选择升级为人类阻塞
 - 若目标、架构方向或拆分形态都无法判断：
-  - 设置 `roadmap/rfc`，写 `[governance suggest]` 说明需要人类决定的问题
+  - 设置 `roadmap/rfc`，写 `[governance suggest][assignee-pool]` 说明需要人类决定的问题
   - 命令：`gh issue edit <issue-number> --add-label "roadmap/rfc"`
   - `roadmap/rfc` 是低置信度终点，不再继续建议 close/split/ready
 
@@ -265,17 +273,17 @@ pool 扫描有 assignee 的 issue →
 - #503: chore: src/vibe3 总行数超过35000行限制
   - 范围过大：涉及整个 src/vibe3
   - 建议：拆分为多个模块级别的清理任务
-  - **结论**：写 `[governance suggest]` 建议 manager / roadmap decider 拆分；拆分后主 issue 继续作为治理容器
+  - **结论**：写 `[governance suggest][assignee-pool]` 建议 manager / roadmap decider 拆分；拆分后主 issue 继续作为治理容器
 
 **应关闭的 issue**
 - #556: tech-debt: 清理事件系统向后兼容别名
   - 若确认事件系统已完全移除旧别名
-  - **结论**：写 `[governance suggest]` 建议关闭（附：旧别名已在 #XYZ 移除）
+  - **结论**：写 `[governance suggest][assignee-pool]` 建议关闭（附：旧别名已在 #XYZ 移除）
 
 **不确定的 issue**
 - #539: 讨论：统一 vibe3 plan/review/run 命令参数和行为
   - 范围不明确，需要架构讨论
-  - **结论**：写 `[governance suggest]` 建议补 scope 或标记 `roadmap/rfc`
+  - **结论**：写 `[governance suggest][assignee-pool]` 建议补 scope 或标记 `roadmap/rfc`
 
 **可自动恢复的 blocked issue**
 - #123: state/blocked (blocked_reason: state unchanged)
@@ -283,14 +291,14 @@ pool 扫描有 assignee 的 issue →
   - 调用 `vibe3 flow show --branch task/issue-123` → plan_ref = "docs/plans/xxx.md"
   - authoritative ref 存在，说明 agent 已完成工作但漏改 state
   - 调用 `vibe3 task resume 123 --label auto --yes`
-  - 写 `[governance decide]` comment 说明决策依据和恢复结果
+  - 写 `[governance decide][assignee-pool]` comment 说明决策依据和恢复结果
   - **结论**：自动恢复成功
 
 **不可自动恢复的 blocked issue**
 - #456: state/blocked (blocked_reason: external dependency)
   - 调用 `gh issue view 456 --json body` → blocked_reason = "external dependency"
   - blocked_reason 不是 "state unchanged"，说明需要真实的人类介入
-  - 写 `[governance suggest]` comment 建议人类检查外部依赖状态
+  - 写 `[governance suggest][assignee-pool]` comment 建议人类检查外部依赖状态
   - **结论**：不自动恢复，建议人类处理
 
 ## What It Produces
@@ -304,10 +312,10 @@ pool 扫描有 assignee 的 issue →
   - resume：明确可恢复的 blocked issue
   - split 建议：分界清晰时
 - ready queue 排序建议
-- `[governance decide]` 和 `[governance suggest]` 格式的决策评论（见 decide/suggest 判定标准）
+- `[governance decide][assignee-pool]` 和 `[governance suggest][assignee-pool]` 格式的决策评论（见 decide/suggest 判定标准）
 - 入池评估与标签补齐：有 assignee 但无 state label → 评 priority → 补 roadmap/priority → 设 `state/ready`
 - **所有决策完成后打 `orchestra-governed` 标签**
-- 漏改恢复补偿：`state unchanged` 恢复（`vibe3 task resume <number> --label auto --yes`，使用 `[governance decide]` 标签）
+- 漏改恢复补偿：`state unchanged` 恢复（`vibe3 task resume <number> --label auto --yes`，使用 `[governance decide][assignee-pool]` 标签）
 
 ## Hard Boundary
 
@@ -331,7 +339,7 @@ pool 扫描有 assignee 的 issue →
   - Epic 检查不受 Step 1 的 `orchestra-governed` 过滤限制
   - 每次 scan 都会检查所有 `roadmap/epic` issues 的进度
   - 对于未完成的 Epic，只记录进度；如果 epic 不是 manager assignee，不添加 `orchestra-governed`，避免下一轮标签验证把它清掉后再次循环
-  - 对于已完成的 Epic，直接关闭，不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 `orchestra-governed`
+  - 对于已完成的 Epic，直接关闭，不要写 `[governance suggest][assignee-pool] 建议关闭此 Epic` 后再只添加 `orchestra-governed`
   - **关键**：assignee-pool 是 Epic 进度的最后守门员；高置信度完成就终局，低置信度就 `roadmap/rfc`，不要循环
 
 ### `.claude/` 和 `.codex/` 目录阻塞规则
@@ -341,7 +349,7 @@ pool 扫描有 assignee 的 issue →
 - **原因**：这些目录涉及 agent 权限配置，自动化流程无法修改
 - **触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
 - **处理动作**：
-  - 写 `[governance suggest]` comment 说明：涉及 agent 权限配置目录，无法自动化执行
+  - 写 `[governance suggest][assignee-pool]` comment 说明：涉及 agent 权限配置目录，无法自动化执行
   - 添加 `roadmap/rfc` 标签
   - **禁止**设置 `state/ready` 或纳入 assignee pool
 
@@ -351,14 +359,15 @@ pool 扫描有 assignee 的 issue →
 
 Steps:
 
-0. **标签验证（强制，先于过滤）**：先执行「标签验证与清理」段——校验所有带 `orchestra-governed` 的 open issue 是否仍满足持有条件，不满足则移除并写 cleanup comment。然后才进入下面的标签过滤。
-1. **标签过滤（强制）**：只处理有 manager assignee，且无 `orchestra-governed` 且无 `roadmap-reviewed` 标签的 issue：
+0. **候选边界验证（强制，先于过滤）**：先执行「候选边界验证」段——用 `vibe3 status` 确认本机 Manager agents，只保留分配给本机 manager 的 issue；不得处理或评论未分配给本机 manager 的 issue。
+1. **标签过滤（强制）**：只处理有本机 manager assignee，且无 `orchestra-governed` 且无 `roadmap-reviewed` 标签的 issue：
    - 无 assignee → 跳过（不在 pool 中，由 roadmap-intake 负责）
+   - assignee 不在本机 `Manager agents` 列表中 → 跳过（非本机 pool）
    - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不重复检查）
    - 有 `roadmap-reviewed` 标签 → 跳过（roadmap 已终审，pool 不再干预）
 2. 运行全局现场观察命令，读取当前 running issues、ready queue、blocked issues、remote tasks 与 flow 现场：
    ```bash
-   uv run python src/vibe3/cli.py task status
+   vibe3 task status
    ```
    这是 assignee pool 的主观察入口；单个 issue 的评论、refs 与去重细节再用 `vibe3 task show <issue-number>`。
 2. **依赖过滤**：从候选中排除不可进入 ready queue 的 issue：
@@ -378,7 +387,7 @@ Steps:
      d. 检查并补齐 `roadmap/*` 标签（如缺失）
      e. 检查并补齐 `priority/*` 标签（如缺失）
      f. 设置 `state/ready`
-     g. 写 `[governance suggest]` comment 说明评估依据
+     g. 写 `[governance suggest][assignee-pool]` comment 说明评估依据
    - **禁止**在 priority 评估完成前设置 `state/ready`
 5. **Blocked Issues 抽查恢复**：
    - 随机抽取 1-2 个处于 `state/blocked` 的 issues 进行检查
@@ -390,11 +399,11 @@ Steps:
         - 检查 `plan_ref`、`report_ref` 或 `audit_ref` 是否存在
         - 如果存在任意一个 authoritative ref（**高置信度 → decide**）：
           - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto --yes`
-          - 写 `[governance decide]` comment 说明恢复原因、依据和执行结果
+          - 写 `[governance decide][assignee-pool]` comment 说明恢复原因、依据和执行结果
         - 如果没有任何 authoritative ref（**低置信度 → suggest**）：
-          - 写 `[governance suggest]` comment 建议人类处理
+          - 写 `[governance suggest][assignee-pool]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
-        - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
+        - 不执行自动恢复，只写 `[governance suggest][assignee-pool]` comment 建议人类处理
 6. **Epic 收口检查**（独立于 Step 1 过滤）：
    - **注意**：此步骤独立于 Step 1 的 `orchestra-governed` 过滤，每次 scan 都会执行
    - 独立查询所有 `roadmap/epic` 标签的 open issues（不受 assignee/governed 过滤限制）：
@@ -415,10 +424,10 @@ Steps:
         - 这是高置信度终局条件：all sub-issues completed → 直接关闭 epic
         - 关闭前执行未完成工作检查；如有剩余工作，创建 follow-up issue 并在关闭评论中引用
         - **防重复（强制）**：
-          - 所有 sub-issues 已完成 → 直接关闭 epic，写 `[governance close]` 评论（不要写 suggest）
-          - 写评论前检查最新评论：如果最新评论已是 `[governance close]` 或 `[governance suggest] 建议关闭此 Epic`，跳过评论
-        - 写 `[governance close]` 评论说明 sub-issues 状态和关闭理由
-        - 关闭原 epic；不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 `orchestra-governed`
+          - 所有 sub-issues 已完成 → 直接关闭 epic，写 `[governance decide][assignee-pool]` 评论（不要写 suggest）
+          - 写评论前检查最新评论：如果最新评论已是 `[governance decide][assignee-pool] 已关闭此 Epic` 或 `[governance suggest][assignee-pool] 建议关闭此 Epic`，跳过评论
+        - 写 `[governance decide][assignee-pool]` 评论说明 sub-issues 状态和关闭理由
+        - 关闭原 epic；不要写 `[governance suggest][assignee-pool] 建议关闭此 Epic` 后再只添加 `orchestra-governed`
      g. **部分 sub-issues 未完成**：
         - 不写评论，避免刷屏
         - 如果 epic 有 manager assignee，可添加 `orchestra-governed` 标记本轮已检查
@@ -442,9 +451,9 @@ Decision sketch:
   - 无标签的 issue 放在最后
 - **需要关注的 issue**：
   - 已在 `state/ready` 但有未解除依赖的 issue：标记为 concern，建议 manager 检查
-  - 已在 `state/blocked` 但依赖已解除的 issue：写 `[governance suggest]` 评论建议人类 resume
-  - 已过时的 issue（高置信度）：写 `[governance close]` 直接关闭
-  - 已过时的 issue（低置信度）：添加 `roadmap/rfc`，写 `[governance suggest]` 说明需要人类判断的具体问题
+  - 已在 `state/blocked` 但依赖已解除的 issue：写 `[governance suggest][assignee-pool]` 评论建议人类 resume
+  - 已过时的 issue（高置信度）：写 `[governance decide][assignee-pool]` 并直接关闭
+  - 已过时的 issue（低置信度）：添加 `roadmap/rfc`，写 `[governance suggest][assignee-pool]` 说明需要人类判断的具体问题
 - **入池评估与标签补齐（本职工作）**：
   - 每次 scan 检查所有有 manager assignee 但缺少 `state/*` label 的 issue
   - 先评 priority → 补 roadmap → 补 priority → 最后设 `state/ready`
@@ -467,14 +476,14 @@ Decision sketch:
 
 	  **恢复动作**：
 		  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto --yes`
-		  - 写 `[governance decide]` comment 说明恢复原因、依据和执行结果
+		  - 写 `[governance decide][assignee-pool]` comment 说明恢复原因、依据和执行结果
 	  - **注意**：只做最小 state 纠偏，不推进后续阶段
 
   **禁止场景**（不自动恢复）：
   - blocked_reason 不是 "state unchanged"（如外部依赖、手动阻塞、测试失败等）
   - 没有任何 authoritative ref（说明 agent 确实未完成工作）
   - 存在多种不一致信号（无法唯一判断）
-  - 以上场景一律写 `[governance suggest]` 评论建议人类处理
+  - 以上场景一律写 `[governance suggest][assignee-pool]` 评论建议人类处理
 - **label 调整（仅非 state labels）**：
   - milestone 调整
   - roadmap 调整
@@ -558,7 +567,7 @@ Exit:
 
 ## Comment Contract
 
-治理建议以 `[governance decide]` 或 `[governance suggest]` 署名写入 issue comment。
+治理建议以 `[governance decide][assignee-pool]` 或 `[governance suggest][assignee-pool]` 署名写入 issue comment。
 
 **去重规则（强制）**：
 
@@ -566,16 +575,15 @@ Exit:
   - **普通 issue**：如果已有 `orchestra-governed` 标签，直接跳过（已决策过）
   - **Epic issue（例外）**：不受此规则限制，每次 scan 都检查（见 Step 6 Epic 收口检查）
 - **写评论前必须检查**：读取该 issue 的现有 comments
-- **去重检查**：若已存在相同类型的 `[governance decide]` 或 `[governance suggest]` 评论（关键字匹配），跳过该评论
+- **去重检查**：若已存在相同类型的 `[governance decide][assignee-pool]` 或 `[governance suggest][assignee-pool]` 评论（关键字匹配），跳过该评论；如果要修改上一条 suggest，必须在新评论中提交证据；如果不修改上一条 suggest，不得 comment
 - **类型匹配规则**：
-  - `[governance suggest] 建议关闭此 Issue` → 检查是否已有"建议关闭"
-  - `[governance suggest] 建议关闭此 Epic` → 检查最新评论是否已建议关闭此 Epic
-  - `[governance suggest] 建议恢复此 Issue` → 检查是否已有"建议恢复"
-  - `[governance suggest] 入池评估` → 检查是否已有"入池评估"
-  - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
-  - `[governance decide]` 恢复 → 检查是否已有相同恢复动作
-  - `[governance auto-cleanup] 移除 orchestra-governed` → 检查最新评论是否已是相同的 auto-cleanup 动作（比对清理原因）
-  - `[governance close] 已关闭此 Epic` → 关闭前检查 issue 是否已经 CLOSED，避免重复 close
+  - `[governance suggest][assignee-pool] 建议关闭此 Issue` → 检查是否已有"建议关闭"
+  - `[governance suggest][assignee-pool] 建议关闭此 Epic` → 检查最新评论是否已建议关闭此 Epic
+  - `[governance suggest][assignee-pool] 建议恢复此 Issue` → 检查是否已有"建议恢复"
+  - `[governance suggest][assignee-pool] 入池评估` → 检查是否已有"入池评估"
+  - `[governance suggest][assignee-pool] 关注` → 检查是否已有"关注"且关注原因相同
+  - `[governance decide][assignee-pool]` 恢复 → 检查是否已有相同恢复动作
+  - `[governance decide][assignee-pool] 已关闭此 Epic` → 关闭前检查 issue 是否已经 CLOSED，避免重复 close
 - **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
 - **目的**：避免重复刷屏，保持 issue 讨论清洁
 
@@ -596,11 +604,11 @@ Exit:
 1. 执行未完成工作检查（见下方）
 2. 若发现未完成工作：创建 follow-up issue
 3. 直接关闭原 issue（无需等待 manager）
-4. 写 `[governance close]` 评论说明关闭理由和后续处理
+4. 写 `[governance decide][assignee-pool]` 评论说明关闭理由和后续处理
 
 **执行格式**：
 ```
-[governance close] 已关闭此 Issue
+[governance decide][assignee-pool] 已关闭此 Issue
 
 关闭理由：<具体理由>
 <若为重复，引用重复 Issue 编号>
@@ -622,12 +630,12 @@ Exit:
 **处理流程**：
 1. 执行未完成工作检查
 2. 添加 `roadmap/rfc`
-3. 写 `[governance suggest]` 说明为什么需要人类判断
+3. 写 `[governance suggest][assignee-pool]` 说明为什么需要人类判断
 4. 添加 `orchestra-governed` 后停止；不要反复建议 manager 关闭
 
 **建议格式**：
 ```
-[governance suggest] 低置信度：转 roadmap/rfc
+[governance suggest][assignee-pool] 低置信度：转 roadmap/rfc
 
 关闭理由：<具体理由>
 <若为重复，引用重复 Issue 编号>
@@ -669,7 +677,7 @@ Exit:
 当 blocked issue 满足高置信度恢复条件时（如上游阻塞已关闭 + 无其他阻塞），governance 作为 decider 直接执行恢复：
 
 ```
-[governance decide] 恢复此 Issue
+[governance decide][assignee-pool] 恢复此 Issue
 
 恢复理由：<上游阻塞已关闭的具体说明>
 执行命令：vibe3 task resume <issue-number> --label auto --yes
@@ -678,7 +686,7 @@ Exit:
 
 **执行动作**：
 1. 执行 `vibe3 task resume <issue-number> --label auto --yes`
-2. 写 `[governance decide]` comment 说明决策依据和执行结果
+2. 写 `[governance decide][assignee-pool]` comment 说明决策依据和执行结果
 3. 添加 `orchestra-governed` 标签
 
 **正确的恢复命令**（强制格式）：
@@ -696,7 +704,7 @@ vibe3 task resume <issue-number> --label auto --yes
 当 blocked issue 的依赖状态不明确，或存在多种不确定信号时：
 
 ```
-[governance suggest] 建议恢复此 Issue
+[governance suggest][assignee-pool] 建议恢复此 Issue
 
 恢复理由：<依赖可能已解除的具体说明>
 建议命令：vibe3 task resume <issue-number> --label auto --yes
@@ -715,7 +723,7 @@ vibe3 task resume <issue-number> --label auto --yes
 当 issue 有 manager assignee 但缺少 state label，governance 完成入池评估与标签补齐后：
 
 ```
-[governance suggest] 入池评估
+[governance suggest][assignee-pool] 入池评估
 
 评估依据：<priority 选择的理由>
 已执行动作：
@@ -737,7 +745,7 @@ vibe3 task resume <issue-number> --label auto --yes
 执行格式：
 
 ```
-[governance decide] 已自动恢复 state
+[governance decide][assignee-pool] 已自动恢复 state
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
 恢复命令：vibe3 task resume <number> --label auto --yes
@@ -756,7 +764,7 @@ vibe3 task resume <issue-number> --label auto --yes
 当发现需要关注但不需立即行动的 issue 时：
 
 ```
-[governance suggest] 关注
+[governance suggest][assignee-pool] 关注
 
 关注原因：<具体说明>
 建议后续动作：<manager 应检查什么>
@@ -767,7 +775,7 @@ vibe3 task resume <issue-number> --label auto --yes
 当 `roadmap/epic` issue 的所有 sub-issues 已完成时：
 
 ```
-[governance close] 已关闭此 Epic
+[governance decide][assignee-pool] 已关闭此 Epic
 
 Epic 编号：#<epic-number>
 Sub-issues 状态：
@@ -818,7 +826,7 @@ Sub-issues 状态：
 **Stop Point Checklist（强制）**：
 
 完成以下动作后才能停止：
-- [ ] 写完 `[governance decide]` 或 `[governance suggest]` 评论
+- [ ] 写完 `[governance decide][assignee-pool]` 或 `[governance suggest][assignee-pool]` 评论
 - [ ] 普通 pool 决策打上 `orchestra-governed` 标签；非 manager assignee 的 partial epic 只记录 stdout
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 - [ ] **Epic 检查**：完成所有 `roadmap/epic` issues 的检查（Step 6）

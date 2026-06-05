@@ -41,7 +41,7 @@
 **触发条件**：改动范围包含 `.claude/` 或 `.codex/` 目录下的任何文件
 
 **处理动作**：
-- 写 `[governance suggest]` comment：涉及 agent 权限配置目录，无法自动化执行
+- 写 `[governance suggest][roadmap-intake]` comment：涉及 agent 权限配置目录，无法自动化执行
 - 添加 `roadmap/rfc` 标签
 - **禁止**纳入 assignee issue pool
 - 记录到 `Skipped`，原因为 `blocked: .claude/.codex directory permission issue`
@@ -57,7 +57,7 @@
 - 每条特征需有具体证据
 
 **命中反模式的处理**：
-- 写 `[governance suggest]` comment：注明反模式原因及评分项（如："反模式：满足 #2 高复杂度低 ROI、#5 边缘场景驱动"）
+- 写 `[governance suggest][roadmap-intake]` comment：注明反模式原因及评分项（如："反模式：满足 #2 高复杂度低 ROI、#5 边缘场景驱动"）
 - 打 `orchestra-scanned` 标签
 - **禁止**纳入 assignee issue pool
 - 记录到 `Skipped`，原因为 `anti-pattern: <评分项>`
@@ -111,7 +111,7 @@
 
 intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 scanned）**。
 
-对于不适合纳入的 issue，intake 在 `[governance suggest]` 评论中说明原因，由后续层（assignee-pool 或 vibe-roadmap）做进一步决策：
+对于不适合纳入的 issue，intake 在 `[governance suggest][roadmap-intake]` 评论中说明原因，由后续层（assignee-pool 或 vibe-roadmap）做进一步决策：
 
 - 范围过大、需拆分 → suggest 中建议拆分，交给 assignee-pool 或 roadmap 处理
 - 目标不明确、需人类讨论 → suggest 中说明不确定，但不设 `roadmap/rfc`（属于 pool 决策范围）
@@ -238,7 +238,7 @@ Why: ...
 
 **正确示例**：
 ```
-[governance suggest] Intake completed (scope=bugfix).
+[governance suggest][roadmap-intake] Intake completed (scope=bugfix).
 ```
 
 ## Permission Contract
@@ -287,31 +287,37 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee、无 `orchestra-scanned` 且无 `orchestra-governed` 的 issue：
+2. **标签过滤（强制）**：扫描前先过滤，只处理无 assignee、无 `orchestra-scanned`、无 `roadmap/rfc`、无 `roadmap/epic` 的 issue：
    - 有 assignee → 跳过（已在 pool 中，由 assignee-pool 负责）
    - 有 `orchestra-scanned` 标签 → 跳过（intake 已审查过，不重复扫描）
-   - 有 `orchestra-governed` 标签 → 跳过（pool 已决策过，不该回到 intake；如 `suggest_close`/`rfc` 后 assignee 被移除的情况）
-3. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
+   - 有 `roadmap/rfc` 或 `roadmap/epic` 标签 → 跳过（已路由到 roadmap/task 可见层）
+   - 有 `orchestra-governed` 但无 assignee → 不要把 `orchestra-governed` 当作可信跳过条件；按当前 issue 事实重新做 intake 判断
+3. 先运行全局现场观察命令，确认当前机器 manager 与 assignee pool / ready queue / blocked / remote tasks 事实：
    ```bash
-   uv run python src/vibe3/cli.py task status
+   vibe3 status
+   ```
+   `vibe3 status` 中的 Manager agents 是 `vibe3 task intake` 分配对象的真源。
+4. 再运行 task 现场观察命令：
+   ```bash
+   vibe3 task status
    ```
    `task status` 用于理解池子深浅、已有 flow、ready queue 与 blocked 现场；单个 issue 的最近评论与细节仍用 `vibe3 task show <issue-number>`。
-3. 先过滤掉 discussion、明确的大 feature、以及真正需要人类先定方向的 issue
-4. 重点识别以下可纳入对象：
+5. 先过滤掉 discussion、明确的大 feature、以及真正需要人类先定方向的 issue
+6. 重点识别以下可纳入对象：
    - bug fix
    - 方案明确的 small feature
    - **边界明确的 refactor / cleanup**
-5. **事实确认（强制）**：在决定对某个 issue 写 `[governance suggest]` comment 前，必须先运行：
+7. **事实确认（强制）**：在决定对某个 issue 写 `[governance suggest][roadmap-intake]` comment 前，必须先运行：
    ```bash
    vibe3 task show <issue-number>
    ```
-   查看该 issue 最近的 2-3 条评论。如果最近已有 `[governance suggest]` 或 `[governance]` 开头的评论（无论是你自己还是其他 agent 写的），**一律跳过，不再重复写 comment**。靠事实判断，不靠猜测。
-6. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
-7. 对可纳入对象执行最小动作：
+   查看该 issue 最近的 2-3 条评论。如果最近已有 `[governance suggest][roadmap-intake]` 或其他 `[governance]` 开头的评论，默认跳过，不重复写 comment；只有在你要修改上一条 roadmap-intake suggest 且能提交新的证据时，才允许写更新评论。如果不修改上一条 suggest，不得 comment。
+8. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
+9. 对可纳入对象执行最小动作：
    - 使用 `vibe3 task intake <issue-number>` 分配 manager assignee（命令自动从配置解析，禁止手动指定人类用户名）
    - 如有必要补最小 routing labels
-8. 对不适合纳入的对象记录简短原因
-9. **扫描 `supervisor + state/ready` issues**，对每个执行：
+10. 对不适合纳入的对象记录简短原因
+11. **扫描 `supervisor + state/ready` issues**，对每个执行：
    - 先运行 `vibe3 task show <issue-number>` 确认最近没有重复 governance comment
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
@@ -324,24 +330,24 @@ Forbidden:
      gh issue close <issue-number> --comment "关闭理由：<具体理由>"
      ```
    - 不确定：写 suggest 说明不确定，记录到 Actions
-10. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
+12. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
    - 还是因为当前材料把”实现选择”误当成了”人类拍板”
    - 若 ready queue 偏浅，优先重新检查是否存在被误判可纳入的 bounded refactor / bugfix
-11. 输出结论后停止
+13. 输出结论后停止
 
 ## Comment Contract
 
 任何 intake 类 routing 评论必须遵循 marker 规则：
 
-- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
-- intake 决策建议用 `[governance suggest]`，因为本材料只产出 routing 信号、不做强制结论
+- 第一行行首必须是 `[governance suggest][roadmap-intake]`（前面只允许空白字符）
+- intake 决策建议用 `[governance suggest][roadmap-intake]`，因为本材料只产出 routing 信号、不做强制结论
 - 不要把 intake 说明嵌入到自由文本中而不带 marker；缺失 marker 会被人类指令解析器误读为人类指令
 
 合规示例：
 ```
-[governance suggest] Intake completed (scope=bugfix).
-[governance suggest] Skipped: scope unclear, needs pool or roadmap review before automation.
+[governance suggest][roadmap-intake] Intake completed (scope=bugfix).
+[governance suggest][roadmap-intake] Skipped: scope unclear, needs pool or roadmap review before automation.
 ```
 
 ## Output Contract
@@ -413,11 +419,11 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 **Stop Point Checklist（强制）**：
 
-- **接受（分配 assignee）**：写完 `[governance suggest]` 评论即可，不打 scanned 标签
+- **接受（分配 assignee）**：写完 `[governance suggest][roadmap-intake]` 评论即可，不打 scanned 标签
 - **跳过（不接受）**：写完评论后必须打 `orchestra-scanned` 标签
 
 完成以下动作后才能停止：
-- [ ] 写完 `[governance suggest]` 评论
+- [ ] 写完 `[governance suggest][roadmap-intake]` 评论
 - [ ] 如果是跳过：打上 `orchestra-scanned` 标签
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 

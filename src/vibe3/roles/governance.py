@@ -175,10 +175,15 @@ def build_governance_snapshot_context(
     github = github or GitHubClient()
     governed_numbers = get_governed_issue_numbers(github, config)
 
-    # Filter out orchestra-governed issues from the active issues
+    manager_usernames = set(OrchestraStatusService.get_manager_usernames(config))
+
+    # Filter out issues that are not owned by this machine's manager pool, plus
+    # issues already decided by assignee-pool.
     active_entries = tuple(snapshot.active_issues)
     filtered_entries = tuple(
-        entry for entry in active_entries if entry.number not in governed_numbers
+        entry
+        for entry in active_entries
+        if entry.assignee in manager_usernames and entry.number not in governed_numbers
     )
 
     skipped_count = len(active_entries) - len(filtered_entries)

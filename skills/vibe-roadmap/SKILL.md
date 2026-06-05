@@ -5,13 +5,13 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 # /vibe-roadmap - 版本规划与治理审查
 
-维护版本路线图，同时作为三层治理架构的 Layer 3 审查者，消化 pool 层的 `[governance suggest]` 并形成最终 `[roadmap decision]`。
+维护版本路线图，同时作为三层治理架构的 Layer 3 审查者，消化 governance 层的 `[governance suggest][roadmap-intake]` / `[governance suggest][assignee-pool]` 并形成最终 `[roadmap decision]`。
 
 三层架构、标签语义（orchestra-scanned / orchestra-governed / roadmap-reviewed）和三级审查框架（Level 1/2/3）见 @vibe/supervisor/roadmap-common.md（使用 `vibe3 handoff show @vibe/supervisor/roadmap-common.md` 命令读取）。
 
 ## 核心原则
 
-- **审查纠正 governance 决策**：消化 assignee-pool 的 `[governance suggest]`，写 `[roadmap decision]`，打 `roadmap-reviewed`
+- **审查纠正 governance 决策**：消化 roadmap-intake / assignee-pool 的分层 `[governance suggest]`，写 `[roadmap decision]`，打 `roadmap-reviewed`
 - **GitHub-as-truth**：所有操作通过 GitHub labels
 - **不做执行**：不处理单个 flow 执行
 - **manager assignee**：分配 assignee 时使用 `vibe3 task intake <number>`（shell），**禁止手动指定人类用户名**
@@ -19,7 +19,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 ## Scope
 
 **做**：
-- 消化 pool 层的 `[governance suggest]`（Step 0）
+- 消化 governance 层的 `[governance suggest][roadmap-intake]` / `[governance suggest][assignee-pool]`（Step 0）
 - 治理漏网检查（Step 0.5）
 - 版本目标定义与 milestone 分配
 - Issue 分类与 roadmap/priority labels 设置
@@ -44,7 +44,7 @@ description: Use when the user wants project-level roadmap planning, version goa
    ```
    若无历史 `[roadmap decision]` 评论（首次运行），锚点设为 7 天前。
 
-2. **列出未消化的 `[governance suggest]`**（过滤已决策的 issue）：
+2. **列出未消化的分层 `[governance suggest]`**（过滤已决策的 issue）：
    ```bash
    REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
    gh search issues "repo:$REPO [governance suggest]" --match comments --limit 50 \
@@ -67,7 +67,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 5. **推翻 intake skip 时的三步处理**：
 
-   当被审查的 `[governance suggest]` 来自 intake 层 skip 决策（issue 带 `orchestra-scanned` 且无 assignee），如果你决定纳入该 issue，**必须显式执行三步**（标签语义见 roadmap-common.md）：
+   当被审查的 `[governance suggest][roadmap-intake]` 来自 intake 层 skip 决策（issue 带 `orchestra-scanned` 且无 assignee），如果你决定纳入该 issue，**必须显式执行三步**（标签语义见 roadmap-common.md）：
 
    ```bash
    # 1. 移除 intake 跳过标记
@@ -88,7 +88,9 @@ Step 0 处理完后，检查两类"漏网" issue：
 **类型 A：有 assignee 但缺 state 标签**（通过了 intake 但 pool 还没处理，卡在两层之间）
 
 ```bash
-gh issue list --assignee vibe-manager-agent --limit 50 --json number,title,labels \
+vibe3 status
+# 从 Manager agents 读取本机 manager，再替换下面的 <manager>
+gh issue list --assignee <manager> --limit 50 --json number,title,labels,state \
   --jq '.[] | select(.state == "OPEN")
             | select([.labels[].name] | map(select(startswith("state/"))) | length == 0)
             | {number, title}'

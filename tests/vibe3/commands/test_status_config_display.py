@@ -1,6 +1,7 @@
 """Tests for status command configuration display enhancements."""
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -157,6 +158,47 @@ class TestRenderConfigurationOutput:
         assert result.exit_code == 0
         assert "Orchestra Status" in result.output
         assert "Vibe3 Configuration" in result.output
+
+    @patch(
+        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+    )
+    def test_status_uses_keys_env_manager_when_token_already_exists(
+        self,
+        mock_fetch_live_snapshot: MagicMock,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        """keys.env should still fill MANAGER_USERNAMES when another key is set."""
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / "keys.env").write_text(
+            "VIBE_MANAGER_GITHUB_TOKEN=from-file\n" "MANAGER_USERNAMES=keys-manager\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "config" / "v3").mkdir(parents=True)
+        (tmp_path / "config" / "v3" / "settings.yaml").write_text(
+            "orchestra:\n"
+            "  repo: test/repo\n"
+            "  manager_usernames:\n"
+            "    - config-manager\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE_MANAGER_GITHUB_TOKEN", "existing-token")
+        monkeypatch.delenv("MANAGER_USERNAMES", raising=False)
+
+        mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+            timestamp=1234567890.0,
+            server_running=True,
+            active_issues=tuple(),
+            active_flows=0,
+            active_worktrees=0,
+        )
+
+        with patch("vibe3.clients.git_client.find_repo_root", return_value=tmp_path):
+            result = runner.invoke(app, ["status"])
+
+        assert result.exit_code == 0
+        assert "Manager agents:    keys-manager (env override)" in result.output
 
 
 class TestTaskStatusExcludesSystemStatus:

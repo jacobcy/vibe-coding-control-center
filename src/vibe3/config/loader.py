@@ -404,13 +404,10 @@ def load_keys_env_fallback() -> None:
     Only loads if environment variables aren't already set.
     Logs warning on failure (non-blocking, allows graceful degradation).
     """
-    # Skip if any vibe env vars are already set (indicates shell wrapper loaded)
-    if any(
-        os.environ.get(key)
-        for key in ["VIBE_MANAGER_GITHUB_TOKEN", "MANAGER_USERNAMES"]
-    ):
+    loadable_keys = {"VIBE_MANAGER_GITHUB_TOKEN", "MANAGER_USERNAMES"}
+    if all(os.environ.get(key) for key in loadable_keys):
         logger.bind(domain="config").debug(
-            "keys.env fallback skipped: environment variables already present"
+            "keys.env fallback skipped: managed environment variables already present"
         )
         return
 
@@ -454,7 +451,8 @@ def load_keys_env_fallback() -> None:
                     key = key.strip()
                     value = value.strip().strip("\"'")
 
-                    # Only set if not already in environment
+                    # Only set if not already in environment. A manually exported
+                    # token must not prevent keys.env from supplying managers.
                     if key and not os.environ.get(key):
                         os.environ[key] = value
 
