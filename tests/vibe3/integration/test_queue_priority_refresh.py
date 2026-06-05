@@ -8,9 +8,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pytest import MonkeyPatch
 
-from vibe3.clients import SQLiteClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+from vibe3.domain.protocols import FlowManagerProtocol
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models import IssueInfo, IssueState
 from vibe3.models.orchestra_config import OrchestraConfig, QueueRecollectConfig
@@ -128,13 +129,16 @@ async def test_priority_label_update_triggers_queue_reorder(
         issues: list[IssueInfo],
         trigger_state: IssueState,
         config: OrchestraConfig,
-        github: MagicMock,
+        github: GitHubClient,
         store: SQLiteClient,
-        flow_manager: MagicMock,
+        flow_manager: FlowManagerProtocol,
         qualify_gate: QualifyGateService,
         supervisor_label: str,
     ) -> list[IssueInfo]:
         """Real queue selector that sorts by priority labels."""
+        # Suppress unused parameter warnings
+        _ = config, github, store, flow_manager, qualify_gate, supervisor_label
+
         # Filter by state (check both enum value and label format)
         ready_issues = [
             i
@@ -259,13 +263,16 @@ async def test_in_flight_entries_preserved_during_recollect(
         issues: list[IssueInfo],
         trigger_state: IssueState,
         config: OrchestraConfig,
-        github: MagicMock,
+        github: GitHubClient,
         store: SQLiteClient,
-        flow_manager: MagicMock,
+        flow_manager: FlowManagerProtocol,
         qualify_gate: QualifyGateService,
         supervisor_label: str,
     ) -> list[IssueInfo]:
         """Only returns issue #200, not #100."""
+        # Suppress unused parameter warnings
+        _ = config, github, store, flow_manager, qualify_gate, supervisor_label
+
         return [
             i
             for i in issues
@@ -367,12 +374,25 @@ async def test_disabled_config_skips_recollect(
         issues: list[IssueInfo],
         trigger_state: IssueState,
         config: OrchestraConfig,
-        github: MagicMock,
+        github: GitHubClient,
         store: SQLiteClient,
-        flow_manager: MagicMock,
+        flow_manager: FlowManagerProtocol,
         qualify_gate: QualifyGateService,
         supervisor_label: str,
     ) -> list[IssueInfo]:
+        """Empty queue selector for disabled config test."""
+        # Suppress unused parameter warnings
+        _ = (
+            issues,
+            trigger_state,
+            config,
+            github,
+            store,
+            flow_manager,
+            qualify_gate,
+            supervisor_label,
+        )
+
         return []
 
     coordinator = GlobalDispatchCoordinator(
