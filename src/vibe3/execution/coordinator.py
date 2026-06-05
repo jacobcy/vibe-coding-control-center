@@ -65,14 +65,14 @@ class ExecutionCoordinator:
     @staticmethod
     def _default_backend() -> BackendProtocol:
         """Default backend factory."""
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents import CodeagentBackend
 
         return CodeagentBackend()
 
     @staticmethod
     def _default_start_async() -> _StartAsyncFactory:
         """Default async launcher factory."""
-        from vibe3.agents.backends.async_launcher import start_async_command
+        from vibe3.agents import start_async_command
 
         return start_async_command
 
@@ -157,7 +157,7 @@ class ExecutionCoordinator:
 
         Delegates to the single-source-of-truth function in git_client.
         """
-        from vibe3.clients.git_client import find_repo_root
+        from vibe3.clients import find_repo_root
 
         return find_repo_root()
 

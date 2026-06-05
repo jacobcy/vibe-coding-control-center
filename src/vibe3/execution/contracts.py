@@ -11,7 +11,7 @@ from vibe3.models import (  # noqa: F401
 )
 
 if TYPE_CHECKING:
-    from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
+    from vibe3.models import AsyncExecutionHandle
 
 
 class AsyncLauncherProtocol(Protocol):

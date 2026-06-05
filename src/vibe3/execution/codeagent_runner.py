@@ -14,12 +14,12 @@ from vibe3.clients import GitClient, SQLiteClient
 if TYPE_CHECKING:
     from loguru import Logger
 
-    from vibe3.agents.backends.codeagent import AgentResult
-    from vibe3.agents.models import (
+    from vibe3.agents import (
         CodeagentCommand,
         CodeagentResult,
     )
-    from vibe3.exceptions.error_severity import ErrorSeverity
+    from vibe3.exceptions import ErrorSeverity
+    from vibe3.models import AgentResult
 from vibe3.config import VibeConfig, get_role_section
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.execution_lifecycle import (
@@ -34,7 +34,7 @@ from vibe3.services import HandoffService, format_agent_actor
 
 def _severity_event_type(role: str, severity: "ErrorSeverity") -> str:
     """Build event type suffix based on error severity."""
-    from vibe3.exceptions.error_severity import ErrorSeverity
+    from vibe3.exceptions import ErrorSeverity
 
     prefix = execution_prefix(role)  # type: ignore[arg-type]
     if severity == ErrorSeverity.WARNING:
@@ -78,9 +78,9 @@ class CodeagentExecutionService:
         (success or failure), we remove the handoff trigger label so
         the next tick does not re-dispatch the same issue.
         """
-        from vibe3.clients.github_labels import GhIssueLabelPort
-        from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.services.orchestra_helpers import get_handoff_state_label
+        from vibe3.clients import GhIssueLabelPort
+        from vibe3.config import load_orchestra_config
+        from vibe3.services import get_handoff_state_label
 
         config = load_orchestra_config()
         handoff_label = get_handoff_state_label(config.supervisor_handoff)
@@ -232,7 +232,7 @@ class CodeagentExecutionService:
         before_issue_is_closed = False
         if command.issue_number is not None:
             try:
-                from vibe3.clients.github_client import GitHubClient
+                from vibe3.clients import GitHubClient
 
                 issue_payload = GitHubClient().view_issue(
                     command.issue_number,
@@ -381,8 +381,7 @@ class CodeagentExecutionService:
 
     def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
         """Execute codeagent synchronously."""
-        from vibe3.agents.backends.codeagent import CodeagentBackend
-        from vibe3.agents.models import CodeagentResult
+        from vibe3.agents import CodeagentBackend, CodeagentResult
 
         log = logger.bind(
             domain="codeagent",
@@ -431,12 +430,12 @@ class CodeagentExecutionService:
                 session_id=effective_session_id,
             )
         except Exception as exc:
-            from vibe3.exceptions import AgentExecutionError
-            from vibe3.exceptions.error_classification import (
+            from vibe3.exceptions import (
+                AgentExecutionError,
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.services.error_helpers import record_error
+            from vibe3.services import record_error
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.
@@ -543,7 +542,7 @@ class CodeagentExecutionService:
         cwd: Path | None = None,
     ) -> CodeagentResult:
         """Execute a sync worker request through the unified execution shell."""
-        from vibe3.agents.models import (
+        from vibe3.agents import (
             ExecutionRole,
             create_codeagent_command,
         )

@@ -67,7 +67,7 @@ class AutoSceneRecoveryService:
         repo_path = resolve_repo_path(request)
         target_path = repo_path / ".worktrees" / branch
 
-        from vibe3.environment.worktree_support import (
+        from vibe3.environment import (
             find_worktree_by_path,
             find_worktree_for_branch,
         )
@@ -108,8 +108,8 @@ class AutoSceneRecoveryService:
         damage_signals: list[str],
         error_msg: str,
     ) -> ExecutionLaunchResult | None:
-        from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
-        from vibe3.services.error_helpers import record_error
+        from vibe3.exceptions import E_EXEC_AUTO_SCENE_RESET
+        from vibe3.services import record_error
 
         detail = "; ".join(damage_signals)
         recovery_actor = "orchestra:auto-recover"
@@ -144,7 +144,7 @@ class AutoSceneRecoveryService:
             },
         )
 
-        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+        from vibe3.services import FlowRebuildUsecase
 
         try:
             FlowRebuildUsecase(store=self.store).rebuild_issue_flow(

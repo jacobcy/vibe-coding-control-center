@@ -21,6 +21,10 @@ if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.environment.worktree import WorktreeManager
     from vibe3.environment.worktree_context import WorktreeContext
+    from vibe3.environment.worktree_support import (
+        find_worktree_by_path,
+        find_worktree_for_branch,
+    )
 
 # Lazy imports
 _LAZY_IMPORTS = {
@@ -30,6 +34,8 @@ _LAZY_IMPORTS = {
     "SessionRegistryService": "vibe3.environment.session_registry",
     "WorktreeManager": "vibe3.environment.worktree",
     "WorktreeContext": "vibe3.environment.worktree_context",
+    "find_worktree_by_path": "vibe3.environment.worktree_support",
+    "find_worktree_for_branch": "vibe3.environment.worktree_support",
     "get_manager_session_name": "vibe3.environment.session_naming",
 }
 
@@ -45,12 +51,14 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    "WorktreeContext",
-    "WorktreeManager",
-    "TmuxSessionContext",
     "CodeagentSessionContext",
     "SessionManager",
     "SessionRegistryService",
+    "TmuxSessionContext",
+    "WorktreeContext",
+    "WorktreeManager",
+    "find_worktree_by_path",
+    "find_worktree_for_branch",
     "get_manager_session_name",
     "resolve_prompt_config",
     "resolve_runtime_asset",

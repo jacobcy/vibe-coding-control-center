@@ -6,8 +6,11 @@ import typer
 
 from vibe3.agents import CodeagentBackend
 from vibe3.clients import GitClient, SQLiteClient
-from vibe3.config import load_orchestra_config
-from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
+from vibe3.config import (
+    ROLE_CONFIG_SECTIONS,
+    RoleCliOverrides,
+    load_orchestra_config,
+)
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
@@ -16,8 +19,8 @@ from vibe3.services import (
     format_agent_actor,
     load_issue_info,
     record_dispatch_failure_if_unexpected,
+    resolve_branch_arg,
 )
-from vibe3.services.branch_arg import resolve_branch_arg
 
 
 def run_issue_role_async(
@@ -46,7 +49,7 @@ def run_issue_role_async(
 
     store = SQLiteClient()
     if branch is not None:
-        branch = resolve_branch_arg(branch)
+        branch = resolve_branch_arg(branch)  # type: ignore[misc]
     else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
@@ -161,7 +164,7 @@ def run_issue_role_sync(
 
     store = SQLiteClient()
     if branch is not None:
-        branch = resolve_branch_arg(branch)
+        branch = resolve_branch_arg(branch)  # type: ignore[misc]
     else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
