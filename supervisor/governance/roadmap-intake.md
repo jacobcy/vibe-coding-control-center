@@ -48,6 +48,25 @@
 
 **为什么 intake 直接打 `roadmap/rfc`**：Level 0 issue 被 skip 后无 assignee，assignee-pool 只扫 has-assignee 永远看不到它。只有 intake 此刻打 `roadmap/rfc` 才能命中 task-status Rule 1（始终展示）被 /vibe-task surface；否则落入 Rule 4（无 state 无 assignee）被永久隐藏。这是 intake 唯一允许设 `roadmap/*` 的机械例外。
 
+**反模式评估（Level 1 附加维度）**
+
+在执行 Level 1 基础条件检查时，同时对照反模式特征（定义详见 [roadmap-common.md](../../supervisor/roadmap-common.md#反模式-issue-识别标准)）进行评估：
+
+**检查项**：
+- 是否命中反模式特征 >= 2 条
+- 每条特征需有具体证据
+
+**命中反模式的处理**：
+- 写 `[governance suggest]` comment：注明反模式原因及评分项（如："反模式：满足 #2 高复杂度低 ROI、#5 边缘场景驱动"）
+- 打 `orchestra-scanned` 标签
+- **禁止**纳入 assignee issue pool
+- 记录到 `Skipped`，原因为 `anti-pattern: <评分项>`
+
+**与现有 Level 1 的关系**：
+- 反模式检查是 Level 1 的**附加维度**，侧重于"看着有道理但超出项目边界"的识别
+- Level 1 检查的是"边界是否明确"，反模式检查的是"边界看似明确但实际超出项目处理范围"
+- 两者互补：Level 1 过滤模糊问题，反模式过滤看似清晰但不应做的问题
+
 **Level 1-3 审查框架详见 @vibe/supervisor/roadmap-common.md#三级审查框架**（使用 `vibe3 handoff show @vibe/supervisor/roadmap-common.md` 命令读取）。
 
 ### 决策逻辑
