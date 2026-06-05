@@ -97,10 +97,7 @@ class TestAutoResumeRestoresInferredState:
             latest_actor=None,
         )
         label = infer_resume_label(fs)
-        assert label in {
-            IssueState.READY,
-            IssueState.CLAIMED,
-        }
+        assert label == IssueState.READY
 
     def test_infer_resume_label_with_actor_restores_in_progress(self, usecase):
         """Active flow with actor should restore to IN_PROGRESS or CLAIMED."""

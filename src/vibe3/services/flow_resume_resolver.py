@@ -20,7 +20,7 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
     2. latest_verdict exists -> MERGE_READY / IN_PROGRESS / HANDOFF (Based on verdict)
     3. report_ref exists -> REVIEW (Code is written, needs review)
     4. plan_ref exists -> IN_PROGRESS (Plan exists, needs execution)
-    5. default -> CLAIMED (Start fresh)
+    5. default -> READY (Ready to be picked up)
 
     Args:
         flow_state: The current local state of the flow
@@ -63,5 +63,5 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
         # Plan exists but no code (report) yet
         return IssueState.IN_PROGRESS
 
-    # Everything is missing -> Need to start from the beginning
-    return IssueState.CLAIMED
+    # No plan_ref -> ready to be picked up by executor
+    return IssueState.READY
