@@ -337,22 +337,37 @@ closeout 约束：
 
 本文只定义这些保护规则的最低要求，不扩展平台实现细节。
 
-## 10. V3 Implementation Notes
+## 10. PR Size and Branch Sync Strategy
+
+### 10.1 PR 规模控制
+
+- 单个 PR 应聚焦单一交付目标
+- 超过 20 个文件变更的 PR 应在 plan 阶段评估拆分可行性
+- 源码迁移和测试变更应尽量分离到不同 PR
+
+### 10.2 分支同步策略
+
+- 同步 main 分支更新时优先使用 `git rebase origin/main`
+- Rebase 保持线性提交历史，使 PR diff 仅反映实际变更
+- 仅当 rebase 冲突过于复杂时才使用 `git merge origin/main`
+- 使用 merge 时必须通过 handoff 记录原因
+
+## 11. V3 Implementation Notes
 
 V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 
-### 10.1 Key V3 Components
+### 11.1 Key V3 Components
 
 - **CLI Layer**: `src/vibe3/cli.py` - Typer-based command interface
 - **Git Operations**: `src/vibe3/clients/git_client.py` - Pythonic git operations
 - **Flow Management**: `src/vibe3/services/flow_service.py` - Flow state tracking
 - **Task Integration**: `src/vibe3/services/task_service.py` - Bridge to task system
 
-## 11. Legacy (Migration from V2)
+## 12. Legacy (Migration from V2)
 
 以下内容仅供从 V2 迁移时参考，V3 原生开发可忽略。
 
-### 11.1 V3 vs V2 Differences
+### 12.1 V3 vs V2 Differences
 
 | Aspect | V2 (Shell) | V3 (Python) |
 |--------|-----------|-------------|
@@ -362,7 +377,7 @@ V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 | Configuration | `.viberc` | `config/settings.yaml` |
 | Command Prefix | `vibe` | `vibe3` |
 
-### 11.2 Migration Path
+### 12.2 Migration Path
 
 V3 保持与 V2 相同的工作流语义，但使用 Python 实现：
 - `git checkout -b` + `vibe3 flow update` → 替代 vibe2 `flow new`

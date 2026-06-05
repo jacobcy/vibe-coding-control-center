@@ -62,6 +62,15 @@
    - 等待 manager 指示是否扩展 scope
    - 不要继续执行超出 scope 的变更
 
+4. **如果发现需要 scope 外变更才能完成目标**
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "需要扩展 scope：<具体原因和变更内容>" --kind finding --actor "executor"
+   ```
+   - **立即停止当前步骤**
+   - 通过 `handoff append --kind finding` 记录需要扩展的原因和具体变更
+   - 等待 manager 确认后再继续
+   - 不要自行决定扩展 scope
+
 #### Scope Enforcement: 死代码清理边界
 
 **强制约束**：Executor 不得删除 plan 范围外的函数、类、方法或符号。
@@ -498,6 +507,7 @@ executor 不得仅凭以下方式判断行为：
 - 发现自己正在执行 plan scope 未覆盖的变更类型（scope violation）
 - plan 声明禁止删除模块，但当前步骤需要删除文件
 - plan 声明禁止修改行为，但当前步骤需要修改错误处理或数据流
+- 发现需要超出 plan scope 的变更才能完成目标，且尚未通过 handoff 获得 manager 批准
 
 ## PR 创建规则
 
@@ -506,6 +516,48 @@ executor 不得仅凭以下方式判断行为：
 - 使用 `gh pr create` 时，显式传递 `--draft=false`
 - 使用 `vibe3 pr create` 时，默认已创建正式 PR（非 draft）
 - 如果 PR 已经是 draft 状态，使用 `gh pr edit <number> --draft=false` 修正
+
+### 分支同步策略（rebase 优先）
+
+同步 main 分支更新时，优先使用 rebase 保持线性历史：
+
+**标准流程**：
+
+1. **优先使用 `git rebase origin/main`**
+   - 保持线性提交历史
+   - 使 PR diff 仅反映实际变更
+   - 便于 review 理解改动范围
+
+2. **仅在冲突过于复杂时使用 `git merge origin/main`**
+   - 判断标准：rebase 冲突涉及超过 10 个文件或多次提交
+   - 使用 merge 时必须在 handoff 中记录原因：
+     ```bash
+     uv run python src/vibe3/cli.py handoff append "使用 merge 同步 main：<具体原因，如 rebase 冲突涉及 15 个文件，解决复杂度过高>" --kind note --actor "executor"
+     ```
+
+3. **禁止无说明使用 merge**
+   - 不要在未说明原因的情况下使用 merge 同步 main
+   - 优先选择 rebase，除非有明确的技术理由
+
+**验证命令**：
+
+```bash
+# 同步前检查
+git fetch origin main
+git log HEAD..origin/main --oneline
+
+# 标准同步流程
+git rebase origin/main
+
+# 处理冲突（如有）
+git status
+# 编辑冲突文件
+git add <resolved-files>
+git rebase --continue
+
+# 验证 rebase 结果
+git log --oneline -5
+```
 
 ## 交付要求
 
