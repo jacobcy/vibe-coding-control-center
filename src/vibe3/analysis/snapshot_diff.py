@@ -222,18 +222,7 @@ def compute_diff(
         module_changes, module_summary, warnings = _diff_modules(baseline, current)
         dep_changes, dep_summary = _diff_dependencies(baseline, current)
 
-        summary = DiffSummary(
-            files_added=file_summary.files_added,
-            files_removed=file_summary.files_removed,
-            files_modified=file_summary.files_modified,
-            modules_added=module_summary.modules_added,
-            modules_removed=module_summary.modules_removed,
-            modules_modified=module_summary.modules_modified,
-            dependencies_added=dep_summary.dependencies_added,
-            dependencies_removed=dep_summary.dependencies_removed,
-            total_loc_delta=file_summary.total_loc_delta,
-            total_functions_delta=file_summary.total_functions_delta,
-        )
+        summary = file_summary + module_summary + dep_summary
 
         diff = StructureDiff(
             baseline_id=baseline.snapshot_id,
