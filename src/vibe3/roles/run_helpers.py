@@ -122,8 +122,7 @@ def publish_run_command_failure(
     reason: str,
 ) -> None:
     """Publish run failure lifecycle for command-mode execution."""
-    from vibe3.domain.events import IssueFailed
-    from vibe3.domain.publisher import publish
+    from vibe3.domain import IssueFailed, publish
 
     publish(
         IssueFailed(

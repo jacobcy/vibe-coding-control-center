@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vibe3.domain.events import (
+from vibe3.domain import (
     ExecutorDispatchIntent,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
