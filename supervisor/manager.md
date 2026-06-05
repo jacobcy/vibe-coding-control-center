@@ -627,28 +627,36 @@ Steps:
    - **目的**：检测分支上是否已存在与当前 issue scope 无关的改动，避免执行继承无关工作。
    - **执行时机**：在架构风险评估后、确认 claimed 状态前。
    - **操作步骤**：
-     a. 获取当前分支相对于 base branch 的改动文件：
-        ```bash
-        git diff <base-branch>...HEAD --name-only
-        ```
-        （base-branch 从 scene 中读取，默认为 `origin/main`）
-     b. 检查改动文件数量是否超过阈值（建议阈值：10 个文件）：
-        - 若改动文件数 ≤ 阈值：继续后续流程
-        - 若改动文件数 > 阈值：进入详细风险评估（步骤 c）
-     c. 运行详细风险评估：
+     a. 运行 scope baseline 评估：
         ```bash
         uv run python src/vibe3/cli.py inspect base --json
         ```
-     d. 判断是否需要 block：
-        - 若 `score.level` 为 `HIGH` 或 `total_changed` 显著超出预期 scope：
-          i. 写 handoff append：详细说明 pre-existing changes（文件数量、风险等级、涉及模块）
-          ii. Comment：`[manager] Branch has pre-existing changes that may conflict with issue scope. <N> files changed vs base. Need human confirmation before planning.`
-          iii. Block：
-             ```bash
-             vibe3 flow blocked --reason "Pre-existing branch changes detected: <N> files changed vs base. Scope baseline validation requires human review."
-             ```
-          iv. `exit()`
-        - 若 clean 或改动在预期 scope 内：继续后续流程
+        **注意**：`inspect base` 使用 `BaseResolutionUsecase` 自动检测父分支（通过 `git merge-base`、parent branch、或 scene 中的 base branch 信息），避免使用过时的基准分支。若检测到的基准分支落后 origin/main 超过 50 commits，会在输出中警告。
+     b. 分析评估结果：
+        - **主要信号**：`score.level` 字段
+          - `HIGH`: 高风险，很可能存在 unrelated changes
+          - `MEDIUM`: 中等风险，需要人工判断
+          - `LOW`: 低风险，可能都是相关改动
+        - **辅助信号**：
+          - `total_changed`: 改动文件总数
+          - `code_changed`: 代码文件改动数
+          - `score.dimensions`: 详细维度（changed_lines, changed_files, impacted_modules, public_api_touch 等）
+          - `base_branch`: 实际使用的基准分支（验证是否为预期的分支）
+     c. 判断是否需要 block：
+        - **必须 block**：`score.level == HIGH`
+          - 写 handoff append：详细说明 pre-existing changes（文件数量、风险等级、涉及模块、base_branch）
+          - Comment：`[manager] Branch has pre-existing changes that may conflict with issue scope. <N> files changed vs base. Score: HIGH. Base branch: <base_branch>. Need human confirmation before planning.`
+          - Block：`vibe3 flow blocked --reason "Pre-existing branch changes detected: <N> files changed vs base. Score: HIGH. Scope baseline validation requires human review."`
+          - `exit()`
+        - **建议 block**：`score.level == MEDIUM` 且满足以下任一条件：
+          - `total_changed > 10` 或 `code_changed > 5`
+          - `public_api_touch == true`
+          - 基准分支落后 origin/main 超过 50 commits（可能有误判风险）
+          - 写 handoff append：说明中等风险及具体原因
+          - Comment：`[manager] Branch has medium-risk pre-existing changes. <details>. Need human confirmation.`
+          - Block：`vibe3 flow blocked --reason "Medium-risk pre-existing changes detected. <details>"`
+          - `exit()`
+        - **允许通过**：`score.level == LOW` 或改动明显在 issue scope 内
    - **理由**：这是最早能检测问题的时机。Plan agent 尚未启动，不会浪费执行时间。提前发现分支复用残留或无关改动，可让人类决定是清理分支还是接受改动。
 3. 复述当前已进入 claimed
 4. 明确记录：拆分窗口已关闭，后续 plan/run/review 不得再改变为 sub-issue 拆分；若 plan agent 发现 scope 无法执行，应 blocked 回 manager/人类，而不是自行拆分
@@ -758,22 +766,23 @@ Decision sketch:
     - **目的**：验证 plan 声明的 scope 与实际分支状态一致，防止 plan agent 创建的 scope 边界与分支已有改动不匹配。
     - **执行时机**：在 Scope Boundary 审查后、批准 plan 前。
     - **操作步骤**：
-      1. 获取当前分支改动：
+      1. 运行 scope baseline 评估获取当前分支改动：
          ```bash
-         git diff <base-branch>...HEAD --name-only
+         uv run python src/vibe3/cli.py inspect base --json
          ```
+         **优势**：
+         - 自动检测正确的 base branch（避免使用过时的基准分支）
+         - 提供详细的风险评估（score.level, dimensions）
+         - 输出 `total_changed`, `code_changed`, `changed_symbols` 等结构化信息
       2. 从 plan 的 "Scope Boundary" / "Changes" 部分提取声明的文件列表
-      3. 比对：检查分支改动文件是否都在 plan 声明的 scope 内
+      3. 比对：检查 `inspect base` 输出的改动文件是否都在 plan 声明的 scope 内
       4. 若发现 scope violation：
-         - 写 handoff append：列出 out-of-scope 文件清单
-         - Comment：`[manager] Branch changes exceed plan scope boundary. Out-of-scope files: <list>.`
-         - Block：
-           ```bash
-           vibe3 flow blocked --reason "Scope baseline violation: branch has <N> out-of-scope files vs plan scope."
-           ```
+         - 写 handoff append：列出 out-of-scope 文件清单、score.level、base_branch
+         - Comment：`[manager] Branch changes exceed plan scope boundary. Out-of-scope files: <list>. Score: <level>. Base branch: <base_branch>.`
+         - Block：`vibe3 flow blocked --reason "Scope baseline violation: branch has <N> out-of-scope files vs plan scope. Score: <level>."`
          - `exit()`
       5. 若分支改动与 plan scope 一致：继续批准 plan
-    - **理由**：即使 Gate 1 通过，plan agent 可能创建与分支状态不匹配的 scope 边界。这个检查在执行前捕获不匹配。
+    - **理由**：即使 Gate 1 通过，plan agent 可能创建与分支状态不匹配的 scope 边界。这个检查在执行前捕获不匹配。使用 `inspect base` 而非 `git diff` 可以自动处理 base branch 检测问题（Issue #2076 自身遇到的误判）。
   - 若 plan 不达标：可直接修改 plan_ref（你有 write 权限），或转回 `state/claimed` 要求重做 plan
   - 若 plan 达标：写 handoff append 说明当前进入执行阶段、重点关注区域、spec 要点
   - 进入 `state/in-progress`
