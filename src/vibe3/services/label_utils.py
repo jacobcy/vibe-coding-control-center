@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import GhIssueLabelPort
+from vibe3.clients.protocols.services_protocols import TriggerableRoleDefinitionProtocol
 from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models import IssueInfo
-    from vibe3.roles import TriggerableRoleDefinition
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -110,7 +110,7 @@ def should_skip_from_queue(
 
 def clean_old_state_labels(
     issue: "IssueInfo",
-    role: "TriggerableRoleDefinition",
+    role: TriggerableRoleDefinitionProtocol,
     config: OrchestraConfig,
 ) -> None:
     """Remove conflicting state/* labels before dispatch.
