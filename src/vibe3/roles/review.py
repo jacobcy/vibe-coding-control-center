@@ -16,9 +16,7 @@ from vibe3.agents import (
     make_review_context_builder,
     run_inspect_json,
 )
-
-# public-api: pending upstream export
-from vibe3.analysis.inspect_output_adapter import changed_symbols
+from vibe3.analysis import changed_symbols
 from vibe3.config import (
     REVIEWER_GATE_CONFIG,
     ConventionResolver,

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         AUTOMATED_MARKERS,
         GENERIC_AGENT_MARKER_PATTERN,
         STARTING_TIMEOUT_SECONDS,
+        VERDICT_UNKNOWN,
     )
     from vibe3.utils.error_message_cleaner import (
         CODEAGENT_WRAPPER_RE,
@@ -58,6 +59,7 @@ _LAZY_IMPORTS = {
     "stream_reader": "vibe3.utils.codeagent_helpers",
     "summarize_backend_output": "vibe3.utils.codeagent_helpers",
     "try_parse_issue_number": "vibe3.utils.issue_ref",
+    "VERDICT_UNKNOWN": "vibe3.utils.constants",
 }
 
 
@@ -76,6 +78,7 @@ __all__ = [
     "CODEAGENT_WRAPPER_RE",
     "GENERIC_AGENT_MARKER_PATTERN",
     "STARTING_TIMEOUT_SECONDS",
+    "VERDICT_UNKNOWN",
     "build_prompt_file_content",
     "clean_error_message",
     "diagnose_backend_error",
