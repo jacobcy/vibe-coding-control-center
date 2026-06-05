@@ -250,10 +250,10 @@ def test_plan_dry_run_outputs_summary(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda branch, file=None: mock_spec_input,
     )
 
-    # Mock VibeConfig.get_defaults
+    # Mock VibeConfig.get_defaults (from vibe3.config module)
     mock_config = MagicMock()
     monkeypatch.setattr(
-        "vibe3.commands.plan.VibeConfig.get_defaults", lambda: mock_config
+        "vibe3.config.loader.VibeConfig.get_defaults", lambda: mock_config
     )
 
     # Mock create_codeagent_command
@@ -431,10 +431,10 @@ def test_plan_show_prompt_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda branch, file=None: mock_spec_input,
     )
 
-    # Mock VibeConfig.get_defaults
+    # Mock VibeConfig.get_defaults (from vibe3.config module)
     mock_config = MagicMock()
     monkeypatch.setattr(
-        "vibe3.commands.plan.VibeConfig.get_defaults", lambda: mock_config
+        "vibe3.config.loader.VibeConfig.get_defaults", lambda: mock_config
     )
 
     # Mock create_codeagent_command to capture show_prompt
