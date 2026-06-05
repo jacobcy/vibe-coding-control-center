@@ -1,5 +1,9 @@
 """Tests for CLI overrides module."""
 
+import dataclasses
+
+import pytest
+
 from vibe3.config.cli_overrides import (
     RoleCliOverrides,
     build_issue_role_cli_overrides,
@@ -57,12 +61,8 @@ class TestRoleCliOverrides:
     def test_frozen(self) -> None:
         """Test that dataclass is frozen (immutable)."""
         o = RoleCliOverrides(agent="a")
-        # Dataclass is frozen, mutation should raise
-        try:
+        with pytest.raises(dataclasses.FrozenInstanceError):
             o.agent = "b"
-            assert False, "Should have raised FrozenInstanceError"
-        except AttributeError:
-            pass
 
     def test_build_role_cli_overrides_delegates(self) -> None:
         """Test that build_role_cli_overrides delegates to RoleCliOverrides."""
