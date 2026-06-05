@@ -70,10 +70,9 @@ if TYPE_CHECKING:
     from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
-    "BootstrapAction",
-    "block_manager_noop_issue",
     "BaseResolutionUsecase",
     "BlockedStateService",
+    "BootstrapAction",
     "BootstrapActionKind",
     "BootstrapContextService",
     "BootstrapPlan",
@@ -105,6 +104,7 @@ __all__ = [
     "TaskService",
     "TaskStatusBucket",
     "VerdictService",
+    "block_manager_noop_issue",
     "build_bind_task_hint",
     "build_pr_analysis",
     "check_ref_exists",
@@ -154,6 +154,7 @@ _SYMBOL_MODULES = {
     "FlowCleanupService": "vibe3.services.flow_cleanup_service",
     "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",
     "FlowProjectionService": "vibe3.services.flow_projection_service",
+    "FlowRebuildUsecase": "vibe3.services.flow_rebuild_usecase",
     "FlowService": "vibe3.services.flow_service",
     "HandoffService": "vibe3.services.handoff_service",
     "HandoffStatusService": "vibe3.services.handoff_status_service",
@@ -204,7 +205,6 @@ _SYMBOL_MODULES = {
     "sanitize_event_detail_paths": "vibe3.services.path_helpers",
     "clean_old_state_labels": "vibe3.services.label_utils",
     "should_skip_from_queue": "vibe3.services.label_utils",
-    "FlowRebuildUsecase": "vibe3.services.flow_rebuild_usecase",
 }
 
 
