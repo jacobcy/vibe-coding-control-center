@@ -1,6 +1,6 @@
 ---
 name: vibe-project-check
-description: Use after `vibe init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Do not use for system-level installation issues (use vibe-onboard instead).
+description: Use after `vibe init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Supports cross-project vibe3 readiness verification (Phase 5-8). Do not use for system-level installation issues (use vibe-onboard instead).
 ---
 
 # /vibe-project-check - 项目配置检查与补全
@@ -17,6 +17,8 @@ description: Use after `vibe init` to verify project configuration completeness.
 - Orchestra 启动前，检查项目是否能被管理
 - 配置修改后，验证配置是否有效
 - 问题诊断时，作为第一道环境检查
+
+**注意**：此 skill 可在任意 repo 中运行。Phase 1–4 检查 vibe-center 项目配置；Phase 5–8 检查跨项目 readiness。
 
 **完成后状态**：输出完整的检查报告，所有配置项已验证或补全，项目可以正常运行。
 
@@ -236,6 +238,270 @@ vibe keys check
 
 ---
 
+## Phase 5: Global Runtime Asset Completeness
+
+检查 `~/.vibe/` 运行时资产是否完整（由 `vibe update run` 分发）。
+
+**Step 5.1: 检查全局资源目录**
+
+```bash
+# 检查 vibe3 resources 目录
+test -d ~/.vibe/src/vibe3/resources && echo "ok" || echo "MISSING: ~/.vibe/src/vibe3/resources"
+```
+
+**Step 5.2: 检查 prompts 配置文件**
+
+```bash
+# 检查 prompts.yaml
+test -f ~/.vibe/config/prompts/prompts.yaml && echo "ok" || echo "MISSING: ~/.vibe/config/prompts/prompts.yaml"
+
+# 检查 prompt-recipes.yaml
+test -f ~/.vibe/config/prompts/prompt-recipes.yaml && echo "ok" || echo "MISSING: ~/.vibe/config/prompts/prompt-recipes.yaml"
+```
+
+**Step 5.3: 检查 supervisor 配置**
+
+```bash
+# 检查 manager.md
+test -f ~/.vibe/supervisor/manager.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/manager.md"
+
+# 检查 supervisor handoff material
+test -f ~/.vibe/supervisor/apply.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/apply.md"
+
+# 检查 policies
+test -f ~/.vibe/supervisor/policies/common.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/policies/common.md"
+test -f ~/.vibe/supervisor/policies/run.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/policies/run.md"
+test -f ~/.vibe/supervisor/policies/plan.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/policies/plan.md"
+test -f ~/.vibe/supervisor/policies/review.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/policies/review.md"
+```
+
+**Step 5.4: 检查 governance material catalog**
+
+```bash
+# 检查 prompt-recipes.yaml 引用的 governance materials
+test -f ~/.vibe/supervisor/governance/assignee-pool.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/assignee-pool.md"
+test -f ~/.vibe/supervisor/governance/roadmap-intake.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/roadmap-intake.md"
+test -f ~/.vibe/supervisor/governance/cron-supervisor.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/cron-supervisor.md"
+test -f ~/.vibe/supervisor/governance/code-auditor.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/code-auditor.md"
+```
+
+**Step 5.5: 检查全局 skills**
+
+```bash
+# 检查 vibe-commit skill
+test -f ~/.vibe/skills/vibe-commit/SKILL.md && echo "ok" || echo "MISSING: ~/.vibe/skills/vibe-commit/SKILL.md"
+```
+
+**修复操作**：
+
+如果发现缺失，提示用户：
+```
+Agent: 发现全局运行时资产缺失（共 14 项）。
+
+       需要回到 vibe-center repo 运行以下命令同步：
+       vibe update run
+
+       同步后重新运行此检查确认完整性。
+
+       是否现在停止检查，等待同步完成？(y/n)
+User: y
+
+Agent: 已停止检查。请切换到 vibe-center repo 运行：
+       cd /path/to/vibe-center
+       vibe update run
+
+       完成后回到此项目重新运行 vibe-project-check。
+```
+
+**验证**: `ls ~/.vibe/src/vibe3/resources/` 显示文件；所有 14 个路径均存在。
+
+---
+
+## Phase 6: Target Repo Init State
+
+检查目标 repo（当前工作目录）是否已正确初始化。
+
+**Step 6.1: 检查 .vibe/config.yaml**
+
+```bash
+# 检查文件是否存在
+test -f .vibe/config.yaml || echo "MISSING: .vibe/config.yaml (run 'vibe init --profile <name>')"
+
+# 检查 profile 字段
+grep -q "^profile:" .vibe/config.yaml && echo "profile: ok" || echo "MISSING: profile field in .vibe/config.yaml"
+```
+
+**Step 6.2: 检查 .vibe/settings.yaml 有效性（如果存在）**
+
+```bash
+# 检查 YAML 格式（容错处理）
+if test -f .vibe/settings.yaml; then
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "import sys; yaml_available = False
+try:
+    import yaml
+    yaml_available = True
+except ImportError:
+    pass
+if yaml_available:
+    try:
+        yaml.safe_load(open('.vibe/settings.yaml'))
+        print('settings.yaml: valid')
+    except Exception as e:
+        print(f'INVALID: .vibe/settings.yaml is not valid YAML: {e}')
+else:
+    print('settings.yaml: yaml-check-skipped: PyYAML not installed, skipping format validation')
+" || echo "settings.yaml: check-failed"
+  fi
+else
+  echo "settings.yaml: not present (optional, ok)"
+fi
+```
+
+**Step 6.3: 检查 Git repo 状态**
+
+```bash
+# 检查 HEAD commit 是否存在
+git rev-parse HEAD >/dev/null 2>&1 || echo "MISSING: no HEAD commit (not a git repo?)"
+
+# 检查 remote origin 是否配置
+git remote get-url origin >/dev/null 2>&1 || echo "WARNING: no remote 'origin' configured"
+
+# 检查当前分支
+git rev-parse --abbrev-ref HEAD >/dev/null 2>&1 || echo "MISSING: cannot determine current branch"
+```
+
+**修复操作**：
+
+根据缺失项提供具体指导：
+- 无 `.vibe/config.yaml` → "运行 `vibe init --profile minimal|github-flow` 初始化此 repo"
+- 缺失 profile 字段 → "编辑 `.vibe/config.yaml` 添加 `profile: <name>`"
+- 无效 settings → "修复 `.vibe/settings.yaml` 的 YAML 格式"
+- 无 git HEAD → "先初始化 git repo: `git init`"
+
+**验证**: 所有检查通过或明确显示 "optional, ok"。
+
+---
+
+## Phase 7: Agent/Toolchain Availability
+
+检查 agent 运行所需的工具链是否就绪。
+
+**Step 7.1: 检查基础工具链**
+
+```bash
+# 检查必需工具
+vibe doctor --essential
+```
+
+**Step 7.2: 检查密钥配置**
+
+```bash
+# 验证 GitHub token 等密钥
+vibe keys check
+```
+
+**Step 7.3: 检查 GitHub CLI 认证**
+
+```bash
+# 验证 gh 认证状态
+gh auth status
+```
+
+**Step 7.4: 检查后端 CLI（根据配置）**
+
+```bash
+# 读取 adapter 配置
+ADAPTER=$(grep -E "^adapter:" .vibe/config.yaml 2>/dev/null | awk '{print $2}')
+
+# 检查对应后端 CLI 是否存在
+case "$ADAPTER" in
+  claude|"")
+    command -v claude >/dev/null 2>&1 || echo "MISSING: claude CLI not found"
+    ;;
+  codex)
+    command -v codex >/dev/null 2>&1 || echo "MISSING: codex CLI not found"
+    ;;
+  opencode)
+    command -v opencode >/dev/null 2>&1 || echo "MISSING: opencode CLI not found"
+    ;;
+  gemini)
+    command -v gemini >/dev/null 2>&1 || echo "MISSING: gemini CLI not found"
+    ;;
+esac
+```
+
+**修复操作**：
+
+根据失败项提供具体指导：
+- `vibe doctor` 失败 → "安装缺失工具（参见 `vibe doctor` 输出）"
+- `vibe keys` 失败 → "运行 `vibe keys init` 或手动配置密钥"
+- `gh auth` 失败 → "运行 `gh auth login`"
+- 后端 CLI 缺失 → "安装所需后端 CLI 或修改 `.vibe/config.yaml` 中的 adapter 配置"
+
+**验证**: 所有命令退出码为 0 且输出符合预期。
+
+---
+
+## Phase 8: Core Command Prompt Readiness
+
+测试核心命令（`plan`, `run`, `review`）是否能正确渲染 prompt。
+
+**Step 8.1: 检查 plan prompt readiness**
+
+```bash
+# 需要已绑定 flow 的分支；使用当前分支测试
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+if vibe3 flow show "$BRANCH" >/dev/null 2>&1; then
+  vibe3 plan --dry-run --show-prompt --branch "$BRANCH" 2>&1 | grep -q "prompt" && echo "plan prompt: ok" || echo "WARNING: plan --show-prompt produced no prompt output"
+else
+  echo "SKIP: plan prompt check (no flow bound to current branch; this is expected in uninitialized repos)"
+fi
+```
+
+**Step 8.2: 检查 run prompt readiness**
+
+```bash
+# 测试 run 命令 prompt 渲染
+vibe3 run --dry-run --show-prompt "test readiness check" 2>&1 | grep -q "prompt\|Task:" && echo "run prompt: ok" || echo "WARNING: run --show-prompt produced no output"
+```
+
+**Step 8.3: 检查 review prompt readiness**
+
+```bash
+# 需要已绑定 flow 的分支
+if vibe3 flow show "$BRANCH" >/dev/null 2>&1; then
+  vibe3 review --dry-run --show-prompt --branch "$BRANCH" 2>&1 | grep -q "prompt\|reviewer" && echo "review prompt: ok" || echo "WARNING: review --show-prompt produced no output"
+else
+  echo "SKIP: review prompt check (no flow bound to current branch)"
+fi
+```
+
+**Step 8.4: internal manager prompt readiness**
+
+```bash
+# internal manager 需要 issue number；优先从 task/issue-<num> 分支名解析
+ISSUE=$(printf "%s" "$BRANCH" | sed -n 's/.*issue-\([0-9][0-9]*\).*/\1/p')
+
+if test -n "$ISSUE"; then
+  vibe3 internal manager "$ISSUE" --no-async --dry-run --show-prompt --branch "$BRANCH" 2>&1 | grep -q "prompt_content\|manager.supervisor_content" && echo "internal manager prompt: ok" || echo "WARNING: internal manager --show-prompt produced no prompt output"
+else
+  echo "SKIP: internal manager prompt check (current branch does not expose issue number)"
+fi
+```
+
+**修复操作**：
+
+根据结果提供指导：
+- 未初始化 repo 中的 SKIP → 预期行为，提示用户先运行 `vibe init`
+- Prompt 输出缺失 → "手动检查 `vibe3 <command> --dry-run --show-prompt`；可能是配置或 prompt 渲染问题"
+- `internal manager` SKIP → "当前分支无法解析 issue number；切换到 `task/issue-<num>` / `dev/issue-<num>` 分支或手动提供 issue number 后复查"
+
+**验证**: `plan`, `run`, `review`, `internal manager` 均产生 prompt 输出；无 issue number 的分支明确显示 SKIP。
+
+---
+
 ## 交互原则
 
 1. **渐进式检查**：一个检查接一个检查，不会"停止"
@@ -253,12 +519,26 @@ vibe keys check
 ```
 ## 检查完成
 
-### 已验证
+### 已验证（vibe-center 项目配置）
 ✅ vibe init 产物完整
 ✅ .gitignore 已补全 2 个条目
 ✅ 已创建 9 个 GitHub labels
 ✅ vibe-manager token 已配置
 ✅ 运行时验证通过
+
+### Cross-Project Readiness（跨项目就绪状态）
+✅ Global runtime assets: 14/14 present
+✅ Target repo init: .vibe/config.yaml valid, profile=github-flow
+✅ Agent/toolchain: all essential tools available
+✅ Prompt readiness: plan/run/review/internal manager ok
+
+### Diagnostic Categories（诊断分类）
+如果发现失败，输出以下分类之一：
+- GLOBAL_INSTALL_MISSING → "回到 vibe-center repo 运行 `vibe update run`"
+- TARGET_REPO_NOT_INIT → "在目标 repo 运行 `vibe init --profile minimal|github-flow`"
+- TARGET_CONFIG_INVALID → "编辑 `.vibe/settings.yaml` 修复格式"
+- BACKEND_OR_KEY_MISSING → "安装缺失的后端 CLI 或运行 `vibe keys init`"
+- PROMPT_READINESS_GAP → "检查 flow 绑定、issue 分支名与 prompt 资产完整性"
 
 ### 项目状态
 你的项目现在可以：
@@ -275,6 +555,10 @@ vibe keys check
 ## 参考
 
 - Issue #1810: feat(skills): add vibe-project-check skill
+- Issue #1926: 扩展 vibe-project-check 为跨项目 vibe3 readiness 验证
+- Issue #1924: global runtime distribution
+- Issue #1925: config loading with target override
+- Issue #1905: internal manager dry-run/show-prompt
 - CLAUDE.md: Skill-First 原则
 - 现有 skill: `vibe-onboard`, `vibe-check`
 - 设计文档: `docs/superpowers/specs/2026-06-02-vibe-project-check-redesign.md`
