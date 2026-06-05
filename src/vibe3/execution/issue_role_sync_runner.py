@@ -81,6 +81,8 @@ def run_issue_role_async(
 
         cmd = getattr(request, "cmd", None)
         if isinstance(cmd, list):
+            # Append CLI params to child self-invocation so the sync
+            # child resolves the same runtime configuration.
             cmd.extend(overrides.to_argv())
 
         try:
@@ -149,8 +151,9 @@ def run_issue_role_sync(
     the same lifecycle / handoff / pre-gate / no-op shell is used.
     See docs/standards/vibe3-execution-paths-standard.md.
 
-    CLI override params are passed into role option resolution so command-layer
-    overrides are reflected in the ExecutionRequest options.
+    Agent configuration overrides (agent/backend/model) are passed into role
+    option resolution so command-layer overrides are reflected in the
+    ExecutionRequest options.
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
