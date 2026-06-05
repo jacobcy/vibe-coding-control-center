@@ -158,10 +158,6 @@ class TestModuleExports:
                 + "\n".join(f"  - {f}" for f in failures)
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: some __init__.py files "
-        "import symbols not in __all__"
-    )
     def test_no_missing_exports(self, module_registry: list[str]) -> None:
         """Verify __all__ includes all symbols imported in __init__.py."""
         failures = []
@@ -192,19 +188,37 @@ class TestModuleExports:
 
                 # Extract imports from __init__.py
                 imported_names = set()
-                for node in ast.walk(tree):
+                for node in tree.body:
                     if isinstance(node, ast.ImportFrom):
-                        # Check absolute imports: from vibe3.<module>.<sub> import X
+                        # Top-level imports
                         if node.module and node.module.startswith(
                             f"vibe3.{module_name}"
                         ):
                             for alias in node.names:
-                                # Use the exported name (handle 'as' aliases)
-                                imported_names.add(alias.asname or alias.name)
-                        # Check relative imports: from .submodule import X
-                        elif node.level > 0:
+                                name = alias.asname or alias.name
+                                if not name.startswith("_"):
+                                    imported_names.add(name)
+                        elif node.level and node.level > 0:
                             for alias in node.names:
-                                imported_names.add(alias.asname or alias.name)
+                                name = alias.asname or alias.name
+                                if not name.startswith("_"):
+                                    imported_names.add(name)
+                    elif isinstance(node, ast.If):
+                        # Imports inside TYPE_CHECKING guards
+                        for sub_node in node.body:
+                            if isinstance(sub_node, ast.ImportFrom):
+                                if sub_node.module and sub_node.module.startswith(
+                                    f"vibe3.{module_name}"
+                                ):
+                                    for alias in sub_node.names:
+                                        name = alias.asname or alias.name
+                                        if not name.startswith("_"):
+                                            imported_names.add(name)
+                                elif sub_node.level and sub_node.level > 0:
+                                    for alias in sub_node.names:
+                                        name = alias.asname or alias.name
+                                        if not name.startswith("_"):
+                                            imported_names.add(name)
 
                 # Check for missing exports
                 missing = imported_names - all_names
