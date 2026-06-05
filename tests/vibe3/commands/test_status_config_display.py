@@ -65,7 +65,7 @@ class TestAnalyzeOrchestraConfigSources:
 class TestRenderConfigurationOutput:
     """Tests for _render_configuration output format."""
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.shared.orchestra.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch(
         "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
@@ -97,7 +97,7 @@ class TestRenderConfigurationOutput:
         # Check for Configuration Sources section
         assert "Configuration Sources:" in result.output
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.shared.orchestra.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch(
         "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
@@ -128,7 +128,7 @@ class TestRenderConfigurationOutput:
         assert "Debug mode:" in result.output
         assert "OFF" in result.output
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.shared.orchestra.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch(
         "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
@@ -162,7 +162,7 @@ class TestRenderConfigurationOutput:
 class TestTaskStatusExcludesSystemStatus:
     """Tests that task status does not show system status sections."""
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.shared.orchestra.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch(
         "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"

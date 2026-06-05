@@ -70,7 +70,7 @@ def test_flow_blocked_resolves_numeric_branch_to_canonical_task_branch() -> None
     # Patch both FlowService import locations
     with (
         patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
-        patch("vibe3.services.branch_arg.FlowService", return_value=flow_service),
+        patch("vibe3.services.shared.branches.FlowService", return_value=flow_service),
     ):
         result = runner.invoke(
             app, ["flow", "blocked", "--branch", "235", "--task", "246"]

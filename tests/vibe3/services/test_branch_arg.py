@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from vibe3.services.branch_arg import resolve_branch_arg
+from vibe3.services.shared.branches import resolve_branch_arg
 
 
 class TestResolveBranchArg:
@@ -10,7 +10,7 @@ class TestResolveBranchArg:
 
     def test_none_returns_current_branch(self):
         """测试：None 输入返回当前分支"""
-        with patch("vibe3.services.branch_arg.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
             mock_flow_service.get_current_branch.return_value = "dev/issue-123"
@@ -20,7 +20,7 @@ class TestResolveBranchArg:
 
     def test_issue_number_returns_canonical_branch(self):
         """测试：纯数字输入返回 canonical branch（无 flow 时）"""
-        with patch("vibe3.services.branch_arg.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
 
@@ -34,7 +34,7 @@ class TestResolveBranchArg:
 
     def test_branch_name_returns_as_is(self):
         """测试：分支名输入返回原值"""
-        with patch("vibe3.services.branch_arg.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
 
