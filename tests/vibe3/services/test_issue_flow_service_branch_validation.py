@@ -113,3 +113,62 @@ class TestIssueFlowServiceBranchValidationGuard:
                 service.find_active_flow(999)
 
             assert exc_info.value.branch == "staging"
+
+    def test_find_active_flow_rejects_scene_base_ref(self, monkeypatch) -> None:
+        """find_active_flow rejects branch matching scene_base_ref from config."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        mock_config = MagicMock(spec=OrchestraConfig)
+        mock_config.scene_base_ref = "origin/custom-base"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from vibe3.clients.sqlite_client import SQLiteClient
+
+            db_path = Path(tmpdir) / "test.db"
+            store = SQLiteClient(db_path=str(db_path))
+            service = IssueFlowService(store=store, config=mock_config)
+
+            store.update_flow_state(
+                "custom-base", flow_slug="custom-base", flow_status="active"
+            )
+            store.add_issue_link("custom-base", 999, "task")
+
+            with pytest.raises(InvalidBranchLinkError) as exc_info:
+                service.find_active_flow(999)
+
+            assert exc_info.value.branch == "custom-base"
+            assert exc_info.value.issue_number == 999
+
+    def test_find_active_flow_strips_origin_prefix_from_scene_base_ref(
+        self, monkeypatch
+    ) -> None:
+        """find_active_flow strips 'origin/' prefix from scene_base_ref.
+
+        Tests comparison after stripping the prefix.
+        """
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        mock_config = MagicMock(spec=OrchestraConfig)
+        mock_config.scene_base_ref = "origin/custom-base"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from vibe3.clients.sqlite_client import SQLiteClient
+
+            db_path = Path(tmpdir) / "test.db"
+            store = SQLiteClient(db_path=str(db_path))
+            service = IssueFlowService(store=store, config=mock_config)
+
+            # Insert branch WITHOUT origin/ prefix (as stored in DB)
+            store.update_flow_state(
+                "custom-base", flow_slug="custom-base", flow_status="active"
+            )
+            store.add_issue_link("custom-base", 999, "task")
+
+            with pytest.raises(InvalidBranchLinkError) as exc_info:
+                service.find_active_flow(999)
+
+            assert exc_info.value.branch == "custom-base"
