@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -13,6 +14,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.environment.worktree import WorktreeManager
+from vibe3.exceptions import GitError
 from vibe3.models.pr import PRState
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
@@ -27,6 +29,10 @@ if TYPE_CHECKING:
     from vibe3.config.orchestra_config import OrchestraConfig
     from vibe3.models import IssueInfo
     from vibe3.services.orchestra_status_service import OrchestraSnapshot
+
+# Retry configuration for Git fetch operations
+MAX_FETCH_RETRIES = 3
+FETCH_RETRY_DELAY = 1.0
 
 
 class FlowOrchestratorService:
@@ -142,8 +148,19 @@ class FlowOrchestratorService:
         try:
             if not self.git.branch_exists(branch):
                 # Ensure scene_base_ref remote is up-to-date before creating branch
-                remote = self.config.scene_base_ref.split("/")[0]
-                self.git.fetch(remote)
+                remote, ref = self.config.scene_base_ref.split("/", 1)
+                for attempt in range(MAX_FETCH_RETRIES):
+                    try:
+                        self.git.fetch(remote, ref)
+                        break
+                    except GitError as e:
+                        if (
+                            "cannot lock ref" in str(e)
+                            and attempt < MAX_FETCH_RETRIES - 1
+                        ):
+                            time.sleep(FETCH_RETRY_DELAY * (attempt + 1))
+                            continue
+                        raise
                 self.git.create_branch_ref(
                     branch,
                     start_ref=self.config.scene_base_ref,

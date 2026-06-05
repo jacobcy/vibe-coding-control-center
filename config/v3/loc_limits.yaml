@@ -236,8 +236,8 @@ code_limits:
         limit: 540
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py，当前 ~536 行"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
-        limit: 480
-        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
+        limit: 560
+        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试等紧密耦合场景，共享 fixture，拆分收益低；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标"
       - path: "tests/vibe3/exceptions/test_error_tracking.py"
         limit: 650
         reason: "Error tracking 测试集，新增 9 个测试（5 个 get_all_errors_status + 4 个 _display_error_tracking），覆盖 severity 分类、threshold 计数、时间窗口逻辑、NULL severity 默认处理、历史 vs 窗口错误显示"

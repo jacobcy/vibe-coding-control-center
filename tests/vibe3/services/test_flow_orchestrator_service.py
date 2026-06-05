@@ -107,7 +107,7 @@ def test_bootstrap_issue_flow_checkouts_branch_in_non_worktree_mode() -> None:
     )
 
     # Verify fetch, create_branch, AND checkout were called
-    git.fetch.assert_called_once_with("origin")
+    git.fetch.assert_called_once_with("origin", "main")
     git.create_branch_ref.assert_called_once_with(
         "dev/issue-999", start_ref=config.scene_base_ref
     )
@@ -149,7 +149,7 @@ def test_bootstrap_issue_flow_skips_checkout_in_worktree_mode() -> None:
         )
 
     # Verify fetch and create_branch were called, but checkout was NOT
-    git.fetch.assert_called_once_with("origin")
+    git.fetch.assert_called_once_with("origin", "main")
     git.create_branch_ref.assert_called_once_with(
         "dev/issue-888", start_ref=config.scene_base_ref
     )
@@ -185,7 +185,7 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     )
 
     # Verify fetch was called before branch creation
-    git.fetch.assert_called_once_with("origin")
+    git.fetch.assert_called_once_with("origin", "main")
     git.create_branch_ref.assert_called_once_with(
         "dev/issue-501", start_ref=config.scene_base_ref
     )
@@ -445,3 +445,72 @@ def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:
         )
 
         assert result is None
+
+
+def test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict() -> None:
+    """Fetch should retry on 'cannot lock ref' GitError and succeed."""
+    from vibe3.exceptions import GitError
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-999"})
+    )
+
+    # Simulate ref lock conflict on first call, success on second
+    git.fetch.side_effect = [
+        GitError("fetch", "cannot lock ref 'refs/remotes/origin/main': ..."),
+        None,  # Success on retry
+    ]
+
+    with patch("vibe3.services.flow_orchestrator_service.time.sleep") as mock_sleep:
+        result = service.bootstrap_issue_flow(
+            IssueInfo(number=999, title="Retry test"),
+            branch="dev/issue-999",
+            source="skill",
+        )
+
+    # Verify fetch was called twice with same args
+    assert git.fetch.call_count == 2
+    git.fetch.assert_any_call("origin", "main")
+    # Verify sleep was called once (after first failure)
+    mock_sleep.assert_called_once()
+    # Verify bootstrap succeeded
+    assert result["branch"] == "dev/issue-999"
+
+
+def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
+    """Fetch should raise GitError after exhausting retries."""
+    from vibe3.exceptions import GitError
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    # Simulate persistent ref lock conflict
+    git.fetch.side_effect = GitError(
+        "fetch", "cannot lock ref 'refs/remotes/origin/main': ..."
+    )
+
+    with patch("vibe3.services.flow_orchestrator_service.time.sleep"):
+        with pytest.raises(GitError, match="cannot lock ref"):
+            service.bootstrap_issue_flow(
+                IssueInfo(number=888, title="Exhausted retry test"),
+                branch="dev/issue-888",
+                source="skill",
+            )
+
+    # Verify fetch was called 3 times (MAX_FETCH_RETRIES)
+    assert git.fetch.call_count == 3
+    git.fetch.assert_any_call("origin", "main")
