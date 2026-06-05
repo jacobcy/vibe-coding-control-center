@@ -4,22 +4,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
-from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
-from vibe3.orchestra.issue_loader import get_flow_context, load_issue
-from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
-from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
-from vibe3.services.check_service import CheckService
-from vibe3.services.flow_service import FlowService
+from vibe3.domain import GlobalDispatchCoordinator
+from vibe3.orchestra import (
+    DispatchHealthCheckService,
+    QueuePersistenceService,
+    get_flow_context,
+    load_issue,
+    select_ready_issues_from_collected_issues,
+)
+from vibe3.services import CheckService, FlowService
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.models import IssueInfo
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.domain.protocols import FlowManagerProtocol
+    from vibe3.environment import SessionRegistryService
+    from vibe3.execution import CapacityService
+    from vibe3.models import IssueInfo, OrchestraConfig
 
 
 def create_global_dispatch_coordinator(

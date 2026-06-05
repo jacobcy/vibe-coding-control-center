@@ -1,6 +1,6 @@
 """Compatibility shell — re-exports from vibe3.observability.orchestra_log."""
 
-from vibe3.observability.orchestra_log import (
+from vibe3.observability import (
     append_governance_event,
     append_orchestra_event,
     append_orchestra_run_separator,

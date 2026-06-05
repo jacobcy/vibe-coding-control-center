@@ -17,14 +17,14 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.models import IssueInfo, IssueState
-from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.protocols import (
+from vibe3.orchestra import (
     CheckServiceProtocol,
     FlowServiceProtocol,
+    append_orchestra_event,
 )
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
 
 class DispatchHealthCheckService:
