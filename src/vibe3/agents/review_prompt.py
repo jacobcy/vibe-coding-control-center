@@ -5,7 +5,7 @@ Public API:
 - ``make_review_context_builder(request, config)`` - PromptContextBuilder
 
 Section builders remain available for direct composition:
-- build_policy_section, build_tools_guide_section, build_ast_analysis_section
+- build_policy_section, build_ast_analysis_section
 - build_review_task_section, build_output_contract_section
 """
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 from loguru import logger
 
@@ -27,6 +27,10 @@ from vibe3.prompts import (
     PromptManifest,
     PromptProvider,
     make_context_builder,
+)
+from vibe3.prompts.sections import (
+    build_tools_guide_section,
+    resolve_common_rules_path,
 )
 
 ReviewPromptMode = Literal["first", "retry"]
@@ -60,36 +64,6 @@ def build_policy_section(policy_path: str) -> str:
         return content
     except OSError as e:
         raise ContextBuilderError(f"Cannot read policy: {e}") from e
-
-
-def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
-    """Build tools guide section from file.
-
-    Source: config/v3/settings.yaml (review.common_rules)
-
-    Args:
-        tools_guide_path: Path to tools guide file (optional)
-
-    Returns:
-        Tools guide section or None if not configured/available
-    """
-    if not tools_guide_path:
-        return None
-
-    log = logger.bind(domain="context_builder", action="build_tools_guide_section")
-    path = resolve_runtime_asset(tools_guide_path)
-    if not path.exists():
-        return None
-
-    try:
-        tools_guide = path.read_text(encoding="utf-8")
-        log.success("Tools guide section built")
-        return f"## Available Tools\n\n{tools_guide}"
-    except OSError as e:
-        log.bind(error=str(e), path=str(tools_guide_path)).warning(
-            "Could not read tools guide"
-        )
-        return None
 
 
 def build_ast_analysis_section(
@@ -240,14 +214,10 @@ def _build_review_prompt_providers(
         )
         return build_policy_section(policy_path) if policy_path else ""
 
-    def common_rules_path() -> str | None:
-        if config.review.common_rules is not None:
-            return config.review.common_rules
-        # Cast needed: lazy __getattr__ import loses type info
-        return cast(str | None, resolver.get_policy_path("common"))
-
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(common_rules_path())
+        return build_tools_guide_section(
+            resolve_common_rules_path(config.review.common_rules, resolver)
+        )
 
     return {
         "review.policy": review_policy,

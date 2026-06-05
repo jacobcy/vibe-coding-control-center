@@ -9,7 +9,7 @@ Public API:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 from loguru import logger
 
@@ -21,6 +21,10 @@ from vibe3.prompts import (
     PromptManifest,
     PromptProvider,
     make_context_builder,
+)
+from vibe3.prompts.sections import (
+    build_tools_guide_section,
+    resolve_common_rules_path,
 )
 
 
@@ -83,14 +87,7 @@ def _build_run_prompt_providers(
     plan_content: str | None = None,
     skill_content: str | None = None,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompts/prompt-recipes.yaml run sections.
-
-    Note: Imports review_prompt inline to avoid circular dependency at module level.
-    If review_prompt ever needs to import run_prompt, extract shared helpers
-    (e.g., build_tools_guide_section) to a common module like prompts/sections.py.
-    """
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
+    """Build providers used by config/prompts/prompt-recipes.yaml run sections."""
     run_config = getattr(config, "run", None)
     resolver = ConventionResolver.from_repo()
 
@@ -122,15 +119,12 @@ def _build_run_prompt_providers(
             )
         return getattr(run_config, "coding_task", None)
 
-    def common_rules_path() -> str | None:
-        if run_config and run_config.common_rules is not None:
-            result: str | None = run_config.common_rules
-            return result
-        # Cast needed: lazy __getattr__ import loses type info
-        return cast(str | None, resolver.get_policy_path("common"))
-
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(common_rules_path())
+        return build_tools_guide_section(
+            resolve_common_rules_path(
+                run_config.common_rules if run_config else None, resolver
+            )
+        )
 
     return {
         "run.plan_ref": plan_ref,

@@ -22,7 +22,7 @@ Prompt Builders:
 - ``build_review_prompt_body`` / ``make_review_context_builder`` — review
   agent prompt construction
 - ``build_tools_guide_section`` — shared utility for building tools guide
-  sections
+  sections (re-exported from prompts.sections)
 - ``describe_plan_sections`` / ``describe_run_plan_sections`` /
   ``describe_review_sections`` — section key inspectors for dry-run summaries
 
@@ -68,7 +68,6 @@ if TYPE_CHECKING:
     )
     from vibe3.agents.review_prompt import (
         build_review_prompt_body,
-        build_tools_guide_section,
         describe_review_sections,
         make_review_context_builder,
     )
@@ -80,6 +79,8 @@ if TYPE_CHECKING:
         make_run_context_builder,
         make_skill_context_builder,
     )
+    from vibe3.prompts.sections import build_tools_guide_section
+
 
 # Lazy imports for self-references (avoid circular init dependencies)
 _LAZY_IMPORTS = {
@@ -96,7 +97,6 @@ _LAZY_IMPORTS = {
     "build_snapshot_diff": "vibe3.agents.review_pipeline_helpers",
     "run_inspect_json": "vibe3.agents.review_pipeline_helpers",
     "build_review_prompt_body": "vibe3.agents.review_prompt",
-    "build_tools_guide_section": "vibe3.agents.review_prompt",
     "describe_review_sections": "vibe3.agents.review_prompt",
     "make_review_context_builder": "vibe3.agents.review_prompt",
     "RunPromptMode": "vibe3.agents.run_prompt",
@@ -105,6 +105,7 @@ _LAZY_IMPORTS = {
     "make_publish_context_builder": "vibe3.agents.run_prompt",
     "make_run_context_builder": "vibe3.agents.run_prompt",
     "make_skill_context_builder": "vibe3.agents.run_prompt",
+    "build_tools_guide_section": "vibe3.prompts.sections",
 }
 
 

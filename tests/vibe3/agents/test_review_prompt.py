@@ -15,7 +15,6 @@ from vibe3.agents.review_prompt import (
     build_policy_section,
     build_review_prompt_body,
     build_review_task_section,
-    build_tools_guide_section,
 )
 from vibe3.models.review import ReviewRequest, ReviewScope
 
@@ -37,31 +36,6 @@ class TestBuildPolicySection:
         """Should raise ContextBuilderError if file not found."""
         with pytest.raises(ContextBuilderError, match="Cannot read policy"):
             build_policy_section("/nonexistent/policy.md")
-
-
-class TestBuildToolsGuideSection:
-    """Tests for build_tools_guide_section (unit test)."""
-
-    def test_returns_none_if_not_configured(self) -> None:
-        """Should return None if path is None."""
-        result = build_tools_guide_section(None)
-        assert result is None
-
-    def test_returns_none_if_file_not_exists(self, tmp_path: Path) -> None:
-        """Should return None if file does not exist."""
-        result = build_tools_guide_section(str(tmp_path / "nonexistent.md"))
-        assert result is None
-
-    def test_reads_tools_guide(self, tmp_path: Path) -> None:
-        """Should read tools guide from file."""
-        tools_file = tmp_path / "tools.md"
-        tools_file.write_text("Use `vibe3 inspect` for analysis.")
-
-        result = build_tools_guide_section(str(tools_file))
-
-        assert result is not None
-        assert "## Available Tools" in result
-        assert "vibe3 inspect" in result
 
 
 class TestBuildAstAnalysisSection:
