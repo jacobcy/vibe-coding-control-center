@@ -84,6 +84,10 @@ def __getattr__(name: str) -> type:
         from vibe3.domain.failed_gate import FailedGate
 
         return FailedGate
+    if name == "EventPublisher":
+        from vibe3.domain.publisher import EventPublisher
+
+        return EventPublisher
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -108,6 +112,7 @@ __all__ = [
     "GlobalDispatchCoordinator",
     "FailedGate",
     # Publisher
+    "EventPublisher",
     "get_publisher",
     "publish",
     "subscribe",
