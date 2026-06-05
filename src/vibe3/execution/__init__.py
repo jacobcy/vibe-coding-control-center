@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         build_issue_async_cli_request,
         build_issue_sync_prompt_request,
         build_task_flow_branch_resolver,
+        resolve_async_cli_project_root,
         resolve_env_overridable_agent_options,
         resolve_orchestra_repo_root,
         use_current_branch,
@@ -55,6 +56,7 @@ _LAZY_IMPORTS = {
     "resolve_env_overridable_agent_options": "vibe3.execution.issue_role_support",
     "build_issue_async_cli_request": "vibe3.execution.issue_role_support",
     "build_issue_sync_prompt_request": "vibe3.execution.issue_role_support",
+    "resolve_async_cli_project_root": "vibe3.execution.issue_role_support",
     "use_current_branch": "vibe3.execution.issue_role_support",
     # Codeagent support
     "build_self_invocation": "vibe3.execution.codeagent_support",
@@ -102,6 +104,7 @@ __all__ = [
     "resolve_env_overridable_agent_options",
     "build_issue_async_cli_request",
     "build_issue_sync_prompt_request",
+    "resolve_async_cli_project_root",
     "use_current_branch",
     # Codeagent support
     "build_self_invocation",

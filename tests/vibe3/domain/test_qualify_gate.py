@@ -147,7 +147,7 @@ class TestRunQualifyGate:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 result = qualify_gate_service.run_qualify_gate(
@@ -177,9 +177,7 @@ class TestRunQualifyGate:
         mock_store.get_flow_state.return_value = flow_state
 
         mock_label_port = Mock()
-        with patch(
-            "vibe3.services.label_service.LabelService", return_value=mock_label_port
-        ):
+        with patch("vibe3.services.LabelService", return_value=mock_label_port):
             mock_truth = Mock()
             mock_truth.is_blocked = True
             mock_truth.blocked_reason = "Manual intervention required"

@@ -90,7 +90,7 @@ class TestRemoteBlockedReason:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
@@ -143,7 +143,7 @@ class TestRemoteBlockedReason:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
@@ -206,7 +206,7 @@ class TestRemoteDependencies:
 
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
@@ -263,7 +263,7 @@ class TestRemoteDependencies:
 
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
@@ -307,7 +307,7 @@ class TestRemoteDependencies:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
@@ -354,9 +354,7 @@ class TestProvenanceTracking:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            with patch(
-                "vibe3.services.label_service.LabelService", return_value=Mock()
-            ):
+            with patch("vibe3.services.LabelService", return_value=Mock()):
                 flow_state = {"status": "active"}
 
                 qualify_gate_service.run_qualify_gate(
@@ -402,7 +400,7 @@ class TestProvenanceTracking:
             qualify_gate_service._github.get_issue_body.return_value = "User content"
 
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=Mock(),
             ):
                 flow_state = {"status": "active"}
@@ -464,7 +462,7 @@ class TestE2EBlockedReconciliation:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 result = qualify_gate.run_qualify_gate(
@@ -580,7 +578,7 @@ class TestE2EBlockedReconciliation:
         ):
             mock_label_service = Mock()
             with patch(
-                "vibe3.services.label_service.LabelService",
+                "vibe3.services.LabelService",
                 return_value=mock_label_service,
             ):
                 result = qualify_gate.run_qualify_gate(

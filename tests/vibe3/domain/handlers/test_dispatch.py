@@ -28,7 +28,7 @@ def _make_mock_request(
 
 
 class TestPlannerDispatchHandler:
-    @patch("vibe3.roles.plan.build_plan_request")
+    @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -84,8 +84,8 @@ class TestPlannerDispatchHandler:
         assert request.role == "planner"
         assert request.target_id == 42
 
-    @patch("vibe3.services.error_helpers.record_error")
-    @patch("vibe3.roles.plan.build_plan_request")
+    @patch("vibe3.services.record_error")
+    @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -136,8 +136,8 @@ class TestPlannerDispatchHandler:
         assert mock_record_error.call_args.kwargs["tick_id"] == 17
         assert mock_record_error.call_args.kwargs["error_code"] == "E_DISPATCH_FAILURE"
 
-    @patch("vibe3.services.error_helpers.record_error")
-    @patch("vibe3.roles.plan.build_plan_request")
+    @patch("vibe3.services.record_error")
+    @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -188,9 +188,9 @@ class TestPlannerDispatchHandler:
         # Should NOT call record_error for launch_failed
         mock_record_error.assert_not_called()
 
-    @patch("vibe3.services.error_helpers.has_recent_specific_error")
-    @patch("vibe3.services.error_helpers.record_error")
-    @patch("vibe3.roles.plan.build_plan_request")
+    @patch("vibe3.services.has_recent_specific_error")
+    @patch("vibe3.services.record_error")
+    @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -252,7 +252,7 @@ class TestPlannerDispatchHandler:
 
 class TestExecutorDispatchHandler:
 
-    @patch("vibe3.roles.run.build_run_request")
+    @patch("vibe3.roles.build_run_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -307,7 +307,7 @@ class TestExecutorDispatchHandler:
 
         mock_coordinator.dispatch_execution.assert_called_once()
 
-    @patch("vibe3.roles.run.build_run_request")
+    @patch("vibe3.roles.build_run_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")
@@ -359,7 +359,7 @@ class TestExecutorDispatchHandler:
 
 class TestReviewerDispatchHandler:
 
-    @patch("vibe3.roles.review.build_review_request")
+    @patch("vibe3.roles.build_review_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")

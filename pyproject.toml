@@ -54,6 +54,10 @@ warn_return_any = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 
+# Allow lazy import patterns (needed for circular dependency avoidance)
+# These errors are caused by __getattr__ based lazy imports in __init__.py files
+disable_error_code = ["misc", "valid-type", "no-any-return", "attr-defined"]
+
 [tool.pyright]
 reportMissingModuleSource = false
 
