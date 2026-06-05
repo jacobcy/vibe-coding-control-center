@@ -158,11 +158,11 @@ class TestLayerDependencies:
 
                 # Look for imports of own submodules
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.ImportFrom):
-                        # Skip imports inside TYPE_CHECKING blocks or functions
-                        if _is_in_type_checking_or_function(node, parents):
-                            continue
+                    # Skip imports inside TYPE_CHECKING blocks or functions
+                    if _is_in_type_checking_or_function(node, parents):
+                        continue
 
+                    if isinstance(node, ast.ImportFrom):
                         # Check absolute imports: from vibe3.<module>.<sub> import ...
                         if node.module and node.module.startswith(
                             f"vibe3.{module_name}."
@@ -186,6 +186,20 @@ class TestLayerDependencies:
                                 f"relative import from .{node.module} "
                                 "(potential circular dependency)"
                             )
+                    elif isinstance(node, ast.Import):
+                        # Check absolute imports: import vibe3.<module>.<sub>
+                        for alias in node.names:
+                            if not alias.name.startswith(f"vibe3.{module_name}."):
+                                continue
+
+                            parts = alias.name.split(".")
+                            if len(parts) > 2:
+                                submodule = parts[2]
+                                violations.append(
+                                    f"{module_name}/__init__.py: "
+                                    f"imports own submodule {submodule} "
+                                    "(potential circular dependency)"
+                                )
 
             except (SyntaxError, OSError) as e:
                 violations.append(f"{module_name}/__init__.py: parse error - {e}")
@@ -195,6 +209,21 @@ class TestLayerDependencies:
                 "Potential circular dependencies in __init__.py:\n"
                 + "\n".join(f"  - {v}" for v in violations)
             )
+
+    def test_no_self_reference_in_init_flags_absolute_imports(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Absolute import statements in __init__.py still create init-time risk."""
+        init_path = tmp_path / "src/vibe3/sample/__init__.py"
+        init_path.parent.mkdir(parents=True)
+        init_path.write_text("import vibe3.sample.child\n", encoding="utf-8")
+
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(pytest.fail.Exception) as exc_info:
+            self.test_no_self_reference_in_init(["sample"])
+
+        assert "imports own submodule child" in str(exc_info.value)
 
 
 def _detect_cycles_dfs(
