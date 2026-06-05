@@ -125,7 +125,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 **验证步骤**：
 
 1. 读取 audit report 中的变更文件列表
-2. 执行 `git diff --name-only origin/main..HEAD` 获取当前分支的实际变更文件列表
+2. 执行 `git diff --name-only origin/main...HEAD` 获取当前分支相对 merge-base 的实际变更文件列表
 3. 对比 audit 中描述的变更文件是否存在于当前分支
 4. 如果 audit 中描述的文件在当前分支的 diff 中不存在：
    - 说明 audit 可能基于错误分支
