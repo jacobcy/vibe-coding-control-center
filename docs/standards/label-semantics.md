@@ -120,7 +120,7 @@ def resolve_priority(labels: list[str]) -> int:
 
 1. `supervisor/governance/assignee-pool.md` 的 Queue Guidance 部分包含明确的优先级刻度表
 2. 本文档作为权威参考，被 `supervisor/roadmap-common.md` 引用
-3. Vibe-roadmap (Layer 3) 审查时可纠正 governance 的优先级误判
+3. Vibe-roadmap (Tier 3) 审查时可纠正 governance 的优先级误判
 
 ## Authority
 

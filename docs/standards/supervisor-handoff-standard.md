@@ -1,6 +1,6 @@
 # Supervisor Handoff Standard
 
-> 轻量治理链路（L2）的完整规范：触发、派发、执行、生命周期、与 Manager (L3) 的边界。
+> Tier 3 (Cognitive/Governance) 轻量治理链路的完整规范：触发、派发、执行、生命周期、与 Manager (Tier 2) 的边界。
 
 ## 定位
 
@@ -9,19 +9,19 @@ Supervisor 是 Vibe Center 的**轻量治理链路**，负责处理带有 `super
 **核心设计原则**：
 - 一次性治理：不追踪开发过程，只关注 issue 最终状态
 - 无 Flow：不创建 `flow_state`、不注册 `flow_issue_links`
-- 临时隔离：执行使用临时 worktree，session orphaned 后清理
+- 临时隔离：执行使用临时 worktree (L2)，session orphaned 后清理
 - 快速处理：label 变更、comment、issue close、文档/测试修复
 
 **Supervisor 可以创建 PR**（见 `supervisor/apply.md`）：文档/测试修复 → commit → push → PR。PR 合并由人工处理。
 
-与 Manager (L3) 的对比：
+与 Manager (Tier 2) 的对比：
 
-| 特性 | Supervisor (L2) | Manager (L3) |
+| 特性 | Supervisor (Tier 3) | Manager (Tier 2) |
 |------|-----------------|-------------|
 | 定位 | 轻量治理 | 重量开发 |
 | Flow 注册 | 无 | `flow_state` + `flow_issue_links` |
 | Branch | L2 临时 branch（无永久记录） | `task/issue-N`（永久） |
-| Worktree | 临时（session orphaned 后清理） | 永久（直到 flow done） |
+| Worktree | 临时（L2，session orphaned 后清理） | 永久（L3，直到 flow done） |
 | State 管理 | GitHub labels | GitHub labels + `flow_status` |
 | 质量门禁 | 跳过 noop gate | Noop gate 检查 state 变化 |
 | 失败处理 | 系统移除 `state/handoff` label | `mark_issue(action="fail")` → `error_log` |
@@ -154,14 +154,14 @@ Supervisor 失败时通过 `ErrorTrackingService` 记录到 `error_log`（ERROR 
 
 ### 扫描调度
 
-`on_supervisor_scan()` 在 `on_tick()` 中位于 FailedGate check 之后、L3 dispatch 之前：
+`on_supervisor_scan()` 在 `on_tick()` 中位于 FailedGate check 之后、Tier 2 dispatch 之前：
 
 ```python
 async def on_tick(self):
     self.on_heartbeat_tick()         # Governance [interval_ticks gating]
     # FailedGate check (阻断所有派发包括 supervisor)
     await self.on_supervisor_scan()   # Supervisor [interval_ticks gating]
-    await self._coordinator.coordinate()  # L3 dispatch
+    await self._coordinator.coordinate()  # Tier 2 dispatch
 ```
 
 ## 可观测性
@@ -204,7 +204,7 @@ async def on_tick(self):
 
 | 文件 | 职责 |
 |------|------|
-| `docs/standards/v3/event-driven-standard.md` | L2 事件层级定义 |
-| `docs/standards/v3/worktree-lifecycle-standard.md` | L2 临时 worktree 语义 |
+| `docs/standards/v3/event-driven-standard.md` | Tier 3/Tier 2 事件层级定义 |
+| `docs/standards/v3/worktree-lifecycle-standard.md` | Tier 3 临时 worktree 语义 |
 | `docs/standards/v3/noop-gate-boundary-standard.md` | Gate 边界定义 |
 | `docs/standards/github-labels-reference.md` | Label 语义参考 |

@@ -88,7 +88,7 @@ related_docs:
 - **GitHub Projects**：作为 Roadmap 规划与优先级参考，不作为执行状态的真源。
 - **GitHub Pull Requests**：PR 真源，通过 GitHub API 读写
 
-## 3. Layer Ownership
+## 3. Tier Ownership
 
 共享状态固定映射如下：
 
