@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.config.settings import VibeConfig
-from vibe3.models.change_source import BranchSource, ChangeSource, PRSource
+from vibe3.clients import GitClient
+from vibe3.config import VibeConfig
+from vibe3.models import BranchSource, ChangeSource, PRSource
 
 
 @dataclass(frozen=True)
@@ -149,6 +149,6 @@ class LocService:
 
         # Exclude test files
         # Reuse the test file detection logic from change_scope_service
-        from vibe3.analysis.change_scope_service import is_test_file
+        from vibe3.analysis import is_test_file
 
         return not is_test_file(filepath)

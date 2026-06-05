@@ -27,9 +27,7 @@ from vibe3.services.flow_consistency_check import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 
 
 class RecoveryAction(StrEnum):
@@ -214,8 +212,7 @@ class FlowRecoveryService:
         Raises:
             RuntimeError: If label write fails (RC2: prevents silent failure)
         """
-        from vibe3.models import IssueState
-        from vibe3.models.flow import FlowState
+        from vibe3.models import FlowState, IssueState
         from vibe3.services.blocked_state_service import BlockedStateService
         from vibe3.services.flow_resume_resolver import infer_resume_label
 

@@ -21,7 +21,10 @@ if TYPE_CHECKING:
         load_runtime_config,
         reload_config,
     )
-    from vibe3.config.manager_config import get_manager_usernames
+    from vibe3.config.manager_config import (
+        get_handoff_state_label,
+        get_manager_usernames,
+    )
     from vibe3.config.orchestra_config import PeriodicCheckConfig
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.config.profile_config import ProfileConfig
@@ -58,7 +61,10 @@ if TYPE_CHECKING:
         TotalFileLocConfig,
         VibeConfig,
     )
-    from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
+    from vibe3.config.timeline_comment_policy import (
+        DEFAULT_COMMENT_POLICY,
+        TimelineCommentPolicy,
+    )
 
 __all__ = [
     "AIConfig",
@@ -67,6 +73,7 @@ __all__ = [
     "CodeLimitsConfig",
     "CodePathsConfig",
     "ConventionResolver",
+    "DEFAULT_COMMENT_POLICY",
     "EXECUTOR_GATE_CONFIG",
     "FlowConfig",
     "GOVERNANCE_GATE_CONFIG",
@@ -94,6 +101,7 @@ __all__ = [
     "VibeConfig",
     "find_missing_backend_commands",
     "get_config",
+    "get_handoff_state_label",
     "get_manager_usernames",
     "get_role_output_contract",
     "get_role_section",
@@ -139,7 +147,9 @@ _SYMBOL_MODULES = {
     "RunConfig": "vibe3.config.settings",
     "SingleFileLocConfig": "vibe3.config.settings",
     "TestPathsConfig": "vibe3.config.settings",
+    "DEFAULT_COMMENT_POLICY": "vibe3.config.timeline_comment_policy",
     "TimelineCommentPolicy": "vibe3.config.timeline_comment_policy",
+    "get_handoff_state_label": "vibe3.config.manager_config",
     "TotalFileLocConfig": "vibe3.config.settings",
     "VibeConfig": "vibe3.config.settings",
     "find_missing_backend_commands": "vibe3.config.agent_preset",

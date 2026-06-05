@@ -3,7 +3,7 @@
 import re
 from typing import Final, Literal, cast
 
-from vibe3.models.issue_body import FlowStateProjection
+from vibe3.models import FlowStateProjection
 
 # Managed section markers
 MANAGED_SECTION_START: Final[str] = "<!-- vibe3-flow-state-start -->"

@@ -10,16 +10,11 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.domain.state_machine import (
-    STATE_LABEL_META,
-    VIBE_TASK_LABEL,
-    validate_transition,
-)
+from vibe3.clients import GhIssueLabelPort, IssueLabelPort
+from vibe3.config import load_orchestra_config
+from vibe3.domain import STATE_LABEL_META, VIBE_TASK_LABEL, validate_transition
 from vibe3.exceptions import InvalidTransitionError, SystemError
-from vibe3.models import IssueState
-from vibe3.models.orchestration import StateTransition
+from vibe3.models import IssueState, StateTransition
 
 
 class LabelService:

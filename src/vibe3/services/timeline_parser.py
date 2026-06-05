@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import Any
 
-from vibe3.models.flow import TimelineEvent
+from vibe3.models import TimelineEvent
 from vibe3.services.flow_timeline_service import TIMELINE_DISPLAY_MAP
 
 

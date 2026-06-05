@@ -5,7 +5,7 @@ compatibility. The actual implementation lives in the analysis layer to avoid
 bidirectional dependencies between analysis and services.
 """
 
-from vibe3.analysis.pr_scoring import (
+from vibe3.analysis import (
     PRDimensions,
     RiskLevel,
     RiskScore,

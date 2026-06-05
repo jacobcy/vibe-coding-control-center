@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
-from vibe3.clients.protocols.git import GitPathProtocol
+from vibe3.clients import GitPathProtocol
 
 
 def _get_git_client(git_client: GitPathProtocol | None = None) -> GitPathProtocol:
     """Get or create a GitClient instance."""
     if git_client is None:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         return GitClient()
     return git_client

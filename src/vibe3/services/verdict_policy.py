@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from vibe3.models.verdict_types import VerdictValue
+from vibe3.models import VerdictValue
 
 ALL_VERDICTS: Final[tuple[VerdictValue, ...]] = (
     "PASS",

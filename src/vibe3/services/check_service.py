@@ -8,13 +8,9 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.config.settings import VibeConfig
-from vibe3.models import IssueState
-from vibe3.models.pr import PRState
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.config import VibeConfig
+from vibe3.models import IssueState, PRState
 from vibe3.services.check_lock import check_lock
 from vibe3.services.check_pr_service import CheckPRService
 from vibe3.services.check_remote import (
@@ -26,7 +22,7 @@ from vibe3.services.flow_status_service import FlowStatusService
 from vibe3.services.pr_service import PRService
 
 if TYPE_CHECKING:
-    from vibe3.models.pr import PRResponse
+    from vibe3.models import PRResponse
 
 
 @dataclass

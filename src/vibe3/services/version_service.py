@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.models.pr import VersionBumpResponse, VersionBumpType
+from vibe3.models import VersionBumpResponse, VersionBumpType
 
 
 class VersionService:

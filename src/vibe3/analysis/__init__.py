@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from vibe3.analysis.pr_scoring import (
         PRDimensions,
         RiskLevel,
+        RiskScore,
         calculate_risk_score,
         determine_risk_level,
         generate_score_report,
@@ -80,6 +81,7 @@ _LAZY_IMPORTS = {
     "is_test_file": "vibe3.analysis.change_scope_service",
     "PRDimensions": "vibe3.analysis.pr_scoring",
     "RiskLevel": "vibe3.analysis.pr_scoring",
+    "RiskScore": "vibe3.analysis.pr_scoring",
     "calculate_risk_score": "vibe3.analysis.pr_scoring",
     "determine_risk_level": "vibe3.analysis.pr_scoring",
     "generate_score_report": "vibe3.analysis.pr_scoring",
@@ -125,6 +127,7 @@ __all__ = [
     # PR scoring
     "PRDimensions",
     "RiskLevel",
+    "RiskScore",
     "calculate_risk_score",
     "determine_risk_level",
     "generate_score_report",

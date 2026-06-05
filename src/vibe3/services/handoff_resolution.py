@@ -247,7 +247,7 @@ def _resolve_shared_artifact(
 
     # Special handling for @current (per-branch artifact)
     if key == "current":
-        from vibe3.utils.git_helpers import get_branch_handoff_dir
+        from vibe3.utils import get_branch_handoff_dir
 
         if not branch:
             # Try to get current branch if not specified

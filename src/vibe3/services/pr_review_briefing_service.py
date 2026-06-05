@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients import GitHubClientProtocol
 
 SENTINEL = "<!-- vibe3:pr-review-briefing -->"
 

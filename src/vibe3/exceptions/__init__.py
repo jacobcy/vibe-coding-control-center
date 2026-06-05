@@ -7,6 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from vibe3.exceptions.error_classification import (
+        classify_error_hybrid,
+        get_error_handling_contract,
+    )
+    from vibe3.exceptions.error_codes import is_api_error, is_model_error
+    from vibe3.exceptions.error_severity import ErrorSeverity
     from vibe3.exceptions.runtime_errors import GitHubAPIError
 
 
@@ -215,7 +221,12 @@ class InvalidBranchLinkError(SystemError):
 
 # Lazy imports to avoid circular dependencies
 _LAZY_IMPORTS = {
+    "ErrorSeverity": "vibe3.exceptions.error_severity",
     "GitHubAPIError": "vibe3.exceptions.runtime_errors",
+    "classify_error_hybrid": "vibe3.exceptions.error_classification",
+    "get_error_handling_contract": "vibe3.exceptions.error_classification",
+    "is_api_error": "vibe3.exceptions.error_codes",
+    "is_model_error": "vibe3.exceptions.error_codes",
 }
 
 
@@ -246,7 +257,12 @@ __all__ = [
     "SerenaError",
     "PRNotFoundError",
     "CapacityDeferredError",
+    "ErrorSeverity",
     "InvalidTransitionError",
     "InvalidBranchLinkError",
     "GitHubAPIError",
+    "classify_error_hybrid",
+    "get_error_handling_contract",
+    "is_api_error",
+    "is_model_error",
 ]

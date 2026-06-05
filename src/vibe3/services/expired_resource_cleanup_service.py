@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients.git_worktree_ops import remove_worktree
-from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients import GitHubClientProtocol, remove_worktree
 
 
 def _is_protected_worktree(
@@ -38,10 +37,7 @@ def _is_protected_worktree(
 
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.protocols import BackendProtocol
+    from vibe3.clients import BackendProtocol, GitClient, GitHubClient, SQLiteClient
     from vibe3.services.pr_service import PRService
 
 
@@ -205,7 +201,7 @@ class ExpiredResourceCleanupService:
             )
 
         # Load protected branches from config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)
@@ -350,7 +346,7 @@ class ExpiredResourceCleanupService:
             )
 
         # Load protected branches and worktree names from config
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
 
         config = VibeConfig.get_defaults()
         protected = set(config.flow.protected_branches)
@@ -609,7 +605,7 @@ class ExpiredResourceCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.environment.session_registry import SessionRegistryService
+            from vibe3.environment import SessionRegistryService
 
             backend = self._backend
             registry = SessionRegistryService(store=self.store, backend=backend)

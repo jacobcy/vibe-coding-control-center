@@ -18,11 +18,12 @@ from vibe3.models.orchestra_config import OrchestraConfig
 
 # Lazy imports via __getattr__ for everything else to avoid circular dependencies
 if TYPE_CHECKING:
-    from vibe3.domain.failed_gate import GateResult, GateStatus
+    from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
     from vibe3.models.queue_entry import QueueEntry
     from vibe3.observability.orchestra_log import (
+        append_governance_event,
         append_orchestra_event,
         append_orchestra_run_separator,
         orchestra_events_log_path,
@@ -46,7 +47,11 @@ if TYPE_CHECKING:
         promote_progressed_entries,
         select_ready_issues_from_collected_issues,
     )
-    from vibe3.orchestra.queue_ordering import sort_ready_issues
+    from vibe3.orchestra.queue_ordering import (
+        resolve_priority,
+        resolve_roadmap_rank,
+        sort_ready_issues,
+    )
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
     from vibe3.services.check_service import CheckResult
     from vibe3.services.label_utils import should_skip_from_queue
@@ -64,6 +69,14 @@ def __getattr__(name: str) -> object:
         from vibe3.models.queue_entry import QueueEntry
 
         return QueueEntry
+    if name == "FailedGate":
+        from vibe3.domain.failed_gate import FailedGate
+
+        return FailedGate
+    if name == "append_governance_event":
+        from vibe3.observability.orchestra_log import append_governance_event
+
+        return append_governance_event
     if name == "append_orchestra_event":
         from vibe3.observability.orchestra_log import append_orchestra_event
 
@@ -80,6 +93,14 @@ def __getattr__(name: str) -> object:
         from vibe3.observability.orchestra_log import orchestra_log_dir
 
         return orchestra_log_dir
+    if name == "resolve_priority":
+        from vibe3.orchestra.queue_ordering import resolve_priority
+
+        return resolve_priority
+    if name == "resolve_roadmap_rank":
+        from vibe3.orchestra.queue_ordering import resolve_roadmap_rank
+
+        return resolve_roadmap_rank
     if name == "sort_ready_issues":
         from vibe3.orchestra.queue_ordering import sort_ready_issues
 
@@ -179,10 +200,14 @@ __all__ = [
     "OrchestraConfig",
     # Orchestra submodules
     "QueueEntry",
+    "FailedGate",
+    "append_governance_event",
     "append_orchestra_event",
     "append_orchestra_run_separator",
     "orchestra_events_log_path",
     "orchestra_log_dir",
+    "resolve_priority",
+    "resolve_roadmap_rank",
     "sort_ready_issues",
     "select_ready_issues_from_collected_issues",
     "promote_progressed_entries",

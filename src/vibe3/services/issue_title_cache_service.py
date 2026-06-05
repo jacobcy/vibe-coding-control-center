@@ -13,8 +13,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient, SQLiteClient
 
 
 class IssueTitleCacheService:
@@ -48,7 +47,7 @@ class IssueTitleCacheService:
     def github_client(self) -> GitHubClient:
         """Lazy-initialized GitHub client."""
         if self._github_client is None:
-            from vibe3.clients.github_client import GitHubClient
+            from vibe3.clients import GitHubClient
 
             self._github_client = GitHubClient()
         return self._github_client

@@ -14,14 +14,38 @@ if TYPE_CHECKING:
         PRSource,
         UncommittedSource,
     )
+    from vibe3.models.coordination_truth import CoordinationTruth
     from vibe3.models.coverage import CoverageReport, LayerCoverage
+    from vibe3.models.data_source import DataSource
     from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
     from vibe3.models.execution_handle import AsyncExecutionHandle
     from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
+    from vibe3.models.flow import (
+        FlowEvent,
+        FlowState,
+        FlowStatusResponse,
+        IssueLink,
+        MainBranchProtectedError,
+        TimelineEvent,
+    )
     from vibe3.models.inspection import CallNode, CommandInspection
+    from vibe3.models.issue_body import FlowStateProjection
     from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
-    from vibe3.models.orchestration import IssueInfo, IssueState
+    from vibe3.models.orchestration import IssueInfo, IssueState, StateTransition
     from vibe3.models.plan import PlanRequest
+    from vibe3.models.pr import (
+        CreatePRRequest,
+        PRMetadata,
+        PRResponse,
+        PRState,
+        VersionBumpResponse,
+        VersionBumpType,
+    )
+    from vibe3.models.pr_analysis import (
+        CommitInfo,
+        CriticalFileInfo,
+        PRCriticalAnalysis,
+    )
     from vibe3.models.prompt_meta import PromptContextMode
     from vibe3.models.queue_entry import QueueEntry
     from vibe3.models.review import ReviewRequest
@@ -50,6 +74,11 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "BranchConvention": "vibe3.models.branch_convention",
     "BranchSource": "vibe3.models.change_source",
+    "CommitInfo": "vibe3.models.pr_analysis",
+    "CoordinationTruth": "vibe3.models.coordination_truth",
+    "CreatePRRequest": "vibe3.models.pr",
+    "CriticalFileInfo": "vibe3.models.pr_analysis",
+    "DataSource": "vibe3.models.data_source",
     "ChangeSource": "vibe3.models.change_source",
     "ChangeSourceType": "vibe3.models.change_source",
     "CommitSource": "vibe3.models.change_source",
@@ -66,8 +95,18 @@ _LAZY_IMPORTS = {
     "CommandInspection": "vibe3.models.inspection",
     "OrchestraConfig": "vibe3.models.orchestra_config",
     "SupervisorHandoffConfig": "vibe3.models.orchestra_config",
+    "FlowEvent": "vibe3.models.flow",
+    "FlowState": "vibe3.models.flow",
+    "FlowStateProjection": "vibe3.models.issue_body",
+    "FlowStatusResponse": "vibe3.models.flow",
     "IssueInfo": "vibe3.models.orchestration",
+    "IssueLink": "vibe3.models.flow",
     "IssueState": "vibe3.models.orchestration",
+    "MainBranchProtectedError": "vibe3.models.flow",
+    "PRCriticalAnalysis": "vibe3.models.pr_analysis",
+    "PRMetadata": "vibe3.models.pr",
+    "PRResponse": "vibe3.models.pr",
+    "PRState": "vibe3.models.pr",
     "PlanRequest": "vibe3.models.plan",
     "PromptContextMode": "vibe3.models.prompt_meta",
     "QueueEntry": "vibe3.models.queue_entry",
@@ -89,8 +128,12 @@ _LAZY_IMPORTS = {
     "StructureSnapshot": "vibe3.models.snapshot",
     "ExecutionStep": "vibe3.models.trace",
     "TraceOutput": "vibe3.models.trace",
+    "StateTransition": "vibe3.models.orchestration",
+    "TimelineEvent": "vibe3.models.flow",
     "VerdictRecord": "vibe3.models.verdict",
     "VerdictValue": "vibe3.models.verdict_types",
+    "VersionBumpResponse": "vibe3.models.pr",
+    "VersionBumpType": "vibe3.models.pr",
     "WorktreeRequirement": "vibe3.models.worktree",
 }
 
@@ -115,8 +158,13 @@ __all__: list[str] = [
     "ChangeSource",
     "ChangeSourceType",
     "CommandInspection",
+    "CommitInfo",
     "CommitSource",
+    "CoordinationTruth",
     "CoverageReport",
+    "CreatePRRequest",
+    "CriticalFileInfo",
+    "DataSource",
     "DeadCodeFinding",
     "DeadCodeReport",
     "DependencyChange",
@@ -128,26 +176,40 @@ __all__: list[str] = [
     "ExecutionStep",
     "FileChange",
     "FileSnapshot",
+    "FlowEvent",
+    "FlowState",
+    "FlowStateProjection",
+    "FlowStatusResponse",
     "FunctionSnapshot",
+    "IssueInfo",
+    "IssueLink",
+    "IssueState",
     "LayerCoverage",
+    "MainBranchProtectedError",
     "ModuleChange",
     "ModuleSnapshot",
-    "IssueInfo",
-    "IssueState",
     "OrchestraConfig",
-    "PlanRequest",
+    "PRCriticalAnalysis",
+    "PRMetadata",
+    "PRResponse",
     "PRSource",
+    "PRState",
+    "PlanRequest",
     "PromptContextMode",
     "QueueEntry",
     "ReviewRequest",
     "SessionRole",
+    "StateTransition",
     "StructureDiff",
     "StructureMetrics",
     "StructureSnapshot",
     "SupervisorHandoffConfig",
+    "TimelineEvent",
     "TraceOutput",
     "UncommittedSource",
     "VerdictRecord",
     "VerdictValue",
+    "VersionBumpResponse",
+    "VersionBumpType",
     "WorktreeRequirement",
 ]

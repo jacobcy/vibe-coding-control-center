@@ -10,12 +10,9 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import IssueInfo, IssueState
-from vibe3.orchestra.queue_ordering import (
+from vibe3.orchestra import (
     resolve_priority,
     resolve_roadmap_rank,
     sort_ready_issues,
@@ -24,7 +21,7 @@ from vibe3.services.issue_collection_service import IssueCollectionService
 from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 
 if TYPE_CHECKING:
-    from vibe3.models.flow import FlowStatusResponse
+    from vibe3.models import FlowStatusResponse
     from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 

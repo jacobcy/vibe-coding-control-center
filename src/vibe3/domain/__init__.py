@@ -40,6 +40,11 @@ if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.failed_gate import FailedGate
     from vibe3.domain.flow_manager import FlowManager
+    from vibe3.domain.state_machine import (
+        STATE_LABEL_META,
+        VIBE_TASK_LABEL,
+        validate_transition,
+    )
 
 if TYPE_CHECKING:
     from vibe3.domain.publisher import EventPublisher
@@ -75,7 +80,7 @@ def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None
     return _subscribe(event_type, handler)
 
 
-def __getattr__(name: str) -> type:
+def __getattr__(name: str) -> object:
     """Lazy import for heavy modules to avoid circular dependencies."""
     # Events
     if name == "DomainEvent":
@@ -152,6 +157,18 @@ def __getattr__(name: str) -> type:
         from vibe3.domain.failed_gate import FailedGate
 
         return FailedGate
+    if name == "STATE_LABEL_META":
+        from vibe3.domain.state_machine import STATE_LABEL_META
+
+        return STATE_LABEL_META
+    if name == "VIBE_TASK_LABEL":
+        from vibe3.domain.state_machine import VIBE_TASK_LABEL
+
+        return VIBE_TASK_LABEL
+    if name == "validate_transition":
+        from vibe3.domain.state_machine import validate_transition
+
+        return validate_transition
     if name == "EventPublisher":
         from vibe3.domain.publisher import EventPublisher
 
@@ -179,6 +196,10 @@ __all__ = [
     "SupervisorApplyStarted",
     "SupervisorApplyCompleted",
     "SupervisorApplyDelegated",
+    # State machine
+    "STATE_LABEL_META",
+    "VIBE_TASK_LABEL",
+    "validate_transition",
     # Orchestration
     "FlowManager",
     "GlobalDispatchCoordinator",

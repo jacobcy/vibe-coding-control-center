@@ -9,16 +9,9 @@ from typing import cast
 
 from loguru import logger
 
-from vibe3.analysis import dag_service
-from vibe3.analysis.pr_scoring import PRDimensions
-from vibe3.analysis.serena_service import SerenaService
-from vibe3.config.loader import get_config
-from vibe3.models.change_source import PRSource
-from vibe3.models.pr_analysis import (
-    CommitInfo,
-    CriticalFileInfo,
-    PRCriticalAnalysis,
-)
+from vibe3.analysis import PRDimensions, SerenaService, dag_service
+from vibe3.config import get_config
+from vibe3.models import CommitInfo, CriticalFileInfo, PRCriticalAnalysis, PRSource
 from vibe3.services.pr_scoring_service import generate_score_report
 
 
@@ -38,8 +31,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
     """
     log = logger.bind(domain="pr_analysis", action="analyze", pr_number=pr_number)
     log.info("Analyzing PR")
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
 
@@ -88,8 +80,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
 def _get_pr_changed_files(pr_number: int) -> list[str]:
     """Return changed file paths for a PR, including deleted files."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
     all_changed_files = git.get_changed_files(PRSource(pr_number=pr_number))
@@ -138,8 +129,7 @@ def _analyze_critical_files(
     pr_number: int,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Extract changed symbols and DAG impact for critical Python files."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient
 
     git = GitClient(github_client=GitHubClient())
     svc = SerenaService(git_client=git)
@@ -207,7 +197,7 @@ def _fetch_pr_commit_shas(pr_number: int) -> list[str]:
 
 def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
     """Return latest commit messages for a PR via direct gh CLI call."""
-    from vibe3.utils.git_helpers import get_commit_message
+    from vibe3.utils import get_commit_message
 
     try:
         commit_shas = _fetch_pr_commit_shas(pr_number)

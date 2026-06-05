@@ -54,9 +54,9 @@ def dispatch_governance_execution(
             (resolves tick conflict)
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.execution.governance_sync_runner import run_governance_sync
-    from vibe3.orchestra.logging import append_governance_event
-    from vibe3.roles.governance_factory import build_default_governance_fns
+    from vibe3.execution import run_governance_sync
+    from vibe3.orchestra import append_governance_event
+    from vibe3.roles import build_default_governance_fns
 
     run_governance_sync(
         tick_count=tick_count,
@@ -79,7 +79,7 @@ def dispatch_supervisor_execution(issue_number: int, no_async: bool = False) -> 
         issue_number: Issue to apply supervisor handoff
         no_async: Run synchronously instead of async tmux session
     """
-    from vibe3.execution.issue_role_sync_runner import (
+    from vibe3.execution import (
         run_issue_role_async,
         run_issue_role_sync,
     )
@@ -210,7 +210,7 @@ def validate_governance_material_consistency(
         Possible types: missing_adapter, missing_recipe, missing_file, orphaned_adapter.
     """
     from vibe3.adapters import get_adapter
-    from vibe3.prompts.manifest import PromptManifest
+    from vibe3.prompts import PromptManifest
 
     issues: list[dict] = []
 
@@ -227,7 +227,7 @@ def validate_governance_material_consistency(
             )
             return issues
     if repo_root is None:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git_client = GitClient()
         git_common_dir = git_client.get_git_common_dir()

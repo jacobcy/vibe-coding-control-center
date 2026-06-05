@@ -4,11 +4,9 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
-from vibe3.clients import BackendProtocol, SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.models.flow import FlowEvent, FlowState
-from vibe3.models.verdict import VerdictRecord
+from vibe3.clients import BackendProtocol, GitClient, SQLiteClient
+from vibe3.environment import SessionRegistryService
+from vibe3.models import FlowEvent, FlowState, VerdictRecord
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService

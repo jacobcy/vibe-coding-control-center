@@ -11,8 +11,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.exceptions.error_codes import is_api_error, is_model_error
-from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.exceptions import ErrorSeverity, is_api_error, is_model_error
 
 # Known canonical severity values
 _KNOWN_SEVERITIES = {"CRITICAL", "ERROR", "WARNING"}

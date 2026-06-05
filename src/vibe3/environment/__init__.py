@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         SessionManager,
         TmuxSessionContext,
     )
+    from vibe3.environment.session_naming import get_manager_session_name
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.environment.worktree import WorktreeManager
     from vibe3.environment.worktree_context import WorktreeContext
@@ -29,6 +30,7 @@ _LAZY_IMPORTS = {
     "SessionRegistryService": "vibe3.environment.session_registry",
     "WorktreeManager": "vibe3.environment.worktree",
     "WorktreeContext": "vibe3.environment.worktree_context",
+    "get_manager_session_name": "vibe3.environment.session_naming",
 }
 
 
@@ -49,6 +51,7 @@ __all__ = [
     "CodeagentSessionContext",
     "SessionManager",
     "SessionRegistryService",
+    "get_manager_session_name",
     "resolve_prompt_config",
     "resolve_runtime_asset",
     "runtime_assets_root",
