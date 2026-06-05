@@ -11,43 +11,94 @@ Public API:
 - Template helpers: DEFAULT_PROMPTS_PATH, resolve_prompt_template
 """
 
-from vibe3.prompts.assembler import PromptAssembler
-from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.exceptions import (
-    MissingVariableError,
-    PromptAssemblyError,
-    ProviderNotFoundError,
-    TemplateNotFoundError,
-    UnusedVariableError,
-)
-from vibe3.prompts.manifest import (
-    PromptManifest,
-    PromptProvider,
-    PromptRecipeDefinition,
-    PromptRecipeVariant,
-)
-from vibe3.prompts.models import (
-    LoadedPromptRecipeDefinition,
-    PromptMaterialSpec,
-    PromptRecipe,
-    PromptRecipeKind,
-    PromptRecipeVariantSpec,
-    PromptRenderResult,
-    PromptSectionSpec,
-    PromptVariableProvenance,
-    PromptVariableSource,
-    VariableSourceKind,
-)
-from vibe3.prompts.provider_registry import ProviderRegistry
-from vibe3.prompts.template_loader import (
-    DEFAULT_PROMPTS_PATH,
-    resolve_prompt_template,
-)
-from vibe3.prompts.validation import (
-    PromptValidationResult,
-    PromptValidationService,
-    ValidationIssue,
-)
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.prompts.assembler import PromptAssembler
+    from vibe3.prompts.context_builder import (
+        PromptContextBuilder,
+        make_context_builder,
+    )
+    from vibe3.prompts.exceptions import (
+        MissingVariableError,
+        PromptAssemblyError,
+        ProviderNotFoundError,
+        TemplateNotFoundError,
+        UnusedVariableError,
+    )
+    from vibe3.prompts.manifest import (
+        PromptManifest,
+        PromptProvider,
+        PromptRecipeDefinition,
+        PromptRecipeVariant,
+    )
+    from vibe3.prompts.models import (
+        LoadedPromptRecipeDefinition,
+        PromptMaterialSpec,
+        PromptRecipe,
+        PromptRecipeKind,
+        PromptRecipeVariantSpec,
+        PromptRenderResult,
+        PromptSectionSpec,
+        PromptVariableProvenance,
+        PromptVariableSource,
+        VariableSourceKind,
+    )
+    from vibe3.prompts.provider_registry import ProviderRegistry
+    from vibe3.prompts.template_loader import (
+        DEFAULT_PROMPTS_PATH,
+        resolve_prompt_template,
+    )
+    from vibe3.prompts.validation import (
+        PromptValidationResult,
+        PromptValidationService,
+        ValidationIssue,
+    )
+
+# Lazy imports
+_LAZY_IMPORTS = {
+    "PromptAssembler": "vibe3.prompts.assembler",
+    "PromptContextBuilder": "vibe3.prompts.context_builder",
+    "make_context_builder": "vibe3.prompts.context_builder",
+    "MissingVariableError": "vibe3.prompts.exceptions",
+    "PromptAssemblyError": "vibe3.prompts.exceptions",
+    "ProviderNotFoundError": "vibe3.prompts.exceptions",
+    "TemplateNotFoundError": "vibe3.prompts.exceptions",
+    "UnusedVariableError": "vibe3.prompts.exceptions",
+    "PromptManifest": "vibe3.prompts.manifest",
+    "PromptProvider": "vibe3.prompts.manifest",
+    "PromptRecipeDefinition": "vibe3.prompts.manifest",
+    "PromptRecipeVariant": "vibe3.prompts.manifest",
+    "LoadedPromptRecipeDefinition": "vibe3.prompts.models",
+    "PromptMaterialSpec": "vibe3.prompts.models",
+    "PromptRecipe": "vibe3.prompts.models",
+    "PromptRecipeKind": "vibe3.prompts.models",
+    "PromptRecipeVariantSpec": "vibe3.prompts.models",
+    "PromptRenderResult": "vibe3.prompts.models",
+    "PromptSectionSpec": "vibe3.prompts.models",
+    "PromptVariableProvenance": "vibe3.prompts.models",
+    "PromptVariableSource": "vibe3.prompts.models",
+    "VariableSourceKind": "vibe3.prompts.models",
+    "ProviderRegistry": "vibe3.prompts.provider_registry",
+    "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
+    "resolve_prompt_template": "vibe3.prompts.template_loader",
+    "PromptValidationResult": "vibe3.prompts.validation",
+    "PromptValidationService": "vibe3.prompts.validation",
+    "ValidationIssue": "vibe3.prompts.validation",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Lazy import for prompts symbols to avoid circular dependencies."""
+    if name in _LAZY_IMPORTS:
+        import importlib
+
+        module = importlib.import_module(_LAZY_IMPORTS[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Core

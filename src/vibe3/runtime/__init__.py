@@ -20,14 +20,6 @@ from vibe3.orchestra.logging import (
     append_orchestra_run_separator,
 )
 
-# Re-export orchestra instance management (runtime component)
-from vibe3.runtime.orchestra_instance import (
-    OrchestraInstanceInfo,
-    read_instance_info,
-    validate_instance,
-    write_instance_info,
-)
-
 # Lazy imports via __getattr__ for everything else to avoid circular dependencies
 if TYPE_CHECKING:
     from vibe3.runtime.circuit_breaker import (
@@ -38,6 +30,12 @@ if TYPE_CHECKING:
     )
     from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
     from vibe3.runtime.heartbeat import HeartbeatServer
+    from vibe3.runtime.orchestra_instance import (
+        OrchestraInstanceInfo,
+        read_instance_info,
+        validate_instance,
+        write_instance_info,
+    )
     from vibe3.runtime.periodic_check_executor import execute_periodic_check
     from vibe3.runtime.service_protocol import ServiceBase
     from vibe3.services.error_tracking_service import ErrorTrackingService
@@ -49,6 +47,24 @@ def __getattr__(name: str) -> object:
     All symbols (runtime submodules, services) are imported lazily
     to prevent circular import issues.
     """
+    # Orchestra instance management
+    if name == "OrchestraInstanceInfo":
+        from vibe3.runtime.orchestra_instance import OrchestraInstanceInfo
+
+        return OrchestraInstanceInfo
+    if name == "read_instance_info":
+        from vibe3.runtime.orchestra_instance import read_instance_info
+
+        return read_instance_info
+    if name == "validate_instance":
+        from vibe3.runtime.orchestra_instance import validate_instance
+
+        return validate_instance
+    if name == "write_instance_info":
+        from vibe3.runtime.orchestra_instance import write_instance_info
+
+        return write_instance_info
+
     # Runtime submodule symbols
     if name == "CircuitBreaker":
         from vibe3.runtime.circuit_breaker import CircuitBreaker

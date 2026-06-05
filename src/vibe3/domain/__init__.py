@@ -10,23 +10,24 @@ Reference: docs/standards/v3/worktree-lifecycle-standard.md
 
 from typing import TYPE_CHECKING, Callable
 
-from vibe3.domain.events import (
-    # Base
-    DomainEvent,
-    # L3 Flow Lifecycle Events
-    # L1 Governance Events
-    GovernanceDecisionRequired,
-    GovernanceScanCompleted,
-    GovernanceScanStarted,
-    IssueFailed,
-    # L2 Supervisor Apply Events
-    SupervisorApplyCompleted,
-    SupervisorApplyDelegated,
-    SupervisorApplyDispatched,
-    SupervisorApplyStarted,
-    SupervisorIssueIdentified,
-    SupervisorPromptRendered,
-)
+if TYPE_CHECKING:
+    from vibe3.domain.events import (
+        # Base
+        DomainEvent,
+        # L3 Flow Lifecycle Events
+        # L1 Governance Events
+        GovernanceDecisionRequired,
+        GovernanceScanCompleted,
+        GovernanceScanStarted,
+        IssueFailed,
+        # L2 Supervisor Apply Events
+        SupervisorApplyCompleted,
+        SupervisorApplyDelegated,
+        SupervisorApplyDispatched,
+        SupervisorApplyStarted,
+        SupervisorIssueIdentified,
+        SupervisorPromptRendered,
+    )
 
 # Import orchestration components lazily to avoid circular imports
 # FlowManager, GlobalDispatchCoordinator, and FailedGate are available through
@@ -56,7 +57,7 @@ def get_publisher() -> "EventPublisher":
     return _get_publisher()
 
 
-def publish(event: DomainEvent) -> None:
+def publish(event: "DomainEvent") -> None:
     """Publish a domain event lazily."""
     from vibe3.domain.publisher import publish as _publish
 
@@ -72,6 +73,53 @@ def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None
 
 def __getattr__(name: str) -> type:
     """Lazy import for heavy modules to avoid circular dependencies."""
+    # Events
+    if name == "DomainEvent":
+        from vibe3.domain.events import DomainEvent
+
+        return DomainEvent
+    if name == "GovernanceDecisionRequired":
+        from vibe3.domain.events import GovernanceDecisionRequired
+
+        return GovernanceDecisionRequired
+    if name == "GovernanceScanCompleted":
+        from vibe3.domain.events import GovernanceScanCompleted
+
+        return GovernanceScanCompleted
+    if name == "GovernanceScanStarted":
+        from vibe3.domain.events import GovernanceScanStarted
+
+        return GovernanceScanStarted
+    if name == "IssueFailed":
+        from vibe3.domain.events import IssueFailed
+
+        return IssueFailed
+    if name == "SupervisorApplyCompleted":
+        from vibe3.domain.events import SupervisorApplyCompleted
+
+        return SupervisorApplyCompleted
+    if name == "SupervisorApplyDelegated":
+        from vibe3.domain.events import SupervisorApplyDelegated
+
+        return SupervisorApplyDelegated
+    if name == "SupervisorApplyDispatched":
+        from vibe3.domain.events import SupervisorApplyDispatched
+
+        return SupervisorApplyDispatched
+    if name == "SupervisorApplyStarted":
+        from vibe3.domain.events import SupervisorApplyStarted
+
+        return SupervisorApplyStarted
+    if name == "SupervisorIssueIdentified":
+        from vibe3.domain.events import SupervisorIssueIdentified
+
+        return SupervisorIssueIdentified
+    if name == "SupervisorPromptRendered":
+        from vibe3.domain.events import SupervisorPromptRendered
+
+        return SupervisorPromptRendered
+
+    # Orchestration
     if name == "FlowManager":
         from vibe3.domain.flow_manager import FlowManager
 

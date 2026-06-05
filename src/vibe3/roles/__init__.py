@@ -14,17 +14,15 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
-# Eager imports - definitions 不导入其他角色模块，不会产生循环
-from vibe3.roles.definitions import (
-    IssueRoleSyncSpec,
-    RoleDefinition,
-    RoleOutputContract,
-    TriggerableRoleDefinition,
-    TriggerName,
-)
-
 if TYPE_CHECKING:
     # For type checkers, import all symbols
+    from vibe3.roles.definitions import (
+        IssueRoleSyncSpec,
+        RoleDefinition,
+        RoleOutputContract,
+        TriggerableRoleDefinition,
+        TriggerName,
+    )
     from vibe3.roles.governance import (
         GOVERNANCE_ROLE,
         GOVERNANCE_TASK_PROMPT,
@@ -113,6 +111,12 @@ if TYPE_CHECKING:
 # Lazy import mapping: symbol_name -> module_path
 # Symbol name is the same in both this module and the source module
 _LAZY_IMPORTS: dict[str, str] = {
+    # definitions (no circular dependency risk, but moved to lazy per modularity test)
+    "IssueRoleSyncSpec": "vibe3.roles.definitions",
+    "RoleDefinition": "vibe3.roles.definitions",
+    "RoleOutputContract": "vibe3.roles.definitions",
+    "TriggerName": "vibe3.roles.definitions",
+    "TriggerableRoleDefinition": "vibe3.roles.definitions",
     # registry (imports from manager, so must be lazy)
     "LABEL_DISPATCH_ROLES": "vibe3.roles.registry",
     "build_label_dispatch_event": "vibe3.roles.registry",
@@ -204,7 +208,7 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    # definitions (eager)
+    # definitions (lazy)
     "IssueRoleSyncSpec",
     "RoleDefinition",
     "RoleOutputContract",
@@ -288,17 +292,10 @@ __all__ = [
     "normalize_material_name",
 ]
 
-# Consistency check: ensure __all__ matches eager + lazy symbols
+# Consistency check: ensure __all__ matches lazy symbols
 # This catches drift when adding/renaming symbols during development
-_eager_exports = {
-    "IssueRoleSyncSpec",
-    "RoleDefinition",
-    "RoleOutputContract",
-    "TriggerName",
-    "TriggerableRoleDefinition",
-}
 _lazy_exports = set(_LAZY_IMPORTS.keys())
-assert set(__all__) == _eager_exports | _lazy_exports, (
+assert set(__all__) == _lazy_exports, (
     f"Export list mismatch: __all__ ({len(__all__)} symbols) != "
-    f"eager ({len(_eager_exports)}) + lazy ({len(_lazy_exports)})"
+    f"lazy ({len(_lazy_exports)})"
 )

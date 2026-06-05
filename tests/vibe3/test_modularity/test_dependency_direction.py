@@ -18,6 +18,63 @@ if TYPE_CHECKING:
     pass
 
 
+def _build_parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST | None]:
+    """Build a mapping from each node to its parent node.
+
+    Args:
+        tree: The AST tree to analyze
+
+    Returns:
+        Dictionary mapping each node to its parent (or None for root)
+    """
+    parents = {}
+
+    def _visit(node: ast.AST, parent: ast.AST | None = None) -> None:
+        parents[node] = parent
+        for child in ast.iter_child_nodes(node):
+            _visit(child, node)
+
+    _visit(tree)
+    return parents
+
+
+def _is_in_type_checking_or_function(
+    node: ast.AST, parents: dict[ast.AST, ast.AST | None]
+) -> bool:
+    """Check if a node is inside a TYPE_CHECKING if block or a function/method body.
+
+    Args:
+        node: The AST node to check
+        parents: Parent mapping from _build_parent_map
+
+    Returns:
+        True if node is inside TYPE_CHECKING block or function body
+    """
+    current = node
+    while current is not None:
+        parent = parents.get(current)
+        if parent is None:
+            break
+
+        # Check if inside an if statement
+        if isinstance(parent, ast.If):
+            # Check if this is an `if TYPE_CHECKING:` block
+            test = parent.test
+            # Handle both `if TYPE_CHECKING:` and `if typing.TYPE_CHECKING:`
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                return True
+            if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+                return True
+
+        # Check if inside a function/method body
+        if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return True
+
+        current = parent
+
+    return False
+
+
 class TestLayerDependencies:
     """Test that dependencies follow layer rules."""
 
@@ -83,10 +140,6 @@ class TestLayerDependencies:
                 + "\n".join(f"  - {v}" for v in violations)
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: ~25 __init__.py files import from own "
-        "submodules (roles, runtime, server, services, utils)"
-    )
     def test_no_self_reference_in_init(self, module_registry: list[str]) -> None:
         """Verify __init__.py files don't import from their own submodule in ways
         that create circular init-time dependencies.
@@ -101,10 +154,15 @@ class TestLayerDependencies:
             try:
                 source = init_path.read_text(encoding="utf-8")
                 tree = ast.parse(source)
+                parents = _build_parent_map(tree)
 
                 # Look for imports of own submodules
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom):
+                        # Skip imports inside TYPE_CHECKING blocks or functions
+                        if _is_in_type_checking_or_function(node, parents):
+                            continue
+
                         # Check absolute imports: from vibe3.<module>.<sub> import ...
                         if node.module and node.module.startswith(
                             f"vibe3.{module_name}."

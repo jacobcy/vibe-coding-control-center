@@ -1,17 +1,17 @@
 """Vibe3 services layer."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-# Direct imports for bootstrap symbols (no circular dep risk)
-from vibe3.services.bootstrap_context_service import (
-    BootstrapAction,
-    BootstrapActionKind,
-    BootstrapContextService,
-    BootstrapPlan,
-)
+if TYPE_CHECKING:
+    from vibe3.services.bootstrap_context_service import (
+        BootstrapAction,
+        BootstrapActionKind,
+        BootstrapContextService,
+        BootstrapPlan,
+    )
 
 __all__ = [
-    # Bootstrap symbols (direct import)
+    # Bootstrap symbols (lazy import)
     "BootstrapAction",
     "BootstrapActionKind",
     "BootstrapContextService",
@@ -75,6 +75,11 @@ __all__ = [
 
 # Lazy import mapping for symbols not directly imported above
 _SYMBOL_MODULES = {
+    # Bootstrap symbols
+    "BootstrapAction": "vibe3.services.bootstrap_context_service",
+    "BootstrapActionKind": "vibe3.services.bootstrap_context_service",
+    "BootstrapContextService": "vibe3.services.bootstrap_context_service",
+    "BootstrapPlan": "vibe3.services.bootstrap_context_service",
     # Services
     "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
     "CheckResult": "vibe3.services.check_service",
