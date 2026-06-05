@@ -8,7 +8,7 @@ from loguru import logger
 from vibe3.clients.github_client_base import raise_gh_pr_error
 from vibe3.exceptions import PRNotFoundError
 
-# PR symbols not in models' public API yet - follow-up issue needed
+# public-api: pending upstream export
 from vibe3.models.pr import (
     CreatePRRequest,
     PRResponse,

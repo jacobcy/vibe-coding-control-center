@@ -6,9 +6,6 @@ Import paths:
 
     # Backward compatible (package re-export)
     from vibe3.clients.protocols import GitPathProtocol
-
-    # Legacy (services shim re-export)
-    from vibe3.services.git_path_client import GitPathProtocol
 """
 
 from pathlib import Path

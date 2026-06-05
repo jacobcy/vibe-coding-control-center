@@ -9,9 +9,6 @@ Import paths:
 
     # Backward compatible (package re-export)
     from vibe3.clients.protocols import FlowReader
-
-    # Legacy (services shim re-export)
-    from vibe3.services.flow_reader import FlowReader
 """
 
 from __future__ import annotations

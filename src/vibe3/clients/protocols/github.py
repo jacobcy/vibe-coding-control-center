@@ -10,7 +10,7 @@ Import paths:
 
 from typing import Any, Protocol
 
-# PR symbols not in models' public API yet - follow-up issue needed
+# public-api: pending upstream export
 from vibe3.models.pr import (
     CreatePRRequest,
     PRResponse,

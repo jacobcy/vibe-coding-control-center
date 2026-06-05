@@ -7,7 +7,7 @@ from typing import Any
 
 from loguru import logger
 
-# PR symbols not in models' public API yet - follow-up issue needed
+# public-api: pending upstream export
 from vibe3.models.pr import CICheck, PRMetadata, PRResponse, PRState
 
 _ACTIONS_RUN_LINK_RE = re.compile(
