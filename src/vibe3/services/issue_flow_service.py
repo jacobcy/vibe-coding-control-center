@@ -4,12 +4,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from vibe3.clients import SQLiteClient
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.settings import VibeConfig
+from vibe3.config import VibeConfig, load_orchestra_config
 from vibe3.exceptions import InvalidBranchLinkError
 
 if TYPE_CHECKING:
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
     from vibe3.services.convention_resolver import ConventionResolver
 
 

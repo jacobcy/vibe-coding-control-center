@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitClient, GitHubClient
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
@@ -20,7 +19,7 @@ from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
-    from vibe3.models.flow import FlowStatusResponse
+    from vibe3.models import FlowStatusResponse
 
 
 # Type alias for progress callback: (issue_number, branch, step, status) -> None

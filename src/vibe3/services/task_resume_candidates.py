@@ -13,7 +13,7 @@ from loguru import logger
 from vibe3.models import IssueState
 
 if TYPE_CHECKING:
-    from vibe3.models.flow import FlowStatusResponse
+    from vibe3.models import FlowStatusResponse
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.label_service import LabelService

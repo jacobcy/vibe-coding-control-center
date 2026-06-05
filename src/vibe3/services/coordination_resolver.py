@@ -6,12 +6,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.coordination_truth import CoordinationTruth
-from vibe3.models.data_source import DataSource
-from vibe3.observability.degraded_mode import (
-    DegradedModeReason,
-    get_degraded_manager,
-)
+from vibe3.models import CoordinationTruth, DataSource
+from vibe3.observability import DegradedModeReason, get_degraded_manager
 from vibe3.services.flow_status_resolver import FlowStatusResolver
 
 if TYPE_CHECKING:
@@ -171,7 +167,7 @@ class CoordinationResolver:
             Dict with projection_state/blocked_reason/blocked_by_issue/dependencies
             from body, or None if read failed
         """
-        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients import GitHubClient
         from vibe3.services.issue_body_service import parse_projection
 
         client = GitHubClient()

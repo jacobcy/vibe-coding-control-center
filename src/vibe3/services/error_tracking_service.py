@@ -15,8 +15,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions.error_classification import get_error_handling_contract
-from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.exceptions import ErrorSeverity, get_error_handling_contract
 from vibe3.services.error_tracking_cleanup import (
     cleanup_old_errors as _cleanup_old_errors,
 )

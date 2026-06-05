@@ -7,13 +7,15 @@ from typing import cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.clients.recent_pr_cache import RecentPRCache
+from vibe3.clients import (
+    GitClient,
+    GitHubClient,
+    GitHubClientProtocol,
+    RecentPRCache,
+    SQLiteClient,
+)
 from vibe3.exceptions import GitError, PRNotFoundError, UserError
-from vibe3.models.pr import (
+from vibe3.models import (
     CreatePRRequest,
     PRResponse,
     PRState,

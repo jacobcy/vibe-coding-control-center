@@ -5,10 +5,8 @@ from typing import Literal, Self, cast
 from loguru import logger
 from pydantic import ValidationError
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
+from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.models import FlowEvent, FlowState, FlowStatusResponse, IssueLink
 from vibe3.services.git_path_client import GitPathProtocol, get_git_common_dir
 
 

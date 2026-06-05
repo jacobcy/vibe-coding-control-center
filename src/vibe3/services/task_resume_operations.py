@@ -13,9 +13,8 @@ from vibe3.exceptions import UserError
 from vibe3.models import IssueState
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.models.flow import FlowStatusResponse
+    from vibe3.clients import GitClient, GitHubClient
+    from vibe3.models import FlowStatusResponse
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.label_service import LabelService
@@ -99,7 +98,7 @@ class TaskResumeOperations:
             # Skip session check if backend not provided (e.g., manual CLI use)
             return
 
-        from vibe3.environment.session_registry import SessionRegistryService
+        from vibe3.environment import SessionRegistryService
 
         registry = SessionRegistryService(
             store=self.flow_service.store,
@@ -118,7 +117,7 @@ class TaskResumeOperations:
         label_state: str,
     ) -> IssueState:
         if not label_state:
-            from vibe3.models.flow import FlowState
+            from vibe3.models import FlowState
             from vibe3.services.flow_resume_resolver import infer_resume_label
 
             fs_dict = (

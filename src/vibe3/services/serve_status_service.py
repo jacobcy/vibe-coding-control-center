@@ -7,16 +7,15 @@ import re
 from rich.console import Console
 from rich.table import Table
 
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.failed_gate import FailedGate
-from vibe3.orchestra.logging import orchestra_events_log_path
+from vibe3.config import load_orchestra_config
+from vibe3.models import OrchestraConfig
+from vibe3.orchestra import FailedGate, orchestra_events_log_path
 from vibe3.services.error_tracking_service import ErrorTrackingService
-from vibe3.utils.error_message_cleaner import (
+from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
+    format_age_aware_time,
 )
-from vibe3.utils.time_format import format_age_aware_time
 
 
 class ServeStatusService:

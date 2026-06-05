@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from vibe3.models.flow import FlowStatusResponse
+from vibe3.models import FlowStatusResponse
 from vibe3.services.status_query_service import is_auto_task_branch
 
 

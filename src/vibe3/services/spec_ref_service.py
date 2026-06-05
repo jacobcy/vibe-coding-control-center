@@ -43,7 +43,7 @@ class SpecRefService:
         )
 
     def _try_parse_issue_number(self, spec_ref: str) -> int | None:
-        from vibe3.utils.issue_ref import try_parse_issue_number
+        from vibe3.utils import try_parse_issue_number
 
         return try_parse_issue_number(spec_ref)
 

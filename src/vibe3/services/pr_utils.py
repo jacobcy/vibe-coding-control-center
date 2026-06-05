@@ -2,12 +2,9 @@
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.clients import GitClient, SQLiteClient, parse_linked_issues
 from vibe3.exceptions import GitError, UserError
-from vibe3.models.flow import IssueLink
-from vibe3.models.pr import PRMetadata
+from vibe3.models import IssueLink, PRMetadata
 
 
 def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | None:

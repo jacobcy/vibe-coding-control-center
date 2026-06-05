@@ -5,7 +5,7 @@ from typing import Any, Callable
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models.flow import FlowEvent
+from vibe3.models import FlowEvent
 from vibe3.services.handoff_storage import HandoffStorage
 
 

@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.data_source import DataSource
-from vibe3.models.flow import FlowStatusResponse
+from vibe3.models import DataSource, FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_body_service import parse_projection
 
@@ -121,7 +120,7 @@ class FlowStatusResolver:
         if issue_number is None:
             raise ValueError("issue_number required for remote source")
 
-        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients import GitHubClient
         from vibe3.services.timeline_parser import parse_timeline_from_comments
 
         github_client = GitHubClient()

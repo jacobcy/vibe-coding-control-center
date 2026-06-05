@@ -15,6 +15,11 @@ if TYPE_CHECKING:
         execution_prefix,
         persist_execution_lifecycle_event,
     )
+    from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.execution.issue_role_sync_runner import (
+        run_issue_role_async,
+        run_issue_role_sync,
+    )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
     from vibe3.execution.session_service import load_session_id
 
@@ -27,6 +32,9 @@ _LAZY_IMPORTS = {
     "persist_execution_lifecycle_event": "vibe3.execution.execution_lifecycle",
     "apply_unified_noop_gate": "vibe3.execution.noop_gate",
     "load_session_id": "vibe3.execution.session_service",
+    "run_governance_sync": "vibe3.execution.governance_sync_runner",
+    "run_issue_role_async": "vibe3.execution.issue_role_sync_runner",
+    "run_issue_role_sync": "vibe3.execution.issue_role_sync_runner",
 }
 
 
@@ -54,4 +62,8 @@ __all__ = [
     "load_session_id",
     # Gates
     "apply_unified_noop_gate",
+    # Sync runners
+    "run_governance_sync",
+    "run_issue_role_async",
+    "run_issue_role_sync",
 ]

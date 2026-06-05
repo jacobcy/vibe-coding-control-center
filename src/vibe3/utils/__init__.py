@@ -12,6 +12,8 @@ from vibe3.clients.runtime_assets import (
 )
 
 if TYPE_CHECKING:
+    from vibe3.utils.actor_utils import normalize_actor
+    from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.codeagent_helpers import (
         build_prompt_file_content,
         diagnose_backend_error,
@@ -21,24 +23,41 @@ if TYPE_CHECKING:
         stream_reader,
         summarize_backend_output,
     )
+    from vibe3.utils.comment_utils import is_human_comment
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
         GENERIC_AGENT_MARKER_PATTERN,
         STARTING_TIMEOUT_SECONDS,
     )
+    from vibe3.utils.error_message_cleaner import (
+        CODEAGENT_WRAPPER_RE,
+        clean_error_message,
+    )
+    from vibe3.utils.git_helpers import get_branch_handoff_dir, get_commit_message
+    from vibe3.utils.issue_ref import try_parse_issue_number
+    from vibe3.utils.time_format import format_age_aware_time
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "AUTOMATED_MARKERS": "vibe3.utils.constants",
+    "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
+    "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
+    "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
     "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
+    "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
+    "find_parent_branch": "vibe3.utils.branch_utils",
+    "format_age_aware_time": "vibe3.utils.time_format",
+    "get_branch_handoff_dir": "vibe3.utils.git_helpers",
+    "get_commit_message": "vibe3.utils.git_helpers",
+    "is_human_comment": "vibe3.utils.comment_utils",
+    "normalize_actor": "vibe3.utils.actor_utils",
     "prepare_prompt_file": "vibe3.utils.codeagent_helpers",
     "sanitize_prompt_for_display": "vibe3.utils.codeagent_helpers",
     "sanitize_task_shell_meta": "vibe3.utils.codeagent_helpers",
     "stream_reader": "vibe3.utils.codeagent_helpers",
     "summarize_backend_output": "vibe3.utils.codeagent_helpers",
-    "AUTOMATED_MARKERS": "vibe3.utils.constants",
-    "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
-    "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
+    "try_parse_issue_number": "vibe3.utils.issue_ref",
 }
 
 
@@ -54,10 +73,18 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "AUTOMATED_MARKERS",
+    "CODEAGENT_WRAPPER_RE",
     "GENERIC_AGENT_MARKER_PATTERN",
     "STARTING_TIMEOUT_SECONDS",
     "build_prompt_file_content",
+    "clean_error_message",
     "diagnose_backend_error",
+    "find_parent_branch",
+    "format_age_aware_time",
+    "get_branch_handoff_dir",
+    "get_commit_message",
+    "is_human_comment",
+    "normalize_actor",
     "prepare_prompt_file",
     "resolve_prompt_config",
     "resolve_runtime_asset",
@@ -66,4 +93,5 @@ __all__ = [
     "sanitize_task_shell_meta",
     "stream_reader",
     "summarize_backend_output",
+    "try_parse_issue_number",
 ]

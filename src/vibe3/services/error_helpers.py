@@ -8,8 +8,8 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
-    from vibe3.exceptions.error_severity import ErrorSeverity
-    from vibe3.models.execution_request import ExecutionLaunchResult
+    from vibe3.exceptions import ErrorSeverity
+    from vibe3.models import ExecutionLaunchResult
 
 
 def has_recent_specific_error(
@@ -34,7 +34,7 @@ def has_recent_specific_error(
     """
     import sqlite3
 
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     if store is None:
         store = SQLiteClient()
@@ -121,8 +121,8 @@ def record_dispatch_failure_if_unexpected(
 
     # Handle exception-level failures
     if exception is not None:
-        from vibe3.clients.sqlite_client import SQLiteClient
-        from vibe3.exceptions.error_classification import classify_error_hybrid
+        from vibe3.clients import SQLiteClient
+        from vibe3.exceptions import classify_error_hybrid
 
         # Detect test mock leaks - skip recording entirely
         exc_str = str(exception)
@@ -173,7 +173,7 @@ def record_dispatch_failure_if_unexpected(
     # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
     # If no, record E_DISPATCH_FAILURE for infrastructure visibility
     if reason_code == "launch_failed":
-        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.clients import SQLiteClient
 
         _store = SQLiteClient()
         if has_recent_specific_error(
@@ -186,7 +186,7 @@ def record_dispatch_failure_if_unexpected(
             return
         # else: fall through to record E_DISPATCH_FAILURE
 
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     # Include dispatch_source marker and reason_code for disambiguation
     reason_detail = result.reason or "(no detail)"

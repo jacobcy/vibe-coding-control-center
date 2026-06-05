@@ -4,17 +4,22 @@ from typing import Any, Literal, cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.settings import VibeConfig
+from vibe3.clients import (
+    GhIssueLabelPort,
+    GitHubClient,
+    GitHubClientProtocol,
+    IssueLabelPort,
+    SQLiteClient,
+)
+from vibe3.config import VibeConfig, load_orchestra_config
 from vibe3.exceptions import InvalidBranchLinkError
-from vibe3.models import IssueState
-from vibe3.models.flow import FlowStatusResponse, IssueLink
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.pr import PRResponse
+from vibe3.models import (
+    FlowStatusResponse,
+    IssueLink,
+    IssueState,
+    OrchestraConfig,
+    PRResponse,
+)
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.pr_service import PRService
@@ -160,7 +165,7 @@ class TaskService:
         # Auto-mirror vibe-task label for task role
         # Only add label if the branch actually exists (true local flow)
         if role == "task":
-            from vibe3.clients.git_client import GitClient
+            from vibe3.clients import GitClient
 
             git = GitClient()
             if git.branch_exists(normalized_branch):

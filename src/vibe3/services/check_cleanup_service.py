@@ -12,14 +12,12 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
-from vibe3.models.flow import FlowStatusResponse
+from vibe3.clients import BackendProtocol
+from vibe3.models import FlowStatusResponse
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.flow_cleanup_service import FlowCleanupService
 
 
@@ -62,7 +60,7 @@ class CheckCleanupService:
         Returns:
             Dict with summary and details of cleaned branches.
         """
-        from vibe3.config.settings import VibeConfig
+        from vibe3.config import VibeConfig
         from vibe3.services.expired_resource_cleanup_service import (
             ExpiredResourceCleanupService,
         )
@@ -217,7 +215,7 @@ class CheckCleanupService:
             SystemError: If query fails, preventing accidental cleanup.
         """
         try:
-            from vibe3.environment.session_registry import SessionRegistryService
+            from vibe3.environment import SessionRegistryService
 
             # Use injected backend, fallback to None (read-only mode)
             backend = self._backend
@@ -345,7 +343,7 @@ class CheckCleanupService:
                 )
                 return
 
-            from vibe3.clients.github_client import GitHubClient
+            from vibe3.clients import GitHubClient
             from vibe3.services.flow_service import FlowService
             from vibe3.services.issue_flow_service import IssueFlowService
             from vibe3.services.label_service import LabelService
@@ -505,7 +503,7 @@ class CheckCleanupService:
             current_cwd = os.getcwd()
 
             # Load protected worktree names from config
-            from vibe3.config.settings import VibeConfig
+            from vibe3.config import VibeConfig
             from vibe3.services.expired_resource_cleanup_service import (
                 _is_protected_worktree,
             )

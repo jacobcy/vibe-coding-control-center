@@ -1,8 +1,8 @@
 """Shared actor formatting helpers for execution and handoff."""
 
-from vibe3.config.agent_preset import resolve_effective_agent_options
+from vibe3.config import resolve_effective_agent_options
 from vibe3.exceptions import AgentPresetNotFoundError
-from vibe3.models.review_runner import AgentOptions
+from vibe3.models import AgentOptions
 
 
 def resolve_actor_backend_model(options: AgentOptions) -> tuple[str, str | None]:

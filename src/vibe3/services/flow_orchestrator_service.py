@@ -9,13 +9,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.environment.worktree import WorktreeManager
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.environment import WorktreeManager
 from vibe3.exceptions import GitError
-from vibe3.models.pr import PRState
+from vibe3.models import PRState
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import block_manager_noop_issue
@@ -26,8 +23,7 @@ from vibe3.services.signature_service import SignatureService
 from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:
-    from vibe3.config.orchestra_config import OrchestraConfig
-    from vibe3.models import IssueInfo
+    from vibe3.models import IssueInfo, OrchestraConfig
     from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 # Retry configuration for Git fetch operations

@@ -8,16 +8,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.pr import PRResponse
+from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.models import FlowStatusResponse, PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.path_helpers import resolve_ref_path
 from vibe3.services.pr_service import PRService
-from vibe3.utils.comment_utils import is_human_comment
+from vibe3.utils import is_human_comment
 
 
 @dataclass
