@@ -7,7 +7,7 @@
 
 from rich.text import Text
 
-from vibe3.ui.console import console
+from vibe3.ui.console_impl import console
 
 _STATUS_COLOR: dict[str, str] = {
     "active": "green",

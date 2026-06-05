@@ -18,18 +18,16 @@ from vibe3.commands.command_options import (
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.config import load_runtime_config
 from vibe3.config.cli_overrides import RoleCliOverrides, build_role_cli_overrides
-from vibe3.config.loader import load_runtime_config
 from vibe3.exceptions import ConfigError
-from vibe3.execution.codeagent_runner import CodeagentExecutionService
+from vibe3.execution import CodeagentExecutionService
 from vibe3.roles.plan import (
     execute_spec_plan_async,
     execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
-from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_resolution import resolve_handoff_target
+from vibe3.services import FlowService, resolve_branch_arg, resolve_handoff_target
 
 app = typer.Typer(
     name="plan",

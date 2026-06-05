@@ -8,10 +8,14 @@ from rich.console import Console
 from rich.panel import Panel
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.models.review_runner import AgentOptions
-from vibe3.prompts.assembler import PromptAssembler
-from vibe3.prompts.models import PromptRecipe, PromptVariableSource, VariableSourceKind
+from vibe3.execution import resolve_orchestra_repo_root
+from vibe3.models import AgentOptions
+from vibe3.prompts import (
+    PromptAssembler,
+    PromptRecipe,
+    PromptVariableSource,
+    VariableSourceKind,
+)
 
 app = typer.Typer(
     name="ask",

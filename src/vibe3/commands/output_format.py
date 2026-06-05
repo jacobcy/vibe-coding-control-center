@@ -11,7 +11,7 @@ from typing import Any
 
 import typer
 
-from vibe3.models.trace import ExecutionStep, TraceOutput
+from vibe3.models import ExecutionStep, TraceOutput
 
 
 def output_result(

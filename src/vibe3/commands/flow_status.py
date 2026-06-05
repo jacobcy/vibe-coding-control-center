@@ -29,20 +29,22 @@ from vibe3.commands.flow_status_helpers import (
     _render_snapshot_format,
     _timeline_to_flow_events,
 )
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services.flow_projection_service import FlowProjectionService
-from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_branch_resolver import resolve_command_branch
-from vibe3.services.pr_service import PRService
-from vibe3.services.task_binding_guard import build_bind_task_hint
-from vibe3.ui.console import console
-from vibe3.ui.flow_ui import (
+from vibe3.services import (
+    FlowProjectionService,
+    FlowService,
+    PRService,
+    build_bind_task_hint,
+    resolve_command_branch,
+)
+from vibe3.ui import (
+    console,
     render_error,
     render_flow_timeline,
     render_flows_status_dashboard,
 )
-from vibe3.utils.branch_utils import find_parent_branch
+from vibe3.utils import find_parent_branch
 
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
 

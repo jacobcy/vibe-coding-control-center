@@ -31,8 +31,7 @@ from vibe3.roles.review import (
     execute_manual_review_sync,
     validate_review_prerequisites,
 )
-from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.flow_service import FlowService
+from vibe3.services import FlowService, resolve_branch_arg
 
 app = typer.Typer(
     name="review",

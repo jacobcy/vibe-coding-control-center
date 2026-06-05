@@ -6,9 +6,9 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.commands.command_options import _ASYNC_OPT
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config import load_orchestra_config
 from vibe3.observability import setup_logging
 
 app = typer.Typer(

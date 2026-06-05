@@ -10,20 +10,22 @@ import typer
 from vibe3.clients import GitHubClient
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
+from vibe3.config import get_manager_usernames
 from vibe3.config.loader import get_config_with_env_override
-from vibe3.config.manager_config import get_manager_usernames
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
-from vibe3.observability.logger import setup_logging
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.flow_service import FlowService
-from vibe3.services.task_resume_usecase import TaskResumeUsecase
-from vibe3.services.task_service import TaskService
-from vibe3.ui.task_ui import (
+from vibe3.observability import setup_logging
+from vibe3.services import (
+    ConventionResolver,
+    FlowService,
+    TaskResumeUsecase,
+    TaskService,
+)
+from vibe3.ui import (
     render_task_comments,
     render_task_show,
 )
-from vibe3.utils.issue_ref import try_parse_issue_number
+from vibe3.utils import try_parse_issue_number
 
 app = typer.Typer(
     help="""Manage execution tasks.

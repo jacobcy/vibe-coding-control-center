@@ -6,9 +6,8 @@ to keep the main render module under 400 lines.
 
 import re
 
-from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.ui.console import console
+from vibe3.models import FlowStatusResponse, OrchestraConfig
+from vibe3.ui import console
 from vibe3.utils.error_message_cleaner import (
     CODEAGENT_WRAPPER_ANYWHERE_RE,
     clean_error_message,

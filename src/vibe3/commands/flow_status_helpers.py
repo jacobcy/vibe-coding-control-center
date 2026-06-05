@@ -9,9 +9,9 @@ import typer
 from loguru import logger
 
 from vibe3.exceptions import UserError
-from vibe3.services.flow_projection_service import FlowProjectionService
-from vibe3.ui.flow_ui import render_error, render_flow_status
-from vibe3.utils.branch_utils import find_parent_branch
+from vibe3.services import FlowProjectionService
+from vibe3.ui import render_error, render_flow_status
+from vibe3.utils import find_parent_branch
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowEvent, TimelineEvent

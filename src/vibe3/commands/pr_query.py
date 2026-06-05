@@ -32,13 +32,14 @@ from vibe3.commands.output_format import (
     create_trace_output,
     output_result,
 )
-from vibe3.models.pr import PRResponse, PRState
-from vibe3.models.trace import TraceOutput
-from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_service import HandoffService
-from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
-from vibe3.services.pr_service import PRService
-from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
+from vibe3.models import PRResponse, PRState, TraceOutput
+from vibe3.services import (
+    FlowService,
+    HandoffService,
+    PRService,
+    resolve_issue_branch_input,
+)
+from vibe3.ui import render_local_review_summary, render_pr_details
 from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_console
 
 
@@ -199,7 +200,9 @@ def _fetch_pr_or_raise(
         pr = pr_svc.get_branch_pr_status(current_branch)
     if not pr:
         raise LookupError("PR not found")
-    return pr
+    from vibe3.models import PRResponse
+
+    return PRResponse(**pr) if isinstance(pr, dict) else pr
 
 
 def _build_missing_pr_message(

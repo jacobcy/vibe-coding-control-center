@@ -9,7 +9,7 @@ import typer
 import yaml
 from loguru import logger
 
-from vibe3.analysis.serena_service import SerenaService
+from vibe3.analysis import SerenaService
 from vibe3.commands.common import enable_method_trace
 
 

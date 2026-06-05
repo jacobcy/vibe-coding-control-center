@@ -6,12 +6,14 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.services.branch_arg import resolve_branch_arg
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.config import load_orchestra_config
+from vibe3.services import (
+    ConventionResolver,
+    FlowService,
+    load_issue_info,
+    resolve_branch_arg,
+)
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_context_loader import load_issue_info
 
 
 def blocked(
