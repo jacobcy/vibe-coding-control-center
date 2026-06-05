@@ -1,6 +1,6 @@
 ---
 name: vibe-onboard
-description: 安装完成后的入门引导与系统检查。用于安装完成后引导用户完成配置、检查系统状态、介绍核心功能，是新用户安装后的第一步入口。支持交互式询问用户需求，只安装必要的可选组件。**职责边界**：底层事实来自 `vibe doctor` / `vibe keys check`，本技能只负责解释结果与组织下一步。
+description: Use after `scripts/install.sh` to guide users through system setup, dependency checks, and core feature introduction. Interactive onboarding for new users. Delegates diagnostics to `vibe doctor` and `vibe keys check`. Do not use for project-level configuration (use vibe-project-check instead).
 ---
 
 # /vibe-onboard - 安装后入门引导

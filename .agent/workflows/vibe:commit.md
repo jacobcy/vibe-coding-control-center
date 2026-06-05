@@ -26,8 +26,8 @@ tags: [workflow, vibe, git, commit, orchestration]
      - `ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-test-file-loc.sh`
      - 任何文件超限必须修复，不允许创建 PR
 4. 在任何 commit 分组前，先做最小 metadata preflight：
-   - 读取 `vibe flow show --json`
-   - 若存在 `current_task`，继续读取 `vibe3 task status --json`
+   - 读取 `vibe3 flow show --format json`
+   - 若存在 `current_task`，继续读取 `vibe3 task status --format json`
    - 若 `current_task` 缺失、无法解析，或 `runtime_branch` 与当前 flow branch 不一致，则 hard block
    - 若缺少 `issue_refs`、`roadmap_item_ids`、`spec_standard/spec_ref`，则至少报告 warning
 5. 由 `vibe-commit` skill 负责：
@@ -35,7 +35,7 @@ tags: [workflow, vibe, git, commit, orchestration]
    - commit 分组
    - 串行多 PR 判断
    - 何时创建新分支并注册为 flow（`git checkout -b` + `vibe3 flow update`）
-   - 何时调用 `vibe3 flow pr --base <ref>`
+   - 何时调用 `vibe3 pr create --base <ref>`
 6. PR 发出后，当前 workflow 只负责把结果交回用户，并提示下一步先去 `/vibe-integrate` 收集或确认 review evidence。
 7. 只有当 review evidence 已存在，且 PR 已可 merge 或已 merged 时，才提示进入 `/vibe-done` 收口。
 
@@ -44,4 +44,4 @@ tags: [workflow, vibe, git, commit, orchestration]
 - workflow 不重写 `vibe-commit` skill 的业务逻辑。
 - workflow 只负责编排，不承载复杂业务逻辑；review evidence 的判定与 `/vibe-done` 的 merge gate 由 skill / shell 真源负责。
 - 若当前 flow 已有 PR 且用户要开始新目标，默认在当前目录创建新的逻辑 flow，不得自行新建物理 worktree。
-- `vibe3 flow pr` 是 shell 发布入口；`gh pr create` 不是 workflow 真源。
+- `vibe3 pr create` 是 shell 发布入口；`gh pr create` 不是 workflow 真源。

@@ -1,9 +1,37 @@
 ---
 name: vibe-check
-description: Use when the user wants to inspect the current runtime scene with vibe3 task status, verify whether flow/task state is synchronized with vibe3 check, resume blocked issues with vibe3 task resume, or mentions "/vibe-check" or "check runtime". Do not use for roadmap prioritization or roadmap-task mapping.
+description: Use for deep inspection of single flow when automated processes fail. Human intervention for complex flow/task binding issues, runtime state inconsistencies, and manual diagnosis. Do not use for routine monitoring (use vibe3 task status) or system-level debugging (use vibe-debug-serve).
 ---
 
-# /vibe-check (/check) - task-flow 审计驱动修复
+# /vibe-check - Flow Deep Inspection & Manual Intervention
+
+**单 flow 深入检查与人工接手**，用于自动化流程无法处理的复杂问题诊断与修复。
+
+## When to Use
+
+使用 vibe-check 的场景：
+
+1. **自动化流程失败**：
+   - Orchestra heartbeat 无法自动恢复的 blocked issues
+   - `vibe3 task resume` 无法解决的复杂绑定问题
+   - Flow/task state 严重不一致，需要人工判断
+
+2. **深度诊断需求**：
+   - 单个 flow 的 runtime 绑定问题
+   - Worktree/branch/flow 三者关系混乱
+   - 需要理解具体错误原因，而非简单恢复
+
+3. **复杂修复场景**：
+   - 需要跨多个 worktree 做一致性判断
+   - 需要结合 PR/issue 历史做语义判断
+   - 自动修复会丢失重要上下文时
+
+**Do NOT use for:**
+- 常规运行时监控 → 使用 `vibe3 task status`
+- 系统/服务层调试 → 使用 `/vibe-debug-serve`
+- 问题 issue 处理 → 使用 `/vibe-task`
+
+## 核心职责
 
 现场观察与修复分三类命令：
 

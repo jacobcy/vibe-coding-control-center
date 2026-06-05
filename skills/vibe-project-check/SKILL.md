@@ -1,6 +1,6 @@
 ---
 name: vibe-project-check
-description: 项目配置检查与补全。在 `vibe init` 之后运行，检查项目配置是否完整正确，发现缺失项时交互式询问用户是否补全。编排现有命令和文件读取，不新增 Python 代码。
+description: Use after `vibe init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Do not use for system-level installation issues (use vibe-onboard instead).
 ---
 
 # /vibe-project-check - 项目配置检查与补全
