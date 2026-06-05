@@ -328,3 +328,43 @@ class IssueAdminMixin:
                 error=str(exc),
             ).error("Failed to parse issue number from create output")
             return None
+
+    def update_issue_body(
+        self: Any, issue_number: int, body: str, repo: str | None = None
+    ) -> bool:
+        """Update issue body content.
+
+        Args:
+            issue_number: Issue number
+            body: New body content
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        logger.bind(
+            external="github",
+            operation="update_issue_body",
+            issue_number=issue_number,
+            body_length=len(body),
+        ).debug("Calling GitHub API: issue edit")
+
+        cmd = [
+            "gh",
+            "issue",
+            "edit",
+            str(issue_number),
+            "--body",
+            body,
+        ]
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to update issue #{issue_number} body"
+                )
+            return False
+        return True

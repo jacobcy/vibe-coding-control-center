@@ -278,6 +278,23 @@ class IssuesMixin(IssueAdminMixin):
             return None
         return cast("dict[str, Any] | None | str", json.loads(result.stdout))
 
+    def get_issue_body(
+        self: Any, issue_number: int, repo: str | None = None
+    ) -> str | None:
+        """Get issue body content.
+
+        Args:
+            issue_number: Issue number
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            Issue body text, or None if not found
+        """
+        result = self.view_issue(issue_number, repo=repo)
+        if isinstance(result, dict):
+            return cast(str | None, result.get("body", ""))
+        return None
+
     def list_issue_comments(
         self, issue_number: int, repo: str | None = None
     ) -> list[dict[str, Any]]:
