@@ -157,13 +157,7 @@ class DiffSummary(BaseModel):
 class DiffWarning(BaseModel):
     """Warning in structure diff."""
 
-    type: Literal[
-        "file_too_large",
-        "module_growth",
-        "dependency_cycle",
-        "missing_imports",
-        "unusual_pattern",
-    ]
+    type: Literal["module_growth"]
     severity: Literal["info", "warning", "error"]
     message: str
     file: str | None = None
