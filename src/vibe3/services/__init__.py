@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow_cleanup_service import FlowCleanupService
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.flow_projection_service import FlowProjectionService
+    from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
     from vibe3.services.flow_resume_resolver import infer_resume_label
     from vibe3.services.flow_service import FlowService
     from vibe3.services.handoff_service import HandoffService
@@ -69,14 +70,13 @@ if TYPE_CHECKING:
     from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
-    # Bootstrap symbols (lazy import)
     "BootstrapAction",
+    "block_manager_noop_issue",
+    "BaseResolutionUsecase",
+    "BlockedStateService",
     "BootstrapActionKind",
     "BootstrapContextService",
     "BootstrapPlan",
-    # Services (lazy import)
-    "BaseResolutionUsecase",
-    "BlockedStateService",
     "CheckResult",
     "CheckService",
     "ConventionResolver",
@@ -85,6 +85,7 @@ __all__ = [
     "FlowCleanupService",
     "FlowOrchestratorService",
     "FlowProjectionService",
+    "FlowRebuildUsecase",
     "FlowService",
     "HandoffService",
     "HandoffStatusService",
@@ -104,11 +105,10 @@ __all__ = [
     "TaskService",
     "TaskStatusBucket",
     "VerdictService",
-    # Functions (lazy import)
-    "block_manager_noop_issue",
     "build_bind_task_hint",
     "build_pr_analysis",
     "check_ref_exists",
+    "clean_old_state_labels",
     "fail_executor_issue",
     "fail_manager_issue",
     "fail_planner_issue",
@@ -133,7 +133,6 @@ __all__ = [
     "resolve_handoff_target",
     "resolve_issue_branch_input",
     "sanitize_event_detail_paths",
-    "clean_old_state_labels",
     "should_skip_from_queue",
 ]
 
@@ -205,6 +204,7 @@ _SYMBOL_MODULES = {
     "sanitize_event_detail_paths": "vibe3.services.path_helpers",
     "clean_old_state_labels": "vibe3.services.label_utils",
     "should_skip_from_queue": "vibe3.services.label_utils",
+    "FlowRebuildUsecase": "vibe3.services.flow_rebuild_usecase",
 }
 
 

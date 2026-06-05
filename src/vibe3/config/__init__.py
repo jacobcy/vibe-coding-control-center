@@ -14,6 +14,8 @@ if TYPE_CHECKING:
         resolve_repo_agent_preset_name,
     )
     from vibe3.config.branch_convention import BranchConvention
+    from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
+    from vibe3.config.convention_resolver import diagnose_profile
     from vibe3.config.loader import (
         get_config,
         load_config,
@@ -88,10 +90,12 @@ __all__ = [
     "PRScoringConfig",
     "QualityConfig",
     "REVIEWER_GATE_CONFIG",
+    "ROLE_CONFIG_SECTIONS",
     "SUPERVISOR_APPLY_GATE_CONFIG",
     "SUPERVISOR_IDENTIFY_GATE_CONFIG",
     "ReviewConfig",
     "ReviewScopeConfig",
+    "RoleCliOverrides",
     "RoleOutputContract",
     "RunConfig",
     "SingleFileLocConfig",
@@ -99,6 +103,7 @@ __all__ = [
     "TimelineCommentPolicy",
     "TotalFileLocConfig",
     "VibeConfig",
+    "diagnose_profile",
     "find_missing_backend_commands",
     "get_config",
     "get_handoff_state_label",
@@ -139,10 +144,12 @@ _SYMBOL_MODULES = {
     "PRScoringConfig": "vibe3.config.settings",
     "QualityConfig": "vibe3.config.settings",
     "REVIEWER_GATE_CONFIG": "vibe3.config.role_gates",
+    "ROLE_CONFIG_SECTIONS": "vibe3.config.cli_overrides",
     "SUPERVISOR_APPLY_GATE_CONFIG": "vibe3.config.role_gates",
     "SUPERVISOR_IDENTIFY_GATE_CONFIG": "vibe3.config.role_gates",
     "ReviewConfig": "vibe3.config.settings",
     "ReviewScopeConfig": "vibe3.config.settings",
+    "RoleCliOverrides": "vibe3.config.cli_overrides",
     "RoleOutputContract": "vibe3.config.role_policy",
     "RunConfig": "vibe3.config.settings",
     "SingleFileLocConfig": "vibe3.config.settings",
@@ -152,6 +159,7 @@ _SYMBOL_MODULES = {
     "get_handoff_state_label": "vibe3.config.manager_config",
     "TotalFileLocConfig": "vibe3.config.settings",
     "VibeConfig": "vibe3.config.settings",
+    "diagnose_profile": "vibe3.config.convention_resolver",
     "find_missing_backend_commands": "vibe3.config.agent_preset",
     "get_config": "vibe3.config.loader",
     "get_manager_usernames": "vibe3.config.manager_config",

@@ -11,7 +11,11 @@ if TYPE_CHECKING:
         classify_error_hybrid,
         get_error_handling_contract,
     )
-    from vibe3.exceptions.error_codes import is_api_error, is_model_error
+    from vibe3.exceptions.error_codes import (
+        E_EXEC_AUTO_SCENE_RESET,
+        is_api_error,
+        is_model_error,
+    )
     from vibe3.exceptions.error_severity import ErrorSeverity
     from vibe3.exceptions.runtime_errors import GitHubAPIError
 
@@ -221,6 +225,7 @@ class InvalidBranchLinkError(SystemError):
 
 # Lazy imports to avoid circular dependencies
 _LAZY_IMPORTS = {
+    "E_EXEC_AUTO_SCENE_RESET": "vibe3.exceptions.error_codes",
     "ErrorSeverity": "vibe3.exceptions.error_severity",
     "GitHubAPIError": "vibe3.exceptions.runtime_errors",
     "classify_error_hybrid": "vibe3.exceptions.error_classification",
@@ -242,25 +247,26 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    "VibeError",
-    "UserError",
-    "DiagnosticContext",
-    "MissingResourceError",
-    "ConfigError",
+    "AgentExecutionError",
     "AgentPresetNotFoundError",
+    "CapacityDeferredError",
+    "ConfigError",
+    "DiagnosticContext",
+    "E_EXEC_AUTO_SCENE_RESET",
+    "ErrorSeverity",
+    "GitError",
+    "GitHubAPIError",
+    "GitHubError",
+    "InvalidBranchLinkError",
+    "InvalidTransitionError",
+    "MissingResourceError",
+    "ModelsJsonSyncError",
+    "PRNotFoundError",
+    "SerenaError",
     "SkillNotAvailableError",
     "SystemError",
-    "AgentExecutionError",
-    "ModelsJsonSyncError",
-    "GitError",
-    "GitHubError",
-    "SerenaError",
-    "PRNotFoundError",
-    "CapacityDeferredError",
-    "ErrorSeverity",
-    "InvalidTransitionError",
-    "InvalidBranchLinkError",
-    "GitHubAPIError",
+    "UserError",
+    "VibeError",
     "classify_error_hybrid",
     "get_error_handling_contract",
     "is_api_error",

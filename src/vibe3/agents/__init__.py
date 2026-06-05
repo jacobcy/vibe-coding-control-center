@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING
 from vibe3.models import PromptContextMode
 
 if TYPE_CHECKING:
+    from vibe3.agents.backends.async_launcher import start_async_command
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.agents.backends.codeagent_config import sync_models_json
     from vibe3.agents.base import AgentBackend
@@ -120,32 +121,28 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    # Protocols & Models
     "AgentBackend",
+    "CodeagentBackend",
     "CodeagentCommand",
     "CodeagentResult",
-    "create_codeagent_command",
     "ExecutionRole",
-    # Backend
-    "CodeagentBackend",
-    # Prompt Builders
-    "build_plan_prompt_body",
-    "make_plan_context_builder",
-    "build_run_prompt_body",
-    "make_run_context_builder",
-    "make_skill_context_builder",
-    "make_publish_context_builder",
-    "build_review_prompt_body",
-    "make_review_context_builder",
-    "build_tools_guide_section",
-    "describe_plan_sections",
-    "describe_run_plan_sections",
-    "describe_review_sections",
-    # Review Helpers
-    "build_snapshot_diff",
-    "run_inspect_json",
-    # Types
     "PromptContextMode",
     "RunPromptMode",
+    "build_plan_prompt_body",
+    "build_review_prompt_body",
+    "build_run_prompt_body",
+    "build_snapshot_diff",
+    "build_tools_guide_section",
+    "create_codeagent_command",
+    "describe_plan_sections",
+    "describe_review_sections",
+    "describe_run_plan_sections",
+    "make_plan_context_builder",
+    "make_publish_context_builder",
+    "make_review_context_builder",
+    "make_run_context_builder",
+    "make_skill_context_builder",
+    "run_inspect_json",
+    "start_async_command",
     "sync_models_json",
 ]

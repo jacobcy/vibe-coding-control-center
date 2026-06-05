@@ -7,11 +7,13 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.agents import sync_models_json
-from vibe3.config import load_orchestra_config
+from vibe3.config import (
+    diagnose_profile,
+    load_orchestra_config,
+)
 from vibe3.config import (
     resolve_effective_agent_options as resolve_backend_effective_agent_options,
 )
-from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.exceptions import DiagnosticContext, MissingResourceError
 from vibe3.models import AgentOptions, OrchestraConfig
 

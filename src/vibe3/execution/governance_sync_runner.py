@@ -52,7 +52,7 @@ def run_governance_sync(
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
     from vibe3.domain import FlowManager
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services import OrchestraStatusService
 
     flow_manager = FlowManager(config)
     status_service = OrchestraStatusService(config, orchestrator=flow_manager)
@@ -115,8 +115,8 @@ def run_governance_sync(
 
     except Exception as exc:
         # Error tracking: classify and record for FailedGate threshold
-        from vibe3.exceptions.error_classification import classify_error_hybrid
-        from vibe3.services.error_helpers import record_error
+        from vibe3.exceptions import classify_error_hybrid
+        from vibe3.services import record_error
 
         error_code = classify_error_hybrid(exc)
 
@@ -162,8 +162,8 @@ def run_governance_async(
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.orchestra.logging import append_governance_event
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.orchestra import append_governance_event
+    from vibe3.services import OrchestraStatusService
 
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)

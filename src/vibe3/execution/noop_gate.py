@@ -62,7 +62,7 @@ def apply_unified_noop_gate(
     - if the agent changed the issue's state/ label, record and pass
     """
     from vibe3.execution.state_verification import StateVerificationService
-    from vibe3.utils.constants import (
+    from vibe3.utils import (
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,

@@ -26,6 +26,10 @@ if TYPE_CHECKING:
     from vibe3.utils.comment_utils import is_human_comment
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
+        EVENT_REQUIRED_REF_MISSING,
+        EVENT_STATE_TRANSITIONED,
+        EVENT_STATE_UNCHANGED,
+        EVENT_TRANSITION_COUNT_EXCEEDED,
         GENERIC_AGENT_MARKER_PATTERN,
         STARTING_TIMEOUT_SECONDS,
         VERDICT_UNKNOWN,
@@ -42,6 +46,10 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "AUTOMATED_MARKERS": "vibe3.utils.constants",
     "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
+    "EVENT_REQUIRED_REF_MISSING": "vibe3.utils.constants",
+    "EVENT_STATE_TRANSITIONED": "vibe3.utils.constants",
+    "EVENT_STATE_UNCHANGED": "vibe3.utils.constants",
+    "EVENT_TRANSITION_COUNT_EXCEEDED": "vibe3.utils.constants",
     "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
     "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
@@ -76,6 +84,10 @@ def __getattr__(name: str) -> object:
 __all__ = [
     "AUTOMATED_MARKERS",
     "CODEAGENT_WRAPPER_RE",
+    "EVENT_REQUIRED_REF_MISSING",
+    "EVENT_STATE_TRANSITIONED",
+    "EVENT_STATE_UNCHANGED",
+    "EVENT_TRANSITION_COUNT_EXCEEDED",
     "GENERIC_AGENT_MARKER_PATTERN",
     "STARTING_TIMEOUT_SECONDS",
     "VERDICT_UNKNOWN",
