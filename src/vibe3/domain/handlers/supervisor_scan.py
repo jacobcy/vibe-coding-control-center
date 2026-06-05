@@ -16,7 +16,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import IssueInfo
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.execution.coordinator import ExecutionCoordinator

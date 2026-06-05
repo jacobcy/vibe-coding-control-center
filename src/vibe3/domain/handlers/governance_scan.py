@@ -19,7 +19,7 @@ from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient

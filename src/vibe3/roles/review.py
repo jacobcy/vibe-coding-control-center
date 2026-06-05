@@ -48,9 +48,9 @@ from vibe3.roles.review_helpers import (
     finalize_review_output,
 )
 from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
+from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
 
 
 def validate_review_prerequisites(

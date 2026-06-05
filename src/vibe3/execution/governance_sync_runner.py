@@ -116,7 +116,7 @@ def run_governance_sync(
     except Exception as exc:
         # Error tracking: classify and record for FailedGate threshold
         from vibe3.exceptions.error_classification import classify_error_hybrid
-        from vibe3.services.error_helpers import record_error
+        from vibe3.services.shared.errors import record_error
 
         error_code = classify_error_hybrid(exc)
 

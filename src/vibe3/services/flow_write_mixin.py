@@ -12,7 +12,7 @@ from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowState, FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_read_mixin import FlowReadMixin
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 
 
 class FlowWriteMixin(FlowReadMixin):

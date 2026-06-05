@@ -11,7 +11,6 @@ from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowEvent
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.external_events import ExternalEventRecorder
 from vibe3.services.git_path_client import GitPathProtocol
 from vibe3.services.handoff_storage import HandoffStorage
@@ -19,8 +18,9 @@ from vibe3.services.handoff_validation import validate_authoritative_ref
 from vibe3.services.shared.actors import (
     extract_role_from_actor,
 )
+from vibe3.services.shared.artifacts import ArtifactParser
 from vibe3.services.shared.paths import _SHARED_HANDOFF_PREFIX
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient

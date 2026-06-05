@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.actor_support import extract_role_from_actor
+from vibe3.services.shared.actors import extract_role_from_actor
 from vibe3.services.verdict_service import VerdictService
 
 

@@ -6,7 +6,7 @@ from vibe3.services.handoff_resolution import (
     is_shared_handoff_ref,
     to_display_target,
 )
-from vibe3.services.path_helpers import (
+from vibe3.services.shared.paths import (
     ref_to_handoff_cmd,
     resolve_ref_path,
     sanitize_event_detail_paths,

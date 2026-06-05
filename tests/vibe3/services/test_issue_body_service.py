@@ -1,7 +1,7 @@
 """Tests for issue body managed section service."""
 
 from vibe3.models.issue_body import FlowStateProjection
-from vibe3.services.issue_body_service import (
+from vibe3.services.shared.issue_utils import (
     MANAGED_SECTION_END,
     MANAGED_SECTION_START,
     merge_projection,

@@ -20,7 +20,7 @@ from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.pr_service import PRService
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.loc_service import LocService
+from vibe3.services.shared.loc import LocService
 
 
 class TestLocService:

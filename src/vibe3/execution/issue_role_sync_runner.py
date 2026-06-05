@@ -17,7 +17,7 @@ from vibe3.services import (
     load_issue_info,
     record_dispatch_failure_if_unexpected,
 )
-from vibe3.services.branch_arg import resolve_branch_arg
+from vibe3.services.shared.branches import resolve_branch_arg
 
 
 def run_issue_role_async(

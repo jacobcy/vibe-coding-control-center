@@ -21,12 +21,12 @@ from vibe3.models.pr import (
 )
 from vibe3.services.pr_loc_comment_service import PRLocCommentService
 from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
-from vibe3.services.pr_utils import (
+from vibe3.services.shared.pr_utils import (
     build_pr_body,
     check_upstream_conflicts,
     get_metadata_from_flow,
 )
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 from vibe3.services.version_service import VersionService
 
 

@@ -18,7 +18,7 @@ from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.services.shared.labels import LabelService
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 from vibe3.services.task_show_service import (
     TaskCommentSummary,
     TaskPRSummary,

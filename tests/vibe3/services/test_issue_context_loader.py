@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services.shared.issue_utils import load_issue_info
 
 
 def test_load_issue_info_parses_github_payload() -> None:

@@ -41,8 +41,8 @@ from vibe3.roles.definitions import (
     TriggerableRoleDefinition,
 )
 from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import fail_planner_issue
+from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
 
 PLANNER_ROLE = TriggerableRoleDefinition(
     name="planner",

@@ -206,7 +206,7 @@ class InvalidBranchLinkError(SystemError):
 # Error classification and tracking references:
 #   from vibe3.exceptions.error_classification import classify_error
 #   from vibe3.exceptions.error_codes import E_MODEL_NOT_FOUND, ...
-#   from vibe3.services.error_helpers import record_error
+#   from vibe3.services.shared.errors import record_error
 
 
 from vibe3.exceptions.runtime_errors import GitHubAPIError  # noqa: E402

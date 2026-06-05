@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+from vibe3.services.shared.cache import IssueTitleCacheService
 
 
 @pytest.fixture
