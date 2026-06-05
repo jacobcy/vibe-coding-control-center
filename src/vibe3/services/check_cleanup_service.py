@@ -348,7 +348,7 @@ class CheckCleanupService:
             from vibe3.clients.github_client import GitHubClient
             from vibe3.services.flow_service import FlowService
             from vibe3.services.issue_flow_service import IssueFlowService
-            from vibe3.services.label_service import LabelService
+            from vibe3.services.shared.labels import LabelService
 
             gh = self._github_client or GitHubClient()
             gh_issue = gh.view_issue(issue_number)
@@ -415,7 +415,7 @@ class CheckCleanupService:
             Current state value (e.g., "blocked", "ready") or None if unknown
         """
         try:
-            from vibe3.services.label_service import LabelService
+            from vibe3.services.shared.labels import LabelService
 
             state = LabelService().get_state(issue_number)
             return state.value if state else None

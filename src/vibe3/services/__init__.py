@@ -84,6 +84,8 @@ __all__ = [
     "blocks_merge",
     # Timeline utilities
     "parse_timeline_from_comments",
+    # Artifact parsing
+    "ArtifactParser",
 ]
 
 # Lazy import mapping for symbols not directly imported above
@@ -129,7 +131,7 @@ _SYMBOL_MODULES = {
     "resolve_actor_backend_model": "vibe3.services.shared.actors",
     "get_handoff_state_label": "vibe3.services.shared.orchestra",
     "get_manager_usernames": "vibe3.services.shared.orchestra",
-    "get_role_block_function": "vibe3.services.role_policy_helpers",
+    "get_role_block_function": "vibe3.services.shared.roles",
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "load_issue_info": "vibe3.services.issue_context_loader",
@@ -156,6 +158,8 @@ _SYMBOL_MODULES = {
     "blocks_merge": "vibe3.services.shared.verdicts",
     # Timeline utilities
     "parse_timeline_from_comments": "vibe3.services.shared.timeline",
+    # Artifact parsing
+    "ArtifactParser": "vibe3.services.shared.artifacts",
 }
 
 

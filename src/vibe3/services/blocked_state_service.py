@@ -24,7 +24,7 @@ from vibe3.services.blocked_state_types import (
     UnblockResult,
 )
 from vibe3.services.flow_timeline_service import FlowTimelineService
-from vibe3.services.label_service import LabelService
+from vibe3.services.shared.labels import LabelService
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

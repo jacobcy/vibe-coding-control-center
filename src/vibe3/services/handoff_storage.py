@@ -296,4 +296,5 @@ class HandoffStorage:
 
     def normalize_ref_value(self, ref_value: str, branch: str) -> str:
         """Normalize a reference value (path) relative to branch worktree."""
-        return normalize_ref_path(ref_value, branch, self.git_client)
+        result: str = normalize_ref_path(ref_value, branch, self.git_client)
+        return result

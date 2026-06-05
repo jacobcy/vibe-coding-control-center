@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
-    from vibe3.services.label_service import LabelService
+    from vibe3.services.shared.labels import LabelService
     from vibe3.services.status_query_service import StatusQueryService
 
 

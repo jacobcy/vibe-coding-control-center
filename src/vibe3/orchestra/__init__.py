@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from vibe3.orchestra.queue_ordering import sort_ready_issues
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
     from vibe3.services.check_service import CheckResult
-    from vibe3.services.label_utils import should_skip_from_queue
+    from vibe3.services.shared.labels import should_skip_from_queue
     from vibe3.services.shared.orchestra import get_manager_usernames
 
 
@@ -163,7 +163,7 @@ def __getattr__(name: str) -> object:
 
         return CheckResult
     if name == "should_skip_from_queue":
-        from vibe3.services.label_utils import should_skip_from_queue
+        from vibe3.services.shared.labels import should_skip_from_queue
 
         return should_skip_from_queue
     if name == "get_manager_usernames":

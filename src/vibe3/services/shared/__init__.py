@@ -21,6 +21,8 @@ __all__ = [
     # Orchestra helpers
     "get_manager_usernames",
     "get_handoff_state_label",
+    # Role policy helpers
+    "get_role_block_function",
     # Verdict utilities
     "ALL_VERDICTS",
     "PASSING_VERDICTS",
@@ -35,6 +37,8 @@ __all__ = [
     "parse_timeline_from_comments",
     # Cache services
     "IssueTitleCacheService",
+    # Resolver utilities
+    "infer_resume_label",
 ]
 
 _SYMBOL_MODULES = {
@@ -56,6 +60,7 @@ _SYMBOL_MODULES = {
     # Orchestra helpers
     "get_manager_usernames": "vibe3.services.shared.orchestra",
     "get_handoff_state_label": "vibe3.services.shared.orchestra",
+    "get_role_block_function": "vibe3.services.shared.roles",
     # Verdict utilities
     "ALL_VERDICTS": "vibe3.services.shared.verdicts",
     "PASSING_VERDICTS": "vibe3.services.shared.verdicts",
@@ -69,6 +74,8 @@ _SYMBOL_MODULES = {
     "parse_timeline_from_comments": "vibe3.services.shared.timeline",
     # Cache services
     "IssueTitleCacheService": "vibe3.services.shared.cache",
+    # Resolver utilities
+    "infer_resume_label": "vibe3.services.shared.resolvers",
 }
 
 

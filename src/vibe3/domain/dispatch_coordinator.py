@@ -42,7 +42,7 @@ from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.observability.orchestra_log import append_orchestra_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.issue_collection_service import IssueCollectionService
-from vibe3.services.label_utils import (
+from vibe3.services.shared.labels import (
     clean_old_state_labels,
     should_skip_from_queue,
 )

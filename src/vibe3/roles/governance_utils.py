@@ -7,13 +7,13 @@ from typing import Any
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.label_utils import normalize_assignees, normalize_labels
 from vibe3.services.orchestra_status_service import (
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
     is_running_issue,
 )
+from vibe3.services.shared.labels import normalize_assignees, normalize_labels
 from vibe3.services.shared.orchestra import get_manager_usernames
 
 

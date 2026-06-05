@@ -132,7 +132,8 @@ class SpecRefService:
             # Use resolve_handoff_target for correct worktree path resolution
             try:
                 resolved_path = resolve_handoff_target(info.file_path, branch=branch)
-                return resolved_path.read_text(encoding="utf-8")
+                content: str | None = resolved_path.read_text(encoding="utf-8")
+                return content
             except (FileNotFoundError, OSError):
                 return None
         return None

@@ -14,7 +14,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.config.loader import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.change_source import BranchSource
-from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
+from vibe3.services.shared.scoring import PRDimensions, generate_score_report
 
 
 def _code_paths() -> list[str]:

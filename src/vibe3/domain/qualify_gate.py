@@ -17,12 +17,12 @@ from vibe3.models import IssueInfo, IssueState
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.services import infer_resume_label
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.coordination_resolver import CoordinationResolver
-from vibe3.services.flow_resume_resolver import infer_resume_label
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.label_service import LabelService
+from vibe3.services.shared.labels import LabelService
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
@@ -239,7 +239,7 @@ class QualifyGateService:
 
         if blocked_label not in labels:
             try:
-                from vibe3.services.label_service import LabelService
+                from vibe3.services.shared.labels import LabelService
 
                 label_service = LabelService(repo=self.config.repo)
                 label_service.confirm_issue_state(
@@ -333,7 +333,7 @@ class QualifyGateService:
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
-            target_label = infer_resume_label(fs_obj)
+            target_label: IssueState = infer_resume_label(fs_obj)
         else:
             target_label = IssueState.CLAIMED
 
@@ -399,7 +399,7 @@ class QualifyGateService:
         if not wt_path.exists():
             reason = f"Worktree path does not exist: {worktree_path}"
             from vibe3.services.blocked_state_service import BlockedStateService
-            from vibe3.services.label_service import LabelService
+            from vibe3.services.shared.labels import LabelService
 
             service = BlockedStateService(
                 store=self._store,
@@ -437,7 +437,7 @@ class QualifyGateService:
                     f"got {actual_branch}"
                 )
                 from vibe3.services.blocked_state_service import BlockedStateService
-                from vibe3.services.label_service import LabelService
+                from vibe3.services.shared.labels import LabelService
 
                 service = BlockedStateService(
                     store=self._store,
@@ -484,7 +484,7 @@ class QualifyGateService:
 
         # Use BlockedStateService for consistent three-source blocking
         from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.label_service import LabelService
+        from vibe3.services.shared.labels import LabelService
 
         service = BlockedStateService(
             store=self._store,

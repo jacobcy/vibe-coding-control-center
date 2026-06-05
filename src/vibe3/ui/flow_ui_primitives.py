@@ -66,4 +66,5 @@ def resolve_ref_path(
     """
     from vibe3.services.path_helpers import resolve_ref_path as _resolve
 
-    return _resolve(ref_value, worktree_root, absolute=absolute)
+    result: str = _resolve(ref_value, worktree_root, absolute=absolute)
+    return result
