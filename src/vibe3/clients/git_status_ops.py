@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.exceptions import GitError, SystemError
-from vibe3.models.change_source import (
+from vibe3.models import (
     BranchSource,
     ChangeSource,
     ChangeSourceType,

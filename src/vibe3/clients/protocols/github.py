@@ -10,7 +10,12 @@ Import paths:
 
 from typing import Any, Protocol
 
-from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
+# PR symbols not in models' public API yet - follow-up issue needed
+from vibe3.models.pr import (
+    CreatePRRequest,
+    PRResponse,
+    UpdatePRRequest,
+)
 
 
 class GitHubAuthPort(Protocol):

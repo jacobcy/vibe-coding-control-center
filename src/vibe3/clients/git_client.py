@@ -75,7 +75,7 @@ from vibe3.clients.git_worktree_ops import (
     remove_worktree as _remove_worktree,
 )
 from vibe3.exceptions import GitError
-from vibe3.models.change_source import (
+from vibe3.models import (
     BranchSource,
     ChangeSource,
     ChangeSourceType,
