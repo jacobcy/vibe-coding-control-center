@@ -58,7 +58,7 @@ related_docs:
 
 - 正式术语：`Tier 3`
 - 别称：`认知治理层`、`Cognitive Layer`、`Governance Layer`
-- 定义：负责全局策略、规则、Supervisor 治理的系统层级。
+- 定义：负责全局策略、规则、Supervisor 治理的系统层级。强调**基于任务的编排 (Task-based Orchestration)** 而非固定角色制衡。
 - 核心命令：`serve`, `scan`, `check`, `mcp`
 - 执行层级：L0/L1 (无 worktree)，L2 (临时 worktree)
 - 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
