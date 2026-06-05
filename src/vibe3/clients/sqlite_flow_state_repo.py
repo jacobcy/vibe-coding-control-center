@@ -1,12 +1,11 @@
 """SQLite repository methods for flow state and issue-link persistence."""
 
-import datetime
 import sqlite3
 from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.clients.sqlite_base import _HasConnection, _utcnow_iso
 
 
 class SQLiteFlowStateRepo(_HasConnection):
@@ -69,9 +68,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         """Update flow state fields. Raises ValueError for invalid fields."""
         if "updated_at" not in kwargs:
             # Use UTC-aware datetime to ensure timezone consistency
-            kwargs["updated_at"] = datetime.datetime.now(
-                datetime.timezone.utc
-            ).isoformat()
+            kwargs["updated_at"] = _utcnow_iso()
 
         invalid_fields = set(kwargs.keys()) - self.VALID_FLOW_STATE_FIELDS
         if invalid_fields:
@@ -103,7 +100,7 @@ class SQLiteFlowStateRepo(_HasConnection):
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         # Use UTC-aware datetime for consistency
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now = _utcnow_iso()
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()
@@ -264,7 +261,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         polluting subsequent orchestra dispatch. flow_events is preserved
         as audit trail.
         """
-        now = datetime.datetime.now().isoformat()
+        now = _utcnow_iso()
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()

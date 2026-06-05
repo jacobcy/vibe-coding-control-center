@@ -1,6 +1,7 @@
 """Shared SQLite client bootstrap and connection helpers."""
 
 import atexit
+import datetime
 import sqlite3
 import threading
 from pathlib import Path
@@ -77,6 +78,15 @@ def _close_global_connection() -> None:
             pass
         _global_conn = None
         _global_db_path = None
+
+
+def _utcnow_iso() -> str:
+    """Return current UTC timestamp in ISO format.
+
+    This helper ensures consistent timezone usage across all SQLite
+    repository timestamp operations.
+    """
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 atexit.register(_close_global_connection)

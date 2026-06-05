@@ -1,11 +1,10 @@
 """SQLite repository methods for flow context cache persistence."""
 
-import datetime
 from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.clients.sqlite_base import _HasConnection, _utcnow_iso
 
 
 class SQLiteContextCacheRepo(_HasConnection):
@@ -21,7 +20,7 @@ class SQLiteContextCacheRepo(_HasConnection):
         pr_number: int | None,
         pr_title: str | None,
     ) -> None:
-        updated_at = datetime.datetime.now().isoformat()
+        updated_at = _utcnow_iso()
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()
@@ -117,7 +116,7 @@ class SQLiteContextCacheRepo(_HasConnection):
         if not entries:
             return
 
-        updated_at = datetime.datetime.now().isoformat()
+        updated_at = _utcnow_iso()
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()

@@ -1,8 +1,7 @@
-import datetime
 import sqlite3
 from typing import Any
 
-from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.clients.sqlite_base import _HasConnection, _utcnow_iso
 
 
 class SQLiteQueueRepo(_HasConnection):
@@ -25,7 +24,7 @@ class SQLiteQueueRepo(_HasConnection):
 
     def replace_all_queue_entries(self, entries: list[dict[str, Any]]) -> None:
         """DELETE all + INSERT batch in single transaction."""
-        now = datetime.datetime.now().isoformat()
+        now = _utcnow_iso()
         conn = self._get_connection()
         with conn:
             conn.execute("DELETE FROM orchestra_queue")

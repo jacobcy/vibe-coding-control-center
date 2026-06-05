@@ -1,12 +1,11 @@
 """SQLite repository methods for runtime session persistence."""
 
-import datetime
 import sqlite3
 from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.clients.sqlite_base import _HasConnection, _utcnow_iso
 
 
 class SQLiteSessionRepo(_HasConnection):
@@ -42,7 +41,7 @@ class SQLiteSessionRepo(_HasConnection):
         status: str = "starting",
         **kwargs: Any,
     ) -> int:
-        now = datetime.datetime.now().isoformat()
+        now = _utcnow_iso()
         row: dict[str, Any] = {
             "role": role,
             "target_type": target_type,
@@ -99,7 +98,7 @@ class SQLiteSessionRepo(_HasConnection):
             raise ValueError(f"Invalid runtime_session fields: {invalid}")
         if not kwargs:
             return
-        kwargs["updated_at"] = datetime.datetime.now().isoformat()
+        kwargs["updated_at"] = _utcnow_iso()
         set_clause = ", ".join([f"{f} = ?" for f in kwargs])
         values = list(kwargs.values()) + [session_id]
         conn = self._get_connection()
