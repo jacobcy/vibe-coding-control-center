@@ -1,13 +1,12 @@
 """SQLite repository methods for flow event persistence."""
 
-import datetime
 import json
 import sqlite3
 from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.clients.sqlite_base import _HasConnection, _utcnow_iso
 
 
 class SQLiteEventRepo(_HasConnection):
@@ -23,7 +22,7 @@ class SQLiteEventRepo(_HasConnection):
         detail: str | None = None,
         refs: dict[str, Any] | None = None,
     ) -> None:
-        now = datetime.datetime.now().isoformat()
+        now = _utcnow_iso()
         refs_json = json.dumps(refs) if refs else None
         conn = self._get_connection()
         with conn:

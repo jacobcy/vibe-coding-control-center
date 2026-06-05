@@ -1,7 +1,7 @@
 """Unit tests for SQLiteTransitionHistoryRepo methods."""
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -33,7 +33,7 @@ class TestTransitionHistoryRepo:
         cursor = db_conn.cursor()
 
         # Insert test data: branch "test-flow" with multiple transitions
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         test_transitions = [
             ("test-flow", "state/handoff", "state/in-progress", now, "actor1", None),
             ("test-flow", "state/handoff", "state/in-progress", now, "actor2", None),

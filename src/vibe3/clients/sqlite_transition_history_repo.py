@@ -3,6 +3,8 @@
 import sqlite3
 from typing import Literal
 
+from vibe3.clients.sqlite_base import _utcnow_iso
+
 
 class SQLiteTransitionHistoryRepo:
     """Mixin providing transition_history query methods."""
@@ -109,8 +111,6 @@ class SQLiteTransitionHistoryRepo:
             actor: Who triggered the transition
             event_id: Optional reference to flow_events.id
         """
-        from datetime import datetime
-
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -118,7 +118,7 @@ class SQLiteTransitionHistoryRepo:
                 (branch, from_state, to_state, created_at, actor, event_id)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (branch, from_state, to_state, datetime.now().isoformat(), actor, event_id),
+            (branch, from_state, to_state, _utcnow_iso(), actor, event_id),
         )
 
     def clear_transition_history(self, conn: sqlite3.Connection, branch: str) -> None:
