@@ -217,7 +217,7 @@ class FlowRecoveryService:
         from vibe3.models import IssueState
         from vibe3.models.flow import FlowState
         from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.flow_resume_resolver import infer_resume_label
+        from vibe3.services.shared.resolvers import infer_resume_label
 
         # Determine target state from flow progress
         fs_dict = self.store.get_flow_state(branch)

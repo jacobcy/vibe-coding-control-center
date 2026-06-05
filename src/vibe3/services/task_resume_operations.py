@@ -119,7 +119,7 @@ class TaskResumeOperations:
     ) -> IssueState:
         if not label_state:
             from vibe3.models.flow import FlowState
-            from vibe3.services.flow_resume_resolver import infer_resume_label
+            from vibe3.services.shared.resolvers import infer_resume_label
 
             fs_dict = (
                 self.flow_service.store.get_flow_state(branch)
