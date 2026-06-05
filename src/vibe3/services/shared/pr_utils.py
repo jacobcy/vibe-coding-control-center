@@ -1,4 +1,4 @@
-"""PR utilities - merged from pr_utils.py, pr_status_checker.py, and pr_analysis_service.py.
+"""PR utilities - merged from pr_utils, pr_status_checker, and pr_analysis_service.
 
 This module provides:
 - PR metadata and body construction utilities

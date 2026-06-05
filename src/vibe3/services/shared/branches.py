@@ -15,7 +15,6 @@ from vibe3.exceptions import UserError
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 
-
 # ============================================================================
 # Issue Branch Resolution
 # ============================================================================
