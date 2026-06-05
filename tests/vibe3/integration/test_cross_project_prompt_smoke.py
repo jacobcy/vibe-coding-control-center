@@ -91,7 +91,7 @@ def installed_vibe_home(tmp_path_factory: pytest.TempPathFactory) -> Generator[P
     temp_home = tmp_path_factory.mktemp("vibe_home")
 
     # Get the project root (where this test is running from)
-    project_root = Path(__file__).resolve().parents[4]
+    project_root = Path(__file__).resolve().parents[3]
 
     # Copy config/prompts/
     src_prompts = project_root / "config" / "prompts"
@@ -306,8 +306,6 @@ def test_missing_prompts_detected(tmp_path: Path) -> None:
         # Record failure category (for documentation)
         # This demonstrates that global install is missing, but system
         # works via fallback
-        failure_category = "install_missing: prompts (using bundled fallback)"
-        assert failure_category == "install_missing: prompts (using bundled fallback)"
     finally:
         # Restore environment
         if old_env is not None:
@@ -350,10 +348,6 @@ def test_missing_supervisor_detected(tmp_path: Path) -> None:
         # Record failure category (for documentation)
         # This demonstrates that global install is missing, but system
         # works via fallback
-        failure_category = "install_missing: supervisor (using bundled fallback)"
-        assert (
-            failure_category == "install_missing: supervisor (using bundled fallback)"
-        )
     finally:
         # Restore environment
         if old_env is not None:
