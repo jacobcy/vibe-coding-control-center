@@ -398,21 +398,7 @@ class SQLiteFlowStateRepo(_HasConnection):
 
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""
-        task_issue_number: int | None = None
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT issue_number
-            FROM flow_issue_links
-            WHERE branch = ? AND issue_role = 'task'
-            LIMIT 1
-            """,
-            (branch,),
-        )
-        row = cursor.fetchone()
-        if row and row[0] is not None:
-            task_issue_number = int(row[0])
+        task_issue_number = self.get_task_issue_number(branch)
 
         if task_issue_number is None:
             logger.bind(
