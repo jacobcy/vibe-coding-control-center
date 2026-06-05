@@ -25,6 +25,11 @@ from vibe3.clients.protocols.github import (
     PRReadPort,
     PRWritePort,
 )
+from vibe3.clients.protocols.orchestra_protocols import (
+    AppendGovernanceEventProtocol,
+    FailedGateProtocol,
+    OrchestraEventLogProtocol,
+)
 from vibe3.clients.protocols.pr import BaseResolver
 from vibe3.clients.protocols.services_protocols import (
     CheckServiceProtocol,
@@ -47,6 +52,9 @@ __all__ = [
     "PRReadPort",
     "PRWritePort",
     "BaseResolver",
+    "AppendGovernanceEventProtocol",
+    "FailedGateProtocol",
+    "OrchestraEventLogProtocol",
     "CheckServiceProtocol",
     "ErrorTrackingServiceProtocol",
     "ExpiredResourceCleanupServiceProtocol",
