@@ -7,15 +7,24 @@ Runs two phases on each interval tick:
    execute_expired_resource_cleanup with config flags)
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
+from vibe3.clients.protocols.services_protocols import CheckServiceProtocol
 from vibe3.config import PeriodicCheckConfig
 from vibe3.orchestra import append_orchestra_event
+
+if TYPE_CHECKING:
+    pass
 
 
 async def execute_periodic_check(
     config: PeriodicCheckConfig,
     tick_number: int,
+    check_service: CheckServiceProtocol,
 ) -> None:
     """Execute periodic consistency check via vibe3 check.
 
@@ -27,27 +36,19 @@ async def execute_periodic_check(
     Args:
         config: Periodic check configuration
         tick_number: Current tick number (for logging)
+        check_service: CheckService instance (injected to avoid circular dependency)
     """
-    # Delay imports to avoid circular dependencies
-    from vibe3.clients import SQLiteClient
-    from vibe3.services import CheckService
-
-    # Initialize services
-    store = SQLiteClient()
+    import asyncio
 
     try:
-        service = CheckService(store=store)
-
         # Run consistency check for all active flows
         logger.bind(domain="orchestra", action="periodic_check").info(
             f"Running periodic consistency check (tick #{tick_number})"
         )
 
         # Offload blocking I/O work to a thread to avoid blocking the event loop
-        import asyncio
-
         results = await asyncio.to_thread(
-            service.verify_all_flows, ["active", "blocked"]
+            check_service.verify_all_flows, ["active", "blocked"]
         )
 
         # Summary logging
