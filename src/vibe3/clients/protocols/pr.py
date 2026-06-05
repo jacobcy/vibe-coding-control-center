@@ -6,9 +6,6 @@ Import paths:
 
     # Backward compatible (package re-export)
     from vibe3.clients.protocols import BaseResolver
-
-    # Legacy (services shim re-export)
-    from vibe3.services.pr_create_usecase import BaseResolver
 """
 
 from typing import Protocol

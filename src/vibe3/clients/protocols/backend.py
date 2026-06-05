@@ -11,8 +11,7 @@ Import paths:
 from pathlib import Path
 from typing import Protocol
 
-from vibe3.models.execution_handle import AsyncExecutionHandle
-from vibe3.models.review_runner import AgentOptions, AgentResult
+from vibe3.models import AgentOptions, AgentResult, AsyncExecutionHandle
 
 
 class BackendProtocol(Protocol):
