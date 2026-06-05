@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from vibe3.analysis.inspect_output_adapter import (
         as_list,
         as_mapping,
+        changed_symbols,
         dag,
         impact,
         pr_analysis_summary,
@@ -87,6 +88,7 @@ _LAZY_IMPORTS = {
     "generate_score_report": "vibe3.analysis.pr_scoring",
     "as_list": "vibe3.analysis.inspect_output_adapter",
     "as_mapping": "vibe3.analysis.inspect_output_adapter",
+    "changed_symbols": "vibe3.analysis.inspect_output_adapter",
     "score": "vibe3.analysis.inspect_output_adapter",
     "impact": "vibe3.analysis.inspect_output_adapter",
     "dag": "vibe3.analysis.inspect_output_adapter",
@@ -134,6 +136,7 @@ __all__ = [
     # Output adapters
     "as_list",
     "as_mapping",
+    "changed_symbols",
     "score",
     "impact",
     "dag",
