@@ -106,3 +106,17 @@ def test_exceptions_all_contains_github_api_error():
     from vibe3.exceptions import __all__
 
     assert "GitHubAPIError" in __all__
+
+
+def test_models_pr_symbols_importable():
+    from vibe3.models import CICheck, UpdatePRRequest
+
+    assert CICheck is not None
+    assert UpdatePRRequest is not None
+
+
+def test_models_all_contains_pr_symbols():
+    from vibe3.models import __all__
+
+    assert "CICheck" in __all__
+    assert "UpdatePRRequest" in __all__
