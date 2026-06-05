@@ -12,7 +12,9 @@ Public API:
 - Section builders: build_tools_guide_section, resolve_common_rules_path
 """
 
-from typing import TYPE_CHECKING, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.prompts.assembler import PromptAssembler
@@ -61,129 +63,48 @@ if TYPE_CHECKING:
     )
 
 
-def __getattr__(name: str) -> Any:
-    """Lazy import for all symbols to avoid cross-module side effects."""
-    if name == "PromptAssembler":
-        from vibe3.prompts.assembler import PromptAssembler
+# Lazy imports
+_LAZY_IMPORTS = {
+    "PromptAssembler": "vibe3.prompts.assembler",
+    "PromptContextBuilder": "vibe3.prompts.context_builder",
+    "make_context_builder": "vibe3.prompts.context_builder",
+    "MissingVariableError": "vibe3.prompts.exceptions",
+    "PromptAssemblyError": "vibe3.prompts.exceptions",
+    "ProviderNotFoundError": "vibe3.prompts.exceptions",
+    "TemplateNotFoundError": "vibe3.prompts.exceptions",
+    "UnusedVariableError": "vibe3.prompts.exceptions",
+    "PromptManifest": "vibe3.prompts.manifest",
+    "PromptProvider": "vibe3.prompts.manifest",
+    "PromptRecipeDefinition": "vibe3.prompts.manifest",
+    "PromptRecipeVariant": "vibe3.prompts.manifest",
+    "LoadedPromptRecipeDefinition": "vibe3.prompts.models",
+    "PromptMaterialSpec": "vibe3.prompts.models",
+    "PromptRecipe": "vibe3.prompts.models",
+    "PromptRecipeKind": "vibe3.prompts.models",
+    "PromptRecipeVariantSpec": "vibe3.prompts.models",
+    "PromptRenderResult": "vibe3.prompts.models",
+    "PromptSectionSpec": "vibe3.prompts.models",
+    "PromptVariableProvenance": "vibe3.prompts.models",
+    "PromptVariableSource": "vibe3.prompts.models",
+    "VariableSourceKind": "vibe3.prompts.models",
+    "ProviderRegistry": "vibe3.prompts.provider_registry",
+    "build_tools_guide_section": "vibe3.prompts.sections",
+    "resolve_common_rules_path": "vibe3.prompts.sections",
+    "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
+    "resolve_prompt_template": "vibe3.prompts.template_loader",
+    "PromptValidationResult": "vibe3.prompts.validation",
+    "PromptValidationService": "vibe3.prompts.validation",
+    "ValidationIssue": "vibe3.prompts.validation",
+}
 
-        return PromptAssembler
-    if name == "PromptContextBuilder":
-        from vibe3.prompts.context_builder import PromptContextBuilder
 
-        return PromptContextBuilder
-    if name == "make_context_builder":
-        from vibe3.prompts.context_builder import make_context_builder
+def __getattr__(name: str) -> object:
+    """Lazy import for prompts symbols to avoid circular dependencies."""
+    if name in _LAZY_IMPORTS:
+        import importlib
 
-        return make_context_builder
-    if name == "PromptManifest":
-        from vibe3.prompts.manifest import PromptManifest
-
-        return PromptManifest
-    if name == "PromptProvider":
-        from vibe3.prompts.manifest import PromptProvider
-
-        return PromptProvider
-    if name == "PromptRecipeDefinition":
-        from vibe3.prompts.manifest import PromptRecipeDefinition
-
-        return PromptRecipeDefinition
-    if name == "PromptRecipeVariant":
-        from vibe3.prompts.manifest import PromptRecipeVariant
-
-        return PromptRecipeVariant
-    if name == "LoadedPromptRecipeDefinition":
-        from vibe3.prompts.models import LoadedPromptRecipeDefinition
-
-        return LoadedPromptRecipeDefinition
-    if name == "PromptMaterialSpec":
-        from vibe3.prompts.models import PromptMaterialSpec
-
-        return PromptMaterialSpec
-    if name == "PromptRecipe":
-        from vibe3.prompts.models import PromptRecipe
-
-        return PromptRecipe
-    if name == "PromptRecipeKind":
-        from vibe3.prompts.models import PromptRecipeKind
-
-        return PromptRecipeKind
-    if name == "PromptRecipeVariantSpec":
-        from vibe3.prompts.models import PromptRecipeVariantSpec
-
-        return PromptRecipeVariantSpec
-    if name == "PromptRenderResult":
-        from vibe3.prompts.models import PromptRenderResult
-
-        return PromptRenderResult
-    if name == "PromptSectionSpec":
-        from vibe3.prompts.models import PromptSectionSpec
-
-        return PromptSectionSpec
-    if name == "PromptVariableProvenance":
-        from vibe3.prompts.models import PromptVariableProvenance
-
-        return PromptVariableProvenance
-    if name == "PromptVariableSource":
-        from vibe3.prompts.models import PromptVariableSource
-
-        return PromptVariableSource
-    if name == "VariableSourceKind":
-        from vibe3.prompts.models import VariableSourceKind
-
-        return VariableSourceKind
-    if name == "ProviderRegistry":
-        from vibe3.prompts.provider_registry import ProviderRegistry
-
-        return ProviderRegistry
-    if name == "MissingVariableError":
-        from vibe3.prompts.exceptions import MissingVariableError
-
-        return MissingVariableError
-    if name == "PromptAssemblyError":
-        from vibe3.prompts.exceptions import PromptAssemblyError
-
-        return PromptAssemblyError
-    if name == "ProviderNotFoundError":
-        from vibe3.prompts.exceptions import ProviderNotFoundError
-
-        return ProviderNotFoundError
-    if name == "TemplateNotFoundError":
-        from vibe3.prompts.exceptions import TemplateNotFoundError
-
-        return TemplateNotFoundError
-    if name == "UnusedVariableError":
-        from vibe3.prompts.exceptions import UnusedVariableError
-
-        return UnusedVariableError
-    if name == "PromptValidationResult":
-        from vibe3.prompts.validation import PromptValidationResult
-
-        return PromptValidationResult
-    if name == "PromptValidationService":
-        from vibe3.prompts.validation import PromptValidationService
-
-        return PromptValidationService
-    if name == "ValidationIssue":
-        from vibe3.prompts.validation import ValidationIssue
-
-        return ValidationIssue
-    if name == "DEFAULT_PROMPTS_PATH":
-        from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
-
-        return DEFAULT_PROMPTS_PATH
-    if name == "resolve_prompt_template":
-        from vibe3.prompts.template_loader import resolve_prompt_template
-
-        return resolve_prompt_template
-    if name == "build_tools_guide_section":
-        from vibe3.prompts.sections import build_tools_guide_section
-
-        return build_tools_guide_section
-    if name == "resolve_common_rules_path":
-        from vibe3.prompts.sections import resolve_common_rules_path
-
-        return resolve_common_rules_path
-
+        module = importlib.import_module(_LAZY_IMPORTS[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

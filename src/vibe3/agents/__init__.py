@@ -40,8 +40,11 @@ Backend Config:
   ``~/.codeagent/models.json``
 """
 
-from typing import TYPE_CHECKING, Any
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+# Cross-module imports (not self-references) - kept minimal per modularity rules
 from vibe3.models import PromptContextMode
 
 if TYPE_CHECKING:
@@ -76,99 +79,43 @@ if TYPE_CHECKING:
         make_run_context_builder,
         make_skill_context_builder,
     )
+    from vibe3.prompts.sections import build_tools_guide_section
 
 
-def __getattr__(name: str) -> Any:
-    """Lazy import for all symbols to avoid circular dependencies."""
-    if name == "CodeagentBackend":
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+# Lazy imports for self-references (avoid circular init dependencies)
+_LAZY_IMPORTS = {
+    "CodeagentBackend": "vibe3.agents.backends.codeagent",
+    "sync_models_json": "vibe3.agents.backends.codeagent_config",
+    "AgentBackend": "vibe3.agents.base",
+    "CodeagentCommand": "vibe3.agents.models",
+    "CodeagentResult": "vibe3.agents.models",
+    "ExecutionRole": "vibe3.agents.models",
+    "create_codeagent_command": "vibe3.agents.models",
+    "build_plan_prompt_body": "vibe3.agents.plan_prompt",
+    "describe_plan_sections": "vibe3.agents.plan_prompt",
+    "make_plan_context_builder": "vibe3.agents.plan_prompt",
+    "build_snapshot_diff": "vibe3.agents.review_pipeline_helpers",
+    "run_inspect_json": "vibe3.agents.review_pipeline_helpers",
+    "build_review_prompt_body": "vibe3.agents.review_prompt",
+    "describe_review_sections": "vibe3.agents.review_prompt",
+    "make_review_context_builder": "vibe3.agents.review_prompt",
+    "RunPromptMode": "vibe3.agents.run_prompt",
+    "build_run_prompt_body": "vibe3.agents.run_prompt",
+    "describe_run_plan_sections": "vibe3.agents.run_prompt",
+    "make_publish_context_builder": "vibe3.agents.run_prompt",
+    "make_run_context_builder": "vibe3.agents.run_prompt",
+    "make_skill_context_builder": "vibe3.agents.run_prompt",
+    "build_tools_guide_section": "vibe3.prompts.sections",
+}
 
-        return CodeagentBackend
-    if name == "sync_models_json":
-        from vibe3.agents.backends.codeagent_config import sync_models_json
 
-        return sync_models_json
-    if name == "AgentBackend":
-        from vibe3.agents.base import AgentBackend
+def __getattr__(name: str) -> object:
+    """Lazy import for agents symbols to avoid circular dependencies."""
+    if name in _LAZY_IMPORTS:
+        import importlib
 
-        return AgentBackend
-    if name == "CodeagentCommand":
-        from vibe3.agents.models import CodeagentCommand
-
-        return CodeagentCommand
-    if name == "CodeagentResult":
-        from vibe3.agents.models import CodeagentResult
-
-        return CodeagentResult
-    if name == "ExecutionRole":
-        from vibe3.agents.models import ExecutionRole
-
-        return ExecutionRole
-    if name == "create_codeagent_command":
-        from vibe3.agents.models import create_codeagent_command
-
-        return create_codeagent_command
-    if name == "build_plan_prompt_body":
-        from vibe3.agents.plan_prompt import build_plan_prompt_body
-
-        return build_plan_prompt_body
-    if name == "describe_plan_sections":
-        from vibe3.agents.plan_prompt import describe_plan_sections
-
-        return describe_plan_sections
-    if name == "make_plan_context_builder":
-        from vibe3.agents.plan_prompt import make_plan_context_builder
-
-        return make_plan_context_builder
-    if name == "build_snapshot_diff":
-        from vibe3.agents.review_pipeline_helpers import build_snapshot_diff
-
-        return build_snapshot_diff
-    if name == "run_inspect_json":
-        from vibe3.agents.review_pipeline_helpers import run_inspect_json
-
-        return run_inspect_json
-    if name == "build_review_prompt_body":
-        from vibe3.agents.review_prompt import build_review_prompt_body
-
-        return build_review_prompt_body
-    if name == "describe_review_sections":
-        from vibe3.agents.review_prompt import describe_review_sections
-
-        return describe_review_sections
-    if name == "make_review_context_builder":
-        from vibe3.agents.review_prompt import make_review_context_builder
-
-        return make_review_context_builder
-    if name == "RunPromptMode":
-        from vibe3.agents.run_prompt import RunPromptMode
-
-        return RunPromptMode
-    if name == "build_run_prompt_body":
-        from vibe3.agents.run_prompt import build_run_prompt_body
-
-        return build_run_prompt_body
-    if name == "describe_run_plan_sections":
-        from vibe3.agents.run_prompt import describe_run_plan_sections
-
-        return describe_run_plan_sections
-    if name == "make_publish_context_builder":
-        from vibe3.agents.run_prompt import make_publish_context_builder
-
-        return make_publish_context_builder
-    if name == "make_run_context_builder":
-        from vibe3.agents.run_prompt import make_run_context_builder
-
-        return make_run_context_builder
-    if name == "make_skill_context_builder":
-        from vibe3.agents.run_prompt import make_skill_context_builder
-
-        return make_skill_context_builder
-    if name == "build_tools_guide_section":
-        from vibe3.prompts.sections import build_tools_guide_section
-
-        return build_tools_guide_section
-
+        module = importlib.import_module(_LAZY_IMPORTS[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
