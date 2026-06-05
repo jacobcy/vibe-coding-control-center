@@ -12,7 +12,7 @@ from vibe3.commands.command_options import (
     validate_show_prompt_dependency,
 )
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services.shared.issue_utils import load_issue_info
 
 app = typer.Typer(
     name="internal",

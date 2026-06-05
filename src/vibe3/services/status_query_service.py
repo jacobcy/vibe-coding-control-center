@@ -305,7 +305,7 @@ class StatusQueryService:
                     blocked_reason = getattr(flow, "blocked_reason", None)
                 elif issue.body:
                     # For remote BLOCKED issues, parse from issue body
-                    from vibe3.services.issue_body_service import parse_projection
+                    from vibe3.services.shared.issue_utils import parse_projection
 
                     proj = parse_projection(issue.body)
                     if proj.blocked_by:

@@ -33,6 +33,8 @@ __all__ = [
     "ArtifactParser",
     # Timeline utilities
     "parse_timeline_from_comments",
+    # Cache services
+    "IssueTitleCacheService",
 ]
 
 _SYMBOL_MODULES = {
@@ -65,6 +67,8 @@ _SYMBOL_MODULES = {
     "ArtifactParser": "vibe3.services.shared.artifacts",
     # Timeline utilities
     "parse_timeline_from_comments": "vibe3.services.shared.timeline",
+    # Cache services
+    "IssueTitleCacheService": "vibe3.services.shared.cache",
 }
 
 

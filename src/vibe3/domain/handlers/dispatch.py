@@ -20,7 +20,7 @@ from vibe3.domain.events import (
 )
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models.execution_request import ExecutionRequest
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.services.shared.issue_utils import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
 
