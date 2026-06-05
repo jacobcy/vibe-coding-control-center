@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.logging import (
+from vibe3.models import OrchestraConfig
+from vibe3.orchestra import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
@@ -197,7 +197,7 @@ class HeartbeatServer:
 
             # Cleanup old error records (maintenance)
             # Delay import to avoid circular dependency
-            from vibe3.services.error_tracking_service import ErrorTrackingService
+            from vibe3.services import ErrorTrackingService
 
             error_tracking = ErrorTrackingService.get_instance()
 
