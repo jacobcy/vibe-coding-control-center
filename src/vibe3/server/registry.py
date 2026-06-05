@@ -14,29 +14,27 @@ from fastapi.responses import HTMLResponse
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.domain import FailedGate, FlowManager
 from vibe3.domain.orchestration_facade import OrchestrationFacade
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.execution.capacity_service import CapacityService
+from vibe3.environment import SessionRegistryService
+from vibe3.execution import CapacityService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import OrchestraConfig
+from vibe3.orchestra import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.dispatch_coordinator_factory import (
     create_global_dispatch_coordinator,
 )
-from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime import CircuitBreaker, HeartbeatServer
-from vibe3.runtime.heartbeat import FailedGateProtocol
-from vibe3.runtime.orchestra_instance import (
+from vibe3.runtime import (
+    CircuitBreaker,
+    HeartbeatServer,
     OrchestraInstanceInfo,
     read_instance_info,
     validate_instance,
 )
-from vibe3.services.orchestra_status_service import (
-    OrchestraSnapshot,
-    OrchestraStatusService,
-)
+from vibe3.runtime.heartbeat import FailedGateProtocol
+from vibe3.services import OrchestraStatusService
+from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
@@ -91,7 +89,7 @@ def _build_server_with_launch_cwd(
     launch_cwd: Path | None = None,
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.agents import CodeagentBackend
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()

@@ -9,10 +9,10 @@ if TYPE_CHECKING:
     from vibe3.domain import FailedGate, FlowManager
 
     # Runtime layer re-exports
-    from vibe3.runtime import CircuitBreaker, HeartbeatServer
-
     # Orchestra instance utilities (now in runtime)
-    from vibe3.runtime.orchestra_instance import (
+    from vibe3.runtime import (
+        CircuitBreaker,
+        HeartbeatServer,
         OrchestraInstanceInfo,
         read_instance_info,
         validate_instance,
@@ -21,25 +21,8 @@ if TYPE_CHECKING:
 
     # MCP server
     from vibe3.server.mcp import (
-        _serialize_snapshot,
         create_mcp_server,
         format_snapshot_for_mcp,
-    )
-
-    # Registry
-    from vibe3.server.registry import (
-        ORCHESTRA_TMUX_SESSION,
-        _build_async_serve_command,
-        _build_server,
-        _build_server_with_launch_cwd,
-        _kill_orchestra_tmux_session,
-        _orchestra_tmux_session_exists,
-        _resolve_async_cli_override_root,
-        _resolve_dispatcher_models_root,
-        _resolve_orchestra_log_dir,
-        _setup_tailscale_webhook,
-        _start_async_serve,
-        _validate_pid_file,
     )
 
     # Server utilities
@@ -54,27 +37,13 @@ _LAZY_IMPORTS = {
     "CircuitBreaker": "vibe3.runtime",
     "HeartbeatServer": "vibe3.runtime",
     # Orchestra instance utilities
-    "OrchestraInstanceInfo": "vibe3.runtime.orchestra_instance",
-    "read_instance_info": "vibe3.runtime.orchestra_instance",
-    "validate_instance": "vibe3.runtime.orchestra_instance",
-    "write_instance_info": "vibe3.runtime.orchestra_instance",
+    "OrchestraInstanceInfo": "vibe3.runtime",
+    "read_instance_info": "vibe3.runtime",
+    "validate_instance": "vibe3.runtime",
+    "write_instance_info": "vibe3.runtime",
     # MCP server
     "create_mcp_server": "vibe3.server.mcp",
     "format_snapshot_for_mcp": "vibe3.server.mcp",
-    "_serialize_snapshot": "vibe3.server.mcp",
-    # Registry
-    "ORCHESTRA_TMUX_SESSION": "vibe3.server.registry",
-    "_build_server": "vibe3.server.registry",
-    "_build_server_with_launch_cwd": "vibe3.server.registry",
-    "_build_async_serve_command": "vibe3.server.registry",
-    "_start_async_serve": "vibe3.server.registry",
-    "_setup_tailscale_webhook": "vibe3.server.registry",
-    "_orchestra_tmux_session_exists": "vibe3.server.registry",
-    "_kill_orchestra_tmux_session": "vibe3.server.registry",
-    "_resolve_dispatcher_models_root": "vibe3.server.registry",
-    "_resolve_orchestra_log_dir": "vibe3.server.registry",
-    "_resolve_async_cli_override_root": "vibe3.server.registry",
-    "_validate_pid_file": "vibe3.server.registry",
     # Server utilities
     "find_available_port": "vibe3.server.server_utils",
 }
@@ -107,18 +76,4 @@ __all__ = [
     # mcp
     "create_mcp_server",
     "format_snapshot_for_mcp",
-    "_serialize_snapshot",
-    # registry
-    "_validate_pid_file",
-    "_build_server",
-    "_build_server_with_launch_cwd",
-    "_build_async_serve_command",
-    "_start_async_serve",
-    "_setup_tailscale_webhook",
-    "_orchestra_tmux_session_exists",
-    "_kill_orchestra_tmux_session",
-    "_resolve_dispatcher_models_root",
-    "_resolve_orchestra_log_dir",
-    "_resolve_async_cli_override_root",
-    "ORCHESTRA_TMUX_SESSION",
 ]

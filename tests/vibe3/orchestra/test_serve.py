@@ -12,8 +12,8 @@ from vibe3.cli import app
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
-from vibe3.server import _build_async_serve_command
 from vibe3.server import app as serve_module
+from vibe3.server.registry import _build_async_serve_command
 
 
 @pytest.fixture(autouse=True)
@@ -452,8 +452,8 @@ def test_resume_clears_errors_even_when_gate_is_open(monkeypatch) -> None:
         blocked_ticks=0,
     )
 
-    # Patch where FailedGate is defined, not where it's imported
-    with patch("vibe3.orchestra.failed_gate.FailedGate", return_value=mock_gate):
+    # Patch where FailedGate is imported (from domain in app.py)
+    with patch("vibe3.domain.FailedGate", return_value=mock_gate):
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "resume", "--reason", "test"])
 
@@ -486,8 +486,8 @@ def test_resume_clears_gate_when_active(monkeypatch) -> None:
         blocked_ticks=3,
     )
 
-    # Patch where FailedGate is defined
-    with patch("vibe3.orchestra.failed_gate.FailedGate", return_value=mock_gate):
+    # Patch where FailedGate is imported (from domain in app.py)
+    with patch("vibe3.domain.FailedGate", return_value=mock_gate):
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "resume", "--reason", "fixed"])
 
