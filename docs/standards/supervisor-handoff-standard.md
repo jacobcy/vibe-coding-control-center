@@ -1,5 +1,9 @@
 # Supervisor Handoff Standard
 
+> [!WARNING]
+> **DEPRECATED/ARCHIVED**: This standard is being retired in favor of V3 governance models.
+> For current V3 handoff logic and governance, please refer to [docs/standards/v3/handoff-governance-standard.md](v3/handoff-governance-standard.md).
+
 > Tier 3 (Cognitive/Governance) 轻量治理链路的完整规范：触发、派发、执行、生命周期、与 Manager (Tier 2) 的边界。
 
 ## 定位
