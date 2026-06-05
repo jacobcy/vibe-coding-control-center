@@ -9,34 +9,42 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.clients.runtime_assets import check_runtime_asset, runtime_assets_root
+# public-api: pending upstream export
+from vibe3.clients.runtime_assets import check_runtime_asset
+from vibe3.config import MANAGER_GATE_CONFIG, ConventionResolver
+
+# public-api: pending upstream export
 from vibe3.config.convention_resolver import diagnose_profile
-from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager
+from vibe3.environment import SessionRegistryService
+
+# public-api: pending upstream export
 from vibe3.environment.session_naming import get_manager_session_name
-from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import (
     CapacityDeferredError,
     DiagnosticContext,
     MissingResourceError,
 )
+
+# public-api: pending upstream export
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
     build_task_flow_branch_resolver,
     resolve_orchestra_repo_root,
 )
-from vibe3.models import ExecutionRequest, IssueInfo, IssueState
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.prompts.manifest import PromptManifest, PromptProvider
+from vibe3.models import ExecutionRequest, IssueInfo, IssueState, OrchestraConfig
+from vibe3.prompts import PromptManifest, PromptProvider
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.issue_failure_service import fail_manager_issue
+from vibe3.services import fail_manager_issue
+from vibe3.utils import runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -98,9 +106,9 @@ def resolve_manager_options(
 
 
 MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
-    fallback_branch=lambda issue_number, _current_branch: ConventionResolver.from_repo()
-    .resolve()
-    .branch.canonical_branch(issue_number)
+    fallback_branch=lambda issue_number, _current_branch: (
+        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
+    )
 )
 
 
@@ -325,7 +333,10 @@ def build_manager_sync_request(
 
             # Create skill path resolver callback for prompts layer
             def skill_path_resolver(skill_name: str) -> str | None:
-                return ConventionResolver.from_repo().get_skill_path(skill_name)
+                result: str | None = ConventionResolver.from_repo().get_skill_path(
+                    skill_name
+                )
+                return result
 
             for section_spec in variant_spec.sections:
                 if section_spec.source is not None:

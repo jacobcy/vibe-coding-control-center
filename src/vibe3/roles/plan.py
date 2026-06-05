@@ -13,36 +13,49 @@ from vibe3.agents import (
     describe_plan_sections,
     make_plan_context_builder,
 )
-from vibe3.clients.github_client import GitHubClient
-from vibe3.config.loader import load_runtime_config
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.role_gates import PLANNER_GATE_CONFIG
-from vibe3.config.settings import VibeConfig
-from vibe3.execution.codeagent_runner import CodeagentExecutionService
+from vibe3.clients import GitHubClient
+from vibe3.config import (
+    PLANNER_GATE_CONFIG,
+    ConventionResolver,
+    VibeConfig,
+    load_orchestra_config,
+    load_runtime_config,
+)
+from vibe3.execution import CodeagentExecutionService, ExecutionCoordinator
+
+# public-api: pending upstream export
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.coordinator import ExecutionCoordinator
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+
+# public-api: pending upstream export
 from vibe3.execution.prompt_meta import build_prompt_meta
+
+# public-api: pending upstream export
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
 )
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import (
+    ExecutionRequest,
+    IssueInfo,
+    IssueState,
+    OrchestraConfig,
+    WorktreeRequirement,
+)
+
+# public-api: pending upstream export
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
-from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.services.issue_failure_service import fail_planner_issue
+from vibe3.services import fail_planner_issue, record_dispatch_failure_if_unexpected
 
 PLANNER_ROLE = TriggerableRoleDefinition(
     name="planner",

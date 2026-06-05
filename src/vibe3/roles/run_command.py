@@ -16,26 +16,28 @@ from vibe3.agents import (
     make_run_context_builder,
     make_skill_context_builder,
 )
-from vibe3.clients.runtime_assets import resolve_runtime_asset
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
+from vibe3.config import ConventionResolver, VibeConfig, load_orchestra_config
 from vibe3.config.cli_overrides import RoleCliOverrides
-from vibe3.config.convention_resolver import ConventionResolver
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import SkillNotAvailableError
-from vibe3.execution.codeagent_runner import CodeagentExecutionService
+from vibe3.execution import (
+    CodeagentExecutionService,
+    ExecutionCoordinator,
+    load_session_id,
+)
+
+# public-api: pending upstream export
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.coordinator import ExecutionCoordinator
+
+# public-api: pending upstream export
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.session_service import load_session_id
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.models.prompt_meta import PromptContextMode
-from vibe3.models.worktree import WorktreeRequirement
+from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
 )
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.services import record_dispatch_failure_if_unexpected
+from vibe3.utils import resolve_runtime_asset
 
 
 def resolve_skill_path(
@@ -57,7 +59,8 @@ def resolve_skill_path(
     """
     if resolver is None:
         resolver = ConventionResolver.from_repo()
-    return resolver.get_skill_path(skill)
+    result: str | None = resolver.get_skill_path(skill)
+    return result
 
 
 def dispatch_run_command_async(

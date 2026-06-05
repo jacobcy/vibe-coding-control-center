@@ -14,12 +14,16 @@ if TYPE_CHECKING:
     from vibe3.domain.events import (
         # Base
         DomainEvent,
-        # L3 Flow Lifecycle Events
+        ExecutorDispatchIntent,
         # L1 Governance Events
         GovernanceDecisionRequired,
         GovernanceScanCompleted,
         GovernanceScanStarted,
+        # L3 Flow Lifecycle Events
         IssueFailed,
+        ManagerDispatchIntent,
+        PlannerDispatchIntent,
+        ReviewerDispatchIntent,
         # L2 Supervisor Apply Events
         SupervisorApplyCompleted,
         SupervisorApplyDelegated,
@@ -94,6 +98,22 @@ def __getattr__(name: str) -> type:
         from vibe3.domain.events import IssueFailed
 
         return IssueFailed
+    if name == "ManagerDispatchIntent":
+        from vibe3.domain.events import ManagerDispatchIntent
+
+        return ManagerDispatchIntent
+    if name == "PlannerDispatchIntent":
+        from vibe3.domain.events import PlannerDispatchIntent
+
+        return PlannerDispatchIntent
+    if name == "ExecutorDispatchIntent":
+        from vibe3.domain.events import ExecutorDispatchIntent
+
+        return ExecutorDispatchIntent
+    if name == "ReviewerDispatchIntent":
+        from vibe3.domain.events import ReviewerDispatchIntent
+
+        return ReviewerDispatchIntent
     if name == "SupervisorApplyCompleted":
         from vibe3.domain.events import SupervisorApplyCompleted
 
@@ -144,6 +164,10 @@ __all__ = [
     "DomainEvent",
     # L3 Flow Lifecycle Events
     "IssueFailed",
+    "ManagerDispatchIntent",
+    "PlannerDispatchIntent",
+    "ExecutorDispatchIntent",
+    "ReviewerDispatchIntent",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",

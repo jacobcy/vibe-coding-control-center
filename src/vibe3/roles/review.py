@@ -16,28 +16,45 @@ from vibe3.agents import (
     make_review_context_builder,
     run_inspect_json,
 )
+
+# public-api: pending upstream export
 from vibe3.analysis.inspect_output_adapter import changed_symbols
+from vibe3.config import (
+    REVIEWER_GATE_CONFIG,
+    ConventionResolver,
+    VibeConfig,
+    load_orchestra_config,
+    load_runtime_config,
+)
+
+# public-api: pending upstream export
 from vibe3.config.cli_overrides import RoleCliOverrides
-from vibe3.config.loader import load_runtime_config
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.role_gates import REVIEWER_GATE_CONFIG
-from vibe3.config.settings import VibeConfig
-from vibe3.execution.codeagent_runner import CodeagentExecutionService
+from vibe3.execution import CodeagentExecutionService, ExecutionCoordinator
+
+# public-api: pending upstream export
 from vibe3.execution.codeagent_support import build_self_invocation
-from vibe3.execution.coordinator import ExecutionCoordinator
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+
+# public-api: pending upstream export
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import (
+    ExecutionRequest,
+    IssueInfo,
+    IssueState,
+    OrchestraConfig,
+    StructureDiff,
+    WorktreeRequirement,
+)
+
+# public-api: pending upstream export
 from vibe3.models.review import ReviewRequest, ReviewScope
-from vibe3.models.snapshot import StructureDiff
-from vibe3.models.worktree import WorktreeRequirement
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -47,10 +64,11 @@ from vibe3.roles.review_helpers import (
     ReviewRunResult,
     finalize_review_output,
 )
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_failure_service import fail_reviewer_issue
+from vibe3.services import (
+    FlowService,
+    fail_reviewer_issue,
+    record_dispatch_failure_if_unexpected,
+)
 
 
 def validate_review_prerequisites(
@@ -83,8 +101,7 @@ def validate_review_prerequisites(
 
     if not issue_number:
         raise UserError(
-            f"No issue linked to flow '{branch}'.\n"
-            "Run 'vibe3 flow bind <issue>' first."
+            f"No issue linked to flow '{branch}'.\nRun 'vibe3 flow bind <issue>' first."
         )
 
     return flow, issue_number

@@ -6,16 +6,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
-from vibe3.config.loader import load_runtime_config
-from vibe3.config.role_gates import EXECUTOR_GATE_CONFIG
+from vibe3.config import EXECUTOR_GATE_CONFIG, load_runtime_config
 from vibe3.exceptions import UserError
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
 from vibe3.models import IssueState
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
-from vibe3.services.flow_service import FlowService
+from vibe3.services import FlowService
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
@@ -121,8 +122,7 @@ def publish_run_command_failure(
     reason: str,
 ) -> None:
     """Publish run failure lifecycle for command-mode execution."""
-    from vibe3.domain.events import IssueFailed
-    from vibe3.domain.publisher import publish
+    from vibe3.domain import IssueFailed, publish
 
     publish(
         IssueFailed(
