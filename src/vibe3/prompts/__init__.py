@@ -9,6 +9,7 @@ Public API:
 - ProviderRegistry: provider registration and dispatch
 - Exceptions: PromptAssemblyError, MissingVariableError, etc.
 - Template helpers: DEFAULT_PROMPTS_PATH, resolve_prompt_template
+- Section builders: build_tools_guide_section, resolve_common_rules_path
 """
 
 from __future__ import annotations
@@ -47,6 +48,10 @@ if TYPE_CHECKING:
         VariableSourceKind,
     )
     from vibe3.prompts.provider_registry import ProviderRegistry
+    from vibe3.prompts.sections import (
+        build_tools_guide_section,
+        resolve_common_rules_path,
+    )
     from vibe3.prompts.template_loader import (
         DEFAULT_PROMPTS_PATH,
         resolve_prompt_template,
@@ -87,6 +92,8 @@ _LAZY_IMPORTS = {
     "PromptValidationResult": "vibe3.prompts.validation",
     "PromptValidationService": "vibe3.prompts.validation",
     "ValidationIssue": "vibe3.prompts.validation",
+    "build_tools_guide_section": "vibe3.prompts.sections",
+    "resolve_common_rules_path": "vibe3.prompts.sections",
 }
 
 
@@ -136,4 +143,7 @@ __all__ = [
     # Template helpers
     "DEFAULT_PROMPTS_PATH",
     "resolve_prompt_template",
+    # Section builders
+    "build_tools_guide_section",
+    "resolve_common_rules_path",
 ]

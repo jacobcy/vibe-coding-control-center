@@ -10,7 +10,7 @@ Section builders (build_plan_policy_section, etc.) remain available for direct u
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 from loguru import logger
 
@@ -23,6 +23,10 @@ from vibe3.prompts import (
     PromptManifest,
     PromptProvider,
     make_context_builder,
+)
+from vibe3.prompts.sections import (
+    build_tools_guide_section,
+    resolve_common_rules_path,
 )
 
 PlanPromptMode = Literal["first", "retry"]
@@ -150,8 +154,6 @@ def _build_plan_prompt_providers(
     context_mode: PromptContextMode,
 ) -> dict[str, PromptProvider]:
     """Build providers used by config/prompts/prompt-recipes.yaml plan sections."""
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
     plan_config = getattr(config, "plan", None)
     task_request = (
         request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
@@ -185,15 +187,12 @@ def _build_plan_prompt_providers(
         )
         return build_plan_task_section(task_request, plan_task_text)
 
-    def common_rules_path() -> str | None:
-        if plan_config and plan_config.common_rules is not None:
-            result: str | None = plan_config.common_rules
-            return result
-        # Cast needed: lazy __getattr__ import loses type info
-        return cast(str | None, resolver.get_policy_path("common"))
-
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(common_rules_path())
+        return build_tools_guide_section(
+            resolve_common_rules_path(
+                plan_config.common_rules if plan_config else None, resolver
+            )
+        )
 
     return {
         "plan.policy": plan_policy,
