@@ -776,12 +776,15 @@ Decision sketch:
          - 输出 `total_changed`, `code_changed`, `changed_symbols` 等结构化信息
       2. 从 plan 的 "Scope Boundary" / "Changes" 部分提取声明的文件列表
       3. 比对：检查 `inspect base` 输出的改动文件是否都在 plan 声明的 scope 内
-      4. 若发现 scope violation：
-         - 写 handoff append：列出 out-of-scope 文件清单、score.level、base_branch
-         - Comment：`[manager] Branch changes exceed plan scope boundary. Out-of-scope files: <list>. Score: <level>. Base branch: <base_branch>.`
-         - Block：`vibe3 flow blocked --reason "Scope baseline violation: branch has <N> out-of-scope files vs plan scope. Score: <level>."`
+      4. 若发现疑似 scope violation：
+         - 先写 handoff append：列出 out-of-scope 文件清单、score.level、base_branch，以及这些文件是否属于当前 issue 的实际变更
+         - 核查 plan 是否遗漏了当前 issue 必要文件，或 `inspect base` 是否包含已合并 PR/main 前进带来的非当前变更
+      5. 只有确认当前 issue 的实际变更违反 plan Scope Boundary 时：
+         - 写 handoff append：指出真实 scope violation 的具体内容和核查证据
+         - Comment：`[manager] Branch changes exceed plan scope boundary after verification. Out-of-scope files: <list>. Score: <level>. Base branch: <base_branch>.`
+         - Block：`vibe3 flow blocked --reason "Verified scope baseline violation: branch has <N> out-of-scope files vs plan scope. Score: <level>."`
          - `exit()`
-      5. 若分支改动与 plan scope 一致：继续批准 plan
+      6. 若分支改动与 plan scope 一致：继续批准 plan
     - **理由**：即使 Gate 1 通过，plan agent 可能创建与分支状态不匹配的 scope 边界。这个检查在执行前捕获不匹配。使用 `inspect base` 而非 `git diff` 可以自动处理 base branch 检测问题（Issue #2076 自身遇到的误判）。
   - 若 plan 不达标：可直接修改 plan_ref（你有 write 权限），或转回 `state/claimed` 要求重做 plan
   - 若 plan 达标：写 handoff append 说明当前进入执行阶段、重点关注区域、spec 要点
@@ -796,10 +799,13 @@ Decision sketch:
     git diff main...HEAD --stat
     ```
     - 对照 issue scope 和 plan 的 Scope Boundary，检查变更范围是否一致
-    - 如果发现明显 scope violation（如 issue 只涉及导入路径，但 diff 显示删除了模块或修改了业务逻辑）：
-      - 写 handoff append：指出 scope violation 的具体内容
+    - 必须先核查是否为真实 scope violation：用三点 diff 的 merge-base 范围、当前分支 commit 列表和 report_ref 描述交叉确认；不要把已合并 PR 或 main 前进带来的差异误判为当前 issue 越界
+    - 如果发现疑似 scope violation（如 issue 只涉及导入路径，但 diff 显示删除了模块或修改了业务逻辑）：
+      - 先写 handoff append：记录疑似越界文件、核查命令、是否属于当前 issue 实际变更
+    - 只有确认当前 issue 的实际变更违反 issue scope 或 plan Scope Boundary 时：
+      - 写 handoff append：指出真实 scope violation 的具体内容和核查证据
       - 进入 `state/blocked`
-      - comment：明确说明 scope violation，需要人类判断是否接受或回退
+      - comment：明确说明已核查为真实 scope violation，需要人类判断是否接受或回退
       - `exit()`
   - **实质审查执行结果**: 读 report_ref，判断代码质量是否达标
   - **若执行结果有明显缺陷**（编译错误、测试全部失败、关键功能未实现）：
