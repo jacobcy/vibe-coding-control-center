@@ -5,7 +5,7 @@ Pure functions for rendering agent chains, handoff events, and updates log.
 
 import re
 
-from vibe3.services.path_helpers import ref_to_handoff_cmd, sanitize_event_detail_paths
+from vibe3.services.shared.paths import ref_to_handoff_cmd, sanitize_event_detail_paths
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils.constants import AUTOMATED_MARKERS

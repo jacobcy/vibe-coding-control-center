@@ -3,7 +3,7 @@
 from typing import Any
 
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.services.path_helpers import ref_to_handoff_cmd
+from vibe3.services.shared.paths import ref_to_handoff_cmd
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
