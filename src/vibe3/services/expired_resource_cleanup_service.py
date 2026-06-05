@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients.git_worktree_ops import remove_worktree
-from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients import GitHubClientProtocol, remove_worktree
 
 
 def _is_protected_worktree(
@@ -38,10 +37,7 @@ def _is_protected_worktree(
 
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.protocols import BackendProtocol
+    from vibe3.clients import BackendProtocol, GitClient, GitHubClient, SQLiteClient
     from vibe3.services.pr_service import PRService
 
 

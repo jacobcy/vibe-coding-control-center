@@ -10,7 +10,7 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
+from vibe3.clients import GhIssueLabelPort, IssueLabelPort
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.state_machine import (
     STATE_LABEL_META,

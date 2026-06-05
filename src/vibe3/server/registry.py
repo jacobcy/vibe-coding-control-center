@@ -14,8 +14,7 @@ from fastapi.responses import HTMLResponse
 from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.domain import FailedGate, FlowManager
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService

@@ -13,8 +13,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.merged_pr_cache import MergedPRCache
+from vibe3.clients import GitHubClient, MergedPRCache
 from vibe3.services.git_path_client import get_git_common_dir
 
 

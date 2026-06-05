@@ -10,7 +10,7 @@ The definitions below are maintained for backward compatibility during migration
 
 from typing import Protocol
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 
 # Re-export protocols from domain for backward compatibility
 from vibe3.domain.protocols.dispatch_protocols import (

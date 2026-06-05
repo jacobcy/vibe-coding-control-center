@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
 
 @contextmanager

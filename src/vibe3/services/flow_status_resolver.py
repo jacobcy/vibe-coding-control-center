@@ -121,7 +121,7 @@ class FlowStatusResolver:
         if issue_number is None:
             raise ValueError("issue_number required for remote source")
 
-        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients import GitHubClient
         from vibe3.services.timeline_parser import parse_timeline_from_comments
 
         github_client = GitHubClient()

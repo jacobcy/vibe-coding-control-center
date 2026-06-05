@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.utils.actor_utils import normalize_actor as _normalize_actor_for_display
 
 WORKFLOW_ACTOR = "workflow"

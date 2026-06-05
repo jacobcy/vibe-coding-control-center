@@ -36,7 +36,7 @@ def resolve_resource_root(
         candidates.append(Path(git_common_dir).parent)
     else:
         try:
-            from vibe3.clients.git_client import GitClient
+            from vibe3.clients import GitClient
 
             detected_common_dir = GitClient().get_git_common_dir()
             if detected_common_dir:

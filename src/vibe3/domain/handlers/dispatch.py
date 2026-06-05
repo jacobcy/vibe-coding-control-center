@@ -11,7 +11,7 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.clients.store_context import get_store
+from vibe3.clients import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import (
     ExecutorDispatchIntent,

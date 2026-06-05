@@ -4,7 +4,7 @@
 # AI clients
 from vibe3.clients.ai_client import AIClient
 from vibe3.clients.ai_suggestion_client import AISuggestionClient
-from vibe3.clients.git_client import GitClient, find_repo_root
+from vibe3.clients.git_client import GitClient, GitClientProtocol, find_repo_root
 
 # Worktree operations
 from vibe3.clients.git_worktree_ops import prune_worktrees, remove_worktree
@@ -21,6 +21,18 @@ from vibe3.clients.merged_pr_cache import MergedPRCache
 
 # Protocols
 from vibe3.clients.protocols import BackendProtocol, GitHubClientProtocol
+from vibe3.clients.protocols.flow import FlowReader
+from vibe3.clients.protocols.git import GitPathProtocol
+from vibe3.clients.protocols.github import (
+    GitHubAuthPort,
+    IssueReadPort,
+    IssueWritePort,
+    PRCommentPort,
+    PRDiffPort,
+    PRReadPort,
+    PRWritePort,
+)
+from vibe3.clients.protocols.pr import BaseResolver
 from vibe3.clients.recent_pr_cache import RecentPRCache
 
 # Runtime assets
@@ -42,8 +54,19 @@ __all__ = [
     # Protocols
     "BackendProtocol",
     "GitHubClientProtocol",
+    "GitPathProtocol",
+    "FlowReader",
+    "BaseResolver",
+    "GitHubAuthPort",
+    "PRReadPort",
+    "PRWritePort",
+    "PRDiffPort",
+    "PRCommentPort",
+    "IssueReadPort",
+    "IssueWritePort",
     # Core clients
     "GitClient",
+    "GitClientProtocol",
     "GitHubClient",
     "SQLiteClient",
     "SerenaClient",

@@ -13,8 +13,7 @@ from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService

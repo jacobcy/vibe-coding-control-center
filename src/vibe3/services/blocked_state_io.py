@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.models import IssueState
 from vibe3.models.issue_body import FlowStateProjection
 from vibe3.services.blocked_state_types import BlockedState

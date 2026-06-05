@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.change_source import BranchSource, ChangeSource, PRSource
 

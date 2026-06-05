@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.clients.runtime_assets import resolve_prompt_config
+from vibe3.clients import resolve_prompt_config
 from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.exceptions import DiagnosticContext, MissingResourceError
 from vibe3.prompts.models import (

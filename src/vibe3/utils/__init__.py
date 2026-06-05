@@ -1,6 +1,6 @@
 """Utility modules for Vibe3."""
 
-from vibe3.clients.runtime_assets import (
+from vibe3.clients import (
     resolve_prompt_config,
     resolve_runtime_asset,
     runtime_assets_root,

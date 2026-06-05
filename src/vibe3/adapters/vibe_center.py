@@ -19,7 +19,7 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     Uses GitClient to find repo root, ensuring correct resource discovery
     regardless of current working directory.
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     git_common_dir = None
     try:
@@ -82,7 +82,7 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    from vibe3.clients.runtime_assets import runtime_assets_root
+    from vibe3.clients import runtime_assets_root
 
     skills_dirs = [repo_root / "skills"]
     global_skills = runtime_assets_root() / "skills"

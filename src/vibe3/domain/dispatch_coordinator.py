@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable, cast
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
@@ -49,7 +49,7 @@ from vibe3.services.label_utils import (
 from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.roles.definitions import TriggerableRoleDefinition
 

@@ -20,7 +20,7 @@ def resolve_orchestra_repo_root() -> Path:
 
     Delegates to find_repo_root() — the single source of truth in git_client.
     """
-    from vibe3.clients.git_client import find_repo_root
+    from vibe3.clients import find_repo_root
 
     return find_repo_root()
 

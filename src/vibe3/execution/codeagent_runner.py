@@ -78,7 +78,7 @@ class CodeagentExecutionService:
         (success or failure), we remove the handoff trigger label so
         the next tick does not re-dispatch the same issue.
         """
-        from vibe3.clients.github_labels import GhIssueLabelPort
+        from vibe3.clients import GhIssueLabelPort
         from vibe3.config.orchestra_settings import load_orchestra_config
         from vibe3.services.orchestra_helpers import get_handoff_state_label
 
@@ -232,7 +232,7 @@ class CodeagentExecutionService:
         before_issue_is_closed = False
         if command.issue_number is not None:
             try:
-                from vibe3.clients.github_client import GitHubClient
+                from vibe3.clients import GitHubClient
 
                 issue_payload = GitHubClient().view_issue(
                     command.issue_number,

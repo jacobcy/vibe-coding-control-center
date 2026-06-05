@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.github_labels import GhIssueLabelPort
+from vibe3.clients import GhIssueLabelPort
 from vibe3.models.orchestra_config import OrchestraConfig
 
 if TYPE_CHECKING:

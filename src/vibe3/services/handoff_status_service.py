@@ -4,8 +4,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
-from vibe3.clients import BackendProtocol, SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import BackendProtocol, GitClient, SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.models.verdict import VerdictRecord

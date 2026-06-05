@@ -27,9 +27,7 @@ from vibe3.services.flow_consistency_check import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 
 
 class RecoveryAction(StrEnum):

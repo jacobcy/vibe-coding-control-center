@@ -146,9 +146,7 @@ def internal_bootstrap(
     ] = False,
 ) -> None:
     """Bootstrap a standardized flow scene through the shared service path."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 
     config = load_orchestra_config()
@@ -174,8 +172,7 @@ def internal_bootstrap(
 @app.command("backfill-worktree-paths")
 def backfill_worktree_paths() -> None:
     """Backfill worktree_path for existing active task/ flows."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitClient, SQLiteClient
     from vibe3.services.status_query_service import is_auto_task_branch
 
     git = GitClient()

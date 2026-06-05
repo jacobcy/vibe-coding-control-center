@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.config.role_policy import RoleOutputContract
 from vibe3.models import IssueInfo, IssueState
 from vibe3.models.execution_request import ExecutionRequest

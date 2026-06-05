@@ -12,14 +12,12 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.clients.protocols import BackendProtocol
+from vibe3.clients import BackendProtocol
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.flow_cleanup_service import FlowCleanupService
 
 
@@ -345,7 +343,7 @@ class CheckCleanupService:
                 )
                 return
 
-            from vibe3.clients.github_client import GitHubClient
+            from vibe3.clients import GitHubClient
             from vibe3.services.flow_service import FlowService
             from vibe3.services.issue_flow_service import IssueFlowService
             from vibe3.services.label_service import LabelService

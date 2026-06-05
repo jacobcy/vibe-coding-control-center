@@ -177,7 +177,7 @@ def rebuild(
         )
         return
 
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
 
     config = load_orchestra_config()
     issue = load_issue_info(issue_number, config=config, github=GitHubClient())

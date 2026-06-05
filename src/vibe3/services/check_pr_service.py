@@ -15,9 +15,7 @@ from vibe3.models.pr import PRState
 from vibe3.services.label_utils import normalize_labels
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.models.pr import PRResponse
     from vibe3.services.flow_status_service import FlowStatusService
 

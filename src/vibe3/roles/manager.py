@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.clients.runtime_assets import check_runtime_asset, runtime_assets_root
+from vibe3.clients import check_runtime_asset, runtime_assets_root
 from vibe3.config.convention_resolver import diagnose_profile
 from vibe3.config.role_gates import MANAGER_GATE_CONFIG
 from vibe3.domain import FlowManager

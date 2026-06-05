@@ -17,8 +17,7 @@ from vibe3.services.label_utils import should_skip_from_queue
 from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.models.orchestra_config import OrchestraConfig
 

@@ -10,7 +10,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService

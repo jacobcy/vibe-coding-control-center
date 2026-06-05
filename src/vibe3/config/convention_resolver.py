@@ -15,7 +15,7 @@ from loguru import logger
 from vibe3.config.profile_convention import ProfileConvention
 
 if TYPE_CHECKING:
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
     from vibe3.config.profile_config import ProfileConfig
 
 
@@ -61,7 +61,7 @@ class ConventionResolver:
             GitClient instance (injected or lazy-loaded)
         """
         if self._git_client is None:
-            from vibe3.clients.git_client import GitClient
+            from vibe3.clients import GitClient
 
             self._git_client = GitClient()
         return self._git_client

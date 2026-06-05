@@ -11,7 +11,7 @@ Import from vibe3.orchestra instead of submodules to ensure clean dependencies.
 from typing import TYPE_CHECKING
 
 # Module-level re-exports from clients/ (safe, no cycle risk)
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 
 # Module-level re-exports from models/ (safe, no cycle risk)
 from vibe3.models.orchestra_config import OrchestraConfig

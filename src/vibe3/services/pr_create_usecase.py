@@ -7,9 +7,7 @@ from loguru import logger
 from rich.console import Console
 from rich.prompt import Prompt
 
-from vibe3.clients.ai_client import AIClient
-from vibe3.clients.ai_suggestion_client import AISuggestionClient
-from vibe3.clients.protocols.pr import BaseResolver
+from vibe3.clients import AIClient, AISuggestionClient, BaseResolver
 from vibe3.config.settings import VibeConfig
 from vibe3.prompts.template_loader import resolve_prompts_path
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase

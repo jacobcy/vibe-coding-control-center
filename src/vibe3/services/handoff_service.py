@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowEvent
 from vibe3.models.verdict import VerdictRecord
@@ -23,7 +22,7 @@ from vibe3.services.path_helpers import _SHARED_HANDOFF_PREFIX
 from vibe3.services.signature_service import SignatureService
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
 
 
 class HandoffService:
@@ -102,7 +101,7 @@ class HandoffService:
             git_client: Git client for branch/worktree operations
             github_client: GitHub client for API operations (optional)
         """
-        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients import GitHubClient
 
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()

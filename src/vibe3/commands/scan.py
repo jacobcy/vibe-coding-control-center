@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.commands.command_options import _ASYNC_OPT
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.observability import setup_logging
@@ -120,7 +120,7 @@ def _run_supervisor_scan_dry_run() -> None:
     """
     from rich.console import Console
 
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.services.scan_service import fetch_supervisor_candidates
     from vibe3.ui.scan_display import display_supervisor_dry_run

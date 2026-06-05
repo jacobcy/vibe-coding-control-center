@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 from vibe3.models import IssueState
 
 

@@ -19,8 +19,7 @@ from loguru import logger
 from vibe3.clients import BackendProtocol
 
 if TYPE_CHECKING:
-    from vibe3.clients import SQLiteClient
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient, SQLiteClient
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.pr_service import PRService
@@ -63,8 +62,7 @@ class FlowCleanupService:
             issue_flow_service: Service for issue-flow mapping
             backend: Backend protocol for tmux session checks
         """
-        from vibe3.clients import SQLiteClient
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient, SQLiteClient
 
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
@@ -191,7 +189,7 @@ class FlowCleanupService:
                     logger.bind(domain="cleanup", branch=branch).warning(
                         f"Failed to remove worktree, trying prune: {exc}"
                     )
-                    from vibe3.clients.git_worktree_ops import prune_worktrees
+                    from vibe3.clients import prune_worktrees
 
                     prune_worktrees()
                     # Mark as failed even after prune - prune is just cleanup

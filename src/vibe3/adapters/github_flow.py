@@ -1,7 +1,7 @@
 """GitHub Flow adapter — lightweight skill distribution from global runtime."""
 
 from vibe3.adapters import register_adapter
-from vibe3.clients.runtime_assets import runtime_assets_root
+from vibe3.clients import runtime_assets_root
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
 

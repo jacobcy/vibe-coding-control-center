@@ -13,8 +13,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted

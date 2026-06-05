@@ -1,7 +1,6 @@
 """Flow service implementation."""
 
-from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin

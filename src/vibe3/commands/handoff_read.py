@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.commands.command_options import FormatOption, VerboseOption
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.handoff_render import (
