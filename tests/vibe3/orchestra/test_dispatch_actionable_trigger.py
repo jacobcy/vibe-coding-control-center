@@ -25,6 +25,8 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     config.repo = "owner/repo"
     config.manager_usernames = ["manager-bot"]
     config.supervisor_handoff.issue_label = "supervisor"
+    config.periodic_check.enabled = True
+    config.periodic_check.interval_ticks = 10
     config.max_concurrent_flows = 10
 
     capacity = MagicMock()
@@ -323,6 +325,38 @@ class TestActionableTriggeredCollection:
         # Should NOT have called _collect_frozen_queue
         # (because queue still has actionable entries)
         mock_coordinator._collect_frozen_queue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_periodic_check_tick_refreshes_queue_when_actionable_available(
+        self, mock_coordinator
+    ):
+        """Periodic check ticks refresh queue before exhaustion."""
+        mock_coordinator._config.periodic_check.enabled = True
+        mock_coordinator._config.periodic_check.interval_ticks = 10
+        mock_coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready", waiting_state=None),
+            QueueEntry(issue_number=2, collected_state="ready", waiting_state=None),
+        ]
+
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+        mock_coordinator._dispatch_loop = MagicMock(return_value=0)
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            return_value=[
+                QueueEntry(issue_number=2, collected_state="ready"),
+                QueueEntry(issue_number=1, collected_state="ready"),
+                QueueEntry(issue_number=3, collected_state="ready"),
+            ]
+        )
+        mock_coordinator._queue_persistence.persist = MagicMock()
+
+        await mock_coordinator.coordinate(tick_id=10)
+
+        mock_coordinator._collect_frozen_queue.assert_called_once()
+        assert [entry.issue_number for entry in mock_coordinator._frozen_queue] == [
+            2,
+            1,
+            3,
+        ]
 
     @pytest.mark.asyncio
     async def test_merge_after_collect(self, mock_coordinator):
