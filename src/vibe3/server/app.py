@@ -12,16 +12,12 @@ from typing import Annotated
 import typer
 import uvicorn
 
-from vibe3.clients.git_client import GitClient
-from vibe3.config.agent_preset import find_missing_backend_commands
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.observability.logger import setup_logging
-from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime.orchestra_instance import (
-    OrchestraInstanceInfo,
-    write_instance_info,
-)
+from vibe3.clients import GitClient
+from vibe3.config import find_missing_backend_commands, load_orchestra_config
+from vibe3.models import OrchestraConfig
+from vibe3.observability import setup_logging
+from vibe3.orchestra import orchestra_events_log_path, orchestra_log_dir
+from vibe3.runtime import OrchestraInstanceInfo, write_instance_info
 
 from .registry import (
     _build_server_with_launch_cwd,
@@ -160,7 +156,7 @@ def start(
     setup_logging(verbose=verbose)
 
     # Register EDA event handlers for orchestra event processing
-    from vibe3.domain.handlers import register_event_handlers
+    from vibe3.domain import register_event_handlers
 
     register_event_handlers()
 
@@ -218,7 +214,7 @@ def start(
         config = config.model_copy(update={"port": effective_port})
 
     # Phase 1: FailedGate Preflight
-    from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.domain import FailedGate
 
     gate = FailedGate()
     result = gate.check()
@@ -346,7 +342,7 @@ def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
     from rich.console import Console
 
-    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services import get_manager_usernames
     from vibe3.services.serve_status_service import ServeStatusService
 
     console = Console()
@@ -453,7 +449,7 @@ def resume(
     """
     from rich.console import Console
 
-    from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.domain import FailedGate
 
     console = Console()
     failed_gate = FailedGate()
