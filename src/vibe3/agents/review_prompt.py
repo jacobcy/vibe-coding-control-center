@@ -263,8 +263,6 @@ def _build_review_prompt_providers(
         ),
         "review.retry_task": review_retry_task,
         "review.exit_contract": review_exit_contract,
-        # Backward-compatible alias for local recipe overrides.
-        "review.task": review_exit_contract,
     }
 
 
