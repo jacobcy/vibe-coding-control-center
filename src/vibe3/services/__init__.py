@@ -3,6 +3,9 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.config.convention_resolver import ConventionResolver
+    from vibe3.services.actor_support import format_agent_actor
+    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.blocked_state_service import BlockedStateService
     from vibe3.services.bootstrap_context_service import (
         BootstrapAction,
@@ -10,8 +13,60 @@ if TYPE_CHECKING:
         BootstrapContextService,
         BootstrapPlan,
     )
+    from vibe3.services.check_service import CheckResult, CheckService
+    from vibe3.services.coordination_resolver import CoordinationResolver
+
+    # Functions used in domain/execution/roles
+    from vibe3.services.error_helpers import (
+        record_dispatch_failure_if_unexpected,
+        record_error,
+    )
+    from vibe3.services.error_tracking_service import ErrorTrackingService
     from vibe3.services.flow_cleanup_service import FlowCleanupService
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services.flow_projection_service import FlowProjectionService
+    from vibe3.services.flow_resume_resolver import infer_resume_label
+    from vibe3.services.flow_service import FlowService
+    from vibe3.services.handoff_service import HandoffService
+    from vibe3.services.handoff_status_service import HandoffStatusService
+    from vibe3.services.issue_collection_service import IssueCollectionService
+    from vibe3.services.issue_context_loader import load_issue_info
+    from vibe3.services.issue_failure_service import (
+        block_manager_noop_issue,
+        fail_executor_issue,
+        fail_manager_issue,
+        fail_planner_issue,
+        fail_reviewer_issue,
+    )
+    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.label_service import LabelService
+    from vibe3.services.label_utils import (
+        clean_old_state_labels,
+        normalize_assignees,
+        normalize_labels,
+        should_skip_from_queue,
+    )
+    from vibe3.services.orchestra_helpers import (
+        get_handoff_state_label,
+        get_manager_usernames,
+    )
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services.path_helpers import (
+        check_ref_exists,
+        ref_to_handoff_cmd,
+        sanitize_event_detail_paths,
+    )
+    from vibe3.services.pr_create_usecase import PRCreateUsecase
+    from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
+    from vibe3.services.pr_service import PRService
+    from vibe3.services.role_policy_helpers import get_role_block_function
+    from vibe3.services.status_query_service import StatusQueryService
+    from vibe3.services.task_binding_guard import build_bind_task_hint
     from vibe3.services.task_resume_operations import TaskResumeOperations
+    from vibe3.services.task_resume_usecase import TaskResumeUsecase
+    from vibe3.services.task_service import TaskService
+    from vibe3.services.task_status_classifier import TaskStatusBucket
+    from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
     # Bootstrap symbols (lazy import)
