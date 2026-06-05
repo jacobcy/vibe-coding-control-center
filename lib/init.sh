@@ -76,6 +76,44 @@ _seed_claude_assets() {
     esac
 }
 
+_generate_settings_yaml() {
+    local repo_root="$1"
+    local settings_file="$repo_root/.vibe/settings.yaml"
+
+    if [[ -f "$settings_file" ]]; then
+        _log_info "Already exists: .vibe/settings.yaml (skipped, not overwritten)"
+        return 0
+    fi
+
+    cat > "$settings_file" <<'EOF'
+# Project-level Vibe override. Global defaults live in ~/.vibe/config/v3/settings.yaml.
+# Uncomment and edit values below to customize for this repo.
+
+orchestra:
+  # repo: owner/name            # auto-detected from git remote if null
+  scene_base_ref: origin/main
+  # manager_usernames:
+  #   - vibe-manager-agent
+  assignee_dispatch:
+    agent: vibe-manager
+    # token_env: VIBE_MANAGER_GITHUB_TOKEN
+
+run:
+  agent_config:
+    agent: vibe-executor
+
+plan:
+  agent_config:
+    agent: vibe-planner
+
+review:
+  agent_config:
+    agent: vibe-reviewer
+EOF
+
+    _log_success "Created: .vibe/settings.yaml"
+}
+
 # --- Main Function ---
 vibe_init() {
     # Enable strict mode for this function only
@@ -205,6 +243,7 @@ vibe_init() {
         echo ""
         echo "This will:"
         echo "  - Create .vibe/config.yaml (profile: $PROFILE_NAME)"
+        echo "  - Create .vibe/settings.yaml (project override template)"
 
         # Show profile-specific actions (variables already defined above)
         if [[ "$ENABLE_AGENT" == true ]]; then
@@ -241,6 +280,9 @@ vibe_init() {
     mkdir -p "$REPO_ROOT/.vibe"
     generate_vibe_config_yaml "$PROFILE_NAME" "$REPO_ROOT"
     _log_success "Created: .vibe/config.yaml"
+
+    # 3b. Create .vibe/settings.yaml override template
+    _generate_settings_yaml "$REPO_ROOT"
 
     # 4. Create necessary directories (profile-dependent)
     _log_info "Creating directory structure..."
@@ -419,6 +461,7 @@ vibe_init() {
     echo ""
     echo "Configuration:"
     echo "  - Config file: ${CYAN}.vibe/config.yaml${NC}"
+    echo "  - Settings override: ${CYAN}.vibe/settings.yaml${NC}"
     echo "  - Profile: ${GREEN}$PROFILE_NAME${NC}"
     echo ""
 
@@ -427,7 +470,7 @@ vibe_init() {
         echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
         echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
         echo "  3. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
-        echo "  4. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
+        echo "  4. Prompts and policies come from: ${CYAN}~/.vibe${NC}"
     elif [[ "$PROFILE_NAME" == "github-flow" ]]; then
         echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
         echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
@@ -438,7 +481,7 @@ vibe_init() {
         fi
         echo "  4. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
         echo "  5. Review created directories: ${CYAN}.agent/${NC} and ${CYAN}.claude/${NC}"
-        echo "  6. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
+        echo "  6. Prompts and policies come from: ${CYAN}~/.vibe${NC}"
     elif [[ "$PROFILE_NAME" == "vibe-center" ]]; then
         echo "  1. Run ${CYAN}/vibe-project-check${NC} to verify your environment"
         echo "  2. Configure manager-bot token (${CYAN}VIBE_MANAGER_GITHUB_TOKEN${NC}) if you need orchestra"
