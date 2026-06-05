@@ -144,10 +144,12 @@ git log HEAD..origin/main --oneline
 **处理策略**：
 
 - 若有新提交：
-  1. 先 `git rebase origin/main` 或 `git merge origin/main`
-  2. 处理冲突（如有）
-  3. 运行测试验证
-  4. 再继续提交流程
+  1. 优先使用 `git rebase origin/main`（保持线性历史，PR diff 清晰）
+  2. 仅当 rebase 冲突过于复杂时才使用 `git merge origin/main`
+  3. 如果使用 merge，必须在 handoff 中记录原因
+  4. 处理冲突（如有）
+  5. 运行测试验证
+  6. 再继续提交流程
 - 若无新提交：直接继续
 
 **Hard Block**：冲突未解决前禁止提交。
