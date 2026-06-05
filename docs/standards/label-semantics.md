@@ -9,7 +9,7 @@ authority:
   - legacy-mapping
 maintainer: Vibe Team
 created: 2026-06-01
-last_updated: 2026-06-01
+last_updated: 2026-06-05
 related_docs:
   - supervisor/roadmap-common.md
   - supervisor/governance/assignee-pool.md
@@ -73,6 +73,36 @@ related_docs:
 |-------|------|----------|
 | `roadmap/rfc` | 需要人类决策 | 架构方向未定、需要讨论 |
 | `roadmap/epic` | 需要拆分 | 范围过大、需拆分为多个 sub-issues |
+
+## Issue States (state/*)
+
+`state/*` 标签用于描述 Issue 在 Orchestra 编排流中的当前阶段。
+
+### 状态定义
+
+| Label | 语义 | Orchestra 行为 |
+|-------|------|----------------|
+| `state/ready` | 待绪 | 允许 Orchestra 扫描并派发给空闲的 Manager |
+| `state/claimed` | 已认领 | Manager 已认领任务，正在初始化 worktree 或环境 |
+| `state/in-progress` | 执行中 | 任务正在被 Agent 活跃执行中 |
+| `state/blocked` | 阻塞 | 任务因错误、依赖未满足或人工干预而暂停 |
+| `state/handoff` | 交接中 | 任务正在进行 Agent 间的上下文交接（Handoff） |
+| `state/review` | 评审中 | 任务已提交（如 PR 已创建），等待人工或自动化评审 |
+| `state/merge-ready` | 待合并 | 评审通过，等待合并到主分支 |
+| `state/done` | 已完成 | 任务执行完毕，由 Orchestra 或 Manager 最终确认 |
+
+### 废弃状态
+
+- `state/failed`: **已废弃**。统一并入 `state/blocked`。执行失败通过 `blocked_reason` 或 `error_log` 表达。
+
+### 在 Orchestra 中的作用
+
+Orchestra 使用 `state/*` 标签进行核心调度决策：
+
+1.  **派发过滤**：只扫描 `state/ready` 且未被绑定的 Issue。
+2.  **状态监控**：通过订阅 Webhook 或周期性 Tick 观察标签变化，更新本地 `flow_state`。
+3.  **自动解封**：检测到依赖 Issue 关闭后，将 `state/blocked` 自动恢复为 `state/ready`（前提是无手动 `blocked_reason`）。
+4.  **超时处理**：监控 `state/claimed` 或 `state/in-progress` 的停留时间，触发健康检查或重试。
 
 ## Legacy Priority Labels
 

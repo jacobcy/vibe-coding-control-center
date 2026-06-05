@@ -7,7 +7,7 @@ audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-06-03
+last_updated: 2026-06-05
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -41,10 +41,10 @@ vibe-center/
 ├── README.md                    # 项目介绍（面向用户）
 │
 ├── bin/                         # CLI 入口
-│   ├── vibe                     # V2 Shell 入口
-│   └── vibe3                    # V3 Python 入口
+│   ├── vibe                     # [Legacy / V2] Shell 入口
+│   └── vibe3                    # [Active Core] Python 入口
 │
-├── src/vibe3/                   # V3 Python 实现（主要）
+├── src/vibe3/                   # [Active Core] V3 Python 实现（主要）
 │   ├── cli.py                   # CLI 主入口
 │   ├── __main__.py              # 进程入口（vibe3 serve）
 │   ├── adapters/                # 逻辑适配器与集成桥接
@@ -69,7 +69,7 @@ vibe-center/
 │   ├── ui/                      # CLI 输出格式化
 │   └── utils/                   # 工具函数
 │
-├── lib/                         # V2 Shell 核心逻辑
+├── lib/                         # [Legacy / V2] Shell 核心逻辑
 │   ├── *.sh                     # 各功能模块
 │   └── ...
 │
@@ -81,8 +81,8 @@ vibe-center/
 │   └── aliases/                 # 命令别名
 │
 ├── tests/                       # 测试
-│   ├── vibe3/                   # V3 测试
-│   └── vibe2/                   # V2 测试
+│   ├── vibe3/                   # [Active Core] V3 测试
+│   └── vibe2/                   # [Legacy / V2] 测试
 │
 ├── skills/                      # 技能定义（canonical source）
 │   └── */                       # 各技能目录
