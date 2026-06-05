@@ -525,6 +525,21 @@ class GlobalDispatchCoordinator:
         if self._frozen_queue is None:
             self._frozen_queue = []
 
+        queue_refreshed = False
+        periodic_check = self._config.periodic_check
+        if (
+            tick_id > 0
+            and periodic_check.enabled
+            and tick_id % periodic_check.interval_ticks == 0
+        ):
+            fresh = await self._collect_frozen_queue()
+            self._check_service.invalidate_pr_cache()
+            self._dispatch_paused = bool(
+                fresh and all(entry.collected_state == "blocked" for entry in fresh)
+            )
+            self._frozen_queue = fresh
+            queue_refreshed = True
+
         paused_with_pending_blocked = False
 
         # Step 3: Paused mode waits for human task resume to create a
@@ -566,7 +581,9 @@ class GlobalDispatchCoordinator:
             return
 
         # Step 6: Rebuild active candidates once active queue is exhausted.
-        need_collect = self._should_collect_after_dispatch(dispatched_count)
+        need_collect = not queue_refreshed and self._should_collect_after_dispatch(
+            dispatched_count
+        )
         if need_collect:
             fresh = await self._collect_frozen_queue()
             # Invalidate PR cache after fresh collection
