@@ -118,11 +118,14 @@ related_docs:
 
 ### 3.3 `vibe3 handoff`
 
-`handoff` 是本地协作增强入口，用于：
+`vibe3 handoff` 组用于管理 agent 责任链与事件记录：
 
-- 记录 plan / report / audit handoff
-- 追加轻量上下文消息
-- 展示当前 branch 的 handoff 链路
+- `show`：读取并展示 handoff artifact
+- `status`：查看当前 flow 或指定 branch 的 handoff 现场
+- `init`：初始化 handoff 文件
+- `append`：追加轻量上下文消息
+- `plan` / `report` / `indicate` / `audit` / `next`：记录特定阶段的责任链上下文
+- `verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
 
 ### 3.4 `vibe3 check`
 
