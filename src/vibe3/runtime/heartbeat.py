@@ -246,6 +246,41 @@ class HeartbeatServer:
                         f"Periodic check failed: {exc}"
                     )
 
+            # Periodic queue recollection to refresh priorities
+            # Force full queue rebuild to incorporate priority label changes
+            if (
+                self.config.queue_recollect.enabled
+                and tick_number % self.config.queue_recollect.interval_ticks == 0
+            ):
+                try:
+                    # Find dispatch coordinator service
+                    dispatch_service = next(
+                        (svc for svc in self._services if svc.is_dispatch_service),
+                        None,
+                    )
+                    if (
+                        dispatch_service is not None
+                        and hasattr(dispatch_service, "_coordinator")
+                        and dispatch_service._coordinator is not None
+                    ):
+                        await dispatch_service._coordinator.force_recollect_queue()
+                        append_orchestra_event(
+                            "server",
+                            f"tick #{tick_number} queue recollection completed",
+                        )
+                        logger.bind(domain="orchestra", action="queue_recollect").info(
+                            "Queue recollection completed"
+                        )
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} queue recollection failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="queue_recollect").warning(
+                        f"Queue recollection failed: {exc}"
+                    )
+
             tasks = []
             tick_services: list[str] = []
             for svc in self._services:
