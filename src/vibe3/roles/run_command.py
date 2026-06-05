@@ -18,6 +18,7 @@ from vibe3.agents import (
 )
 from vibe3.clients.runtime_assets import resolve_runtime_asset
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
@@ -151,6 +152,11 @@ def execute_manual_run(
                     *([instructions] if instructions else []),
                 ]
             )
+            # Forward CLI override args to async child
+            overrides = RoleCliOverrides(
+                agent=agent, backend=backend, model=model, fresh_session=fresh_session
+            )
+            cli_args += overrides.to_argv()
             handoff_metadata: dict[str, object] = {"skill": skill}
             if publish:
                 handoff_metadata["publish"] = True
@@ -328,6 +334,11 @@ def execute_manual_run(
             cli_args = ["run", *([instructions] if instructions else [])]
         else:
             cli_args = ["run"]
+        # Forward CLI override args to async child
+        overrides = RoleCliOverrides(
+            agent=agent, backend=backend, model=model, fresh_session=fresh_session
+        )
+        cli_args += overrides.to_argv()
         dispatch_run_command_async(
             branch=branch,
             cli_args=cli_args,
