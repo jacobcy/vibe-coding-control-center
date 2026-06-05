@@ -6,20 +6,21 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from vibe3.config.role_gates import (
+from vibe3.config import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
+    ConventionResolver,
 )
-from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
+from vibe3.domain import SupervisorIssueIdentified
+
+# public-api: pending upstream export
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import use_current_branch
-from vibe3.models import IssueInfo
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.orchestra_helpers import get_handoff_state_label
+from vibe3.services import IssueFlowService, get_handoff_state_label
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",

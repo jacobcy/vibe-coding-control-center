@@ -6,7 +6,9 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from vibe3.services.flow_service import FlowService
+from vibe3.services import FlowService
+
+# public-api: pending upstream export
 from vibe3.utils.constants import VERDICT_UNKNOWN
 
 

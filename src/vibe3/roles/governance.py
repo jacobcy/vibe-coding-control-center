@@ -10,28 +10,28 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
+from vibe3.clients import GitHubClient
+from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
+
+# public-api: pending upstream export
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
+
+# public-api: pending upstream export
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.logging import (
-    append_governance_event,
-    governance_dry_run_dir,
-)
-from vibe3.prompts.assembler import PromptAssembler
-from vibe3.prompts.manifest import PromptManifest, PromptRecipeDefinition
-from vibe3.prompts.models import (
+from vibe3.models import ExecutionRequest, OrchestraConfig
+from vibe3.observability import append_governance_event, governance_dry_run_dir
+from vibe3.prompts import (
+    DEFAULT_PROMPTS_PATH,
+    PromptAssembler,
+    PromptManifest,
     PromptMaterialSpec,
     PromptRecipe,
+    PromptRecipeDefinition,
     PromptRenderResult,
     PromptVariableSource,
+    ProviderRegistry,
     VariableSourceKind,
 )
-from vibe3.prompts.provider_registry import ProviderRegistry
-from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
     build_broader_repo_entries,
@@ -40,7 +40,7 @@ from vibe3.roles.governance_utils import (
     find_material_in_catalog,
     get_governed_issue_numbers,
 )
-from vibe3.services.orchestra_status_service import OrchestraStatusService
+from vibe3.services import OrchestraStatusService
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
