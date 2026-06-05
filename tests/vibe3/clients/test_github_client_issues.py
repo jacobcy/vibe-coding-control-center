@@ -28,7 +28,7 @@ def _client() -> GitHubClient:
 
 def test_list_issues_with_assignees_success():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout=json.dumps(
@@ -51,7 +51,7 @@ def test_list_issues_with_assignees_success():
 
 def test_list_issues_with_assignees_failure_returns_empty():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1, stderr="Error")
         issues = client.list_issues_with_assignees()
         assert issues == []
@@ -59,7 +59,7 @@ def test_list_issues_with_assignees_failure_returns_empty():
 
 def test_list_issues_with_assignees_passes_repo():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="[]")
         client.list_issues_with_assignees(repo="org/repo")
 
@@ -74,14 +74,14 @@ def test_list_issues_with_assignees_passes_repo():
 
 def test_close_issue_success():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.close_issue(1) is True
 
 
 def test_remove_assignees_success():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.remove_assignees(1, ["alice", "bob"]) is True
 
@@ -93,42 +93,42 @@ def test_remove_assignees_success():
 
 def test_remove_assignees_empty_is_noop():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         assert client.remove_assignees(1, []) is True
         mock_run.assert_not_called()
 
 
 def test_close_issue_with_comment():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.close_issue(1, comment="Fixed it") is True
 
 
 def test_close_issue_failure_returns_false():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1)
         assert client.close_issue(1) is False
 
 
 def test_add_comment_success():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.add_comment(1, "Nice") is True
 
 
 def test_add_comment_failure_returns_false():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1)
         assert client.add_comment(1, "Nice") is False
 
 
 def test_add_comment_passes_repo():
     client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         client.add_comment(1, "Nice", repo="org/repo")
 
@@ -184,7 +184,7 @@ def test_close_issue_if_open_returns_failure_when_close_fails(
 
 def test_create_issue_success(github_client: GitHubClient) -> None:
     """create_issue should return issue number on success."""
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         # Mock gh issue create output
         mock_run.return_value = MagicMock(
             returncode=0,
@@ -202,7 +202,7 @@ def test_create_issue_success(github_client: GitHubClient) -> None:
 
 def test_create_issue_with_labels(github_client: GitHubClient) -> None:
     """create_issue should apply labels when provided."""
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="https://github.com/owner/repo/issues/43\n",
@@ -223,7 +223,7 @@ def test_create_issue_with_labels(github_client: GitHubClient) -> None:
 
 def test_create_issue_with_assignees(github_client: GitHubClient) -> None:
     """create_issue should assign users when assignees provided."""
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="https://github.com/owner/repo/issues/44\n",
@@ -244,7 +244,7 @@ def test_create_issue_with_assignees(github_client: GitHubClient) -> None:
 
 def test_create_issue_failure_returns_none(github_client: GitHubClient) -> None:
     """create_issue should return None on failure."""
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=1,
             stderr="Validation Failed",
@@ -260,7 +260,7 @@ def test_create_issue_failure_returns_none(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_success(github_client: GitHubClient) -> None:
     """list_issue_comments should return comments on success."""
-    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout=json.dumps(
@@ -290,7 +290,7 @@ def test_list_issue_comments_success(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list when no comments."""
-    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout=json.dumps({"comments": []}),
@@ -303,7 +303,7 @@ def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list on timeout."""
-    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
 
         result = github_client.list_issue_comments(issue_number=123)
@@ -313,7 +313,7 @@ def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_failure(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list on failure."""
-    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=1,
             stderr="Not found",

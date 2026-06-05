@@ -1,14 +1,12 @@
 """GitHub client issues operations."""
 
 import json
-import os
 import re
-import subprocess
 from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.clients.github_issue_admin_ops import GH_API_TIMEOUT, IssueAdminMixin
+from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -103,11 +101,12 @@ class IssuesMixin(IssueAdminMixin):
             "number,headRefName,body,mergedAt",
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                "Failed to list merged PRs"
-            )
+        result = self._run_gh_command(cmd)
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    "Failed to list merged PRs"
+                )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
 
@@ -159,11 +158,12 @@ class IssuesMixin(IssueAdminMixin):
             cmd.extend(["--search", search])
         if repo:
             cmd.extend(["--repo", repo])
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                "Failed to list issues"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    "Failed to list issues"
+                )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
 
@@ -244,18 +244,10 @@ class IssuesMixin(IssueAdminMixin):
         ]
         if repo:
             cmd.extend(["--repo", repo])
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=15,
-                env={**os.environ, "GH_PAGER": "cat"},
-            )
-        except subprocess.TimeoutExpired:
-            logger.bind(external="github", issue_number=issue_number).warning(
-                f"Timed out fetching issue #{issue_number}"
-            )
+
+        result = self._run_gh_command(cmd, pager=True)
+        if result is None:
+            # Timeout or gh CLI not found
             return "network_error"
         if result.returncode != 0:
             stderr = result.stderr or ""
@@ -316,24 +308,12 @@ class IssuesMixin(IssueAdminMixin):
         if repo:
             cmd.extend(["--repo", repo])
 
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=GH_API_TIMEOUT,
-                env={**os.environ, "GH_PAGER": "cat"},
-            )
-        except subprocess.TimeoutExpired:
-            logger.bind(external="github", issue_number=issue_number).warning(
-                f"Timed out fetching comments for issue #{issue_number}"
-            )
-            return []
-
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to list comments on issue #{issue_number}"
-            )
+        result = self._run_gh_command(cmd, pager=True)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to list comments on issue #{issue_number}"
+                )
             return []
 
         try:

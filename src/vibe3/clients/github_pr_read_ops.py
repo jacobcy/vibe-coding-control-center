@@ -168,27 +168,21 @@ class PRReadMixin:
             )
             target = result.stdout.strip()
 
-        try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "view",
-                    target,
-                    "--json",
-                    "number,title,body,state,headRefName,baseRefName,"
-                    "url,isDraft,createdAt,updatedAt,mergedAt,closedAt,mergeable,statusCheckRollup,"
-                    "closingIssuesReferences",
-                ],
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            logger.bind(external="github", target=target).warning(
-                "GitHub CLI (gh) not found, skipping PR lookup"
-            )
+        result = self._run_gh_command(
+            [
+                "gh",
+                "pr",
+                "view",
+                target,
+                "--json",
+                "number,title,body,state,headRefName,baseRefName,"
+                "url,isDraft,createdAt,updatedAt,mergedAt,closedAt,mergeable,statusCheckRollup,"
+                "closingIssuesReferences",
+            ]
+        )
+        if result is None:
+            # Timeout or gh CLI not found
             return None
-
         if result.returncode != 0:
             logger.bind(external="github", target=target).warning("PR not found")
             return None
@@ -250,51 +244,36 @@ class PRReadMixin:
 
         # Fetch CI check details via gh pr checks
         ci_checks: list[CICheck] = []
-        try:
-            checks_result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "checks",
-                    target,
-                    "--json",
-                    "name,state,bucket,link,description,workflow",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            if checks_result.returncode == 0:
+        checks_result = self._run_gh_command(
+            [
+                "gh",
+                "pr",
+                "checks",
+                target,
+                "--json",
+                "name,state,bucket,link,description,workflow",
+            ]
+        )
+        if checks_result is not None and checks_result.returncode == 0:
+            try:
                 checks_data = json.loads(checks_result.stdout)
                 ci_checks = [
                     _enrich_failed_check(CICheck(**c))
                     for c in checks_data
                     if isinstance(c, dict)
                 ]
-            else:
-                stderr = checks_result.stderr.strip() if checks_result.stderr else None
-                logger.bind(
-                    external="github",
-                    target=target,
-                    returncode=checks_result.returncode,
-                    stderr=stderr,
-                ).debug("gh pr checks returned non-zero exit code")
-        except json.JSONDecodeError as e:
-            logger.bind(external="github", target=target, error=str(e)).debug(
-                "Failed to parse gh pr checks JSON output"
-            )
-        except subprocess.TimeoutExpired:
-            logger.bind(external="github", target=target).debug(
-                "gh pr checks timed out after 30 seconds"
-            )
-        except FileNotFoundError:
-            logger.bind(external="github", target=target).debug(
-                "gh CLI not found when fetching CI checks"
-            )
-        except Exception as e:
-            logger.bind(external="github", target=target, error=str(e)).debug(
-                "Unexpected error fetching CI checks"
-            )
+            except json.JSONDecodeError as e:
+                logger.bind(external="github", target=target, error=str(e)).debug(
+                    "Failed to parse gh pr checks JSON output"
+                )
+        elif checks_result is not None:
+            stderr = checks_result.stderr.strip() if checks_result.stderr else None
+            logger.bind(
+                external="github",
+                target=target,
+                returncode=checks_result.returncode,
+                stderr=stderr,
+            ).debug("gh pr checks returned non-zero exit code")
 
         return PRResponse(
             number=int(data["number"]),
@@ -354,14 +333,10 @@ class PRReadMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-        except FileNotFoundError:
-            logger.bind(external="github", repo=repo).warning(
-                "GitHub CLI (gh) not found, returning empty PR list"
-            )
+        result = self._run_gh_command(cmd)
+        if result is None:
+            # Timeout or gh CLI not found
             return []
-
         if result.returncode != 0:
             logger.bind(external="github", repo=repo, stderr=result.stderr).warning(
                 "Failed to list PRs, returning empty list"
@@ -448,14 +423,10 @@ class PRReadMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-        except FileNotFoundError:
-            logger.bind(external="github", branch=branch, repo=repo).warning(
-                "GitHub CLI (gh) not found, returning empty PR list"
-            )
+        result = self._run_gh_command(cmd)
+        if result is None:
+            # Timeout or gh CLI not found
             return []
-
         if result.returncode != 0:
             logger.bind(
                 external="github", branch=branch, repo=repo, stderr=result.stderr
