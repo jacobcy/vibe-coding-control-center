@@ -9,8 +9,9 @@ authority:
   - cleanup-orchestration
 author: Claude Sonnet 4.6
 created: 2026-04-28
-last_updated: 2026-04-28
+last_updated: 2026-06-05
 related_docs:
+  - docs/standards/label-semantics.md
   - docs/standards/glossary.md
   - docs/standards/v3/error-severity-and-blocking-standard.md
   - docs/standards/vibe3-role-checks-and-balances-standard.md
@@ -62,7 +63,7 @@ new → active ↔ blocked
   - `failed` 已废弃，通过 `active` 状态配合 `blocked_reason` 表达
 
 - **Issue State**：`ready/claimed/in-progress/blocked/handoff/review/merge-ready/done`（GitHub label）
-  - 描述 issue 的编排状态
+  - 描述 issue 的编排状态。详细语义见 [label-semantics.md](./label-semantics.md)。
   - IssueState.FAILED 已废弃，统一到 BLOCKED
 
 **关系**：

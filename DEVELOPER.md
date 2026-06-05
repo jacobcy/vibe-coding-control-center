@@ -32,10 +32,12 @@
 ### 2.2 Setup（自动化环境准备）
 
 ```bash
+vibe3 internal bootstrap  # 现代 V3 推荐方式
+# 或使用 legacy 脚本
 ./scripts/init.sh
 ```
 
-当你执行 `vibe flow start <feature>`、`wtnew <branch>`，或由 V3 runtime 自动创建 worktree 时，`scripts/init.sh` 会自动运行，完成以下工作：
+当你执行 `vibe flow start <feature>`（Legacy）、`wtnew <branch>`，或由 V3 runtime 自动创建 worktree 时，`scripts/init.sh` 或 `vibe3 internal bootstrap` 会自动运行，完成以下工作：
 1. 安装并配置 `openSpec` 和 `Superpowers`
 2. 在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
@@ -46,27 +48,28 @@
 uv tool install -e .
 ```
 
-如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `./scripts/init.sh`。
+如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `vibe3 internal bootstrap` 或 `./scripts/init.sh`。
 
 ### 2.3 验证环境
 
 ```bash
-bin/vibe check       # 环境诊断（V2）
-vibe3 check          # V3 Handoff 存储一致性与共享状态审计
-vibe3 snapshot show  # V3 项目健康度、指标与 LOC 限制度量
-bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
+bin/vibe check       # 环境诊断（Legacy / V2）
+vibe3 check          # [Active] V3 Handoff 存储一致性与共享状态审计
+vibe3 snapshot show  # [Active] V3 项目健康度、指标与 LOC 限制度量
+bats tests/          # 运行 V2 测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
 
 
 ### 2.4 V3 开发入口
 
-V3 相关工作优先用 Python 入口和 V3 标准来校准语义。支持通过 `uv tool install -e .` 安装全局 `vibe3` 命令：
+V3 相关工作优先用 Python 入口 and V3 标准来校准语义。支持通过 `uv tool install -e .` 安装全局 `vibe3` 命令：
 
 ```bash
 vibe3 check
 vibe3 status
 vibe3 flow show
+vibe3 flow update    # 注册/同步当前分支 flow
 vibe3 handoff show
 uv run pytest tests/vibe3
 ```
@@ -343,6 +346,7 @@ tests/                 # bats-core 测试（≥20 个用例）
 
 ```bash
 # 开发工作流（V2，仅供参考）
+# 推荐使用 V3 命令：vibe3 internal bootstrap && vibe3 flow update
 bin/vibe flow start <feature>  # 创建 worktree + 分支
 bin/vibe flow review           # Pre-PR 检查
 bin/vibe flow pr               # 创建 PR
@@ -375,6 +379,7 @@ vibe3 flow update       # 注册/更新当前分支为活跃 flow
 vibe3 flow bind         # 显式绑定 issue-flow 关系
 vibe3 handoff show      # 查看 agent 间的 handoff 链路
 vibe3 handoff append    # 向当前 flow 追加 handoff 记录
+vibe3 internal bootstrap # 初始化/同步当前 flow 环境
 
 # 代码智能与执行 (Agent 模式)
 vibe3 inspect symbols   # AST 级代码结构分析
