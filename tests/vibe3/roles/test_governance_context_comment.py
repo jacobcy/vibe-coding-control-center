@@ -128,7 +128,7 @@ class TestBuildSnapshotContext:
                 number=i,
                 title=f"Issue {i}",
                 state=None,
-                assignee="a",
+                assignee="vibe-manager-agent",
                 has_flow=False,
                 flow_branch=None,
                 has_worktree=False,
@@ -299,16 +299,9 @@ class TestBuildSnapshotContext:
         assert "#100" not in ctx["suggested_issue_details"]
 
     @patch("vibe3.roles.governance_utils.GitHubClient")
-    def test_broader_repo_filters_orchestra_labeled(self, mock_github_cls):
-        """Broader repo candidates should filter all governance-labeled issues.
-
-        Covers the three-layer filter + legacy compat alias:
-        - orchestra-scanned: intake self-closure
-        - orchestra-governed: pool defensive filter (close/rfc with assignee
-          removed)
-        - orchestra: legacy umbrella alias (historical issues; sync-labels.sh
-          is non-destructive)
-        """
+    def test_roadmap_intake_keeps_governed_unassigned_candidates(self, mock_github_cls):
+        """Roadmap intake should not trust stale orchestra-governed
+        on unassigned issues."""
         snapshot = _make_snapshot()
         config = _make_config()
         mock_github = MagicMock()
@@ -331,10 +324,10 @@ class TestBuildSnapshotContext:
             },
             {
                 "number": 203,
-                "title": "Already governed",
-                "body": "Pool decided",
+                "title": "Stale governed",
+                "body": "No assignee; intake should re-evaluate",
                 "assignees": [],
-                "labels": [{"name": "orchestra-governed"}],  # Should be filtered
+                "labels": [{"name": "orchestra-governed"}],  # Should pass through
                 "milestone": None,
             },
             {
@@ -343,6 +336,22 @@ class TestBuildSnapshotContext:
                 "body": "Historical issue",
                 "assignees": [],
                 "labels": [{"name": "orchestra"}],  # Legacy alias — should be filtered
+                "milestone": None,
+            },
+            {
+                "number": 205,
+                "title": "RFC",
+                "body": "Needs human decision",
+                "assignees": [],
+                "labels": [{"name": "roadmap/rfc"}],  # Should be filtered
+                "milestone": None,
+            },
+            {
+                "number": 206,
+                "title": "Epic",
+                "body": "Umbrella issue",
+                "assignees": [],
+                "labels": [{"name": "roadmap/epic"}],  # Should be filtered
                 "milestone": None,
             },
         ]
@@ -354,11 +363,96 @@ class TestBuildSnapshotContext:
         )
 
         assert ctx["issue_scope_name"] == "broader repo issue pool"
-        assert ctx["active_count"] == 1
+        assert ctx["active_count"] == 2
         assert "#202" in ctx["suggested_issue_details"]
+        assert "#203" in ctx["suggested_issue_details"]
         assert "#201" not in ctx["suggested_issue_details"]
-        assert "#203" not in ctx["suggested_issue_details"]
         assert "#204" not in ctx["suggested_issue_details"]
+        assert "#205" not in ctx["suggested_issue_details"]
+        assert "#206" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_assignee_pool_filters_nonlocal_and_governed_snapshot_entries(
+        self, mock_github_cls
+    ):
+        """Assignee-pool context should only expose local manager ungoverned issues."""
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {"number": 402, "labels": [{"name": "orchestra-governed"}]},
+        ]
+        mock_github_cls.return_value = mock_github
+
+        local_candidate = IssueStatusEntry(
+            number=401,
+            title="Local candidate",
+            state=None,
+            assignee="local-manager",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        governed_candidate = IssueStatusEntry(
+            number=402,
+            title="Already governed",
+            state=None,
+            assignee="local-manager",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        unassigned = IssueStatusEntry(
+            number=403,
+            title="Unassigned",
+            state=None,
+            assignee=None,
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        remote_assignee = IssueStatusEntry(
+            number=404,
+            title="Other assignee",
+            state=None,
+            assignee="other-manager",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        snapshot = _make_snapshot(
+            active_issues=(
+                local_candidate,
+                governed_candidate,
+                unassigned,
+                remote_assignee,
+            )
+        )
+
+        ctx = build_governance_snapshot_context(
+            snapshot,
+            config=_make_config(manager_usernames=("local-manager",)),
+        )
+
+        assert ctx["active_count"] == 1
+        assert "#401" in ctx["suggested_issue_details"]
+        assert "#402" not in ctx["suggested_issue_details"]
+        assert "#403" not in ctx["suggested_issue_details"]
+        assert "#404" not in ctx["suggested_issue_details"]
 
     def test_no_orchestra_labeled_issues_no_filtering(self):
         """When no orchestra-labeled issues exist, all candidates pass through."""
@@ -413,14 +507,12 @@ class TestCommentFormatContract:
 
         content = Path("supervisor/governance/roadmap-intake.md").read_text()
 
-        # After PR #1801, format is: [governance suggest] Intake completed (scope=...)
-        # More concise, no "assigned to manager-agent (manager-pool)" part
         correct_example_pattern = re.compile(
-            r"\[governance suggest\]\s+Intake completed.*scope="
+            r"\[governance suggest\]\[roadmap-intake\]\s+" r"Intake completed.*scope="
         )
         assert correct_example_pattern.search(
             content
-        ), "Correct example should use new format: Intake completed (scope=...)"
+        ), "Correct example should use layered marker and scope"
 
         # Should NOT use @alice or other human usernames in correct examples
         # Line 236 is marked as "错误示例"
@@ -434,6 +526,28 @@ class TestCommentFormatContract:
             assert (
                 "错误示例" in content
             ), "If @alice appears, it should be marked as wrong example"
+
+    def test_roadmap_intake_material_documents_current_boundaries(self):
+        """Roadmap intake should document the re-intake boundary for stale governed."""
+        content = Path("supervisor/governance/roadmap-intake.md").read_text()
+
+        assert "[governance suggest][roadmap-intake]" in content
+        assert "vibe3 status" in content
+        assert "vibe3 task intake <issue-number>" in content
+        assert "无 `roadmap/rfc`、无 `roadmap/epic`" in content
+        assert "不要把 `orchestra-governed` 当作可信跳过条件" in content
+        assert "如果不修改上一条 suggest，不得 comment" in content
+
+    def test_assignee_pool_material_documents_local_manager_boundary(self):
+        """Assignee pool should document local-manager-only processing."""
+        content = Path("supervisor/governance/assignee-pool.md").read_text()
+
+        assert "[governance suggest][assignee-pool]" in content
+        assert "[governance decide][assignee-pool]" in content
+        assert "vibe3 status" in content
+        assert "禁止删除 `orchestra-scanned`" in content
+        assert "不得处理或评论未分配给本机 manager 的 issue" in content
+        assert "如果不修改上一条 suggest，不得 comment" in content
 
     def test_roadmap_skill_comment_format_matches_intake(self):
         """Verify vibe-roadmap SKILL.md mentions roadmap decision marker."""

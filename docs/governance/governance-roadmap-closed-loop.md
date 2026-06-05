@@ -25,7 +25,9 @@ Issue 创建（无 assignee，无标签）
 [intake 扫描]
   |- 有 orchestra-scanned? -> 跳过
   |- 有 assignee? -> 跳过（已在 pool）
-  |- 无标签、无 assignee -> 三级审查
+  |- 有 roadmap/rfc 或 roadmap/epic? -> 跳过（已路由）
+  |- 无 assignee、无 orchestra-scanned、无 roadmap/rfc/epic -> 三级审查
+       |- 即使带 orchestra-governed，也按当前无 assignee 事实重新评估
        |- 接受 -> 分配 assignee --> 流入 pool（无 scanned 标签）
        |- 跳过 -> 打 orchestra-scanned --> 不再看
               |
@@ -58,8 +60,8 @@ Issue 创建（无 assignee，无标签）
 
 | | roadmap-intake | assignee-pool |
 |---|---|---|
-| **扫描范围** | broader repo（无 assignee） | assignee pool（有 assignee） |
-| **跳过条件** | 有 assignee / 有 `orchestra-scanned` / 有 `orchestra-governed`（防御） | 无 assignee 或 有 `orchestra-governed` |
+| **扫描范围** | broader repo（无 assignee） | 本机 manager 的 assignee pool |
+| **跳过条件** | 有 assignee / 有 `orchestra-scanned` / 有 `roadmap/rfc` / 有 `roadmap/epic` | 无 assignee / assignee 非本机 manager / 有 `orchestra-governed` |
 | **打标签** | 只对跳过的打 `orchestra-scanned` | 对所有决策完的打 `orchestra-governed` |
 | **不打的含义** | 接受 -> assignee 是信号 -> 流入 pool | 无——所有决策完都打 |
 | **过滤例外** | 无 | `roadmap/epic` 收口检查独立扫描所有 epic，不受 governed 过滤 |

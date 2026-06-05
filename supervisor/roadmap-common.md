@@ -31,13 +31,14 @@ Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有
 broader repo --> Layer 1: roadmap-intake (入口层)
                     扫描范围: 无 assignee 的 issue
                     过滤: 无 orchestra-scanned（自闭环）
-                          + 无 orchestra-governed（防御：pool 已决策的不该回头）
+                          + 无 roadmap/rfc / roadmap/epic
+                    注意: no-assignee + orchestra-governed 不能被当作可信跳过条件
                     接受 -> 分配 assignee -> 流入 Layer 2
                     跳过 -> 打 orchestra-scanned -> 不再看
                           |
                           v
                  Layer 2: assignee-pool (入池前/池内准入决策层)
-                    扫描范围: 有 assignee 的 issue
+                    扫描范围: 分配给本机 manager 的 issue
                     过滤: 无 orchestra-governed
                     例外: roadmap/epic 收口检查每次独立扫描，不受 governed 过滤
                     高置信度决策(close/split/rfc/epic/ready/resume) -> 直接执行/打闭环标签
@@ -45,7 +46,7 @@ broader repo --> Layer 1: roadmap-intake (入口层)
                           |
                           v
                  Layer 3: vibe-roadmap (上层审查/纠偏层)
-                    扫描范围: 所有 [governance suggest] 评论
+                    扫描范围: 所有 [governance suggest][roadmap-intake] / [governance suggest][assignee-pool] 评论
                     过滤: 无 roadmap-reviewed 且无 roadmap/rfc
                     审查 -> 打 roadmap-reviewed -> 写入 memory.md
 ```
@@ -54,8 +55,8 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 
 | 角色 | 文件 | Marker | 职责 | 标签 |
 |------|------|--------|------|------|
-| **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
-| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest]` / `[governance close]` | 入池前/池内准入 decider：对 pool 中 issue 做 rfc/epic/ready/close 决策 | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
+| **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest][roadmap-intake]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
+| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest][assignee-pool]` / `[governance decide][assignee-pool]` | 入池前/池内准入 decider：对本机 manager pool 中 issue 做 rfc/epic/ready/close 决策 | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
 | **vibe-roadmap** | skills/vibe-roadmap/SKILL.md | `[roadmap decision]` | 上层审查者：审查 governance 决策，纠正和补全 | 审查后打 `roadmap-reviewed` |
 
 ---
@@ -100,14 +101,13 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 **过滤逻辑**：
 ```
 intake 扫描 -> 跳过有 orchestra-scanned 的 issue（自闭环）
-intake 扫描 -> 跳过有 orchestra-governed 的 issue（防御性过滤）
+intake 扫描 -> 跳过有 roadmap/rfc 或 roadmap/epic 的 issue（已路由）
 intake 扫描 -> 跳过有 assignee 的 issue（已在 pool 中）
+intake 扫描 -> 不信任 no-assignee + orchestra-governed，重新评估
 ```
 
-**防御性过滤说明**：
-代码 `build_broader_repo_entries` 同时过滤 `orchestra-scanned` 和 `orchestra-governed`。
-原因：broader repo 默认查询无 assignee 的 issue，但如果一个 issue 曾被 pool 决策（带 `orchestra-governed`）后 assignee 被移除，或 pool 决策 `close`/`rfc` 后 issue 仍 OPEN 但无 assignee，
-不该让 intake 再次评估它——它已经过更上层的决策了。
+**stale governed 说明**：
+`orchestra-governed` 是 assignee-pool 层闭环标签。若 issue 当前无 assignee，它不再证明 issue 仍在 pool 中；roadmap-intake 不把它当作可信跳过条件。
 
 ---
 
@@ -239,7 +239,7 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 
 | 角色 | Marker | 性质 |
 |---|---|---|
-| roadmap-intake / assignee-pool（observer） | `[governance suggest]` | 观察者意见，无强制力 |
+| roadmap-intake / assignee-pool（observer） | `[governance suggest][roadmap-intake]` / `[governance suggest][assignee-pool]` | 观察者意见，无强制力 |
 | **vibe-roadmap（decider）** | `[roadmap decision]` | 决策者结论，覆盖 governance 建议 |
 
 ### 强制规则
@@ -276,7 +276,7 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 
 **决策范围**：**只决定 accept（分配 assignee）或 skip（打 scanned）**
 **检查**：生命周期、依赖、API、模块（含 Level 0：`.claude/`/`.codex/` 目录机械检查）
-**输出**：`[governance suggest]` 建议纳入或跳过，附带原因
+**输出**：`[governance suggest][roadmap-intake]` 建议纳入或跳过，附带原因
 **标签**：不设 `roadmap/*`、`priority/*` 标签。**唯一例外**——Level 0 机械阻塞 skip 时直接打 `roadmap/rfc`：这是路由一个确定性硬阻塞（diff 是否碰 `.claude/`/`.codex/`，yes/no 机械可判），不是 intake 自称 decider。理由：Level 0 issue 无 assignee，pool 永远扫不到；只有 intake 打 `roadmap/rfc` 才能命中 task-status Rule 1 被 `/vibe-task` surface（否则落入 Rule 4 永久隐藏）。
 **边界**：intake 不自称 decider；除 Level 0 机械例外外，跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
 

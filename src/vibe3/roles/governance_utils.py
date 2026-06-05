@@ -105,14 +105,19 @@ def build_broader_repo_entries(
             continue
 
         labels = normalize_labels(item.get("labels"))
-        # Three-layer governance filter + legacy compat:
-        # - orchestra-scanned: intake skipped (self-closure)
-        # - orchestra-governed: pool decided (defensive filter, e.g. close/rfc
-        #   after assignee removed)
-        # - orchestra (legacy umbrella): kept as compatibility alias because
-        #   sync-labels.sh is non-destructive and historical issues may still
-        #   carry it
-        if (
+        # Three-layer governance filter + legacy compat. Roadmap intake must not
+        # trust stale orchestra-governed labels on unassigned issues; it owns the
+        # broader unassigned pool and should re-evaluate those candidates.
+        if material_name == "roadmap-intake.md":
+            if (
+                "supervisor" in labels
+                or "orchestra-scanned" in labels
+                or "roadmap/rfc" in labels
+                or "roadmap/epic" in labels
+                or "orchestra" in labels
+            ):
+                continue
+        elif (
             "supervisor" in labels
             or "orchestra-scanned" in labels
             or "orchestra-governed" in labels

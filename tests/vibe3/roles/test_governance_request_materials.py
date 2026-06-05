@@ -115,7 +115,7 @@ class TestGovernanceMaterials:
         content = Path("supervisor/governance/assignee-pool.md").read_text()
         assert "all sub-issues completed → 直接关闭 epic" in content
         assert (
-            "不要写 `[governance suggest] 建议关闭此 Epic` 后再只添加 "
+            "不要写 `[governance suggest][assignee-pool] 建议关闭此 Epic` 后再只添加 "
             "`orchestra-governed`" in content
         )
 

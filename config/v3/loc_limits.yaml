@@ -191,8 +191,8 @@ code_limits:
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/roles/test_governance_context_comment.py"
-        limit: 520
-        reason: "Governance snapshot context and comment format contract tests, covering 11 test methods across TestBuildSnapshotContext and TestCommentFormatContract classes; includes PR #1783 comment format regression tests; split from original test_governance.py (#1803)"
+        limit: 630
+        reason: "Governance snapshot context and comment format contract tests, covering 11 test methods across TestBuildSnapshotContext and TestCommentFormatContract classes; includes PR #1783 comment format regression tests; split from original test_governance.py (#1803); Issue #1925 adds keys.env partial loading, layered markers, and local manager boundary tests (3 new test methods)"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 480
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
