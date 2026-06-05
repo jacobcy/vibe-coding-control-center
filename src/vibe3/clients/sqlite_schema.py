@@ -303,14 +303,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 f"Added {col} column to flow_state"
             )
 
-    # Legacy compatibility: keep old column for existing databases.
-    # New code no longer reads or writes this field.
-    if "latest_indicate_action" not in existing:
-        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added latest_indicate_action column to flow_state"
-        )
-
     # Migration: add indicate_ref column for indicate handoff tracking
     if "indicate_ref" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN indicate_ref TEXT")

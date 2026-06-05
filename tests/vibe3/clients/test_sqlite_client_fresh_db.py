@@ -20,7 +20,12 @@ def test_fresh_db_schema_no_deprecated_columns(tmp_path):
             row[1] for row in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
         }
 
-    deprecated = {"task_issue_number", "pr_number", "pr_ready_for_review"}
+    deprecated = {
+        "task_issue_number",
+        "pr_number",
+        "pr_ready_for_review",
+        "latest_indicate_action",
+    }
     assert not (
         deprecated & columns
     ), f"Deprecated columns found: {deprecated & columns}"
