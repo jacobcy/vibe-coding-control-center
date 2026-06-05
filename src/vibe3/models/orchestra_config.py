@@ -272,6 +272,10 @@ class OrchestraConfig(BaseModel):
         default_factory=SupervisorHandoffConfig
     )
     periodic_check: PeriodicCheckConfig = Field(default_factory=PeriodicCheckConfig)
+    queue_recollect: QueueRecollectConfig = Field(
+        default_factory=QueueRecollectConfig,
+        description="Configuration for periodic queue priority refresh",
+    )
     max_retry_budget: int = Field(
         default=3,
         ge=1,
