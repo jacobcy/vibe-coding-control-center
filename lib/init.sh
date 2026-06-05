@@ -79,37 +79,22 @@ _seed_claude_assets() {
 _generate_settings_yaml() {
     local repo_root="$1"
     local settings_file="$repo_root/.vibe/settings.yaml"
+    local init_lib_dir
+    init_lib_dir="$(cd "$(dirname "${(%):-%x:A}")" && pwd)"
+    local source_root="${VIBE_ROOT:-$(cd "$init_lib_dir/.." && pwd)}"
+    local template_file="$source_root/config/v3/settings.yaml.template"
 
     if [[ -f "$settings_file" ]]; then
         _log_info "Already exists: .vibe/settings.yaml (skipped, not overwritten)"
         return 0
     fi
 
-    cat > "$settings_file" <<'EOF'
-# Project-level Vibe override. Global defaults live in ~/.vibe/config/v3/settings.yaml.
-# Uncomment and edit values below to customize for this repo.
+    if [[ ! -f "$template_file" ]]; then
+        _log_error "Settings template not found: $template_file"
+        return 1
+    fi
 
-orchestra:
-  # repo: owner/name            # auto-detected from git remote if null
-  scene_base_ref: origin/main
-  # manager_usernames:
-  #   - vibe-manager-agent
-  assignee_dispatch:
-    agent: vibe-manager
-    # token_env: VIBE_MANAGER_GITHUB_TOKEN
-
-run:
-  agent_config:
-    agent: vibe-executor
-
-plan:
-  agent_config:
-    agent: vibe-planner
-
-review:
-  agent_config:
-    agent: vibe-reviewer
-EOF
+    cp "$template_file" "$settings_file"
 
     _log_success "Created: .vibe/settings.yaml"
 }

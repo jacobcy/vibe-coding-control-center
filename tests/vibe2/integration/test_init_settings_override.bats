@@ -28,6 +28,26 @@ setup() {
   grep -q "scene_base_ref:" "$fixture/.vibe/settings.yaml"
 }
 
+@test "vibe init copies settings template from config/v3 source" {
+  local fixture
+  fixture="$(mktemp -d)"
+  git -C "$fixture" init >/dev/null 2>&1
+
+  run zsh -c "
+    export VIBE_ROOT='$REPO_ROOT'
+    export VIBE_LIB='$REPO_ROOT/lib'
+    export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
+    source '$REPO_ROOT/lib/profiles.sh'
+    source '$REPO_ROOT/lib/init.sh'
+    cd '$fixture'
+    vibe_init --profile github-flow --yes 2>&1
+  "
+
+  [ "$status" -eq 0 ]
+  [ -f "$REPO_ROOT/config/v3/settings.yaml.template" ]
+  cmp -s "$REPO_ROOT/config/v3/settings.yaml.template" "$fixture/.vibe/settings.yaml"
+}
+
 @test "vibe init does not overwrite existing .vibe/settings.yaml" {
   local fixture
   fixture="$(mktemp -d)"
@@ -80,6 +100,41 @@ setup() {
   grep -q "run:" "$fixture/.vibe/settings.yaml"
   grep -q "plan:" "$fixture/.vibe/settings.yaml"
   grep -q "review:" "$fixture/.vibe/settings.yaml"
+}
+
+@test "generated settings.yaml loads through VibeConfig with usable defaults" {
+  local fixture
+  fixture="$(mktemp -d)"
+  git -C "$fixture" init >/dev/null 2>&1
+
+  run zsh -c "
+    export VIBE_ROOT='$REPO_ROOT'
+    export VIBE_LIB='$REPO_ROOT/lib'
+    export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
+    source '$REPO_ROOT/lib/profiles.sh'
+    source '$REPO_ROOT/lib/init.sh'
+    cd '$fixture'
+    vibe_init --profile github-flow --yes 2>&1
+  "
+
+  [ "$status" -eq 0 ]
+
+  run env PYTHONPATH="$REPO_ROOT/src" uv run python - "$fixture" <<'PY'
+from pathlib import Path
+import sys
+
+from vibe3.config.loader import load_config
+
+cfg = load_config(target_repo=Path(sys.argv[1]))
+assert cfg.orchestra.repo is None
+assert cfg.orchestra.scene_base_ref == "origin/main"
+assert cfg.orchestra.assignee_dispatch.agent == "vibe-manager"
+assert cfg.run.agent_config.agent == "vibe-executor"
+assert cfg.plan.agent_config.agent == "vibe-planner"
+assert cfg.review.agent_config.agent == "vibe-reviewer"
+PY
+
+  [ "$status" -eq 0 ]
 }
 
 @test "vibe init creates settings.yaml for vibe-center profile" {
