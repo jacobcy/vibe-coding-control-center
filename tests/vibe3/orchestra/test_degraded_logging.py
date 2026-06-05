@@ -67,6 +67,10 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"
     mock_config.supervisor_handoff = mock_supervisor_handoff
+    mock_periodic_check = MagicMock()
+    mock_periodic_check.enabled = True
+    mock_periodic_check.interval_ticks = 10
+    mock_config.periodic_check = mock_periodic_check
 
     # Create BLOCKED issue
     blocked_issue = IssueInfo(
@@ -172,6 +176,10 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"
     mock_config.supervisor_handoff = mock_supervisor_handoff
+    mock_periodic_check = MagicMock()
+    mock_periodic_check.enabled = True
+    mock_periodic_check.interval_ticks = 10
+    mock_config.periodic_check = mock_periodic_check
 
     # Create BLOCKED issue
     blocked_issue = IssueInfo(
