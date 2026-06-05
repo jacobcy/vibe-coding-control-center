@@ -9,8 +9,8 @@ Runs two phases on each interval tick:
 
 from loguru import logger
 
-from vibe3.config.orchestra_config import PeriodicCheckConfig
-from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.config import PeriodicCheckConfig
+from vibe3.orchestra import append_orchestra_event
 
 
 async def execute_periodic_check(
@@ -30,7 +30,7 @@ async def execute_periodic_check(
     """
     # Delay imports to avoid circular dependencies
     from vibe3.clients import SQLiteClient
-    from vibe3.services.check_service import CheckService
+    from vibe3.services import CheckService
 
     # Initialize services
     store = SQLiteClient()
