@@ -13,7 +13,11 @@ class RoleCliOverrides:
     fresh_session: bool = False
 
     def to_config_overrides(self, role: str) -> dict[str, str]:
-        """Convert to config override dict for load_runtime_config."""
+        """Convert to config override dict for load_runtime_config.
+
+        Note: fresh_session is intentionally excluded — it is a runtime control
+        flag passed via argv, not a config-schema key.
+        """
         overrides: dict[str, str] = {}
         if self.backend:
             overrides[f"{role}.agent_config.backend"] = self.backend
