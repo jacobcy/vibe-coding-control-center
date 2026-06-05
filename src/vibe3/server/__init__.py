@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         create_mcp_server,
         format_snapshot_for_mcp,
     )
+
     # Registry
     from vibe3.server.registry import (
         ORCHESTRA_TMUX_SESSION,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
         _start_async_serve,
         _validate_pid_file,
     )
+
     # Server utilities
     from vibe3.server.server_utils import find_available_port
 
