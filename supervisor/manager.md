@@ -566,6 +566,8 @@ Steps:
 
     说明：baseline 记录了分支创建时的代码库结构，供后续 `snapshot diff` 对比分析开发过程中的结构变化。
 
+**Baseline 在 Scope Validation 中的作用**：此 baseline 作为 "claim-time baseline"，供后续 `handle_claimed()` 的 Gate 1 验证和 `handle_handoff()` 的 Gate 2 验证使用，用于检测分支是否有 pre-existing unrelated changes 或 scope violation。
+
 8. 再次读取当前 labels/state
 9. 如果 `state/claimed` 未生效：
    - 将当前 issue 调整为 `state/blocked`
@@ -621,6 +623,33 @@ Steps:
        - 列出具体变化文件和 commit 数量
        - 进入 `state/blocked`
        - `exit()`
+2.5. **Pre-execution Scope Baseline Validation（新增）**：
+   - **目的**：检测分支上是否已存在与当前 issue scope 无关的改动，避免执行继承无关工作。
+   - **执行时机**：在架构风险评估后、确认 claimed 状态前。
+   - **操作步骤**：
+     a. 获取当前分支相对于 base branch 的改动文件：
+        ```bash
+        git diff <base-branch>...HEAD --name-only
+        ```
+        （base-branch 从 scene 中读取，默认为 `origin/main`）
+     b. 检查改动文件数量是否超过阈值（建议阈值：10 个文件）：
+        - 若改动文件数 ≤ 阈值：继续后续流程
+        - 若改动文件数 > 阈值：进入详细风险评估（步骤 c）
+     c. 运行详细风险评估：
+        ```bash
+        uv run python src/vibe3/cli.py inspect base --json
+        ```
+     d. 判断是否需要 block：
+        - 若 `score.level` 为 `HIGH` 或 `total_changed` 显著超出预期 scope：
+          i. 写 handoff append：详细说明 pre-existing changes（文件数量、风险等级、涉及模块）
+          ii. Comment：`[manager] Branch has pre-existing changes that may conflict with issue scope. <N> files changed vs base. Need human confirmation before planning.`
+          iii. Block：
+             ```bash
+             vibe3 flow blocked --reason "Pre-existing branch changes detected: <N> files changed vs base. Scope baseline validation requires human review."
+             ```
+          iv. `exit()`
+        - 若 clean 或改动在预期 scope 内：继续后续流程
+   - **理由**：这是最早能检测问题的时机。Plan agent 尚未启动，不会浪费执行时间。提前发现分支复用残留或无关改动，可让人类决定是清理分支还是接受改动。
 3. 复述当前已进入 claimed
 4. 明确记录：拆分窗口已关闭，后续 plan/run/review 不得再改变为 sub-issue 拆分；若 plan agent 发现 scope 无法执行，应 blocked 回 manager/人类，而不是自行拆分
 5. 写 issue comment：当前 scene、当前风险、下一阶段为 plan agent 接手，scope 按当前 issue 执行
@@ -725,6 +754,26 @@ Decision sketch:
     - 检查 plan 是否包含 Scope Boundary 声明（允许/禁止清单）
     - 如果 plan 缺少 Scope Boundary，写 handoff append 要求补充
     - 如果 plan 的 Scope Boundary 与 issue scope 不一致，写 handoff append 指出不一致点
+  - **Scope Boundary Cross-check（新增）**：
+    - **目的**：验证 plan 声明的 scope 与实际分支状态一致，防止 plan agent 创建的 scope 边界与分支已有改动不匹配。
+    - **执行时机**：在 Scope Boundary 审查后、批准 plan 前。
+    - **操作步骤**：
+      1. 获取当前分支改动：
+         ```bash
+         git diff <base-branch>...HEAD --name-only
+         ```
+      2. 从 plan 的 "Scope Boundary" / "Changes" 部分提取声明的文件列表
+      3. 比对：检查分支改动文件是否都在 plan 声明的 scope 内
+      4. 若发现 scope violation：
+         - 写 handoff append：列出 out-of-scope 文件清单
+         - Comment：`[manager] Branch changes exceed plan scope boundary. Out-of-scope files: <list>.`
+         - Block：
+           ```bash
+           vibe3 flow blocked --reason "Scope baseline violation: branch has <N> out-of-scope files vs plan scope."
+           ```
+         - `exit()`
+      5. 若分支改动与 plan scope 一致：继续批准 plan
+    - **理由**：即使 Gate 1 通过，plan agent 可能创建与分支状态不匹配的 scope 边界。这个检查在执行前捕获不匹配。
   - 若 plan 不达标：可直接修改 plan_ref（你有 write 权限），或转回 `state/claimed` 要求重做 plan
   - 若 plan 达标：写 handoff append 说明当前进入执行阶段、重点关注区域、spec 要点
   - 进入 `state/in-progress`
