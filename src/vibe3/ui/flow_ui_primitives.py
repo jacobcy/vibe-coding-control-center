@@ -47,7 +47,7 @@ def display_actor(actor: str | None) -> tuple[str, bool]:
 
     # Fallback: worktree git user.name
     try:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         name = GitClient().get_config("user.name") or "unknown"
     except Exception:
