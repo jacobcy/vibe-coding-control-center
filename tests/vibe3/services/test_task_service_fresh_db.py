@@ -92,7 +92,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path, monkeypatch)
 
     # Mock GitClient to return True for branch_exists (for vibe-task label auto-mirror)
     monkeypatch.setattr(
-        "vibe3.clients.git_client.GitClient",
+        "vibe3.clients.GitClient",
         lambda: type(
             "MockGitClient", (), {"branch_exists": lambda self, branch: True}
         )(),

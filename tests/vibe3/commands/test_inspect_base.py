@@ -18,7 +18,7 @@ def test_inspect_base_default_parent():
     mock_git = MagicMock()
     mock_git.get_changed_files.return_value = ["tests/test_foo.py", "docs/README.md"]
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git_client:
+    with patch("vibe3.clients.GitClient") as mock_git_client:
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
@@ -41,7 +41,7 @@ def test_inspect_base_custom_base_branch():
     mock_git = MagicMock()
     mock_git.get_changed_files.return_value = ["tests/test_foo.py", "docs/README.md"]
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git_client:
+    with patch("vibe3.clients.GitClient") as mock_git_client:
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
@@ -68,7 +68,7 @@ def test_inspect_base_with_core_files():
     mock_dag = MagicMock()
     mock_dag.impacted_modules = ["vibe3.core", "vibe3.api", "vibe3.utils"]
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git_client:
+    with patch("vibe3.clients.GitClient") as mock_git_client:
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
@@ -100,7 +100,7 @@ def test_inspect_base_json_output():
     mock_dag = MagicMock()
     mock_dag.impacted_modules = ["vibe3.core"]
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git_client:
+    with patch("vibe3.clients.GitClient") as mock_git_client:
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
@@ -146,7 +146,7 @@ def test_inspect_base_json_custom_branch():
     mock_dag = MagicMock()
     mock_dag.impacted_modules = ["vibe3.core"]
 
-    with patch("vibe3.clients.git_client.GitClient") as mock_git_client:
+    with patch("vibe3.clients.GitClient") as mock_git_client:
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
@@ -188,7 +188,7 @@ def test_inspect_base_uses_shared_base_resolver():
     mock_git = MagicMock()
     mock_git.get_changed_files.return_value = []
 
-    with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
+    with patch("vibe3.clients.GitClient", return_value=mock_git):
         with patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ):

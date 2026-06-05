@@ -168,7 +168,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.roles.manager.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
-    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.clients.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_github_none(
         self,
@@ -203,7 +203,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.roles.manager.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
-    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.clients.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_network_error(
         self,
@@ -236,7 +236,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.roles.manager.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
-    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.clients.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_invalid_issue_data(
         self,

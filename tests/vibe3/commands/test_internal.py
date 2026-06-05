@@ -164,9 +164,9 @@ def test_internal_bootstrap_dispatch() -> None:
 
     with patch("vibe3.commands.internal.load_orchestra_config") as load_config:
         load_config.return_value = MagicMock(repo="owner/repo")
-        with patch("vibe3.clients.sqlite_client.SQLiteClient"):
-            with patch("vibe3.clients.git_client.GitClient"):
-                with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
+        with patch("vibe3.clients.SQLiteClient"):
+            with patch("vibe3.clients.GitClient"):
+                with patch("vibe3.clients.GitHubClient") as github_cls:
                     with patch(
                         "vibe3.services.flow_orchestrator_service.FlowOrchestratorService"
                     ) as service_cls:

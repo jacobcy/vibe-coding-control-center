@@ -54,9 +54,7 @@ def test_vibe_center_adapter_global_skills_fallback():
         # Simulate external repo without skills/ marker
         mock_resolve_root.return_value = Path("/tmp/external-repo")
 
-        with patch(
-            "vibe3.clients.runtime_assets.runtime_assets_root"
-        ) as mock_runtime_root:
+        with patch("vibe3.clients.runtime_assets_root") as mock_runtime_root:
             # Mock global runtime root
             import tempfile
 

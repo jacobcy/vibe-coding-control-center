@@ -37,7 +37,7 @@ def mock_all_dependencies():
         patch("vibe3.services.pr_analysis_service._get_recent_commits") as mock_commits,
         patch("vibe3.services.pr_analysis_service._get_pr_commit_count") as mock_count,
         patch("vibe3.services.pr_analysis_service.dag_service") as mock_dag,
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
     ):
         # Setup default returns
         mock_files.return_value = [

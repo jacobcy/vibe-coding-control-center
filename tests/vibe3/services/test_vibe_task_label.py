@@ -30,7 +30,7 @@ def test_link_issue_as_task_adds_vibe_task_label(tmp_path, monkeypatch):
 
     # Mock GitClient to return True for branch_exists
     monkeypatch.setattr(
-        "vibe3.clients.git_client.GitClient",
+        "vibe3.clients.GitClient",
         lambda: Mock(branch_exists=lambda branch: True),
     )
 
