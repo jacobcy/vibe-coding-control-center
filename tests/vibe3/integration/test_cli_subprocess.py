@@ -11,8 +11,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 
-def _categorize_failure(stderr: str, exit_code: int) -> str:
+
+def _categorize_failure(stderr: str, _exit_code: int) -> str:
     """Categorize CLI failure based on stderr output and exit code.
 
     Returns one of:
@@ -53,6 +55,52 @@ def _categorize_failure(stderr: str, exit_code: int) -> str:
     return "unknown"
 
 
+def _cli_env(runtime_assets_root: Path) -> dict[str, str]:
+    """Return isolated environment for CLI subprocess smoke tests."""
+    env = os.environ.copy()
+    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(runtime_assets_root)
+    for key in (
+        "PYTHONPATH",
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_PREFIX",
+    ):
+        env.pop(key, None)
+    return env
+
+
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "This project uses an editable install (.pth file in venv site-packages). "
+        "Python -I suppresses PYTHONPATH but not venv site-packages, so vibe3 "
+        "remains importable. This test documents the known isolation limitation: "
+        "the other subprocess tests rely on -I but cannot block venv editable installs."
+    ),
+)
+def test_subprocess_isolation_prevents_source_tree_access(
+    installed_vibe_home: Path,
+    target_repo: Path,
+) -> None:
+    """Verify subprocess isolation blocks vibe3 source-tree imports."""
+    env = _cli_env(installed_vibe_home)
+
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", "import vibe3; print('VIBE3_FOUND')"],
+        cwd=target_repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert "VIBE3_FOUND" not in result.stdout, (
+        "vibe3 is accessible in isolated subprocess. "
+        "This may indicate the test does not truly validate cross-project isolation. "
+        "An editable install or .pth file may be bypassing the -I flag."
+    )
+
+
 def test_cli_plan_dry_run_accepts_flags(
     installed_vibe_home: Path,
     target_repo: Path,
@@ -66,10 +114,7 @@ def test_cli_plan_dry_run_accepts_flags(
     cli_path = project_root / "src" / "vibe3" / "cli.py"
 
     # Prepare environment
-    env = os.environ.copy()
-    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(installed_vibe_home)
-    # Remove PYTHONPATH to ensure no source-tree fallback via sys.path
-    env.pop("PYTHONPATH", None)
+    env = _cli_env(installed_vibe_home)
 
     # Run command in subprocess
     result = subprocess.run(
@@ -78,6 +123,7 @@ def test_cli_plan_dry_run_accepts_flags(
         env=env,
         capture_output=True,
         text=True,
+        timeout=60,
     )
 
     # Assert stderr does NOT contain module import errors
@@ -111,9 +157,7 @@ def test_cli_run_dry_run_accepts_flags(
     cli_path = project_root / "src" / "vibe3" / "cli.py"
 
     # Prepare environment
-    env = os.environ.copy()
-    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(installed_vibe_home)
-    env.pop("PYTHONPATH", None)
+    env = _cli_env(installed_vibe_home)
 
     # Run command in subprocess
     result = subprocess.run(
@@ -122,6 +166,7 @@ def test_cli_run_dry_run_accepts_flags(
         env=env,
         capture_output=True,
         text=True,
+        timeout=60,
     )
 
     # Assert stderr does NOT contain module import errors
@@ -155,9 +200,7 @@ def test_cli_review_dry_run_accepts_flags(
     cli_path = project_root / "src" / "vibe3" / "cli.py"
 
     # Prepare environment
-    env = os.environ.copy()
-    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(installed_vibe_home)
-    env.pop("PYTHONPATH", None)
+    env = _cli_env(installed_vibe_home)
 
     # Run command in subprocess
     result = subprocess.run(
@@ -166,6 +209,7 @@ def test_cli_review_dry_run_accepts_flags(
         env=env,
         capture_output=True,
         text=True,
+        timeout=60,
     )
 
     # Assert stderr does NOT contain module import errors
@@ -197,9 +241,7 @@ def test_cli_internal_manager_dry_run_accepts_flags(
     cli_path = project_root / "src" / "vibe3" / "cli.py"
 
     # Prepare environment
-    env = os.environ.copy()
-    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(installed_vibe_home)
-    env.pop("PYTHONPATH", None)
+    env = _cli_env(installed_vibe_home)
 
     # Run command in subprocess
     # Use issue number 99999 (unlikely to exist)
@@ -219,6 +261,7 @@ def test_cli_internal_manager_dry_run_accepts_flags(
         env=env,
         capture_output=True,
         text=True,
+        timeout=60,
     )
 
     # Assert stderr does NOT contain module import errors
@@ -259,9 +302,7 @@ def test_cli_missing_runtime_assets_detected(
     cli_path = project_root / "src" / "vibe3" / "cli.py"
 
     # Prepare environment
-    env = os.environ.copy()
-    env["VIBE3_RUNTIME_ASSETS_ROOT"] = str(empty_home)
-    env.pop("PYTHONPATH", None)
+    env = _cli_env(empty_home)
 
     # Run a command (plan) that should still work via bundled fallback
     result = subprocess.run(
@@ -270,6 +311,7 @@ def test_cli_missing_runtime_assets_detected(
         env=env,
         capture_output=True,
         text=True,
+        timeout=60,
     )
 
     # The command should NOT fail due to missing imports

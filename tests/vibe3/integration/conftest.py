@@ -1,5 +1,6 @@
 """Shared fixtures for integration tests."""
 
+import os
 import shutil
 import subprocess
 from collections.abc import Generator
@@ -35,7 +36,7 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 
 @pytest.fixture
-def mock_all_dependencies():
+def mock_all_dependencies() -> Generator[dict[str, MagicMock], None, None]:
     """Mock all external dependencies for PR analysis."""
     with (
         patch("vibe3.services.pr_analysis_service._get_pr_changed_files") as mock_files,
@@ -110,6 +111,14 @@ def mock_all_dependencies():
 # ============================================================================
 
 
+def _clean_git_env() -> dict[str, str]:
+    """Return env for nested git commands run from hooks or other git subprocesses."""
+    env = os.environ.copy()
+    for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"):
+        env.pop(key, None)
+    return env
+
+
 @pytest.fixture(scope="session")
 def installed_vibe_home(tmp_path_factory: pytest.TempPathFactory) -> Generator[Path]:
     """Create a temp directory simulating ~/.vibe with runtime assets installed.
@@ -176,31 +185,45 @@ def target_repo(tmp_path: Path) -> Generator[Path]:
     repo_path.mkdir()
 
     # Initialize git repo
-    subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+    git_env = _clean_git_env()
+    subprocess.run(
+        ["git", "init"],
+        cwd=repo_path,
+        check=True,
+        capture_output=True,
+        env=git_env,
+    )
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
         cwd=repo_path,
         check=True,
         capture_output=True,
+        env=git_env,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test User"],
         cwd=repo_path,
         check=True,
         capture_output=True,
+        env=git_env,
     )
 
     # Create minimal commit
     readme = repo_path / "README.md"
     readme.write_text("# Test Repo\n", encoding="utf-8")
     subprocess.run(
-        ["git", "add", "README.md"], cwd=repo_path, check=True, capture_output=True
+        ["git", "add", "README.md"],
+        cwd=repo_path,
+        check=True,
+        capture_output=True,
+        env=git_env,
     )
     subprocess.run(
         ["git", "commit", "-m", "Initial commit"],
         cwd=repo_path,
         check=True,
         capture_output=True,
+        env=git_env,
     )
 
     # Create minimal .vibe directory

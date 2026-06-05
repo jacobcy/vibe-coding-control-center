@@ -277,9 +277,6 @@ code_limits:
       - path: "tests/vibe3/integration/test_session_reuse.py"
         limit: 420
         reason: "Session reuse 集成测试集，覆盖完整生命周期验证、NULL/empty 过滤、无效 ID 验证、live preference、branch/role 隔离、安全网、race condition、多 session 选择等 9 个紧密耦合场景，每个测试使用真实 SQLite 数据库（非 mock）需要完整 setup，拆分会破坏测试场景完整性（#2060）"
-      - path: "tests/vibe3/integration/test_cross_project_prompt_smoke.py"
-        limit: 650
-        reason: "Cross-project prompt readiness smoke test suite，包含两层测试（Layer 1: Python-level asset discovery，Layer 2: CLI subprocess smoke tests）、session-scoped fixture (installed_vibe_home)、function-scoped fixture (target_repo)、failure categorization helper 等 10 个测试用例，验证 plan/run/review/internal-manager 命令的 prompt readiness，测试场景紧密耦合，拆分会降低可读性（#1928）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"

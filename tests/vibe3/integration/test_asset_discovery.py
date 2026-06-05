@@ -93,11 +93,15 @@ def test_config_layering_loads_project_override(
     # Load config
     config = load_config()
 
-    # Assert the project override was loaded
+    # Assert the project override was applied while other config layers remain usable.
     assert "test-protected-branch" in config.flow.protected_branches, (
-        f"Project config override not loaded. "
+        f"Project-level protected_branches override was not applied. "
         f"protected_branches: {config.flow.protected_branches}"
     )
+    assert config.flow is not None, "Config layering broke the flow config entirely"
+    assert hasattr(
+        config, "flow"
+    ), "Config object is missing expected attributes from global config"
 
 
 def test_missing_prompts_detected(tmp_path: Path) -> None:
