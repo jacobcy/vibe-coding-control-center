@@ -333,7 +333,10 @@ def build_manager_sync_request(
 
             # Create skill path resolver callback for prompts layer
             def skill_path_resolver(skill_name: str) -> str | None:
-                return ConventionResolver.from_repo().get_skill_path(skill_name)
+                result: str | None = ConventionResolver.from_repo().get_skill_path(
+                    skill_name
+                )
+                return result
 
             for section_spec in variant_spec.sections:
                 if section_spec.source is not None:

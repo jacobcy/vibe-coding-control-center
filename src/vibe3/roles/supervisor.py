@@ -315,7 +315,8 @@ def get_supervisor_prompt_path(
     """
     if resolver is None:
         resolver = ConventionResolver.from_repo()
-    return resolver.get_supervisor_path("apply")
+    result: str | None = resolver.get_supervisor_path("apply")
+    return result
 
 
 def iter_supervisor_identified_events(

@@ -59,7 +59,8 @@ def resolve_skill_path(
     """
     if resolver is None:
         resolver = ConventionResolver.from_repo()
-    return resolver.get_skill_path(skill)
+    result: str | None = resolver.get_skill_path(skill)
+    return result
 
 
 def dispatch_run_command_async(

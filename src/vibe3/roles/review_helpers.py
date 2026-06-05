@@ -26,7 +26,8 @@ def _load_existing_audit_ref(branch: str | None) -> str | None:
         return None
     flow = FlowService().get_flow_status(branch)
     if flow and flow.audit_ref:
-        return flow.audit_ref
+        audit_ref: str | None = flow.audit_ref
+        return audit_ref
     return None
 
 
@@ -36,7 +37,9 @@ def _load_existing_verdict(branch: str | None) -> str | None:
         return None
     flow = FlowService().get_flow_status(branch)
     if flow and flow.latest_verdict:
-        return flow.latest_verdict.verdict
+        verdict: str | None = flow.latest_verdict.verdict
+        return verdict
+    return None
     return None
 
 
