@@ -582,3 +582,54 @@ class GlobalDispatchCoordinator:
             else:
                 self._dispatch_paused = False
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
+
+    async def force_recollect_queue(self) -> None:
+        """Force immediate queue recollection to refresh priorities.
+
+        This method triggers a full queue rebuild, bypassing the normal
+        exhaustion-based rebuild logic. It preserves in-flight entries
+        (those with waiting_state is not None) while rebuilding the rest
+        of the queue with fresh priorities.
+
+        Called periodically by the heartbeat loop based on
+        config.queue_recollect.interval_ticks.
+        """
+        # Preserve in-flight entries (waiting_state is not None)
+        waiting_entries = [
+            entry
+            for entry in (self._frozen_queue or [])
+            if entry.waiting_state is not None
+        ]
+
+        # Collect fresh queue
+        fresh = await self._collect_frozen_queue()
+
+        # Merge: waiting entries first, then fresh non-waiting entries
+        fresh_numbers = {e.issue_number for e in fresh}
+        preserved_waiting = [
+            entry
+            for entry in waiting_entries
+            if entry.issue_number not in fresh_numbers
+        ]
+
+        # Reset dispatch pause state
+        self._dispatch_paused = False
+
+        # Set new queue
+        self._frozen_queue = preserved_waiting + fresh
+
+        # Persist the new queue
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.persist()
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: force recollected queue, "
+            f"preserved={len(preserved_waiting)} waiting, "
+            f"fresh={len(fresh)} new entries",
+        )
+
+        logger.bind(domain="global_dispatch").info(
+            f"Force recollected queue: {len(preserved_waiting)} waiting, "
+            f"{len(fresh)} fresh entries"
+        )
