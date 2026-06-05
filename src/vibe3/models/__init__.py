@@ -176,6 +176,7 @@ _LAZY_IMPORTS = {
     "VersionBumpResponse": "vibe3.models.pr",
     "VersionBumpType": "vibe3.models.pr",
     "WorktreeRequirement": "vibe3.models.worktree",
+    "normalize_actor": "vibe3.models.actor_utils",
 }
 
 
@@ -236,6 +237,7 @@ __all__: list[str] = [
     "ManagerDispatchIntent",
     "ModuleChange",
     "ModuleSnapshot",
+    "normalize_actor",
     "OrchestraConfig",
     "PRCriticalAnalysis",
     "PRMetadata",

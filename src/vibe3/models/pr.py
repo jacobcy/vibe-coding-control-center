@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from vibe3.models._actor_utils import normalize_actor
+from vibe3.models.actor_utils import normalize_actor
 
 
 class CICheck(BaseModel):

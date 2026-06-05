@@ -268,7 +268,7 @@ def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
     return True, stdout or f"Tailscale webhook configured for port {port}"
 
 
-def _validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, bool]:
+def validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, bool]:
     """Validate PID file and check if process is a running orchestra instance.
 
     Returns:

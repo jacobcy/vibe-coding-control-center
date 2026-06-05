@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -178,6 +179,143 @@ def get_module_layer(module_name: str) -> int | None:
     return MODULE_LAYER_MAP.get(module_name)
 
 
+@dataclass
+class CrossModuleImport:
+    """Represents a cross-module import statement.
+
+    Attributes:
+        source_file: Path to the file containing the import
+        target_module: The top-level module being imported from (e.g., 'services')
+        import_path: Full import path (e.g., 'vibe3.services.flow_service')
+        symbols: List of symbols being imported
+        is_deep: True if importing from a submodule (bypassing __init__.py)
+    """
+
+    source_file: str
+    target_module: str
+    import_path: str
+    symbols: list[str]
+    is_deep: bool
+
+
+def get_module_public_api(module_name: str) -> set[str]:
+    """Extract public API symbols from module's __init__.py.
+
+    AST parses the __all__ definition to get the list of exported symbols.
+
+    Args:
+        module_name: Top-level module name (e.g., 'services')
+
+    Returns:
+        Set of symbol names in __all__, or empty set if __all__ not found
+    """
+    init_path = Path(f"src/vibe3/{module_name}/__init__.py")
+    if not init_path.exists():
+        return set()
+
+    try:
+        source = init_path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+    except (SyntaxError, OSError):
+        return set()
+
+    # Extract __all__ list
+    for node in ast.walk(tree):
+        # Check for regular assignment: __all__ = [...]
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__all__":
+                    if isinstance(node.value, ast.List):
+                        symbols = set()
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Constant):
+                                symbols.add(elt.value)
+                        return symbols
+        # Check for annotated assignment: __all__: list[str] = [...]
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "__all__":
+                if isinstance(node.value, ast.List):
+                    symbols = set()
+                    for elt in node.value.elts:
+                        if isinstance(elt, ast.Constant):
+                            symbols.add(elt.value)
+                    return symbols
+
+    return set()
+
+
+def extract_cross_module_imports(source_module: str) -> list[CrossModuleImport]:
+    """Extract all cross-module imports from a source module.
+
+    Scans all .py files in the module directory and extracts import statements
+    that reference other vibe3 modules.
+
+    Args:
+        source_module: Top-level module name (e.g., 'services')
+
+    Returns:
+        List of CrossModuleImport instances for cross-module imports only
+    """
+    module_dir = Path(f"src/vibe3/{source_module}")
+    if not module_dir.exists():
+        return []
+
+    imports: list[CrossModuleImport] = []
+
+    # Recursively find all .py files in the module
+    for py_file in module_dir.rglob("*.py"):
+        # Skip __pycache__ and test files
+        if "__pycache__" in str(py_file):
+            continue
+
+        try:
+            source = py_file.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+        except (SyntaxError, OSError):
+            continue
+
+        # Extract imports from AST
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if not node.module:
+                    continue
+
+                # Only process vibe3 imports
+                if not node.module.startswith("vibe3."):
+                    continue
+
+                # Parse the import path
+                parts = node.module.split(".")
+                if len(parts) < 2:
+                    continue
+
+                target_module = parts[1]  # e.g., 'services' from 'vibe3.services'
+
+                # Skip same-module imports
+                if target_module == source_module:
+                    continue
+
+                # Determine if this is a deep import
+                # Deep import: from vibe3.X.submodule import Y (parts >= 3)
+                # Top-level import: from vibe3.X import Y (parts == 2)
+                is_deep = len(parts) > 2
+
+                # Extract imported symbols
+                symbols = [alias.name for alias in node.names]
+
+                imports.append(
+                    CrossModuleImport(
+                        source_file=str(py_file),
+                        target_module=target_module,
+                        import_path=node.module,
+                        symbols=symbols,
+                        is_deep=is_deep,
+                    )
+                )
+
+    return imports
+
+
 @pytest.fixture
 def module_registry() -> list[str]:
     """Fixture providing list of all vibe3 modules."""
@@ -200,3 +338,16 @@ def module_layer_map() -> dict[str, int]:
 def layer_allowed_deps() -> dict[int, set[int]]:
     """Fixture providing layer dependency rules."""
     return LAYER_ALLOWED_DEPS
+
+
+@pytest.fixture
+def module_public_api(module_registry: list[str]) -> dict[str, set[str]]:
+    """Fixture providing public API symbols for each module.
+
+    Returns:
+        Dict mapping module name to set of symbols in __all__
+    """
+    return {
+        module_name: get_module_public_api(module_name)
+        for module_name in module_registry
+    }

@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     # Server utilities
     from vibe3.server.server_utils import find_available_port
 
+    # Registry (public API)
+    from vibe3.server.registry import validate_pid_file
+
 # Lazy imports for all symbols (avoid circular init dependencies)
 _LAZY_IMPORTS = {
     # Domain layer re-exports
@@ -46,6 +49,8 @@ _LAZY_IMPORTS = {
     "format_snapshot_for_mcp": "vibe3.server.mcp",
     # Server utilities
     "find_available_port": "vibe3.server.server_utils",
+    # Registry (public API)
+    "validate_pid_file": "vibe3.server.registry",
 }
 
 
@@ -76,4 +81,6 @@ __all__ = [
     # mcp
     "create_mcp_server",
     "format_snapshot_for_mcp",
+    # registry (public API)
+    "validate_pid_file",
 ]
