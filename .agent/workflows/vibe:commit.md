@@ -26,8 +26,8 @@ tags: [workflow, vibe, git, commit, orchestration]
      - `ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-test-file-loc.sh`
      - 任何文件超限必须修复，不允许创建 PR
 4. 在任何 commit 分组前，先做最小 metadata preflight：
-   - 读取 `vibe3 flow show --json`
-   - 若存在 `current_task`，继续读取 `vibe3 task status --json`
+   - 读取 `vibe3 flow show --format json`
+   - 若存在 `current_task`，继续读取 `vibe3 task status --format json`
    - 若 `current_task` 缺失、无法解析，或 `runtime_branch` 与当前 flow branch 不一致，则 hard block
    - 若缺少 `issue_refs`、`roadmap_item_ids`、`spec_standard/spec_ref`，则至少报告 warning
 5. 由 `vibe-commit` skill 负责：

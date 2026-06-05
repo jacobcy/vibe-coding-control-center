@@ -103,7 +103,7 @@ git pull origin main
 在当前 flow 的 handoff 链中记录终态：
 
 ```bash
-vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
+vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind note
 ```
 
 格式：

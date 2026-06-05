@@ -1,6 +1,6 @@
 ---
 name: vibe-project-check
-description: Use after `vibe3 init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Do not use for system-level installation issues (use vibe-onboard instead).
+description: Use after `vibe init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Do not use for system-level installation issues (use vibe-onboard instead).
 ---
 
 # /vibe-project-check - 项目配置检查与补全
