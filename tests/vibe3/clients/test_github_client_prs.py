@@ -139,7 +139,7 @@ def test_create_pr_maps_recoverable_error_to_user_error(
         draft=True,
     )
 
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "create"],
@@ -167,7 +167,7 @@ def test_create_pr_maps_non_recoverable_error_to_github_error(
         draft=True,
     )
 
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "create"],
@@ -259,7 +259,7 @@ def test_get_pr_enriches_failed_checks_with_category_and_command() -> None:
         ]
     }
 
-    with patch("vibe3.clients.github_pr_read_ops.subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout=json.dumps(pr_data), stderr=""),
             MagicMock(returncode=0, stdout=json.dumps(checks_data), stderr=""),
@@ -293,7 +293,7 @@ def test_mark_ready_success(
 def test_mark_ready_maps_recoverable_error_to_user_error(
     github_client: GitHubClient,
 ) -> None:
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "ready", "123"],
@@ -309,7 +309,7 @@ def test_mark_ready_maps_recoverable_error_to_user_error(
 def test_merge_pr_maps_non_recoverable_error_to_github_error(
     github_client: GitHubClient,
 ) -> None:
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "merge", "123"],
@@ -326,7 +326,7 @@ def test_merge_pr_maps_non_recoverable_error_to_github_error(
 def test_update_pr_maps_error_to_user_error(github_client: GitHubClient) -> None:
     request = UpdatePRRequest(number=123, title="new title")
 
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "edit", "123"],
@@ -415,7 +415,7 @@ def review_mixin():
 
 def test_get_pr_diff_file_limit_error(review_mixin):
     """Test that PR diff with >300 files raises UserError."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         # Mock subprocess error with file limit message
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
@@ -440,7 +440,7 @@ def test_get_pr_diff_file_limit_error(review_mixin):
 
 def test_get_pr_diff_other_error(review_mixin):
     """Test that other PR diff errors raise GitHubError."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "diff", "200"],
@@ -456,7 +456,7 @@ def test_get_pr_diff_other_error(review_mixin):
 
 def test_get_pr_files_file_limit_error(review_mixin):
     """Test that PR files with >300 files raises UserError."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         # Mock subprocess error with file limit message
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
@@ -478,7 +478,7 @@ def test_get_pr_files_file_limit_error(review_mixin):
 
 def test_get_pr_files_success(review_mixin):
     """Test successful get_pr_files."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.stdout = "file1.py\nfile2.py\nfile3.py\n"
         mock_result.returncode = 0
@@ -491,7 +491,7 @@ def test_get_pr_files_success(review_mixin):
 
 def test_get_pr_files_other_error(review_mixin):
     """Test that other PR files errors raise GitHubError."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "diff", "200", "--name-only"],
@@ -507,7 +507,7 @@ def test_get_pr_files_other_error(review_mixin):
 
 def test_error_message_suggests_alternatives(review_mixin):
     """Test that error message suggests alternative approaches."""
-    with patch("subprocess.run") as mock_run:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1,
             cmd=["gh", "pr", "diff", "200"],

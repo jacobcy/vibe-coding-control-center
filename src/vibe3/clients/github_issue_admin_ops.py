@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import Any, cast
 
 from loguru import logger
-
-# Standard timeout for GitHub CLI API calls (seconds)
-GH_API_TIMEOUT = 30
 
 
 class IssueAdminMixin:
@@ -39,13 +35,12 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to remove assignees from issue #{issue_number}"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to remove assignees from issue #{issue_number}"
+                )
             return False
         return True
 
@@ -76,13 +71,12 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to add assignee to issue #{issue_number}"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to add assignee to issue #{issue_number}"
+                )
             return False
         return True
 
@@ -122,13 +116,12 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                "Failed to list issues with assignees"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    "Failed to list issues with assignees"
+                )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
 
@@ -160,13 +153,12 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to close issue #{issue_number}"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to close issue #{issue_number}"
+                )
             return False
         return True
 
@@ -196,13 +188,12 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to add comment on #{issue_number}"
-            )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to add comment on #{issue_number}"
+                )
             return False
         return True
 
@@ -311,14 +302,13 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
+        result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
 
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to create issue: {title}"
-            )
+        if result is None or result.returncode != 0:
+            if result is not None:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to create issue: {title}"
+                )
             return None
 
         # Parse issue number from URL

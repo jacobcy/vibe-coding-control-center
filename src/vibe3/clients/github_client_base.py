@@ -8,6 +8,9 @@ from loguru import logger
 
 from vibe3.exceptions import GitHubError, UserError
 
+# Standard timeout for GitHub CLI API calls (seconds)
+GH_API_TIMEOUT = 30
+
 
 def raise_gh_pr_error(
     error: subprocess.CalledProcessError,
@@ -89,6 +92,43 @@ class GitHubClientBase:
                 operation="check_auth",
             ).error("Failed to check auth")
             return False
+
+    def _run_gh_command(
+        self,
+        cmd: list[str],
+        *,
+        timeout: int | None = None,
+        pager: bool = False,
+    ) -> subprocess.CompletedProcess[str] | None:
+        """Execute a gh CLI command with standard error handling.
+
+        Args:
+            cmd: Full command list (e.g. ["gh", "issue", "list", ...]).
+            timeout: Seconds before timeout. Defaults to GH_API_TIMEOUT.
+            pager: If True, inject GH_PAGER=cat into the subprocess env.
+
+        Returns:
+            CompletedProcess on success.
+            None on TimeoutExpired or FileNotFoundError (gh not installed).
+        """
+        env = {**os.environ, "GH_PAGER": "cat"} if pager else None
+        effective_timeout = timeout if timeout is not None else GH_API_TIMEOUT
+        try:
+            return subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                env=env,
+            )
+        except subprocess.TimeoutExpired:
+            logger.bind(external="github", cmd=" ".join(cmd[:3])).warning(
+                f"gh command timed out after {effective_timeout}s"
+            )
+            return None
+        except FileNotFoundError:
+            logger.bind(external="github").warning("gh CLI not found")
+            return None
 
     def get_current_user(self) -> str:
         """Get current authenticated user login name."""

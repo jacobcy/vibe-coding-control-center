@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import Any, cast
 
 from loguru import logger
-
-GH_API_TIMEOUT = 30
 
 
 class IssueBodyMixin:
@@ -38,19 +35,18 @@ class IssueBodyMixin:
             "body",
         ]
 
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-            )
-            if result.returncode != 0:
+        result = self._run_gh_command(cmd)
+        if result is None or result.returncode != 0:
+            if result is not None:
                 logger.bind(external="github", error=result.stderr).error(
                     f"Failed to get issue #{issue_number} body"
                 )
-                return None
+            return None
 
+        try:
             data = json.loads(result.stdout)
             return cast(str | None, data.get("body", ""))
-        except (json.JSONDecodeError, subprocess.TimeoutExpired) as e:
+        except json.JSONDecodeError as e:
             logger.bind(
                 external="github",
                 operation="get_issue_body",
@@ -89,21 +85,11 @@ class IssueBodyMixin:
             body,
         ]
 
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-            )
-            if result.returncode != 0:
+        result = self._run_gh_command(cmd)
+        if result is None or result.returncode != 0:
+            if result is not None:
                 logger.bind(external="github", error=result.stderr).error(
                     f"Failed to update issue #{issue_number} body"
                 )
-                return False
-            return True
-        except subprocess.TimeoutExpired as e:
-            logger.bind(
-                external="github",
-                operation="update_issue_body",
-                issue_number=issue_number,
-                error=str(e),
-            ).warning(f"Timeout updating issue body: {e}")
             return False
+        return True
