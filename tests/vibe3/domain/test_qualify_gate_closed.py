@@ -91,9 +91,7 @@ class TestQualifyGateGitHubClosed:
             labels=labels,
             github_state="CLOSED",
         )
-        with patch(
-            "vibe3.services.flow_cleanup_service.FlowCleanupService"
-        ) as mock_svc:
+        with patch("vibe3.services.FlowCleanupService") as mock_svc:
             result = qualify_gate_service.run_qualify_gate(
                 issue=closed_issue,
                 branch=effective_branch,

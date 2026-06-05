@@ -3,13 +3,10 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.domain.qualify_gate import QualifyGateService
-    from vibe3.models import IssueInfo, IssueState
-    from vibe3.models.orchestra_config import OrchestraConfig
-    from vibe3.models.queue_entry import QueueEntry
-    from vibe3.services.check_service import CheckResult
+    from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
+    from vibe3.services import CheckResult
 
     from .flow_protocols import FlowManagerProtocol
 

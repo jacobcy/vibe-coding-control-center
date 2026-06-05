@@ -11,16 +11,16 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.clients import get_store
+from vibe3.config import load_orchestra_config
 from vibe3.domain.events import (
     ExecutorDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
-from vibe3.models.execution_request import ExecutionRequest
-from vibe3.services.issue_context_loader import load_issue_info
+from vibe3.models import ExecutionRequest
+from vibe3.services import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
 
@@ -36,7 +36,7 @@ def _dispatch_role_intent(
     **builder_kwargs: object,
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
-    from vibe3.execution.coordinator import ExecutionCoordinator
+    from vibe3.execution import ExecutionCoordinator
 
     config = load_orchestra_config()
 
@@ -105,7 +105,7 @@ def _dispatch_role_intent(
             # Check if bottom layer already recorded a specific error
             # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
             # If no, record E_DISPATCH_FAILURE for infrastructure visibility
-            from vibe3.services.error_helpers import has_recent_specific_error
+            from vibe3.services import has_recent_specific_error
 
             if has_recent_specific_error(
                 issue_number=issue_number,
@@ -129,7 +129,7 @@ def _dispatch_role_intent(
         else:
             # Dispatch-level infrastructure failure - record to error_log
             # FailedGate will control dispatch based on threshold
-            from vibe3.services.error_helpers import record_error
+            from vibe3.services import record_error
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:
@@ -160,7 +160,7 @@ def _dispatch_role_intent(
 @register_handler("PlannerDispatchIntent")
 def handle_planner_dispatch_intent(event: PlannerDispatchIntent, /) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
-    from vibe3.roles.plan import build_plan_request
+    from vibe3.roles import build_plan_request
 
     with get_store() as store:
         flow_state = store.get_flow_state(event.branch) if event.branch else None
@@ -204,7 +204,7 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent, /) -> None:
     commit_mode is derived from trigger_state: when the executor is dispatched
     with state/merge-ready, it enters the publish path automatically.
     """
-    from vibe3.roles.run import build_run_request
+    from vibe3.roles import build_run_request
 
     with get_store() as store:
         # Read execution context from flow state
@@ -254,7 +254,7 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent, /) -> None:
     Enriches the neutral dispatch intent with report_ref and retry context
     read from flow state.
     """
-    from vibe3.roles.review import build_review_request
+    from vibe3.roles import build_review_request
 
     with get_store() as store:
         # Read execution context from flow state

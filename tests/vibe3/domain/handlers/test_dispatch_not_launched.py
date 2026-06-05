@@ -29,7 +29,7 @@ def _make_mock_request(
 class TestDispatchNotLaunched:
     """When coordinator does not launch, handler should log warning without error."""
 
-    @patch("vibe3.roles.plan.build_plan_request")
+    @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.load_issue_info")

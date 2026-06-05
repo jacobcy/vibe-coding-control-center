@@ -12,8 +12,7 @@ the domain layer avoids circular imports while maintaining type safety.
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from vibe3.models.execution_request import ExecutionRequest
-    from vibe3.models.flow import FlowState
+    from vibe3.models import ExecutionRequest, FlowState
 
 
 @runtime_checkable

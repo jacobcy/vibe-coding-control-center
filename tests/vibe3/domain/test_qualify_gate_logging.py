@@ -83,7 +83,7 @@ def test_blocked_skip_log_reports_aligned_label_state() -> None:
             "resolve_coordination",
             return_value=truth,
         ),
-        patch("vibe3.services.label_service.LabelService") as label_service,
+        patch("vibe3.services.LabelService") as label_service,
         patch(
             "vibe3.observability.orchestra_log.append_orchestra_event"
         ) as append_event,

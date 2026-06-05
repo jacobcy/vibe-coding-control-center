@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable, cast
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
+from vibe3.clients import GitHubClient
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
@@ -35,23 +35,20 @@ from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.queue_entry import QueueEntry
-from vibe3.observability.degraded_mode import get_degraded_manager
-from vibe3.observability.orchestra_log import append_orchestra_event
-from vibe3.services.check_service import CheckService
-from vibe3.services.issue_collection_service import IssueCollectionService
-from vibe3.services.label_utils import (
+from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
+from vibe3.observability import append_orchestra_event, get_degraded_manager
+from vibe3.services import (
+    CheckService,
+    IssueCollectionService,
     clean_old_state_labels,
+    get_manager_usernames,
     should_skip_from_queue,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.roles.definitions import TriggerableRoleDefinition
+    from vibe3.clients import SQLiteClient
+    from vibe3.environment import SessionRegistryService
+    from vibe3.roles import TriggerableRoleDefinition
 
 # Hard limit to prevent extreme tick duration in edge cases
 MAX_INTENTS_PER_TICK = 10
@@ -134,7 +131,7 @@ class GlobalDispatchCoordinator:
 
         # Lazy default for label_dispatcher to avoid module-level import
         if label_dispatcher is None:
-            from vibe3.roles.registry import build_label_dispatch_event
+            from vibe3.roles import build_label_dispatch_event
 
             self._label_dispatcher: LabelDispatchCallable = build_label_dispatch_event  # type: ignore[assignment]
         else:

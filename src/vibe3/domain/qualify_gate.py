@@ -11,22 +11,26 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.coordination_truth import CoordinationTruth
-from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.convention_resolver import ConventionResolver
-from vibe3.services.coordination_resolver import CoordinationResolver
-from vibe3.services.flow_resume_resolver import infer_resume_label
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.task_resume_operations import TaskResumeOperations
+from vibe3.clients import GitClient, GitHubClient
+from vibe3.models import (
+    CoordinationTruth,
+    FlowStatusResponse,
+    IssueInfo,
+    IssueState,
+    OrchestraConfig,
+)
+from vibe3.services import (
+    ConventionResolver,
+    CoordinationResolver,
+    FlowService,
+    IssueFlowService,
+    LabelService,
+    TaskResumeOperations,
+    infer_resume_label,
+)
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
 
@@ -69,14 +73,14 @@ class QualifyGateService:
             )
             return
 
-        from vibe3.observability.orchestra_log import append_orchestra_event
+        from vibe3.observability import append_orchestra_event
 
         append_orchestra_event(
             "dispatcher",
             f"qualify_gate skip (#{issue.number}): "
             "issue closed on GitHub — terminalizing local flow",
         )
-        from vibe3.services.flow_cleanup_service import FlowCleanupService
+        from vibe3.services import FlowCleanupService
 
         FlowCleanupService(store=self._store).cleanup_flow_scene(
             branch,
@@ -214,8 +218,8 @@ class QualifyGateService:
         Ensures local flow_state has flow_status='blocked' and blocked fields
         match the remote truth. Adds state/blocked label if missing.
         """
-        from vibe3.observability.orchestra_log import append_orchestra_event
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.observability import append_orchestra_event
+        from vibe3.services import BlockedStateService
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
         label_blocked = blocked_label in labels
@@ -239,7 +243,7 @@ class QualifyGateService:
 
         if blocked_label not in labels:
             try:
-                from vibe3.services.label_service import LabelService
+                from vibe3.services import LabelService
 
                 label_service = LabelService(repo=self.config.repo)
                 label_service.confirm_issue_state(
@@ -328,8 +332,8 @@ class QualifyGateService:
 
         Clears local blocked cache and removes state/blocked label.
         """
-        from vibe3.models.flow import FlowState
-        from vibe3.observability.orchestra_log import append_orchestra_event
+        from vibe3.models import FlowState
+        from vibe3.observability import append_orchestra_event
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -389,7 +393,7 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
-        from vibe3.observability.orchestra_log import append_orchestra_event
+        from vibe3.observability import append_orchestra_event
 
         worktree_path = truth.worktree_path
         if not worktree_path or not isinstance(worktree_path, str):
@@ -398,8 +402,7 @@ class QualifyGateService:
         wt_path = Path(worktree_path)
         if not wt_path.exists():
             reason = f"Worktree path does not exist: {worktree_path}"
-            from vibe3.services.blocked_state_service import BlockedStateService
-            from vibe3.services.label_service import LabelService
+            from vibe3.services import BlockedStateService, LabelService
 
             service = BlockedStateService(
                 store=self._store,
@@ -436,8 +439,7 @@ class QualifyGateService:
                     f"Worktree branch mismatch: expected {branch}, "
                     f"got {actual_branch}"
                 )
-                from vibe3.services.blocked_state_service import BlockedStateService
-                from vibe3.services.label_service import LabelService
+                from vibe3.services import BlockedStateService, LabelService
 
                 service = BlockedStateService(
                     store=self._store,
@@ -483,8 +485,7 @@ class QualifyGateService:
             return True
 
         # Use BlockedStateService for consistent three-source blocking
-        from vibe3.services.blocked_state_service import BlockedStateService
-        from vibe3.services.label_service import LabelService
+        from vibe3.services import BlockedStateService, LabelService
 
         service = BlockedStateService(
             store=self._store,

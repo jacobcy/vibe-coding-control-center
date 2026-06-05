@@ -8,23 +8,23 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.clients import get_store
+from vibe3.config import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
 from vibe3.models import IssueInfo, IssueState
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
-from vibe3.services.issue_failure_service import block_manager_noop_issue
+from vibe3.services import (
+    block_manager_noop_issue,
+    record_dispatch_failure_if_unexpected,
+)
 
 if TYPE_CHECKING:
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.config.orchestra_settings import OrchestraConfig
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.execution.coordinator import ExecutionCoordinator
+    from vibe3.agents import CodeagentBackend
+    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.config import OrchestraConfig
+    from vibe3.environment import SessionRegistryService
+    from vibe3.execution import CapacityService, ExecutionCoordinator
 
 
 @dataclass
@@ -44,10 +44,9 @@ def build_dispatch_context(
     store: "SQLiteClient",
 ) -> DispatchContext:
     """Construct all dispatch services from base dependencies."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.execution.coordinator import ExecutionCoordinator
+    from vibe3.agents import CodeagentBackend
+    from vibe3.environment import SessionRegistryService
+    from vibe3.execution import CapacityService, ExecutionCoordinator
 
     backend = CodeagentBackend()
     return DispatchContext(
@@ -61,7 +60,7 @@ def build_dispatch_context(
 
 
 def _lazy_github_client() -> "GitHubClient":
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
 
     return GitHubClient()
 
@@ -97,7 +96,7 @@ def handle_manager_dispatch_intent(
     ).info("Manager dispatch intent received, scheduling async dispatch")
 
     async def _do_dispatch(ctx: DispatchContext) -> None:
-        from vibe3.roles.manager import build_manager_request
+        from vibe3.roles import build_manager_request
 
         def _block_for_noop(reason: str) -> None:
             logger.bind(

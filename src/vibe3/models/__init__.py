@@ -31,7 +31,13 @@ if TYPE_CHECKING:
     from vibe3.models.inspection import CallNode, CommandInspection
     from vibe3.models.issue_body import FlowStateProjection
     from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
-    from vibe3.models.orchestration import IssueInfo, IssueState, StateTransition
+    from vibe3.models.orchestration import (
+        ALLOWED_TRANSITIONS,
+        FORBIDDEN_TRANSITIONS,
+        IssueInfo,
+        IssueState,
+        StateTransition,
+    )
     from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
     from vibe3.models.pr import (
         CreatePRRequest,
@@ -72,6 +78,7 @@ if TYPE_CHECKING:
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "ALLOWED_TRANSITIONS": "vibe3.models.orchestration",
     "BranchConvention": "vibe3.models.branch_convention",
     "BranchSource": "vibe3.models.change_source",
     "CommitInfo": "vibe3.models.pr_analysis",
@@ -82,6 +89,7 @@ _LAZY_IMPORTS = {
     "ChangeSource": "vibe3.models.change_source",
     "ChangeSourceType": "vibe3.models.change_source",
     "CommitSource": "vibe3.models.change_source",
+    "FORBIDDEN_TRANSITIONS": "vibe3.models.orchestration",
     "PRSource": "vibe3.models.change_source",
     "UncommittedSource": "vibe3.models.change_source",
     "CoverageReport": "vibe3.models.coverage",
@@ -154,6 +162,7 @@ def __getattr__(name: str) -> object:
 __all__: list[str] = [
     "AgentOptions",
     "AgentResult",
+    "ALLOWED_TRANSITIONS",
     "AsyncExecutionHandle",
     "BranchConvention",
     "BranchSource",
@@ -183,6 +192,7 @@ __all__: list[str] = [
     "FlowState",
     "FlowStateProjection",
     "FlowStatusResponse",
+    "FORBIDDEN_TRANSITIONS",
     "FunctionSnapshot",
     "IssueInfo",
     "IssueLink",

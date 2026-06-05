@@ -26,9 +26,7 @@ class TestAlignBlockedState:
         )
 
         mock_label_service = MagicMock()
-        with patch(
-            "vibe3.services.label_service.LabelService", return_value=mock_label_service
-        ):
+        with patch("vibe3.services.LabelService", return_value=mock_label_service):
             service._align_blocked_state(
                 issue_number=100,
                 branch="test-branch",
@@ -64,9 +62,7 @@ class TestAlignBlockedState:
         )
 
         mock_label_service = MagicMock()
-        with patch(
-            "vibe3.services.label_service.LabelService", return_value=mock_label_service
-        ):
+        with patch("vibe3.services.LabelService", return_value=mock_label_service):
             service._align_blocked_state(
                 issue_number=100,
                 branch="test-branch",

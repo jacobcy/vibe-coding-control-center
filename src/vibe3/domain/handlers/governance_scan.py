@@ -13,19 +13,18 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.store_context import get_store
-from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.config.role_gates import GOVERNANCE_GATE_CONFIG
+from vibe3.clients import get_store
+from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
-from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
+from vibe3.services import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.config.orchestra_config import OrchestraConfig
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.clients import SQLiteClient
+    from vibe3.config import OrchestraConfig
+    from vibe3.environment import SessionRegistryService
+    from vibe3.services import OrchestraStatusService
 
 
 @dataclass(frozen=True)
@@ -48,10 +47,10 @@ class GovernanceScanDependencies:
         Returns:
             GovernanceScanDependencies with registry and status_service
         """
-        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.agents import CodeagentBackend
         from vibe3.domain import FlowManager
-        from vibe3.environment.session_registry import SessionRegistryService
-        from vibe3.services.orchestra_status_service import OrchestraStatusService
+        from vibe3.environment import SessionRegistryService
+        from vibe3.services import OrchestraStatusService
 
         backend = CodeagentBackend()
         registry = SessionRegistryService(store, backend)
@@ -67,12 +66,12 @@ def handle_governance_scan_started(
     event: GovernanceScanStarted, /, deps: GovernanceScanDependencies | None = None
 ) -> None:
     """Dispatch governance scan via CLI self-invocation."""
-    from vibe3.execution.issue_role_support import (
+    from vibe3.execution import (
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.observability.orchestra_log import append_governance_event
-    from vibe3.roles.governance import build_governance_execution_name
+    from vibe3.observability import append_governance_event
+    from vibe3.roles import build_governance_execution_name
 
     config = load_orchestra_config()
 
@@ -159,7 +158,7 @@ def handle_governance_scan_started(
     )
 
     with get_store() as store:
-        from vibe3.execution.coordinator import ExecutionCoordinator
+        from vibe3.execution import ExecutionCoordinator
 
         coordinator = ExecutionCoordinator(config, store)
 

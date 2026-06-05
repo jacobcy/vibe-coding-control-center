@@ -79,7 +79,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     def test_ready_state_dispatches_manager(
         self,
         mock_build_request: MagicMock,
@@ -124,7 +124,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     def test_handoff_state_dispatches_manager(
         self,
         mock_build_request: MagicMock,
@@ -166,7 +166,7 @@ class TestIssueStateDispatchHandler:
         mock_build_request.assert_called_once()
 
     @patch("vibe3.execution.capacity_service.CapacityService")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -201,7 +201,7 @@ class TestIssueStateDispatchHandler:
         mock_block_noop.assert_called_once()
 
     @patch("vibe3.execution.capacity_service.CapacityService")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -234,7 +234,7 @@ class TestIssueStateDispatchHandler:
         mock_block_noop.assert_called_once()
 
     @patch("vibe3.execution.capacity_service.CapacityService")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -290,7 +290,7 @@ class TestIssueStateDispatchHandler:
 
         # Mock build_manager_request to return None
         with patch(
-            "vibe3.roles.manager.build_manager_request",
+            "vibe3.roles.build_manager_request",
             return_value=None,
         ):
             handle_manager_dispatch_intent(
@@ -357,7 +357,7 @@ class TestIssueStateDispatchHandler:
 
         # Mock build_request to raise CapacityDeferredError (race condition case)
         with patch(
-            "vibe3.roles.manager.build_manager_request",
+            "vibe3.roles.build_manager_request",
             side_effect=CapacityDeferredError(
                 "Manager capacity reached (3/3). Deferred flow creation."
             ),
@@ -409,7 +409,7 @@ class TestIssueStateDispatchHandler:
 
         # Mock build_manager_request to return a valid request
         with patch(
-            "vibe3.roles.manager.build_manager_request",
+            "vibe3.roles.build_manager_request",
             return_value=mock_request,
         ):
             handle_manager_dispatch_intent(
@@ -432,7 +432,7 @@ class TestManagerHandlerDispatch:
 
     @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.roles.manager.build_manager_request")
+    @patch("vibe3.roles.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_dispatch_success(
         self,

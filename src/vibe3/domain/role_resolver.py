@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.models import IssueState
-    from vibe3.roles.definitions import TriggerableRoleDefinition
+    from vibe3.roles import TriggerableRoleDefinition
 
 
 def find_role_for_state(
@@ -28,7 +28,7 @@ def find_role_for_state(
         Role definition if found, None otherwise
     """
     # Deferred import to avoid circular dependencies at module load time
-    from vibe3.roles.registry import LABEL_DISPATCH_ROLES
+    from vibe3.roles import LABEL_DISPATCH_ROLES
 
     for role in LABEL_DISPATCH_ROLES:
         if role.trigger_state == state:
