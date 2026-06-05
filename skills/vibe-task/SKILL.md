@@ -1,17 +1,25 @@
 ---
 name: vibe-task
-description: Use when the user wants to inspect RFC, blocked, or epic issues, check dependency chains, or assess milestone readiness. Do not use for roadmap prioritization or issue pool governance.
+description: Use for handling blocked and RFC issues, making decisions that may form ADRs (Architecture Decision Records). Processes problem issues requiring human judgment, dependency resolution, and architectural decisions. Do not use for routine issue monitoring (use vibe-orchestra) or roadmap planning (use vibe-roadmap).
 ---
 
-# /vibe-task - RFC / Blocked / Epic 检查与依赖图编排
+# /vibe-task - Problem Issues & ADR Entry Point
 
-检查项目中的 RFC、blocked、epic issues 状态，并梳理三类 issue 间的依赖关系。
+**问题 issue 处理与架构决策入口**，处理 RFC、blocked、epic issues，形成架构决策记录（ADR）。
+
+## 核心职责
+
+1. **RFC 决策**：处理需要人类讨论的 RFC issues，形成明确决策
+2. **ADR 形成**：架构级 RFC 结晶为 Architecture Decision Records
+3. **Blocked 恢复**：判断并恢复被阻塞的 issues
+4. **依赖梳理**：构建 epic/blocked_by 依赖关系图
 
 ## 核心原则
 
 - **专注问题 issue**：RFC、blocked、epic
 - **基于真源**：只读 shell 输出，不补充字段
 - **依赖优先**：梳理依赖链，给出 milestone 可进性判断
+- **决策落地**：每个 RFC 必须形成明确决策并写入 issue comment
 
 ## Scope
 
