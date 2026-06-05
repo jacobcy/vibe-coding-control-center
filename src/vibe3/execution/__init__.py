@@ -10,17 +10,32 @@ from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.codeagent_runner import CodeagentExecutionService
+    from vibe3.execution.codeagent_support import build_self_invocation
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.execution_lifecycle import (
         execution_prefix,
         persist_execution_lifecycle_event,
     )
+    from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
     from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.execution.issue_role_support import (
+        build_issue_async_cli_request,
+        build_issue_sync_prompt_request,
+        build_task_flow_branch_resolver,
+        resolve_env_overridable_agent_options,
+        resolve_orchestra_repo_root,
+        use_current_branch,
+    )
     from vibe3.execution.issue_role_sync_runner import (
         run_issue_role_async,
         run_issue_role_sync,
     )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
+    from vibe3.execution.prompt_meta import build_prompt_meta
+    from vibe3.execution.role_request_factory import (
+        build_role_async_request,
+        build_role_sync_request,
+    )
     from vibe3.execution.session_service import load_session_id
 
 # Lazy imports for self-references (avoid circular init dependencies)
@@ -32,6 +47,23 @@ _LAZY_IMPORTS = {
     "persist_execution_lifecycle_event": "vibe3.execution.execution_lifecycle",
     "apply_unified_noop_gate": "vibe3.execution.noop_gate",
     "load_session_id": "vibe3.execution.session_service",
+    # Role policy
+    "ExecutionRolePolicyService": "vibe3.execution.execution_role_policy",
+    # Issue role support
+    "resolve_orchestra_repo_root": "vibe3.execution.issue_role_support",
+    "build_task_flow_branch_resolver": "vibe3.execution.issue_role_support",
+    "resolve_env_overridable_agent_options": "vibe3.execution.issue_role_support",
+    "build_issue_async_cli_request": "vibe3.execution.issue_role_support",
+    "build_issue_sync_prompt_request": "vibe3.execution.issue_role_support",
+    "use_current_branch": "vibe3.execution.issue_role_support",
+    # Codeagent support
+    "build_self_invocation": "vibe3.execution.codeagent_support",
+    # Prompt metadata
+    "build_prompt_meta": "vibe3.execution.prompt_meta",
+    # Role request factory
+    "build_role_async_request": "vibe3.execution.role_request_factory",
+    "build_role_sync_request": "vibe3.execution.role_request_factory",
+    # Sync runners
     "run_governance_sync": "vibe3.execution.governance_sync_runner",
     "run_issue_role_async": "vibe3.execution.issue_role_sync_runner",
     "run_issue_role_sync": "vibe3.execution.issue_role_sync_runner",
@@ -62,6 +94,22 @@ __all__ = [
     "load_session_id",
     # Gates
     "apply_unified_noop_gate",
+    # Role policy
+    "ExecutionRolePolicyService",
+    # Issue role support
+    "resolve_orchestra_repo_root",
+    "build_task_flow_branch_resolver",
+    "resolve_env_overridable_agent_options",
+    "build_issue_async_cli_request",
+    "build_issue_sync_prompt_request",
+    "use_current_branch",
+    # Codeagent support
+    "build_self_invocation",
+    # Prompt metadata
+    "build_prompt_meta",
+    # Role request factory
+    "build_role_async_request",
+    "build_role_sync_request",
     # Sync runners
     "run_governance_sync",
     "run_issue_role_async",

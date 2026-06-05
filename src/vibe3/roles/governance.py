@@ -12,12 +12,7 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
-
-# public-api: pending upstream export
-from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+from vibe3.execution import ExecutionRolePolicyService, resolve_orchestra_repo_root
 from vibe3.models import ExecutionRequest, OrchestraConfig
 from vibe3.observability import append_governance_event, governance_dry_run_dir
 from vibe3.prompts import (

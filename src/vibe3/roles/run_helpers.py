@@ -8,9 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from vibe3.config import EXECUTOR_GATE_CONFIG, load_runtime_config
 from vibe3.exceptions import UserError
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import (
+from vibe3.execution import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )

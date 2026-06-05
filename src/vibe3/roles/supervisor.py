@@ -12,12 +12,7 @@ from vibe3.config import (
     ConventionResolver,
 )
 from vibe3.domain import SupervisorIssueIdentified
-
-# public-api: pending upstream export
-from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import use_current_branch
+from vibe3.execution import ExecutionRolePolicyService, use_current_branch
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.services import IssueFlowService, get_handoff_state_label

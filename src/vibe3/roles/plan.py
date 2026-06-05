@@ -21,24 +21,15 @@ from vibe3.config import (
     load_orchestra_config,
     load_runtime_config,
 )
-from vibe3.execution import CodeagentExecutionService, ExecutionCoordinator
-
-# public-api: pending upstream export
-from vibe3.execution.codeagent_support import build_self_invocation
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import (
-    build_task_flow_branch_resolver,
-    resolve_env_overridable_agent_options,
-)
-
-# public-api: pending upstream export
-from vibe3.execution.prompt_meta import build_prompt_meta
-
-# public-api: pending upstream export
-from vibe3.execution.role_request_factory import (
+from vibe3.execution import (
+    CodeagentExecutionService,
+    ExecutionCoordinator,
+    build_prompt_meta,
     build_role_async_request,
     build_role_sync_request,
+    build_self_invocation,
+    build_task_flow_branch_resolver,
+    resolve_env_overridable_agent_options,
 )
 from vibe3.models import (
     ExecutionRequest,

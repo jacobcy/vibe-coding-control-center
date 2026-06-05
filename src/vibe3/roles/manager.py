@@ -25,12 +25,8 @@ from vibe3.exceptions import (
     DiagnosticContext,
     MissingResourceError,
 )
-
-# public-api: pending upstream export
-from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import (
+from vibe3.execution import (
+    ExecutionRolePolicyService,
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
     build_task_flow_branch_resolver,
