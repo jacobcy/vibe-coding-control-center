@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from vibe3.models.issue_body import FlowStateProjection
     from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
     from vibe3.models.orchestration import IssueInfo, IssueState, StateTransition
-    from vibe3.models.plan import PlanRequest
+    from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
     from vibe3.models.pr import (
         CreatePRRequest,
         PRMetadata,
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     )
     from vibe3.models.prompt_meta import PromptContextMode
     from vibe3.models.queue_entry import QueueEntry
-    from vibe3.models.review import ReviewRequest
+    from vibe3.models.review import ReviewRequest, ReviewScope
     from vibe3.models.review_runner import AgentOptions, AgentResult
     from vibe3.models.session_types import SessionRole
     from vibe3.models.snapshot import (
@@ -108,9 +108,12 @@ _LAZY_IMPORTS = {
     "PRResponse": "vibe3.models.pr",
     "PRState": "vibe3.models.pr",
     "PlanRequest": "vibe3.models.plan",
+    "PlanScope": "vibe3.models.plan",
+    "PlanSpecInput": "vibe3.models.plan",
     "PromptContextMode": "vibe3.models.prompt_meta",
     "QueueEntry": "vibe3.models.queue_entry",
     "ReviewRequest": "vibe3.models.review",
+    "ReviewScope": "vibe3.models.review",
     "AgentOptions": "vibe3.models.review_runner",
     "AgentResult": "vibe3.models.review_runner",
     "SessionRole": "vibe3.models.session_types",
@@ -192,12 +195,16 @@ __all__: list[str] = [
     "PRCriticalAnalysis",
     "PRMetadata",
     "PRResponse",
+    "PlanRequest",
+    "PlanScope",
+    "PlanSpecInput",
     "PRSource",
     "PRState",
     "PlanRequest",
     "PromptContextMode",
     "QueueEntry",
     "ReviewRequest",
+    "ReviewScope",
     "SessionRole",
     "StateTransition",
     "StructureDiff",

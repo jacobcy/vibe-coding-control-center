@@ -44,12 +44,11 @@ from vibe3.models import (
     IssueInfo,
     IssueState,
     OrchestraConfig,
+    ReviewRequest,
+    ReviewScope,
     StructureDiff,
     WorktreeRequirement,
 )
-
-# public-api: pending upstream export
-from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,

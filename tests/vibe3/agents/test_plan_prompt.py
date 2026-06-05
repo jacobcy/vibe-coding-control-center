@@ -5,7 +5,7 @@ from vibe3.agents.plan_prompt import (
     build_plan_prompt_body,
     build_plan_task_section,
 )
-from vibe3.models.plan import PlanRequest, PlanScope
+from vibe3.models import PlanRequest, PlanScope
 
 
 def test_build_plan_prompt_body_includes_task_guidance() -> None:

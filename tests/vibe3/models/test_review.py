@@ -2,7 +2,7 @@
 
 import pytest
 
-from vibe3.models.review import ReviewRequest, ReviewScope
+from vibe3.models import ReviewRequest, ReviewScope
 
 
 class TestReviewScope:
