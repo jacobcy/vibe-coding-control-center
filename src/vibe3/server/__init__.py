@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-# Domain layer re-exports (cross-module) - kept minimal
-from vibe3.domain import FailedGate, FlowManager
-
-# Runtime layer re-exports (cross-module) - kept minimal
-from vibe3.runtime import CircuitBreaker, HeartbeatServer
-
-# Orchestra instance utilities (now in runtime - cross-module) - kept minimal
-from vibe3.runtime.orchestra_instance import (
-    OrchestraInstanceInfo,
-    read_instance_info,
-    validate_instance,
-    write_instance_info,
-)
-
 if TYPE_CHECKING:
+    # Domain layer re-exports
+    from vibe3.domain import FailedGate, FlowManager
+
+    # Runtime layer re-exports
+    from vibe3.runtime import CircuitBreaker, HeartbeatServer
+
+    # Orchestra instance utilities (now in runtime)
+    from vibe3.runtime.orchestra_instance import (
+        OrchestraInstanceInfo,
+        read_instance_info,
+        validate_instance,
+        write_instance_info,
+    )
+
     # MCP server
     from vibe3.server.mcp import (
         _serialize_snapshot,
@@ -45,11 +45,24 @@ if TYPE_CHECKING:
     # Server utilities
     from vibe3.server.server_utils import find_available_port
 
-# Lazy imports for self-references (avoid circular init dependencies)
+# Lazy imports for all symbols (avoid circular init dependencies)
 _LAZY_IMPORTS = {
+    # Domain layer re-exports
+    "FailedGate": "vibe3.domain",
+    "FlowManager": "vibe3.domain",
+    # Runtime layer re-exports
+    "CircuitBreaker": "vibe3.runtime",
+    "HeartbeatServer": "vibe3.runtime",
+    # Orchestra instance utilities
+    "OrchestraInstanceInfo": "vibe3.runtime.orchestra_instance",
+    "read_instance_info": "vibe3.runtime.orchestra_instance",
+    "validate_instance": "vibe3.runtime.orchestra_instance",
+    "write_instance_info": "vibe3.runtime.orchestra_instance",
+    # MCP server
     "create_mcp_server": "vibe3.server.mcp",
     "format_snapshot_for_mcp": "vibe3.server.mcp",
     "_serialize_snapshot": "vibe3.server.mcp",
+    # Registry
     "ORCHESTRA_TMUX_SESSION": "vibe3.server.registry",
     "_build_server": "vibe3.server.registry",
     "_build_server_with_launch_cwd": "vibe3.server.registry",
@@ -62,6 +75,7 @@ _LAZY_IMPORTS = {
     "_resolve_orchestra_log_dir": "vibe3.server.registry",
     "_resolve_async_cli_override_root": "vibe3.server.registry",
     "_validate_pid_file": "vibe3.server.registry",
+    # Server utilities
     "find_available_port": "vibe3.server.server_utils",
 }
 
