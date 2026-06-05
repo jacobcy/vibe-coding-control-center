@@ -14,7 +14,6 @@ from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
 from vibe3.models import IssueInfo, IssueState
-from vibe3.roles.manager import build_manager_request
 from vibe3.services.error_helpers import record_dispatch_failure_if_unexpected
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 
@@ -98,6 +97,8 @@ def handle_manager_dispatch_intent(
     ).info("Manager dispatch intent received, scheduling async dispatch")
 
     async def _do_dispatch(ctx: DispatchContext) -> None:
+        from vibe3.roles.manager import build_manager_request
+
         def _block_for_noop(reason: str) -> None:
             logger.bind(
                 domain="issue_state_dispatch_handler",

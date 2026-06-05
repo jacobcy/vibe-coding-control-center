@@ -25,7 +25,6 @@ from vibe3.domain.protocols.dispatch_protocols import (
     CheckServiceProtocol,
     DispatchHealthCheckProtocol,
     FlowContextResolverProtocol,
-    FlowServiceProtocol,
     IssueCollectionServiceProtocol,
     IssueLoaderProtocol,
     LabelDispatchCallable,
@@ -41,9 +40,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.queue_entry import QueueEntry
 from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.observability.orchestra_log import append_orchestra_event
-from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
-from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_collection_service import IssueCollectionService
 from vibe3.services.label_utils import (
     clean_old_state_labels,
@@ -78,7 +75,6 @@ class GlobalDispatchCoordinator:
     _flow_context: FlowContextResolverProtocol
     _queue_selector: QueueSelectorProtocol
     _check_service: CheckServiceProtocol
-    _flow_blocker: FlowServiceProtocol
     _issue_collector_factory: Callable[[], IssueCollectionServiceProtocol]
     _label_dispatcher: LabelDispatchCallable
     _dispatch_paused: bool
@@ -100,7 +96,6 @@ class GlobalDispatchCoordinator:
         flow_context_resolver: FlowContextResolverProtocol,
         queue_selector: QueueSelectorProtocol,
         check_service: CheckServiceProtocol | None = None,
-        flow_blocker: FlowServiceProtocol | None = None,
         issue_collector_factory: (
             Callable[[], IssueCollectionServiceProtocol] | None
         ) = None,
@@ -130,18 +125,20 @@ class GlobalDispatchCoordinator:
         self._check_service = check_service or CheckService(
             store=store, git_client=flow_manager.git, github_client=github
         )
-        self._flow_blocker = flow_blocker or FlowService(
-            store=store, git_client=flow_manager.git
-        )
 
         # Fallback: create default factory or use default dispatcher
         self._issue_collector_factory: Callable[[], IssueCollectionServiceProtocol] = (
             issue_collector_factory
             or (lambda: IssueCollectionService(github, config.repo))
         )
-        self._label_dispatcher: LabelDispatchCallable = (
-            label_dispatcher or build_label_dispatch_event  # type: ignore[assignment]
-        )
+
+        # Lazy default for label_dispatcher to avoid module-level import
+        if label_dispatcher is None:
+            from vibe3.roles.registry import build_label_dispatch_event
+
+            self._label_dispatcher: LabelDispatchCallable = build_label_dispatch_event  # type: ignore[assignment]
+        else:
+            self._label_dispatcher = label_dispatcher
 
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
@@ -175,6 +172,7 @@ class GlobalDispatchCoordinator:
             issue: Issue info
             tick_id: Heartbeat tick number for error tracking
         """
+
         # Pre-dispatch cleanup: remove conflicting state/* labels
         clean_old_state_labels(issue, role, self._config)
 

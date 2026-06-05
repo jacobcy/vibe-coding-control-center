@@ -34,11 +34,16 @@ def _setup_health_check_service(
     store: MagicMock,
 ) -> None:
     """Helper to re-create health check service with mocked dependencies."""
+    from unittest.mock import MagicMock
+
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+
+    # Create mock flow_blocker for tests
+    mock_flow_blocker = MagicMock()
 
     coordinator._health_check_service = DispatchHealthCheckService(
         check_service=check_service,
-        flow_blocker=coordinator._flow_blocker,
+        flow_blocker=mock_flow_blocker,
         store=store,
         flow_context_resolver=coordinator._flow_context,
     )

@@ -19,11 +19,7 @@ from vibe3.domain.events import (
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.execution_request import ExecutionRequest
-from vibe3.roles.plan import build_plan_request
-from vibe3.roles.review import build_review_request
-from vibe3.roles.run import build_run_request
 from vibe3.services.issue_context_loader import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
@@ -40,6 +36,8 @@ def _dispatch_role_intent(
     **builder_kwargs: object,
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
+    from vibe3.execution.coordinator import ExecutionCoordinator
+
     config = load_orchestra_config()
 
     with get_store() as store:
@@ -162,6 +160,8 @@ def _dispatch_role_intent(
 @register_handler("PlannerDispatchIntent")
 def handle_planner_dispatch_intent(event: PlannerDispatchIntent, /) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
+    from vibe3.roles.plan import build_plan_request
+
     with get_store() as store:
         flow_state = store.get_flow_state(event.branch) if event.branch else None
         has_plan = (
@@ -204,6 +204,8 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent, /) -> None:
     commit_mode is derived from trigger_state: when the executor is dispatched
     with state/merge-ready, it enters the publish path automatically.
     """
+    from vibe3.roles.run import build_run_request
+
     with get_store() as store:
         # Read execution context from flow state
         flow_state = store.get_flow_state(event.branch) if event.branch else None
@@ -252,6 +254,8 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent, /) -> None:
     Enriches the neutral dispatch intent with report_ref and retry context
     read from flow state.
     """
+    from vibe3.roles.review import build_review_request
+
     with get_store() as store:
         # Read execution context from flow state
         flow_state = store.get_flow_state(event.branch) if event.branch else None

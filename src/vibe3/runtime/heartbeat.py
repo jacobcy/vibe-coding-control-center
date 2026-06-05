@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
@@ -14,13 +14,35 @@ from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
-from vibe3.services.error_tracking_service import ErrorTrackingService
 
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
 
 if TYPE_CHECKING:
-    from vibe3.domain.failed_gate import FailedGate
+    from vibe3.domain.failed_gate import GateResult
+
+
+class FailedGateProtocol(Protocol):
+    """Protocol for FailedGate to avoid circular dependency.
+
+    This protocol defines the interface used by HeartbeatServer,
+    allowing runtime layer to avoid importing from domain layer.
+    """
+
+    def check(self) -> GateResult:
+        """Check if orchestra dispatch should be frozen.
+
+        Returns:
+            GateResult with blocked status and reason
+        """
+        ...
+
+    def increment_blocked_ticks(self) -> None:
+        """Increment blocked_ticks counter.
+
+        Called each tick when gate is ACTIVE.
+        """
+        ...
 
 
 class HeartbeatServer:
@@ -34,7 +56,7 @@ class HeartbeatServer:
     def __init__(
         self,
         config: OrchestraConfig,
-        failed_gate: FailedGate | None = None,
+        failed_gate: FailedGateProtocol | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -174,6 +196,9 @@ class HeartbeatServer:
                     continue
 
             # Cleanup old error records (maintenance)
+            # Delay import to avoid circular dependency
+            from vibe3.services.error_tracking_service import ErrorTrackingService
+
             error_tracking = ErrorTrackingService.get_instance()
 
             # Cleanup retention-based errors
