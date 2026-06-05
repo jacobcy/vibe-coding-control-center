@@ -51,20 +51,18 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
 
     with (
         patch(
-            "vibe3.environment.worktree_support.find_worktree_by_path",
+            "vibe3.environment.find_worktree_by_path",
             return_value=True,
         ),
         patch(
-            "vibe3.environment.worktree_support.find_worktree_for_branch",
+            "vibe3.environment.find_worktree_for_branch",
             return_value=None,
         ),
         patch(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch(
-            "vibe3.services.error_tracking_service.ErrorTrackingService"
-        ) as mock_tracking,
+        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
         patch("vibe3.services.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
@@ -118,22 +116,20 @@ def test_auto_scene_reset_does_not_directly_unblock_without_rebuild(
 
     with (
         patch(
-            "vibe3.environment.worktree_support.find_worktree_by_path",
+            "vibe3.environment.find_worktree_by_path",
             return_value=True,
         ),
         patch(
-            "vibe3.environment.worktree_support.find_worktree_for_branch",
+            "vibe3.environment.find_worktree_for_branch",
             return_value=None,
         ),
         patch(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.services.error_tracking_service.ErrorTrackingService"),
+        patch("vibe3.services.ErrorTrackingService"),
         patch("vibe3.services.FlowRebuildUsecase"),
-        patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
-        ) as blocked_cls,
+        patch("vibe3.services.BlockedStateService") as blocked_cls,
     ):
         service.maybe_reset_damaged_scene(
             request,
@@ -177,9 +173,7 @@ def test_auto_scene_reset_skips_when_live_session_exists(
         return Path(req.repo_path) if req.repo_path else tmp_path
 
     with (
-        patch(
-            "vibe3.services.error_tracking_service.ErrorTrackingService"
-        ) as mock_tracking,
+        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
         patch("vibe3.services.FlowRebuildUsecase") as mock_cleanup_cls,
     ):
         result = service.maybe_reset_damaged_scene(
@@ -226,20 +220,18 @@ def test_auto_scene_reset_reports_rebuild_failure(
 
     with (
         patch(
-            "vibe3.environment.worktree_support.find_worktree_by_path",
+            "vibe3.environment.find_worktree_by_path",
             return_value=True,
         ),
         patch(
-            "vibe3.environment.worktree_support.find_worktree_for_branch",
+            "vibe3.environment.find_worktree_for_branch",
             return_value=None,
         ),
         patch(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch(
-            "vibe3.services.error_tracking_service.ErrorTrackingService"
-        ) as mock_tracking,
+        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
         patch("vibe3.services.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
