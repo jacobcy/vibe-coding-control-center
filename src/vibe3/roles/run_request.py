@@ -11,12 +11,8 @@ from vibe3.agents import (
 )
 from vibe3.clients import SQLiteClient
 from vibe3.config import ConventionResolver, VibeConfig
-
-# public-api: pending upstream export
-from vibe3.execution.prompt_meta import build_prompt_meta
-
-# public-api: pending upstream export
-from vibe3.execution.role_request_factory import (
+from vibe3.execution import (
+    build_prompt_meta,
     build_role_async_request,
     build_role_sync_request,
 )

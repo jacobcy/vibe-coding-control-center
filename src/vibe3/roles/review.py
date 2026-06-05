@@ -29,21 +29,16 @@ from vibe3.config import (
 
 # public-api: pending upstream export
 from vibe3.config.cli_overrides import RoleCliOverrides
-from vibe3.execution import CodeagentExecutionService, ExecutionCoordinator
-
-# public-api: pending upstream export
-from vibe3.execution.codeagent_support import build_self_invocation
-
-# public-api: pending upstream export
-from vibe3.execution.issue_role_support import (
+from vibe3.execution import (
+    CodeagentExecutionService,
+    ExecutionCoordinator,
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
+    build_prompt_meta,
+    build_self_invocation,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
-
-# public-api: pending upstream export
-from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.models import (
     ExecutionRequest,
     IssueInfo,

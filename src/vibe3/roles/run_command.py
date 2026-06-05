@@ -23,14 +23,10 @@ from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution import (
     CodeagentExecutionService,
     ExecutionCoordinator,
+    build_prompt_meta,
+    build_self_invocation,
     load_session_id,
 )
-
-# public-api: pending upstream export
-from vibe3.execution.codeagent_support import build_self_invocation
-
-# public-api: pending upstream export
-from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
