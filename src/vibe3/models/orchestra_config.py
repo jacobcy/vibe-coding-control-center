@@ -179,6 +179,23 @@ class PeriodicCheckConfig(BaseModel):
     enable_remote_branch_cleanup: bool = True
 
 
+class QueueRecollectConfig(BaseModel):
+    """Configuration for periodic queue recollection to refresh priorities.
+
+    Periodically forces a full queue rebuild to incorporate priority label
+    changes that occurred after the initial collection. Without this, the
+    frozen queue would only rebuild when empty, potentially blocking
+    high-priority issues behind lower-priority ones.
+    """
+
+    enabled: bool = True
+    interval_ticks: int = Field(
+        default=10,
+        ge=1,
+        description="Force queue recollection every N heartbeat ticks",
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -274,6 +291,7 @@ __all__ = [
     "GovernanceConfig",
     "SupervisorHandoffConfig",
     "PeriodicCheckConfig",
+    "QueueRecollectConfig",
     "OrchestraConfig",
     "_default_pid_file",
 ]
