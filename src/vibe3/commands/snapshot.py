@@ -5,8 +5,7 @@ from typing import Annotated
 
 import typer
 
-from vibe3.analysis import snapshot_service
-from vibe3.analysis.snapshot_diff import compute_diff
+from vibe3.analysis import compute_diff, snapshot_service
 from vibe3.commands.common import enable_method_trace
 
 app = typer.Typer(

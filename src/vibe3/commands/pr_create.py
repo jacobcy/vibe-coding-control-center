@@ -12,13 +12,16 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
-from vibe3.models.pr import PRResponse, UpdatePRRequest
-from vibe3.observability.logger import setup_logging
-from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_create_usecase import PRCreateUsecase
-from vibe3.services.pr_service import PRService
-from vibe3.services.task_binding_guard import MissingTaskIssueError
-from vibe3.ui.pr_ui import render_pr_confirmed, render_pr_created
+from vibe3.models import PRResponse
+from vibe3.models.pr import UpdatePRRequest
+from vibe3.observability import setup_logging
+from vibe3.services import (
+    FlowService,
+    MissingTaskIssueError,
+    PRCreateUsecase,
+    PRService,
+)
+from vibe3.ui import console, render_pr_confirmed, render_pr_created
 from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_body
 
 
@@ -124,8 +127,6 @@ def register_create_command(app: typer.Typer) -> None:
 
         # Human-only gate
         if not (yes or agent):
-            from vibe3.ui.console import console
-
             console.print("[yellow]此命令需要明确确认：[/]")
             console.print("[yellow]  - 人类用户：使用 --yes[/]")
             console.print("[yellow]  - AI Agent：使用 --agent[/]")

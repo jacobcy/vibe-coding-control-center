@@ -8,19 +8,20 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 from vibe3.commands.command_options import FormatOption, VerboseOption
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.handoff_render import (
     _render_handoff_events,
 )
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_status_service import HandoffStatusService
-from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
-from vibe3.services.pr_branch_resolver import resolve_command_branch
-from vibe3.ui.console import console
-from vibe3.ui.handoff_ui import render_handoff_detail
+from vibe3.services import (
+    FlowService,
+    HandoffStatusService,
+    resolve_command_branch,
+    resolve_issue_branch_input,
+)
+from vibe3.ui import console, render_handoff_detail
 
 
 def _format_relative_time(timestamp: datetime, now: datetime | None = None) -> str:

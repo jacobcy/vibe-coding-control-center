@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from typing import Iterator
 
-from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
+from vibe3.services import BaseResolutionUsecase
 
 
 @contextmanager

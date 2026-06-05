@@ -4,7 +4,7 @@ from pathlib import Path
 
 from rich.panel import Panel
 
-from vibe3.ui.console import console
+from vibe3.ui.console_impl import console
 
 
 def render_handoff_detail(artifact_path: Path) -> None:

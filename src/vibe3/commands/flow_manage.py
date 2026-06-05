@@ -12,11 +12,9 @@ from vibe3.commands.command_options import (
     TraceOption,
 )
 from vibe3.commands.common import enable_method_trace, validate_trace_options
-from vibe3.models.flow import IssueLink
-from vibe3.services.flow_service import FlowService
-from vibe3.services.task_service import TaskService
-from vibe3.ui.console import console
-from vibe3.ui.flow_ui import render_flow_created
+from vibe3.models import IssueLink
+from vibe3.services import FlowService, TaskService
+from vibe3.ui import console, render_flow_created
 
 # Type annotations for command arguments
 BranchArg = Annotated[
@@ -94,7 +92,7 @@ def _resolve_bind_branch(flow_service: FlowService, branch: str | None) -> str:
     current branch directly.
     """
     if branch is None:
-        return flow_service.get_current_branch()
+        return str(flow_service.get_current_branch())
 
     if flow_service._is_main_branch(branch):
         typer.echo(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.ui.console import console
+    from vibe3.ui.console_impl import console
     from vibe3.ui.flow_ui import (
         render_error,
         render_flow_created,
@@ -38,9 +38,9 @@ if TYPE_CHECKING:
         render_task_show,
     )
 
-# Lazy imports
-_LAZY_IMPORTS = {
-    "console": "vibe3.ui.console",
+# Lazy import mapping
+_SYMBOL_MODULES = {
+    "console": "vibe3.ui.console_impl",
     "render_flow_status": "vibe3.ui.flow_ui",
     "render_flow_created": "vibe3.ui.flow_ui",
     "render_flows_status_dashboard": "vibe3.ui.flow_ui",
@@ -67,11 +67,14 @@ _LAZY_IMPORTS = {
 
 def __getattr__(name: str) -> object:
     """Lazy import for ui symbols to avoid circular dependencies."""
-    if name in _LAZY_IMPORTS:
+    if name in _SYMBOL_MODULES:
         import importlib
 
-        module = importlib.import_module(_LAZY_IMPORTS[name])
-        return getattr(module, name)
+        module = importlib.import_module(_SYMBOL_MODULES[name])
+        symbol = getattr(module, name)
+        # Cache in module globals for faster subsequent access
+        globals()[name] = symbol
+        return symbol
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

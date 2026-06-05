@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from vibe3.commands import _validate_pid_file
 from vibe3.commands.command_options import (
     FormatOption,
     TraceMinMsOption,
@@ -22,11 +21,12 @@ from vibe3.commands.common import (
     validate_trace_options,
 )
 from vibe3.config.env_override import OVERRIDE_RULES
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.logging import orchestra_events_log_path
-from vibe3.services.orchestra_helpers import get_manager_usernames
-from vibe3.ui.console import console
-from vibe3.utils.time_format import format_age_aware_time
+from vibe3.models import OrchestraConfig
+from vibe3.orchestra import orchestra_events_log_path
+from vibe3.server.registry import _validate_pid_file
+from vibe3.services import get_manager_usernames
+from vibe3.ui import console
+from vibe3.utils import format_age_aware_time
 
 if TYPE_CHECKING:
     from vibe3.services.orchestra_status_service import OrchestraSnapshot

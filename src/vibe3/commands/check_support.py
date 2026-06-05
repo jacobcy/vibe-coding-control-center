@@ -14,8 +14,7 @@ from rich.progress import (
     TextColumn,
 )
 
-from vibe3.services.check_remote import InitResult
-from vibe3.services.check_service import CheckResult, CheckService
+from vibe3.services import CheckResult, CheckService, InitResult
 
 
 @dataclass
@@ -61,7 +60,7 @@ def _run_with_progress(
 
         results = service.verify_all_flows(status=status, on_progress=on_progress)
 
-    return results
+    return list(results)
 
 
 def execute_check_mode(

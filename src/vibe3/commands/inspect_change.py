@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 import yaml
 
-from vibe3.analysis.inspect_query_service import build_change_analysis
+from vibe3.analysis import build_change_analysis
 from vibe3.commands.common import enable_method_trace
 
 

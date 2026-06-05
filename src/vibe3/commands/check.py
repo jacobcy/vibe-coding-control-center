@@ -8,8 +8,8 @@ from rich.markup import escape
 
 from vibe3.commands.check_support import execute_check_mode
 from vibe3.commands.common import enable_method_trace
-from vibe3.observability.logger import setup_logging
-from vibe3.services.check_service import CheckService
+from vibe3.observability import setup_logging
+from vibe3.services import CheckService
 
 app = typer.Typer(
     help="Verify handoff store consistency",
