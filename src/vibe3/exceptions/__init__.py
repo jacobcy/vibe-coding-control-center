@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.exceptions.runtime_errors import GitHubAPIError
 
 
 class VibeError(Exception):
@@ -209,7 +213,22 @@ class InvalidBranchLinkError(SystemError):
 #   from vibe3.services.error_helpers import record_error
 
 
-from vibe3.exceptions.runtime_errors import GitHubAPIError  # noqa: E402
+# Lazy imports to avoid circular dependencies
+_LAZY_IMPORTS = {
+    "GitHubAPIError": "vibe3.exceptions.runtime_errors",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Lazy import symbols to avoid circular dependencies."""
+    if name in _LAZY_IMPORTS:
+        module_path = _LAZY_IMPORTS[name]
+        import importlib
+
+        module = importlib.import_module(module_path)
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "VibeError",

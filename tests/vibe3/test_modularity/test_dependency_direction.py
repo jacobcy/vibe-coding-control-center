@@ -18,6 +18,63 @@ if TYPE_CHECKING:
     pass
 
 
+def _build_parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST | None]:
+    """Build a mapping from each node to its parent node.
+
+    Args:
+        tree: The AST tree to analyze
+
+    Returns:
+        Dictionary mapping each node to its parent (or None for root)
+    """
+    parents = {}
+
+    def _visit(node: ast.AST, parent: ast.AST | None = None) -> None:
+        parents[node] = parent
+        for child in ast.iter_child_nodes(node):
+            _visit(child, node)
+
+    _visit(tree)
+    return parents
+
+
+def _is_in_type_checking_or_function(
+    node: ast.AST, parents: dict[ast.AST, ast.AST | None]
+) -> bool:
+    """Check if a node is inside a TYPE_CHECKING if block or a function/method body.
+
+    Args:
+        node: The AST node to check
+        parents: Parent mapping from _build_parent_map
+
+    Returns:
+        True if node is inside TYPE_CHECKING block or function body
+    """
+    current = node
+    while current is not None:
+        parent = parents.get(current)
+        if parent is None:
+            break
+
+        # Check if inside an if statement
+        if isinstance(parent, ast.If):
+            # Check if this is an `if TYPE_CHECKING:` block
+            test = parent.test
+            # Handle both `if TYPE_CHECKING:` and `if typing.TYPE_CHECKING:`
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                return True
+            if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+                return True
+
+        # Check if inside a function/method body
+        if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return True
+
+        current = parent
+
+    return False
+
+
 class TestLayerDependencies:
     """Test that dependencies follow layer rules."""
 
@@ -83,10 +140,6 @@ class TestLayerDependencies:
                 + "\n".join(f"  - {v}" for v in violations)
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: ~25 __init__.py files import from own "
-        "submodules (roles, runtime, server, services, utils)"
-    )
     def test_no_self_reference_in_init(self, module_registry: list[str]) -> None:
         """Verify __init__.py files don't import from their own submodule in ways
         that create circular init-time dependencies.
@@ -101,9 +154,14 @@ class TestLayerDependencies:
             try:
                 source = init_path.read_text(encoding="utf-8")
                 tree = ast.parse(source)
+                parents = _build_parent_map(tree)
 
                 # Look for imports of own submodules
                 for node in ast.walk(tree):
+                    # Skip imports inside TYPE_CHECKING blocks or functions
+                    if _is_in_type_checking_or_function(node, parents):
+                        continue
+
                     if isinstance(node, ast.ImportFrom):
                         # Check absolute imports: from vibe3.<module>.<sub> import ...
                         if node.module and node.module.startswith(
@@ -128,6 +186,20 @@ class TestLayerDependencies:
                                 f"relative import from .{node.module} "
                                 "(potential circular dependency)"
                             )
+                    elif isinstance(node, ast.Import):
+                        # Check absolute imports: import vibe3.<module>.<sub>
+                        for alias in node.names:
+                            if not alias.name.startswith(f"vibe3.{module_name}."):
+                                continue
+
+                            parts = alias.name.split(".")
+                            if len(parts) > 2:
+                                submodule = parts[2]
+                                violations.append(
+                                    f"{module_name}/__init__.py: "
+                                    f"imports own submodule {submodule} "
+                                    "(potential circular dependency)"
+                                )
 
             except (SyntaxError, OSError) as e:
                 violations.append(f"{module_name}/__init__.py: parse error - {e}")
@@ -137,6 +209,21 @@ class TestLayerDependencies:
                 "Potential circular dependencies in __init__.py:\n"
                 + "\n".join(f"  - {v}" for v in violations)
             )
+
+    def test_no_self_reference_in_init_flags_absolute_imports(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Absolute import statements in __init__.py still create init-time risk."""
+        init_path = tmp_path / "src/vibe3/sample/__init__.py"
+        init_path.parent.mkdir(parents=True)
+        init_path.write_text("import vibe3.sample.child\n", encoding="utf-8")
+
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(pytest.fail.Exception) as exc_info:
+            self.test_no_self_reference_in_init(["sample"])
+
+        assert "imports own submodule child" in str(exc_info.value)
 
 
 def _detect_cycles_dfs(
