@@ -12,6 +12,7 @@ Protocols & Models:
 
 Backend:
 - ``CodeagentBackend`` — concrete backend implementation via codeagent-wrapper
+- ``start_async_command`` — launch async command in tmux session
 
 Prompt Builders:
 - ``build_plan_prompt_body`` / ``make_plan_context_builder`` — plan agent
@@ -87,6 +88,7 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "CodeagentBackend": "vibe3.agents.backends.codeagent",
     "sync_models_json": "vibe3.agents.backends.codeagent_config",
+    "start_async_command": "vibe3.agents.backends.async_launcher",
     "AgentBackend": "vibe3.agents.base",
     "CodeagentCommand": "vibe3.agents.models",
     "CodeagentResult": "vibe3.agents.models",
