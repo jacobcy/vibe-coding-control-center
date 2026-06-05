@@ -10,17 +10,13 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.models import IssueInfo, IssueState
-from vibe3.models.queue_entry import QueueEntry
-from vibe3.orchestra.queue_operations import promote_progressed_entries
-from vibe3.services.label_utils import should_skip_from_queue
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
+from vibe3.orchestra import promote_progressed_entries
+from vibe3.services import get_manager_usernames, should_skip_from_queue
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.environment import SessionRegistryService
 
 
 @dataclass

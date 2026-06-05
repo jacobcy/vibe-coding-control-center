@@ -11,18 +11,19 @@ Import from vibe3.orchestra instead of submodules to ensure clean dependencies.
 from typing import TYPE_CHECKING
 
 # Module-level re-exports from clients/ (safe, no cycle risk)
-from vibe3.clients.git_client import GitClient
+from vibe3.clients import GitClient
 
 # Module-level re-exports from models/ (safe, no cycle risk)
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import OrchestraConfig
 
 # Lazy imports via __getattr__ for everything else to avoid circular dependencies
 if TYPE_CHECKING:
+    from vibe3.domain.dispatch_coordinator import MAX_INTENTS_PER_TICK
     from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
-    from vibe3.models.queue_entry import QueueEntry
-    from vibe3.observability.orchestra_log import (
+    from vibe3.models import QueueEntry
+    from vibe3.observability import (
         append_governance_event,
         append_orchestra_event,
         append_orchestra_run_separator,
@@ -53,9 +54,11 @@ if TYPE_CHECKING:
         sort_ready_issues,
     )
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
-    from vibe3.services.check_service import CheckResult
-    from vibe3.services.label_utils import should_skip_from_queue
-    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services import (
+        CheckResult,
+        get_manager_usernames,
+        should_skip_from_queue,
+    )
 
 
 def __getattr__(name: str) -> object:
@@ -66,7 +69,7 @@ def __getattr__(name: str) -> object:
     """
     # Orchestra submodule symbols
     if name == "QueueEntry":
-        from vibe3.models.queue_entry import QueueEntry
+        from vibe3.models import QueueEntry
 
         return QueueEntry
     if name == "FailedGate":
@@ -74,23 +77,23 @@ def __getattr__(name: str) -> object:
 
         return FailedGate
     if name == "append_governance_event":
-        from vibe3.observability.orchestra_log import append_governance_event
+        from vibe3.observability import append_governance_event
 
         return append_governance_event
     if name == "append_orchestra_event":
-        from vibe3.observability.orchestra_log import append_orchestra_event
+        from vibe3.observability import append_orchestra_event
 
         return append_orchestra_event
     if name == "append_orchestra_run_separator":
-        from vibe3.observability.orchestra_log import append_orchestra_run_separator
+        from vibe3.observability import append_orchestra_run_separator
 
         return append_orchestra_run_separator
     if name == "orchestra_events_log_path":
-        from vibe3.observability.orchestra_log import orchestra_events_log_path
+        from vibe3.observability import orchestra_events_log_path
 
         return orchestra_events_log_path
     if name == "orchestra_log_dir":
-        from vibe3.observability.orchestra_log import orchestra_log_dir
+        from vibe3.observability import orchestra_log_dir
 
         return orchestra_log_dir
     if name == "resolve_priority":
@@ -161,6 +164,10 @@ def __getattr__(name: str) -> object:
         return LabelDispatchCallable
 
     # Domain symbols (domain/ imports from orchestra submodules)
+    if name == "MAX_INTENTS_PER_TICK":
+        from vibe3.domain.dispatch_coordinator import MAX_INTENTS_PER_TICK
+
+        return MAX_INTENTS_PER_TICK
     if name == "QualifyGateService":
         from vibe3.domain.qualify_gate import QualifyGateService
 
@@ -180,15 +187,15 @@ def __getattr__(name: str) -> object:
 
     # Services symbols (services/ may import from orchestra)
     if name == "CheckResult":
-        from vibe3.services.check_service import CheckResult
+        from vibe3.services import CheckResult
 
         return CheckResult
     if name == "should_skip_from_queue":
-        from vibe3.services.label_utils import should_skip_from_queue
+        from vibe3.services import should_skip_from_queue
 
         return should_skip_from_queue
     if name == "get_manager_usernames":
-        from vibe3.services.orchestra_helpers import get_manager_usernames
+        from vibe3.services import get_manager_usernames
 
         return get_manager_usernames
 
@@ -226,6 +233,7 @@ __all__ = [
     # Clients
     "GitClient",
     # Domain (via __getattr__)
+    "MAX_INTENTS_PER_TICK",
     "QualifyGateService",
     "find_role_for_state",
     "GateResult",

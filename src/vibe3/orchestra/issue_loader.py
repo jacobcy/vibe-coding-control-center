@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.models import IssueInfo
-    from vibe3.orchestra.protocols import FlowManagerProtocol
+    from vibe3.orchestra import FlowManagerProtocol
 
 
 def is_auto_task_branch(branch: str) -> bool:
