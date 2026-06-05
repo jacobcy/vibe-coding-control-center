@@ -101,6 +101,8 @@ This project has **two parallel implementations**:
 
 - `vibe3 handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
 - `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
+- `vibe3 handoff verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
+- `vibe3 handoff plan/report/audit/next`：记录特定阶段的责任链上下文
 - `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
 
 ## 架构层级 (Three-Tier Architecture)

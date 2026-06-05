@@ -215,8 +215,8 @@ src/vibe3/
 
 ```
 vibe3
-├── flow: update, bind, blocked, show, status, list-deleted, restore
-├── task: show, status, resume
+├── flow: blocked, rebuild, show, status, update, bind, list-deleted, restore
+├── task: show, status, intake, resume
 ├── handoff: show, status, init, append, plan, report, indicate, audit, next, verdict
 ├── inspect: pr, base, symbols, files, commit
 ├── review: pr
