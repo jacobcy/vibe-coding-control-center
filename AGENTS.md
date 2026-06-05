@@ -150,7 +150,7 @@ This project uses community skills:
 - **[Superpowers](https://github.com/jomifred/superpowers)** — General agent skills
 - **[OpenSpec](https://github.com/OpenSpec)** — Structured change management
 
-Install via respective tools, then create symlinks in `.agent/skills/`. See [DEVELOPER.md](DEVELOPER.md) for setup.
+Install via respective tools, then create symlinks in `.claude/skills/`. See [DEVELOPER.md](DEVELOPER.md) for setup.
 
 ## 代码分析工具
 

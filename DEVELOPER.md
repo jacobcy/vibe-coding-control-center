@@ -39,7 +39,7 @@ vibe3 internal bootstrap  # 现代 V3 推荐方式
 
 当你执行 `vibe flow start <feature>`（Legacy）、`wtnew <branch>`，或由 V3 runtime 自动创建 worktree 时，`scripts/init.sh` 或 `vibe3 internal bootstrap` 会自动运行，完成以下工作：
 1. 安装并配置 `openSpec` 和 `Superpowers`
-2. 在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接
+2. 在 `.claude/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
 
 **Hybrid Architecture Setup (Recommended):**
