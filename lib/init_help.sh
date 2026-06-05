@@ -9,7 +9,7 @@ vibe_init_help() {
     echo "  2. 根据 profile 创建必要的目录结构"
     echo "  3. 根据 profile 创建 GitHub labels"
     echo "  4.根据 profile 分别创建 skills/ 目录和 .claude/skills 全局符号链接"
-    echo "  5. 生成 .vibe/config.yaml 配置文件"
+    echo "  5. 生成 .vibe/config.yaml 和 .vibe/settings.yaml 配置文件"
     echo "  6. 验证项目运行支持（minimal/github-flow 自动生成 CLAUDE.md 模板；vibe-center 保留 AGENTS.md 检查）"
     echo ""
     echo "Usage: ${CYAN}vibe init${NC} [options]"
