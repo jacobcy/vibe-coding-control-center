@@ -7,7 +7,7 @@ import typer
 from vibe3.agents import CodeagentBackend
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config import load_orchestra_config
-from vibe3.config.cli_overrides import build_issue_role_cli_overrides
+from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
@@ -51,8 +51,12 @@ def run_issue_role_async(
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
 
-    cli_overrides = build_issue_role_cli_overrides(
-        spec.role_name, agent, backend, model
+    overrides = RoleCliOverrides(
+        agent=agent, backend=backend, model=model, fresh_session=fresh_session
+    )
+    config_section = ROLE_CONFIG_SECTIONS.get(spec.role_name)
+    cli_overrides = (
+        overrides.to_config_overrides(config_section) if config_section else {}
     )
     options = spec.resolve_options(config, cli_overrides or None)
     actor = format_agent_actor(options)
@@ -75,13 +79,9 @@ def run_issue_role_async(
                 )
             raise typer.Exit(1)
 
-        _append_child_cli_overrides(
-            request,
-            agent=agent,
-            backend=backend,
-            model=model,
-            fresh_session=fresh_session,
-        )
+        cmd = getattr(request, "cmd", None)
+        if isinstance(cmd, list):
+            cmd.extend(overrides.to_argv())
 
         try:
             result = coordinator.dispatch_execution(request)
@@ -167,8 +167,12 @@ def run_issue_role_sync(
         None if fresh_session else load_session_id(spec.role_name, branch=branch)
     )
 
-    cli_overrides = build_issue_role_cli_overrides(
-        spec.role_name, agent, backend, model
+    overrides = RoleCliOverrides(
+        agent=agent, backend=backend, model=model, fresh_session=fresh_session
+    )
+    config_section = ROLE_CONFIG_SECTIONS.get(spec.role_name)
+    cli_overrides = (
+        overrides.to_config_overrides(config_section) if config_section else {}
     )
     options = spec.resolve_options(config, cli_overrides or None)
     actor = format_agent_actor(options)
@@ -214,25 +218,3 @@ def run_issue_role_sync(
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
-
-
-def _append_child_cli_overrides(
-    request: object,
-    *,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
-    fresh_session: bool,
-) -> None:
-    """Append role CLI overrides to an async self-invocation command."""
-    cmd = getattr(request, "cmd", None)
-    if not isinstance(cmd, list):
-        return
-    if agent:
-        cmd.extend(["--agent", agent])
-    if backend:
-        cmd.extend(["--backend", backend])
-    if model:
-        cmd.extend(["--model", model])
-    if fresh_session:
-        cmd.append("--fresh-session")
