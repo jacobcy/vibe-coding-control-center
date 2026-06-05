@@ -46,7 +46,7 @@ from vibe3.services.label_utils import (
     clean_old_state_labels,
     should_skip_from_queue,
 )
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services.shared.orchestra import get_manager_usernames
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient

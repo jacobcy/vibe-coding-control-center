@@ -39,8 +39,8 @@ def fetch_task_status_data(
 
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.orchestra_helpers import get_manager_usernames
     from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services.shared.orchestra import get_manager_usernames
 
     config = load_orchestra_config()
     orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
@@ -147,7 +147,7 @@ def classify_task_issues_for_rendering(
         waiting_for_pool_items, governed_anomaly_items, task_progress_items,
         remote_items, bucketed_items, pr_ref_items, blocked_items.
     """
-    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services.shared.orchestra import get_manager_usernames
 
     supervisor_label = config.supervisor_handoff.issue_label
     manager_usernames = get_manager_usernames(config)

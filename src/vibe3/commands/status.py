@@ -24,7 +24,7 @@ from vibe3.commands.common import (
 from vibe3.config.env_override import OVERRIDE_RULES
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path
-from vibe3.services.orchestra_helpers import get_manager_usernames
+from vibe3.services.shared.orchestra import get_manager_usernames
 from vibe3.ui.console import console
 from vibe3.utils.time_format import format_age_aware_time
 

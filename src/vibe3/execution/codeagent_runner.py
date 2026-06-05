@@ -80,7 +80,7 @@ class CodeagentExecutionService:
         """
         from vibe3.clients.github_labels import GhIssueLabelPort
         from vibe3.config.orchestra_settings import load_orchestra_config
-        from vibe3.services.orchestra_helpers import get_handoff_state_label
+        from vibe3.services.shared.orchestra import get_handoff_state_label
 
         config = load_orchestra_config()
         handoff_label = get_handoff_state_label(config.supervisor_handoff)

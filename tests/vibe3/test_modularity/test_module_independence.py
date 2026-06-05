@@ -55,10 +55,6 @@ class TestIndependentImport:
             )
 
     @pytest.mark.slow
-    @pytest.mark.xfail(
-        reason="Known architectural debt: 5 modules trigger unexpected cross-module "
-        "imports (agents, commands, execution, prompts, server)"
-    )
     def test_no_cross_module_side_effects(self, module_registry: list[str]) -> None:
         """Verify modules don't trigger unexpected cross-module imports.
 
