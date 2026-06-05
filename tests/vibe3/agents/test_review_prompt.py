@@ -16,7 +16,7 @@ from vibe3.agents.review_prompt import (
     build_review_prompt_body,
     build_review_task_section,
 )
-from vibe3.models.review import ReviewRequest, ReviewScope
+from vibe3.models import ReviewRequest, ReviewScope
 
 
 class TestBuildPolicySection:

@@ -36,11 +36,11 @@ from vibe3.models import (
     IssueInfo,
     IssueState,
     OrchestraConfig,
+    PlanRequest,
+    PlanScope,
+    PlanSpecInput,
     WorktreeRequirement,
 )
-
-# public-api: pending upstream export
-from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,

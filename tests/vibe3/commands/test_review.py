@@ -34,7 +34,7 @@ class TestReviewContextBuilderUsesAssembler:
         """make_review_context_builder should invoke build_review_prompt_body."""
         from vibe3.agents.review_prompt import make_review_context_builder
         from vibe3.config.settings import VibeConfig
-        from vibe3.models.review import ReviewRequest, ReviewScope
+        from vibe3.models import ReviewRequest, ReviewScope
 
         config = VibeConfig.get_defaults()
         request = ReviewRequest(scope=ReviewScope.for_base("main"))

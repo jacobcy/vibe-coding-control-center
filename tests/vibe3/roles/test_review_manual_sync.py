@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from vibe3.roles.review import ReviewRequest, ReviewRunResult, ReviewScope
+from vibe3.models import ReviewRequest, ReviewScope
+from vibe3.roles.review import ReviewRunResult
 
 
 def test_execute_manual_review_sync_imports_session_service_from_execution(

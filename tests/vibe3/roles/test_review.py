@@ -214,7 +214,7 @@ class TestDispatchAsyncManualReviewWorktreeRequirement:
             mock_coord.dispatch_execution.return_value = MagicMock(launched=True)
             mock_coord_cls.return_value = mock_coord
 
-            from vibe3.models.review import ReviewRequest, ReviewScope
+            from vibe3.models import ReviewRequest, ReviewScope
             from vibe3.roles.review import _dispatch_async_manual_review
 
             request = ReviewRequest(
