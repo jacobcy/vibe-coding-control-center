@@ -215,7 +215,6 @@ __all__: list[str] = [
     "PlanSpecInput",
     "PRSource",
     "PRState",
-    "PlanRequest",
     "PromptContextMode",
     "QueueEntry",
     "ReviewRequest",
