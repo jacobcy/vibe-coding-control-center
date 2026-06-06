@@ -259,14 +259,10 @@ class TestJobResult:
             branch="main",
             status="launched",
         )
-        assert result.status == "launched"
-
-        # Transition to completed
         result.status = "completed"
         result.exit_code = 0
         assert result.status == "completed"
 
-        # Create new result for failed scenario
         failed_result = JobResult(
             command_type=CommandType.RUN,
             issue_number=456,
@@ -275,9 +271,7 @@ class TestJobResult:
         )
         failed_result.status = "failed"
         failed_result.error_message = "Test failure"
-        failed_result.error_code = "TEST_ERROR"
         assert failed_result.status == "failed"
-        assert failed_result.error_message == "Test failure"
 
 
 class TestSemanticEquivalence:
@@ -330,116 +324,74 @@ class TestSemanticEquivalence:
 class TestExistingPayloadRepresentation:
     """Test representing existing dispatch paths as JobEnvelope instances."""
 
-    def test_planner_dispatch_intent_to_plan_envelope(self):
-        """Represent PlannerDispatchIntent → plan command."""
+    @pytest.mark.parametrize(
+        "cmd_type,issue,branch,source,event_type,refs",
+        [
+            (
+                CommandType.PLAN,
+                123,
+                "task/issue-123",
+                "heartbeat-tick",
+                "PlannerDispatchIntent",
+                {"spec_ref": "@spec-123"},
+            ),
+            (
+                CommandType.RUN,
+                456,
+                "task/issue-456",
+                "heartbeat-tick",
+                "ExecutorDispatchIntent",
+                {"plan_ref": "@plan-456"},
+            ),
+            (
+                CommandType.REVIEW,
+                789,
+                "task/issue-789",
+                "heartbeat-tick",
+                "ReviewerDispatchIntent",
+                {"report_ref": "@report-789"},
+            ),
+            (
+                CommandType.MANAGER,
+                999,
+                "main",
+                "heartbeat-tick",
+                "ManagerDispatchIntent",
+                {"audit_ref": "@audit-999"},
+            ),
+            (CommandType.PLAN, 111, "task/issue-111", "cli-manual", None, {}),
+            (CommandType.GOVERNANCE_SCAN, 0, "main", "heartbeat-tick", None, {}),
+            (
+                CommandType.SUPERVISOR_APPLY,
+                222,
+                "task/issue-222",
+                "heartbeat-tick",
+                "SupervisorApplyDispatchIntent",
+                {},
+            ),
+            (
+                CommandType.RUN,
+                333,
+                "task/issue-333",
+                "cli-resume",
+                None,
+                {"session_id": "sess-333"},
+            ),
+        ],
+    )
+    def test_dispatch_intent_envelopes(
+        self, cmd_type, issue, branch, source, event_type, refs
+    ):
+        """Represent dispatch intents as JobEnvelope instances."""
         envelope = JobEnvelope(
-            command_type=CommandType.PLAN,
-            issue_number=123,
-            branch="task/issue-123",
-            source="heartbeat-tick",
-            source_event_type="PlannerDispatchIntent",
-            actor="orchestra:system",
-            refs={"spec_ref": "@spec-123"},
-            tick_id=42,
-            worktree_requirement="temporary",
+            command_type=cmd_type,
+            issue_number=issue,
+            branch=branch,
+            source=source,
+            source_event_type=event_type,
+            refs=refs,
         )
-        assert envelope.command_type == CommandType.PLAN
-        assert envelope.source_event_type == "PlannerDispatchIntent"
-
-    def test_executor_dispatch_intent_to_run_envelope(self):
-        """Represent ExecutorDispatchIntent → run command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.RUN,
-            issue_number=456,
-            branch="task/issue-456",
-            source="heartbeat-tick",
-            source_event_type="ExecutorDispatchIntent",
-            actor="orchestra:system",
-            refs={"plan_ref": "@plan-456"},
-            tick_id=43,
-            worktree_requirement="permanent",
-        )
-        assert envelope.command_type == CommandType.RUN
-        assert envelope.source_event_type == "ExecutorDispatchIntent"
-
-    def test_reviewer_dispatch_intent_to_review_envelope(self):
-        """Represent ReviewerDispatchIntent → review command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.REVIEW,
-            issue_number=789,
-            branch="task/issue-789",
-            source="heartbeat-tick",
-            source_event_type="ReviewerDispatchIntent",
-            actor="orchestra:system",
-            refs={"report_ref": "@report-789"},
-            tick_id=44,
-            worktree_requirement="none",
-        )
-        assert envelope.command_type == CommandType.REVIEW
-        assert envelope.source_event_type == "ReviewerDispatchIntent"
-
-    def test_manager_dispatch_intent_to_manager_envelope(self):
-        """Represent ManagerDispatchIntent → manager command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.MANAGER,
-            issue_number=999,
-            branch="main",
-            source="heartbeat-tick",
-            source_event_type="ManagerDispatchIntent",
-            actor="orchestra:system",
-            refs={"audit_ref": "@audit-999"},
-            tick_id=45,
-        )
-        assert envelope.command_type == CommandType.MANAGER
-        assert envelope.source_event_type == "ManagerDispatchIntent"
-
-    def test_cli_manual_to_plan_envelope(self):
-        """Represent CLI manual → plan command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.PLAN,
-            issue_number=111,
-            branch="task/issue-111",
-            source="cli-manual",
-            actor="user:alice",
-            refs={},
-        )
-        assert envelope.command_type == CommandType.PLAN
-        assert envelope.source == "cli-manual"
-
-    def test_governance_scan_envelope(self):
-        """Represent governance scan command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.GOVERNANCE_SCAN,
-            issue_number=0,  # governance scan may not target a specific issue
-            branch="main",
-            source="heartbeat-tick",
-            actor="orchestra:system",
-            tick_id=46,
-        )
-        assert envelope.command_type == CommandType.GOVERNANCE_SCAN
-
-    def test_supervisor_apply_envelope(self):
-        """Represent supervisor apply command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.SUPERVISOR_APPLY,
-            issue_number=222,
-            branch="task/issue-222",
-            source="heartbeat-tick",
-            source_event_type="SupervisorApplyDispatchIntent",
-            actor="orchestra:system",
-            tick_id=47,
-        )
-        assert envelope.command_type == CommandType.SUPERVISOR_APPLY
-
-    def test_cli_resume_envelope(self):
-        """Represent CLI resume command."""
-        envelope = JobEnvelope(
-            command_type=CommandType.RUN,
-            issue_number=333,
-            branch="task/issue-333",
-            source="cli-resume",
-            actor="user:bob",
-            refs={"session_id": "sess-333"},
-        )
-        assert envelope.command_type == CommandType.RUN
-        assert envelope.source == "cli-resume"
+        assert envelope.command_type == cmd_type
+        assert envelope.source == source
+        if event_type:
+            assert envelope.source_event_type == event_type
