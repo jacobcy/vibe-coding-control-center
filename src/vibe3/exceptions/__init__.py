@@ -131,9 +131,15 @@ class SystemError(VibeError):
 class AgentExecutionError(SystemError):
     """Agent execution failed (wrapper/API/backend error)."""
 
-    def __init__(self, message: str, log_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        log_path: Path | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.log_path: Path | None = log_path
+        self.metadata: dict[str, str] | None = metadata
 
 
 class ModelsJsonSyncError(SystemError):

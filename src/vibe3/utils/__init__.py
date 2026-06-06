@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from vibe3.utils.codeagent_helpers import (
         build_prompt_file_content,
         diagnose_backend_error,
+        diagnose_prompt_size_issue,
         prepare_prompt_file,
         sanitize_prompt_for_display,
         sanitize_task_shell_meta,
@@ -55,6 +56,7 @@ _LAZY_IMPORTS = {
     "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
+    "diagnose_prompt_size_issue": "vibe3.utils.codeagent_helpers",
     "find_parent_branch": "vibe3.utils.branch_utils",
     "format_age_aware_time": "vibe3.utils.time_format",
     "get_branch_handoff_dir": "vibe3.utils.git_helpers",
@@ -94,6 +96,7 @@ __all__ = [
     "build_prompt_file_content",
     "clean_error_message",
     "diagnose_backend_error",
+    "diagnose_prompt_size_issue",
     "find_parent_branch",
     "format_age_aware_time",
     "get_branch_handoff_dir",
