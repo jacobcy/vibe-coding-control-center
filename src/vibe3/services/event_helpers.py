@@ -7,6 +7,9 @@ which would create a circular dependency.
 
 from __future__ import annotations
 
+from vibe3.models.domain_events import IssueFailed
+from vibe3.models.event_bus import publish
+
 
 def emit_issue_failed(
     issue_number: int,
@@ -14,20 +17,7 @@ def emit_issue_failed(
     actor: str = "system",
     role: str | None = None,
 ) -> None:
-    """Publish an IssueFailed domain event.
-
-    Used by roles layer to signal execution failure without
-    taking a direct dependency on vibe3.domain.
-
-    Uses importlib to avoid static analysis detecting circular dependency.
-    """
-    import importlib
-
-    publisher_module = importlib.import_module("vibe3.domain.publisher")
-    publish = publisher_module.publish
-
-    from vibe3.models.domain_events import IssueFailed
-
+    """Publish an IssueFailed domain event."""
     publish(
         IssueFailed(issue_number=issue_number, reason=reason, actor=actor, role=role)
     )
