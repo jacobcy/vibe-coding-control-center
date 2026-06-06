@@ -1,4 +1,8 @@
-# Agent 调试标准
+# Agent 调试标准 (DEPRECATED)
+
+> [!CAUTION]
+> **本文档已废弃**。Vibe3 Agent 编排与调试的最新权威指南请参考：[v3/serve-debugging-guide.md](../standards/v3/serve-debugging-guide.md)。
+> 本文档仅保留作为历史背景参考。
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、Role Adapters (manager) 的 agent 编排调试。

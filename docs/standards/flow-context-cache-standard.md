@@ -369,7 +369,7 @@ WHERE branch = ? AND expires_at > datetime('now');
 
 - [glossary.md](glossary.md) — 术语定义
 - [v3/command-standard.md](v3/command-standard.md) — 命令与状态同步标准
-- [agent-debugging-standard.md](agent-debugging-standard.md) — 调试方法
+- [v3/serve-debugging-guide.md](v3/serve-debugging-guide.md) — 调试方法
 
 ## 10. 变更历史
 

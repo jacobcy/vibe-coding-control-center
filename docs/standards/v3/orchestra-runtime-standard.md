@@ -31,7 +31,7 @@
 - `state/*` 业务含义细节（见 `docs/standards/v3/command-standard.md`）
 - handoff 正文格式
 - skill / supervisor 具体 prompt 文案
-- 日志读取与调试方法（见 `docs/standards/agent-debugging-standard.md`）
+- 日志读取与调试方法（见 `docs/standards/serve-debugging-guide.md`）
 
 ## 2. 核心对象
 
@@ -264,7 +264,7 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 
 ## 7. 日志语义
 
-> 完整的日志规范、目录结构和读取方法见 [agent-debugging-standard.md](agent-debugging-standard.md) §三。
+> 完整的日志规范、目录结构和读取方法见 [serve-debugging-guide.md](serve-debugging-guide.md) §三。
 
 ### 7.1 主事件日志
 

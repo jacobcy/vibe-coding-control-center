@@ -10,7 +10,7 @@ author: planner (Claude Opus 4.6)
 created: 2026-05-01
 last_updated: 2026-05-01
 related_docs:
-  - docs/standards/agent-debugging-standard.md
+  - ../../archive/agent-debugging-standard.md
   - docs/standards/vibe3-orchestra-runtime-standard.md
   - docs/standards/v3/noop-gate-boundary-standard.md
   - docs/standards/v3/command-standard.md
@@ -28,7 +28,7 @@ related_docs:
 
 **调试前必读的权威标准**（按优先级）：
 
-1. **[agent-debugging-standard.md](./agent-debugging-standard.md)**：Agent 调试总入口
+1. **[agent-debugging-standard.md](../../archive/agent-debugging-standard.md)**：(Archive) Agent 调试总入口 (DEPRECATED)
    - 日志规范、链路调试方法、观测手段
    - 上层业务 vs 底层触发的职责边界
    - async/tmux 观察优先原则
@@ -186,8 +186,8 @@ tail -f temp/logs/orchestra/events.log
 | 场景 | 文档 | 用途 |
 |-----|------|------|
 | Reviewer Webhook | [debug-reviewer-webhook.md](../v3/orchestra/debug-reviewer-webhook.md) | Webhook 触发链路、签名验证 |
-| Manager 执行 | 见 agent-debugging-standard.md | 单 issue 执行链 |
-| Supervisor 治理 | 见 agent-debugging-standard.md | 自动化治理链 |
+| Manager 执行 | 见 [agent-debugging-standard.md](../../archive/agent-debugging-standard.md) (Archive) | 单 issue 执行链 |
+| Supervisor 治理 | 见 [agent-debugging-standard.md](../../archive/agent-debugging-standard.md) (Archive) | 自动化治理链 |
 
 **使用原则**：
 - 先读本指南了解整体框架
@@ -266,7 +266,7 @@ vibe3 task status --trace
 
 每次调试前快速检查：
 
-- [ ] 已阅读 [agent-debugging-standard.md](./agent-debugging-standard.md)
+- [ ] 已阅读 [agent-debugging-standard.md](../../archive/agent-debugging-standard.md)
 - [ ] 确认当前 CLI 语法（`serve start` 默认 async，`--no-async` 同步）
 - [ ] 确认日志路径（`temp/logs/orchestra/`、`temp/logs/*.async.log`）
 - [ ] 确认真源路径（`vibe3 flow show`、`vibe3 task status`、GitHub issue）

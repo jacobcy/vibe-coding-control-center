@@ -14,7 +14,7 @@ related_docs:
   - docs/standards/label-semantics.md
   - docs/standards/glossary.md
   - docs/standards/v3/error-severity-and-blocking-standard.md
-  - docs/standards/vibe3-role-checks-and-balances-standard.md
+  - docs/standards/v3/human-mirror-architecture-philosophy.md
   - docs/standards/v3/data-model-standard.md
   - docs/standards/v3/event-driven-standard.md
 ---
@@ -25,7 +25,7 @@ related_docs:
 
 **术语定义** 见 [glossary.md](glossary.md)，本文档不重复定义。
 
-**角色权力边界** 见 [vibe3-role-checks-and-balances-standard.md](vibe3-role-checks-and-balances-standard.md)。
+**角色权力边界** 见 [v3/human-mirror-architecture-philosophy.md](v3/human-mirror-architecture-philosophy.md)。
 
 **数据模型** 见 [v3/data-model-standard.md](v3/data-model-standard.md)。
 
@@ -653,7 +653,7 @@ store.add_event(
 ## 9. 参考文档
 
 - [glossary.md](glossary.md) - 术语定义（权威）
-- [vibe3-role-checks-and-balances-standard.md](vibe3-role-checks-and-balances-standard.md) - 角色权力边界（权威）
+- [v3/human-mirror-architecture-philosophy.md](v3/human-mirror-architecture-philosophy.md) - 角色权力边界（权威）
 - [v3/data-model-standard.md](v3/data-model-standard.md) - 数据模型（权威）
 - [event-driven-standard.md](v3/event-driven-standard.md) - 事件驱动架构
 - [noop-gate-boundary-standard.md](v3/noop-gate-boundary-standard.md) - 阻塞原则与 noop gate 边界

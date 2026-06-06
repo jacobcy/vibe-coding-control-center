@@ -1,6 +1,8 @@
-# Vibe3 Role Checks and Balances Standard
+# Vibe3 Role Checks and Balances Standard (DEPRECATED)
 
-状态: Deprecated (见 [v3/human-mirror-architecture-philosophy.md](v3/human-mirror-architecture-philosophy.md))
+> [!CAUTION]
+> **本文档已废弃**。Vibe3 角色制衡与架构哲学的最新权威指南请参考：[v3/human-mirror-architecture-philosophy.md](../standards/v3/human-mirror-architecture-philosophy.md)。
+> 本文档仅保留作为历史背景参考。
 
 ## 1. 目的
 
