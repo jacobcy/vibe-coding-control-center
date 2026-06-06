@@ -377,7 +377,7 @@ class CodeagentBackend:
                     error_msg += f"\n\n{diagnosis}"
 
                 # Only check prompt size for "no agent_message output" case
-                # to avoid misleading diagnostics for unrelated errors
+                # to avoid misleading diagnostics
                 if "completed without agent_message output" in combined_output:
                     prompt_size_diagnostic = diagnose_prompt_size_issue(
                         len(prompt),
