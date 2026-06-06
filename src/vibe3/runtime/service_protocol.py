@@ -1,27 +1,10 @@
 """Service protocol for runtime observers.
 
-This module defines the minimal runtime service contract used by HeartbeatServer.
+Re-exports ServiceBase from domain/protocols to maintain backward compatibility.
+Actual definition moved to domain/protocols/runtime_protocols.py to break
+the domain→runtime circular dependency.
 """
 
-from abc import ABC
+from vibe3.domain.protocols.runtime_protocols import ServiceBase
 
-
-class ServiceBase(ABC):
-    """Abstract protocol for runtime services observed by HeartbeatServer."""
-
-    @property
-    def service_name(self) -> str:
-        """Human-readable service name for orchestration logs."""
-        return type(self).__name__
-
-    @property
-    def is_dispatch_service(self) -> bool:
-        """Whether this service initiates automated flow/task actions."""
-        return True
-
-    async def on_tick(self, tick_id: int = 0) -> None:
-        """Called on each heartbeat tick.
-
-        Args:
-            tick_id: Current tick number (0 if not available)
-        """
+__all__ = ["ServiceBase"]

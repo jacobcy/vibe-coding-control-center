@@ -50,7 +50,7 @@ def fetch_task_status_data(
     snapshot_found = orch_snapshot is not None
 
     if not orch_snapshot:
-        from vibe3.runtime import (
+        from vibe3.utils.orchestra_instance import (
             read_instance_info,
             validate_instance,
         )

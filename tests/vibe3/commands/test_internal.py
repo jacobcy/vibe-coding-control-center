@@ -129,7 +129,7 @@ def test_internal_apply_dispatch():
 def test_internal_governance_dispatch_forwards_tick_and_material():
     """测试 internal governance 会透传 tick 和 material."""
     with patch(
-        "vibe3.services.scan_service.dispatch_governance_execution"
+        "vibe3.roles.scan_service.dispatch_governance_execution"
     ) as mock_dispatch:
         result = runner.invoke(
             cli_app,

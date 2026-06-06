@@ -2,7 +2,7 @@
 
 import yaml
 
-from vibe3.services.scan_service import (
+from vibe3.roles.scan_service import (
     extract_material_description,
     fetch_supervisor_candidates,
     validate_governance_material_consistency,

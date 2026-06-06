@@ -17,8 +17,8 @@ from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.config import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.domain.protocols import ServiceBase
 from vibe3.models import IssueInfo, OrchestraConfig
-from vibe3.runtime import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator

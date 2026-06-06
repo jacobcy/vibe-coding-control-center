@@ -37,6 +37,7 @@ from vibe3.domain.protocols.orchestra_protocols import (
     FailedGateProtocol,
     OrchestraEventLogProtocol,
 )
+from vibe3.domain.protocols.runtime_protocols import ServiceBase
 
 __all__ = [
     "AppendGovernanceEventProtocol",
@@ -58,5 +59,6 @@ __all__ = [
     "QueuePersistenceServiceProtocol",
     "QueueSelectorProtocol",
     "RoleFactoryProtocol",
+    "ServiceBase",
     "TriggerableRoleDefinitionProtocol",
 ]
