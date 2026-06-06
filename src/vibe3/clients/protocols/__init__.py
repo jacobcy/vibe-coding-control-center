@@ -26,6 +26,7 @@ from vibe3.clients.protocols.github import (
     PRWritePort,
 )
 from vibe3.clients.protocols.pr import BaseResolver
+from vibe3.clients.protocols.role import TriggerableRoleDefinitionProtocol
 
 __all__ = [
     "BackendProtocol",
@@ -40,4 +41,5 @@ __all__ = [
     "PRReadPort",
     "PRWritePort",
     "BaseResolver",
+    "TriggerableRoleDefinitionProtocol",
 ]

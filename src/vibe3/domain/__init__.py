@@ -158,15 +158,15 @@ def __getattr__(name: str) -> object:
 
         return FailedGate
     if name == "STATE_LABEL_META":
-        from vibe3.domain.state_machine import STATE_LABEL_META
+        from vibe3.models.state_machine import STATE_LABEL_META
 
         return STATE_LABEL_META
     if name == "VIBE_TASK_LABEL":
-        from vibe3.domain.state_machine import VIBE_TASK_LABEL
+        from vibe3.models.state_machine import VIBE_TASK_LABEL
 
         return VIBE_TASK_LABEL
     if name == "validate_transition":
-        from vibe3.domain.state_machine import validate_transition
+        from vibe3.models.state_machine import validate_transition
 
         return validate_transition
     if name == "EventPublisher":

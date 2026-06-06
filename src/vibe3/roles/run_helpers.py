@@ -120,15 +120,9 @@ def publish_run_command_failure(
     reason: str,
 ) -> None:
     """Publish run failure lifecycle for command-mode execution."""
-    from vibe3.domain import IssueFailed, publish
+    from vibe3.services.event_helpers import emit_issue_failed
 
-    publish(
-        IssueFailed(
-            issue_number=issue_number,
-            reason=reason,
-            actor="agent:run",
-        )
-    )
+    emit_issue_failed(issue_number=issue_number, reason=reason, actor="agent:run")
 
 
 def resolve_run_mode(

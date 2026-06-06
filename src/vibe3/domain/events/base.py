@@ -1,14 +1,9 @@
-"""Base class for all domain events."""
+"""Base class for all domain events.
 
-from dataclasses import dataclass
+Re-exported from models layer to break L3 circular dependencies.
+See vibe3.models.domain_events for the canonical definition.
+"""
 
+from vibe3.models.domain_events import DomainEvent
 
-@dataclass(frozen=True)
-class DomainEvent:
-    """Base class for all domain events.
-
-    All domain events should inherit from this class.
-    Events are immutable (frozen) to ensure event integrity.
-    """
-
-    pass
+__all__ = ["DomainEvent"]

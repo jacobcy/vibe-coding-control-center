@@ -1,6 +1,6 @@
 """Thin orchestration layer for issue state labels.
 
-Domain transition rules live in ``vibe3.domain.state_machine``.
+Domain transition rules live in ``vibe3.models.state_machine``.
 GitHub label CRUD lives behind ``IssueLabelPort`` in ``vibe3.clients``.
 This service only coordinates the two.
 """
@@ -12,9 +12,14 @@ from loguru import logger
 
 from vibe3.clients import GhIssueLabelPort, IssueLabelPort
 from vibe3.config import load_orchestra_config
-from vibe3.domain import STATE_LABEL_META, VIBE_TASK_LABEL, validate_transition
 from vibe3.exceptions import InvalidTransitionError, SystemError
-from vibe3.models import IssueState, StateTransition
+from vibe3.models import (
+    STATE_LABEL_META,
+    VIBE_TASK_LABEL,
+    IssueState,
+    StateTransition,
+    validate_transition,
+)
 
 
 class LabelService:
