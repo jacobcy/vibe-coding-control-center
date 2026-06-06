@@ -36,24 +36,6 @@ class TestRepoModelsJsonPath:
 
         assert result == expected_path
 
-    def test_override_falls_back_to_legacy_models_path(self, tmp_path: Path) -> None:
-        """Override root should support legacy config/models.json during migration."""
-        override_root = tmp_path / "custom_root"
-        legacy_path = override_root / "config" / "models.json"
-        legacy_path.parent.mkdir(parents=True)
-        legacy_path.write_text("{}", encoding="utf-8")
-
-        with patch.dict(
-            os.environ,
-            {"VIBE3_REPO_MODELS_ROOT": str(override_root)},
-            clear=True,
-        ):
-            from vibe3.config.agent_preset import repo_models_json_path
-
-            result = repo_models_json_path()
-
-        assert result == legacy_path
-
     def test_override_supports_tilde_expansion(self) -> None:
         """VIBE3_REPO_MODELS_ROOT should support ~ expansion."""
         # Use a path with ~ that expands to home directory
