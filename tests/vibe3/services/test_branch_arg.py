@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from vibe3.services.branch_arg import resolve_branch_arg
+from vibe3.services.branch_arg import resolve_branch_and_issue, resolve_branch_arg
 
 
 class TestResolveBranchArg:
@@ -45,3 +45,100 @@ class TestResolveBranchArg:
 
             result = resolve_branch_arg("dev/issue-789")
             assert result == "dev/issue-789"
+
+
+class TestResolveBranchAndIssue:
+    """测试 resolve_branch_and_issue 组合解析行为"""
+
+    def test_none_returns_current_branch_with_issue(self):
+        """测试：None 输入返回当前分支和正确的 issue number"""
+        with (
+            patch("vibe3.services.branch_arg.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.branch_arg.ConventionResolver") as mock_resolver_cls,
+        ):
+            mock_resolve.return_value = "task/issue-123"
+
+            mock_branch_convention = Mock()
+            mock_branch_convention.parse_issue_number.return_value = 123
+            mock_resolver_cls.from_repo.return_value.resolve.return_value.branch = (
+                mock_branch_convention
+            )
+
+            result = resolve_branch_and_issue(None)
+            assert result == ("task/issue-123", 123)
+            mock_resolve.assert_called_once_with(None)
+
+    def test_digit_arg_returns_canonical_with_issue(self):
+        """测试：纯数字输入返回 canonical branch 和 issue number"""
+        with (
+            patch("vibe3.services.branch_arg.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.branch_arg.ConventionResolver") as mock_resolver_cls,
+        ):
+            mock_resolve.return_value = "task/issue-123"
+
+            mock_branch_convention = Mock()
+            mock_branch_convention.parse_issue_number.return_value = 123
+            mock_resolver_cls.from_repo.return_value.resolve.return_value.branch = (
+                mock_branch_convention
+            )
+
+            result = resolve_branch_and_issue("123")
+            assert result == ("task/issue-123", 123)
+            mock_resolve.assert_called_once_with("123")
+
+    def test_branch_name_with_issue(self):
+        """测试：分支名输入返回原值和解析出的 issue number"""
+        with (
+            patch("vibe3.services.branch_arg.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.branch_arg.ConventionResolver") as mock_resolver_cls,
+        ):
+            mock_resolve.return_value = "task/issue-456"
+
+            mock_branch_convention = Mock()
+            mock_branch_convention.parse_issue_number.return_value = 456
+            mock_resolver_cls.from_repo.return_value.resolve.return_value.branch = (
+                mock_branch_convention
+            )
+
+            result = resolve_branch_and_issue("task/issue-456")
+            assert result == ("task/issue-456", 456)
+            mock_resolve.assert_called_once_with("task/issue-456")
+
+    def test_invalid_name_no_issue(self):
+        """测试：无效分支名返回原值和 None issue number"""
+        with (
+            patch("vibe3.services.branch_arg.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.branch_arg.ConventionResolver") as mock_resolver_cls,
+        ):
+            mock_resolve.return_value = "invalid-name"
+
+            mock_branch_convention = Mock()
+            mock_branch_convention.parse_issue_number.return_value = None
+            mock_resolver_cls.from_repo.return_value.resolve.return_value.branch = (
+                mock_branch_convention
+            )
+
+            result = resolve_branch_and_issue("invalid-name")
+            assert result == ("invalid-name", None)
+            mock_resolve.assert_called_once_with("invalid-name")
+
+    def test_return_type_is_tuple(self):
+        """测试：返回值类型为 tuple，且元素类型正确"""
+        with (
+            patch("vibe3.services.branch_arg.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.branch_arg.ConventionResolver") as mock_resolver_cls,
+        ):
+            mock_resolve.return_value = "task/issue-789"
+
+            mock_branch_convention = Mock()
+            mock_branch_convention.parse_issue_number.return_value = 789
+            mock_resolver_cls.from_repo.return_value.resolve.return_value.branch = (
+                mock_branch_convention
+            )
+
+            result = resolve_branch_and_issue("789")
+            assert isinstance(result, tuple)
+            assert len(result) == 2
+            assert isinstance(result[0], str)
+            assert isinstance(result[1], int)
+            assert result == ("task/issue-789", 789)
