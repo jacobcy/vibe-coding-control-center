@@ -423,14 +423,11 @@ class TestAutoResumeNoFlowScene:
             mock_label_service_init,
         )
 
-        # This test verifies READY issues are not auto-resumed
-        # (they're already in the target state)
+        # Call the function with READY issue
         _auto_resume_to_ready(issue, config)
 
-        # Should not call transition because READY is already the target
-        # But the function doesn't have that guard - the guard is in the caller
-        # So this test actually calls the function (which would transition)
-        # The real guard is in select_ready_issues_from_collected_issues
+        # Verify transition is NOT called (defensive guard)
+        mock_label_service.transition.assert_not_called()
 
     def test_no_auto_resume_blocked_no_branch(
         self, make_issue_info, monkeypatch
@@ -452,14 +449,11 @@ class TestAutoResumeNoFlowScene:
             mock_label_service_init,
         )
 
-        # This test verifies BLOCKED issues are not auto-resumed
-        # The guard is in the caller (select_ready_issues_from_collected_issues)
+        # Call the function with BLOCKED issue
         _auto_resume_to_ready(issue, config)
 
-        # Should not call transition because BLOCKED requires human intervention
-        # But the function doesn't have that guard - the guard is in the caller
-        # So this test actually calls the function (which would transition)
-        # The real guard is in select_ready_issues_from_collected_issues
+        # Verify transition is NOT called (state machine invariant)
+        mock_label_service.transition.assert_not_called()
 
     def test_auto_resume_failure_does_not_crash(
         self, make_issue_info, monkeypatch
@@ -553,5 +547,150 @@ class TestAutoResumeNoFlowScene:
         mock_label_service.transition.assert_not_called()
 
         # No auto-resume events should be logged
+        auto_resume_calls = [call for call in event_calls if "auto-resume" in call[1]]
+        assert len(auto_resume_calls) == 0
+
+    def test_auto_resume_triggered_for_claimed_no_branch_integration(
+        self, make_issue_info, make_capacity, make_coordinator, monkeypatch
+    ) -> None:
+        """Integration test: CLAIMED issue with no branch triggers auto-resume."""
+        coordinator = make_coordinator(
+            "planner",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+
+        # Setup CLAIMED issue with no branch (orphaned)
+        issues = [
+            make_issue_info(300, IssueState.CLAIMED),
+        ]
+
+        # Mock get_flow_context to return no branch
+        def mock_get_flow_context(*args, **kwargs):
+            return (None, None)
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.get_flow_context",
+            mock_get_flow_context,
+        )
+
+        # Mock qualify gate to return the trigger state (allow issue through)
+        coordinator._qualify_gate.run_qualify_gate = MagicMock(
+            return_value=IssueState.CLAIMED
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Call the queue selector - should trigger auto-resume
+        select_ready_issues_from_collected_issues(
+            issues=issues,
+            trigger_state=IssueState.CLAIMED,
+            config=coordinator._config,
+            github=coordinator._github,
+            store=coordinator._store,
+            flow_manager=coordinator._flow_manager,
+            qualify_gate=coordinator._qualify_gate,
+            supervisor_label=coordinator._config.supervisor_handoff.issue_label,
+        )
+
+        # Verify auto-resume was triggered
+        mock_label_service.transition.assert_called_once_with(
+            300,
+            IssueState.READY,
+            actor="orchestra:auto-resume",
+            force=True,
+        )
+
+        # Verify event logged
+        auto_resume_calls = [
+            call for call in event_calls if "auto-resume #300" in call[1]
+        ]
+        assert len(auto_resume_calls) == 1
+
+    def test_auto_resume_not_triggered_for_blocked_no_branch_integration(
+        self, make_issue_info, make_capacity, make_coordinator, monkeypatch
+    ) -> None:
+        """Integration test: BLOCKED issue with no branch does NOT trigger."""
+        coordinator = make_coordinator(
+            "planner",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+
+        # Setup BLOCKED issue with no branch
+        issues = [
+            make_issue_info(301, IssueState.BLOCKED),
+        ]
+
+        # Mock get_flow_context to return no branch
+        def mock_get_flow_context(*args, **kwargs):
+            return (None, None)
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.get_flow_context",
+            mock_get_flow_context,
+        )
+
+        # Mock qualify gate to return the trigger state (allow issue through)
+        coordinator._qualify_gate.run_qualify_gate = MagicMock(
+            return_value=IssueState.BLOCKED
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Call the queue selector - should NOT trigger auto-resume
+        select_ready_issues_from_collected_issues(
+            issues=issues,
+            trigger_state=IssueState.BLOCKED,
+            config=coordinator._config,
+            github=coordinator._github,
+            store=coordinator._store,
+            flow_manager=coordinator._flow_manager,
+            qualify_gate=coordinator._qualify_gate,
+            supervisor_label=coordinator._config.supervisor_handoff.issue_label,
+        )
+
+        # Verify auto-resume was NOT triggered (state machine invariant)
+        mock_label_service.transition.assert_not_called()
+
+        # Verify no auto-resume events logged
         auto_resume_calls = [call for call in event_calls if "auto-resume" in call[1]]
         assert len(auto_resume_calls) == 0

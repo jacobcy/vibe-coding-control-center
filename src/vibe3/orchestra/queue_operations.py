@@ -125,6 +125,12 @@ def _auto_resume_to_ready(
     if issue.state is None:
         return
 
+    # Defensive guard: never auto-resume READY or BLOCKED issues
+    # READY issues are already in target state
+    # BLOCKED issues require human intervention per state machine invariant
+    if issue.state in {IssueState.READY, IssueState.BLOCKED}:
+        return
+
     try:
         label_service = LabelService(repo=config.repo)
         label_service.transition(
