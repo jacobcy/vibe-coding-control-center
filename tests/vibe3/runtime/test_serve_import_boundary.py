@@ -10,6 +10,7 @@ layers, which should only be loaded during actual serve execution.
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 # Modules that must NOT be imported at startup time
@@ -69,7 +70,7 @@ loaded = sorted(m for m in (after - before) if m.startswith("vibe3."))
 print("\\n".join(loaded))
 """
     result = subprocess.run(
-        ["python", "-c", script],
+        [sys.executable, "-c", script],
         capture_output=True,
         text=True,
         timeout=30,
@@ -202,7 +203,7 @@ else:
     sys.exit(1)  # Guard failed to detect
 """
     result = subprocess.run(
-        ["python", "-c", script],
+        [sys.executable, "-c", script],
         capture_output=True,
         text=True,
         timeout=30,
