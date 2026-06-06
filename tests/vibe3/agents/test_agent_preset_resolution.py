@@ -238,3 +238,36 @@ class TestResolveRepoAgentPreset:
             result = resolve_repo_agent_preset("any-preset")
 
         assert result is None
+
+
+class TestResolveAgentEntry:
+    """Tests for the _resolve_agent_entry helper."""
+
+    def test_direct_lookup(self) -> None:
+        from vibe3.config.agent_preset import _resolve_agent_entry
+
+        agents = {"reviewer": {"backend": "claude"}}
+        assert _resolve_agent_entry(agents, "reviewer") == (
+            "reviewer",
+            {"backend": "claude"},
+        )
+
+    def test_prefixed_fallback(self) -> None:
+        from vibe3.config.agent_preset import _resolve_agent_entry
+
+        agents = {"vibe-reviewer": {"backend": "claude"}}
+        assert _resolve_agent_entry(agents, "reviewer") == (
+            "vibe-reviewer",
+            {"backend": "claude"},
+        )
+
+    def test_not_found(self) -> None:
+        from vibe3.config.agent_preset import _resolve_agent_entry
+
+        assert _resolve_agent_entry({}, "unknown") is None
+
+    def test_non_dict_entry_ignored(self) -> None:
+        from vibe3.config.agent_preset import _resolve_agent_entry
+
+        agents = {"reviewer": "not-a-dict"}
+        assert _resolve_agent_entry(agents, "reviewer") is None
