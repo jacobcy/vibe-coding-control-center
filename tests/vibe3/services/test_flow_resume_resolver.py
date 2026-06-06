@@ -119,9 +119,9 @@ def test_infer_resume_label_plan_only() -> None:
 
 
 def test_infer_resume_label_empty() -> None:
-    """Nothing exists -> CLAIMED."""
+    """Nothing exists -> READY."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
     )
-    assert infer_resume_label(state) == IssueState.CLAIMED
+    assert infer_resume_label(state) == IssueState.READY
