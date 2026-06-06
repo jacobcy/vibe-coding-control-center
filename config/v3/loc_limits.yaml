@@ -152,6 +152,9 @@ code_limits:
         reason: "配置加载核心模块，包含配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback（repo root 相对路径解析）、变量展开等紧密耦合的配置加载逻辑；新增 load_runtime_config() 统一入口（issue #1925）、target_repo 参数支持、lazy import 注释和 repo root 检测逻辑后略微超标"
 
       # 基础设施核心模块
+      - path: "src/vibe3/agents/backends/codeagent.py"
+        limit: 410
+        reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断（仅针对 'no agent_message output' 错误）等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持（修复 MAJOR audit finding）后略微超标"
       - path: "src/vibe3/agents/backends/async_launcher.py"
         limit: 410
         reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；新增 VIBE3_ASYNC_CHILD 到 CRITICAL_ENV_PASSTHROUGH 修复 pre-push hook 测试失败"

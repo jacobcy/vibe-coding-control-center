@@ -31,6 +31,7 @@ from vibe3.models import AgentOptions, AgentResult
 from vibe3.utils import (
     build_prompt_file_content,
     diagnose_backend_error,
+    diagnose_prompt_size_issue,
     prepare_prompt_file,
     sanitize_prompt_for_display,
     sanitize_task_shell_meta,
@@ -273,6 +274,16 @@ class CodeagentBackend:
             prepare_prompt_file(prompt, include_global_notice=include_global_notice)
         )
 
+        # Log prompt metadata before execution for debugging
+        effective_options = resolve_effective_agent_options(options)
+        logger.bind(domain="agent_execution").debug(
+            "Executing codeagent-wrapper: "
+            f"backend={effective_options.backend or 'default'}, "
+            f"model={effective_options.model or 'default'}, "
+            f"prompt_length={len(prompt)} chars, "
+            "stdin_mode_threshold=800 chars"
+        )
+
         try:
             command = self._build_command(
                 options,
@@ -365,7 +376,30 @@ class CodeagentBackend:
                 if diagnosis:
                     error_msg += f"\n\n{diagnosis}"
 
-                raise AgentExecutionError(error_msg, log_path=wrapper_log_path)
+                # Only check prompt size for "no agent_message output" case
+                # to avoid misleading diagnostics
+                if "completed without agent_message output" in combined_output:
+                    prompt_size_diagnostic = diagnose_prompt_size_issue(
+                        len(prompt),
+                        effective_options.backend or "default",
+                        effective_options.model or "default",
+                    )
+                    if prompt_size_diagnostic:
+                        error_msg += f"\n\n{prompt_size_diagnostic}"
+
+                # Build metadata for structured error info
+                metadata = {
+                    "backend": effective_options.backend or "default",
+                    "model": effective_options.model or "default",
+                    "prompt_length": str(len(prompt)),
+                    "exit_code": str(agent_result.exit_code),
+                }
+                if wrapper_log_path:
+                    metadata["session_log_path"] = str(wrapper_log_path)
+
+                raise AgentExecutionError(
+                    error_msg, log_path=wrapper_log_path, metadata=metadata
+                )
 
             return agent_result
         finally:

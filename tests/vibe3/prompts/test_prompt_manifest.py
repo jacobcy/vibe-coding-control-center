@@ -251,3 +251,82 @@ recipes:
     assert recipe.loaded_definition is not None
     vars = recipe.loaded_definition.variables
     assert vars["supervisor_content"].kind == VariableSourceKind.FILE
+
+
+def test_no_large_file_sources_in_default_recipes() -> None:
+    """Regression test: no recipe section with kind:file should reference large files.
+
+    Large files (>2048 bytes) should use kind:literal with Read instruction instead
+    to avoid codeagent-wrapper stdin-mode threshold (~800 chars).
+
+    This prevents regressions where runtime centralization accidentally reverts
+    the kind:literal fix (as happened in commit 44d26faf).
+    """
+    from vibe3.prompts.models import VariableSourceKind
+
+    # Size limit for kind:file sources
+    max_file_size_bytes = 2048
+
+    manifest = PromptManifest.load_default()
+
+    violations: list[str] = []
+
+    # Check all recipes in the manifest
+    for recipe_key, recipe in manifest.recipes.items():
+
+        # Check section_recipe sections
+        if recipe.kind == "section_recipe" and recipe.loaded_definition:
+            for variant_key, variant in recipe.loaded_definition.variants.items():
+                for section in variant.sections:
+                    if (
+                        section.source
+                        and section.source.kind == VariableSourceKind.FILE
+                    ):
+                        # Resolve the file path
+                        file_path = _resolve_repo_path(Path(section.source.path))
+                        if file_path.exists():
+                            file_size = file_path.stat().st_size
+                            if file_size > max_file_size_bytes:
+                                violations.append(
+                                    f"{recipe_key}/{variant_key}/{section.key}: "
+                                    f"{section.source.path} is {file_size} bytes "
+                                    f"(limit: {max_file_size_bytes})"
+                                )
+
+        # Check template_recipe variables
+        if recipe.kind == "template_recipe" and recipe.loaded_definition:
+            for var_name, var_source in recipe.loaded_definition.variables.items():
+                if var_source.kind == VariableSourceKind.FILE:
+                    # Resolve the file path
+                    file_path = _resolve_repo_path(Path(var_source.path))
+                    if file_path.exists():
+                        file_size = file_path.stat().st_size
+                        if file_size > max_file_size_bytes:
+                            violations.append(
+                                f"{recipe_key}/variable/{var_name}: "
+                                f"{var_source.path} is {file_size} bytes "
+                                f"(limit: {max_file_size_bytes})"
+                            )
+
+        # Check template_recipe material_catalog
+        if recipe.kind == "template_recipe" and recipe.loaded_definition:
+            if recipe.loaded_definition.material_catalog:
+                for material in recipe.loaded_definition.material_catalog:
+                    if material.source.kind == VariableSourceKind.FILE:
+                        # Resolve the file path
+                        file_path = _resolve_repo_path(Path(material.source.path))
+                        if file_path.exists():
+                            file_size = file_path.stat().st_size
+                            if file_size > max_file_size_bytes:
+                                violations.append(
+                                    f"{recipe_key}/material/{material.name}: "
+                                    f"{material.source.path} is {file_size} bytes "
+                                    f"(limit: {max_file_size_bytes})"
+                                )
+
+    if violations:
+        violation_list = "\n  - ".join([""] + violations)
+        pytest.fail(
+            f"Found large file sources with kind:file (should use kind:literal):"
+            f"{violation_list}"
+        )

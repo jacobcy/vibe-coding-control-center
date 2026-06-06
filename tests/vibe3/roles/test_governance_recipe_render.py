@@ -53,14 +53,15 @@ class TestBuildGovernanceRecipe:
         assert "supervisor_name" in recipe.variables
         assert "server_status" in recipe.variables
 
-    def test_supervisor_content_uses_file_source(self):
+    def test_supervisor_content_uses_literal_source(self):
         config = _make_config()
         recipe = build_governance_recipe(config)
         from vibe3.prompts.models import VariableSourceKind
 
         src = recipe.variables["supervisor_content"]
-        assert src.kind == VariableSourceKind.FILE
-        assert src.path == "supervisor/governance/assignee-pool.md"
+        # After fix for issue #1897, materials use kind:literal with Read instruction
+        assert src.kind == VariableSourceKind.LITERAL
+        assert "Read(" in src.value
 
     def test_missing_material_catalog_fails_instead_of_using_python_fallback(
         self, tmp_path, monkeypatch
@@ -159,4 +160,6 @@ class TestRenderGovernancePrompt:
         assert (
             "Supervisor=supervisor/governance/roadmap-intake.md" in result.rendered_text
         )
-        assert "GLOBAL ROADMAP INTAKE MATERIAL" in result.rendered_text
+        # After fix for issue #1897, materials use literal with Read instruction
+        assert "Read(" in result.rendered_text
+        assert "Governance 执行指南" in result.rendered_text

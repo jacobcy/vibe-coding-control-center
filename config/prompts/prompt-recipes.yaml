@@ -34,8 +34,26 @@ recipes:
         sections:
           - key: manager.supervisor_content
             source:
-              kind: file
-              path: supervisor/manager.md
+              kind: literal
+              value: |
+                ## Manager 执行指南
+
+                你的完整执行指令和决策规则在以下文件中：
+                `supervisor/manager.md` (约 1000 行)
+
+                **请立即使用 Read tool 阅读此文件**：
+                ```
+                Read("supervisor/manager.md")
+                ```
+
+                该文件包含：
+                - **Role 定义**：Issue Owner 职责边界
+                - **Permission Contract**：允许/禁止的操作
+                - **核心决策逻辑**：做 vs 不做，无中间地带
+                - **State 机器**：ready → claimed → in_progress → review → done/blocked
+                - **Exit 条件**：何时停止执行
+
+                阅读后，按照其中的规则执行 manager 职责。
           - key: manager.target
           - key: manager.quick_commands
 
@@ -170,8 +188,24 @@ recipes:
         kind: literal
         value: supervisor/apply.md
       supervisor_content:
-        kind: file
-        path: supervisor/apply.md
+        kind: literal
+        value: |
+          ## Supervisor Handoff 执行指南
+
+          你的完整执行指令和决策规则在以下文件中：
+          `supervisor/apply.md`
+
+          **请立即使用 Read tool 阅读此文件**：
+          ```
+          Read("supervisor/apply.md")
+          ```
+
+          该文件包含：
+          - **Role 定义**：Supervisor 应用职责边界
+          - **执行逻辑**：如何应用 handoff 指令
+          - **状态转换**：issue state 的变化规则
+
+          阅读后，按照其中的规则执行 supervisor apply 职责。
       server_status:
         kind: provider
         provider: governance.server_status
@@ -222,20 +256,85 @@ recipes:
     material_catalog:
       - name: supervisor/governance/assignee-pool.md
         source:
-          kind: file
-          path: supervisor/governance/assignee-pool.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/assignee-pool.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/assignee-pool.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：Governance 治理观察者的职责边界
+            - **观察范围**：assignee issue pool 状态分析
+            - **允许操作**：最小 label 调整、comment 建议
+            - **禁止操作**：不恢复一般 blocked issue、不执行代码变更
+
+            阅读后，按照其中的规则执行 governance 职责。
       - name: supervisor/governance/roadmap-intake.md
         source:
-          kind: file
-          path: supervisor/governance/roadmap-intake.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/roadmap-intake.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/roadmap-intake.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：roadmap intake triage 的职责边界
+            - **观察范围**：broader repo issue pool
+            - **目标**：识别适合自动化纳入 assignee issue pool 的对象
+
+            阅读后，按照其中的规则执行 governance 职责。
       - name: supervisor/governance/cron-supervisor.md
         source:
-          kind: file
-          path: supervisor/governance/cron-supervisor.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/cron-supervisor.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/cron-supervisor.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：cron-supervisor 的职责边界
+            - **观察范围**：broader repo docs scope
+            - **目标**：挑选最多 5 个需要语义对齐的过时文档对象
+
+            阅读后，按照其中的规则执行 governance 职责。
       - name: supervisor/governance/code-auditor.md
         source:
-          kind: file
-          path: supervisor/governance/code-auditor.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/code-auditor.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/code-auditor.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：code-auditor 的职责边界
+            - **观察范围**：code quality and architecture patterns
+            - **目标**：识别代码质量问题并提出改进建议
+
+            阅读后，按照其中的规则执行 governance 职责。
     variables:
       server_status:
         kind: provider
