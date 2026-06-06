@@ -15,6 +15,7 @@ from vibe3.orchestra import (
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.domain.events.coalescing import DispatchCoalescer
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
     from vibe3.models import IssueInfo, OrchestraConfig
@@ -37,6 +38,7 @@ def create_global_dispatch_coordinator(
     check_service: "CheckServiceProtocol",
     flow_service: "FlowServiceProtocol",
     queue_filter: Callable[..., bool] | None = None,
+    coalescer: "DispatchCoalescer | None" = None,
 ) -> object:
     """Create GlobalDispatchCoordinator with orchestra runtime services."""
 
@@ -77,4 +79,5 @@ def create_global_dispatch_coordinator(
         flow_context_resolver=flow_context_resolver,
         queue_selector=select_ready_issues_from_collected_issues,
         check_service=check_service,
+        coalescer=coalescer,
     )

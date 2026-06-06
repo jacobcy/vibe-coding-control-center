@@ -16,6 +16,7 @@ from loguru import logger
 from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.config import load_orchestra_config
 from vibe3.domain import publish
+from vibe3.domain.events.coalescing import DispatchCoalescer
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.protocols.runtime_protocols import ServiceBase
 from vibe3.models import IssueInfo, OrchestraConfig
@@ -102,6 +103,9 @@ class OrchestrationFacade(ServiceBase):
         self._flow_manager = flow_manager or FlowManager(self._config)
         self._registry: SessionRegistryService | None = registry
 
+        # Initialize dispatch coalescer
+        self._coalescer = DispatchCoalescer()
+
         if self._capacity is not None:
             from vibe3.environment import SessionRegistryService
 
@@ -126,6 +130,7 @@ class OrchestrationFacade(ServiceBase):
                 check_service=check_service,
                 flow_service=flow_service,
                 queue_filter=queue_filter,
+                coalescer=self._coalescer,
             )
 
     def shutdown(self) -> None:
@@ -218,7 +223,27 @@ class OrchestrationFacade(ServiceBase):
                 )
                 # Continue to dispatch even if reconciliation fails
 
-        await self._coordinator.coordinate(tick_id)
+        # Start coalescer tick
+        from vibe3.domain import get_publisher
+
+        self._coalescer.start_tick(tick_id)
+        get_publisher().set_coalescer(self._coalescer)
+
+        try:
+            await self._coordinator.coordinate(tick_id)
+        finally:
+            # End coalescer tick and log results
+            records = self._coalescer.end_tick()
+
+            # Log coalescing results for observability
+            for record in records:
+                append_orchestra_event(
+                    "coalescer",
+                    f"coalesced {record.event_type} for #{record.issue_number}: "
+                    f"merged={record.merged_count}",
+                )
+
+            get_publisher().set_coalescer(None)
 
     def on_heartbeat_tick(self) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.

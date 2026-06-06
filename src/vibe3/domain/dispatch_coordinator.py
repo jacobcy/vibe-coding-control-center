@@ -47,6 +47,7 @@ from vibe3.services import (
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
+    from vibe3.domain.events.coalescing import DispatchCoalescer
     from vibe3.environment import SessionRegistryService
     from vibe3.roles import TriggerableRoleDefinition
 
@@ -76,6 +77,7 @@ class GlobalDispatchCoordinator:
     _label_dispatcher: LabelDispatchCallable
     _dispatch_paused: bool
     _supervisor_label: str
+    _coalescer: "DispatchCoalescer | None"
 
     def __init__(
         self,
@@ -98,6 +100,7 @@ class GlobalDispatchCoordinator:
         ) = None,
         label_dispatcher: LabelDispatchCallable | None = None,
         queue_filter: Callable[..., bool] | None = None,
+        coalescer: "DispatchCoalescer | None" = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -141,6 +144,7 @@ class GlobalDispatchCoordinator:
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
+        self._coalescer = coalescer
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -559,6 +563,17 @@ class GlobalDispatchCoordinator:
         # Step 4: Dispatch actionable entries FIRST
         # Note: dispatch event logging is handled by _dispatch_loop internally
         dispatched_count = self._dispatch_loop(tick_id)
+
+        # Step 4b: Flush coalescer buffer to drain any buffered events
+        # (edge case: events published from within handlers during same tick)
+        if self._coalescer is not None:
+            buffered_events = self._coalescer.flush()
+            # Clear coalescer so flushed events bypass coalescing and reach handlers
+            from vibe3.domain.publisher import get_publisher, publish as publish_event
+
+            get_publisher().set_coalescer(None)
+            for event in buffered_events:
+                publish_event(event)
 
         # Step 5: Persist queue state AFTER dispatch but BEFORE collection.
         # Entries that were dispatched this tick have been popped (blocked entries
