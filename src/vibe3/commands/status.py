@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from vibe3.server import validate_pid_file
 from vibe3.commands.command_options import (
     FormatOption,
     TraceMinMsOption,
