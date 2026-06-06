@@ -47,9 +47,8 @@ MODULE_CATEGORY_MAP: Final[dict[str, ModuleCategory]] = {
 # Allowed dependency directions: category N may import from categories >= N
 # Kernel (1) must not import from command-adapter (2), policy (3),
 # plugin (4), observation (5) internals
-# Observation (5) must not import from kernel (1), command-adapter (2),
-# policy (3), plugin (4)
-# Plugin-surface (4) may import from observation (5) only
+# Observation (5) may import from all categories (event core needs full access)
+# Plugin-surface (4) may import from kernel, adapter, policy, and itself
 CATEGORY_ALLOWED_DEPS: Final[dict[ModuleCategory, set[ModuleCategory]]] = {
     ModuleCategory.KERNEL: {ModuleCategory.KERNEL},
     ModuleCategory.COMMAND_ADAPTER: {

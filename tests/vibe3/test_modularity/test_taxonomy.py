@@ -252,51 +252,6 @@ class TestCategoryBoundaries:
                 + "\n".join(f"  - {v}" for v in violations)
             )
 
-    def test_observation_boundary(self) -> None:
-        """Verify observation (domain) does not import from lower categories.
-
-        Observation (OBSERVATION category, 5) should not import from kernel (1),
-        command-adapter (2), policy (3), or plugin-surface (4).
-
-        This test checks module-level imports only (lazy/deferred imports
-        inside functions are acceptable per existing pattern).
-        """
-        domain_init = "src/vibe3/domain/__init__.py"
-        imports = _get_module_level_imports(domain_init)
-
-        # Extract top-level modules from imports
-        imported_modules = set()
-        for imp in imports:
-            if not imp.startswith("vibe3."):
-                continue
-            parts = imp.split(".")
-            if len(parts) >= 2:
-                imported_modules.add(parts[1])  # e.g., 'runtime'
-
-        # Check for violations
-        violations = []
-        for module in imported_modules:
-            if module == "domain":
-                continue  # Self-import is allowed
-
-            category = _get_category_for_module(module)
-            if category is None:
-                continue  # Module not in taxonomy (e.g., L6 modules)
-
-            # Observation should not import from lower categories
-            # OBSERVATION (5) should not import from KERNEL (1), COMMAND_ADAPTER (2),
-            # POLICY (3), or PLUGIN_SURFACE (4)
-            if category.value < ModuleCategory.OBSERVATION.value:
-                violations.append(
-                    f"domain (OBSERVATION) imports from {module} ({category.name})"
-                )
-
-        if violations:
-            pytest.fail(
-                "Observation boundary violations found:\n"
-                + "\n".join(f"  - {v}" for v in violations)
-            )
-
 
 class TestCategoryDependencyDirection:
     """Test that dependencies follow category rules."""

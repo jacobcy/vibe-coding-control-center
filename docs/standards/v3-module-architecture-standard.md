@@ -77,7 +77,7 @@ L3 编排核心内的 6 个模块按职责分为以下水平类别：
 | **Plugin Surface** | `orchestra` | 向后兼容适配器、用户扩展点 | 可依赖 Kernel、Adapter、Policy |
 | **Observation** | `domain` | 事件核心、观察门面、状态机 | 可依赖所有类别 |
 
-规则：类别 N 仅可依赖类别 ≥ N 的模块。Kernel 严禁依赖 Adapter/Policy/Plugin/Observation 的内部实现。
+规则：低编号类别为基石，高编号类别可依赖低编号类别。Kernel 严禁依赖 Adapter/Policy/Plugin/Observation 的内部实现。
 
 详细定义见 `src/vibe3/runtime/taxonomy.py`，测试见 `tests/vibe3/test_modularity/test_taxonomy.py`。
 
