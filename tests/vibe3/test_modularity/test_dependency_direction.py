@@ -308,9 +308,10 @@ class TestCircularDependencies:
             )
 
     @pytest.mark.xfail(
-        reason="Known architectural debt: L3-internal circular deps remain in "
-        "{domain, execution, orchestra, roles, runtime, services} SCC. "
-        "Tracked by epic #1987."
+        reason="Known architectural debt: 3 L3-internal circular deps remain "
+        "in {domain, execution, services, roles} after #2122/#2123/#2125 cleanup. "
+        "Remaining: domain↔execution (2 cycles), domain↔roles (1 cycle). "
+        "Tracked by epic #1987, follow-up in #2098/#2099."
     )
     def test_no_circular_deps_within_l3_core(
         self, import_graph: dict[str, list[str]], module_layer_map: dict[str, int]

@@ -53,6 +53,21 @@ def _file_to_module(file_path: str, root: str = "src") -> str:
         return str(p.with_suffix("")).replace("/", ".")
 
 
+def _collect_type_checking_node_ids(tree: ast.AST) -> set[int]:
+    """收集 `if TYPE_CHECKING:` 块内所有 AST 节点的 id.
+
+    TYPE_CHECKING 导入仅用于类型注解，不是运行时依赖，应排除在依赖图外。
+    """
+    excluded: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            test = node.test
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                for child in ast.walk(node):
+                    excluded.add(id(child))
+    return excluded
+
+
 def _extract_imports(file_path: str) -> list[str]:
     """从 Python 文件提取 import 的模块名.
 
@@ -60,7 +75,7 @@ def _extract_imports(file_path: str) -> list[str]:
         file_path: Python 文件路径
 
     Returns:
-        导入的模块名列表（仅 vibe3 内部模块）
+        导入的模块名列表（仅 vibe3 内部模块，排除 TYPE_CHECKING 块）
     """
     try:
         source = Path(file_path).read_text(encoding="utf-8")
@@ -68,8 +83,12 @@ def _extract_imports(file_path: str) -> list[str]:
     except (SyntaxError, OSError):
         return []
 
+    type_checking_ids = _collect_type_checking_node_ids(tree)
+
     imports: list[str] = []
     for node in ast.walk(tree):
+        if id(node) in type_checking_ids:
+            continue
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith("vibe3"):

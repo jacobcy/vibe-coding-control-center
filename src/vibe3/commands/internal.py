@@ -73,7 +73,7 @@ def internal_apply_dispatch(
     ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
-    from vibe3.services.scan_service import dispatch_supervisor_execution
+    from vibe3.roles.scan_service import dispatch_supervisor_execution
 
     dispatch_supervisor_execution(issue_number=issue, no_async=no_async)
 
@@ -104,7 +104,7 @@ def internal_governance_dispatch(
     Note: This command is only called via CLI self-invocation (internal governance)
     from the tmux wrapper launched by governance_scan handler. It always runs sync.
     """
-    from vibe3.services.scan_service import dispatch_governance_execution
+    from vibe3.roles.scan_service import dispatch_governance_execution
 
     dispatch_governance_execution(
         tick_count=tick, execution_count=execution_count, material_override=material

@@ -1,4 +1,8 @@
-"""Scan service functions - business logic for scan commands."""
+"""Scan service functions - governance material scanning and dispatch.
+
+Moved from services/ to roles/ to break services→roles circular dependency.
+This module orchestrates governance execution using both roles and execution layers.
+"""
 
 from pathlib import Path
 from typing import Any

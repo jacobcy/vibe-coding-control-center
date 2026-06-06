@@ -27,7 +27,7 @@ def _execute_governance_internal(material_override: str | None = None) -> None:
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.services.scan_service import dispatch_governance_execution
+    from vibe3.roles.scan_service import dispatch_governance_execution
 
     dispatch_governance_execution(material_override=material_override)
 
@@ -93,7 +93,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
-    from vibe3.services.scan_service import (
+    from vibe3.roles.scan_service import (
         dispatch_supervisor_execution,
         fetch_supervisor_candidates,
     )
@@ -122,7 +122,7 @@ def _run_supervisor_scan_dry_run() -> None:
 
     from vibe3.clients.github_client import GitHubClient
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.scan_service import fetch_supervisor_candidates
+    from vibe3.roles.scan_service import fetch_supervisor_candidates
     from vibe3.ui.scan_display import display_supervisor_dry_run
 
     console = Console()
@@ -175,7 +175,7 @@ def governance(
     """
     from rich.console import Console
 
-    from vibe3.services.scan_service import (
+    from vibe3.roles.scan_service import (
         get_available_governance_materials,
         governance_material_exists,
         list_governance_materials,
