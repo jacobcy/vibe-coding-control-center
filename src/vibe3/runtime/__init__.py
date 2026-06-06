@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     )
     from vibe3.runtime.periodic_check_executor import execute_periodic_check
     from vibe3.runtime.service_protocol import ServiceBase
+    from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
 
 
 def __getattr__(name: str) -> object:
@@ -87,6 +88,16 @@ def __getattr__(name: str) -> object:
 
         return ServiceBase
 
+    # Taxonomy symbols
+    if name == "MODULE_CATEGORY_MAP":
+        from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP
+
+        return MODULE_CATEGORY_MAP
+    if name == "ModuleCategory":
+        from vibe3.runtime.taxonomy import ModuleCategory
+
+        return ModuleCategory
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -104,4 +115,7 @@ __all__ = [
     "read_instance_info",
     "validate_instance",
     "write_instance_info",
+    # Taxonomy (via __getattr__)
+    "MODULE_CATEGORY_MAP",
+    "ModuleCategory",
 ]
