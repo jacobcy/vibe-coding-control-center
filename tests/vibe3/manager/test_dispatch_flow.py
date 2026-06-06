@@ -29,7 +29,7 @@ class TestManagerRoleServicePreparation:
         issue = make_issue()
 
         with patch(
-            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
+            "vibe3.domain.flow_manager.FlowManager.create_flow_for_issue",
             return_value={"branch": ""},
         ):
             assert (
@@ -45,7 +45,7 @@ class TestManagerRoleServicePreparation:
         issue = make_issue(number=102, title="Manager real dispatch")
 
         with patch(
-            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
+            "vibe3.domain.flow_manager.FlowManager.create_flow_for_issue",
             return_value={"branch": "task/issue-102"},
         ):
             request = build_manager_dispatch_request(
