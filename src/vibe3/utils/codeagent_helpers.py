@@ -163,8 +163,15 @@ def build_prompt_file_content(prompt: str, include_global_notice: bool = True) -
     return f"{notice}\n\n---\n\n{prompt}"
 
 
-def prepare_prompt_file(prompt: str, include_global_notice: bool = True) -> Path:
-    """Create temporary prompt file with global notice."""
+def prepare_prompt_file(
+    prompt: str, include_global_notice: bool = True
+) -> tuple[Path, str]:
+    """Create temporary prompt file with global notice.
+
+    Returns:
+        tuple of (file_path, prompt_content) to avoid caller needing to
+        call build_prompt_file_content separately for diagnostics.
+    """
     prompt_dir = Path.home() / ".codeagent" / "agents"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     prompt_content = build_prompt_file_content(
@@ -174,7 +181,7 @@ def prepare_prompt_file(prompt: str, include_global_notice: bool = True) -> Path
         mode="w", suffix=".md", delete=False, dir=prompt_dir
     ) as f:
         f.write(prompt_content)
-        return Path(f.name)
+        return Path(f.name), prompt_content
 
 
 def sanitize_task_shell_meta(task: str) -> str:

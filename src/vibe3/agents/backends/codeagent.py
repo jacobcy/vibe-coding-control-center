@@ -29,7 +29,6 @@ from vibe3.config import (
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models import AgentOptions, AgentResult
 from vibe3.utils import (
-    build_prompt_file_content,
     diagnose_backend_error,
     diagnose_prompt_size_issue,
     prepare_prompt_file,
@@ -231,7 +230,7 @@ class CodeagentBackend:
         """Start codeagent-wrapper in tmux and return the async handle."""
         sync_models_json(options)
 
-        prompt_file_path = prepare_prompt_file(prompt)
+        prompt_file_path, _ = prepare_prompt_file(prompt)
         command = self._build_command(
             options,
             str(prompt_file_path),
@@ -270,11 +269,8 @@ class CodeagentBackend:
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
-        prompt_content = build_prompt_file_content(
+        prompt_file_path, prompt_content = prepare_prompt_file(
             prompt, include_global_notice=include_global_notice
-        )
-        prompt_file_path = str(
-            prepare_prompt_file(prompt_content, include_global_notice=False)
         )
         diagnostic_prompt_length = len(prompt_content)
 
@@ -291,7 +287,7 @@ class CodeagentBackend:
         try:
             command = self._build_command(
                 options,
-                cast(str, prompt_file_path),
+                str(prompt_file_path),
                 task=task,
                 session_id=session_id,
             )
@@ -323,20 +319,17 @@ class CodeagentBackend:
                 if should_retry_without_session(result, session_id=session_id):
                     retry_prompt_path = prompt_file_path
                     if fallback_prompt is not None:
-                        fallback_prompt_content = build_prompt_file_content(
+                        (
+                            retry_prompt_path,
+                            fallback_prompt_content,
+                        ) = prepare_prompt_file(
                             fallback_prompt,
                             include_global_notice=fallback_include_global_notice,
-                        )
-                        retry_prompt_path = str(
-                            prepare_prompt_file(
-                                fallback_prompt_content,
-                                include_global_notice=False,
-                            )
                         )
                         diagnostic_prompt_length = len(fallback_prompt_content)
                     retry_command = self._build_command(
                         options,
-                        cast(str, retry_prompt_path),
+                        str(retry_prompt_path),
                         task=task,
                         session_id=None,
                     )
@@ -410,4 +403,4 @@ class CodeagentBackend:
             return agent_result
         finally:
             if prompt_file_path:
-                Path(prompt_file_path).unlink(missing_ok=True)
+                prompt_file_path.unlink(missing_ok=True)
