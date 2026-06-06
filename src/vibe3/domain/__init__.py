@@ -11,20 +11,17 @@ Reference: docs/standards/v3/worktree-lifecycle-standard.md
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.events import (
-        # Base
         DomainEvent,
         ExecutorDispatchIntent,
-        # L1 Governance Events
         GovernanceDecisionRequired,
         GovernanceScanCompleted,
         GovernanceScanStarted,
-        # L3 Flow Lifecycle Events
         IssueFailed,
         ManagerDispatchIntent,
         PlannerDispatchIntent,
         ReviewerDispatchIntent,
-        # L2 Supervisor Apply Events
         SupervisorApplyCompleted,
         SupervisorApplyDelegated,
         SupervisorApplyDispatched,
@@ -32,22 +29,43 @@ if TYPE_CHECKING:
         SupervisorIssueIdentified,
         SupervisorPromptRendered,
     )
-
-# Import orchestration components lazily to avoid circular imports
-# FlowManager, GlobalDispatchCoordinator, and FailedGate are available through
-# __getattr__ for runtime access
-if TYPE_CHECKING:
-    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.failed_gate import FailedGate
     from vibe3.domain.flow_manager import FlowManager
+    from vibe3.domain.publisher import EventPublisher
     from vibe3.domain.state_machine import (
         STATE_LABEL_META,
         VIBE_TASK_LABEL,
         validate_transition,
     )
 
-if TYPE_CHECKING:
-    from vibe3.domain.publisher import EventPublisher
+_LAZY_IMPORTS: dict[str, str] = {
+    # Events
+    "DomainEvent": "vibe3.domain.events",
+    "GovernanceDecisionRequired": "vibe3.domain.events",
+    "GovernanceScanCompleted": "vibe3.domain.events",
+    "GovernanceScanStarted": "vibe3.domain.events",
+    "IssueFailed": "vibe3.domain.events",
+    "ManagerDispatchIntent": "vibe3.domain.events",
+    "PlannerDispatchIntent": "vibe3.domain.events",
+    "ExecutorDispatchIntent": "vibe3.domain.events",
+    "ReviewerDispatchIntent": "vibe3.domain.events",
+    "SupervisorApplyCompleted": "vibe3.domain.events",
+    "SupervisorApplyDelegated": "vibe3.domain.events",
+    "SupervisorApplyDispatched": "vibe3.domain.events",
+    "SupervisorApplyStarted": "vibe3.domain.events",
+    "SupervisorIssueIdentified": "vibe3.domain.events",
+    "SupervisorPromptRendered": "vibe3.domain.events",
+    # Orchestration
+    "FlowManager": "vibe3.domain.flow_manager",
+    "GlobalDispatchCoordinator": "vibe3.domain.dispatch_coordinator",
+    "FailedGate": "vibe3.domain.failed_gate",
+    # State machine
+    "STATE_LABEL_META": "vibe3.models.state_machine",
+    "VIBE_TASK_LABEL": "vibe3.models.state_machine",
+    "validate_transition": "vibe3.models.state_machine",
+    # Publisher
+    "EventPublisher": "vibe3.domain.publisher",
+}
 
 
 def register_event_handlers() -> None:
@@ -81,98 +99,11 @@ def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None
 
 
 def __getattr__(name: str) -> object:
-    """Lazy import for heavy modules to avoid circular dependencies."""
-    # Events
-    if name == "DomainEvent":
-        from vibe3.domain.events import DomainEvent
+    if name in _LAZY_IMPORTS:
+        import importlib
 
-        return DomainEvent
-    if name == "GovernanceDecisionRequired":
-        from vibe3.domain.events import GovernanceDecisionRequired
-
-        return GovernanceDecisionRequired
-    if name == "GovernanceScanCompleted":
-        from vibe3.domain.events import GovernanceScanCompleted
-
-        return GovernanceScanCompleted
-    if name == "GovernanceScanStarted":
-        from vibe3.domain.events import GovernanceScanStarted
-
-        return GovernanceScanStarted
-    if name == "IssueFailed":
-        from vibe3.domain.events import IssueFailed
-
-        return IssueFailed
-    if name == "ManagerDispatchIntent":
-        from vibe3.domain.events import ManagerDispatchIntent
-
-        return ManagerDispatchIntent
-    if name == "PlannerDispatchIntent":
-        from vibe3.domain.events import PlannerDispatchIntent
-
-        return PlannerDispatchIntent
-    if name == "ExecutorDispatchIntent":
-        from vibe3.domain.events import ExecutorDispatchIntent
-
-        return ExecutorDispatchIntent
-    if name == "ReviewerDispatchIntent":
-        from vibe3.domain.events import ReviewerDispatchIntent
-
-        return ReviewerDispatchIntent
-    if name == "SupervisorApplyCompleted":
-        from vibe3.domain.events import SupervisorApplyCompleted
-
-        return SupervisorApplyCompleted
-    if name == "SupervisorApplyDelegated":
-        from vibe3.domain.events import SupervisorApplyDelegated
-
-        return SupervisorApplyDelegated
-    if name == "SupervisorApplyDispatched":
-        from vibe3.domain.events import SupervisorApplyDispatched
-
-        return SupervisorApplyDispatched
-    if name == "SupervisorApplyStarted":
-        from vibe3.domain.events import SupervisorApplyStarted
-
-        return SupervisorApplyStarted
-    if name == "SupervisorIssueIdentified":
-        from vibe3.domain.events import SupervisorIssueIdentified
-
-        return SupervisorIssueIdentified
-    if name == "SupervisorPromptRendered":
-        from vibe3.domain.events import SupervisorPromptRendered
-
-        return SupervisorPromptRendered
-
-    # Orchestration
-    if name == "FlowManager":
-        from vibe3.domain.flow_manager import FlowManager
-
-        return FlowManager
-    if name == "GlobalDispatchCoordinator":
-        from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
-
-        return GlobalDispatchCoordinator
-    if name == "FailedGate":
-        from vibe3.domain.failed_gate import FailedGate
-
-        return FailedGate
-    if name == "STATE_LABEL_META":
-        from vibe3.models.state_machine import STATE_LABEL_META
-
-        return STATE_LABEL_META
-    if name == "VIBE_TASK_LABEL":
-        from vibe3.models.state_machine import VIBE_TASK_LABEL
-
-        return VIBE_TASK_LABEL
-    if name == "validate_transition":
-        from vibe3.models.state_machine import validate_transition
-
-        return validate_transition
-    if name == "EventPublisher":
-        from vibe3.domain.publisher import EventPublisher
-
-        return EventPublisher
+        module = importlib.import_module(_LAZY_IMPORTS[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
