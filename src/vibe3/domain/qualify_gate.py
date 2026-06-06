@@ -339,7 +339,7 @@ class QualifyGateService:
             fs_obj = FlowState.model_validate(flow_state)
             target_label = infer_resume_label(fs_obj)
         else:
-            target_label = IssueState.CLAIMED
+            target_label = IssueState.READY
 
         from typing import Literal, cast
 
