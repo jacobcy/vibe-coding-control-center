@@ -5,7 +5,7 @@ Handles syncing effective backend/model settings to ``~/.codeagent/models.json``
 
 import json
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 from loguru import logger
 
@@ -33,15 +33,7 @@ def sync_models_json(options: AgentOptions) -> None:
     if not effective.backend:
         return  # no repo-local backend mapping available
 
-    try:
-        existing: dict[str, Any] = {}
-        if MODELS_JSON_PATH.exists():
-            existing = json.loads(MODELS_JSON_PATH.read_text())
-    except Exception as exc:
-        logger.bind(domain="review_runner").warning(
-            f"Failed to read models.json, will overwrite: {exc}"
-        )
-        existing = {}
+    existing = read_models_json(MODELS_JSON_PATH)
 
     # Sync complete agents presets from repo config
     repo_data = read_models_json(repo_models_json_path())
