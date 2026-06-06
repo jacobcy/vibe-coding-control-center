@@ -531,3 +531,26 @@ def test_auto_resume_blocked_uses_task_resume_operations() -> None:
         assert call["issue_number"] == 303
         assert call["label_state"] == ""
         assert result != IssueState.BLOCKED
+
+
+def test_auto_resume_blocked_with_none_flow_state_returns_ready() -> None:
+    """When flow_state is None, _auto_resume_blocked should return READY."""
+    from unittest.mock import MagicMock, patch
+
+    from vibe3.domain.qualify_gate import QualifyGateService
+    from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models.orchestration import IssueState
+
+    service = QualifyGateService(
+        OrchestraConfig(repo="owner/repo"), MagicMock(), MagicMock(), MagicMock()
+    )
+
+    with patch("vibe3.domain.qualify_gate.TaskResumeOperations"):
+        result = service._auto_resume_blocked(
+            issue_number=303,
+            branch="task/issue-303",
+            labels=["state/blocked"],
+            flow_state=None,
+        )
+
+        assert result == IssueState.READY
