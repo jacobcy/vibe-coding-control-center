@@ -10,7 +10,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.config import VibeConfig
-from vibe3.models import IssueState, PRState
+from vibe3.models import IssueState
 from vibe3.services.check_lock import check_lock
 from vibe3.services.check_pr_service import CheckPRService
 from vibe3.services.check_remote import (
@@ -344,30 +344,8 @@ class CheckService(CheckRemote):
             if len(task_issues) > 1:
                 issues.append(f"Multiple task issues for branch '{branch}'")
 
-            # ==== Issue & Flow State Validation ====
-            # Priority 1: Check issue state against flow state
-            flow_status = flow_data.get("flow_status", "active")
-            is_active_flow = flow_status not in self.INACTIVE_FLOW_STATUSES
-
-            if task_issue_closed:
-                if is_active_flow:
-                    # Active flow with closed issue = anomaly
-                    # Need to check PR status to determine if it's a real error
-                    cached_pr = self._branch_to_pr.get(branch)
-                    has_open_pr = cached_pr and cached_pr.state == PRState.OPEN
-
-                    if not has_open_pr:
-                        return CheckResult(
-                            is_valid=False,
-                            branch=branch,
-                            issues=[
-                                f"Task issue #{task_issue} is CLOSED (no open PR found)"
-                            ],
-                        )
-                # Inactive flow with closed issue = expected terminal state, continue
-
             # ==== PR State Handling ====
-            # Priority 2: Handle PR state changes (merged/closed)
+            # Priority 1: Handle PR state changes (merged/closed)
             pr = self._branch_to_pr.get(branch)
             if pr:
                 handled, pr_issues, pr_warnings = (
@@ -403,6 +381,23 @@ class CheckService(CheckRemote):
                         f"Failed to verify PR status from GitHub: {e}"
                     )
                     issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
+
+            # ==== Issue & Flow State Validation ====
+            # Priority 2: Check issue state against flow state
+            flow_status = flow_data.get("flow_status", "active")
+            is_active_flow = flow_status not in self.INACTIVE_FLOW_STATUSES
+
+            if task_issue_closed:
+                if is_active_flow:
+                    # Active flow with closed issue and no open PR = anomaly
+                    return CheckResult(
+                        is_valid=False,
+                        branch=branch,
+                        issues=[
+                            f"Task issue #{task_issue} is CLOSED (no open PR found)"
+                        ],
+                    )
+                # Inactive flow with closed issue = expected terminal state, continue
 
             # Handle stale ready flow rebuild
             if (

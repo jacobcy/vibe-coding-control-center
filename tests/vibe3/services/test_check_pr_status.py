@@ -207,6 +207,124 @@ class TestPRStatusDetection:
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "active"
 
+    def test_check_marks_flow_done_when_merged_with_closed_issue(self, tmp_path):
+        """Should mark flow as done when PR is merged, even if issue is closed.
+
+        This is the primary bug fix: PR merged detection should run BEFORE
+        issue-closed detection. Previously, issue-closed check returned early
+        and prevented PR merged check from running.
+        """
+        # ARRANGE: Active flow with closed issue and merged PR
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/issue-2284",
+            flow_slug="issue_2284",
+            flow_status="active",
+        )
+        # Link issue to flow
+        store.add_issue_link("task/issue-2284", 2284, "task")
+
+        # Mock git client
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        git_client.get_current_branch.return_value = "task/issue-2284"
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
+
+        # Mock GitHub client with merged PR
+        github_client = MagicMock(spec=GitHubClient)
+        merged_pr = PRResponse(
+            number=42,
+            title="Fix PR merged flow misclassification",
+            state=PRState.MERGED,
+            head_branch="task/issue-2284",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            merged_at="2026-06-07T00:00:00Z",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+        github_client.list_prs_for_branch.return_value = [merged_pr]
+        github_client.list_all_prs.return_value = [merged_pr]
+        # Mock issue as CLOSED (this would have triggered early return before fix)
+        github_client.view_issue.return_value = {
+            "state": "CLOSED",
+            "title": "Bug: PR merged flow misclassified",
+            "body": "Description",
+            "labels": [],
+        }
+
+        # Create handoff file
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, "task/issue-2284")
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
+        # ACT: Run check
+        service = CheckService(
+            store=store, git_client=git_client, github_client=github_client
+        )
+        service.verify_current_flow()
+
+        # ASSERT: Flow should be marked as done (not error about closed issue)
+        flow = store.get_flow_state("task/issue-2284")
+        assert flow["flow_status"] == "done"
+
+    def test_check_closed_issue_without_pr_reports_error(self, tmp_path):
+        """Should report error when issue is closed but no PR exists.
+
+        This ensures the issue-closed fallback still works after the reorder.
+        An active flow with closed issue and no PR is an anomaly.
+        """
+        # ARRANGE: Active flow with closed issue, no PR
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/issue-999",
+            flow_slug="issue_999",
+            flow_status="active",
+        )
+        # Link issue to flow
+        store.add_issue_link("task/issue-999", 999, "task")
+
+        # Mock git client
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        git_client.get_current_branch.return_value = "task/issue-999"
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
+
+        # Mock GitHub client with no PR
+        github_client = MagicMock(spec=GitHubClient)
+        github_client.list_prs_for_branch.return_value = []
+        github_client.list_all_prs.return_value = []
+        # Mock issue as CLOSED
+        github_client.view_issue.return_value = {
+            "state": "CLOSED",
+            "title": "Some issue",
+            "body": "Description",
+            "labels": [],
+        }
+
+        # Create handoff file
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, "task/issue-999")
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
+        # ACT: Run check
+        service = CheckService(
+            store=store, git_client=git_client, github_client=github_client
+        )
+        result = service.verify_current_flow()
+
+        # ASSERT: Should report error about closed issue
+        assert result is not None
+        assert result.is_valid is False
+        assert "CLOSED" in str(result.issues)
+
 
 class TestMergedPRCacheIntegration:
     """Test MergedPRCache integration with pr_status_checker."""

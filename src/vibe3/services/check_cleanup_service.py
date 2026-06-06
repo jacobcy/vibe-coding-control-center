@@ -25,7 +25,7 @@ class CheckCleanupService:
     """Service for cleaning up terminal flow resources.
 
     Handles the --clean-branch functionality:
-    - done: Clean physical resources, keep flow record as audit history
+    - done: Clean physical resources, soft-delete flow record
     - aborted: Clean everything including flow record (allows issue to restart)
     """
 
@@ -279,13 +279,13 @@ class CheckCleanupService:
             branch: Branch name
             flow_status: Flow status (done/aborted)
             cleanup_service: Cleanup service instance
-            cleaned: List to append successfully cleaned aborted flows
-            kept_records: List to append done flows with preserved records
+            cleaned: List to append successfully cleaned flows (both done and aborted)
+            kept_records: List to append done flows with preserved records (now unused)
             failed: List to append failure messages
         """
-        # done: keep record as audit history (issue is closed, PR was merged)
-        # aborted: delete record (issue may still be open, allow restart)
-        keep_flow_record = flow_status == "done"
+        # Both done and aborted: soft-delete flow record after physical cleanup
+        # This allows clean_expired_local_branches to clean residual branches
+        keep_flow_record = False
 
         try:
             results = cleanup_service.cleanup_flow_scene(
