@@ -301,7 +301,7 @@ Blocked Issues:
 - **标签管理**：[roadmap-label-management.md](roadmap-label-management.md)
 - **术语表**：[glossary.md](glossary.md)
 - **Manager 行为规范**：[supervisor/manager.md](../../supervisor/manager.md)
-- **Governance 规范**：[vibe3-role-checks-and-balances-standard.md](vibe3-role-checks-and-balances-standard.md)
+- **Governance 规范**：[v3/human-mirror-architecture-philosophy.md](v3/human-mirror-architecture-philosophy.md)
 
 ---
 
