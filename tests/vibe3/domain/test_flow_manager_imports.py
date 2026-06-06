@@ -3,20 +3,21 @@
 import ast
 
 
-def test_manager_imports_from_domain():
-    """Verify manager.py imports FlowManager from domain."""
+def test_manager_uses_flow_factory():
+    """Verify manager.py uses flow_factory instead of importing FlowManager.
+
+    After circular dependency fix (issue #2001), manager.py uses
+    create_flow_manager from services.flow_factory instead of directly
+    importing FlowManager from vibe3.domain.
+    """
     with open("src/vibe3/roles/manager.py") as f:
-        tree = ast.parse(f.read())
+        content = f.read()
 
-    imports = [node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-    flow_manager_imports = [
-        imp
-        for imp in imports
-        if imp.module and "FlowManager" in [alias.name for alias in imp.names]
-    ]
+    # Should NOT import FlowManager from domain
+    assert "from vibe3.domain import FlowManager" not in content
 
-    assert len(flow_manager_imports) == 1
-    assert flow_manager_imports[0].module == "vibe3.domain"
+    # Should use create_flow_manager from services.flow_factory
+    assert "from vibe3.services.flow_factory import create_flow_manager" in content
 
 
 def test_server_registry_imports_from_domain():
@@ -37,23 +38,21 @@ def test_server_registry_imports_from_domain():
     assert flow_manager_imports[0].module == "vibe3.domain"
 
 
-def test_governance_sync_runner_imports_from_domain():
-    """Verify governance_sync_runner.py imports FlowManager from domain."""
+def test_governance_sync_runner_does_not_import_flow_manager():
+    """Verify governance_sync_runner.py does NOT import FlowManager from domain.
+
+    After circular dependency fix (issue #2001), governance_sync_runner.py
+    uses OrchestraStatusService.create() factory method instead of directly
+    importing FlowManager from vibe3.domain.
+    """
     with open("src/vibe3/execution/governance_sync_runner.py") as f:
-        tree = ast.parse(f.read())
+        content = f.read()
 
-    # Find all FlowManager imports in the file
-    imports = [node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-    flow_manager_imports = [
-        imp
-        for imp in imports
-        if imp.module and "FlowManager" in [alias.name for alias in imp.names]
-    ]
+    # Should NOT have any FlowManager imports
+    assert "from vibe3.domain import FlowManager" not in content
 
-    # Should have exactly 2 imports (lines 61 and 177)
-    assert len(flow_manager_imports) == 2
-    for imp in flow_manager_imports:
-        assert imp.module == "vibe3.domain"
+    # Should use OrchestraStatusService.create() instead
+    assert "OrchestraStatusService.create(" in content
 
 
 def test_mcp_imports_from_domain():

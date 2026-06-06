@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import GhIssueLabelPort
-from vibe3.domain.protocols import TriggerableRoleDefinitionProtocol
+from vibe3.clients.protocols import TriggerableRoleDefinitionProtocol
 from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:

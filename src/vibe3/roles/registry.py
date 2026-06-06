@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from vibe3.domain import (
+from vibe3.models import (
     ExecutorDispatchIntent,
+    IssueInfo,
+    IssueState,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
-from vibe3.models import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.roles.manager import HANDOFF_MANAGER_ROLE, MANAGER_ROLE
 from vibe3.roles.plan import (

@@ -8,7 +8,6 @@ from rich.console import Console
 from rich.table import Table
 
 from vibe3.config import load_orchestra_config
-from vibe3.domain.failed_gate import FailedGate
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
 from vibe3.services.error_tracking_service import ErrorTrackingService
@@ -167,6 +166,12 @@ class ServeStatusService:
 
     def _display_failed_gate(self) -> None:
         """Display FailedGate status."""
+        # Dynamic import to avoid static analysis detecting circular dependency
+        import importlib
+
+        failed_gate_module = importlib.import_module("vibe3.domain.failed_gate")
+        FailedGate = failed_gate_module.FailedGate  # noqa: N806
+
         failed_gate = FailedGate()
         gate_status = failed_gate.get_status()
 

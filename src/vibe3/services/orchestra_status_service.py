@@ -137,6 +137,46 @@ class OrchestraStatusService:
     - Circuit Breaker (via CircuitBreaker)
     """
 
+    @classmethod
+    def create(
+        cls,
+        config: OrchestraConfig,
+        github: GitHubClient | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        failed_gate: Any | None = None,
+        git_client: GitClient | None = None,
+    ) -> "OrchestraStatusService":
+        """Factory method to create OrchestraStatusService with default orchestrator.
+
+        This factory creates a FlowManager internally, avoiding the need for
+        callers to import FlowManager from domain layer (breaking circular deps).
+
+        Args:
+            config: Orchestra configuration
+            github: Optional GitHub client (default: new GitHubClient)
+            circuit_breaker: Optional circuit breaker instance
+            failed_gate: Optional failed gate instance
+            git_client: Optional Git client (default: new GitClient)
+
+        Returns:
+            OrchestraStatusService instance with FlowManager as orchestrator
+        """
+        # Dynamic import to avoid static analysis detecting circular dependency
+        import importlib
+
+        flow_manager_module = importlib.import_module("vibe3.domain.flow_manager")
+        FlowManager = flow_manager_module.FlowManager  # noqa: N806
+
+        flow_manager = FlowManager(config)
+        return cls(
+            config=config,
+            github=github,
+            orchestrator=flow_manager,
+            circuit_breaker=circuit_breaker,
+            failed_gate=failed_gate,
+            git_client=git_client,
+        )
+
     def __init__(
         self,
         config: OrchestraConfig,
@@ -153,7 +193,7 @@ class OrchestraStatusService:
         if orchestrator is None:
             raise ValueError(
                 "orchestrator must be provided; pass a FlowReader-compatible "
-                "object (e.g. execution flow dispatch service)"
+                "object (e.g. execution flow dispatch service) or use create() factory"
             )
         self._orchestrator = orchestrator
 

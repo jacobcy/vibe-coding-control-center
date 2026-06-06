@@ -18,6 +18,15 @@ if TYPE_CHECKING:
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
     from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+    from vibe3.models.domain_events import (
+        DomainEvent,
+        ExecutorDispatchIntent,
+        IssueFailed,
+        ManagerDispatchIntent,
+        PlannerDispatchIntent,
+        ReviewerDispatchIntent,
+        SupervisorIssueIdentified,
+    )
     from vibe3.models.execution_handle import AsyncExecutionHandle
     from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
     from vibe3.models.flow import (
@@ -73,6 +82,12 @@ if TYPE_CHECKING:
         StructureMetrics,
         StructureSnapshot,
     )
+    from vibe3.models.state_machine import (
+        STATE_LABEL_META,
+        VIBE_TASK_LABEL,
+        can_transition,
+        validate_transition,
+    )
     from vibe3.models.trace import ExecutionStep, TraceOutput
     from vibe3.models.verdict import VerdictRecord
     from vibe3.models.verdict_types import VerdictValue
@@ -80,6 +95,17 @@ if TYPE_CHECKING:
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "DomainEvent": "vibe3.models.domain_events",
+    "ExecutorDispatchIntent": "vibe3.models.domain_events",
+    "IssueFailed": "vibe3.models.domain_events",
+    "ManagerDispatchIntent": "vibe3.models.domain_events",
+    "PlannerDispatchIntent": "vibe3.models.domain_events",
+    "ReviewerDispatchIntent": "vibe3.models.domain_events",
+    "SupervisorIssueIdentified": "vibe3.models.domain_events",
+    "STATE_LABEL_META": "vibe3.models.state_machine",
+    "VIBE_TASK_LABEL": "vibe3.models.state_machine",
+    "can_transition": "vibe3.models.state_machine",
+    "validate_transition": "vibe3.models.state_machine",
     "ALLOWED_TRANSITIONS": "vibe3.models.orchestration",
     "BranchConvention": "vibe3.models.branch_convention",
     "BranchSource": "vibe3.models.change_source",
@@ -185,12 +211,14 @@ __all__: list[str] = [
     "DeadCodeFinding",
     "DeadCodeReport",
     "DependencyChange",
+    "DomainEvent",
     "DependencyEdge",
     "DiffSummary",
     "DiffWarning",
     "ExecutionLaunchResult",
     "ExecutionRequest",
     "ExecutionStep",
+    "ExecutorDispatchIntent",
     "FileChange",
     "FileSnapshot",
     "FlowEvent",
@@ -199,17 +227,20 @@ __all__: list[str] = [
     "FlowStatusResponse",
     "FORBIDDEN_TRANSITIONS",
     "FunctionSnapshot",
+    "IssueFailed",
     "IssueInfo",
     "IssueLink",
     "IssueState",
     "LayerCoverage",
     "MainBranchProtectedError",
+    "ManagerDispatchIntent",
     "ModuleChange",
     "ModuleSnapshot",
     "OrchestraConfig",
     "PRCriticalAnalysis",
     "PRMetadata",
     "PRResponse",
+    "PlannerDispatchIntent",
     "PlanRequest",
     "PlanScope",
     "PlanSpecInput",
@@ -217,21 +248,27 @@ __all__: list[str] = [
     "PRState",
     "PromptContextMode",
     "QueueEntry",
+    "ReviewerDispatchIntent",
     "ReviewRequest",
     "ReviewScope",
     "SessionRole",
+    "STATE_LABEL_META",
     "StateTransition",
     "StructureDiff",
     "StructureMetrics",
     "StructureSnapshot",
     "SupervisorHandoffConfig",
+    "SupervisorIssueIdentified",
     "TimelineEvent",
     "TraceOutput",
     "UncommittedSource",
+    "VIBE_TASK_LABEL",
     "UpdatePRRequest",
     "VerdictRecord",
     "VerdictValue",
     "VersionBumpResponse",
     "VersionBumpType",
     "WorktreeRequirement",
+    "can_transition",
+    "validate_transition",
 ]

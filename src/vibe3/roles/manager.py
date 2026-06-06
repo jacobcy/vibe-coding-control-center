@@ -15,7 +15,6 @@ from vibe3.config import MANAGER_GATE_CONFIG, ConventionResolver
 
 # public-api: pending upstream export
 from vibe3.config.convention_resolver import diagnose_profile
-from vibe3.domain import FlowManager
 from vibe3.environment import SessionRegistryService
 
 # public-api: pending upstream export
@@ -40,6 +39,7 @@ from vibe3.roles.definitions import (
     TriggerableRoleDefinition,
 )
 from vibe3.services import fail_manager_issue
+from vibe3.services.flow_factory import create_flow_manager
 from vibe3.utils import runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(
@@ -170,7 +170,7 @@ def build_manager_request(
     tick_id: int = 0,
 ) -> ExecutionRequest | None:
     """Build the manager execution request from declarative role policy."""
-    flow_manager = FlowManager(config, registry=registry)
+    flow_manager = create_flow_manager(config, registry=registry)
     try:
         flow = flow_manager.create_flow_for_issue(issue)
     except CapacityDeferredError:
