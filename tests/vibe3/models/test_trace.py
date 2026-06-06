@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+import yaml
+
 from vibe3.models.trace import ExecutionStep, TraceOutput, format_result_entries
 
 
@@ -220,12 +222,17 @@ def test_trace_output_to_yaml_flat_structure() -> None:
     )
 
     yaml_str = trace.to_yaml()
+    data = yaml.safe_load(yaml_str)
 
-    # Verify flat structure: these should be top-level keys, not nested under "trace:"
-    assert "command: pr show" in yaml_str
-    assert "status: completed" in yaml_str
-    assert "start_time:" in yaml_str
-    # Verify no "trace:" wrapper key at the top
-    lines = yaml_str.split("\n")
-    # Check that 'command:' is not indented (top-level key)
-    assert any(line.startswith("command:") for line in lines)
+    assert "trace" not in data
+    assert set(data) == {
+        "command",
+        "status",
+        "start_time",
+        "end_time",
+        "execution",
+        "result",
+    }
+    assert data["command"] == "pr show"
+    assert data["status"] == "completed"
+    assert data["result"] == {"number": 200}

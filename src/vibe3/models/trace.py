@@ -106,7 +106,7 @@ class TraceOutput(BaseModel):
         Example:
             >>> trace = TraceOutput(command="pr show", status="completed", ...)
             >>> print(trace.to_json())
-            {"trace": {"command": "pr show", ...}}
+            {"command": "pr show", "status": "completed", ...}
         """
         return self.model_dump_json(indent=2)
 
