@@ -13,6 +13,34 @@ import yaml
 from pydantic import BaseModel, Field
 
 
+def format_result_entries(result: dict[str, Any], indent: str = "  ") -> list[str]:
+    """Format result dict entries as text lines.
+
+    Handles dict values (nested key-value), list values (bulleted items),
+    and scalar values.
+
+    Args:
+        result: Result dictionary to format
+        indent: Indentation prefix for each line
+
+    Returns:
+        List of formatted text lines
+    """
+    lines: list[str] = []
+    for key, value in result.items():
+        if isinstance(value, dict):
+            lines.append(f"{indent}{key}:")
+            for k, v in value.items():
+                lines.append(f"{indent}  {k}: {v}")
+        elif isinstance(value, list):
+            lines.append(f"{indent}{key}:")
+            for item in value:
+                lines.append(f"{indent}  - {item}")
+        else:
+            lines.append(f"{indent}{key}: {value}")
+    return lines
+
+
 class ExecutionStep(BaseModel):
     """A single execution step in the trace.
 
@@ -63,30 +91,10 @@ class TraceOutput(BaseModel):
         Example:
             >>> trace = TraceOutput(command="pr show", status="completed", ...)
             >>> print(trace.to_yaml())
-            trace:
-              command: pr show
-              status: completed
+            command: pr show
+            status: completed
         """
-        data = {
-            "trace": {
-                "command": self.command,
-                "status": self.status,
-                "start_time": self.start_time.isoformat(),
-                "end_time": self.end_time.isoformat() if self.end_time else None,
-            },
-            "execution": [
-                {
-                    "time": step.time,
-                    "level": step.level,
-                    "module": step.module,
-                    "function": step.function,
-                    "line": step.line,
-                    "message": step.message,
-                }
-                for step in self.execution
-            ],
-            "result": self.result,
-        }
+        data = self.model_dump(mode="json")
         return yaml.dump(data, default_flow_style=False, allow_unicode=True)
 
     def to_json(self) -> str:
@@ -98,7 +106,7 @@ class TraceOutput(BaseModel):
         Example:
             >>> trace = TraceOutput(command="pr show", status="completed", ...)
             >>> print(trace.to_json())
-            {"trace": {"command": "pr show", ...}}
+            {"command": "pr show", "status": "completed", ...}
         """
         return self.model_dump_json(indent=2)
 
@@ -135,13 +143,7 @@ class TraceOutput(BaseModel):
         if self.result:
             lines.append("")
             lines.append("▶ Result:")
-            for key, value in self.result.items():
-                if isinstance(value, dict):
-                    lines.append(f"  {key}:")
-                    for k, v in value.items():
-                        lines.append(f"    {k}: {v}")
-                else:
-                    lines.append(f"  {key}: {value}")
+            lines.extend(format_result_entries(self.result))
 
         # Add footer
         lines.append("")

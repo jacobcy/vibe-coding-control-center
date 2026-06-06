@@ -136,3 +136,31 @@ def test_output_no_trace_text(capsys: pytest.CaptureFixture[str]) -> None:
     output_result(result, None, json_output=False, yaml_output=False)
     captured = capsys.readouterr()
     assert "number: 200" in captured.out
+
+
+def test_output_simple_scalar(capsys: pytest.CaptureFixture[str]) -> None:
+    """Test simple output with scalar values."""
+    result = {"number": 200, "title": "Test PR"}
+    _output_simple(result)
+    captured = capsys.readouterr()
+    assert "number: 200" in captured.out
+    assert "title: Test PR" in captured.out
+
+
+def test_output_simple_mixed(capsys: pytest.CaptureFixture[str]) -> None:
+    """Test simple output with mixed types."""
+    result = {
+        "pr": {"number": 200, "title": "Test PR"},
+        "files": ["a.py", "b.py"],
+        "status": "completed",
+    }
+    _output_simple(result)
+    captured = capsys.readouterr()
+    # Verify dict value
+    assert "pr:" in captured.out
+    assert "  number: 200" in captured.out
+    # Verify list value
+    assert "files:" in captured.out
+    assert "  - a.py" in captured.out
+    # Verify scalar value
+    assert "status: completed" in captured.out

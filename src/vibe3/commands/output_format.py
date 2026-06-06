@@ -12,6 +12,7 @@ from typing import Any
 import typer
 
 from vibe3.models import ExecutionStep, TraceOutput
+from vibe3.models.trace import format_result_entries
 
 
 def output_result(
@@ -62,17 +63,8 @@ def _output_simple(result: dict[str, Any]) -> None:
     Args:
         result: Result dictionary
     """
-    for key, value in result.items():
-        if isinstance(value, dict):
-            typer.echo(f"{key}:")
-            for k, v in value.items():
-                typer.echo(f"  {k}: {v}")
-        elif isinstance(value, list):
-            typer.echo(f"{key}:")
-            for item in value:
-                typer.echo(f"  - {item}")
-        else:
-            typer.echo(f"{key}: {value}")
+    for line in format_result_entries(result, indent=""):
+        typer.echo(line)
 
 
 def create_trace_output(

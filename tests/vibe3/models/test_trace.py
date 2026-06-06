@@ -2,7 +2,9 @@
 
 from datetime import datetime
 
-from vibe3.models.trace import ExecutionStep, TraceOutput
+import yaml
+
+from vibe3.models.trace import ExecutionStep, TraceOutput, format_result_entries
 
 
 def test_execution_step_creation() -> None:
@@ -154,3 +156,83 @@ def test_trace_output_failed_status() -> None:
     text = trace.to_text()
 
     assert "failed ❌" in text
+
+
+def test_format_result_entries_dict() -> None:
+    """Test format_result_entries with dict value."""
+    result = {"pr": {"number": 200, "title": "Test PR"}}
+    lines = format_result_entries(result)
+    assert lines == ["  pr:", "    number: 200", "    title: Test PR"]
+
+
+def test_format_result_entries_list() -> None:
+    """Test format_result_entries with list value."""
+    result = {"files": ["a.py", "b.py"]}
+    lines = format_result_entries(result)
+    assert lines == ["  files:", "    - a.py", "    - b.py"]
+
+
+def test_format_result_entries_scalar() -> None:
+    """Test format_result_entries with scalar value."""
+    result = {"number": 200, "title": "Test PR"}
+    lines = format_result_entries(result)
+    assert lines == ["  number: 200", "  title: Test PR"]
+
+
+def test_format_result_entries_empty() -> None:
+    """Test format_result_entries with empty dict."""
+    result = {}
+    lines = format_result_entries(result)
+    assert lines == []
+
+
+def test_format_result_entries_custom_indent() -> None:
+    """Test format_result_entries with custom indent."""
+    result = {"pr": {"number": 200}}
+    lines = format_result_entries(result, indent="")
+    assert lines == ["pr:", "  number: 200"]
+
+
+def test_trace_output_to_text_with_list() -> None:
+    """Test to_text with list result."""
+    trace = TraceOutput(
+        command="pr list",
+        status="completed",
+        start_time=datetime(2026, 3, 18, 13, 13, 43),
+        end_time=datetime(2026, 3, 18, 13, 13, 45),
+        result={"files": ["a.py", "b.py"]},
+    )
+
+    text = trace.to_text()
+
+    assert "▶ Result:" in text
+    assert "  files:" in text
+    assert "    - a.py" in text
+    assert "    - b.py" in text
+
+
+def test_trace_output_to_yaml_flat_structure() -> None:
+    """Test to_yaml produces flat structure (not nested under trace:)."""
+    trace = TraceOutput(
+        command="pr show",
+        status="completed",
+        start_time=datetime(2026, 3, 18, 13, 13, 43),
+        end_time=datetime(2026, 3, 18, 13, 13, 45),
+        result={"number": 200},
+    )
+
+    yaml_str = trace.to_yaml()
+    data = yaml.safe_load(yaml_str)
+
+    assert "trace" not in data
+    assert set(data) == {
+        "command",
+        "status",
+        "start_time",
+        "end_time",
+        "execution",
+        "result",
+    }
+    assert data["command"] == "pr show"
+    assert data["status"] == "completed"
+    assert data["result"] == {"number": 200}
