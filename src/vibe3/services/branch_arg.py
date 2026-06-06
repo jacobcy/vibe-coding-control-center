@@ -3,6 +3,7 @@
 Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_branch_resolver import resolve_command_branch
 
@@ -30,3 +31,22 @@ def resolve_branch_arg(branch_arg: str | None) -> str:
         allow_no_flow=False,
         canonical_fallback=True,
     )
+
+
+def resolve_branch_and_issue(branch_arg: str | None) -> tuple[str, int | None]:
+    """Resolve --branch argument and extract issue number in one call.
+
+    This centralizes the ConventionResolver call to a single invocation,
+    eliminating redundant resolver calls in callers that need both branch
+    and issue number.
+
+    Args:
+        branch_arg: Branch argument from CLI (may be None, digits, or branch name)
+
+    Returns:
+        Tuple of (resolved_branch_name, issue_number or None)
+    """
+    branch = resolve_branch_arg(branch_arg)
+    convention = ConventionResolver.from_repo().resolve().branch
+    issue_number = convention.parse_issue_number(branch)
+    return branch, issue_number

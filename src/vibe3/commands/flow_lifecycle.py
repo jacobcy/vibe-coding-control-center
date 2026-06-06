@@ -8,10 +8,9 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.config import load_orchestra_config
 from vibe3.services import (
-    ConventionResolver,
     FlowService,
     load_issue_info,
-    resolve_branch_arg,
+    resolve_branch_and_issue,
 )
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
@@ -51,7 +50,7 @@ def blocked(
 
     service = FlowService()
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch, issue_number = resolve_branch_and_issue(branch)
 
     logger.bind(
         command="flow blocked",
@@ -65,9 +64,6 @@ def blocked(
 
     if not flow_status:
         # Try to auto-create flow if branch matches task/dev convention
-        convention = ConventionResolver.from_repo().resolve().branch
-        issue_number = convention.parse_issue_number(target_branch)
-
         if issue_number:
             logger.bind(
                 branch=target_branch,
@@ -161,14 +157,14 @@ def rebuild(
         typer.echo("Error: 需要指定 issue number 或 --branch", err=True)
         raise typer.Exit(1)
 
-    # Unified resolution: both "123" and "task/issue-123" work via resolve_branch_arg
+    # Unified resolution: both "123" and "task/issue-123" work via
+    # resolve_branch_and_issue
     input_arg = branch if branch is not None else str(issue_number)
-    target_branch = resolve_branch_arg(input_arg)
+    target_branch, resolved_issue_number = resolve_branch_and_issue(input_arg)
 
-    # Derive issue_number from resolved branch when --branch is used
+    # Use provided issue_number or derive from resolved branch
     if issue_number is None:
-        convention = ConventionResolver.from_repo().resolve().branch
-        issue_number = convention.parse_issue_number(target_branch)
+        issue_number = resolved_issue_number
         if issue_number is None:
             typer.echo(f"Error: 无法从 '{branch}' 解析 issue number", err=True)
             raise typer.Exit(1)
