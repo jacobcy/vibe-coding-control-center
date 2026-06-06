@@ -19,7 +19,7 @@ from vibe3.services.check_remote import (
     issue_state_from_payload,
 )
 from vibe3.services.flow_status_service import FlowStatusService
-from vibe3.services.pr_service import PRService
+from vibe3.services.pr.service import PRService
 
 if TYPE_CHECKING:
     from vibe3.models import PRResponse

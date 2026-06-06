@@ -6,7 +6,7 @@ from vibe3.exceptions import UserError
 from vibe3.models import PRResponse
 
 if TYPE_CHECKING:
-    from vibe3.services.pr_service import PRService
+    from vibe3.services.pr.service import PRService
 
 
 class PrReadyAbortedError(UserError):

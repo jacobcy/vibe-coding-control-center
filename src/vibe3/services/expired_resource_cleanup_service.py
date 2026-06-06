@@ -38,7 +38,7 @@ def _is_protected_worktree(
 
 if TYPE_CHECKING:
     from vibe3.clients import BackendProtocol, GitClient, GitHubClient, SQLiteClient
-    from vibe3.services.pr_service import PRService
+    from vibe3.services.pr.service import PRService
 
 
 class ExpiredResourceCleanupService:
@@ -68,7 +68,7 @@ class ExpiredResourceCleanupService:
     def pr_service(self) -> "PRService":
         """Lazy-initialized PR service."""
         if self._pr_service is None:
-            from vibe3.services.pr_service import PRService
+            from vibe3.services.pr.service import PRService
 
             self._pr_service = PRService(
                 github_client=cast(GitHubClientProtocol | None, self._github_client),

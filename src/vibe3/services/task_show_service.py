@@ -13,7 +13,7 @@ from vibe3.models import FlowStatusResponse, PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.path_helpers import resolve_ref_path
-from vibe3.services.pr_service import PRService
+from vibe3.services.pr.service import PRService
 from vibe3.utils import is_human_comment
 
 
@@ -124,7 +124,7 @@ class TaskShowService:
             allow_no_flow: If True, return raw numeric string instead of raising
                 UserError when no flows exist for an issue number.
         """
-        from vibe3.services.pr_branch_resolver import resolve_command_branch
+        from vibe3.services.pr.resolver import resolve_command_branch
 
         return resolve_command_branch(
             branch_opt=branch,

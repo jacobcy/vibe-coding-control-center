@@ -13,7 +13,7 @@ from vibe3.clients import GitClient
 from vibe3.config import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models import BranchSource
-from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
+from vibe3.services.pr.scoring import PRDimensions, generate_score_report
 
 
 def _code_paths() -> list[str]:

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
+from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
 
 
 def _pr_response() -> PRResponse:
