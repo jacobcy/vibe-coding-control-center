@@ -77,11 +77,6 @@ def _diff_files(
             )
             summary.files_modified += 1
 
-    summary.total_loc_delta = current.metrics.total_loc - baseline.metrics.total_loc
-    summary.total_functions_delta = (
-        current.metrics.total_functions - baseline.metrics.total_functions
-    )
-
     return file_changes, summary
 
 
@@ -223,6 +218,12 @@ def compute_diff(
         dep_changes, dep_summary = _diff_dependencies(baseline, current)
 
         summary = file_summary + module_summary + dep_summary
+
+        # Compute global metrics (must be after __add__ to avoid being overwritten)
+        summary.total_loc_delta = current.metrics.total_loc - baseline.metrics.total_loc
+        summary.total_functions_delta = (
+            current.metrics.total_functions - baseline.metrics.total_functions
+        )
 
         diff = StructureDiff(
             baseline_id=baseline.snapshot_id,
