@@ -23,6 +23,10 @@ def get_vibe_config() -> "VibeConfig":
     return VibeConfig.get_defaults()
 
 
+# Stdin-mode threshold for codeagent-wrapper
+# Prompts exceeding this length may trigger stdin mode and fail silently
+CODEAGENT_STDIN_MODE_THRESHOLD: Final[int] = 800
+
 # Known backend-internal error patterns with suggested fixes
 KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
     (
@@ -59,9 +63,9 @@ def diagnose_backend_error(output: str) -> str | None:
 def diagnose_prompt_size_issue(prompt_len: int, backend: str, model: str) -> str | None:
     """Diagnose if prompt size exceeds stdin-mode threshold.
 
-    codeagent-wrapper enters stdin mode when prompt exceeds ~800 chars,
-    which can cause parsing failures. Returns diagnostic message if size
-    exceeds threshold, None otherwise.
+    codeagent-wrapper enters stdin mode when prompt exceeds ~800 chars
+    (CODEAGENT_STDIN_MODE_THRESHOLD), which can cause parsing failures.
+    Returns diagnostic message if size exceeds threshold, None otherwise.
 
     Args:
         prompt_len: Length of the prompt in characters
@@ -71,13 +75,10 @@ def diagnose_prompt_size_issue(prompt_len: int, backend: str, model: str) -> str
     Returns:
         Diagnostic message if prompt exceeds threshold, None otherwise
     """
-    # codeagent-wrapper stdin mode threshold is approximately 800 characters
-    stdin_mode_threshold = 800
-
-    if prompt_len > stdin_mode_threshold:
+    if prompt_len > CODEAGENT_STDIN_MODE_THRESHOLD:
         return (
             f"Prompt size ({prompt_len} chars) exceeds stdin-mode threshold "
-            f"({stdin_mode_threshold} chars) for {backend}/{model}. "
+            f"({CODEAGENT_STDIN_MODE_THRESHOLD} chars) for {backend}/{model}. "
             f"This may cause codeagent-wrapper to enter stdin mode and fail silently. "
             f"Consider using kind:literal + Read instruction in prompt-recipes.yaml "
             f"instead of kind:file for large files."
