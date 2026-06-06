@@ -153,8 +153,8 @@ code_limits:
 
       # 基础设施核心模块
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 410
-        reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断（仅针对 'no agent_message output' 错误）等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持（修复 MAJOR audit finding）后略微超标"
+        limit: 420
+        reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断（仅针对 'no agent_message output' 错误）等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持，并在 #2265 follow-up 中改为按实际 prompt file payload 计算诊断长度后略微超标"
       - path: "src/vibe3/agents/backends/async_launcher.py"
         limit: 410
         reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；新增 VIBE3_ASYNC_CHILD 到 CRITICAL_ENV_PASSTHROUGH 修复 pre-push hook 测试失败"
@@ -171,8 +171,8 @@ code_limits:
         limit: 650
         reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 580
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑"
+        limit: 590
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多"
@@ -182,8 +182,8 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 650
-        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑"
+        limit: 680
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标"
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
@@ -200,8 +200,8 @@ code_limits:
         limit: 630
         reason: "Governance snapshot context and comment format contract tests, covering 11 test methods across TestBuildSnapshotContext and TestCommentFormatContract classes; includes PR #1783 comment format regression tests; split from original test_governance.py (#1803); Issue #1925 adds keys.env partial loading, layered markers, and local manager boundary tests (3 new test methods)"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
-        limit: 480
-        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
+        limit: 520
+        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标"
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"

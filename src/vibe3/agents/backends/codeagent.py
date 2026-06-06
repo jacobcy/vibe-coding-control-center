@@ -270,9 +270,13 @@ class CodeagentBackend:
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
-        prompt_file_path = str(
-            prepare_prompt_file(prompt, include_global_notice=include_global_notice)
+        prompt_content = build_prompt_file_content(
+            prompt, include_global_notice=include_global_notice
         )
+        prompt_file_path = str(
+            prepare_prompt_file(prompt_content, include_global_notice=False)
+        )
+        diagnostic_prompt_length = len(prompt_content)
 
         # Log prompt metadata before execution for debugging
         effective_options = resolve_effective_agent_options(options)
@@ -280,7 +284,7 @@ class CodeagentBackend:
             "Executing codeagent-wrapper: "
             f"backend={effective_options.backend or 'default'}, "
             f"model={effective_options.model or 'default'}, "
-            f"prompt_length={len(prompt)} chars, "
+            f"prompt_length={diagnostic_prompt_length} chars, "
             "stdin_mode_threshold=800 chars"
         )
 
@@ -300,9 +304,6 @@ class CodeagentBackend:
                 echo(f"command: {' '.join(command)}")
                 if show_prompt and prompt_file_path:
                     echo(f"prompt_file: {prompt_file_path}")
-                    prompt_content = build_prompt_file_content(
-                        prompt, include_global_notice=include_global_notice
-                    )
                     echo(
                         f"prompt_content:\n{sanitize_prompt_for_display(prompt_content)}"
                     )
@@ -322,12 +323,17 @@ class CodeagentBackend:
                 if should_retry_without_session(result, session_id=session_id):
                     retry_prompt_path = prompt_file_path
                     if fallback_prompt is not None:
+                        fallback_prompt_content = build_prompt_file_content(
+                            fallback_prompt,
+                            include_global_notice=fallback_include_global_notice,
+                        )
                         retry_prompt_path = str(
                             prepare_prompt_file(
-                                fallback_prompt,
-                                include_global_notice=fallback_include_global_notice,
+                                fallback_prompt_content,
+                                include_global_notice=False,
                             )
                         )
+                        diagnostic_prompt_length = len(fallback_prompt_content)
                     retry_command = self._build_command(
                         options,
                         cast(str, retry_prompt_path),
@@ -380,7 +386,7 @@ class CodeagentBackend:
                 # to avoid misleading diagnostics
                 if "completed without agent_message output" in combined_output:
                     prompt_size_diagnostic = diagnose_prompt_size_issue(
-                        len(prompt),
+                        diagnostic_prompt_length,
                         effective_options.backend or "default",
                         effective_options.model or "default",
                     )
@@ -391,7 +397,7 @@ class CodeagentBackend:
                 metadata = {
                     "backend": effective_options.backend or "default",
                     "model": effective_options.model or "default",
-                    "prompt_length": str(len(prompt)),
+                    "prompt_length": str(diagnostic_prompt_length),
                     "exit_code": str(agent_result.exit_code),
                 }
                 if wrapper_log_path:

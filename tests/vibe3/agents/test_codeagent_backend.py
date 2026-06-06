@@ -423,6 +423,35 @@ class TestCodeagentBackend:
         assert "codeagent-wrapper failed" in str(exc_info.value)
         assert "something failed" in str(exc_info.value)
 
+    def test_run_error_metadata_uses_assembled_prompt_length(self) -> None:
+        """Prompt diagnostics should measure the actual prompt file payload."""
+        config = VibeConfig(
+            agent_prompt=AgentPromptConfig(global_notice="notice " * 150)
+        )
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = "claude completed without agent_message output\n"
+        mock_result.stderr = ""
+        raw_prompt = "prompt body"
+
+        with (
+            patch(
+                "vibe3.utils.codeagent_helpers.get_vibe_config",
+                return_value=config,
+            ),
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
+        ):
+            mock_run.return_value = (mock_result, None)
+            backend = CodeagentBackend()
+            assembled_prompt = build_prompt_file_content(raw_prompt)
+
+            with pytest.raises(AgentExecutionError) as exc_info:
+                backend.run(raw_prompt, AgentOptions(agent="vibe-reviewer"))
+
+        assert "Prompt size" in str(exc_info.value)
+        assert exc_info.value.metadata is not None
+        assert exc_info.value.metadata["prompt_length"] == str(len(assembled_prompt))
+
     def test_run_non_zero_exit_prefers_stderr_in_message(self) -> None:
         """Runner should surface stderr details when available."""
         mock_result = MagicMock()
