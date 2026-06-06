@@ -70,31 +70,14 @@ class CoverageService:
         commands_cov = self._analyze_layer(coverage_data, "commands")
 
         # 3. Build report
-        total_covered = (
-            services_cov.covered_lines
-            + clients_cov.covered_lines
-            + commands_cov.covered_lines
-        )
-        total_lines = (
-            services_cov.total_lines
-            + clients_cov.total_lines
-            + commands_cov.total_lines
-        )
-        overall_percent = (
-            (total_covered / total_lines * 100) if total_lines > 0 else 0.0
-        )
-
         report = CoverageReport(
             services=services_cov,
             clients=clients_cov,
             commands=commands_cov,
-            total_covered=total_covered,
-            total_lines=total_lines,
-            overall_percent=overall_percent,
         )
 
         logger.info(
-            f"Coverage check complete: {overall_percent:.1f}% overall, "
+            f"Coverage check complete: {report.overall_percent:.1f}% overall, "
             f"all_passing={report.all_passing}"
         )
 

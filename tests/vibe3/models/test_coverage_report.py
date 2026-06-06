@@ -1,5 +1,7 @@
 """Tests for CoverageReport model."""
 
+import pytest
+
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 
 
@@ -33,9 +35,6 @@ def test_coverage_report_creation() -> None:
         services=services,
         clients=clients,
         commands=commands,
-        total_covered=2170,
-        total_lines=2500,
-        overall_percent=86.8,
     )
 
     assert report.services == services
@@ -43,7 +42,7 @@ def test_coverage_report_creation() -> None:
     assert report.commands == commands
     assert report.total_covered == 2170
     assert report.total_lines == 2500
-    assert report.overall_percent == 86.8
+    assert report.overall_percent == pytest.approx(86.8)
 
 
 def test_coverage_report_all_passing() -> None:
@@ -71,9 +70,6 @@ def test_coverage_report_all_passing() -> None:
             coverage_percent=90.0,
             threshold=80,
         ),
-        total_covered=2170,
-        total_lines=2500,
-        overall_percent=86.8,
     )
     assert all_pass.all_passing is True
 
@@ -100,9 +96,6 @@ def test_coverage_report_all_passing() -> None:
             coverage_percent=90.0,
             threshold=80,
         ),
-        total_covered=2020,
-        total_lines=2500,
-        overall_percent=80.8,
     )
     assert one_fail.all_passing is False
 
@@ -129,9 +122,6 @@ def test_coverage_report_all_passing() -> None:
             coverage_percent=70.0,
             threshold=80,
         ),
-        total_covered=1650,
-        total_lines=2500,
-        overall_percent=66.0,
     )
     assert all_fail.all_passing is False
 
@@ -166,9 +156,6 @@ def test_coverage_report_get_failing_layers() -> None:
         services=services,
         clients=clients,
         commands=commands,
-        total_covered=1870,
-        total_lines=2500,
-        overall_percent=74.8,
     )
 
     failing = report.get_failing_layers()
@@ -203,9 +190,6 @@ def test_coverage_report_no_failing_layers() -> None:
             coverage_percent=90.0,
             threshold=80,
         ),
-        total_covered=2170,
-        total_lines=2500,
-        overall_percent=86.8,
     )
 
     failing = report.get_failing_layers()
