@@ -12,18 +12,18 @@ runner = CliRunner()
 
 
 @patch("vibe3.commands.flow_lifecycle.FlowRebuildUsecase")
-@patch("vibe3.commands.flow_lifecycle.resolve_branch_arg")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_and_issue")
 @patch("vibe3.commands.flow_lifecycle.load_orchestra_config")
 @patch("vibe3.commands.flow_lifecycle.load_issue_info")
 def test_flow_rebuild_invokes_explicit_rebuild(
     load_issue_info: MagicMock,
     load_config: MagicMock,
-    resolve_branch_arg_mock: MagicMock,
+    resolve_branch_and_issue_mock: MagicMock,
     rebuild_cls: MagicMock,
 ) -> None:
     config = OrchestraConfig(repo="owner/repo")
     load_config.return_value = config
-    resolve_branch_arg_mock.return_value = "feature/303"
+    resolve_branch_and_issue_mock.return_value = ("feature/303", 303)
     issue = IssueInfo(
         number=303,
         title="Rebuild me",
@@ -47,26 +47,20 @@ def test_flow_rebuild_invokes_explicit_rebuild(
     assert call["ensure_worktree"] is True
 
 
-@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_and_issue")
 def test_flow_rebuild_branch_extracts_issue_number(
-    convention_resolver_cls: MagicMock,
+    resolve_branch_and_issue_mock: MagicMock,
 ) -> None:
     """`--branch task/issue-123` should be equivalent to `123`."""
-    # Setup convention resolver mock
-    convention = MagicMock()
-    convention.parse_issue_number.return_value = 123
-    convention.canonical_branch.return_value = "task/issue-123"
-    resolver = MagicMock()
-    resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    resolve_branch_and_issue_mock.return_value = ("task/issue-123", 123)
 
     result = runner.invoke(app, ["flow", "rebuild", "--branch", "task/issue-123"])
 
     # Should be in dry-run mode
     assert result.exit_code == 0
     assert "Would hard rebuild issue #123" in result.output
-    # Verify parse_issue_number was called with the branch name
-    convention.parse_issue_number.assert_called_once_with("task/issue-123")
+    # Verify resolve_branch_and_issue was called with the branch name
+    resolve_branch_and_issue_mock.assert_called_once_with("task/issue-123")
 
 
 def test_flow_rebuild_branch_conflicts_with_positional() -> None:
@@ -87,15 +81,12 @@ def test_flow_rebuild_no_args() -> None:
     assert "需要指定 issue number 或 --branch" in result.output
 
 
-@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
-def test_flow_rebuild_branch_invalid_name(convention_resolver_cls: MagicMock) -> None:
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_and_issue")
+def test_flow_rebuild_branch_invalid_name(
+    resolve_branch_and_issue_mock: MagicMock,
+) -> None:
     """Invalid branch name should error."""
-    # Setup convention resolver mock
-    convention = MagicMock()
-    convention.parse_issue_number.return_value = None  # Cannot parse
-    resolver = MagicMock()
-    resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    resolve_branch_and_issue_mock.return_value = ("invalid-name", None)
 
     result = runner.invoke(app, ["flow", "rebuild", "--branch", "invalid-name"])
 
@@ -103,44 +94,31 @@ def test_flow_rebuild_branch_invalid_name(convention_resolver_cls: MagicMock) ->
     assert "无法从 'invalid-name' 解析 issue number" in result.output
 
 
-@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
-@patch("vibe3.commands.flow_lifecycle.resolve_branch_arg")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_and_issue")
 def test_flow_rebuild_branch_bare_number(
-    resolve_branch_arg_mock: MagicMock,
-    convention_resolver_cls: MagicMock,
+    resolve_branch_and_issue_mock: MagicMock,
 ) -> None:
     """`--branch 123` (bare number) should work the same as positional `123`."""
-    resolve_branch_arg_mock.return_value = "task/issue-123"
-    convention = MagicMock()
-    convention.parse_issue_number.return_value = 123
-    resolver = MagicMock()
-    resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    resolve_branch_and_issue_mock.return_value = ("task/issue-123", 123)
 
     result = runner.invoke(app, ["flow", "rebuild", "--branch", "123"])
 
     assert result.exit_code == 0
     assert "Would hard rebuild issue #123" in result.output
-    resolve_branch_arg_mock.assert_called_once_with("123")
-    convention.parse_issue_number.assert_called_once_with("task/issue-123")
+    resolve_branch_and_issue_mock.assert_called_once_with("123")
 
 
-@patch("vibe3.commands.flow_lifecycle.ConventionResolver")
+@patch("vibe3.commands.flow_lifecycle.resolve_branch_and_issue")
 def test_flow_rebuild_positional_still_works(
-    convention_resolver_cls: MagicMock,
+    resolve_branch_and_issue_mock: MagicMock,
 ) -> None:
     """Backward compatibility: positional argument still works."""
-    # Setup convention resolver mock
-    convention = MagicMock()
-    convention.canonical_branch.return_value = "task/issue-123"
-    resolver = MagicMock()
-    resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    resolve_branch_and_issue_mock.return_value = ("task/issue-123", 123)
 
     result = runner.invoke(app, ["flow", "rebuild", "123"])
 
     # Should be in dry-run mode
     assert result.exit_code == 0
     assert "Would hard rebuild issue #123" in result.output
-    # Verify parse_issue_number was NOT called (we used positional arg)
-    convention.parse_issue_number.assert_not_called()
+    # Verify resolve_branch_and_issue was called with "123"
+    resolve_branch_and_issue_mock.assert_called_once_with("123")
