@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.agents.models import CodeagentCommand
+from vibe3.exceptions import AgentExecutionError
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,
 )
@@ -402,6 +403,66 @@ class TestTransitionCountFlow:
 
 class TestSeverityAwareErrorHandling:
     """Test severity-based error handling in codeagent_runner."""
+
+    def test_agent_execution_metadata_is_recorded_on_failure(self) -> None:
+        """Backend diagnostics should reach error log and lifecycle refs."""
+        mock_store = _make_mock_store()
+        command = CodeagentCommand(
+            role="manager",
+            context_builder=lambda: "manager prompt",
+            branch="task/issue-42",
+            issue_number=42,
+        )
+        exc = AgentExecutionError(
+            "codeagent-wrapper failed",
+            metadata={
+                "backend": "claude",
+                "model": "sonnet",
+                "prompt_length": "1234",
+                "exit_code": "1",
+            },
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:manager",
+            ),
+            patch("vibe3.services.record_error") as mock_record_error,
+            patch(
+                "vibe3.execution.codeagent_runner.persist_execution_lifecycle_event"
+            ) as mock_persist_event,
+        ):
+            mock_backend.return_value.run.side_effect = exc
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+
+            try:
+                service.execute_sync(command)
+            except AgentExecutionError:
+                pass
+
+        error_message = mock_record_error.call_args.kwargs["error_message"]
+        assert "backend=claude" in error_message
+        assert "model=sonnet" in error_message
+        assert "prompt_length=1234" in error_message
+
+        refs = mock_persist_event.call_args.kwargs["refs"]
+        assert refs["backend"] == "claude"
+        assert refs["model"] == "sonnet"
+        assert refs["prompt_length"] == "1234"
 
     def test_warning_does_not_fail_issue(self) -> None:
         """Test that WARNING severity errors don't fail the issue."""

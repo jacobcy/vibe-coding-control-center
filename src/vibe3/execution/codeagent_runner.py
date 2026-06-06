@@ -45,6 +45,13 @@ def _severity_event_type(role: str, severity: "ErrorSeverity") -> str:
         return f"codeagent_{prefix}_error"
 
 
+def _format_agent_error_metadata(metadata: dict[str, str] | None) -> str:
+    """Format agent error metadata for operator-visible diagnostics."""
+    if not metadata:
+        return ""
+    return ", ".join(f"{key}={value}" for key, value in metadata.items())
+
+
 @dataclass
 class SyncExecutionContext:
     """Execution context for sync execution shell."""
@@ -443,12 +450,21 @@ class CodeagentExecutionService:
 
             # Get handling contract for severity-aware behavior
             error_contract = get_error_handling_contract(error_code)
+            agent_metadata = (
+                exc.metadata if isinstance(exc, AgentExecutionError) else None
+            )
+            metadata_summary = _format_agent_error_metadata(agent_metadata)
+            error_message = str(exc)
+            if metadata_summary:
+                error_message = (
+                    f"{error_message}\n\n[agent metadata] {metadata_summary}"
+                )
 
             # Use store-specific instance to ensure consistency with FailedGate
             # Record error with severity from contract
             record_error(
                 error_code=error_code,
-                error_message=str(exc),
+                error_message=error_message,
                 store=ctx.store,
                 tick_id=command.tick_id,
                 issue_number=command.issue_number,
@@ -465,10 +481,12 @@ class CodeagentExecutionService:
             # Record abort event to flow timeline
             if ctx.branch and ctx.store:
                 abort_refs: dict[str, str] = {
-                    "reason": str(exc),
+                    "reason": error_message,
                     "error_code": error_code,
                     "status": "blocked",
                 }
+                if agent_metadata:
+                    abort_refs.update(agent_metadata)
                 if isinstance(exc, AgentExecutionError) and exc.log_path:
                     abort_refs["log_path"] = str(exc.log_path)
 

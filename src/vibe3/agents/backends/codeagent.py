@@ -29,7 +29,6 @@ from vibe3.config import (
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models import AgentOptions, AgentResult
 from vibe3.utils import (
-    build_prompt_file_content,
     diagnose_backend_error,
     diagnose_prompt_size_issue,
     prepare_prompt_file,
@@ -231,7 +230,7 @@ class CodeagentBackend:
         """Start codeagent-wrapper in tmux and return the async handle."""
         sync_models_json(options)
 
-        prompt_file_path = prepare_prompt_file(prompt)
+        prompt_file_path, _ = prepare_prompt_file(prompt)
         command = self._build_command(
             options,
             str(prompt_file_path),
@@ -270,9 +269,10 @@ class CodeagentBackend:
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
-        prompt_file_path = str(
-            prepare_prompt_file(prompt, include_global_notice=include_global_notice)
+        prompt_file_path, prompt_content = prepare_prompt_file(
+            prompt, include_global_notice=include_global_notice
         )
+        diagnostic_prompt_length = len(prompt_content)
 
         # Log prompt metadata before execution for debugging
         effective_options = resolve_effective_agent_options(options)
@@ -280,14 +280,14 @@ class CodeagentBackend:
             "Executing codeagent-wrapper: "
             f"backend={effective_options.backend or 'default'}, "
             f"model={effective_options.model or 'default'}, "
-            f"prompt_length={len(prompt)} chars, "
+            f"prompt_length={diagnostic_prompt_length} chars, "
             "stdin_mode_threshold=800 chars"
         )
 
         try:
             command = self._build_command(
                 options,
-                cast(str, prompt_file_path),
+                str(prompt_file_path),
                 task=task,
                 session_id=session_id,
             )
@@ -300,9 +300,6 @@ class CodeagentBackend:
                 echo(f"command: {' '.join(command)}")
                 if show_prompt and prompt_file_path:
                     echo(f"prompt_file: {prompt_file_path}")
-                    prompt_content = build_prompt_file_content(
-                        prompt, include_global_notice=include_global_notice
-                    )
                     echo(
                         f"prompt_content:\n{sanitize_prompt_for_display(prompt_content)}"
                     )
@@ -322,15 +319,17 @@ class CodeagentBackend:
                 if should_retry_without_session(result, session_id=session_id):
                     retry_prompt_path = prompt_file_path
                     if fallback_prompt is not None:
-                        retry_prompt_path = str(
-                            prepare_prompt_file(
-                                fallback_prompt,
-                                include_global_notice=fallback_include_global_notice,
-                            )
+                        (
+                            retry_prompt_path,
+                            fallback_prompt_content,
+                        ) = prepare_prompt_file(
+                            fallback_prompt,
+                            include_global_notice=fallback_include_global_notice,
                         )
+                        diagnostic_prompt_length = len(fallback_prompt_content)
                     retry_command = self._build_command(
                         options,
-                        cast(str, retry_prompt_path),
+                        str(retry_prompt_path),
                         task=task,
                         session_id=None,
                     )
@@ -380,7 +379,7 @@ class CodeagentBackend:
                 # to avoid misleading diagnostics
                 if "completed without agent_message output" in combined_output:
                     prompt_size_diagnostic = diagnose_prompt_size_issue(
-                        len(prompt),
+                        diagnostic_prompt_length,
                         effective_options.backend or "default",
                         effective_options.model or "default",
                     )
@@ -391,7 +390,7 @@ class CodeagentBackend:
                 metadata = {
                     "backend": effective_options.backend or "default",
                     "model": effective_options.model or "default",
-                    "prompt_length": str(len(prompt)),
+                    "prompt_length": str(diagnostic_prompt_length),
                     "exit_code": str(agent_result.exit_code),
                 }
                 if wrapper_log_path:
@@ -404,4 +403,4 @@ class CodeagentBackend:
             return agent_result
         finally:
             if prompt_file_path:
-                Path(prompt_file_path).unlink(missing_ok=True)
+                prompt_file_path.unlink(missing_ok=True)
