@@ -91,6 +91,9 @@ def select_ready_issues_from_collected_issues(
         # Role-specific branch existence requirements
         if role.trigger_name != "manager":
             if not branch or not is_auto_task_branch(branch):
+                # Auto-resume orphaned issues without flow scene
+                if issue.state not in {IssueState.READY, IssueState.BLOCKED}:
+                    _auto_resume_to_ready(issue, config)
                 continue
             if not flow_manager.git.branch_exists(branch):
                 append_orchestra_event(
@@ -102,6 +105,44 @@ def select_ready_issues_from_collected_issues(
         selected.append(issue)
 
     return sort_ready_issues(selected)
+
+
+def _auto_resume_to_ready(
+    issue: IssueInfo,
+    config: OrchestraConfig,
+) -> None:
+    """Auto-resume orphaned issue without flow scene back to READY state.
+
+    Used when an issue has no flow scene (branch=None) but is in a non-ready/blocked
+    state. This recovers orphaned issues that got stuck due to missing branch/flow.
+
+    Args:
+        issue: Issue to auto-resume
+        config: Orchestra configuration
+    """
+    from vibe3.services.label_service import LabelService
+
+    if issue.state is None:
+        return
+
+    try:
+        label_service = LabelService(repo=config.repo)
+        label_service.transition(
+            issue.number,
+            IssueState.READY,
+            actor="orchestra:auto-resume",
+            force=True,
+        )
+        append_orchestra_event(
+            "dispatcher",
+            f"auto-resume #{issue.number}: no flow scene, "
+            f"state={issue.state.value}, recovered to ready",
+        )
+    except Exception as exc:
+        append_orchestra_event(
+            "dispatcher",
+            f"auto-resume #{issue.number} failed: {exc}",
+        )
 
 
 def promote_progressed_entries(
