@@ -1,6 +1,6 @@
 """Protocol definitions for dispatch coordination."""
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Callable, Protocol
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
@@ -156,6 +156,10 @@ class CapacityServiceProtocol(Protocol):
 class CheckServiceProtocol(Protocol):
     """Protocol for health check service operations."""
 
+    def verify_current_flow(self) -> "CheckResult":
+        """Verify current branch flow consistency."""
+        ...
+
     def verify_branch(self, branch: str) -> "CheckResult":
         """Verify branch flow consistency.
 
@@ -167,14 +171,16 @@ class CheckServiceProtocol(Protocol):
         """
         ...
 
-    def invalidate_pr_cache(self) -> None:
-        """Invalidate PR cache to force refresh on next check.
+    def verify_all_flows(
+        self,
+        status: str | list[str] | None = "active",
+        on_progress: Callable[[int, int, str], None] | None = None,
+    ) -> list["CheckResult"]:
+        """Run consistency checks for flows in the store."""
+        ...
 
-        Should be called when:
-        - Queue is restored from persistence
-        - Queue is cleared after promote()
-        - Fresh queue collection occurs
-        """
+    def invalidate_pr_cache(self) -> None:
+        """Invalidate PR cache to force refresh on next check."""
         ...
 
 
@@ -225,4 +231,23 @@ class LabelDispatchCallable(Protocol):
         Returns:
             DispatchIntent event object
         """
+        ...
+
+
+class TriggerableRoleDefinitionProtocol(Protocol):
+    """Protocol for TriggerableRoleDefinition used by services.label_utils."""
+
+    @property
+    def trigger_name(self) -> str:
+        """Trigger name for this role (e.g., 'manager', 'plan', 'run')."""
+        ...
+
+    @property
+    def trigger_state(self) -> "IssueState":
+        """Issue state that triggers this role (e.g., IssueState.READY)."""
+        ...
+
+    @property
+    def dispatch_predicate(self) -> Callable[[dict[str, object], bool], bool]:
+        """Predicate to determine if role should dispatch."""
         ...

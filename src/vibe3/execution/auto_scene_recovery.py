@@ -14,7 +14,7 @@ from vibe3.models import (
     IssueState,
     WorktreeRequirement,
 )
-from vibe3.orchestra import append_orchestra_event
+from vibe3.observability import append_orchestra_event
 
 if TYPE_CHECKING:
     from vibe3.environment import SessionRegistryService

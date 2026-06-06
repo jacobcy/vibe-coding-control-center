@@ -162,7 +162,7 @@ def run_governance_async(
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.orchestra import append_governance_event
+    from vibe3.observability import append_governance_event
     from vibe3.services import OrchestraStatusService
 
     repo = resolve_orchestra_repo_root()

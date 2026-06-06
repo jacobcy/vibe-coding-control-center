@@ -12,13 +12,13 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import IssueInfo, IssueState
-from vibe3.orchestra import (
+from vibe3.services.issue_collection_service import IssueCollectionService
+from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
+from vibe3.utils.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,
     sort_ready_issues,
 )
-from vibe3.services.issue_collection_service import IssueCollectionService
-from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 
 if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
