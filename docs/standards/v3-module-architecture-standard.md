@@ -65,6 +65,23 @@ Vibe 3.0 采用 3-tier 架构模型作为顶层战略划分，并辅以六层架
    - **规则**：作为全系统的基石，严禁依赖上述任何上层模块。
 
 
+### 2.2 水平分类法 (Horizontal Taxonomy within L3)
+
+L3 编排核心内的 6 个模块按职责分为以下水平类别：
+
+| 类别 | 模块 | 职责 | 依赖方向 |
+| :--- | :--- | :--- | :--- |
+| **Kernel** | `runtime` | 心跳循环、服务生命周期 | 仅依赖自身和 L4–L6 |
+| **Command Adapter** | `execution`, `services` | 将业务意图翻译为后端命令 | 可依赖 Kernel 和同类别 |
+| **Policy** | `roles` | 声明式角色定义与材料加载 | 可依赖 Kernel、Command Adapter |
+| **Plugin Surface** | `orchestra` | 向后兼容适配器、用户扩展点 | 可依赖 Kernel、Adapter、Policy |
+| **Observation** | `domain` | 事件核心、观察门面、状态机 | 可依赖所有类别 |
+
+规则：类别 N 仅可依赖类别 ≥ N 的模块。Kernel 严禁依赖 Adapter/Policy/Plugin/Observation 的内部实现。
+
+详细定义见 `src/vibe3/runtime/taxonomy.py`，测试见 `tests/vibe3/test_modularity/test_taxonomy.py`。
+
+
 ## 3. 模块职责边界 (22 Submodules)
 
 Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：

@@ -13,6 +13,9 @@ import pytest
 if TYPE_CHECKING:
     pass
 
+# Import taxonomy for fixture
+from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
+
 # Layer mapping (6 = Infrastructure, 1 = CLI)
 # Based on docs/standards/v3-module-architecture-standard.md §2 and §3
 MODULE_LAYER_MAP: dict[str, int] = {
@@ -351,3 +354,9 @@ def module_public_api(module_registry: list[str]) -> dict[str, set[str]]:
         module_name: get_module_public_api(module_name)
         for module_name in module_registry
     }
+
+
+@pytest.fixture
+def module_category_map() -> dict[str, ModuleCategory]:
+    """Fixture providing module-to-category mapping."""
+    return MODULE_CATEGORY_MAP
