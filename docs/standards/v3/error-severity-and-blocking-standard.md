@@ -310,17 +310,14 @@ After the Phase 1-3 refactor (2026-05-23), ERROR and BLOCK systems are **complet
 
 ```
 VibeError (base)
-├── RuntimeInfrastructureError  → error_log only, NO block_flow
-│   ├── GitHubAPIError
-│   ├── DatabaseError
-│   ├── ModelError
-│   └── APIError
-└── BusinessViolation  → may trigger block_flow
-    ├── NoOpViolation
-    ├── DependencyViolation
-    ├── TransitionLoopViolation
-    └── RequiredRefViolation
+└── RuntimeInfrastructureError  → error_log only, NO block_flow
+    ├── GitHubAPIError
+    ├── DatabaseError
+    ├── ModelError
+    └── APIError
 ```
+
+**Note**: Business-level violations (no-op, dependency not satisfied, transition loop, missing required ref) are currently expressed as string `reason=` values passed to `_block_fn()` / `BlockedStateService.block()`, not as typed exceptions. The `BusinessViolation` exception hierarchy in `src/vibe3/exceptions/business_errors.py` was aspirational but never integrated.
 
 ### 11.3 Key Invariants
 
