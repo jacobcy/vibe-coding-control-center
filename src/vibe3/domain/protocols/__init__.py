@@ -31,14 +31,21 @@ from vibe3.domain.protocols.infra_protocols import (
     ConfigLoaderProtocol,
     GitClientProtocol,
 )
+from vibe3.domain.protocols.orchestra_protocols import (
+    AppendGovernanceEventProtocol,
+    FailedGateProtocol,
+    OrchestraEventLogProtocol,
+)
 
 __all__ = [
+    "AppendGovernanceEventProtocol",
     "CapacityServiceProtocol",
     "CheckServiceProtocol",
     "ConfigLoaderProtocol",
     "CoreFlowServiceProtocol",
     "DispatchHealthCheckProtocol",
     "ExecutionCoordinatorProtocol",
+    "FailedGateProtocol",
     "FlowContextResolverProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",
@@ -46,6 +53,7 @@ __all__ = [
     "IssueCollectionServiceProtocol",
     "IssueLoaderProtocol",
     "LabelDispatchCallable",
+    "OrchestraEventLogProtocol",
     "QueuePersistenceServiceProtocol",
     "QueueSelectorProtocol",
     "RoleFactoryProtocol",

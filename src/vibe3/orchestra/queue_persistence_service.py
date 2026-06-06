@@ -12,11 +12,14 @@ from loguru import logger
 
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.orchestra import promote_progressed_entries
-from vibe3.services import get_manager_usernames, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.environment import SessionRegistryService
+    from vibe3.services import (  # noqa: F401
+        get_manager_usernames,
+        should_skip_from_queue,
+    )
 
 
 @dataclass
@@ -35,6 +38,25 @@ class QueuePersistenceService:
     supervisor_label: str
     load_issue: Callable[[int], IssueInfo | None]
     frozen_queue: list[QueueEntry] | None = None
+
+    def _get_manager_usernames(self) -> tuple[str, ...]:
+        """Lazy import wrapper for get_manager_usernames."""
+        from vibe3.services import get_manager_usernames
+
+        return get_manager_usernames(self.config)
+
+    def _should_skip_from_queue(
+        self, issue: IssueInfo, *, require_manager_assignee: bool = True
+    ) -> bool:
+        """Lazy import wrapper for should_skip_from_queue."""
+        from vibe3.services import should_skip_from_queue
+
+        return should_skip_from_queue(
+            issue,
+            supervisor_label=self.supervisor_label,
+            manager_usernames=self._get_manager_usernames(),
+            require_manager_assignee=require_manager_assignee,
+        )
 
     def restore(self) -> list[QueueEntry] | None:
         """Load persisted queue from database on restart."""
@@ -67,10 +89,8 @@ class QueuePersistenceService:
                 continue
 
             # Skip supervisor-labeled issues
-            if should_skip_from_queue(
+            if self._should_skip_from_queue(
                 issue,
-                supervisor_label=self.supervisor_label,
-                manager_usernames=get_manager_usernames(self.config),
                 require_manager_assignee=True,
             ):
                 invalid_issue_numbers.append(issue_number)

@@ -14,12 +14,35 @@ from vibe3.orchestra import (
     load_issue,
     sort_ready_issues,
 )
-from vibe3.services import get_manager_usernames, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
+
+
+def _get_manager_usernames_lazy(config: OrchestraConfig) -> tuple[str, ...]:
+    """Lazy import wrapper for get_manager_usernames."""
+    from vibe3.services import get_manager_usernames
+
+    return get_manager_usernames(config)
+
+
+def _should_skip_from_queue_lazy(
+    issue: IssueInfo,
+    supervisor_label: str,
+    manager_usernames: tuple[str, ...],
+    require_manager_assignee: bool,
+) -> bool:
+    """Lazy import wrapper for should_skip_from_queue."""
+    from vibe3.services import should_skip_from_queue
+
+    return should_skip_from_queue(
+        issue,
+        supervisor_label=supervisor_label,
+        manager_usernames=manager_usernames,
+        require_manager_assignee=require_manager_assignee,
+    )
 
 
 def select_ready_issues_from_collected_issues(
@@ -43,10 +66,10 @@ def select_ready_issues_from_collected_issues(
             continue
         # Verify assignee/supervisor filters
         # Always require manager assignee for all dispatch stages
-        if should_skip_from_queue(
+        if _should_skip_from_queue_lazy(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=get_manager_usernames(config),
+            manager_usernames=_get_manager_usernames_lazy(config),
             require_manager_assignee=True,
         ):
             continue
@@ -119,10 +142,10 @@ def promote_progressed_entries(
         if issue is None or issue.state is None:
             continue
 
-        if should_skip_from_queue(
+        if _should_skip_from_queue_lazy(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=get_manager_usernames(config),
+            manager_usernames=_get_manager_usernames_lazy(config),
             require_manager_assignee=True,
         ):
             removed.append(entry)

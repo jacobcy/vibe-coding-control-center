@@ -12,7 +12,6 @@ from vibe3.orchestra import (
     load_issue,
     select_ready_issues_from_collected_issues,
 )
-from vibe3.services import CheckService, FlowService
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
@@ -32,6 +31,9 @@ def create_global_dispatch_coordinator(
     registry: "SessionRegistryService | None",
 ) -> GlobalDispatchCoordinator:
     """Create GlobalDispatchCoordinator with orchestra runtime services."""
+    # Delay imports to avoid circular dependencies
+    from vibe3.services import CheckService, FlowService
+
     check_service = CheckService(
         store=store,
         git_client=flow_manager.git,

@@ -21,9 +21,7 @@ async def execute_expired_resource_cleanup(
     """
     # Delay imports to avoid circular dependencies
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-    from vibe3.services.expired_resource_cleanup_service import (
-        ExpiredResourceCleanupService,
-    )
+    from vibe3.services import ExpiredResourceCleanupService
 
     # Initialize services
     store = SQLiteClient()
