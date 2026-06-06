@@ -221,8 +221,8 @@ code_limits:
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
-        limit: 700
-        reason: "Dispatch queue operation 测试集，覆盖 merge、persist、restore、eviction、auto-resume 等 queue 操作场景；新增 2 个 integration test (CLAIMED/BLOCKED no branch auto-resume) + 3 个 unit test with effective assertions 以修复 MAJOR audit finding，共享 fixture，拆分收益低"
+        limit: 950
+        reason: "Dispatch queue operation 测试集，覆盖 merge、persist、restore、eviction、auto-resume 等 queue 操作场景；新增 2 个 integration test (CLAIMED/BLOCKED no branch auto-resume) + 3 个 unit test with effective assertions 以修复 MAJOR audit finding；新增 4 个 cooldown 机制测试 (skip/allow/clear/independent) 以实现 auto-resume circuit breaker (#2268)，共享 fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_dispatch_actionable_trigger.py"
         limit: 460
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低"
