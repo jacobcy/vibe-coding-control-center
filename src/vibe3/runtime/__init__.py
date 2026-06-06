@@ -15,7 +15,7 @@ if TYPE_CHECKING:
         classify_failure,
     )
     from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
-    from vibe3.runtime.heartbeat import HeartbeatServer
+    from vibe3.runtime.heartbeat import FailedGateProtocol, HeartbeatServer
     from vibe3.runtime.orchestra_instance import (
         OrchestraInstanceInfo,
         read_instance_info,
@@ -74,6 +74,10 @@ def __getattr__(name: str) -> object:
         from vibe3.runtime.heartbeat import HeartbeatServer
 
         return HeartbeatServer
+    if name == "FailedGateProtocol":
+        from vibe3.runtime.heartbeat import FailedGateProtocol
+
+        return FailedGateProtocol
     if name == "execute_periodic_check":
         from vibe3.runtime.periodic_check_executor import execute_periodic_check
 
@@ -93,6 +97,7 @@ __all__ = [
     "classify_failure",
     "execute_expired_resource_cleanup",
     "HeartbeatServer",
+    "FailedGateProtocol",
     "execute_periodic_check",
     "ServiceBase",
     "OrchestraInstanceInfo",

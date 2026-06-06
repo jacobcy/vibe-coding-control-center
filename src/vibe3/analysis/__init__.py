@@ -71,8 +71,11 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "SerenaService": "vibe3.analysis.serena_service",
     "build_change_analysis": "vibe3.analysis.inspect_query_service",
+    "command_analyzer": "vibe3.analysis.command_analyzer",
+    "CoverageService": "vibe3.analysis.coverage_service",
     "ImpactGraph": "vibe3.analysis.dag_service",
     "ModuleNode": "vibe3.analysis.dag_service",
+    "dag_service": "vibe3.analysis.dag_service",
     "expand_impacted_modules": "vibe3.analysis.dag_service",
     "build_module_graph": "vibe3.analysis.dag_service",
     "ChangedFileScope": "vibe3.analysis.change_scope_service",
@@ -94,10 +97,14 @@ _LAZY_IMPORTS = {
     "dag": "vibe3.analysis.inspect_output_adapter",
     "pr_analysis_summary": "vibe3.analysis.inspect_output_adapter",
     "compute_diff": "vibe3.analysis.snapshot_diff",
+    "find_latest_prepush_report": "vibe3.analysis.local_review_report",
+    "LocalReviewReport": "vibe3.analysis.local_review_report",
     "SnapshotError": "vibe3.analysis.snapshot_service",
     "build_snapshot": "vibe3.analysis.snapshot_service",
     "find_snapshot_by_branch": "vibe3.analysis.snapshot_service",
     "build_snapshot_diff_section": "vibe3.analysis.snapshot_diff_section",
+    "snapshot_service": "vibe3.analysis.snapshot_service",
+    "structure_service": "vibe3.analysis.structure_service",
 }
 
 
@@ -107,6 +114,8 @@ def __getattr__(name: str) -> object:
         import importlib
 
         module = importlib.import_module(_LAZY_IMPORTS[name])
+        if name == module.__name__.rsplit(".", 1)[-1]:
+            return module
         return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -115,9 +124,12 @@ __all__ = [
     # Core services
     "SerenaService",
     "build_change_analysis",
+    "command_analyzer",
+    "CoverageService",
     # DAG impact analysis
     "ImpactGraph",
     "ModuleNode",
+    "dag_service",
     "expand_impacted_modules",
     "build_module_graph",
     # Change scope classification
@@ -143,8 +155,12 @@ __all__ = [
     "pr_analysis_summary",
     # Snapshot diff
     "compute_diff",
+    "find_latest_prepush_report",
+    "LocalReviewReport",
     "SnapshotError",
     "build_snapshot",
     "find_snapshot_by_branch",
     "build_snapshot_diff_section",
+    "snapshot_service",
+    "structure_service",
 ]

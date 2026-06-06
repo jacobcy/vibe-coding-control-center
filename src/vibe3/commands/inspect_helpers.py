@@ -19,12 +19,12 @@ from vibe3.models.pr_analysis import (  # noqa: F401
     PRCriticalAnalysis,
 )
 from vibe3.services.pr_analysis_service import (  # noqa: F401 - backward compat re-exports
-    _analyze_critical_files,
-    _calculate_risk_score,
-    _filter_critical_files,
-    _get_pr_changed_files,
-    _get_pr_commit_count,
-    _get_recent_commits,
+    analyze_critical_files,
+    calculate_pr_risk_score,
+    filter_critical_files,
+    get_pr_changed_files,
+    get_pr_commit_count,
+    get_recent_commits,
 )
 
 
@@ -61,11 +61,11 @@ __all__ = [
     "PRCriticalAnalysis",
     "build_change_analysis",
     "build_pr_analysis",
-    "_get_pr_changed_files",
-    "_filter_critical_files",
-    "_analyze_critical_files",
-    "_calculate_risk_score",
-    "_get_recent_commits",
-    "_get_pr_commit_count",
+    "get_pr_changed_files",
+    "filter_critical_files",
+    "analyze_critical_files",
+    "calculate_pr_risk_score",
+    "get_recent_commits",
+    "get_pr_commit_count",
     "suggest_next_step",
 ]

@@ -9,15 +9,15 @@ and this module provides a convenient import path for other layers.
 
 # Re-export from canonical location in models layer
 from vibe3.models.actor_utils import (
-    _ACTOR_ALIAS_MAP,
-    _DISPLAY_PLACEHOLDER_ACTORS,
-    _PLACEHOLDER_ACTORS,
+    ACTOR_ALIAS_MAP,
+    DISPLAY_PLACEHOLDER_ACTORS,
+    PLACEHOLDER_ACTORS,
     normalize_actor,
 )
 
 __all__ = [
     "normalize_actor",
-    "_PLACEHOLDER_ACTORS",
-    "_DISPLAY_PLACEHOLDER_ACTORS",
-    "_ACTOR_ALIAS_MAP",
+    "PLACEHOLDER_ACTORS",
+    "DISPLAY_PLACEHOLDER_ACTORS",
+    "ACTOR_ALIAS_MAP",
 ]

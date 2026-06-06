@@ -230,9 +230,9 @@ def start(
         raise typer.Exit(1)
 
     # Warning: Manager token isolation
-    from vibe3.roles.manager import _resolve_manager_token
+    from vibe3.roles.manager import resolve_manager_token
 
-    manager_token = _resolve_manager_token(config)
+    manager_token = resolve_manager_token(config)
     if not manager_token:
         typer.echo(
             "\nWARNING: VIBE_MANAGER_GITHUB_TOKEN not configured.\n"

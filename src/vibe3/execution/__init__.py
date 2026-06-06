@@ -32,7 +32,8 @@ if TYPE_CHECKING:
         run_issue_role_sync,
     )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
-    from vibe3.execution.prompt_meta import build_prompt_meta
+    from vibe3.execution.prompt_meta import PromptMeta, build_prompt_meta
+    from vibe3.execution.role_interfaces import GovernanceFunctions
     from vibe3.execution.role_request_factory import (
         build_role_async_request,
         build_role_sync_request,
@@ -62,11 +63,14 @@ _LAZY_IMPORTS = {
     "build_self_invocation": "vibe3.execution.codeagent_support",
     # Prompt metadata
     "build_prompt_meta": "vibe3.execution.prompt_meta",
+    "PromptMeta": "vibe3.execution.prompt_meta",
     # Role request factory
     "build_role_async_request": "vibe3.execution.role_request_factory",
     "build_role_sync_request": "vibe3.execution.role_request_factory",
+    "GovernanceFunctions": "vibe3.execution.role_interfaces",
     # Sync runners
     "run_governance_sync": "vibe3.execution.governance_sync_runner",
+    "run_governance_async": "vibe3.execution.governance_sync_runner",
     "run_issue_role_async": "vibe3.execution.issue_role_sync_runner",
     "run_issue_role_sync": "vibe3.execution.issue_role_sync_runner",
 }
@@ -110,11 +114,14 @@ __all__ = [
     "build_self_invocation",
     # Prompt metadata
     "build_prompt_meta",
+    "PromptMeta",
     # Role request factory
     "build_role_async_request",
     "build_role_sync_request",
+    "GovernanceFunctions",
     # Sync runners
     "run_governance_sync",
+    "run_governance_async",
     "run_issue_role_async",
     "run_issue_role_sync",
 ]

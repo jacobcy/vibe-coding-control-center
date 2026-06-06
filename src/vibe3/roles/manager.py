@@ -108,7 +108,7 @@ MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
 )
 
 
-def _resolve_manager_token(config: OrchestraConfig) -> str | None:
+def resolve_manager_token(config: OrchestraConfig) -> str | None:
     """Resolve manager token with fallback: env var (.zshrc) → keys.env → None."""
     token_env = config.assignee_dispatch.token_env
     if not token_env:
@@ -215,7 +215,7 @@ def build_manager_request(
     env = dict(os.environ)
 
     # Inject manager-specific token if configured (Phase 4)
-    manager_token = _resolve_manager_token(config)
+    manager_token = resolve_manager_token(config)
     if manager_token:
         env["GH_TOKEN"] = manager_token
         logger.bind(domain="manager", issue_number=issue.number).info(
@@ -275,6 +275,9 @@ def build_manager_request(
     else:
         request.env.update(env)
     return request
+
+
+_resolve_manager_token = resolve_manager_token
 
 
 def build_manager_sync_request(

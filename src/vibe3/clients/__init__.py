@@ -19,8 +19,15 @@ if TYPE_CHECKING:
         FlowReader,
         GitHubClientProtocol,
         GitPathProtocol,
+        TriggerableRoleDefinitionProtocol,
     )
     from vibe3.clients.recent_pr_cache import RecentPRCache
+    from vibe3.clients.runtime_assets import (
+        check_runtime_asset,
+        resolve_prompt_config,
+        resolve_runtime_asset,
+        runtime_assets_root,
+    )
     from vibe3.clients.serena_client import (
         SerenaClient,
         count_references,
@@ -47,6 +54,8 @@ _LAZY_IMPORTS = {
     "RecentPRCache": "vibe3.clients.recent_pr_cache",
     "SerenaClient": "vibe3.clients.serena_client",
     "SQLiteClient": "vibe3.clients.sqlite_client",
+    "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols",
+    "check_runtime_asset": "vibe3.clients.runtime_assets",
     "count_references": "vibe3.clients.serena_client",
     "extract_function_names": "vibe3.clients.serena_client",
     "find_repo_root": "vibe3.clients.git_client",
@@ -55,6 +64,9 @@ _LAZY_IMPORTS = {
     "parse_linked_issues": "vibe3.clients.github_issues_ops",
     "prune_worktrees": "vibe3.clients.git_worktree_ops",
     "remove_worktree": "vibe3.clients.git_worktree_ops",
+    "resolve_prompt_config": "vibe3.clients.runtime_assets",
+    "resolve_runtime_asset": "vibe3.clients.runtime_assets",
+    "runtime_assets_root": "vibe3.clients.runtime_assets",
 }
 
 
@@ -85,6 +97,8 @@ __all__ = [
     "RecentPRCache",
     "SerenaClient",
     "SQLiteClient",
+    "TriggerableRoleDefinitionProtocol",
+    "check_runtime_asset",
     "count_references",
     "extract_function_names",
     "find_repo_root",
@@ -93,4 +107,7 @@ __all__ = [
     "parse_linked_issues",
     "prune_worktrees",
     "remove_worktree",
+    "resolve_prompt_config",
+    "resolve_runtime_asset",
+    "runtime_assets_root",
 ]

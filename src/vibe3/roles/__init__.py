@@ -47,6 +47,7 @@ if TYPE_CHECKING:
         build_manager_request,
         build_manager_sync_request,
         resolve_manager_options,
+        resolve_manager_token,
     )
     from vibe3.roles.plan import (
         PLAN_BRANCH_RESOLVER,
@@ -127,6 +128,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "MANAGER_SYNC_SPEC": "vibe3.roles.manager",
     "build_manager_request": "vibe3.roles.manager",
     "build_manager_sync_request": "vibe3.roles.manager",
+    "resolve_manager_token": "vibe3.roles.manager",
     "resolve_manager_options": "vibe3.roles.manager",
     # planner
     "PLAN_BRANCH_RESOLVER": "vibe3.roles.plan",
@@ -193,6 +195,13 @@ _LAZY_IMPORTS: dict[str, str] = {
     "build_default_governance_fns": "vibe3.roles.governance_factory",
     "find_material_in_catalog": "vibe3.roles.governance_utils",
     "normalize_material_name": "vibe3.roles.governance_utils",
+    # scan service
+    "dispatch_governance_execution": "vibe3.roles.scan_service",
+    "dispatch_supervisor_execution": "vibe3.roles.scan_service",
+    "fetch_supervisor_candidates": "vibe3.roles.scan_service",
+    "get_available_governance_materials": "vibe3.roles.scan_service",
+    "governance_material_exists": "vibe3.roles.scan_service",
+    "list_governance_materials": "vibe3.roles.scan_service",
 }
 
 
@@ -224,6 +233,7 @@ __all__ = [
     "MANAGER_ROLE",
     "build_manager_request",
     "build_manager_sync_request",
+    "resolve_manager_token",
     "resolve_manager_options",
     # planner (lazy)
     "PLAN_BRANCH_RESOLVER",
@@ -290,6 +300,13 @@ __all__ = [
     "build_default_governance_fns",
     "find_material_in_catalog",
     "normalize_material_name",
+    # scan service
+    "dispatch_governance_execution",
+    "dispatch_supervisor_execution",
+    "fetch_supervisor_candidates",
+    "get_available_governance_materials",
+    "governance_material_exists",
+    "list_governance_materials",
 ]
 
 # Consistency check: ensure __all__ matches lazy symbols
