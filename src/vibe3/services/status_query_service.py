@@ -335,7 +335,7 @@ class StatusQueryService:
                     pr_state = pr.state.value
 
             # Calculate remote flag: issue claimed by manager but no local flow
-            # Mark as remote for active states and BLOCKED state
+            # Blocked issues are not remote — they display in Blocked Issues section
             is_remote = (
                 state
                 in {
@@ -344,7 +344,6 @@ class StatusQueryService:
                     IssueState.HANDOFF,
                     IssueState.REVIEW,
                     IssueState.MERGE_READY,
-                    IssueState.BLOCKED,
                 }
                 and assignee is not None
                 and assignee in (manager_usernames or [])

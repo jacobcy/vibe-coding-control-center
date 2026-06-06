@@ -191,7 +191,8 @@ class TestRemoteField:
         assert result[0]["remote"] is False
 
     def test_blocked_state_remote_when_manager_assigned_no_flow(self) -> None:
-        """BLOCKED state should be remote when manager-assigned without flow."""
+        """BLOCKED state should not be remote even when manager-assigned
+        without flow."""
         service = self._make_mock_service()
         service.github.list_issues.return_value = [
             {
@@ -210,7 +211,7 @@ class TestRemoteField:
         )
 
         assert len(result) == 1
-        assert result[0]["remote"] is True
+        assert result[0]["remote"] is False
         assert result[0]["state"] == IssueState.BLOCKED
 
     def test_blocked_remote_parses_reason_from_body(self) -> None:
@@ -241,7 +242,7 @@ class TestRemoteField:
         )
 
         assert len(result) == 1
-        assert result[0]["remote"] is True
+        assert result[0]["remote"] is False
         assert result[0]["state"] == IssueState.BLOCKED
         assert result[0]["blocked_reason"] == "Waiting for external dependency"
         assert result[0]["blocked_by"] == (123, 456)
