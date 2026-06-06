@@ -55,7 +55,7 @@ def dispatch_governance_execution(
         material_override: Optional governance role to override material rotation
     """
     from vibe3.execution import run_governance_sync
-    from vibe3.orchestra import append_governance_event
+    from vibe3.observability import append_governance_event
     from vibe3.roles import build_default_governance_fns
 
     run_governance_sync(

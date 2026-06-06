@@ -22,7 +22,7 @@ from vibe3.models import (
     OrchestraConfig,
     WorktreeRequirement,
 )
-from vibe3.orchestra import append_orchestra_event
+from vibe3.observability import append_orchestra_event
 
 # Reason code invariant for duplicate session handling:
 #

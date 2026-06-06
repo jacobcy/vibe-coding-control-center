@@ -12,8 +12,8 @@ from vibe3.orchestra import (
     get_flow_context,
     is_auto_task_branch,
     load_issue,
-    sort_ready_issues,
 )
+from vibe3.utils.queue_ordering import sort_ready_issues
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient

@@ -8,8 +8,9 @@ from rich.console import Console
 from rich.table import Table
 
 from vibe3.config import load_orchestra_config
+from vibe3.domain.failed_gate import FailedGate
 from vibe3.models import OrchestraConfig
-from vibe3.orchestra import FailedGate, orchestra_events_log_path
+from vibe3.observability import orchestra_events_log_path
 from vibe3.services.error_tracking_service import ErrorTrackingService
 from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,

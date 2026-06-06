@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.protocols.services_protocols import CheckServiceProtocol
 from vibe3.config import PeriodicCheckConfig
-from vibe3.orchestra import append_orchestra_event
+from vibe3.domain.protocols import CheckServiceProtocol
+from vibe3.observability import append_orchestra_event
 
 if TYPE_CHECKING:
     pass

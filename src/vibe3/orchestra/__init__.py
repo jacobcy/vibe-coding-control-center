@@ -48,16 +48,16 @@ if TYPE_CHECKING:
         promote_progressed_entries,
         select_ready_issues_from_collected_issues,
     )
-    from vibe3.orchestra.queue_ordering import (
-        resolve_priority,
-        resolve_roadmap_rank,
-        sort_ready_issues,
-    )
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
     from vibe3.services import (
         CheckResult,
         get_manager_usernames,
         should_skip_from_queue,
+    )
+    from vibe3.utils.queue_ordering import (
+        resolve_priority,
+        resolve_roadmap_rank,
+        sort_ready_issues,
     )
 
 
@@ -97,15 +97,15 @@ def __getattr__(name: str) -> object:
 
         return orchestra_log_dir
     if name == "resolve_priority":
-        from vibe3.orchestra.queue_ordering import resolve_priority
+        from vibe3.utils.queue_ordering import resolve_priority
 
         return resolve_priority
     if name == "resolve_roadmap_rank":
-        from vibe3.orchestra.queue_ordering import resolve_roadmap_rank
+        from vibe3.utils.queue_ordering import resolve_roadmap_rank
 
         return resolve_roadmap_rank
     if name == "sort_ready_issues":
-        from vibe3.orchestra.queue_ordering import sort_ready_issues
+        from vibe3.utils.queue_ordering import sort_ready_issues
 
         return sort_ready_issues
     if name == "select_ready_issues_from_collected_issues":

@@ -3,7 +3,7 @@
 from loguru import logger
 
 from vibe3.config import PeriodicCheckConfig
-from vibe3.orchestra import append_orchestra_event
+from vibe3.observability import append_orchestra_event
 
 
 async def execute_expired_resource_cleanup(

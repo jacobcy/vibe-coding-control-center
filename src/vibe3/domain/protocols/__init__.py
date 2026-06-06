@@ -25,6 +25,7 @@ from vibe3.domain.protocols.dispatch_protocols import (
     LabelDispatchCallable,
     QueuePersistenceServiceProtocol,
     QueueSelectorProtocol,
+    TriggerableRoleDefinitionProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.protocols.infra_protocols import (
@@ -57,4 +58,5 @@ __all__ = [
     "QueuePersistenceServiceProtocol",
     "QueueSelectorProtocol",
     "RoleFactoryProtocol",
+    "TriggerableRoleDefinitionProtocol",
 ]

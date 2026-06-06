@@ -10,10 +10,7 @@ from typing import TYPE_CHECKING, Protocol
 from loguru import logger
 
 from vibe3.models import OrchestraConfig
-from vibe3.orchestra import (
-    append_orchestra_event,
-    append_orchestra_run_separator,
-)
+from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
 
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase

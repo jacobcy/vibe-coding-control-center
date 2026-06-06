@@ -26,13 +26,6 @@ from vibe3.clients.protocols.github import (
     PRWritePort,
 )
 from vibe3.clients.protocols.pr import BaseResolver
-from vibe3.clients.protocols.services_protocols import (
-    CheckServiceProtocol,
-    ErrorTrackingServiceProtocol,
-    ExpiredResourceCleanupServiceProtocol,
-    FlowServiceProtocol,
-    TriggerableRoleDefinitionProtocol,
-)
 
 __all__ = [
     "BackendProtocol",
@@ -47,9 +40,4 @@ __all__ = [
     "PRReadPort",
     "PRWritePort",
     "BaseResolver",
-    "CheckServiceProtocol",
-    "ErrorTrackingServiceProtocol",
-    "ExpiredResourceCleanupServiceProtocol",
-    "FlowServiceProtocol",
-    "TriggerableRoleDefinitionProtocol",
 ]

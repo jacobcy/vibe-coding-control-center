@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.queue_ordering import (
+from vibe3.utils.queue_ordering import (
     resolve_milestone_rank,
     resolve_priority,
     resolve_roadmap_rank,
