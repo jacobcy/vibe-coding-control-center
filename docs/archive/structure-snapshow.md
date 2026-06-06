@@ -6,7 +6,7 @@
 > - `vibe3 inspect structure` — 单文件/变更分析
 >
 > 本文档保留为历史设计参考，其中描述的 CLI 命令名（`structure build/show/diff`）并非 V3 实际命令。
-> 详见 `docs/v3/v3-next-steps.md` §4 "Structure Snapshot 的位置"。
+> 详见 `docs/archive/v3/ARCHIVED_v3-next-steps.md` §4 "Structure Snapshot 的位置"。
 
 1. Goal
 
