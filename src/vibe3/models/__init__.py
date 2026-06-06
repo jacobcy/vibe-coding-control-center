@@ -40,10 +40,12 @@ if TYPE_CHECKING:
     )
     from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
     from vibe3.models.pr import (
+        CICheck,
         CreatePRRequest,
         PRMetadata,
         PRResponse,
         PRState,
+        UpdatePRRequest,
         VersionBumpResponse,
         VersionBumpType,
     )
@@ -88,6 +90,7 @@ _LAZY_IMPORTS = {
     "DataSource": "vibe3.models.data_source",
     "ChangeSource": "vibe3.models.change_source",
     "ChangeSourceType": "vibe3.models.change_source",
+    "CICheck": "vibe3.models.pr",
     "CommitSource": "vibe3.models.change_source",
     "FORBIDDEN_TRANSITIONS": "vibe3.models.orchestration",
     "PRSource": "vibe3.models.change_source",
@@ -139,6 +142,7 @@ _LAZY_IMPORTS = {
     "StructureSnapshot": "vibe3.models.snapshot",
     "ExecutionStep": "vibe3.models.trace",
     "TraceOutput": "vibe3.models.trace",
+    "UpdatePRRequest": "vibe3.models.pr",
     "StateTransition": "vibe3.models.orchestration",
     "TimelineEvent": "vibe3.models.flow",
     "VerdictRecord": "vibe3.models.verdict",
@@ -169,6 +173,7 @@ __all__: list[str] = [
     "CallNode",
     "ChangeSource",
     "ChangeSourceType",
+    "CICheck",
     "CommandInspection",
     "CommitInfo",
     "CommitSource",
@@ -224,6 +229,7 @@ __all__: list[str] = [
     "TimelineEvent",
     "TraceOutput",
     "UncommittedSource",
+    "UpdatePRRequest",
     "VerdictRecord",
     "VerdictValue",
     "VersionBumpResponse",
