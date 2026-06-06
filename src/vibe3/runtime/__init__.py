@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from vibe3.runtime.periodic_check_executor import execute_periodic_check
     from vibe3.runtime.service_protocol import ServiceBase
     from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
-    from vibe3.services.error_tracking_service import ErrorTrackingService
 
 
 def __getattr__(name: str) -> object:
@@ -89,12 +88,6 @@ def __getattr__(name: str) -> object:
 
         return ServiceBase
 
-    # Services symbols (services/ may import from runtime)
-    if name == "ErrorTrackingService":
-        from vibe3.services.error_tracking_service import ErrorTrackingService
-
-        return ErrorTrackingService
-
     # Taxonomy symbols
     if name == "MODULE_CATEGORY_MAP":
         from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP
@@ -122,8 +115,6 @@ __all__ = [
     "read_instance_info",
     "validate_instance",
     "write_instance_info",
-    # Services (via __getattr__)
-    "ErrorTrackingService",
     # Taxonomy (via __getattr__)
     "MODULE_CATEGORY_MAP",
     "ModuleCategory",

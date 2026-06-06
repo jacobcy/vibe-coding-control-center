@@ -3,9 +3,17 @@
 Validates that:
 1. All L3 modules have a category assignment
 2. Dependency directions follow category rules
-3. Kernel does not depend on adapter/policy/plugin/observation internals
-4. Observation (domain) does not depend on kernel/adapter/policy/plugin
-5. Plugin-surface (orchestra) respects its boundary
+3. Kernel (runtime + orchestra) does not import adapter/policy/observation internals
+   at module level
+4. Observation (domain) has access to all categories (event core)
+
+Taxonomy alignment with kernel startup boundary (#2161/#2293):
+  KERNEL: runtime, orchestra
+  COMMAND_ADAPTER: execution, services
+  POLICY: roles
+  OBSERVATION: domain
+  FORBIDDEN at startup: roles, agents, services, prompts, execution,
+                        domain.handlers, domain.orchestration_facade
 """
 
 from __future__ import annotations
@@ -205,18 +213,12 @@ class TestTaxonomyCompleteness:
 class TestCategoryBoundaries:
     """Test that modules respect category boundaries."""
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: runtime currently imports from "
-        "services and orchestra.logging. Tracked by follow-up issues."
-    )
     def test_kernel_boundary(self) -> None:
-        """Verify kernel (runtime) does not import from other categories.
+        """Verify kernel (runtime) only imports KERNEL-category modules at module level.
 
-        Kernel (KERNEL category) should only depend on itself and lower
-        layers (L4-L6).
-
-        This test checks module-level imports only (lazy/deferred imports
-        inside functions are acceptable per existing pattern).
+        Kernel: only itself, orchestra (also KERNEL), and L4-L6 are allowed.
+        Lazy/__getattr__ imports inside functions are acceptable per existing
+        pattern — this test checks module-level only.
         """
         runtime_init = "src/vibe3/runtime/__init__.py"
         imports = _get_module_level_imports(runtime_init)
@@ -258,10 +260,10 @@ class TestCategoryDependencyDirection:
 
     @pytest.mark.xfail(
         reason="Known architectural debt: L3 modules have cross-category imports. "
-        "runtime imports from domain/orchestra/services. "
+        "runtime imports from domain/services (lazy). "
         "execution/services import from domain/orchestra. "
-        "roles/orchestra import from domain. "
-        "Tracked by follow-up issues #2161, #2163, #2167, #2182, #2183."
+        "roles imports from domain. "
+        "Tracked by follow-up issues #2163, #2167, #2182, #2183."
     )
     def test_category_dependency_direction(
         self, import_graph: dict[str, list[str]], module_layer_map: dict[str, int]
