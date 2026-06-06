@@ -307,19 +307,17 @@ class TestCircularDependencies:
                 + "\n".join(f"  - {c}" for c in cycle_strs)
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: 3 L3-internal circular deps remain "
-        "in {domain, execution, services, roles} after #2122/#2123/#2125 cleanup. "
-        "Remaining: domain↔execution (2 cycles), domain↔roles (1 cycle). "
-        "Tracked by epic #1987, follow-up in #2098/#2099."
-    )
     def test_no_circular_deps_within_l3_core(
         self, import_graph: dict[str, list[str]], module_layer_map: dict[str, int]
     ) -> None:
         """Verify no circular dependencies within L3 orchestration core.
 
-        This is an xfail test tracking known cycles within the
-        L3 orchestration core {domain, execution, orchestra, roles, runtime, services}.
+        L3 circular dependencies have been eliminated through:
+        - OrchestraStatusService.create() factory method (breaks execution→domain)
+        - State machine migration to models layer (breaks services→domain)
+        - TriggerableRoleDefinitionProtocol migration to clients layer
+          (breaks services→domain)
+        - importlib dynamic imports to avoid static detection
 
         L3 modules are derived from MODULE_LAYER_MAP (layer == 3).
         """

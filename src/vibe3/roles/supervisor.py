@@ -11,9 +11,13 @@ from vibe3.config import (
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
     ConventionResolver,
 )
-from vibe3.domain import SupervisorIssueIdentified
 from vibe3.execution import ExecutionRolePolicyService, use_current_branch
-from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
+from vibe3.models import (
+    ExecutionRequest,
+    IssueInfo,
+    OrchestraConfig,
+    SupervisorIssueIdentified,
+)
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.services import IssueFlowService, get_handoff_state_label
 

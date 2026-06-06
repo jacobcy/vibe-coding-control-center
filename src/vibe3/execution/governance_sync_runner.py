@@ -51,11 +51,9 @@ def run_governance_sync(
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
-    from vibe3.domain import FlowManager
     from vibe3.services import OrchestraStatusService
 
-    flow_manager = FlowManager(config)
-    status_service = OrchestraStatusService(config, orchestrator=flow_manager)
+    status_service = OrchestraStatusService.create(config)
     snapshot = status_service.snapshot()
 
     # Resolve agent options
@@ -155,7 +153,6 @@ def run_governance_async(
         material_override: Optional governance role to override material rotation
         build_execution_name: Injected execution name builder (required)
     """
-    from vibe3.domain import FlowManager
     from vibe3.environment import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.issue_role_support import (
@@ -196,8 +193,7 @@ def run_governance_async(
             echo(skip_result.reason)
             return
 
-    flow_manager = FlowManager(config)
-    status_service = OrchestraStatusService(config, orchestrator=flow_manager)
+    status_service = OrchestraStatusService.create(config)
     snapshot = status_service.snapshot()
 
     root = resolve_orchestra_repo_root()

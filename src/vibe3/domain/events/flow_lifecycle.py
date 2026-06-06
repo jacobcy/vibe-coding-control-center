@@ -1,108 +1,21 @@
 """Flow lifecycle domain events.
 
-Events for agent execution lifecycle (planner, executor, reviewer).
+Re-exported from models layer to break the roles↔domain circular dependency.
+See vibe3.models.domain_events for the canonical definitions.
 """
 
-from dataclasses import dataclass
+from vibe3.models.domain_events import (
+    ExecutorDispatchIntent,
+    IssueFailed,
+    ManagerDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
+)
 
-from .base import DomainEvent
-
-
-@dataclass(frozen=True)
-class IssueFailed(DomainEvent):
-    """Issue failure event.
-
-    Published when a role (executor/planner/reviewer/manager) fails.
-    """
-
-    issue_number: int
-    reason: str
-    actor: str = "system"
-    role: str | None = None
-    timestamp: str | None = None
-
-
-# Dispatch-intent events (authoritative dispatch signals)
-
-
-@dataclass(frozen=True)
-class ManagerDispatchIntent(DomainEvent):
-    """Manager dispatch intent event.
-
-    Authoritative signal that manager should be dispatched for an issue.
-    Published by StateLabelDispatchService for ready/handoff manager triggers.
-
-    Note: This is an INTENT event, not a completion event.
-    The actual dispatch happens in handlers.
-    """
-
-    issue_number: int
-    branch: str
-    trigger_state: str  # "ready" | "handoff"
-    issue_title: str | None = None
-    actor: str = "orchestra:dispatcher"
-    timestamp: str | None = None
-    tick_id: int = 0  # Heartbeat tick number for error tracking
-
-
-@dataclass(frozen=True)
-class PlannerDispatchIntent(DomainEvent):
-    """Planner dispatch intent event.
-
-    Authoritative signal that planner should be dispatched for an issue.
-    Published by StateLabelDispatchService when trigger_name="plan".
-
-    Note: This is an INTENT event, not a completion event.
-    The actual dispatch happens in handlers.
-    """
-
-    issue_number: int
-    branch: str
-    trigger_state: str  # "claimed"
-    actor: str = "orchestra:dispatcher"
-    timestamp: str | None = None
-    tick_id: int = 0  # Heartbeat tick number for error tracking
-
-
-@dataclass(frozen=True)
-class ExecutorDispatchIntent(DomainEvent):
-    """Executor dispatch intent event.
-
-    Authoritative signal that executor should be dispatched for an issue.
-    Published by StateLabelDispatchService when trigger_name="run".
-
-    Execution-specific context (plan_ref, audit_ref, commit_mode) is
-    resolved by the handler layer, not carried on the dispatch intent.
-
-    Note: This is an INTENT event, not a completion event.
-    The actual dispatch happens in handlers.
-    """
-
-    issue_number: int
-    branch: str
-    trigger_state: str  # "in-progress"
-    actor: str = "orchestra:dispatcher"
-    timestamp: str | None = None
-    tick_id: int = 0  # Heartbeat tick number for error tracking
-
-
-@dataclass(frozen=True)
-class ReviewerDispatchIntent(DomainEvent):
-    """Reviewer dispatch intent event.
-
-    Authoritative signal that reviewer should be dispatched for an issue.
-    Published by StateLabelDispatchService when trigger_name="review".
-
-    Execution-specific context (report_ref) is resolved by the handler
-    layer, not carried on the dispatch intent.
-
-    Note: This is an INTENT event, not a completion event.
-    The actual dispatch happens in handlers.
-    """
-
-    issue_number: int
-    branch: str
-    trigger_state: str  # "review"
-    actor: str = "orchestra:dispatcher"
-    timestamp: str | None = None
-    tick_id: int = 0  # Heartbeat tick number for error tracking
+__all__ = [
+    "ExecutorDispatchIntent",
+    "IssueFailed",
+    "ManagerDispatchIntent",
+    "PlannerDispatchIntent",
+    "ReviewerDispatchIntent",
+]

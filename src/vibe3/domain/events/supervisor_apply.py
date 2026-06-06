@@ -11,22 +11,19 @@ Reference: docs/standards/vibe3-worktree-ownership-standard.md §二 (L2)
 
 from dataclasses import dataclass
 
+# Re-exported from models to allow roles layer to import without domain dependency
+from vibe3.models.domain_events import SupervisorIssueIdentified
+
 from .base import DomainEvent
 
-
-@dataclass(frozen=True)
-class SupervisorIssueIdentified(DomainEvent):
-    """Supervisor issue identified event.
-
-    Published when supervisor handoff service detects an issue
-    with supervisor+state/handoff labels.
-    """
-
-    issue_number: int
-    issue_title: str
-    supervisor_file: str
-    actor: str = "system:supervisor"
-    timestamp: str | None = None
+__all__ = [
+    "SupervisorIssueIdentified",
+    "SupervisorPromptRendered",
+    "SupervisorApplyDispatched",
+    "SupervisorApplyStarted",
+    "SupervisorApplyCompleted",
+    "SupervisorApplyDelegated",
+]
 
 
 @dataclass(frozen=True)

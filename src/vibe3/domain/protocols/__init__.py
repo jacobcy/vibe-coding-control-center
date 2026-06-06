@@ -7,6 +7,8 @@ This enables the domain layer to depend on abstractions (protocols) rather
 than concrete implementations, following the dependency inversion principle.
 """
 
+# Re-export from clients.protocols to break circular dependency
+from vibe3.clients.protocols.role import TriggerableRoleDefinitionProtocol
 from vibe3.domain.protocols.core_protocols import (
     ExecutionCoordinatorProtocol,
     RoleFactoryProtocol,
@@ -25,7 +27,6 @@ from vibe3.domain.protocols.dispatch_protocols import (
     LabelDispatchCallable,
     QueuePersistenceServiceProtocol,
     QueueSelectorProtocol,
-    TriggerableRoleDefinitionProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 from vibe3.domain.protocols.infra_protocols import (
