@@ -108,6 +108,30 @@ def find_missing_backend_commands(
     return missing
 
 
+def _resolve_agent_entry(
+    agents: dict[str, Any], agent_name: str
+) -> tuple[str, dict[str, Any]] | None:
+    """Resolve agent preset entry with vibe- prefix fallback.
+
+    Args:
+        agents: Dict of agent presets from models.json
+        agent_name: Agent name to look up
+
+    Returns:
+        (resolved_name, entry_dict) on success, None on failure
+    """
+    raw = agents.get(agent_name)
+    if isinstance(raw, dict):
+        return agent_name, raw
+
+    prefixed_name = f"vibe-{agent_name}"
+    raw = agents.get(prefixed_name)
+    if isinstance(raw, dict):
+        return prefixed_name, raw
+
+    return None
+
+
 def resolve_repo_agent_preset(
     agent_name: str,
 ) -> tuple[str | None, str | None] | None:
@@ -141,14 +165,10 @@ def resolve_repo_agent_preset(
     if not isinstance(agents, dict):
         return None
 
-    # Try direct lookup first
-    raw = agents.get(agent_name)
-    if not isinstance(raw, dict):
-        # Try with 'vibe-' prefix if direct lookup fails
-        prefixed_name = f"vibe-{agent_name}"
-        raw = agents.get(prefixed_name)
-        if not isinstance(raw, dict):
-            return None
+    resolved = _resolve_agent_entry(agents, agent_name)
+    if resolved is None:
+        return None
+    _, raw = resolved
 
     backend = raw.get("backend")
     model = raw.get("model")
@@ -173,15 +193,11 @@ def resolve_repo_agent_preset_name(agent_name: str) -> str | None:
     if not isinstance(agents, dict):
         return None
 
-    raw = agents.get(agent_name)
-    if isinstance(raw, dict):
-        return agent_name
-
-    prefixed_name = f"vibe-{agent_name}"
-    raw = agents.get(prefixed_name)
-    if isinstance(raw, dict):
-        return prefixed_name
-    return None
+    resolved = _resolve_agent_entry(agents, agent_name)
+    if resolved is None:
+        return None
+    resolved_name, _ = resolved
+    return resolved_name
 
 
 def has_agent_env_override(agent_name: str) -> bool:
