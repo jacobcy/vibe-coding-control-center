@@ -376,14 +376,16 @@ class CodeagentBackend:
                 if diagnosis:
                     error_msg += f"\n\n{diagnosis}"
 
-                # Check for prompt size issue and add diagnostic
-                prompt_size_diagnostic = diagnose_prompt_size_issue(
-                    len(prompt),
-                    effective_options.backend or "default",
-                    effective_options.model or "default",
-                )
-                if prompt_size_diagnostic:
-                    error_msg += f"\n\n{prompt_size_diagnostic}"
+                # Only check prompt size for "no agent_message output" case
+                # to avoid misleading diagnostics for unrelated errors
+                if "completed without agent_message output" in combined_output:
+                    prompt_size_diagnostic = diagnose_prompt_size_issue(
+                        len(prompt),
+                        effective_options.backend or "default",
+                        effective_options.model or "default",
+                    )
+                    if prompt_size_diagnostic:
+                        error_msg += f"\n\n{prompt_size_diagnostic}"
 
                 # Build metadata for structured error info
                 metadata = {
