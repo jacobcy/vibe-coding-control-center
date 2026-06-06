@@ -80,6 +80,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
     "sort_ready_issues": "vibe3.utils.queue_ordering",
     # Orchestra submodules
+    "create_global_dispatch_coordinator": "vibe3.orchestra.dispatch_coordinator_factory",  # noqa: E501
     "select_ready_issues_from_collected_issues": "vibe3.orchestra.queue_operations",
     "promote_progressed_entries": "vibe3.orchestra.queue_operations",
     "QueuePersistenceService": "vibe3.orchestra.queue_persistence_service",
@@ -128,6 +129,7 @@ __all__ = [
     "promote_progressed_entries",
     "QueuePersistenceService",
     "DispatchHealthCheckService",
+    "create_global_dispatch_coordinator",
     "get_flow_context",
     "load_issue",
     "is_auto_task_branch",

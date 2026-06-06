@@ -11,7 +11,10 @@ Reference: docs/standards/v3/worktree-lifecycle-standard.md
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.domain.dispatch_coordinator import (
+        MAX_INTENTS_PER_TICK,
+        GlobalDispatchCoordinator,
+    )
     from vibe3.domain.events import (
         DomainEvent,
         ExecutorDispatchIntent,
@@ -29,9 +32,20 @@ if TYPE_CHECKING:
         SupervisorIssueIdentified,
         SupervisorPromptRendered,
     )
-    from vibe3.domain.failed_gate import FailedGate
+    from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.flow_manager import FlowManager
+    from vibe3.domain.orchestration_facade import OrchestrationFacade
+    from vibe3.domain.protocols import (
+        CapacityServiceProtocol,
+        CheckServiceProtocol,
+        FlowManagerProtocol,
+        FlowServiceProtocol,
+        LabelDispatchCallable,
+        ServiceBase,
+    )
     from vibe3.domain.publisher import EventPublisher
+    from vibe3.domain.qualify_gate import QualifyGateService
+    from vibe3.domain.role_resolver import find_role_for_state
     from vibe3.domain.state_machine import (
         STATE_LABEL_META,
         VIBE_TASK_LABEL,
@@ -63,6 +77,20 @@ _LAZY_IMPORTS: dict[str, str] = {
     "STATE_LABEL_META": "vibe3.models.state_machine",
     "VIBE_TASK_LABEL": "vibe3.models.state_machine",
     "validate_transition": "vibe3.models.state_machine",
+    # Protocols
+    "CapacityServiceProtocol": "vibe3.domain.protocols",
+    "CheckServiceProtocol": "vibe3.domain.protocols",
+    "FlowServiceProtocol": "vibe3.domain.protocols",
+    "FlowManagerProtocol": "vibe3.domain.protocols",
+    "LabelDispatchCallable": "vibe3.domain.protocols",
+    "ServiceBase": "vibe3.domain.protocols",
+    # Additional domain classes
+    "GateResult": "vibe3.domain.failed_gate",
+    "GateStatus": "vibe3.domain.failed_gate",
+    "MAX_INTENTS_PER_TICK": "vibe3.domain.dispatch_coordinator",
+    "OrchestrationFacade": "vibe3.domain.orchestration_facade",
+    "QualifyGateService": "vibe3.domain.qualify_gate",
+    "find_role_for_state": "vibe3.domain.role_resolver",
     # Publisher
     "EventPublisher": "vibe3.domain.publisher",
 }
@@ -135,6 +163,19 @@ __all__ = [
     "FlowManager",
     "GlobalDispatchCoordinator",
     "FailedGate",
+    "GateResult",
+    "GateStatus",
+    "MAX_INTENTS_PER_TICK",
+    "OrchestrationFacade",
+    "QualifyGateService",
+    "find_role_for_state",
+    # Protocols
+    "CapacityServiceProtocol",
+    "CheckServiceProtocol",
+    "FlowServiceProtocol",
+    "FlowManagerProtocol",
+    "LabelDispatchCallable",
+    "ServiceBase",
     # Publisher
     "EventPublisher",
     "get_publisher",
