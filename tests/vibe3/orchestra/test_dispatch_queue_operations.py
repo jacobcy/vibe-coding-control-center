@@ -694,3 +694,242 @@ class TestAutoResumeNoFlowScene:
         # Verify no auto-resume events logged
         auto_resume_calls = [call for call in event_calls if "auto-resume" in call[1]]
         assert len(auto_resume_calls) == 0
+
+
+class TestAutoResumeCooldown:
+    """Tests for auto-resume cooldown mechanism."""
+
+    def test_cooldown_skips_rapid_retry(self, make_issue_info, monkeypatch) -> None:
+        """Second auto-resume within cooldown period is skipped (failure case)."""
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        config = OrchestraConfig(repo="owner/repo")
+        issue = make_issue_info(100, IssueState.CLAIMED)
+
+        # Start with empty cooldown dict for test isolation
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations._last_auto_resume_attempt",
+            {},
+        )
+
+        mock_label_service = MagicMock()
+        # First call fails, second would succeed
+        mock_label_service.transition = MagicMock(
+            side_effect=[RuntimeError("API error"), None]
+        )
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Mock time to control cooldown
+        current_time = [1000.0]
+
+        def mock_time():
+            return current_time[0]
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.time.time",
+            mock_time,
+        )
+
+        # First call - fails but sets cooldown
+        _auto_resume_to_ready(issue, config)
+
+        # Advance time by 60s (within cooldown)
+        current_time[0] = 1060.0
+
+        # Second call - should be skipped by cooldown (transition not called)
+        _auto_resume_to_ready(issue, config)
+
+        # Verify transition was called only once (second was skipped by cooldown)
+        mock_label_service.transition.assert_called_once_with(
+            100,
+            IssueState.READY,
+            actor="orchestra:auto-resume",
+            force=True,
+        )
+
+    def test_cooldown_allows_after_expiry(self, make_issue_info, monkeypatch) -> None:
+        """Auto-resume after cooldown expiry is allowed."""
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        config = OrchestraConfig(repo="owner/repo")
+        issue = make_issue_info(101, IssueState.CLAIMED)
+
+        # Start with empty cooldown dict for test isolation
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations._last_auto_resume_attempt",
+            {},
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Mock time to control cooldown
+        current_time = [1000.0]
+
+        def mock_time():
+            return current_time[0]
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.time.time",
+            mock_time,
+        )
+
+        # First call
+        _auto_resume_to_ready(issue, config)
+
+        # Advance time by 301s (beyond cooldown)
+        current_time[0] = 1301.0
+
+        # Second call - should be allowed
+        _auto_resume_to_ready(issue, config)
+
+        # Verify transition was called twice
+        assert mock_label_service.transition.call_count == 2
+
+    def test_successful_resume_clears_cooldown(
+        self, make_issue_info, monkeypatch
+    ) -> None:
+        """Successful resume clears cooldown for immediate future resume."""
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        config = OrchestraConfig(repo="owner/repo")
+        issue = make_issue_info(102, IssueState.CLAIMED)
+
+        # Start with empty cooldown dict for test isolation
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations._last_auto_resume_attempt",
+            {},
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Mock time
+        current_time = [1000.0]
+
+        def mock_time():
+            return current_time[0]
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.time.time",
+            mock_time,
+        )
+
+        # First call - succeeds and clears cooldown
+        _auto_resume_to_ready(issue, config)
+
+        # No time advance - should still work because cooldown was cleared
+        _auto_resume_to_ready(issue, config)
+
+        # Verify transition was called twice (cooldown cleared after success)
+        assert mock_label_service.transition.call_count == 2
+
+    def test_cooldown_tracks_per_issue_independently(
+        self, make_issue_info, monkeypatch
+    ) -> None:
+        """Cooldown is tracked independently per issue."""
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        config = OrchestraConfig(repo="owner/repo")
+        issue_100 = make_issue_info(100, IssueState.CLAIMED)
+        issue_200 = make_issue_info(200, IssueState.CLAIMED)
+
+        # Start with empty cooldown dict for test isolation
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations._last_auto_resume_attempt",
+            {},
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Mock time
+        current_time = [1000.0]
+
+        def mock_time():
+            return current_time[0]
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.time.time",
+            mock_time,
+        )
+
+        # Call for issue #100
+        _auto_resume_to_ready(issue_100, config)
+
+        # Immediately call for issue #200 - should work (different issue)
+        _auto_resume_to_ready(issue_200, config)
+
+        # Verify both calls went through
+        assert mock_label_service.transition.call_count == 2
