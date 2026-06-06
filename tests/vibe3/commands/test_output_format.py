@@ -47,7 +47,7 @@ def test_add_execution_step() -> None:
     assert trace_output.execution[0].message == "Fetching PR details"
 
 
-def test_add_execution_step_none() -> None:
+def test_add_execution_step_none(capsys: pytest.CaptureFixture[str]) -> None:
     """Test adding execution step when trace_output is None."""
     add_execution_step(
         trace_output=None,
@@ -58,6 +58,8 @@ def test_add_execution_step_none() -> None:
         line=1,
         message="test",
     )
+    captured = capsys.readouterr()
+    assert captured.out == ""
 
 
 def test_output_simple_dict(capsys: pytest.CaptureFixture[str]) -> None:
@@ -66,6 +68,8 @@ def test_output_simple_dict(capsys: pytest.CaptureFixture[str]) -> None:
     _output_simple(result)
     captured = capsys.readouterr()
     assert "pr:" in captured.out
+    assert "number: 200" in captured.out
+    assert "title: Test PR" in captured.out
 
 
 def test_output_simple_list(capsys: pytest.CaptureFixture[str]) -> None:
@@ -74,6 +78,8 @@ def test_output_simple_list(capsys: pytest.CaptureFixture[str]) -> None:
     _output_simple(result)
     captured = capsys.readouterr()
     assert "files:" in captured.out
+    assert "- file1.py" in captured.out
+    assert "- file2.py" in captured.out
 
 
 # ==============================================================================
