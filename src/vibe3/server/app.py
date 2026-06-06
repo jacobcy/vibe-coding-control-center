@@ -28,7 +28,7 @@ from .registry import (
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
     _start_async_serve,
-    _validate_pid_file,
+    validate_pid_file,
 )
 from .server_utils import find_available_port
 
@@ -197,7 +197,7 @@ def start(
         config = config.model_copy(update=overrides)
 
     # Check for existing process
-    instance_info, is_valid = _validate_pid_file(config.pid_file)
+    instance_info, is_valid = validate_pid_file(config.pid_file)
     if is_valid and instance_info is not None:
         typer.echo(f"Orchestra server already running (PID: {instance_info.pid})")
         raise typer.Exit(0)
@@ -230,9 +230,9 @@ def start(
         raise typer.Exit(1)
 
     # Warning: Manager token isolation
-    from vibe3.roles.manager import _resolve_manager_token
+    from vibe3.roles.manager import resolve_manager_token
 
-    manager_token = _resolve_manager_token(config)
+    manager_token = resolve_manager_token(config)
     if not manager_token:
         typer.echo(
             "\nWARNING: VIBE_MANAGER_GITHUB_TOKEN not configured.\n"
@@ -348,7 +348,7 @@ def status() -> None:
     console = Console()
 
     config = load_orchestra_config()
-    instance_info, is_valid = _validate_pid_file(config.pid_file)
+    instance_info, is_valid = validate_pid_file(config.pid_file)
     tmux_exists = _orchestra_tmux_session_exists()
 
     # Display instance info from PID file
@@ -381,7 +381,7 @@ def stop() -> None:
     """Stop Orchestra server via SIGTERM."""
     config = load_orchestra_config()
     pid_file = config.pid_file
-    instance_info, is_valid = _validate_pid_file(pid_file)
+    instance_info, is_valid = validate_pid_file(pid_file)
 
     if instance_info is None:
         if _orchestra_tmux_session_exists():

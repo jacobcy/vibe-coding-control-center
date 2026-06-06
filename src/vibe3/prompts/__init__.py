@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.prompts.assembler import PromptAssembler
+    from vibe3.prompts.builtin_providers import resolve_source
     from vibe3.prompts.context_builder import (
         PromptContextBuilder,
         make_context_builder,
@@ -94,6 +95,7 @@ _LAZY_IMPORTS = {
     "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
     "resolve_prompt_template": "vibe3.prompts.template_loader",
     "resolve_prompts_path": "vibe3.prompts.template_loader",
+    "resolve_source": "vibe3.prompts.builtin_providers",
     "PromptValidationResult": "vibe3.prompts.validation",
     "PromptValidationService": "vibe3.prompts.validation",
     "ValidationIssue": "vibe3.prompts.validation",
@@ -147,6 +149,7 @@ __all__ = [
     "DEFAULT_PROMPTS_PATH",
     "resolve_prompt_template",
     "resolve_prompts_path",
+    "resolve_source",
     # Section builders
     "build_tools_guide_section",
     "resolve_common_rules_path",

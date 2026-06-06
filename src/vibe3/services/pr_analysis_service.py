@@ -78,7 +78,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
     )
 
 
-def _get_pr_changed_files(pr_number: int) -> list[str]:
+def get_pr_changed_files(pr_number: int) -> list[str]:
     """Return changed file paths for a PR, including deleted files."""
     from vibe3.clients import GitClient, GitHubClient
 
@@ -98,7 +98,7 @@ def _get_pr_changed_files(pr_number: int) -> list[str]:
     return all_changed_files
 
 
-def _filter_critical_files(files: list[str]) -> list[CriticalFileInfo]:
+def filter_critical_files(files: list[str]) -> list[CriticalFileInfo]:
     """Filter files touching configured critical/public-api paths."""
     config = get_config()
     critical_paths = config.review_scope.critical_paths
@@ -124,7 +124,7 @@ def _filter_critical_files(files: list[str]) -> list[CriticalFileInfo]:
     return critical_files
 
 
-def _analyze_critical_files(
+def analyze_critical_files(
     critical_files: list[CriticalFileInfo],
     pr_number: int,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
@@ -158,7 +158,7 @@ def _analyze_critical_files(
     return critical_symbols, critical_file_dags
 
 
-def _calculate_risk_score(
+def calculate_pr_risk_score(
     all_files: list[str],
     critical_files: list[CriticalFileInfo],
     impacted_modules: list[str],
@@ -195,7 +195,7 @@ def _fetch_pr_commit_shas(pr_number: int) -> list[str]:
     return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
 
 
-def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
+def get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
     """Return latest commit messages for a PR via direct gh CLI call."""
     from vibe3.utils import get_commit_message
 
@@ -225,7 +225,7 @@ def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
     return commits_info
 
 
-def _get_pr_commit_count(pr_number: int) -> int:
+def get_pr_commit_count(pr_number: int) -> int:
     """Return total commit count for a PR via direct gh CLI call."""
     try:
         commits = _fetch_pr_commit_shas(pr_number)
@@ -233,3 +233,11 @@ def _get_pr_commit_count(pr_number: int) -> int:
     except Exception as e:
         logger.warning(f"Failed to get commit count for PR {pr_number}: {e}")
         return 0
+
+
+_get_pr_changed_files = get_pr_changed_files
+_filter_critical_files = filter_critical_files
+_analyze_critical_files = analyze_critical_files
+_calculate_risk_score = calculate_pr_risk_score
+_get_recent_commits = get_recent_commits
+_get_pr_commit_count = get_pr_commit_count

@@ -15,7 +15,7 @@ from vibe3.models.orchestra_config import (
     PRReviewDispatchConfig,
     StateLabelDispatchConfig,
     SupervisorHandoffConfig,
-    _default_pid_file,
+    default_pid_file,
 )
 
 __all__ = [
@@ -28,5 +28,5 @@ __all__ = [
     "PRReviewDispatchConfig",
     "StateLabelDispatchConfig",
     "SupervisorHandoffConfig",
-    "_default_pid_file",
+    "default_pid_file",
 ]

@@ -23,7 +23,7 @@ from vibe3.commands.common import (
 from vibe3.config.env_override import OVERRIDE_RULES
 from vibe3.models import OrchestraConfig
 from vibe3.orchestra import orchestra_events_log_path
-from vibe3.server.registry import _validate_pid_file
+from vibe3.server import validate_pid_file
 from vibe3.services import get_manager_usernames
 from vibe3.ui import console
 from vibe3.utils import format_age_aware_time
@@ -37,7 +37,7 @@ def _resolve_server_label(
 ) -> str:
     if snapshot_found and server_running:
         return "[green]running[/]"
-    pid, is_valid = _validate_pid_file(config.pid_file)
+    pid, is_valid = validate_pid_file(config.pid_file)
     if is_valid and pid is not None:
         return "[green]running[/]"
     return "[dim]stopped[/]"
@@ -49,7 +49,7 @@ def _compute_effective_server_running(
     """Unified server status: snapshot is authoritative, PID-valid is fallback."""
     if snapshot_running:
         return True
-    _, pid_valid = _validate_pid_file(config.pid_file)
+    _, pid_valid = validate_pid_file(config.pid_file)
     return pid_valid
 
 
@@ -229,7 +229,7 @@ def _fetch_system_snapshot(
     snapshot_found = snapshot is not None
 
     if not snapshot:
-        _, pid_alive = _validate_pid_file(config.pid_file)
+        _, pid_alive = validate_pid_file(config.pid_file)
         if pid_alive:
             time.sleep(0.5)
             snapshot = OrchestraStatusService.fetch_live_snapshot(config)

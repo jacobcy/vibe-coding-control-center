@@ -238,10 +238,10 @@ def show(
 
     if output_format in ("json", "yaml"):
         # Apply filtering for structured output
-        from vibe3.ui.flow_ui_timeline import _filter_passive_if_active_exists
+        from vibe3.ui.flow_ui_timeline import filter_passive_if_active_exists
 
         filtered_events = events
-        filtered_events = _filter_passive_if_active_exists(filtered_events)
+        filtered_events = filter_passive_if_active_exists(filtered_events)
         if not show_all:
             filtered_events = [
                 e

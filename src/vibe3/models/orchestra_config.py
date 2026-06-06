@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
-def _default_pid_file() -> Path:
+def default_pid_file() -> Path:
     """Resolve global PID file path."""
     vibe_dir = Path.home() / ".vibe"
     vibe_dir.mkdir(parents=True, exist_ok=True)
@@ -214,7 +214,7 @@ class OrchestraConfig(BaseModel):
     )
 
     dry_run: bool = False
-    pid_file: Path = Field(default_factory=_default_pid_file)
+    pid_file: Path = Field(default_factory=default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
     port_range_max: int | None = Field(
         default=None,
@@ -275,5 +275,7 @@ __all__ = [
     "SupervisorHandoffConfig",
     "PeriodicCheckConfig",
     "OrchestraConfig",
-    "_default_pid_file",
+    "default_pid_file",
 ]
+
+_default_pid_file = default_pid_file

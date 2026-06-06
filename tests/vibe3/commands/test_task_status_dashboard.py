@@ -447,7 +447,7 @@ class TestResolveServerLabel:
 
         config = MagicMock()
         config.pid_file = "/tmp/vibe3.pid"
-        with patch("vibe3.commands.status._validate_pid_file") as mock_pid:
+        with patch("vibe3.commands.status.validate_pid_file") as mock_pid:
             mock_pid.return_value = (1234, pid_valid)
             return _resolve_server_label(config, snapshot_found, server_running)
 
@@ -480,7 +480,7 @@ class TestComputeEffectiveServerRunning:
 
         config = MagicMock()
         config.pid_file = "/tmp/vibe3.pid"
-        with patch("vibe3.commands.status._validate_pid_file") as mock_pid:
+        with patch("vibe3.commands.status.validate_pid_file") as mock_pid:
             mock_pid.return_value = (1234, pid_valid)
             return _compute_effective_server_running(snapshot_running, config)
 

@@ -18,7 +18,10 @@ if TYPE_CHECKING:
         resolve_ref_path,
         status_text,
     )
-    from vibe3.ui.flow_ui_timeline import render_flow_timeline
+    from vibe3.ui.flow_ui_timeline import (
+        filter_passive_if_active_exists,
+        render_flow_timeline,
+    )
     from vibe3.ui.handoff_ui import render_handoff_detail
     from vibe3.ui.pr_ui import (
         render_local_review_summary,
@@ -50,6 +53,7 @@ _SYMBOL_MODULES = {
     "display_actor": "vibe3.ui.flow_ui_primitives",
     "resolve_ref_path": "vibe3.ui.flow_ui_primitives",
     "render_flow_timeline": "vibe3.ui.flow_ui_timeline",
+    "filter_passive_if_active_exists": "vibe3.ui.flow_ui_timeline",
     "render_handoff_detail": "vibe3.ui.handoff_ui",
     "render_pr_created": "vibe3.ui.pr_ui",
     "render_pr_confirmed": "vibe3.ui.pr_ui",
@@ -93,6 +97,7 @@ __all__ = [
     "resolve_ref_path",
     # Flow UI timeline
     "render_flow_timeline",
+    "filter_passive_if_active_exists",
     # Handoff UI
     "render_handoff_detail",
     # PR UI

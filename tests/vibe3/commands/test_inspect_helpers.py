@@ -14,10 +14,10 @@ import pytest
 
 from vibe3.clients.git_status_ops import _get_commit_files
 from vibe3.commands.inspect_helpers import (
-    _calculate_risk_score,
-    _filter_critical_files,
-    _get_pr_commit_count,
-    _get_recent_commits,
+    calculate_pr_risk_score,
+    filter_critical_files,
+    get_pr_commit_count,
+    get_recent_commits,
 )
 from vibe3.exceptions import GitError
 
@@ -93,7 +93,7 @@ def test_get_recent_commits_success():
             "update docs",
         ]
 
-        result = _get_recent_commits(42, limit=3)
+        result = get_recent_commits(42, limit=3)
 
         assert len(result) == 3
         assert result[0]["sha"] == "abc123"
@@ -113,7 +113,7 @@ def test_get_recent_commits_limit():
             stdout="a\nb\nc\nd\ne\nf\n",
         )
         mock_get_commit_message.return_value = "message"
-        result = _get_recent_commits(42, limit=3)
+        result = get_recent_commits(42, limit=3)
         assert len(result) == 3
 
 
@@ -124,7 +124,7 @@ def test_get_recent_commits_empty():
             returncode=0,
             stdout="\n",
         )
-        result = _get_recent_commits(42)
+        result = get_recent_commits(42)
         assert result == []
 
 
@@ -132,7 +132,7 @@ def test_get_recent_commits_github_error():
     """Handle GitHub API error gracefully."""
     with patch("vibe3.services.pr_analysis_service.subprocess.run") as mock_run:
         mock_run.side_effect = Exception("API error")
-        result = _get_recent_commits(42)
+        result = get_recent_commits(42)
         assert result == []
 
 
@@ -152,7 +152,7 @@ def test_get_recent_commits_git_error():
             GitError(operation="log", details="Not found"),
             "Update docs",
         ]
-        result = _get_recent_commits(42)
+        result = get_recent_commits(42)
         # Should skip failed commit
         assert len(result) == 2
         assert result[0]["sha"] == "abc123"
@@ -170,7 +170,7 @@ def test_get_recent_commits_short_sha():
             stdout="abcdefghijklmnopqrstuvwxyz123456\n",
         )
         mock_get_commit_message.return_value = "message"
-        result = _get_recent_commits(42)
+        result = get_recent_commits(42)
         assert result[0]["sha"] == "abcdefg"  # First 7 chars
 
 
@@ -184,7 +184,7 @@ def test_get_pr_commit_count_success():
             returncode=0,
             stdout="a\nb\nc\nd\ne\n",
         )
-        result = _get_pr_commit_count(42)
+        result = get_pr_commit_count(42)
         assert result == 5
 
 
@@ -195,7 +195,7 @@ def test_get_pr_commit_count_empty():
             returncode=0,
             stdout="\n",
         )
-        result = _get_pr_commit_count(42)
+        result = get_pr_commit_count(42)
         assert result == 0
 
 
@@ -203,7 +203,7 @@ def test_get_pr_commit_count_error():
     """Return 0 on error."""
     with patch("vibe3.services.pr_analysis_service.subprocess.run") as mock_run:
         mock_run.side_effect = Exception("API error")
-        result = _get_pr_commit_count(42)
+        result = get_pr_commit_count(42)
         assert result == 0
 
 
@@ -244,7 +244,7 @@ def test_filter_critical_files_no_matches(mock_config):
         "scripts/setup.sh",
     ]
 
-    result = _filter_critical_files(files)
+    result = filter_critical_files(files)
 
     assert result == []
 
@@ -256,7 +256,7 @@ def test_filter_critical_files_all_critical(mock_config):
         "src/vibe3/clients/git_client.py",
     ]
 
-    result = _filter_critical_files(files)
+    result = filter_critical_files(files)
 
     assert len(result) == 2
     assert result[0]["path"] == "src/vibe3/config/settings.py"
@@ -273,7 +273,7 @@ def test_filter_critical_files_public_api(mock_config):
         "src/vibe3/api/handlers.py",
     ]
 
-    result = _filter_critical_files(files)
+    result = filter_critical_files(files)
 
     assert len(result) == 2
     assert result[0]["public_api"] is True
@@ -288,7 +288,7 @@ def test_filter_critical_files_mixed(mock_config):
         "tests/test_foo.py",  # non-critical
     ]
 
-    result = _filter_critical_files(files)
+    result = filter_critical_files(files)
 
     assert len(result) == 2
     assert result[0]["critical_path"] is True
@@ -305,7 +305,7 @@ def test_filter_critical_files_both_tags(mock_config):
     mock_config.return_value.review_scope.critical_paths = ["src/vibe3/config/"]
     mock_config.return_value.review_scope.public_api_paths = ["api.py"]
 
-    result = _filter_critical_files(files)
+    result = filter_critical_files(files)
 
     assert len(result) == 1
     assert result[0]["critical_path"] is True
@@ -321,7 +321,7 @@ def test_calculate_risk_score_no_critical(mock_generate_score):
     critical_files = []
     impacted_modules = ["vibe3.utils"]
 
-    result = _calculate_risk_score(all_files, critical_files, impacted_modules)
+    result = calculate_pr_risk_score(all_files, critical_files, impacted_modules)
 
     assert result["score"] == 6
     assert result["level"] == "MEDIUM"
@@ -346,7 +346,7 @@ def test_calculate_risk_score_with_critical(mock_generate_score):
     ]
     impacted_modules = ["vibe3.config", "vibe3.utils"]
 
-    _calculate_risk_score(all_files, critical_files, impacted_modules)
+    calculate_pr_risk_score(all_files, critical_files, impacted_modules)
 
     call_args = mock_generate_score.call_args[0][0]
     assert call_args.critical_path_touch is True
@@ -365,7 +365,7 @@ def test_calculate_risk_score_with_public_api(mock_generate_score):
     ]
     impacted_modules = ["vibe3.api"]
 
-    _calculate_risk_score(all_files, critical_files, impacted_modules)
+    calculate_pr_risk_score(all_files, critical_files, impacted_modules)
 
     call_args = mock_generate_score.call_args[0][0]
     assert call_args.critical_path_touch is False
@@ -384,7 +384,7 @@ def test_calculate_risk_score_both_tags(mock_generate_score):
     ]
     impacted_modules = ["vibe3.config", "vibe3.api"]
 
-    _calculate_risk_score(all_files, critical_files, impacted_modules)
+    calculate_pr_risk_score(all_files, critical_files, impacted_modules)
 
     call_args = mock_generate_score.call_args[0][0]
     assert call_args.critical_path_touch is True

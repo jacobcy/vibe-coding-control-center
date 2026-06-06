@@ -6,7 +6,7 @@ from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 
 
-def _filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
+def filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
     """Filter passive recorded events when corresponding active events exist.
 
     When a handoff_plan/report/run/audit event exists, suppress the matching
@@ -38,6 +38,9 @@ def _filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]
             has_active.add(kind)
 
     return [e for e in events if passive_kind.get(e.event_type) not in has_active]
+
+
+_filter_passive_if_active_exists = filter_passive_if_active_exists
 
 
 _EVENT_COLOR: dict[str, str] = {
