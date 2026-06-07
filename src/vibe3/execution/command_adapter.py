@@ -4,7 +4,8 @@ This module provides a registry that maps command types (from vibe3.models.job)
 to import paths, resolving the actual callable only at execution time.
 
 Uses CommandType from the job contracts module (#2163) as the canonical
-type definition — no duplicate enum.
+type definition. ResolvedAdapter.callable is typed as Callable[..., Any]
+pending #2165 executor integration.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ class CommandAdapterError(Exception):
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class ResolvedAdapter:
     """Resolved adapter with loaded module metadata.
 
@@ -220,5 +221,11 @@ def build_default_registry() -> CommandAdapterRegistry:
             description="Supervisor role for orchestration",
         )
     )
+
+    # Verify all CommandType values are registered
+    registered = set(registry.list_registered())
+    missing = set(CommandType) - registered
+    if missing:
+        raise CommandAdapterError(f"Incomplete registry: {missing} not registered")
 
     return registry

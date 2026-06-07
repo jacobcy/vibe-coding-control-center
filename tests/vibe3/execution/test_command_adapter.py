@@ -337,8 +337,22 @@ def test_resolved_adapter_attributes():
     assert hasattr(resolved, "qualname")
 
     assert isinstance(resolved.entry, CommandAdapterEntry)
-    # The callable can be either a function or a spec object (dataclass)
-    # For PLAN_SYNC_SPEC, it's an IssueRoleSyncSpec dataclass
     assert resolved.callable is not None
     assert isinstance(resolved.module_name, str)
     assert isinstance(resolved.qualname, str)
+
+
+def test_resolved_adapter_frozen():
+    """Test that ResolvedAdapter is frozen (immutable)."""
+    registry = build_default_registry()
+    resolved = registry.resolve(CommandType.PLAN)
+
+    with pytest.raises(AttributeError):
+        resolved.module_name = "other"  # type: ignore[misc]
+
+
+def test_build_default_registry_completeness():
+    """Test that build_default_registry registers all CommandType values."""
+    registry = build_default_registry()
+    registered = set(registry.list_registered())
+    assert registered == set(CommandType)
