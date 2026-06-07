@@ -291,7 +291,8 @@ class TestCleanResidualBranches:
     def test_clean_residual_branches_removes_done_flow_branches(
         self, cleanup_service, mock_store, mock_git_client
     ):
-        """Should clean physical resources for done flows but keep flow record."""
+        """Should clean physical resources for done flows and soft-delete flow
+        record."""
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
             {"branch": "feature/active-branch", "flow_status": "active"},
@@ -302,18 +303,18 @@ class TestCleanResidualBranches:
 
         result = cleanup_service.clean_residual_branches()
 
-        # Done flow should be in kept_records (physical resources cleaned, record kept)
-        assert "feature/done-branch" in result["kept_records"]
-        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows only
+        # Done flow should be in cleaned (both physical resources and record deleted)
+        assert "feature/done-branch" in result["cleaned"]
+        assert len(result["kept_records"]) == 0  # kept_records no longer used
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_skips_when_no_resources(
         self, cleanup_service, mock_store, mock_git_client
     ):
-        """Should preserve done/merged flow records even without physical resources.
+        """Should soft-delete done/merged flow records even without physical resources.
 
-        Done/merged flows keep their records as completion history.
-        Only aborted flows have their records deleted.
+        Done/merged flows now soft-delete their records to allow
+        clean_expired_local_branches to clean residual branches.
         """
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
@@ -324,10 +325,10 @@ class TestCleanResidualBranches:
 
         result = cleanup_service.clean_residual_branches()
 
-        # Done flow record should be preserved (in kept_records, not cleaned)
-        assert len(result["kept_records"]) == 1
-        assert "feature/done-branch" in result["kept_records"]
-        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows
+        # Done flow record should be soft-deleted (in cleaned, not kept_records)
+        assert len(result["cleaned"]) == 1
+        assert "feature/done-branch" in result["cleaned"]
+        assert len(result["kept_records"]) == 0  # kept_records no longer used
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_aborted_deletes_record(
