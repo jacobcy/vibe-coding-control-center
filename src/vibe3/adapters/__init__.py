@@ -50,7 +50,6 @@ def list_adapters() -> list[str]:
 
 
 __all__ = [
-    "AdapterManifest",
     "register_adapter",
     "get_adapter",
     "list_adapters",

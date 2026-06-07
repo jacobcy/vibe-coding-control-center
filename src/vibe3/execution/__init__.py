@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-# Cross-module imports (not self-references) - kept minimal per modularity rules
-from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-
 if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -109,9 +106,6 @@ __all__ = [
     "CommandAdapterError",
     "ResolvedAdapter",
     "build_default_registry",
-    # Request/Result contracts
-    "ExecutionRequest",
-    "ExecutionLaunchResult",
     # Lifecycle utilities
     "execution_prefix",
     "persist_execution_lifecycle_event",

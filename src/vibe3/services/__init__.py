@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.config.convention_resolver import ConventionResolver
     from vibe3.services.actor_support import format_agent_actor
     from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.blocked_state_service import BlockedStateService
@@ -80,7 +79,6 @@ __all__ = [
     "CheckCleanupService",
     "CheckResult",
     "CheckService",
-    "ConventionResolver",
     "CoordinationResolver",
     "ErrorTrackingService",
     "ExpiredResourceCleanupService",
@@ -185,7 +183,6 @@ _SYMBOL_MODULES = {
     "CheckCleanupService": "vibe3.services.check_cleanup_service",
     "CheckResult": "vibe3.services.check_service",
     "CheckService": "vibe3.services.check_service",
-    "ConventionResolver": "vibe3.config.convention_resolver",
     "CoordinationResolver": "vibe3.services.coordination_resolver",
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient
-from vibe3.config.convention_resolver import get_convention
+from vibe3.config import get_convention
 from vibe3.models import (
     CoordinationTruth,
     FlowStatusResponse,
