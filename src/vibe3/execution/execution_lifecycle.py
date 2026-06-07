@@ -112,6 +112,7 @@ class ExecutionLifecycleService:
         refs: dict[str, str] | None = None,
         *,
         event_type: str | None = None,
+        error_contract: ErrorHandlingContract | None = None,
     ) -> None:
         persist_execution_lifecycle_event(
             store=self._store,
@@ -122,6 +123,7 @@ class ExecutionLifecycleService:
             detail=error or f"{role} execution failed",
             refs=refs,
             event_type=event_type,
+            error_contract=error_contract,
         )
 
 
