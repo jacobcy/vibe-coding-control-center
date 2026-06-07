@@ -395,6 +395,10 @@ class GitClient:
             args.append(ref)
         self._run(args)
 
+    def pack_refs_all(self) -> None:
+        """Pack all loose refs into packed-refs for consistency."""
+        self._run(["pack-refs", "--all"])
+
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
         """Dry-run merge to detect conflicts without modifying working tree."""
         return _check_merge_conflicts(self._run, target_ref)
