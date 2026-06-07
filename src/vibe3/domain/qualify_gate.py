@@ -96,6 +96,7 @@ class QualifyGateService:
         flow_state: dict[str, object] | None,
         labels: list[str],
         trigger_state: IssueState,
+        truth: CoordinationTruth | None = None,
     ) -> IssueState | None:
         """Run the Qualify Gate for an issue to resolve dependencies and blocking.
 
@@ -112,6 +113,8 @@ class QualifyGateService:
             flow_state: Current flow state from store
             labels: Current issue labels
             trigger_state: The trigger state being evaluated
+            truth: Pre-resolved coordination truth (optional). If provided, skips
+                the resolve_coordination call.
 
         Returns:
             Target IssueState if the issue passes the gate and can be dispatched,
@@ -123,7 +126,10 @@ class QualifyGateService:
             return None
 
         # Step 1: Resolve body/local truth (remote-first)
-        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+        if truth is None:
+            truth = self._coordination_resolver.resolve_coordination(
+                branch, issue.number
+            )
 
         # Step 2: Blocked truth alignment — body truth is authoritative
         if truth.is_blocked:
@@ -204,7 +210,12 @@ class QualifyGateService:
 
         flow_state = self._store.get_flow_state(branch)
         result = self.run_qualify_gate(
-            issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
+            issue,
+            branch,
+            flow_state,
+            list(issue.labels),
+            IssueState.BLOCKED,
+            truth=truth,
         )
 
         if result == IssueState.BLOCKED:
