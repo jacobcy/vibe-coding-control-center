@@ -7,6 +7,7 @@ from typing import Any, Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.exceptions.error_severity import ErrorHandlingContract
 
 ExecutionRole = Literal[
     "planner", "executor", "reviewer", "manager", "supervisor", "governance"
@@ -111,6 +112,7 @@ class ExecutionLifecycleService:
         refs: dict[str, str] | None = None,
         *,
         event_type: str | None = None,
+        error_contract: ErrorHandlingContract | None = None,
     ) -> None:
         persist_execution_lifecycle_event(
             store=self._store,
@@ -121,6 +123,7 @@ class ExecutionLifecycleService:
             detail=error or f"{role} execution failed",
             refs=refs,
             event_type=event_type,
+            error_contract=error_contract,
         )
 
 
@@ -222,8 +225,25 @@ def persist_execution_lifecycle_event(
     refs: dict[str, str] | None = None,
     extra_state_updates: dict[str, object] | None = None,
     event_type: str | None = None,
+    error_contract: ErrorHandlingContract | None = None,
 ) -> None:
-    """Persist lifecycle state and timeline event for an execution role."""
+    """Persist lifecycle state and timeline event for an execution role.
+
+    Args:
+        store: SQLite client for database operations.
+        branch: Target branch name.
+        role: Execution role (planner, executor, reviewer, etc.).
+        lifecycle: Lifecycle event type (started, completed, aborted, failed).
+        actor: Actor identifier for the event.
+        detail: Human-readable event detail.
+        session_id: Optional backend session ID.
+        refs: Optional reference metadata.
+        extra_state_updates: Optional additional state updates.
+        event_type: Optional custom event type.
+        error_contract: Optional error contract for runtime errors.
+            When provided with issue_action="record_only", role status
+            updates are skipped to preserve flow state.
+    """
     now = datetime.now().isoformat()
     state_updates: dict[str, object] = {}
 
@@ -241,16 +261,21 @@ def persist_execution_lifecycle_event(
         if status_field:
             state_updates[status_field] = "completed"
     else:
-        state_updates["execution_completed_at"] = now
-        state_updates["execution_pid"] = None
-        # Update role status to lifecycle value (aborted/failed)
-        status_field = _ROLE_STATUS_FIELD[role]
-        if status_field:
-            state_updates[status_field] = lifecycle
-
-        actor_field = _ROLE_ACTOR_FIELD[role]
-        if actor_field:
-            state_updates[actor_field] = actor
+        # For runtime errors with record_only, skip ALL state updates
+        # to preserve flow state orthogonality
+        if error_contract and error_contract.issue_action == "record_only":
+            # Only record timeline event, no state modifications
+            pass
+        else:
+            # Business error: update all state fields
+            state_updates["execution_completed_at"] = now
+            state_updates["execution_pid"] = None
+            status_field = _ROLE_STATUS_FIELD[role]
+            if status_field:
+                state_updates[status_field] = lifecycle
+            actor_field = _ROLE_ACTOR_FIELD[role]
+            if actor_field:
+                state_updates[actor_field] = actor
 
     if extra_state_updates:
         state_updates.update(extra_state_updates)
