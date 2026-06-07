@@ -349,7 +349,7 @@ class CheckService(CheckRemote):
             pr = self._branch_to_pr.get(branch)
             if pr:
                 handled, pr_issues, pr_warnings = (
-                    self._check_pr_service.handle_closed_pr(branch, pr)
+                    self._check_pr_service.handle_pr_terminal_state(branch, pr)
                 )
                 if handled:
                     return CheckResult(
@@ -364,7 +364,7 @@ class CheckService(CheckRemote):
                     cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
                     if cached_or_remote_pr:
                         handled, pr_issues, pr_warnings = (
-                            self._check_pr_service.handle_closed_pr(
+                            self._check_pr_service.handle_pr_terminal_state(
                                 branch, cached_or_remote_pr
                             )
                         )

@@ -406,7 +406,7 @@ class TestMergedPRCacheIntegration:
 class TestClosedPRIdempotency:
     """Test idempotency guard for closed PR handling."""
 
-    def test_handle_closed_pr_idempotency_skips_second_call(self, tmp_path):
+    def test_handle_pr_terminal_state_idempotency_skips_second_call(self, tmp_path):
         """Should skip handling if already handled with same closed_at."""
         from datetime import datetime, timezone
 
@@ -450,7 +450,7 @@ class TestClosedPRIdempotency:
             ci_passed=True,
         )
 
-        # ACT: Call handle_closed_pr
+        # ACT: Call handle_pr_terminal_state
         service = CheckPRService(
             store=store,
             git_client=git_client,
@@ -458,7 +458,7 @@ class TestClosedPRIdempotency:
             flow_status_service=flow_status_service,
         )
         with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
-            handled, issues, warnings = service.handle_closed_pr(
+            handled, issues, warnings = service.handle_pr_terminal_state(
                 "task/my-feature", closed_pr
             )
 
@@ -468,7 +468,7 @@ class TestClosedPRIdempotency:
             assert warnings == []
             mock_reset.assert_not_called()
 
-    def test_handle_closed_pr_retriggers_after_reclose(self, tmp_path):
+    def test_handle_pr_terminal_state_retriggers_after_reclose(self, tmp_path):
         """Should handle again if PR was closed again (updated_at before closed_at)."""
         from datetime import datetime, timezone
 
@@ -512,7 +512,7 @@ class TestClosedPRIdempotency:
             ci_passed=True,
         )
 
-        # ACT: Call handle_closed_pr
+        # ACT: Call handle_pr_terminal_state
         service = CheckPRService(
             store=store,
             git_client=git_client,
@@ -521,7 +521,7 @@ class TestClosedPRIdempotency:
         )
         with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
             mock_reset.return_value = (None, [])
-            handled, issues, warnings = service.handle_closed_pr(
+            handled, issues, warnings = service.handle_pr_terminal_state(
                 "task/my-feature", closed_pr
             )
 
@@ -529,7 +529,7 @@ class TestClosedPRIdempotency:
             assert handled is True
             mock_reset.assert_called_once()
 
-    def test_handle_closed_pr_no_initiated_by_triggers_reset(self, tmp_path):
+    def test_handle_pr_terminal_state_no_initiated_by_triggers_reset(self, tmp_path):
         """Should handle if initiated_by is not 'check:pr_closed'."""
         from datetime import datetime, timezone
 
@@ -571,7 +571,7 @@ class TestClosedPRIdempotency:
             ci_passed=True,
         )
 
-        # ACT: Call handle_closed_pr
+        # ACT: Call handle_pr_terminal_state
         service = CheckPRService(
             store=store,
             git_client=git_client,
@@ -580,7 +580,7 @@ class TestClosedPRIdempotency:
         )
         with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
             mock_reset.return_value = (None, [])
-            handled, issues, warnings = service.handle_closed_pr(
+            handled, issues, warnings = service.handle_pr_terminal_state(
                 "task/my-feature", closed_pr
             )
 
