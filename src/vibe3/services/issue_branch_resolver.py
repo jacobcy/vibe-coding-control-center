@@ -4,13 +4,12 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from vibe3.exceptions import UserError
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.convention_resolver import get_convention
 
 
 def iter_issue_branch_candidates(issue_number: int) -> Iterable[str]:
     """Yield supported branch candidates for an issue number."""
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     yield convention.branch.canonical_branch(issue_number)
     yield convention.branch.dev_branch(issue_number)
 

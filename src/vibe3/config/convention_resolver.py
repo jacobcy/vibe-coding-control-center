@@ -8,6 +8,7 @@ the codebase.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cache
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -247,7 +248,42 @@ def diagnose_profile() -> str:
         Profile name or "unknown" if resolution fails
     """
     try:
-        resolver = ConventionResolver.from_repo()
+        resolver = get_resolver()
         return resolver._detect_profile()
     except Exception:
         return "unknown"
+
+
+@cache
+def get_convention() -> ProfileConvention:
+    """Return cached ProfileConvention for the current repo.
+
+    Safe to call repeatedly — profile detection runs only once per process.
+
+    Returns:
+        ProfileConvention instance with resolved conventions.
+
+    Example:
+        >>> convention = get_convention()
+        >>> convention.branch.task_prefix
+        'task/issue-'
+    """
+    return ConventionResolver.from_repo().resolve()
+
+
+@cache
+def get_resolver() -> ConventionResolver:
+    """Return cached ConventionResolver for the current repo.
+
+    Use when you need resolver methods (get_skill_path, get_supervisor_path, etc.).
+    For convention data only, prefer get_convention().
+
+    Returns:
+        ConventionResolver instance configured for current repo.
+
+    Example:
+        >>> resolver = get_resolver()
+        >>> resolver.get_skill_path("review")
+        'skills/review/SKILL.md'
+    """
+    return ConventionResolver.from_repo()

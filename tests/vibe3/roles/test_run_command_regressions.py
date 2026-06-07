@@ -16,7 +16,7 @@ def test_skill_not_available_error_includes_profile() -> None:
     with (
         patch("vibe3.roles.run_command.resolve_skill_path", return_value=None),
         patch(
-            "vibe3.roles.run_command.ConventionResolver._detect_profile",
+            "vibe3.config.convention_resolver.ConventionResolver._detect_profile",
             return_value="minimal",
         ),
         pytest.raises(SkillNotAvailableError) as exc_info,
@@ -84,6 +84,11 @@ def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """External repos using github-flow discover and read global skills."""
+    # Clear resolver cache to ensure fresh resolver for custom test environment
+    from vibe3.config.convention_resolver import get_resolver
+
+    get_resolver.cache_clear()
+
     external_repo = tmp_path / "external-repo"
     external_repo.mkdir()
     git_dir = external_repo / ".git"

@@ -13,7 +13,7 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.config import VibeConfig, get_resolver
 from vibe3.environment import resolve_runtime_asset
 from vibe3.models import PromptContextMode
 from vibe3.prompts import (
@@ -89,7 +89,7 @@ def _build_run_prompt_providers(
 ) -> dict[str, PromptProvider]:
     """Build providers used by config/prompts/prompt-recipes.yaml run sections."""
     run_config = getattr(config, "run", None)
-    resolver = ConventionResolver.from_repo()
+    resolver = get_resolver()
 
     def plan_ref() -> str | None:
         if not plan_content:

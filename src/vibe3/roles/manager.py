@@ -13,7 +13,7 @@ from vibe3.clients import runtime_assets_root
 
 # public-api: pending upstream export
 from vibe3.clients.runtime_assets import check_runtime_asset
-from vibe3.config import MANAGER_GATE_CONFIG, ConventionResolver
+from vibe3.config import MANAGER_GATE_CONFIG, get_convention, get_resolver
 
 # public-api: pending upstream export
 from vibe3.config.convention_resolver import diagnose_profile
@@ -104,7 +104,7 @@ def resolve_manager_options(
 
 MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
     fallback_branch=lambda issue_number, _current_branch: (
-        ConventionResolver.from_repo().resolve().branch.canonical_branch(issue_number)
+        get_convention().branch.canonical_branch(issue_number)
     )
 )
 
@@ -333,9 +333,7 @@ def build_manager_sync_request(
 
             # Create skill path resolver callback for prompts layer
             def skill_path_resolver(skill_name: str) -> str | None:
-                result: str | None = ConventionResolver.from_repo().get_skill_path(
-                    skill_name
-                )
+                result: str | None = get_resolver().get_skill_path(skill_name)
                 return result
 
             for section_spec in variant_spec.sections:

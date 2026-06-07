@@ -10,7 +10,7 @@ from vibe3.execution.issue_role_support import (
     build_issue_sync_prompt_request,
 )
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
-from vibe3.services import ConventionResolver
+from vibe3.services import get_convention
 
 
 def build_role_async_request(
@@ -27,8 +27,7 @@ def build_role_async_request(
     tick_id: int = 0,
 ) -> ExecutionRequest:
     """Unified factory for building role-specific async CLI requests."""
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     target_branch = branch or convention.branch.canonical_branch(issue.number)
     effective_refs = {"issue_number": str(issue.number)}
     if refs:

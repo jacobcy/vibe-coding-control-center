@@ -19,9 +19,9 @@ def _default_store() -> SQLiteClient:
 
 def _default_resolver() -> "ConventionResolver":
     """Default factory for resolver."""
-    from vibe3.services.convention_resolver import ConventionResolver
+    from vibe3.config.convention_resolver import get_resolver
 
-    return ConventionResolver.from_repo()
+    return get_resolver()
 
 
 def _default_config() -> "OrchestraConfig":

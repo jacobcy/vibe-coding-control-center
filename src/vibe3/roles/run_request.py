@@ -10,7 +10,7 @@ from vibe3.agents import (
     make_run_context_builder,
 )
 from vibe3.clients import SQLiteClient
-from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.config import VibeConfig, get_convention
 from vibe3.execution import (
     build_prompt_meta,
     build_role_async_request,
@@ -45,8 +45,7 @@ def build_run_request(
     if audit_ref:
         refs["audit_ref"] = audit_ref
 
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     target_branch = branch or convention.branch.canonical_branch(issue.number)
     if commit_mode:
         command_args = [
