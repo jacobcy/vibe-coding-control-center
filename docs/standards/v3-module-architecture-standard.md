@@ -13,56 +13,56 @@
 
 ## 2. 分层架构规则 (3-Tier & 6-Layer Mapping)
 
-Vibe 3.0 采用 3-tier 架构模型作为顶层战略划分，并辅以六层架构进行代码实现约束。依赖方向应始终向下（Top-Down）。
+Vibe 3.0 采用 **3-Tier 战略分层** 模型作为顶层职责划分，并辅以 **6-Layer 实现分层** 进行代码约束。
 
-### 3-Tier 战略划分
+### 2.1 3-Tier 战略分层 (Architecture Tiers)
 
-| 层级 (Tier) | 名称 | 职责 (Responsibility) | 对应六层模型层级 |
-| :--- | :--- | :--- | :--- |
-| **Tier 3** | **Cognitive / Governance** | 认知与治理：负责全局策略、规则、Supervisor 治理。 | Layer 1, 2, 3 (part) |
-| **Tier 2** | **Skill Layer** | 技能/编排层：负责 Flow 状态机、任务编排、Agent 执行。 | Layer 2, 3, 4 |
-| **Tier 1** | **Shell Layer** | 壳层/原子能力：提供原子指令、环境原语、基础设施。 | Layer 5, 6 |
+| 层级 (Tier) | 名称 | 职责 (Responsibility) | 对应六层模型 | 关联执行等级 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 3** | **Cognitive / Governance** | 认知与治理：负责全局策略、规则、Supervisor 治理、Issue 路由。 | Layer 1, 2, 3 (part) | L1, L2 |
+| **Tier 2** | **Skill Layer** | 技能/编排层：负责 Flow 状态机、任务编排、Agent 执行。 | Layer 3, 4 | L3 |
+| **Tier 1** | **Shell Layer** | 壳层/原子能力：提供原子指令、环境原语、基础设施。 | Layer 2, 5, 6 | L3, L4 |
+
+**注意**：Architecture Tier 定义的是**职责边界**，而 Runtime Execution Level (L1-L4) 定义的是**运行隔离级别**。两者在逻辑上是正交的。
 
 ---
 
-### 六层架构实现标准
+### 2.2 六层实现分层 (Implementation Layers)
 
 层级编号约定：Layer 1 为最上层（交互入口），Layer 6 为最底层（基础设施）。依赖方向始终向下（Layer N 仅可依赖 Layer ≥ N），下层对上层保持盲态。
 
-1. **CLI 层** (`cli.py`)
+1. **CLI 层** (`cli.py`, `__main__.py`)
    - **职责**：命令行主入口。负责顶级 Typer 组装与全局上下文初始化。
    - **规则**：仅做转发，不持有业务逻辑。
 
 2. **Command & IO Gateway 层** (`commands/`, `server/`, `ui/`)
-   - **Commands**：原子 CLI 命令逻辑。将用户动作转化为业务请求，进行初步状态校验与现场绑定。
-   - **Server**：HTTP/Webhook/MCP 服务入口。作为外部请求的汇聚网关，启停并装配 Driver。
-   - **UI**：控制台输出原语。负责时间轴视图、表格格式化与着色。
-   - **规则**：作为外部世界（人类/HTTP/终端）与编排核心之间的网关，向下依赖编排核心，彼此可同层协作。
+   - **Commands**：原子 CLI 命令逻辑。将用户动作转化为业务请求。
+   - **Server**：HTTP/Webhook/MCP 服务入口。
+   - **UI**：控制台输出原语。
+   - **规则**：作为外部世界（人类/HTTP/终端）与编排核心之间的网关。
 
 3. **Orchestration Core 层** (`domain/`, `services/`, `orchestra/`, `runtime/`, `execution/`, `roles/`)
-   - **Domain**：事件驱动的业务编排真源（Authoritative Source）。定义领域事件、状态机转换。
-   - **Services**：具体的业务功能逻辑。负责跨模块的业务组合。
-   - **Orchestra**：顶层调度外壳。基于心跳驱动的多角色派发与自动治理逻辑。
-   - **Runtime**：运行时内核。负责心跳循环、异步任务分发、事件总线与路由。
-   - **Execution**：执行中控台。负责并发控制、Session 登记、执行生命周期审计。
-   - **Roles**：角色行为定义。包含 Plan, Run, Review, Supervisor 等角色的专属逻辑。
-   - **规则**：决定“做什么（What to do）”并协调“何时执行（When to execute）”。这 6 个模块构成一个**强连通分量（SCC）**，彼此存在事件驱动的双向协作，在架构上视为**同一编排核心层**；它们对 L1/L2 保持盲态，不产生向上依赖违规。
-   - **技术债**：SCC 内部的循环依赖（如 `domain ↔ runtime`、`orchestra ↔ services`）是已知技术债，由 `test_no_circular_deps_within_l3_core` 追踪（硬门禁 `test_no_circular_deps_outside_l3_core` 已激活），待 epic #1987 Phase 1/2 通过 Protocol 注入与事件解耦消除（见 #1971/#1884/#1887/#1888）。
+   - **Domain**：事件驱动的业务编排真源。定义领域事件、状态机转换。
+   - **Services**：具体的业务功能逻辑。
+   - **Orchestra**：顶层调度外壳。
+   - **Runtime**：运行时内核（心跳循环、分发器）。
+   - **Execution**：执行控制面（并发、Session）。
+   - **Roles**：角色行为（Manager, Plan, Run, Review, Supervisor）。
+   - **规则**：决定“做什么”并协调“何时执行”。这 6 个模块构成一个**强连通分量 (SCC)**。
 
 4. **Execution Primitives 层** (`agents/`, `prompts/`)
-   - **Agents**：Agent 执行引擎。包含后端驱动（Claude/Codex 等）与执行流水线。
-   - **Prompts**：提示词工厂。负责模板管理、上下文裁剪与 Agent 指令生成。
-   - **规则**：被编排核心调用的无状态执行原语，将业务意图转化为物理执行动作，不反向感知编排状态。
+   - **Agents**：Agent 执行引擎驱动。
+   - **Prompts**：提示词工厂。
+   - **规则**：无状态执行原语。
 
 5. **Environment & Analysis 层** (`environment/`, `analysis/`)
-   - **Environment**：物理环境原语。负责 Git Worktree 创建/回收、Tmux 会话管理、环境变量隔离。
-   - **Analysis**：架构洞察工具。负责代码依赖扫描、风险审计与治理分析；仅依赖 L6，作为无状态分析工具被多层调用。
-   - **规则**：仅处理物理资源或静态分析，不感知业务语义。
+   - **Environment**：物理环境原语（Worktree, Tmux）。
+   - **Analysis**：架构洞察工具。
 
 6. **Infrastructure & Models 层** (`adapters/`, `clients/`, `config/`, `exceptions/`, `observability/`, `utils/`, `models/`)
-   - **Models**：全系统的类型真源（Entities/DTOs）。
-   - **Infrastructure**：底层系统服务。负责配置、日志、调用链追踪、异常定义、外部客户端封装、发行版适配（adapters）。
-   - **规则**：作为全系统的基石，严禁依赖上述任何上层模块。
+   - **Models**：类型真源（Entities/DTOs）。
+   - **Infrastructure**：底层系统服务（日志、配置、数据库客户端）。
+   - **规则**：全系统的基石，严禁向上依赖。
 
 
 ### 2.2 水平分类法 (Horizontal Taxonomy within L3)

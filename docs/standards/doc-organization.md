@@ -44,33 +44,32 @@ docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
 │   ├── doc-organization.md          # 本文档组织标准
-│   ├── glossary.md                  # 术语真源
+│   ├── glossary.md                  # 术语真源 (T1-T3 & L1-L4)
 │   └── ...                          # 其他现行标准
 ├── specs/                           # 规范文档 (Issue/Feature 契约)
 ├── prds/                            # 产品需求文档（全局 PRD）
 ├── design/                          # 设计文档
 ├── decisions/                       # 架构决策记录 (ADR)
-│   ├── INDEX.md                     # 决策总表（发现入口 + supersede 追踪）
-│   ├── _template.md                 # ADR 模板
+│   ├── INDEX.md                     # 决策总表
 │   └── NNNN-kebab-title.md          # 具体决策文件
 ├── plans/                           # 执行计划
 ├── reports/                         # 报告与总结
 ├── references/                      # 外部参考资料
 ├── archive/                         # 历史文档归档
-│   └── ...                          # 已退役设计与历史任务文档
 
 核心系统目录说明：
-- `src/vibe3/` - V3 Python 实现（主要实现，Tier 1/2/3）
-- `lib3/` - V3 Python 核心包装器与仓库重定向中心 (Tier 1 Hub)
+- `src/vibe3/` - V3 Python 实现 (Tier 1/2/3)
+- `lib3/` - V3 Python 核心包装器 (Tier 1)
 - `supervisor/` - 治理与决策指令集 (Tier 3 Governance)
 - `skills/` - 技能定义权威来源 (Canonical Source)
-- `.agent/` - AI 工作区 (Workflows, Templates, Context/Memory)
-- `.claude/` - Claude AI 配置与规则真源 (Rules, Skills runtime)
+- `.agent/` - AI 运行时上下文 (Context/Memory, Templates)
+- `.claude/` - AI 规则与技能运行时真源 (Rules, Skills runtime)
 
 AI 工作区中的临时产物与模板：
 - `.agent/context/memory/` - [TRACKED] AI 上下文记忆
 - `.agent/templates/` - AI 工作模板 (prd, spec, plan, etc.)
 - `.claude/rules/` - 编码规则真源 (coding-standards, python-standards, etc.)
+- `.claude/skills/` - 技能运行时规则与指令
 ```
 
 ## 命名规范

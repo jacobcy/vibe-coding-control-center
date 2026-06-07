@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-06-03
+last_updated: 2026-06-07
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -52,38 +52,71 @@ related_docs:
 
 禁止把不同维度的术语当作同一层概念使用。
 
-## 3. Architecture Tiers
+## 3. Architecture Tiers (架构分层)
 
-### 3.0.1 Tier 3 (Cognitive / Governance Layer)
+V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
+
+### 3.1 Tier 3 (Cognitive / Governance Layer)
 
 - 正式术语：`Tier 3`
 - 别称：`认知治理层`、`Cognitive Layer`、`Governance Layer`
-- 定义：负责全局策略、规则、Supervisor 治理的系统层级。强调**基于任务的编排 (Task-based Orchestration)** 而非固定角色制衡。
+- 定义：负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划的系统层级。强调**基于任务的编排 (Task-based Orchestration)**。
+- 核心组件：Orchestra, Governance Services, Roadmap Intake, Supervisor/Apply.
 - 核心命令：`serve`, `scan`, `check`, `mcp`
-- 执行层级：L0/L1 (无 worktree)，L2 (临时 worktree)
+- 对应执行等级：L1 (无 worktree), L2 (临时 worktree)
 - 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
 
-### 3.0.2 Tier 2 (Skill Layer)
+### 3.2 Tier 2 (Skill Layer)
 
 - 正式术语：`Tier 2`
 - 别称：`技能层`、`编排层`、`Skill Layer`
-- 定义：负责 Flow 状态机、任务编排、Agent 执行的系统层级。
+- 定义：负责 Flow 状态机、任务编排、Agent 执行（Plan/Run/Review）的系统层级。
+- 核心组件：Manager Role, Agent Runners, Domain Handlers, Execution Coordinator.
 - 核心命令：`flow`, `task`, `run`, `plan`, `review`
-- 执行层级：L3 (持久 worktree)
+- 对应执行等级：L3 (持久 issue-worktree)
 - 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
 
-### 3.0.3 Tier 1 (Shell Layer)
+### 3.3 Tier 1 (Shell Layer)
 
 - 正式术语：`Tier 1`
 - 别称：`壳层`、`原子能力层`、`Shell Layer`
-- 定义：提供原子级能力访问、状态读取与项目信息检索的系统层级。
+- 定义：提供原子级能力访问、状态读取、环境原语与项目信息检索的系统层级。
+- 核心组件：V3 Python CLI (vibe3), V2 Shell (vibe), Clients (Git/GitHub/SQLite), Environment Primitives.
 - 核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`
-- 执行层级：L3/L4 (原子工具)
+- 对应执行等级：L3/L4 (原子工具)
 - 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
 
-## 4. Shared-State Terms
+## 4. Runtime Execution Levels (运行执行等级)
 
-### 4.1 GitHub Issue
+用于描述 V3 系统内任务执行的具体集成深度与环境隔离级别，避免与 Architecture Tier 混淆。
+
+### 4.1 Level 1 (L1 - Inspection Level)
+
+- 定义：**无 Worktree 观察层**。在主仓库或内存中运行，仅负责只读观察、Metadata 扫描或轻量 Label 路由。
+- 典型场景：`governance/roadmap` 扫描、`assignee-pool` 巡检、心跳状态监测。
+- 隔离：无隔离，直接访问共享真源。
+
+### 4.2 Level 2 (L2 - Governance Execution Level)
+
+- 定义：**临时隔离治理层**。使用临时创建且自动销毁的 Git Worktree 进行文档治理、测试修补或环境清理。
+- 典型场景：`supervisor/apply` 任务执行。
+- 隔离：文件系统级临时隔离。
+
+### 4.3 Level 3 (L3 - Main Development Level)
+
+- 定义：**持久隔离开发层**。为每个 GitHub Issue 分配持久化的独立 Worktree，承载完整的 Plan/Run/Review 生命周期。
+- 典型场景：核心业务开发、架构调整、大型特性实现。
+- 隔离：文件系统级持久隔离 + 独立的 Flow 状态机。
+
+### 4.4 Level 4 (L4 - Atomic Collaboration Level)
+
+- 定义：**原子协作层**。由人类或外部系统通过单一指令/工具进行的细粒度干预或原子级交付。
+- 典型场景：手动 PR 合并、密钥注入、配置热更新。
+- 隔离：通常在 L3 环境内执行或通过 API 远程执行。
+
+## 5. Shared-State Terms
+
+### 5.1 GitHub Issue
 
 - 正式术语：`GitHub issue` 或简称 `issue`
 - 别称：无（不再使用 “repo issue”）
@@ -101,7 +134,7 @@ related_docs:
   - 讨论需求、任务、缺陷时统一使用 “issue” 或 “GitHub issue”
   - 不要区分 “repo issue” 和 “task issue”，它们都是 GitHub issue
 
-### 3.2 `roadmap item`
+### 5.2 `roadmap item`
 
 - 正式术语：`roadmap item`
 - 别称：`规划项`
@@ -115,7 +148,7 @@ related_docs:
   - 仅在讨论版本排期（`p0/current/next/deferred/rejected`）时使用。
   - 不得将 roadmap 状态作为分支执行进度的判定依据。
 
-### 3.3 `task`
+### 5.3 `task`
 
 - 正式术语：`task`
 - 别称：`执行任务`
@@ -128,7 +161,7 @@ related_docs:
   - `task` 是 flow 建立后的 execution bridge，不是 roadmap item 的强制下游产物。
   - 它是执行现场的“任务视图”，不是用户默认主链的第一锚点。
 
-### 3.3.1 task issue
+### 5.3.1 task issue
 
 - 正式术语：`task issue`
 - 别称：无
@@ -144,7 +177,7 @@ related_docs:
   - 不说 "创建 task issue"，而是 "将 issue 关联为 task"。
   - 它是相对于 flow 的**关系**，而不是 issue 的固有属性。
 
-### 3.3.1a `orchestra-governed` (label)
+### 5.3.2 `orchestra-governed` (label)
 
 - 正式术语：`orchestra-governed`
 - 别称：无
@@ -157,7 +190,7 @@ related_docs:
   - 由 `assignee-pool` 扫描完成后添加。
   - 人类手动移除此标签可使 issue 重新进入 governance 评估循环。
 
-### 3.3.1b `orchestra-scanned` (label)
+### 5.3.3 `orchestra-scanned` (label)
 
 - 正式术语：`orchestra-scanned`
 - 别称：无
@@ -165,7 +198,7 @@ related_docs:
 - 职责：标记该 issue 已被 intake 层处理（通常是跳过或拒绝），防止重复扫描。
 - 边界：Level 1 治理标记。
 
-### 3.3.1c `roadmap-reviewed` (label)
+### 5.3.4 `roadmap-reviewed` (label)
 
 - 正式术语：`roadmap-reviewed`
 - 别称：无
@@ -173,7 +206,7 @@ related_docs:
 - 职责：治理体系的终态标记，表示决策已固化并写入 memory。
 - 边界：Level 3 治理标记。
 
-### 3.3.2 `assignee issue`
+### 5.3.5 `assignee issue`
 
 
 - 正式术语：`assignee issue`
@@ -187,7 +220,7 @@ related_docs:
   - Manager 链只消费 `assignee issue`。
   - 当前 governance 排序与建议只针对此池。
 
-### 3.3.3 `supervisor issue`
+### 5.3.6 `supervisor issue`
 
 - 正式术语：`supervisor issue`
 - 别称：无
@@ -198,7 +231,7 @@ related_docs:
 - 使用规则：
   - `supervisor/apply` 只消费 `supervisor issue`。
 
-### 3.3.4 `broader repo issue pool`
+### 5.3.7 `broader repo issue pool`
 
 - 正式术语：`broader repo issue pool`
 - 别称：无
@@ -210,7 +243,8 @@ related_docs:
 - 使用规则：
   - roadmap governance 可从此池中把适合自动化推进的 issue 纳入 assignee issue pool。
   - cron governance 可从与文档治理相关的 broader repo 范围中形成 supervisor issue。
-### 3.3.5 `check`
+
+### 5.3.8 `check`
 
 - 正式术语：`check`
 - 别称：`handoff check`、`vibe task audit` (Legacy)
@@ -222,19 +256,19 @@ related_docs:
   - 讨论 task registry、handoff store、分支、OpenSpec、plans 的执行层核对时使用 `check`
   - 不要把 `check` 表述成 GitHub Project 同步
 
-### 3.3.6 `OpenSpec 注册`
+### 5.3.9 `OpenSpec 注册`
 
 - 正式术语：`OpenSpec 注册`
 - 别称：`OpenSpec execution spec 来源桥接`
 - 定义：把 OpenSpec change 或 plan 文档作为 task 的 execution spec 来源写入 `spec_standard/spec_ref` 的动作。
 - 边界：
-  - `OpenSpec 注册` 不是 roadmap item 创建
+  - `OpenSpec 注册` 不是 roadmap item创建
   - `OpenSpec 注册` 不是 `roadmap sync`
 - 使用规则：
   - 讨论 `spec_standard/spec_ref` 来源时使用 `OpenSpec 注册`
   - 不要把 OpenSpec change 直接说成 roadmap item 或 task 本体
 
-### 3.3.7 `milestone`
+### 5.3.10 `milestone`
 
 - 正式术语：`milestone`
 - 别称：无
@@ -249,7 +283,7 @@ related_docs:
   - 讨论版本、阶段、交付窗口时优先使用 `milestone`
   - 历史上的 `version_goal` 应视为兼容字段，而不是长期上位概念
 
-### 3.3.8 `verdict`
+### 5.3.11 `verdict`
 
 - 正式术语：`verdict`
 - 别称：`裁决`
@@ -261,7 +295,7 @@ related_docs:
   - `UNKNOWN`: 状态不明。
 - 职责：驱动 Orchestra 的流转逻辑与状态自动变迁。
 
-### 3.4 `flow`
+### 5.4 `flow`
 
 - 正式术语：`flow`
 - 别称：无
@@ -280,7 +314,7 @@ related_docs:
   - 讨论用户正在推进哪个目标时，默认优先从 `GitHub issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
-### 3.4.1 Flow Status 语义
+### 5.4.1 Flow Status 语义
 
 `flow_status` 定义了 flow 当前的执行状态，各状态语义：
 
@@ -301,7 +335,7 @@ related_docs:
 
 > `failed` 状态字面值已从 `flow_status` 中移除。Legacy 数据中的 `failed` 已迁移为 `active` 状态并配合 `blocked_reason` 表达。
 
-### 3.4.2 `dependency` (issue role)
+### 5.4.2 `dependency` (issue role)
 
 - 正式术语：`dependency` (issue role)
 - 别称：依赖 issue
@@ -313,7 +347,7 @@ related_docs:
   - 自动恢复：所有依赖满足后，Orchestra 自动移除阻塞，推断并恢复到正确状态。
   - 继承分支：解封 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖。
 
-### 3.5 `pr`
+### 5.5 `pr`
 
 - 正式术语：`pr`
 - 别称：`pull request`
@@ -327,9 +361,9 @@ related_docs:
   - 讨论代码评审与合并对象时使用 `pr`
   - 不要把 `pr` 当作需求或执行单元
 
-## 4. Git And Runtime Terms
+## 6. Git And Runtime Terms
 
-### 4.1 `worktree`
+### 6.1 `worktree`
 
 - 正式术语：`worktree`
 - 别称：`工作树`、`工作目录`
@@ -342,7 +376,7 @@ related_docs:
 - 使用规则：
   - 讨论物理目录、当前文件现场、worktree 清理时使用 `worktree`
 
-### 4.2 `branch`
+### 6.2 `branch`
 
 - 正式术语：`branch`
 - 别称：`分支`
@@ -355,7 +389,7 @@ related_docs:
 - 使用规则：
   - 讨论提交线、合并线、切分交付线时使用 `branch`
 
-### 4.3 `workflow`
+### 6.3 `workflow`
 
 - 正式术语：`workflow`
 - 别称：`工作流`
@@ -369,7 +403,7 @@ related_docs:
   - 讨论过程、阶段、交付路径时使用 `workflow`
   - 讨论运行时容器时不要用 `workflow` 代替 `flow`
 
-### 4.4 Installation Lifecycle
+### 6.4 Installation Lifecycle
 
 - 正式术语：`installation lifecycle`
 - 别称：`安装生命周期`
@@ -388,11 +422,11 @@ related_docs:
   - 讨论全局同步、更新分发时使用 `vibe update`
   - 讨论 worktree 初始化时使用 `scripts/init.sh`
 
-### 4.5 Global Distribution
+### 6.5 Global Distribution
 
 - 正式术语：`global distribution`
 - 别称：`全局分发`
-- 定义：位于 `~/.vibe` 的共享 Vibe 安装，供所有项目和工作树使用。包含：
+- 定义：位于 `~/.vibe` 的共享 Vibe 安装，供所有项目 and 工作树使用。包含：
   - V2 shell scripts (`bin/vibe`, `lib/`)
   - V3 Python code (`src/vibe3/`)
   - Configuration (`config/`)
@@ -404,7 +438,7 @@ related_docs:
   - 讨论全局安装位置、跨项目共享时使用 `global distribution`
   - 指定路径时写作 `~/.vibe`
 
-### 4.6 Update Command
+### 6.6 Update Command
 
 - 正式术语：`update command`
 - 别称：`更新命令`
@@ -422,7 +456,7 @@ related_docs:
 - 使用规则：
   - 讨论全局同步、更新分发时使用 `update command`
 
-### 4.7 Effect Semantics
+### 6.7 Effect Semantics
 
 - 正式术语：`effect semantics`
 - 别称：`效果语义`
@@ -438,7 +472,7 @@ related_docs:
 - 使用规则：
   - 讨论变更生效时机、同步需求时使用 `effect semantics`
 
-### 4.8 Shared Venv
+### 6.8 Shared Venv
 
 - 正式术语：`shared venv`
 - 别称：`共享虚拟环境`
@@ -455,9 +489,9 @@ related_docs:
 - 使用规则：
   - 讨论依赖隔离、跨 worktree venv 共享时使用 `shared venv`
 
-## 5. System Responsibility Terms
+## 7. System Responsibility Terms
 
-### 5.1 Server 层
+### 7.1 Server 层
 
 - 正式术语：`Server 层`
 - 别称：`服务层`
@@ -467,7 +501,7 @@ related_docs:
   - 不负责角色特有的派发规则。
 - 落点：`src/vibe3/server/`
 
-### 5.2 Runtime 层
+### 7.2 Runtime 层
 
 - 正式术语：`Runtime 层`
 - 别称：`运行时层`
@@ -477,7 +511,7 @@ related_docs:
   - 不直接启动具体角色任务。
 - 落点：`src/vibe3/runtime/`
 
-### 5.3 Domain 层
+### 7.3 Domain 层
 
 - 正式术语：`Domain 层`
 - 别称：`领域层`
@@ -487,7 +521,7 @@ related_docs:
   - 不负责具体的执行细节。
 - 落点：`src/vibe3/domain/`
 
-### 5.4 Execution 层
+### 7.4 Execution 层
 
 - 正式术语：`Execution 层`
 - 别称：`执行层`
@@ -497,7 +531,7 @@ related_docs:
   - 不包含业务编排逻辑。
 - 落点：`src/vibe3/execution/`
 
-### 5.5 Environment 层
+### 7.5 Environment 层
 
 - 正式术语：`Environment 层`
 - 别称：`环境层`
@@ -507,7 +541,7 @@ related_docs:
   - 不决定执行哪个角色。
 - 落点：`src/vibe3/environment/`
 
-### 5.6 Clients 层
+### 7.6 Clients 层
 
 - 正式术语：`Clients 层`
 - 别称：`客户端层`
@@ -517,7 +551,7 @@ related_docs:
   - 不直接持有全局状态，仅作为原子操作的代理。
 - 落点：`src/vibe3/clients/`
 
-### 5.7 `调度`
+### 7.7 `调度`
 
 - 正式术语：`调度`
 - 别称：无
@@ -530,7 +564,7 @@ related_docs:
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
-### 5.8 `编排`
+### 7.8 `编排`
 
 - 正式术语：`编排`
 - 别称：无
@@ -543,7 +577,7 @@ related_docs:
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
-### 5.9 `执行代理`
+### 7.9 `执行代理`
 
 - 正式术语：`执行代理`
 - 别称：`执行器`
@@ -559,7 +593,7 @@ related_docs:
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
 
-### 5.10 Role Adapters (角色适配器)
+### 7.10 Role Adapters (角色适配器)
 
 - 正式术语：`Role Adapters`
 - 别称：`Skill 层`, `胶水层`
@@ -574,7 +608,7 @@ related_docs:
   - 文档中优先使用 `Role Adapters`
   - `Skill 层` 作为历史叫法保留
 
-### 5.9.1 Orchestra
+### 7.11 Orchestra
 
 - 正式术语：`Orchestra`
 - 别称：`Orchestrator`
@@ -593,7 +627,7 @@ related_docs:
   - Skill: `skills/vibe-orchestra/SKILL.md`
 
 
-### 5.9.2 `Manager`
+### 7.12 `Manager`
 
 - 正式术语：`Manager`
 - 别称：`Execution Proxy`, `执行负责人`
@@ -608,7 +642,7 @@ related_docs:
   - Python 模块：`src/vibe3/roles/manager.py`（Manager 角色定义）
   - Skill: `skills/vibe-manager/SKILL.md`
 
-### 5.10 `Shell 能力层`
+### 7.13 `Shell 能力层`
 
 - 正式术语：`Shell 能力层`
 - 别称：`capability layer`
@@ -624,7 +658,7 @@ related_docs:
   - **V3 Python (`vibe3`) 是当前主能力层**，负责 flow/handoff/orchestra 逻辑
   - **V2 Shell (`vibe`) 是次要/兼容层**，负责环境初始化、密钥管理和 legacy 工具
 
-### 5.11 `共享状态真源`
+### 7.14 `共享状态真源`
 
 - 正式术语：`共享状态真源`
 - 别称：无
@@ -640,7 +674,7 @@ related_docs:
   - `roadmap.json` 当前只按 mirror / cache / projection / backup 理解
   - 不要再用“物理真源”同时指 shell 和 JSON 文件
 
-### 5.12 `shell 命令`
+### 7.15 `shell 命令`
 
 - 正式术语：`shell 命令`
 - 别称：`vibe3 shell`, `vibe shell`
@@ -654,7 +688,7 @@ related_docs:
   - 文档和沟通中首次提及时，建议显式写成 `vibe3 flow (shell)` 这类格式
   - 优先调用 V3 命令，仅在环境管理等特定场景使用 V2 命令
 
-### 5.13 `skill 命令`
+### 7.16 `skill 命令`
 
 - 正式术语：`skill 命令`
 - 别称：`vibe skill`
@@ -665,21 +699,21 @@ related_docs:
 - 使用规则：
   - 文档和沟通中首次提及时，建议显式写成 `/vibe-save (skill)` 这类格式
 
-### 5.14 `调用面标注规则`
+### 7.17 `调用面标注规则`
 
 - 当同一段内容同时出现 shell 与 skill 能力时，首次提及必须显式标注调用面：
   - `vibe flow (shell)`
   - `/vibe-save (skill)`
 - 后续同段复用同一对象时可省略后缀，但跨段再次出现建议重标一次，避免歧义。
 
-## 6. Runtime Hierarchy Terms
+## 8. Runtime Hierarchy Terms
 
 - **`Orchestra Driver`**：通过 `vibe3 serve start` 启动的长期运行主进程。
 - **`Heartbeat Tick`**：Driver 内部的周期性轮询循环。
 - **`Async Child Session`**：由 Tick 派发的、在独立 tmux session 中运行的异步子任务（如 manager run, governance scan）。
 - **`Domain Event`**：Agent 执行生命周期的真源，负责驱动状态转换与副作用。
 
-## 7. Document Process Terms
+## 9. Document Process Terms
 
 以下术语只属于文档流程层级，不属于运行时系统分层：
 
@@ -697,7 +731,7 @@ related_docs:
 
 当作同一个概念。
 
-### 7.1 Documentation Role Terms
+### 9.1 Documentation Role Terms
 
 #### `入口文件`
 
@@ -767,9 +801,9 @@ related_docs:
 - 使用规则：
   - 执行代理需要具体执行细则、实现边界和模式时使用 `规则文件`
 
-## 8. Identity Tracking Terms
+## 10. Identity Tracking Terms
 
-### 8.1 `署名`
+### 10.1 `署名`
 
 - 正式术语：`署名`
 - 别称：`Authorship`, `打卡`, `追加署名`
@@ -785,7 +819,7 @@ related_docs:
   - 讨论 Agent 如何宣告自己的参与贡献时，统一使用**“署名”**。
   - “如果误用签名，指的也是署名，不是数字签名。”项目语境下默认口语中的签名等同于署名。
 
-### 8.2 `物理签名`
+### 10.2 `物理签名`
 
 - 正式术语：`物理签名`
 - 别称：`Git Author`, `Alias`, `工作区身份`
@@ -798,7 +832,7 @@ related_docs:
 - 使用规则：
   - 讨论底层谁在提交代码或初始化 Worktree 所记录的身份时，使用**“物理签名”**。
 
-### 8.3 `actor`
+### 10.3 `actor`
 
 - 正式术语：`actor`
 - 别称：无
@@ -810,7 +844,7 @@ related_docs:
   - SQLite `flow_state` 中的 `latest_actor` 字段。
   - `FlowEvent` 中的 `actor` 字段。
 
-### 8.4 `initiated_by`
+### 10.4 `initiated_by`
 
 - 正式术语：`initiated_by`
 - 别称：无
@@ -821,7 +855,7 @@ related_docs:
 - 落点：
   - SQLite `flow_state` 中的 `initiated_by` 字段。
 
-### 8.5 `FailedGate`
+### 10.5 `FailedGate`
 
 - 正式术语：`FailedGate`
 - 别称：`失败门禁`
@@ -836,7 +870,7 @@ related_docs:
   - 讨论系统级错误防护、自动恢复机制时使用 `FailedGate`。
   - 区别于 `blocked` 状态（BLOCK 系统）。
 
-### 8.6 `QualifyGate`
+### 10.6 `QualifyGate`
 
 - 正式术语：`QualifyGate`
 - 别称：`合格门禁`
@@ -850,13 +884,13 @@ related_docs:
 - 使用规则：
   - 讨论自动恢复、依赖解除时使用 `QualifyGate`。
 
-## 9. Common Confusions
+## 11. Common Confusions
 
 以下混用是高风险错误：
 
-  - GitHub issue != `task`（一个是对象，一个是关系）
-  - `roadmap item` != `task`
-  - `flow` != `workflow`
+- GitHub issue != `task`（一个是对象，一个是关系）
+- `roadmap item` != `task`
+- `flow` != `workflow`
 - `flow` != `worktree`
 - `flow` != `branch`
 - `Shell 能力层` != `共享状态真源`

@@ -39,58 +39,51 @@ related_docs:
 
 ## 2. Core Rule
 
-`.git/vibe3/handoff/<branch>/current.md` 是本地 handoff buffer，不是真源。
+`.git/vibe3/handoff/` 目录及其子目录是 V3 Handoff 系统的**物理存储真源**。
 
-**注意**：在 worktree 环境下，直接访问或编辑 `.git/vibe3/handoff/` 目录可能受限。所有 handoff 操作**必须优先通过 `vibe3` CLI 命令完成**（如 `vibe3 handoff append/show`），除非在特定离线或手动修复场景下。
+**注意**：在隔离环境中，直接访问该目录可能受权限限制。所有 handoff 操作**必须优先通过 `vibe3` CLI 命令完成**（如 `vibe3 handoff append/show`），除非在特定底层调试或手动修复场景。
 
-It only serves for passing short-term context between agents, skills, or sessions, for example:
+It serves for passing short-term context between agents, skills, or sessions, for example:
 
-- 本轮已完成
-- blockers
-- 临时判断
-- 下一步建议
-- 关键文件
+- 本轮已完成 (Achievements)
+- 阻塞原因 (Blockers)
+- 临时判断与发现 (Findings)
+- 下一步建议 (Next Steps)
+- 关键变更文件 (Key Files)
 
 它不得替代：
 
-- `vibe3` Python CLI 提供的共享状态事实
-- SQLite handoff store (`.git/vibe3/handoff.db`)
-- 当前 `git` 现场事实
-- 其他标准文档中的正式语义
+- `vibe3` Python CLI 提供的实时状态事实。
+- SQLite handoff store (`.git/vibe3/handoff.db`)。
+- 当前 `git` 现场事实。
 
-## 3. Priority Order
+## 3. Priority Order (优先级顺序)
 
-当 handoff 与其他来源同时存在时，优先级固定为：
+当 handoff 信息与其他来源冲突时，优先级固定为：
 
-1. 共享真源（SQLite store + CLI 输出）
-2. 当前 git/worktree/PR 现场事实
-3. `.git/vibe3/handoff/<branch>/current.md` buffer
-4. `.agent/context/task.md` 本地草稿（可选，已废弃）
+1. **共享真源** (Shared Truth): SQLite store + `vibe3` CLI 实时输出。
+2. **现场事实** (Live Context): 当前 git/worktree/PR 物理现场。
+3. **Handoff Buffer**: `.git/vibe3/handoff/<branch>/current.md`。
 
 因此：
 
-- handoff 只能补充解释，不能覆盖事实
-- handoff 不能作为当前阶段判断的唯一依据
-- 若 handoff 与事实冲突，必须以事实为准
+- handoff 只能补充解释，不能覆盖或伪造事实。
+- handoff 不能作为当前执行阶段决策的唯一依据。
+- 若 handoff 内容与现场事实冲突，必须以事实为准。
 
-## 4. Read Rule
+## 4. Read Rule (读取规则)
 
-任何 agent 或 skill 如果读取 `.git/vibe3/handoff/<branch>/current.md`，必须先核查：
+任何 agent 或 skill 读取 handoff 前，必须先通过 `vibe3` 命令核查：
 
-- 当前共享状态真源（`vibe3 flow show` 或 SQLite 直接查询）
-- 当前 git 现场
-- 必要时的 PR / review 事实
-
-读取顺序必须是：
-
-1. 先确认事实（SQLite + CLI）
-2. 再读取 handoff buffer
-3. 最后把 handoff 作为补充线索解释当前状态
+1. **当前状态** (`vibe3 flow show` 或 `vibe3 task status`)。
+2. **现场完整性** (`vibe3 check` 或 `git status`)。
+3. **补充线索**：最后读取 handoff md 文件作为解释性补充。
 
 禁止：
 
-- 先读 handoff，再把其中结论当当前事实继续执行
-- 在共享真源缺失时，直接把 handoff 升格为替代真源
+- 先读 handoff，直接把其中文案结论升格为当前事实继续执行。
+- 在真源缺失时，盲目使用 handoff 作为替代真源。
+
 
 ## 5. Maintenance Duty
 
