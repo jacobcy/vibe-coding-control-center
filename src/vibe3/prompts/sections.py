@@ -11,8 +11,8 @@ from typing import cast
 
 from loguru import logger
 
+from vibe3.clients import resolve_runtime_asset
 from vibe3.config import ConventionResolver
-from vibe3.environment import resolve_runtime_asset
 
 
 def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
