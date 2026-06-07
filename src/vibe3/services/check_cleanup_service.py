@@ -107,9 +107,9 @@ class CheckCleanupService:
     def _clean_terminal_flows(self) -> dict[str, object]:
         """Clean terminal flows (done/aborted).
 
-        Different handling based on flow status:
-        - done: Clean physical resources, keep flow record as audit history
-        - aborted: Clean everything including flow record (allows issue to restart)
+        Both done and aborted flows have their physical resources cleaned and
+        flow records soft-deleted (removed from active flows) to allow
+        branch cleanup.
 
         Returns:
             Dict with summary and details of cleaned flows.
@@ -140,8 +140,8 @@ class CheckCleanupService:
             store=self.store,
         )
 
-        cleaned: list[str] = []
-        kept_records: list[str] = []
+        cleaned_aborted: list[str] = []
+        cleaned_done: list[str] = []
         removed_invalid: list[str] = []
         failed: list[str] = []
         skipped_live: list[str] = []
@@ -166,20 +166,31 @@ class CheckCleanupService:
                 branch=branch,
                 flow_status=flow_status,
                 cleanup_service=cleanup_service,
-                cleaned=cleaned,
-                kept_records=kept_records,
+                cleaned_aborted=cleaned_aborted,
+                cleaned_done=cleaned_done,
                 failed=failed,
             )
 
-        summary = f"Cleaned {len(cleaned)} aborted flows"
-        if kept_records:
-            summary += f", preserved {len(kept_records)} done records"
+        summary_parts = []
+        if cleaned_aborted:
+            summary_parts.append(f"Cleaned {len(cleaned_aborted)} aborted flows")
+        if cleaned_done:
+            summary_parts.append(f"Cleaned {len(cleaned_done)} done flows")
+        if not summary_parts and not failed and not removed_invalid:
+            summary_parts.append("No terminal flows to clean")
+
+        summary = "; ".join(summary_parts)
         if removed_invalid:
-            summary += f", removed {len(removed_invalid)} invalid records"
+            prefix = "; " if summary else ""
+            summary += f"{prefix}removed {len(removed_invalid)} invalid records"
         if skipped_live:
-            summary += f", skipped {len(skipped_live)} branches with live sessions"
+            prefix = "; " if summary else ""
+            summary += (
+                f"{prefix}skipped {len(skipped_live)} branches with live sessions"
+            )
         if failed:
-            summary += f", failed {len(failed)}"
+            prefix = "; " if summary else ""
+            summary += f"{prefix}failed {len(failed)}"
 
         # Clean orphan detached HEAD worktrees
         detached_results = self._cleanup_detached_worktrees()
@@ -187,14 +198,17 @@ class CheckCleanupService:
         detached_failed = detached_results.get("failed", [])
 
         if detached_cleaned:
-            summary += f", cleaned {len(detached_cleaned)} detached worktrees"
+            prefix = "; " if summary else ""
+            summary += f"{prefix}cleaned {len(detached_cleaned)} detached worktrees"
         if detached_failed:
-            summary += f", failed {len(detached_failed)} detached worktrees"
+            prefix = "; " if summary else ""
+            summary += f"{prefix}failed {len(detached_failed)} detached worktrees"
 
         return {
             "summary": summary,
-            "cleaned": cleaned,
-            "kept_records": kept_records,
+            "cleaned": cleaned_aborted + cleaned_done,
+            "cleaned_aborted": cleaned_aborted,
+            "cleaned_done": cleaned_done,
             "removed_invalid": removed_invalid,
             "failed": failed + detached_failed,
             "skipped_live": skipped_live,
@@ -263,8 +277,8 @@ class CheckCleanupService:
         branch: str,
         flow_status: str,
         cleanup_service: "FlowCleanupService",
-        cleaned: list[str],
-        kept_records: list[str],
+        cleaned_aborted: list[str],
+        cleaned_done: list[str],
         failed: list[str],
     ) -> None:
         """Process a single terminal flow with appropriate cleanup.
@@ -279,8 +293,8 @@ class CheckCleanupService:
             branch: Branch name
             flow_status: Flow status (done/aborted)
             cleanup_service: Cleanup service instance
-            cleaned: List to append successfully cleaned flows (both done and aborted)
-            kept_records: List to append done flows with preserved records (now unused)
+            cleaned_aborted: List to append successfully cleaned aborted flows
+            cleaned_done: List to append successfully cleaned done flows
             failed: List to append failure messages
         """
         # Both done and aborted: soft-delete flow record after physical cleanup
@@ -295,19 +309,26 @@ class CheckCleanupService:
                 keep_flow_record=keep_flow_record,
             )
 
+            # Note: keep_flow_record is currently hardcoded to False for all
+            # terminal flows. This logic remains for potential future
+            # restoration of record preservation.
             if keep_flow_record:
                 # done: success if physical resources cleaned
                 if results.get("worktree", False) or results.get("local_branch", False):
-                    kept_records.append(branch)
+                    cleaned_done.append(branch)
                     logger.bind(domain="check", branch=branch).info(
                         "Cleaned done flow resources, kept record"
                     )
             else:
-                # aborted: success if flow record deleted
+                # success if flow record deleted
                 if results.get("flow_record", False):
-                    cleaned.append(branch)
+                    if flow_status == "aborted":
+                        cleaned_aborted.append(branch)
+                    else:
+                        cleaned_done.append(branch)
+
                     logger.bind(domain="check", branch=branch).info(
-                        "Cleaned aborted flow completely"
+                        f"Cleaned {flow_status} flow completely"
                     )
 
                     # Resume blocked issue to READY (passive cleanup)
