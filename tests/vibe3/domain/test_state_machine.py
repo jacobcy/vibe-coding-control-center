@@ -2,9 +2,9 @@
 
 import pytest
 
-from vibe3.domain.state_machine import can_transition, validate_transition
 from vibe3.exceptions import InvalidTransitionError
 from vibe3.models.orchestration import IssueState
+from vibe3.models.state_machine import can_transition, validate_transition
 
 
 def test_can_transition_accepts_mainline_edge() -> None:

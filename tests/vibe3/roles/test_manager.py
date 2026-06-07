@@ -322,8 +322,8 @@ class TestManagerBlockedToHandoffTransitionBlocked:
         self,
     ) -> None:
         """ALLOWED_TRANSITIONS 应该拒绝 blocked → handoff"""
-        from vibe3.domain.state_machine import validate_transition
         from vibe3.exceptions import InvalidTransitionError
+        from vibe3.models.state_machine import validate_transition
 
         # Try blocked → handoff
         with pytest.raises(InvalidTransitionError):
@@ -337,7 +337,7 @@ class TestManagerBlockedToHandoffTransitionBlocked:
         self,
     ) -> None:
         """手动 resume 命令可以用 force=True 绕过"""
-        from vibe3.domain.state_machine import validate_transition
+        from vibe3.models.state_machine import validate_transition
 
         # Try blocked → handoff with force=True
         validate_transition(

@@ -1,7 +1,7 @@
 """Tests for LabelService."""
 
-from vibe3.domain.state_machine import VIBE_TASK_LABEL
 from vibe3.models.orchestration import IssueState
+from vibe3.models.state_machine import VIBE_TASK_LABEL
 from vibe3.services.label_service import LabelService
 
 
