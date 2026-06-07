@@ -49,7 +49,7 @@ class TestExecutionLifecycleSessionCleanup:
         assert event_call.args[2] == "agent:test"
 
     def test_runtime_error_preserves_role_status(self, mock_store: MagicMock) -> None:
-        """Runtime error with record_only should NOT update role status."""
+        """Runtime error with record_only should NOT update ANY flow state fields."""
         from vibe3.exceptions.error_severity import (
             ErrorHandlingContract,
             ErrorSeverity,
@@ -76,18 +76,15 @@ class TestExecutionLifecycleSessionCleanup:
             error_contract=error_contract,
         )
 
-        # Verify role status was NOT updated (preserved)
-        call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert "executor_status" not in call_kwargs
+        # Verify NO flow state updates for runtime errors
+        # update_flow_state should NOT be called at all
+        mock_store.update_flow_state.assert_not_called()
 
-        # Verify actor was still updated
-        assert call_kwargs.get("executor_actor") == "agent:test"
-
-        # Verify event was still recorded
+        # Verify timeline event was still recorded (for observability)
         mock_store.add_event.assert_called_once()
 
     def test_business_error_updates_role_status(self, mock_store: MagicMock) -> None:
-        """Business error without error_contract should update role status."""
+        """Business error without error_contract should update ALL state fields."""
         persist_execution_lifecycle_event(
             store=mock_store,
             branch="task/issue-42",
@@ -97,11 +94,17 @@ class TestExecutionLifecycleSessionCleanup:
             detail="Business logic error",
         )
 
-        # Verify role status WAS updated
+        # Verify ALL state fields were updated for business errors
         call_kwargs = mock_store.update_flow_state.call_args.kwargs
+
+        # Role status should be updated
         assert call_kwargs.get("executor_status") == "aborted"
 
-        # Verify actor was updated
+        # Execution timestamps should be updated
+        assert "execution_completed_at" in call_kwargs
+        assert call_kwargs.get("execution_pid") is None
+
+        # Actor should be updated
         assert call_kwargs.get("executor_actor") == "agent:test"
 
         # Verify event was recorded
@@ -121,11 +124,17 @@ class TestExecutionLifecycleSessionCleanup:
             error_contract=None,
         )
 
-        # Verify role status WAS updated (same as business error)
+        # Verify ALL state fields were updated (same as business error)
         call_kwargs = mock_store.update_flow_state.call_args.kwargs
+
+        # Role status should be updated
         assert call_kwargs.get("executor_status") == "aborted"
 
-        # Verify actor was updated
+        # Execution timestamps should be updated
+        assert "execution_completed_at" in call_kwargs
+        assert call_kwargs.get("execution_pid") is None
+
+        # Actor should be updated
         assert call_kwargs.get("executor_actor") == "agent:test"
 
         # Verify event was recorded

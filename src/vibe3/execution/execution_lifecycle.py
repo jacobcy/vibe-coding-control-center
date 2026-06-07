@@ -259,19 +259,21 @@ def persist_execution_lifecycle_event(
         if status_field:
             state_updates[status_field] = "completed"
     else:
-        state_updates["execution_completed_at"] = now
-        state_updates["execution_pid"] = None
-
+        # For runtime errors with record_only, skip ALL state updates
+        # to preserve flow state orthogonality
         if error_contract and error_contract.issue_action == "record_only":
+            # Only record timeline event, no state modifications
             pass
         else:
+            # Business error: update all state fields
+            state_updates["execution_completed_at"] = now
+            state_updates["execution_pid"] = None
             status_field = _ROLE_STATUS_FIELD[role]
             if status_field:
                 state_updates[status_field] = lifecycle
-
-        actor_field = _ROLE_ACTOR_FIELD[role]
-        if actor_field:
-            state_updates[actor_field] = actor
+            actor_field = _ROLE_ACTOR_FIELD[role]
+            if actor_field:
+                state_updates[actor_field] = actor
 
     if extra_state_updates:
         state_updates.update(extra_state_updates)
