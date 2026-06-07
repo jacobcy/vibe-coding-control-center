@@ -58,6 +58,7 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 | **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest][roadmap-intake]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
 | **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest][assignee-pool]` / `[governance decide][assignee-pool]` | 入池前/池内准入 decider：对本机 manager pool 中 issue 做 rfc/epic/ready/close 决策 | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
 | **vibe-roadmap** | skills/vibe-roadmap/SKILL.md | `[roadmap decision]` | 上层审查者：审查 governance 决策，纠正和补全 | 审查后打 `roadmap-reviewed` |
+| **vibe-task** | skills/vibe-task/SKILL.md | 无（human-facing，不写 marker） | 人机协作规划辅助：帮助人类处理 blocked/RFC/epic issues，整理依赖关系说明，pre-flow 阶段仅写 issue body 自然语言 | 不操作 `state/*` 标签，不写 managed section |
 
 ---
 
@@ -291,6 +292,42 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 **审查范围**：`roadmap/rfc`、`state/blocked`、未 reviewed 的 issue
 **权限**：可覆盖 pool 的决策（rfc → continue、epic → split 等）
 **标签**：审查完打 `roadmap-reviewed`，写 memory.md
+
+### Vibe Task（人机协作规划辅助）
+
+**职责**：human-facing skill，帮助人类处理 blocked/RFC/epic 问题类 issue，整理依赖关系，监控 epic 进度
+**操作权限**：
+- ✅ 读取 issue/flow/task 现场信息
+- ✅ 在 issue body 正文中用自然语言说明依赖关系（"Blocked by #N", "Depends on #N"）
+- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels
+- ❌ 不操作 `state/*` 标签（blocked/ready/handoff 等均不允许）
+- ❌ 不直接写 managed section（`<!-- vibe3-flow-state-start -->` 块）
+- ❌ 不调用 `vibe3 flow blocked / flow bind` 命令（需要 flow context，pre-flow 阶段不存在）
+**与 governance 层的边界**：vibe-task 是人类规划阶段的辅助工具，不参与自动化 governance 循环；它写入的依赖说明由 manager 入场后转化为正式 flow_issue_links
+
+---
+
+## Pre-flow Dependency Rules
+
+**适用范围**：所有在 pre-flow 阶段操作的角色（vibe-task、vibe-roadmap、roadmap-intake、assignee-pool）
+
+pre-flow 阶段指 issue 尚未进入执行池、无 branch、无 flow context 的状态。此阶段的核心约束：
+
+**Allowed**:
+- issue body 中用自然语言说明依赖关系：`Blocked by #N`、`Depends on #N`、`依赖 #N 完成后推进`
+- 添加 `roadmap/*`、`priority/*` 等规划类 labels
+
+**Forbidden**:
+- ❌ 直接添加 `state/blocked` 标签
+- ❌ 直接写 managed section（`<!-- vibe3-flow-state-start --> ... <!-- vibe3-flow-state-end -->` 块中的 `Blocked by:`/`Dependencies:` 等结构化字段）
+- ❌ 调用 `vibe3 flow blocked`、`vibe3 flow bind` 命令
+
+**理由**：
+1. pre-flow 阶段无 flow context，`flow blocked / flow bind` 命令需要 branch 存在才能执行
+2. 直接添加 `state/blocked` 标签而不写 managed section，会导致三源（label/body/local cache）不一致，orchestra dispatcher 无法正确识别和清除
+3. 依赖关系的正式注册（写入 managed section + flow_issue_links）由 **manager 入场后**通过 `vibe3 flow blocked --task <N>` 完成；pre-flow 只需写清楚依赖关系的自然语言描述即可
+
+**Manager 的衔接职责**：manager 入场时须读取 issue body 中的依赖声明，与 flow_issue_links 比对，补全未注册的依赖。
 
 ---
 

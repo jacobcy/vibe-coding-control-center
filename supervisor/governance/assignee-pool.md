@@ -839,3 +839,19 @@ Sub-issues 状态：
 - 对于未完成的 Epic，按 assignee 决定是否只记录 stdout 或添加 `orchestra-governed`
 - 对于已完成的 Epic，直接关闭
 - **关键**：assignee-pool 是 Epic 进度的最后守门员；不要重复 suggest，也不要制造 cleanup/scan 循环
+
+---
+
+## Pre-flow Dependency Rules
+
+> 完整规范见 [roadmap-common.md § Pre-flow Dependency Rules](../roadmap-common.md)
+
+assignee-pool 在评估和决策阶段的依赖操作约束：
+
+- ✅ 在 decide/suggest comment 中说明依赖关系（"需先完成 #N"、"阻塞于 #N 的基础设施"）
+- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels；决策后打 `orchestra-governed`
+- ❌ 禁止直接添加 `state/blocked` 标签 — 即使 issue 已有 assignee，正式 blocked 状态需由 manager 通过 `vibe3 flow blocked --task <N>` 建立
+- ❌ 禁止写 managed section（`<!-- vibe3-flow-state-start -->` 块中的结构化字段）
+- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — pool 层无 flow 执行权限
+
+**记录方式**：依赖关系和阻塞原因写在 `[governance decide][assignee-pool]` 评论中，manager 入场时读取并执行 `vibe3 flow blocked --task <N>` 完成正式注册。
