@@ -41,8 +41,8 @@ vibe-center/
 ├── README.md                    # 项目介绍（面向用户）
 │
 ├── bin/                         # CLI 入口
-│   ├── vibe                     # [Legacy / V2] Shell 入口
-│   └── vibe3                    # [Active Core] Python 入口
+│   ├── vibe                     # [Legacy / V2] Shell 入口 (Deprecated for core flows)
+│   └── vibe3                    # [Active Core] Python 入口 (Main interface)
 │
 ├── src/vibe3/                   # [Active Core] V3 Python 实现（主要）
 │   ├── cli.py                   # CLI 主入口

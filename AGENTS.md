@@ -107,6 +107,8 @@ This project has **two parallel implementations**:
 
 ## 架构层级 (Three-Tier Architecture)
 
+> **语义真源**：详细定义详见 [docs/standards/glossary.md](docs/standards/glossary.md)
+
 - **Tier 3 (Cognitive/Governance)**: Policies, rules, supervisor. (Rules and Principles)
 - **Tier 2 (Skill Layer)**: Orchestration and context management. (Workflow and Logic)
 - **Tier 1 (Shell Layer)**: Atomic capabilities and state access. (Tools and Execution)
