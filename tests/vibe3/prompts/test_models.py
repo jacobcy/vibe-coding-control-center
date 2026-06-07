@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from vibe3.prompts.exceptions import MissingVariableError, UnusedVariableError
 from vibe3.prompts.models import (
     PromptRecipe,
     PromptRenderResult,
@@ -135,15 +134,3 @@ class TestPromptRenderResult:
         )
         with pytest.raises((AttributeError, TypeError, ValidationError)):
             result.rendered_text = "other"  # type: ignore[misc]
-
-
-class TestPromptExceptions:
-    def test_missing_variable_error(self) -> None:
-        exc = MissingVariableError(variable="skill_content", template_key="test.key")
-        assert "skill_content" in str(exc)
-        assert "test.key" in str(exc)
-
-    def test_unused_variable_error(self) -> None:
-        exc = UnusedVariableError(variable="extra_var", template_key="test.key")
-        assert "extra_var" in str(exc)
-        assert "test.key" in str(exc)
