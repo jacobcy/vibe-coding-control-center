@@ -28,7 +28,6 @@ from vibe3.services import (
     TaskResumeOperations,
     infer_resume_label,
 )
-from vibe3.services.flow_timeline_service import FlowTimelineService
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -218,7 +217,8 @@ class QualifyGateService:
     ) -> None:
         """Notify that dependency has been resolved.
 
-        Writes handoff record and transitions label from blocked to handoff.
+        Uses unified FlowRecoveryService to ensure consistency checks
+        and proper rebuild if needed.
 
         Args:
             branch: Flow branch
@@ -226,33 +226,19 @@ class QualifyGateService:
             dep_issue_number: Dependency issue number that closed
         """
         from vibe3.observability import append_orchestra_event
-        from vibe3.services import BlockedStateService
+        from vibe3.services import FlowRecoveryService
 
-        # Clear blocked state in body/DB before label transition
-        blocked_svc = BlockedStateService(store=self._store, github_client=self._github)
-        blocked_svc.unblock(
-            branch=branch,
-            target_state=IssueState.HANDOFF,
-            actor="orchestra:qualify_gate",
-            issue_number=issue_number,
-            detail=(
-                f"Dependency #{dep_issue_number} closed, "
-                f"awaiting manager verification"
-            ),
+        # Use unified recovery path (includes consistency checks)
+        recovery = FlowRecoveryService(
+            store=self._store,
+            git_client=GitClient(),
+            github_client=self._github,
         )
-
-        # Record timeline event
-        timeline_service = FlowTimelineService(store=self._store)
-        timeline_service.record_timeline_event(
+        recovery.recover(
             branch=branch,
-            event_type="dep_resolved",
-            actor="orchestra:qualify_gate",
-            detail=(
-                f"Dependency #{dep_issue_number} closed, "
-                f"awaiting manager verification"
-            ),
             issue_number=issue_number,
-            repo=self.config.repo,
+            reason=f"Dependency #{dep_issue_number} closed",
+            auto=True,  # Auto-rebuild if needed
         )
 
         append_orchestra_event(
