@@ -78,7 +78,7 @@ new → active ↔ blocked
 见 [error-severity-and-blocking-standard.md](./v3/error-severity-and-blocking-standard.md) §11。
 
 - **ERROR 系统**：关注运行时基础设施健康（Runtime Infrastructure Health）。
-  - 触发：`mark_issue(action="fail")` 或 `vibe3.services.error_helpers.record_error(...)` 或 `ErrorTrackingService.get_instance(...).record_error(...)`。
+  - 触发：`mark_issue(action="fail")` 或 `vibe3.services.shared.errors.record_error(...)` 或 `ErrorTrackingService.get_instance(...).record_error(...)`。
   - 存储：`error_log` 表。
   - 影响：控制 FailedGate 派发，**不直接改变** Flow 业务状态。
 - **BLOCK 系统**：关注业务流状态（Business Flow State）。

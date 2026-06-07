@@ -20,7 +20,7 @@ class TestRecordDispatchFailureIfUnexpected:
             reason_code=None,
         )
 
-        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+        with patch("vibe3.services.shared.errors.record_error") as mock_record_error:
             record_dispatch_failure_if_unexpected(
                 result=result,
                 role="planner",
@@ -40,7 +40,7 @@ class TestRecordDispatchFailureIfUnexpected:
             reason_code="capacity_full",
         )
 
-        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+        with patch("vibe3.services.shared.errors.record_error") as mock_record_error:
             record_dispatch_failure_if_unexpected(
                 result=result1,
                 role="executor",
@@ -58,7 +58,7 @@ class TestRecordDispatchFailureIfUnexpected:
             reason_code="duplicate_dispatch",
         )
 
-        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+        with patch("vibe3.services.shared.errors.record_error") as mock_record_error:
             record_dispatch_failure_if_unexpected(
                 result=result2,
                 role="reviewer",
@@ -81,7 +81,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -118,7 +118,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -154,7 +154,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -191,7 +191,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -213,7 +213,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -233,7 +233,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -262,7 +262,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -299,7 +299,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -321,7 +321,7 @@ class TestRecordDispatchFailureIfUnexpected:
 
     def test_neither_result_nor_exception_noop(self) -> None:
         """Verify both None results in no call to record_error."""
-        with patch("vibe3.services.error_helpers.record_error") as mock_record_error:
+        with patch("vibe3.services.shared.errors.record_error") as mock_record_error:
             record_dispatch_failure_if_unexpected(
                 result=None,
                 role="planner",
@@ -338,7 +338,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
@@ -363,7 +363,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.services.error_helpers.record_error") as mock_record_error,
+            patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
                 "vibe3.clients.sqlite_client.SQLiteClient",
                 return_value=mock_store,
