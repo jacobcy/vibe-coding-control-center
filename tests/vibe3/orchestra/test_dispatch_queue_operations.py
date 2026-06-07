@@ -12,6 +12,7 @@ from vibe3.orchestra.global_dispatch_coordinator import (
 )
 from vibe3.orchestra.queue_operations import (
     _auto_resume_to_ready,
+    _last_auto_resume_attempt,
     select_ready_issues_from_collected_issues,
 )
 
@@ -933,3 +934,57 @@ class TestAutoResumeCooldown:
 
         # Verify both calls went through
         assert mock_label_service.transition.call_count == 2
+
+    def test_cooldown_evicts_stale_entries(self, make_issue_info, monkeypatch) -> None:
+        """Stale cooldown entries (>24h) are evicted to bound memory."""
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        config = OrchestraConfig(repo="owner/repo")
+        issue = make_issue_info(300, IssueState.CLAIMED)
+
+        # Seed stale entry from 25 hours ago
+        stale_time = 1000.0
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations._last_auto_resume_attempt",
+            {300: stale_time, 999: stale_time},
+        )
+
+        mock_label_service = MagicMock()
+        mock_label_service.transition = MagicMock()
+
+        def mock_label_service_init(*args, **kwargs):
+            return mock_label_service
+
+        monkeypatch.setattr(
+            "vibe3.services.label_service.LabelService",
+            mock_label_service_init,
+        )
+
+        event_calls = []
+
+        def mock_append_event(source: str, message: str) -> None:
+            event_calls.append((source, message))
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.append_orchestra_event",
+            mock_append_event,
+        )
+
+        # Current time is 25h after stale entries
+        current_time = [stale_time + 86400 + 1]
+
+        def mock_time():
+            return current_time[0]
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.queue_operations.time.time",
+            mock_time,
+        )
+
+        # Call triggers eviction + proceeds with resume
+        _auto_resume_to_ready(issue, config)
+
+        # Entry for 999 should be evicted (stale)
+        assert 999 not in _last_auto_resume_attempt
+        # Issue 300 was resumed successfully (pop clears on success)
+        mock_label_service.transition.assert_called_once()

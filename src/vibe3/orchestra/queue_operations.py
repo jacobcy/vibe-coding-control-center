@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 # Cooldown mechanism for auto-resume circuit breaker
 AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
+_COOLDOWN_EVICTION_SECONDS = 86400  # 24 hours
 _last_auto_resume_attempt: dict[int, float] = {}
 
 
@@ -129,6 +130,16 @@ def _auto_resume_to_ready(
 
     # Cooldown guard: prevent repeated attempts within cooldown period
     now = time.time()
+
+    # Evict stale entries older than eviction threshold to bound memory
+    stale = [
+        k
+        for k, t in _last_auto_resume_attempt.items()
+        if now - t > _COOLDOWN_EVICTION_SECONDS
+    ]
+    for k in stale:
+        del _last_auto_resume_attempt[k]
+
     last_attempt = _last_auto_resume_attempt.get(issue.number, 0)
     if now - last_attempt < AUTO_RESUME_COOLDOWN_SECONDS:
         return
