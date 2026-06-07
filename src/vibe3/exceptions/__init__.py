@@ -16,7 +16,7 @@ if TYPE_CHECKING:
         is_api_error,
         is_model_error,
     )
-    from vibe3.exceptions.error_severity import ErrorSeverity
+    from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
     from vibe3.exceptions.runtime_errors import GitHubAPIError
 
 
@@ -232,6 +232,7 @@ class InvalidBranchLinkError(SystemError):
 # Lazy imports to avoid circular dependencies
 _LAZY_IMPORTS = {
     "E_EXEC_AUTO_SCENE_RESET": "vibe3.exceptions.error_codes",
+    "ErrorHandlingContract": "vibe3.exceptions.error_severity",
     "ErrorSeverity": "vibe3.exceptions.error_severity",
     "GitHubAPIError": "vibe3.exceptions.runtime_errors",
     "classify_error_hybrid": "vibe3.exceptions.error_classification",
@@ -259,6 +260,7 @@ __all__ = [
     "ConfigError",
     "DiagnosticContext",
     "E_EXEC_AUTO_SCENE_RESET",
+    "ErrorHandlingContract",
     "ErrorSeverity",
     "GitError",
     "GitHubAPIError",

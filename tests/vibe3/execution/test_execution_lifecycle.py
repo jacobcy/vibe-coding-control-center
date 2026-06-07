@@ -48,6 +48,98 @@ class TestExecutionLifecycleSessionCleanup:
         assert event_call.args[1] == "run_aborted"
         assert event_call.args[2] == "agent:test"
 
+    def test_runtime_error_preserves_role_status(self, mock_store: MagicMock) -> None:
+        """Runtime error with record_only should NOT update ANY flow state fields."""
+        from vibe3.exceptions.error_severity import (
+            ErrorHandlingContract,
+            ErrorSeverity,
+        )
+
+        error_contract = ErrorHandlingContract(
+            code="E_EXEC_TIMEOUT",
+            severity=ErrorSeverity.ERROR,
+            counts_toward_threshold=True,
+            record_in_error_log=True,
+            write_timeline_event=True,
+            issue_action="record_only",
+            gate_action="threshold",
+            description="Execution timeout",
+        )
+
+        persist_execution_lifecycle_event(
+            store=mock_store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="aborted",
+            actor="agent:test",
+            detail="Execution timed out",
+            error_contract=error_contract,
+        )
+
+        # Verify NO flow state updates for runtime errors
+        # update_flow_state should NOT be called at all
+        mock_store.update_flow_state.assert_not_called()
+
+        # Verify timeline event was still recorded (for observability)
+        mock_store.add_event.assert_called_once()
+
+    def test_business_error_updates_role_status(self, mock_store: MagicMock) -> None:
+        """Business error without error_contract should update ALL state fields."""
+        persist_execution_lifecycle_event(
+            store=mock_store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="aborted",
+            actor="agent:test",
+            detail="Business logic error",
+        )
+
+        # Verify ALL state fields were updated for business errors
+        call_kwargs = mock_store.update_flow_state.call_args.kwargs
+
+        # Role status should be updated
+        assert call_kwargs.get("executor_status") == "aborted"
+
+        # Execution timestamps should be updated
+        assert "execution_completed_at" in call_kwargs
+        assert call_kwargs.get("execution_pid") is None
+
+        # Actor should be updated
+        assert call_kwargs.get("executor_actor") == "agent:test"
+
+        # Verify event was recorded
+        mock_store.add_event.assert_called_once()
+
+    def test_none_error_contract_updates_role_status(
+        self, mock_store: MagicMock
+    ) -> None:
+        """Explicit None error_contract should behave like business error."""
+        persist_execution_lifecycle_event(
+            store=mock_store,
+            branch="task/issue-42",
+            role="executor",
+            lifecycle="aborted",
+            actor="agent:test",
+            detail="Execution failed",
+            error_contract=None,
+        )
+
+        # Verify ALL state fields were updated (same as business error)
+        call_kwargs = mock_store.update_flow_state.call_args.kwargs
+
+        # Role status should be updated
+        assert call_kwargs.get("executor_status") == "aborted"
+
+        # Execution timestamps should be updated
+        assert "execution_completed_at" in call_kwargs
+        assert call_kwargs.get("execution_pid") is None
+
+        # Actor should be updated
+        assert call_kwargs.get("executor_actor") == "agent:test"
+
+        # Verify event was recorded
+        mock_store.add_event.assert_called_once()
+
 
 class TestExecutionLifecycleReEntry:
     """Tests for re-entry after terminal lifecycle events."""
