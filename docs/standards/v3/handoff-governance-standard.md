@@ -37,13 +37,18 @@ related_docs:
 - Python CLI 实现语义
 - task / flow / PR 的业务生命周期
 
-## 2. Core Rule
+## 2. Core Rule (Handoff Security & Access)
 
-`.git/vibe3/handoff/` 目录及其子目录是 V3 Handoff 系统的**物理存储真源**。
+`.git/vibe3/handoff/` 目录及其子目录是 V3 Handoff 系统的**物理存储位置**。
 
-**注意**：在隔离环境中，直接访问该目录可能受权限限制。所有 handoff 操作**必须优先通过 `vibe3` CLI 命令完成**（如 `vibe3 handoff append/show`），除非在特定底层调试或手动修复场景。
+**硬禁令 (Security Mandate)**：
+为确保系统安全与多 worktree 环境下的权限一致性，**严禁**任何 Agent 或 Skill 直接通过文件系统 API 访问、读取或写入该目录及其内容。
 
-It serves for passing short-term context between agents, skills, or sessions, for example:
+1. **必须且只能通过 CLI**：所有 Handoff 操作**必须且只能**通过 `vibe3` CLI 命令完成（例如 `vibe3 handoff show`、`vibe3 handoff append`）。
+2. **物理访问拒绝**：在 Worktree 隔离环境下，直接访问该物理目录会被文件系统权限拒绝（external_directory 权限限制）。
+3. **调用面统一**：无论是读取 Artifact 还是追加 Context，CLI 是唯一的合法通道。
+
+Handoff 的核心作用是传递 Agent、Skill 或 Session 之间的短期上下文：
 
 - 本轮已完成 (Achievements)
 - 阻塞原因 (Blockers)
