@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Callable
 
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
@@ -19,6 +20,11 @@ if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
+
+# Cooldown mechanism for auto-resume circuit breaker
+AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
+_COOLDOWN_EVICTION_SECONDS = 86400  # 24 hours
+_last_auto_resume_attempt: dict[int, float] = {}
 
 
 def _get_manager_usernames_lazy(config: OrchestraConfig) -> tuple[str, ...]:
@@ -122,6 +128,23 @@ def _auto_resume_to_ready(
     """
     from vibe3.services.label_service import LabelService
 
+    # Cooldown guard: prevent repeated attempts within cooldown period
+    now = time.time()
+
+    # Evict stale entries older than eviction threshold to bound memory
+    stale = [
+        k
+        for k, t in _last_auto_resume_attempt.items()
+        if now - t > _COOLDOWN_EVICTION_SECONDS
+    ]
+    for k in stale:
+        del _last_auto_resume_attempt[k]
+
+    last_attempt = _last_auto_resume_attempt.get(issue.number, 0)
+    if now - last_attempt < AUTO_RESUME_COOLDOWN_SECONDS:
+        return
+    _last_auto_resume_attempt[issue.number] = now
+
     if issue.state is None:
         return
 
@@ -144,6 +167,8 @@ def _auto_resume_to_ready(
             f"auto-resume #{issue.number}: no flow scene, "
             f"state={issue.state.value}, recovered to ready",
         )
+        # Clear cooldown on success to allow immediate future resume
+        _last_auto_resume_attempt.pop(issue.number, None)
     except Exception as exc:
         append_orchestra_event(
             "dispatcher",
