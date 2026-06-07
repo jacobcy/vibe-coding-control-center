@@ -39,6 +39,13 @@ if TYPE_CHECKING:
     )
     from vibe3.models.inspection import CallNode, CommandInspection
     from vibe3.models.issue_body import FlowStateProjection
+    from vibe3.models.job import (
+        CommandType,
+        JobContext,
+        JobEnvelope,
+        JobResult,
+        JobSource,
+    )
     from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
     from vibe3.models.orchestration import (
         ALLOWED_TRANSITIONS,
@@ -196,6 +203,11 @@ _LAZY_IMPORTS = {
     "publish": "vibe3.models.event_bus",
     "StateLabelDispatchConfig": "vibe3.models.orchestra_config",
     "subscribe": "vibe3.models.event_bus",
+    "CommandType": "vibe3.models.job",
+    "JobContext": "vibe3.models.job",
+    "JobEnvelope": "vibe3.models.job",
+    "JobResult": "vibe3.models.job",
+    "JobSource": "vibe3.models.job",
 }
 
 
@@ -223,6 +235,7 @@ __all__: list[str] = [
     "CommandInspection",
     "CommitInfo",
     "CommitSource",
+    "CommandType",
     "CoordinationTruth",
     "CoverageReport",
     "CreatePRRequest",
@@ -251,6 +264,10 @@ __all__: list[str] = [
     "IssueInfo",
     "IssueLink",
     "IssueState",
+    "JobContext",
+    "JobEnvelope",
+    "JobResult",
+    "JobSource",
     "LayerCoverage",
     "MainBranchProtectedError",
     "ManagerDispatchIntent",
