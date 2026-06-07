@@ -14,12 +14,6 @@ if TYPE_CHECKING:
     )
     from vibe3.services.check_service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
-
-    # Functions used in domain/execution/roles
-    from vibe3.services.error_helpers import (
-        record_dispatch_failure_if_unexpected,
-        record_error,
-    )
     from vibe3.services.error_tracking_service import ErrorTrackingService
     from vibe3.services.flow_cleanup_service import FlowCleanupService
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
@@ -42,26 +36,32 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.label_service import LabelService
-    from vibe3.services.label_utils import (
-        clean_old_state_labels,
-        normalize_assignees,
-        normalize_labels,
-        should_skip_from_queue,
-    )
     from vibe3.services.orchestra_helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
     from vibe3.services.orchestra_status_service import OrchestraStatusService
-    from vibe3.services.path_helpers import (
-        check_ref_exists,
-        ref_to_handoff_cmd,
-        sanitize_event_detail_paths,
-    )
     from vibe3.services.pr.create import PRCreateUsecase
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
     from vibe3.services.pr.service import PRService
     from vibe3.services.role_policy_helpers import get_role_block_function
+
+    # Functions used in domain/execution/roles
+    from vibe3.services.shared.errors import (
+        record_dispatch_failure_if_unexpected,
+        record_error,
+    )
+    from vibe3.services.shared.labels import (
+        clean_old_state_labels,
+        normalize_assignees,
+        normalize_labels,
+        should_skip_from_queue,
+    )
+    from vibe3.services.shared.paths import (
+        check_ref_exists,
+        ref_to_handoff_cmd,
+        sanitize_event_detail_paths,
+    )
     from vibe3.services.status_query_service import StatusQueryService
     from vibe3.services.task_binding_guard import build_bind_task_hint
     from vibe3.services.task_resume_operations import TaskResumeOperations
@@ -231,7 +231,7 @@ _SYMBOL_MODULES = {
     "build_bind_task_hint": "vibe3.services.task_binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
-    "check_ref_exists": "vibe3.services.path_helpers",
+    "check_ref_exists": "vibe3.services.shared.paths",
     "classify_flow": "vibe3.services.flow_classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     "create_flow_manager": "vibe3.services.flow_factory",
@@ -255,27 +255,27 @@ _SYMBOL_MODULES = {
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
     "get_role_block_function": "vibe3.services.role_policy_helpers",
-    "has_recent_specific_error": "vibe3.services.error_helpers",
+    "has_recent_specific_error": "vibe3.services.shared.errors",
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "is_running_issue": "vibe3.services.orchestra_status_service",
     "load_issue_info": "vibe3.services.issue.context",
-    "normalize_assignees": "vibe3.services.label_utils",
-    "normalize_labels": "vibe3.services.label_utils",
-    "record_dispatch_failure_if_unexpected": "vibe3.services.error_helpers",
-    "record_error": "vibe3.services.error_helpers",
-    "ref_to_handoff_cmd": "vibe3.services.path_helpers",
+    "normalize_assignees": "vibe3.services.shared.labels",
+    "normalize_labels": "vibe3.services.shared.labels",
+    "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
+    "record_error": "vibe3.services.shared.errors",
+    "ref_to_handoff_cmd": "vibe3.services.shared.paths",
     "requires_audit_ref": "vibe3.services.verdict_policy",
-    "resolve_branch_and_issue": "vibe3.services.branch_arg",
-    "resolve_branch_arg": "vibe3.services.branch_arg",
+    "resolve_branch_and_issue": "vibe3.services.shared.branches",
+    "resolve_branch_arg": "vibe3.services.shared.branches",
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff_resolution",
     "resolve_issue_branch_input": "vibe3.services.issue_branch_resolver",
-    "resolve_ref_path": "vibe3.services.path_helpers",
-    "sanitize_event_detail_paths": "vibe3.services.path_helpers",
-    "clean_old_state_labels": "vibe3.services.label_utils",
-    "should_skip_from_queue": "vibe3.services.label_utils",
+    "resolve_ref_path": "vibe3.services.shared.paths",
+    "sanitize_event_detail_paths": "vibe3.services.shared.paths",
+    "clean_old_state_labels": "vibe3.services.shared.labels",
+    "should_skip_from_queue": "vibe3.services.shared.labels",
 }
 
 
