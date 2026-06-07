@@ -10,26 +10,26 @@ from vibe3.execution.command_adapter import (
     CommandAdapterEntry,
     CommandAdapterError,
     CommandAdapterRegistry,
-    CommandJobType,
     ResolvedAdapter,
     build_default_registry,
 )
+from vibe3.models.job import CommandType
 
 
-def test_command_job_type_enum():
-    """Test that CommandJobType enum has all expected values."""
-    assert CommandJobType.MANAGER == "manager"
-    assert CommandJobType.PLAN == "plan"
-    assert CommandJobType.RUN == "run"
-    assert CommandJobType.REVIEW == "review"
-    assert CommandJobType.GOVERNANCE == "governance"
-    assert CommandJobType.SUPERVISOR == "supervisor"
+def test_command_type_enum():
+    """Test that CommandType enum has all expected values."""
+    assert CommandType.MANAGER == "manager"
+    assert CommandType.PLAN == "plan"
+    assert CommandType.RUN == "run"
+    assert CommandType.REVIEW == "review"
+    assert CommandType.GOVERNANCE_SCAN == "governance-scan"
+    assert CommandType.SUPERVISOR_APPLY == "supervisor-apply"
 
 
 def test_command_adapter_entry_frozen():
     """Test that CommandAdapterEntry is frozen (immutable)."""
     entry = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="PLAN_SYNC_SPEC",
         description="Test entry",
@@ -37,7 +37,7 @@ def test_command_adapter_entry_frozen():
 
     # Should not be able to modify
     with pytest.raises(AttributeError):
-        entry.job_type = CommandJobType.RUN  # type: ignore[misc]
+        entry.job_type = CommandType.RUN  # type: ignore[misc]
 
 
 def test_registry_construction_no_business_imports():
@@ -86,7 +86,7 @@ def test_registry_register():
     registry = CommandAdapterRegistry()
 
     entry = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="PLAN_SYNC_SPEC",
         description="Planner role",
@@ -94,8 +94,8 @@ def test_registry_register():
 
     registry.register(entry)
 
-    assert registry.is_registered(CommandJobType.PLAN)
-    assert CommandJobType.PLAN in registry.list_registered()
+    assert registry.is_registered(CommandType.PLAN)
+    assert CommandType.PLAN in registry.list_registered()
 
 
 def test_registry_register_duplicate():
@@ -103,14 +103,14 @@ def test_registry_register_duplicate():
     registry = CommandAdapterRegistry()
 
     entry1 = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="PLAN_SYNC_SPEC",
         description="First entry",
     )
 
     entry2 = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="OTHER_SPEC",
         description="Second entry",
@@ -126,10 +126,10 @@ def test_registry_resolve_plan_adapter():
     """Test resolving the plan adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.PLAN)
+    resolved = registry.resolve(CommandType.PLAN)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.PLAN
+    assert resolved.entry.job_type == CommandType.PLAN
     assert resolved.entry.import_path == "vibe3.roles.plan"
     assert resolved.entry.callable_name == "PLAN_SYNC_SPEC"
     assert resolved.module_name == "vibe3.roles.plan"
@@ -145,10 +145,10 @@ def test_registry_resolve_run_adapter():
     """Test resolving the run adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.RUN)
+    resolved = registry.resolve(CommandType.RUN)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.RUN
+    assert resolved.entry.job_type == CommandType.RUN
     assert resolved.entry.import_path == "vibe3.roles.run_request"
     assert resolved.entry.callable_name == "RUN_SYNC_SPEC"
 
@@ -162,10 +162,10 @@ def test_registry_resolve_review_adapter():
     """Test resolving the review adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.REVIEW)
+    resolved = registry.resolve(CommandType.REVIEW)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.REVIEW
+    assert resolved.entry.job_type == CommandType.REVIEW
     assert resolved.entry.import_path == "vibe3.roles.review"
     assert resolved.entry.callable_name == "REVIEW_SYNC_SPEC"
 
@@ -179,10 +179,10 @@ def test_registry_resolve_manager_adapter():
     """Test resolving the manager adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.MANAGER)
+    resolved = registry.resolve(CommandType.MANAGER)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.MANAGER
+    assert resolved.entry.job_type == CommandType.MANAGER
     assert resolved.entry.import_path == "vibe3.roles.manager"
     assert resolved.entry.callable_name == "MANAGER_SYNC_SPEC"
 
@@ -196,10 +196,10 @@ def test_registry_resolve_governance_adapter():
     """Test resolving the governance adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.GOVERNANCE)
+    resolved = registry.resolve(CommandType.GOVERNANCE_SCAN)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.GOVERNANCE
+    assert resolved.entry.job_type == CommandType.GOVERNANCE_SCAN
     assert resolved.entry.import_path == "vibe3.roles.governance"
     assert resolved.entry.callable_name == "GOVERNANCE_ROLE"
 
@@ -213,10 +213,10 @@ def test_registry_resolve_supervisor_adapter():
     """Test resolving the supervisor adapter."""
     registry = build_default_registry()
 
-    resolved = registry.resolve(CommandJobType.SUPERVISOR)
+    resolved = registry.resolve(CommandType.SUPERVISOR_APPLY)
 
     assert isinstance(resolved, ResolvedAdapter)
-    assert resolved.entry.job_type == CommandJobType.SUPERVISOR
+    assert resolved.entry.job_type == CommandType.SUPERVISOR_APPLY
     assert resolved.entry.import_path == "vibe3.roles.supervisor"
     assert resolved.entry.callable_name == "SUPERVISOR_CLI_SYNC_SPEC"
 
@@ -231,7 +231,7 @@ def test_registry_resolve_missing_adapter():
     registry = CommandAdapterRegistry()
 
     with pytest.raises(CommandAdapterError, match="No adapter registered"):
-        registry.resolve(CommandJobType.PLAN)
+        registry.resolve(CommandType.PLAN)
 
 
 def test_registry_resolve_bad_import_path():
@@ -239,7 +239,7 @@ def test_registry_resolve_bad_import_path():
     registry = CommandAdapterRegistry()
 
     entry = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.nonexistent.module",
         callable_name="SOME_CALLABLE",
         description="Bad import path",
@@ -248,7 +248,7 @@ def test_registry_resolve_bad_import_path():
     registry.register(entry)
 
     with pytest.raises(CommandAdapterError, match="Failed to import module"):
-        registry.resolve(CommandJobType.PLAN)
+        registry.resolve(CommandType.PLAN)
 
 
 def test_registry_resolve_bad_callable_name():
@@ -256,7 +256,7 @@ def test_registry_resolve_bad_callable_name():
     registry = CommandAdapterRegistry()
 
     entry = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="NONEXISTENT_CALLABLE",
         description="Bad callable name",
@@ -265,15 +265,15 @@ def test_registry_resolve_bad_callable_name():
     registry.register(entry)
 
     with pytest.raises(CommandAdapterError, match="Callable.*not found"):
-        registry.resolve(CommandJobType.PLAN)
+        registry.resolve(CommandType.PLAN)
 
 
 def test_registry_resolve_caching():
     """Test that resolve() caches results and returns the same object."""
     registry = build_default_registry()
 
-    resolved1 = registry.resolve(CommandJobType.PLAN)
-    resolved2 = registry.resolve(CommandJobType.PLAN)
+    resolved1 = registry.resolve(CommandType.PLAN)
+    resolved2 = registry.resolve(CommandType.PLAN)
 
     # Should be the exact same object
     assert resolved1 is resolved2
@@ -287,22 +287,22 @@ def test_registry_list_registered():
     registered = registry.list_registered()
 
     assert len(registered) == 6
-    assert CommandJobType.MANAGER in registered
-    assert CommandJobType.PLAN in registered
-    assert CommandJobType.RUN in registered
-    assert CommandJobType.REVIEW in registered
-    assert CommandJobType.GOVERNANCE in registered
-    assert CommandJobType.SUPERVISOR in registered
+    assert CommandType.MANAGER in registered
+    assert CommandType.PLAN in registered
+    assert CommandType.RUN in registered
+    assert CommandType.REVIEW in registered
+    assert CommandType.GOVERNANCE_SCAN in registered
+    assert CommandType.SUPERVISOR_APPLY in registered
 
 
 def test_registry_is_registered():
     """Test checking if a job type is registered."""
     registry = CommandAdapterRegistry()
 
-    assert not registry.is_registered(CommandJobType.PLAN)
+    assert not registry.is_registered(CommandType.PLAN)
 
     entry = CommandAdapterEntry(
-        job_type=CommandJobType.PLAN,
+        job_type=CommandType.PLAN,
         import_path="vibe3.roles.plan",
         callable_name="PLAN_SYNC_SPEC",
         description="Planner",
@@ -310,8 +310,8 @@ def test_registry_is_registered():
 
     registry.register(entry)
 
-    assert registry.is_registered(CommandJobType.PLAN)
-    assert not registry.is_registered(CommandJobType.RUN)
+    assert registry.is_registered(CommandType.PLAN)
+    assert not registry.is_registered(CommandType.RUN)
 
 
 def test_build_default_registry():
@@ -322,14 +322,14 @@ def test_build_default_registry():
     assert len(registry.list_registered()) == 6
 
     # All types should be registered
-    for job_type in CommandJobType:
+    for job_type in CommandType:
         assert registry.is_registered(job_type), f"{job_type} not registered"
 
 
 def test_resolved_adapter_attributes():
     """Test that ResolvedAdapter has all expected attributes."""
     registry = build_default_registry()
-    resolved = registry.resolve(CommandJobType.PLAN)
+    resolved = registry.resolve(CommandType.PLAN)
 
     assert hasattr(resolved, "entry")
     assert hasattr(resolved, "callable")

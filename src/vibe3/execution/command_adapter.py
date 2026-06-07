@@ -1,30 +1,18 @@
 """Command adapter registry for lazy loading of command job handlers.
 
-This module provides a registry that maps command job types to import paths,
-resolving the actual callable only at execution time. This avoids eager
-imports of command business logic during startup.
+This module provides a registry that maps command types (from vibe3.models.job)
+to import paths, resolving the actual callable only at execution time.
 
-The registry is pure-data (import paths only) and contract-agnostic.
-When #2163 defines JobEnvelope/JobContext/JobResult, a follow-up change
-will add an execute() method that takes a JobEnvelope.
+Uses CommandType from the job contracts module (#2163) as the canonical
+type definition — no duplicate enum.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable
 
-
-class CommandJobType(str, Enum):
-    """Canonical vibe3 command job types."""
-
-    MANAGER = "manager"
-    PLAN = "plan"
-    RUN = "run"
-    REVIEW = "review"
-    GOVERNANCE = "governance"
-    SUPERVISOR = "supervisor"
+from vibe3.models.job import CommandType
 
 
 @dataclass(frozen=True)
@@ -38,7 +26,7 @@ class CommandAdapterEntry:
         description: Human-readable description
     """
 
-    job_type: CommandJobType
+    job_type: CommandType
     import_path: str
     callable_name: str
     description: str
@@ -76,8 +64,8 @@ class CommandAdapterRegistry:
     """
 
     def __init__(self) -> None:
-        self._entries: dict[CommandJobType, CommandAdapterEntry] = {}
-        self._resolved: dict[CommandJobType, ResolvedAdapter] = {}
+        self._entries: dict[CommandType, CommandAdapterEntry] = {}
+        self._resolved: dict[CommandType, ResolvedAdapter] = {}
 
     def register(self, entry: CommandAdapterEntry) -> None:
         """Register an adapter entry.
@@ -94,7 +82,7 @@ class CommandAdapterRegistry:
             )
         self._entries[entry.job_type] = entry
 
-    def resolve(self, job_type: CommandJobType) -> ResolvedAdapter:
+    def resolve(self, job_type: CommandType) -> ResolvedAdapter:
         """Resolve an adapter for a job type.
 
         Imports the module and retrieves the callable on first call,
@@ -147,7 +135,7 @@ class CommandAdapterRegistry:
         self._resolved[job_type] = resolved
         return resolved
 
-    def is_registered(self, job_type: CommandJobType) -> bool:
+    def is_registered(self, job_type: CommandType) -> bool:
         """Check if a job type is registered.
 
         Args:
@@ -158,7 +146,7 @@ class CommandAdapterRegistry:
         """
         return job_type in self._entries
 
-    def list_registered(self) -> list[CommandJobType]:
+    def list_registered(self) -> list[CommandType]:
         """List all registered job types.
 
         Returns:
@@ -181,7 +169,7 @@ def build_default_registry() -> CommandAdapterRegistry:
     # Register all canonical commands
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.MANAGER,
+            job_type=CommandType.MANAGER,
             import_path="vibe3.roles.manager",
             callable_name="MANAGER_SYNC_SPEC",
             description="Manager role for issue state transitions",
@@ -190,7 +178,7 @@ def build_default_registry() -> CommandAdapterRegistry:
 
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.PLAN,
+            job_type=CommandType.PLAN,
             import_path="vibe3.roles.plan",
             callable_name="PLAN_SYNC_SPEC",
             description="Planner role for creating implementation plans",
@@ -199,7 +187,7 @@ def build_default_registry() -> CommandAdapterRegistry:
 
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.RUN,
+            job_type=CommandType.RUN,
             import_path="vibe3.roles.run_request",
             callable_name="RUN_SYNC_SPEC",
             description="Executor role for running implementation",
@@ -208,7 +196,7 @@ def build_default_registry() -> CommandAdapterRegistry:
 
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.REVIEW,
+            job_type=CommandType.REVIEW,
             import_path="vibe3.roles.review",
             callable_name="REVIEW_SYNC_SPEC",
             description="Reviewer role for code review",
@@ -217,7 +205,7 @@ def build_default_registry() -> CommandAdapterRegistry:
 
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.GOVERNANCE,
+            job_type=CommandType.GOVERNANCE_SCAN,
             import_path="vibe3.roles.governance",
             callable_name="GOVERNANCE_ROLE",
             description="Governance role for system-wide operations",
@@ -226,7 +214,7 @@ def build_default_registry() -> CommandAdapterRegistry:
 
     registry.register(
         CommandAdapterEntry(
-            job_type=CommandJobType.SUPERVISOR,
+            job_type=CommandType.SUPERVISOR_APPLY,
             import_path="vibe3.roles.supervisor",
             callable_name="SUPERVISOR_CLI_SYNC_SPEC",
             description="Supervisor role for orchestration",

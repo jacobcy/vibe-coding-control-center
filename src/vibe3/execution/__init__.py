@@ -15,7 +15,6 @@ if TYPE_CHECKING:
         CommandAdapterEntry,
         CommandAdapterError,
         CommandAdapterRegistry,
-        CommandJobType,
         ResolvedAdapter,
         build_default_registry,
     )
@@ -55,7 +54,6 @@ _LAZY_IMPORTS = {
     "CommandAdapterEntry": "vibe3.execution.command_adapter",
     "CommandAdapterError": "vibe3.execution.command_adapter",
     "CommandAdapterRegistry": "vibe3.execution.command_adapter",
-    "CommandJobType": "vibe3.execution.command_adapter",
     "ExecutionCoordinator": "vibe3.execution.coordinator",
     "ResolvedAdapter": "vibe3.execution.command_adapter",
     "build_default_registry": "vibe3.execution.command_adapter",
@@ -109,7 +107,6 @@ __all__ = [
     "CommandAdapterRegistry",
     "CommandAdapterEntry",
     "CommandAdapterError",
-    "CommandJobType",
     "ResolvedAdapter",
     "build_default_registry",
     # Request/Result contracts
