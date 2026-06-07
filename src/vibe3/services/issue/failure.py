@@ -2,11 +2,13 @@
 
 This module handles failure/block transitions for issues when
 executor or manager runs fail or make no progress.
+
+Intra-subpackage dependency: failure → flow (one-directional; do not reverse).
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from loguru import logger
 
@@ -274,7 +276,3 @@ def block_reviewer_noop_issue(
         repo=repo,
         is_noop=True,
     )
-
-
-if TYPE_CHECKING:
-    pass
