@@ -11,6 +11,7 @@ from vibe3.services import (
     FlowService,
     load_issue_info,
     resolve_branch_and_issue,
+    resolve_branch_arg,
 )
 from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
@@ -50,7 +51,7 @@ def blocked(
 
     service = FlowService()
 
-    target_branch, issue_number = resolve_branch_and_issue(branch)
+    target_branch = resolve_branch_arg(branch)
 
     logger.bind(
         command="flow blocked",
@@ -63,7 +64,8 @@ def blocked(
     flow_status = service.get_flow_status(target_branch)
 
     if not flow_status:
-        # Try to auto-create flow if branch matches task/dev convention
+        # Lazy: only resolve issue_number when flow doesn't exist
+        _, issue_number = resolve_branch_and_issue(branch)
         if issue_number:
             logger.bind(
                 branch=target_branch,
