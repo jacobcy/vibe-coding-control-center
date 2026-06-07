@@ -5,20 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # Domain layer re-exports
-    from vibe3.domain import FailedGate, FlowManager
-
-    # Runtime layer re-exports
-    # Orchestra instance utilities (now in runtime)
-    from vibe3.runtime import (
-        CircuitBreaker,
-        HeartbeatServer,
-        OrchestraInstanceInfo,
-        read_instance_info,
-        validate_instance,
-        write_instance_info,
-    )
-
     # MCP server
     from vibe3.server.mcp import (
         create_mcp_server,
@@ -33,17 +19,6 @@ if TYPE_CHECKING:
 
 # Lazy imports for all symbols (avoid circular init dependencies)
 _LAZY_IMPORTS = {
-    # Domain layer re-exports
-    "FailedGate": "vibe3.domain",
-    "FlowManager": "vibe3.domain",
-    # Runtime layer re-exports
-    "CircuitBreaker": "vibe3.runtime",
-    "HeartbeatServer": "vibe3.runtime",
-    # Orchestra instance utilities
-    "OrchestraInstanceInfo": "vibe3.runtime",
-    "read_instance_info": "vibe3.runtime",
-    "validate_instance": "vibe3.runtime",
-    "write_instance_info": "vibe3.runtime",
     # MCP server
     "create_mcp_server": "vibe3.server.mcp",
     "format_snapshot_for_mcp": "vibe3.server.mcp",
@@ -65,17 +40,6 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    # domain
-    "FailedGate",
-    "FlowManager",
-    # runtime
-    "CircuitBreaker",
-    "HeartbeatServer",
-    # orchestra_instance
-    "OrchestraInstanceInfo",
-    "read_instance_info",
-    "write_instance_info",
-    "validate_instance",
     # server_utils
     "find_available_port",
     # mcp
