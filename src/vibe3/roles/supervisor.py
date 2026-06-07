@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from vibe3.config import ConventionResolver
 
 from vibe3.config import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
-    ConventionResolver,
+    get_resolver,
 )
 from vibe3.execution import ExecutionRolePolicyService, use_current_branch
 from vibe3.models import (
@@ -313,7 +316,7 @@ def get_supervisor_prompt_path(
         Path or None if profile has no supervisor
     """
     if resolver is None:
-        resolver = ConventionResolver.from_repo()
+        resolver = get_resolver()
     result: str | None = resolver.get_supervisor_path("apply")
     return result
 
@@ -329,7 +332,7 @@ def iter_supervisor_identified_events(
     handoff_label = get_handoff_state_label(config.supervisor_handoff)
 
     # Use profile resolution for supervisor template path
-    resolver = ConventionResolver.from_repo()
+    resolver = get_resolver()
     supervisor_file = get_supervisor_prompt_path(resolver)
 
     if not supervisor_file:

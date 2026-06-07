@@ -3,7 +3,7 @@
 Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
-from vibe3.config.convention_resolver import ConventionResolver
+from vibe3.config.convention_resolver import get_convention
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr.resolver import resolve_command_branch
 
@@ -47,6 +47,6 @@ def resolve_branch_and_issue(branch_arg: str | None) -> tuple[str, int | None]:
         Tuple of (resolved_branch_name, issue_number or None)
     """
     branch = resolve_branch_arg(branch_arg)
-    convention = ConventionResolver.from_repo().resolve().branch
+    convention = get_convention().branch
     issue_number = convention.parse_issue_number(branch)
     return branch, issue_number

@@ -6,7 +6,7 @@ ConventionResolver defaults when explicit config values are not set.
 
 from __future__ import annotations
 
-from vibe3.config.convention_resolver import ConventionResolver
+from vibe3.config.convention_resolver import get_convention
 from vibe3.models import OrchestraConfig, SupervisorHandoffConfig
 
 
@@ -36,8 +36,7 @@ def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
         return config.manager_usernames
 
     # Fallback to ConventionResolver
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     return convention.manager_usernames
 
 
@@ -58,6 +57,5 @@ def get_handoff_state_label(config: SupervisorHandoffConfig) -> str:
     if config.handoff_state_label:
         return config.handoff_state_label
 
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     return convention.state_label(convention.handoff_label)

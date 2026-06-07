@@ -119,21 +119,21 @@ def test_task_resume_has_no_all_option() -> None:
     assert "No such option" in result.output
 
 
-@patch("vibe3.commands.task.ConventionResolver")
+@patch("vibe3.commands.task.get_convention")
 @patch("vibe3.commands.task.FlowService")
 @patch("vibe3.commands.task._build_resume_usecase")
 def test_task_resume_branch_extracts_issue_number(
     build_usecase: MagicMock,
     flow_service_cls: MagicMock,
-    convention_resolver_cls: MagicMock,
+    mock_get_convention: MagicMock,
 ) -> None:
     """`--branch task/issue-303` should be equivalent to `303`."""
-    # Setup convention resolver mock
+    # Setup convention mock
     convention = MagicMock()
     convention.parse_issue_number.return_value = 303
     resolver = MagicMock()
     resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    mock_get_convention.return_value = resolver
 
     # Setup usecase mock
     usecase = MagicMock()
@@ -167,15 +167,15 @@ def test_task_resume_branch_conflicts_with_positional() -> None:
     assert "不能同时指定 --branch 和位置参数" in result.output
 
 
-@patch("vibe3.commands.task.ConventionResolver")
-def test_task_resume_branch_invalid_name(convention_resolver_cls: MagicMock) -> None:
+@patch("vibe3.commands.task.get_convention")
+def test_task_resume_branch_invalid_name(mock_get_convention: MagicMock) -> None:
     """Invalid branch name should error."""
-    # Setup convention resolver mock
+    # Setup convention mock
     convention = MagicMock()
     convention.parse_issue_number.return_value = None  # Cannot parse
     resolver = MagicMock()
     resolver.branch = convention
-    convention_resolver_cls.from_repo.return_value.resolve.return_value = resolver
+    mock_get_convention.return_value = resolver
 
     result = runner.invoke(app, ["task", "resume", "--branch", "invalid-name", "--yes"])
 

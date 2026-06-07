@@ -18,7 +18,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.analysis import build_snapshot_diff_section
-from vibe3.config import ConventionResolver, VibeConfig
+from vibe3.config import VibeConfig, get_resolver
 from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
 from vibe3.models import PromptContextMode, ReviewRequest
@@ -204,7 +204,7 @@ def _build_review_prompt_providers(
     def review_exit_contract() -> str:
         return build_review_task_section(config.review.review_task)
 
-    resolver = ConventionResolver.from_repo()
+    resolver = get_resolver()
 
     def review_policy() -> str:
         policy_path = (

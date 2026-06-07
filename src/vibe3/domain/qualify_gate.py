@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient
+from vibe3.config.convention_resolver import get_convention
 from vibe3.models import (
     CoordinationTruth,
     FlowStatusResponse,
@@ -20,7 +21,6 @@ from vibe3.models import (
     OrchestraConfig,
 )
 from vibe3.services import (
-    ConventionResolver,
     CoordinationResolver,
     FlowService,
     IssueFlowService,
@@ -60,8 +60,7 @@ class QualifyGateService:
         self._github = github
         self._store = store
         self._flow_manager = flow_manager
-        resolver = ConventionResolver.from_repo()
-        self._convention = resolver.resolve()
+        self._convention = get_convention()
         self._coordination_resolver = CoordinationResolver(store=store)
 
     def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:

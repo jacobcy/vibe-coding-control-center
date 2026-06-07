@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
@@ -18,6 +20,19 @@ from vibe3.roles.supervisor import (
     iter_supervisor_identified_events,
 )
 from vibe3.services.convention_resolver import ConventionResolver
+
+
+@pytest.fixture(autouse=True)
+def clear_resolver_cache():
+    """Clear resolver cache before each test to ensure fresh resolver."""
+    from vibe3.config.convention_resolver import get_convention, get_resolver
+
+    get_convention.cache_clear()
+    get_resolver.cache_clear()
+    yield
+    # Clear after test as well
+    get_convention.cache_clear()
+    get_resolver.cache_clear()
 
 
 def _get_adapter_for_profile(profile_config):

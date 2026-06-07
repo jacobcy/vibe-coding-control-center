@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import os
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from vibe3.config import ConventionResolver
 
 from vibe3.agents import (
     CodeagentResult,
@@ -17,7 +21,7 @@ from vibe3.agents import (
     make_skill_context_builder,
 )
 from vibe3.clients import SQLiteClient, resolve_runtime_asset
-from vibe3.config import ConventionResolver, VibeConfig, load_orchestra_config
+from vibe3.config import VibeConfig, get_resolver, load_orchestra_config
 from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution import (
@@ -53,7 +57,7 @@ def resolve_skill_path(
         ...     content = Path(path).read_text()
     """
     if resolver is None:
-        resolver = ConventionResolver.from_repo()
+        resolver = get_resolver()
     result: str | None = resolver.get_skill_path(skill)
     return result
 
@@ -127,7 +131,9 @@ def execute_manual_run(
     if skill:
         skill_path = resolve_skill_path(skill)
         if not skill_path:
-            detected_profile = ConventionResolver(profile=None)._detect_profile()
+            from vibe3.config.convention_resolver import diagnose_profile
+
+            detected_profile = diagnose_profile()
             raise SkillNotAvailableError(skill, profile=detected_profile)
 
         try:

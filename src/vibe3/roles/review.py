@@ -19,8 +19,8 @@ from vibe3.agents import (
 from vibe3.analysis import changed_symbols
 from vibe3.config import (
     REVIEWER_GATE_CONFIG,
-    ConventionResolver,
     VibeConfig,
+    get_convention,
     load_orchestra_config,
     load_runtime_config,
 )
@@ -159,8 +159,7 @@ def build_issue_review_request(
     tick_id: int = 0,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     target_branch = branch or convention.branch.canonical_branch(issue.number)
     execution_name = f"vibe3-reviewer-issue-{issue.number}"
 

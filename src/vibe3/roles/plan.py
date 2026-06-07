@@ -16,8 +16,8 @@ from vibe3.agents import (
 from vibe3.clients import GitHubClient
 from vibe3.config import (
     PLANNER_GATE_CONFIG,
-    ConventionResolver,
     VibeConfig,
+    get_convention,
     load_orchestra_config,
     load_runtime_config,
 )
@@ -191,8 +191,7 @@ def build_plan_request(
     tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
-    resolver = ConventionResolver.from_repo()
-    convention = resolver.resolve()
+    convention = get_convention()
     target_branch = branch or convention.branch.canonical_branch(issue.number)
     return build_role_async_request(
         role="planner",

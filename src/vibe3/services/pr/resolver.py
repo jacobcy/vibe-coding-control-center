@@ -6,7 +6,7 @@ import typer
 
 from vibe3.clients import GitHubClient
 from vibe3.exceptions import UserError
-from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.convention_resolver import get_convention
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 
@@ -131,8 +131,7 @@ def resolve_command_branch(
             return resolved
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and branch_opt.isdigit():
-            resolver = ConventionResolver.from_repo()
-            convention = resolver.resolve()
+            convention = get_convention()
             return convention.branch.canonical_branch(int(branch_opt))
         return branch_opt
 
@@ -155,8 +154,7 @@ def resolve_command_branch(
             return resolved
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and position_arg.isdigit():
-            resolver = ConventionResolver.from_repo()
-            convention = resolver.resolve()
+            convention = get_convention()
             return convention.branch.canonical_branch(int(position_arg))
         return position_arg
 
