@@ -526,13 +526,18 @@ Steps:
 
 4.6. **依赖检查**：检查 Issue 是否有未解决的依赖：
    - 检查 issue body 和 comments 中引用的其他 issue（如 "Depends on #123"、"blocked by #456"）
-   - 对每个被依赖的 issue，检查其状态是否已关闭或处于 `state/done`
-   - 如果存在未解除的依赖：
-     - comment 当前 issue，列出未解除的依赖项
-     - 调用 `vibe3 flow blocked --task <被依赖的 issue 号>` 建立 flow 依赖关系
-       - 这会自动：写入 `blocked_reason`、转换 label、在 `flow_issue_links` 表中记录 `dependency` 角色
-     - 多个依赖时，对每个依赖分别调用一次
-     - `exit()`
+   - 读取 `truth.dependencies` 和 `flow_issue_links` 表中的正式依赖记录
+   - 比对非正式声明与正式记录：
+     - **未注册依赖**：若 issue body 中声明了依赖但 `flow_issue_links` 中无对应记录
+       - 调用 `vibe3 flow bind <task-id> --role dependency` 注册依赖关系
+       - 记录新注册的依赖 issue 编号
+     - **未关闭依赖**：对每个依赖 issue，检查其状态是否已关闭或处于 `state/done`
+       - 若依赖未关闭：
+         - comment 当前 issue，列出未解除的依赖项
+         - 调用 `vibe3 flow blocked --task <被依赖的 issue 号>` 建立 flow 依赖关系
+           - 这会自动：写入 `blocked_reason`、转换 label、在 `flow_issue_links` 表中记录 `dependency` 角色
+         - 多个依赖时，对每个依赖分别调用一次
+         - `exit()`
 
 5. 如果 scene 不健康：
    - 调用 `check_blocker_explained()` 检查是否需要写新 comment
@@ -738,9 +743,24 @@ Steps:
        ```
        [manager] Flow reached terminal state ({flow_status}), cleanup signaled
        ```
-     - 保持当前状态（done 保持 done，handoff 保持 handoff）
-     - `exit()`
-8. 根据 refs 和现场真源决定当前 issue 应进入哪一步
+- 保持当前状态（done 保持 done，handoff 保持 handoff）
+      - `exit()`
+ 7.5. **Dep-closure 验证（新增）**：检查 handoff 记录中是否有 dep-closure 上下文：
+    - 检查 handoff history 中是否有 `event_type="dep_resolved"` 的记录
+    - 若从 dep-closure HANDOFF 入场（有 dep_resolved 记录）：
+      - 验证依赖 issue 确实完全解决（检查 GitHub state 和关闭原因）
+      - 检查依赖 issue 是否以 "won't fix" / "not planned" 等非完成方式关闭
+      - **验证通过**（依赖正常完成）：
+        - 清除 blocked body state：调用 `vibe3 flow blocked --clear`
+        - 推进到合适状态（通常为 `state/claimed` 或继续 handoff 流程）
+        - Comment：`[manager] Dependency #{dep_issue_number} fully resolved, unblocking issue`
+        - `exit()`
+      - **验证失败**（依赖非正常关闭）：
+        - Re-block with new reason：调用 `vibe3 flow blocked --reason "Dependency #{dep_issue_number} closed as won't fix, need alternative approach"`
+        - Comment：`[manager] Dependency #{dep_issue_number} closed without resolution. Alternative approach required.`
+        - 添加 `roadmap/rfc` 标签（需要人类判断替代方案）
+        - `exit()`
+ 8. 根据 refs 和现场真源决定当前 issue 应进入哪一步
 9. 如果当前无法推进：
    - 先检查最新评论里是否已经解释原因
    - 若无解释，再检查已有 comments 是否已经覆盖同一 blocker
