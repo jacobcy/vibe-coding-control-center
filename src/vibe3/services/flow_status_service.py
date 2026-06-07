@@ -183,3 +183,29 @@ class FlowStatusService:
         self.mark_flow_status(
             branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
+
+    def mark_flow_unblocked(self, branch: str, reason: str) -> None:
+        """Clear stale blocked state from local DB and mark flow as active.
+
+        Clears blocked_by_issue and blocked_reason in addition to flow_status,
+        matching what BlockedStateIO.clear_database_cache() does.
+        Only updates local state — GitHub label sync is left to qualify_gate.
+        """
+        logger.bind(
+            domain="check",
+            action="auto_unblock_flow",
+            branch=branch,
+        ).info(f"auto_unblock_flow: {reason}")
+        self.store.update_flow_state(
+            branch,
+            flow_status="active",
+            blocked_reason=None,
+            blocked_by_issue=None,
+            transition_count=0,
+        )
+        self.store.add_event(
+            branch,
+            "flow_auto_unblocked",
+            "system",
+            f"Flow auto-unblocked: {reason}",
+        )

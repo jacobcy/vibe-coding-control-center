@@ -399,6 +399,20 @@ class CheckService(CheckRemote):
                     )
                 # Inactive flow with closed issue = expected terminal state, continue
 
+            # Priority 3: Sync stale blocked state from remote
+            # If flow is locally blocked but remote state/blocked was removed,
+            # clear the stale local state so the flow is not permanently stuck.
+            if (
+                flow_status == "blocked"
+                and task_issue
+                and orchestration_state is not None
+                and orchestration_state != IssueState.BLOCKED
+            ):
+                self._flow_status_service.mark_flow_unblocked(
+                    branch, "Remote state/blocked label removed"
+                )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
+
             # Handle stale ready flow rebuild
             if (
                 flow_status == "stale"
