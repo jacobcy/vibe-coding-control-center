@@ -9,7 +9,7 @@ from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.models import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr.service import PRService
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 if TYPE_CHECKING:
     from vibe3.services.issue.title_cache import IssueTitleCacheService

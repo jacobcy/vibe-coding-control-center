@@ -24,7 +24,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.pr.service import PRService
 from vibe3.services.signature_service import SignatureService
-from vibe3.services.task_show_service import (
+from vibe3.services.task.show import (
     TaskCommentSummary,
     TaskPRSummary,
     TaskRefSummary,

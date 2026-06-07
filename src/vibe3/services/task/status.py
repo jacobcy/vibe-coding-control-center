@@ -7,7 +7,7 @@ from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
-from vibe3.services.task_status_classifier import TaskStatusBucket, classify_task_status
+from vibe3.services.task.classifier import TaskStatusBucket, classify_task_status
 
 
 @dataclass

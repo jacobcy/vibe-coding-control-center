@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.task_resume_usecase import TaskResumeUsecase
+from vibe3.services.task import TaskResumeUsecase
 
 
 @pytest.fixture
@@ -23,19 +23,19 @@ def usecase():
     mock_github.get_issue_body.return_value = "User content"
 
     with (
-        patch("vibe3.services.task_resume_usecase.StatusQueryService") as mock_status,
-        patch("vibe3.services.task_resume_usecase.LabelService") as mock_label,
-        patch("vibe3.services.task_resume_usecase.FlowService") as mock_flow,
-        patch("vibe3.services.task_resume_usecase.GitClient") as mock_git,
+        patch("vibe3.services.task.resume.StatusQueryService") as mock_status,
+        patch("vibe3.services.task.resume.LabelService") as mock_label,
+        patch("vibe3.services.task.resume.FlowService") as mock_flow,
+        patch("vibe3.services.task.resume.GitClient") as mock_git,
         patch(
-            "vibe3.services.task_resume_usecase.GitHubClient",
+            "vibe3.services.task.resume.GitHubClient",
             return_value=mock_github,
         ) as _,
         patch(
             "vibe3.services.blocked_state_io.GitHubClient",
             return_value=mock_github,
         ) as _,
-        patch("vibe3.services.task_resume_usecase.IssueFlowService") as mock_issue_flow,
+        patch("vibe3.services.task.resume.IssueFlowService") as mock_issue_flow,
     ):
         uc = TaskResumeUsecase(
             status_service=mock_status.return_value,

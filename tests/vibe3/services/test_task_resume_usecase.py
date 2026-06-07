@@ -4,7 +4,7 @@ import inspect
 from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.task_resume_usecase import TaskResumeUsecase
+from vibe3.services.task import TaskResumeUsecase
 
 
 def _make_usecase() -> TaskResumeUsecase:

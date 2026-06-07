@@ -209,8 +209,8 @@ class TestTaskStatusExcludesSystemStatus:
     @patch(
         "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
     )
-    @patch("vibe3.services.task_status_service.FlowService")
-    @patch("vibe3.services.task_status_service.StatusQueryService")
+    @patch("vibe3.services.task.status.FlowService")
+    @patch("vibe3.services.task.status.StatusQueryService")
     def test_task_status_no_system_sections(
         self,
         mock_status_service_cls: MagicMock,

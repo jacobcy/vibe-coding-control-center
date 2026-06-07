@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from vibe3.models.flow import IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 
 class TestFlowBinding:

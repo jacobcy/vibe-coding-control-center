@@ -9,7 +9,7 @@ import pytest
 from vibe3.analysis.coverage_service import CoverageService
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
-from vibe3.services.task_resume_operations import TaskResumeOperations
+from vibe3.services.task import TaskResumeOperations
 
 
 @pytest.fixture(autouse=True)

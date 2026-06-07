@@ -3,7 +3,7 @@
 from unittest.mock import patch
 
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 
 class TestTaskRetrieval:
