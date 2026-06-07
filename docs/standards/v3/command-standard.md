@@ -91,7 +91,7 @@ related_docs:
 - `update`
 - `bind`
 - `blocked`
-- `unblock`
+- `rebuild`
 - `show`
 - `status`
 - `list-deleted`
@@ -103,20 +103,14 @@ related_docs:
 
 - `show`：查看当前或指定 task 的 execution scene 摘要
 - `status`：项目级总览入口，汇总活跃 flow、orchestra 状态与 worktree 上下文
+- `intake`：将 issue 分解/纳入本地管理
 - `resume`：恢复 blocked issues 到 ready 状态
 
-明确不再作为现行公共命令面的旧入口：
+### 3.3 `vibe3 status` [Compatibility]
 
-- `flow add`
-- `flow create`
-- `flow new`
-- `flow switch`
-- `flow list`
-- `flow done`
-- `flow aborted`
-- `task list`
+- `vibe3 status`：保留为全局状态查询的兼容入口。建议优先使用 `vibe3 task status`。
 
-### 3.3 `vibe3 handoff`
+### 3.4 `vibe3 handoff`
 
 `vibe3 handoff` 组用于管理 agent 责任链与事件记录：
 
@@ -127,7 +121,7 @@ related_docs:
 - `plan` / `report` / `indicate` / `audit` / `next`：记录特定阶段的责任链上下文
 - `verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
 
-### 3.4 `vibe3 check`
+### 3.5 `vibe3 check`
 
 `check` 是一致性与审计入口，用于：
 
@@ -136,6 +130,13 @@ related_docs:
 - 做最小、显式的审计补充
 
 `check` 不是 branch / PR / issue 生命周期包装器。
+
+### 3.6 `vibe3 serve`
+
+`serve` 组用于 Orchestra 服务管理：
+
+- `start` / `stop` / `status` / `logs`
+- `resume`：清除 FailedGate 并允许 Orchestra 恢复。
 
 ## 4. `flow` 语义边界
 
@@ -251,20 +252,17 @@ vibe3 flow bind <issue> [<issue> ...] [--role <role>] [--branch <branch>]
 - `--branch` 省略时默认当前分支
 - 显式 `--branch` 只允许已注册且非保护的 flow 分支
 
-### 7.3 `flow blocked` / `flow unblock`
+### 7.3 `flow blocked`
 
 ```bash
 # Block
 vibe3 flow blocked [--branch <branch>] [--reason <text>] [--task <issue>]
-
-# Unblock (Manual override)
-vibe3 flow unblock [--branch <branch>]
 ```
 
 约束：
 
 - 目标 flow 必须已存在
-- `unblock` 负责清除 `blocked_reason` 并尝试恢复 state
+- 手动恢复应使用 `vibe3 task resume`
 
 ### 7.4 `task show` / `task status` / `task resume`
 

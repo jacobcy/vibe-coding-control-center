@@ -27,28 +27,24 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
-- `vibe3 status` (兼容入口，重定向至 `task status`)
-- `vibe3 flow show`
-- `vibe3 handoff show`
-- `flow update` / `flow bind` / `flow show` / `flow status`
-- `task status` / `status` 全局总览
-- `handoff` 本地协作增强
-- `plan` / `run` / `review` agent 执行入口
-- `serve` / orchestra / manager 运行时能力
-- `snapshot` 项目健康度度量
-- `inspect` 代码影响分析
-- `adapters` 逻辑适配器与集成桥接
+- `vibe3 task status` — 全局任务面板与 Flow 状态总览 (推荐)
+- `vibe3 status` — [Compatibility] 全局状态兼容入口
+- `vibe3 flow show` / `rebuild` / `bind` — Flow 现场管理
+- `vibe3 task show` / `intake` / `resume` — 任务生命周期管理
+- `vibe3 handoff show` / `status` / `append` — Agent 协作上下文
+- `vibe3 plan` / `run` / `review` — Agent 执行入口
+- `vibe3 serve` / `scan` / `check` — 基础设施与治理服务
+- `vibe3 snapshot` / `inspect` / `ask` — 项目分析与知识检索
 
 ## 快速开始
 
 ```bash
-# 1. 查看 V3 运行时与 Flow 状态 (这是 Agent 的首选入口)
-vibe3 status           # 重定向至 task status
+# 1. 查看 V3 运行时与任务状态 (这是 Agent 的首选入口)
+vibe3 task status      # 全局任务面板
+vibe3 status           # [Compatibility] 兼容入口
 vibe3 snapshot show    # 查看项目健康度仪表盘
-vibe3 inspect symbols  # (可选) 分析当前代码结构
 
-vibe3 flow update
-vibe3 flow show
+vibe3 flow show        # 查看当前分支 Flow 详情
 ```
 # 2. 如果是首次使用或环境变更，执行初始化
 # 这会同步基础文件并初始化本地 worktree (symlinks, hooks, etc.)

@@ -42,28 +42,37 @@ related_docs:
 - 共享状态 schema
 - manager agent / orchestra agent 如何决定是否进入 plan、run、review 等步骤
 
-## 2. Core Model
+## 2. Runtime Execution Levels (L1-L4)
 
-- `worktree` 是物理目录容器
-- `branch` 是该目录当前承载的 Git 提交线
-- `flow` 可以借由该目录承载，但不等于该目录
+根据 [glossary.md](../glossary.md) 的定义，系统任务按执行集成深度分为 L1-L4 四个等级。
 
-因此：
+### 2.1 Level 1 (L1 - Inspection Level)
+- **定义**：**无 Worktree 观察层**。
+- **环境**：直接在主仓库或内存中运行，不创建独立目录。
+- **职责**：只读观察、Metadata 扫描、Label 路由、心跳监测。
 
-- 新 `flow` 不强制要求新 `worktree`
-- 复用同一目录承载新的 `flow` 是允许的
-- 但复用目录时，必须显式切换到新的 `branch`
-- 当前开放 flow 的执行判断应优先围绕 `branch`，`worktree` 只提供目录 hint
-- 复用目录进入新的逻辑 `flow` 时，应通过 `git checkout` 切换分支，并运行 `vibe3 flow update` 注册现场，而不是靠目录名暗示
-- 已关闭 flow 的历史不保存在 `worktree` 目录内，而应保存在共享历史真源中
+### 2.2 Level 2 (L2 - Governance Execution Level)
+- **定义**：**临时隔离治理层**。
+- **环境**：使用**临时创建且自动销毁**的 Git Worktree。
+- **职责**：
+  - 文档治理（更新、校正、语义对齐）。
+  - 测试修补（测试文件、夹具、文案修正）。
+  - `supervisor/apply` 治理任务执行。
+- **生命周期**：任务开始时创建，任务结束（PASS/BLOCK/MAJOR）后通常立即或短期内物理销毁，不承载长期开发历史。
 
-补充边界：
+### 2.3 Level 3 (L3 - Main Development Level)
+- **定义**：**持久隔离开发层**。
+- **环境**：为每个 GitHub Issue 分配**持久化**的独立 Worktree。
+- **职责**：核心业务开发、架构调整、大型特性实现。
+- **生命周期**：贯穿完整的 Plan/Run/Review 生命周期。在 PR 合并并由 `vibe-done` 确认前，目录持久保留以支持后续修复与 Review follow-up。
 
-- `manager` 模块负责提供 worktree 的创建、查找、复用、回收能力
-- 是否调用这些能力，由 manager agent、orchestra agent 或其他 skill 根据现场决定
-- worktree 模块本身不应隐藏“发现异常就自动推进后续流程”的业务判断
+### 2.4 Level 4 (L4 - Atomic Collaboration Level)
+- **定义**：**原子协作层**。
+- **环境**：通常在 L3 环境内执行或通过 API 远程执行。
+- **职责**：单指令干预、手动 PR 合并、密钥注入。
 
 ## 3. Create and Reuse Rules
+
 
 ### 3.1 Create a New Worktree
 
