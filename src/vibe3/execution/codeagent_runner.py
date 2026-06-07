@@ -502,6 +502,7 @@ class CodeagentExecutionService:
                     session_id=ctx.session_id,
                     refs=abort_refs,
                     event_type=event_type,
+                    error_contract=error_contract,
                 )
 
             # Runtime error handling: record to error_log only.
