@@ -88,10 +88,12 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     ],
 }
 
-# Modules the core must not import from at module level
+# Top-level modules the core must not import from at module level.
+# Aligns with #2293 kernel startup boundary (FORBIDDEN list).
+# Note: "domain" is intentionally excluded here — see FORBIDDEN_CORE_DOMAIN_PREFIXES
+# and test_core_no_domain_business_entity_imports for domain-specific debt tracking.
 FORBIDDEN_CORE_SOURCES: frozenset[str] = frozenset(
     {
-        "domain",  # observation/business semantics
         "services",  # command adapter business services
         "execution",  # command adapter execution primitives
         "roles",  # policy: dispatch predicates & material loading
@@ -99,6 +101,19 @@ FORBIDDEN_CORE_SOURCES: frozenset[str] = frozenset(
         "prompts",  # prompt rendering logic
     }
 )
+
+# Domain sub-paths strictly forbidden in core (aligns with #2293).
+# Only event-handler registration and the orchestration facade must never be
+# loaded eagerly — domain models and domain.protocols are allowed.
+FORBIDDEN_CORE_DOMAIN_PREFIXES: frozenset[str] = frozenset(
+    {
+        "vibe3.domain.handlers",
+        "vibe3.domain.orchestration_facade",
+    }
+)
+
+# domain.protocols is allowed (interface definitions, not business logic).
+_ALLOWED_DOMAIN_PROTOCOL_PREFIX = "vibe3.domain.protocols"
 
 # Infrastructure modules the core may freely import
 ALLOWED_CORE_SOURCES: frozenset[str] = frozenset(
@@ -148,52 +163,97 @@ class TestCoreBudget:
                 f"got {category}"
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: orchestra submodules import from "
-        "domain/services at module level. Tracked by follow-up issues.",
-        strict=True,
-    )
     def test_core_no_business_imports_at_module_level(self) -> None:
         """Verify core does not import business modules at module level.
 
         Acceptance criterion 2: Test fails when core imports command-specific
-        business modules at startup.
+        business modules at startup. Aligned with #2293 kernel startup boundary:
+        - Top-level forbidden: services, execution, roles, agents, prompts
+        - Domain sub-path forbidden: domain.handlers, domain.orchestration_facade
+        - domain.protocols (interface definitions) and plain domain models are
+          tracked separately in test_core_no_domain_business_entity_imports.
         """
         violations: list[str] = []
 
-        # Check all .py files in runtime/ and orchestra/
         for module_name in CORE_MODULES:
             module_dir = Path("src/vibe3") / module_name
 
             for py_file in module_dir.rglob("*.py"):
-                # Skip __init__.py (re-exports are allowed there)
                 if py_file.name == "__init__.py":
                     continue
 
-                # Get module-level imports
                 imports = _get_module_level_imports(str(py_file))
 
-                # Check each import
                 for imp in imports:
-                    # Extract top-level module name (second component)
-                    # e.g., "vibe3.domain.events" -> "domain"
                     parts = imp.split(".")
-                    if len(parts) >= _MIN_VIBE3_IMPORT_PARTS and parts[0] == "vibe3":
-                        top_level = parts[1]
+                    if len(parts) < _MIN_VIBE3_IMPORT_PARTS or parts[0] != "vibe3":
+                        continue
+                    top_level = parts[1]
 
-                        # Check if importing from forbidden source
-                        if top_level in FORBIDDEN_CORE_SOURCES:
-                            violations.append(
-                                f"{py_file.relative_to('src/vibe3')}: "
-                                f"imports from {top_level} ({imp})",
-                            )
+                    # Check top-level forbidden modules
+                    if top_level in FORBIDDEN_CORE_SOURCES:
+                        violations.append(
+                            f"{py_file.relative_to('src/vibe3')}: "
+                            f"imports from {top_level} ({imp})",
+                        )
+                    # Check forbidden domain sub-paths
+                    elif any(
+                        imp.startswith(prefix)
+                        for prefix in FORBIDDEN_CORE_DOMAIN_PREFIXES
+                    ):
+                        violations.append(
+                            f"{py_file.relative_to('src/vibe3')}: "
+                            f"imports from forbidden domain path ({imp})",
+                        )
 
-        # Report all violations
         if violations:
             violation_list = "\n".join(f"  - {v}" for v in violations)
             pytest.fail(
                 f"Core modules must not import from business/plugin modules "
                 f"at module level:\n{violation_list}",
+            )
+
+    @pytest.mark.xfail(
+        reason="Architectural debt: orchestra submodules import domain business "
+        "entities (FailedGate, FlowManager, GlobalDispatchCoordinator) at module "
+        "level. domain.protocols imports are explicitly allowed. Tracked by #2318.",
+        strict=True,
+    )
+    def test_core_no_domain_business_entity_imports(self) -> None:
+        """Verify core does not import domain business entities at module level.
+
+        domain.protocols (interface definitions) are allowed — these are contracts
+        that core legitimately depends on.
+        All other direct domain imports in core are architectural debt (#2318).
+        """
+        violations: list[str] = []
+
+        for module_name in CORE_MODULES:
+            module_dir = Path("src/vibe3") / module_name
+
+            for py_file in module_dir.rglob("*.py"):
+                if py_file.name == "__init__.py":
+                    continue
+
+                imports = _get_module_level_imports(str(py_file))
+
+                for imp in imports:
+                    parts = imp.split(".")
+                    if (
+                        len(parts) >= _MIN_VIBE3_IMPORT_PARTS
+                        and parts[0] == "vibe3"
+                        and parts[1] == "domain"
+                        and not imp.startswith(_ALLOWED_DOMAIN_PROTOCOL_PREFIX)
+                    ):
+                        violations.append(
+                            f"{py_file.relative_to('src/vibe3')}: {imp}",
+                        )
+
+        if violations:
+            violation_list = "\n".join(f"  - {v}" for v in violations)
+            pytest.fail(
+                f"Core must not import domain business entities at module level "
+                f"(domain.protocols is allowed):\n{violation_list}",
             )
 
     def test_core_responsibility_allowlist_documented(self) -> None:
