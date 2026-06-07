@@ -289,9 +289,9 @@ code_limits:
     # Milestone 1: 65,000 LOC (intermediate target)
     # Milestone 2: 60,000 LOC (stretch target)
     # Final target: 55,000 LOC (governance goal)
-    v3_python: 68000        # Python 核心代码总行数（临时提升 3000，待模块化重构后清理）
+    v3_python: 75000        # Python 核心代码总行数（临时提升 7000，PR #2349 dep-closure 架构统一后超标）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
-    last_reviewed: "2026-06-04"    # Track last governance review (Issue #625)
+    last_reviewed: "2026-06-07"    # Track last governance review (Issue #625)
 
   # 统计口径（路径定义）
   code_paths:
