@@ -3,7 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from vibe3.server import (
+from vibe3.runtime import (
     OrchestraInstanceInfo,
     read_instance_info,
     write_instance_info,

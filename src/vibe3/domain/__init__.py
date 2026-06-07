@@ -46,11 +46,6 @@ if TYPE_CHECKING:
     from vibe3.domain.publisher import EventPublisher
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
-    from vibe3.domain.state_machine import (
-        STATE_LABEL_META,
-        VIBE_TASK_LABEL,
-        validate_transition,
-    )
 
 _LAZY_IMPORTS: dict[str, str] = {
     # Events
@@ -73,10 +68,6 @@ _LAZY_IMPORTS: dict[str, str] = {
     "FlowManager": "vibe3.domain.flow_manager",
     "GlobalDispatchCoordinator": "vibe3.domain.dispatch_coordinator",
     "FailedGate": "vibe3.domain.failed_gate",
-    # State machine
-    "STATE_LABEL_META": "vibe3.models.state_machine",
-    "VIBE_TASK_LABEL": "vibe3.models.state_machine",
-    "validate_transition": "vibe3.models.state_machine",
     # Protocols
     "CapacityServiceProtocol": "vibe3.domain.protocols",
     "CheckServiceProtocol": "vibe3.domain.protocols",
@@ -155,10 +146,6 @@ __all__ = [
     "SupervisorApplyStarted",
     "SupervisorApplyCompleted",
     "SupervisorApplyDelegated",
-    # State machine
-    "STATE_LABEL_META",
-    "VIBE_TASK_LABEL",
-    "validate_transition",
     # Orchestration
     "FlowManager",
     "GlobalDispatchCoordinator",

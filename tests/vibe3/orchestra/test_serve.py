@@ -503,7 +503,7 @@ def test_resume_clears_gate_when_active(monkeypatch) -> None:
 
 def test_start_blocks_when_instance_running(monkeypatch, tmp_path: Path) -> None:
     """Test that serve start blocks when another instance is already running."""
-    from vibe3.server import OrchestraInstanceInfo
+    from vibe3.runtime import OrchestraInstanceInfo
 
     pid_file = tmp_path / "orchestra.pid"
     instance_info = OrchestraInstanceInfo(
@@ -534,7 +534,7 @@ def test_start_blocks_when_instance_running(monkeypatch, tmp_path: Path) -> None
 
 def test_status_displays_instance_directory(monkeypatch, tmp_path: Path) -> None:
     """Test that serve status displays the running directory."""
-    from vibe3.server import OrchestraInstanceInfo
+    from vibe3.runtime import OrchestraInstanceInfo
 
     pid_file = tmp_path / "orchestra.pid"
     instance_info = OrchestraInstanceInfo(
@@ -567,7 +567,7 @@ def test_stop_clears_global_pid_file(monkeypatch, tmp_path: Path) -> None:
     """Test that serve stop removes the global PID file."""
     from unittest.mock import MagicMock
 
-    from vibe3.server import OrchestraInstanceInfo
+    from vibe3.runtime import OrchestraInstanceInfo
 
     pid_file = tmp_path / "orchestra.pid"
     instance_info = OrchestraInstanceInfo(
