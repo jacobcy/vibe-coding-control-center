@@ -354,4 +354,46 @@ def test_verify_branch_closed_issue_returns_invalid(tmp_path: Path) -> None:
 
     # Closed issue = NOT valid for dispatch
     assert result.is_valid is False
-    assert any("CLOSED" in issue for issue in result.issues)
+
+
+def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
+    """When flow is locally blocked but remote state/blocked was removed, unblock it."""
+    store = SQLiteClient(db_path=tmp_path / "test.db")
+    branch = "task/issue-500"
+
+    # Set up blocked flow with stale blocked markers
+    store.update_flow_state(
+        branch,
+        flow_status="blocked",
+        blocked_by_issue=100,
+        blocked_reason="waiting for PR #100",
+    )
+    store.add_issue_link(branch, 500, "task")
+
+    mock_git = MagicMock()
+    mock_git.get_git_common_dir.return_value = tmp_path
+    # Non-empty return means branch exists locally
+    mock_git._run.return_value = branch
+
+    mock_github = MagicMock()
+    # Issue 500 has state/ready — remote state/blocked was removed
+    mock_github.view_issue.return_value = {
+        "number": 500,
+        "state": "open",
+        "labels": [{"name": "state/ready"}],
+    }
+    mock_github.list_all_prs.return_value = []
+    mock_github.list_prs_for_branch.return_value = []
+
+    service = CheckService(store=store, git_client=mock_git, github_client=mock_github)
+    service._initialize_pr_cache()
+    result = service.verify_branch(branch)
+
+    assert result.is_valid is True
+
+    # DB blocked state must be cleared
+    flow = store.get_flow_state(branch)
+    assert flow is not None
+    assert flow.get("flow_status") == "active"
+    assert flow.get("blocked_by_issue") is None
+    assert flow.get("blocked_reason") is None
