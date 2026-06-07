@@ -159,18 +159,6 @@ def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> No
         )
 
 
-class TestExecutorSuccessStateChanged:
-    """场景 4: executor 正常推进 → 不干预"""
-
-    def test_executor_success_no_forced_handoff_event(
-        self,
-    ) -> None:
-        """Executor 正常推进 → 不应该强制转 HANDOFF"""
-        # This test verifies that executor success does NOT force HANDOFF
-        # The actual implementation will be fixed to remove confirm_role_handoff
-        pass  # ← Placeholder: 实际修复后添加详细测试
-
-
 class TestExecutorNoOpGate:
     """Executor no-op gate: state 未变 → blocked"""
 
