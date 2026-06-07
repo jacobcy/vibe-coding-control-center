@@ -54,11 +54,22 @@ class FlowReadMixin:
         # Cache-first: derive pr_number from local pr_ref if available
         pr_ref = flow_data.get("pr_ref")
         if isinstance(pr_ref, str) and pr_ref:
-            pr_number = int(pr_ref.rsplit("/", 1)[-1])
-            pr_ready = False  # Draft status unavailable from cache
+            try:
+                pr_number = int(pr_ref.rsplit("/", 1)[-1])
+                pr_ready = False  # Draft status unavailable from cache
+            except (ValueError, IndexError) as e:
+                # Malformed pr_ref: fall through to PRService fallback
+                logger.bind(domain="flow", branch=branch).warning(
+                    f"Malformed pr_ref '{pr_ref}': {e}"
+                )
+                pr_number, pr_ready = None, False
+                # Continue to PRService fallback below
+                pr_ref = None  # Clear to trigger fallback path
         else:
-            # Fallback: hydrate from GitHub via PRService
             pr_number, pr_ready = None, False
+
+        if not pr_ref:
+            # Fallback: hydrate from GitHub via PRService
             try:
                 from vibe3.services.pr.service import PRService
 

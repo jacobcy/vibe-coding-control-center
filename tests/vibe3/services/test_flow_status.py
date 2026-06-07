@@ -66,6 +66,32 @@ class TestFlowStatus:
         assert result.pr_number == 99
         assert result.pr_ready_for_review is True
 
+    def test_get_flow_status_malformed_pr_ref(self, mock_store) -> None:
+        """Test fallback when pr_ref is malformed (triggers ValueError/IndexError)."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-slug",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+            "pr_ref": "https://github.com/test/repo/pull/not-a-number",
+        }
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store)
+        # Should fall back to PRService when int() fails
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_service_class:
+            mock_pr_service = mock_pr_service_class.return_value
+            mock_pr = MagicMock()
+            mock_pr.number = 88
+            mock_pr.is_ready = False
+            mock_pr_service.get_branch_pr_status.return_value = mock_pr
+
+            result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert result.pr_number == 88  # From PRService fallback
+        assert result.pr_ready_for_review is False
+
     def test_get_flow_status_not_found(self, mock_store) -> None:
         """Test getting flow status for non-existent branch."""
         mock_store.get_flow_state.return_value = None
