@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from vibe3.exceptions import InvalidBranchLinkError
-from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.issue.flow import IssueFlowService
 
 
 class TestIssueFlowServiceBranchValidationGuard:

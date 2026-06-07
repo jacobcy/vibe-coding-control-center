@@ -260,7 +260,7 @@ class FlowRecoveryService:
         from vibe3.config.orchestra_settings import load_orchestra_config
         from vibe3.models import IssueInfo, IssueState
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-        from vibe3.services.issue_context_loader import load_issue_info
+        from vibe3.services.issue.context import load_issue_info
 
         # Load issue info from GitHub
         config = load_orchestra_config()

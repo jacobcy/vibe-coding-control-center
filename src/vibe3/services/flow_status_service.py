@@ -37,7 +37,7 @@ class FlowStatusService:
     ) -> bool:
         """Rebuild stale canonical ready flow using FlowRebuildUsecase."""
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-        from vibe3.services.issue_flow_service import IssueFlowService
+        from vibe3.services.issue.flow import IssueFlowService
 
         issue_number = task_issue
         if issue_number is None:

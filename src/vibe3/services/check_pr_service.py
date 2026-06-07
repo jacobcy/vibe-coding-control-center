@@ -644,7 +644,7 @@ The unresolved work continues in #{bridge_issue_number}.
             pr: PR response object with title and number
         """
         try:
-            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+            from vibe3.services.issue.title_cache import IssueTitleCacheService
 
             title_cache = IssueTitleCacheService(self.store, self.github_client)
             title_cache.update_pr(

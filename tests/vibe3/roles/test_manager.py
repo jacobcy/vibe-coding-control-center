@@ -357,7 +357,7 @@ class TestManagerBlockedReasonWriting:
         mock_issue_number = 305
 
         with patch(
-            "vibe3.services.issue_failure_service._get_issue_flow_service"
+            "vibe3.services.issue.failure._get_issue_flow_service"
         ) as mock_get_service:
             mock_service = MagicMock()
             mock_store = MagicMock()
@@ -372,7 +372,7 @@ class TestManagerBlockedReasonWriting:
             with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
                 mock_flow_instance = mock_flow_service.return_value
 
-                from vibe3.services.issue_failure_service import (
+                from vibe3.services.issue.failure import (
                     block_manager_noop_issue,
                 )
 

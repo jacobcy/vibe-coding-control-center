@@ -130,7 +130,7 @@ class PRService:
 
     def _sync_branch_context_cache(self, prs: dict[str, PRResponse]) -> None:
         """Project recent PR facts into flow_context_cache."""
-        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+        from vibe3.services.issue.title_cache import IssueTitleCacheService
 
         title_cache = IssueTitleCacheService(self.store)
         pr_entries = [(pr.head_branch, pr.number, pr.title) for pr in prs.values()]
@@ -590,7 +590,7 @@ class PRService:
         )
 
         # Update PR context cache with latest PR info using IssueTitleCacheService
-        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+        from vibe3.services.issue.title_cache import IssueTitleCacheService
 
         title_cache = IssueTitleCacheService(self.store)
         title_cache.update_pr(

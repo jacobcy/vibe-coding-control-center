@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient
     from vibe3.models import FlowStatusResponse
     from vibe3.services.flow_service import FlowService
-    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.label_service import LabelService
 
 

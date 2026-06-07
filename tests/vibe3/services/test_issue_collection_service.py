@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.issue_collection_service import IssueCollectionService
+from vibe3.services.issue.collection import IssueCollectionService
 
 
 def test_collect_open_issues_calls_github_once_without_label_filter() -> None:

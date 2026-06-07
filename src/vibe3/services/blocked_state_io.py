@@ -16,7 +16,7 @@ from loguru import logger
 from vibe3.clients import GitHubClient
 from vibe3.models import FlowStateProjection, IssueState
 from vibe3.services.blocked_state_types import BlockedState
-from vibe3.services.issue_body_service import merge_projection, parse_projection
+from vibe3.services.issue.body import merge_projection, parse_projection
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:

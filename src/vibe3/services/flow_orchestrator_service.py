@@ -15,8 +15,8 @@ from vibe3.exceptions import GitError
 from vibe3.models import PRState
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_failure_service import block_manager_noop_issue
-from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.issue.failure import block_manager_noop_issue
+from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.pr.service import PRService
 from vibe3.services.signature_service import SignatureService

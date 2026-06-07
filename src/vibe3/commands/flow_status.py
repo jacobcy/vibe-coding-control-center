@@ -103,7 +103,7 @@ def show(
             raise typer.Exit(1) from error
 
         # Get task issue number for remote fallback
-        from vibe3.services.issue_flow_service import IssueFlowService
+        from vibe3.services.issue.flow import IssueFlowService
 
         issue_flow_service = IssueFlowService(store=service.store)
         task_issue_number = issue_flow_service.resolve_task_issue_number(target_branch)

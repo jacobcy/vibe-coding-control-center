@@ -21,7 +21,7 @@ from vibe3.clients import BackendProtocol
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, SQLiteClient
     from vibe3.services.flow_service import FlowService
-    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.pr.service import PRService
 
 
@@ -84,7 +84,7 @@ class FlowCleanupService:
     def issue_flow_service(self) -> IssueFlowService:
         """Lazy-initialized issue-flow service."""
         if self._issue_flow_service is None:
-            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.issue.flow import IssueFlowService
 
             self._issue_flow_service = IssueFlowService(store=self.store)
         return self._issue_flow_service

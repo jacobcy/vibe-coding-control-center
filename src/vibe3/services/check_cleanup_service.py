@@ -333,7 +333,7 @@ class CheckCleanupService:
             branch: Branch name (expected to be task/issue-N pattern)
         """
         try:
-            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.issue.flow import IssueFlowService
 
             issue_flow_service = IssueFlowService(store=self.store)
             issue_number = issue_flow_service.resolve_task_issue_number(branch)
@@ -345,7 +345,7 @@ class CheckCleanupService:
 
             from vibe3.clients import GitHubClient
             from vibe3.services.flow_service import FlowService
-            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.issue.flow import IssueFlowService
             from vibe3.services.label_service import LabelService
 
             gh = self._github_client or GitHubClient()

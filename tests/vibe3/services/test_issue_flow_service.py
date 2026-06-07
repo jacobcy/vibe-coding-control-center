@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 from vibe3.config.profile_convention import ProfileConvention
 from vibe3.models.branch_convention import BranchConvention
-from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.issue.flow import IssueFlowService
 
 
 class TestIssueFlowServiceConventionInjection:

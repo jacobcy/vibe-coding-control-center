@@ -12,7 +12,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import IssueInfo, IssueState
-from vibe3.services.issue_collection_service import IssueCollectionService
+from vibe3.services.issue.collection import IssueCollectionService
 from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
 from vibe3.utils.queue_ordering import (
     resolve_priority,
@@ -22,7 +22,7 @@ from vibe3.utils.queue_ordering import (
 
 if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
-    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+    from vibe3.services.issue.title_cache import IssueTitleCacheService
 
 
 def _state_from_labels(raw_labels: object) -> IssueState | None:
@@ -206,7 +206,7 @@ class StatusQueryService:
     def title_cache(self) -> IssueTitleCacheService:
         """Lazy-initialized title cache service."""
         if self._title_cache is None:
-            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+            from vibe3.services.issue.title_cache import IssueTitleCacheService
 
             self._title_cache = IssueTitleCacheService(self.store, self.github)
         return self._title_cache
@@ -302,7 +302,7 @@ class StatusQueryService:
                     blocked_reason = getattr(flow, "blocked_reason", None)
                 elif issue.body:
                     # For remote BLOCKED issues, parse from issue body
-                    from vibe3.services.issue_body_service import parse_projection
+                    from vibe3.services.issue.body import parse_projection
 
                     proj = parse_projection(issue.body)
                     if proj.blocked_by:

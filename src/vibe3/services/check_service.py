@@ -307,7 +307,7 @@ class CheckService(CheckRemote):
                 )
 
             # task issue exists and is open on GitHub
-            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.issue.flow import IssueFlowService
 
             issue_flow_service = IssueFlowService(store=self.store)
             task_issue = issue_flow_service.resolve_task_issue_number(branch)
