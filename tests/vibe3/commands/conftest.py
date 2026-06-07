@@ -78,9 +78,6 @@ def mock_coverage_all_passing() -> CoverageReport:
             coverage_percent=90.0,
             threshold=80,
         ),
-        total_covered=2170,
-        total_lines=2500,
-        overall_percent=86.8,
     )
 
 
@@ -109,9 +106,6 @@ def mock_coverage_failing() -> CoverageReport:
             coverage_percent=90.0,
             threshold=80,
         ),
-        total_covered=2020,
-        total_lines=2500,
-        overall_percent=80.8,
     )
 
 

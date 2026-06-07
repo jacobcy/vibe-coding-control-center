@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class LayerCoverage(BaseModel):
@@ -31,9 +31,33 @@ class CoverageReport(BaseModel):
     services: LayerCoverage
     clients: LayerCoverage
     commands: LayerCoverage
-    total_covered: int
-    total_lines: int
-    overall_percent: float
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_covered(self) -> int:
+        """Total covered lines across all layers."""
+        return (
+            self.services.covered_lines
+            + self.clients.covered_lines
+            + self.commands.covered_lines
+        )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_lines(self) -> int:
+        """Total lines across all layers."""
+        return (
+            self.services.total_lines
+            + self.clients.total_lines
+            + self.commands.total_lines
+        )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def overall_percent(self) -> float:
+        """Overall coverage percentage."""
+        total = self.total_lines
+        return (self.total_covered / total * 100) if total > 0 else 0.0
 
     @property
     def all_passing(self) -> bool:
