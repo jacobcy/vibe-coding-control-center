@@ -428,3 +428,19 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 - [ ] 确认标签已添加（可选：`gh issue view <number> --json labels` 验证）
 
 **缺少标签的后果**：跳过的 issue 会被下次扫描重复处理，造成资源浪费。
+
+---
+
+## Pre-flow Dependency Rules
+
+> 完整规范见 [roadmap-common.md § Pre-flow Dependency Rules](../roadmap-common.md)
+
+roadmap-intake 在扫描和决策阶段的依赖操作约束：
+
+- ✅ 在 suggest comment 中用自然语言说明依赖关系（"建议先等 #N 完成"、"依赖 #N 的 API 设计"）
+- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels
+- ❌ 禁止直接添加 `state/blocked` 标签 — intake 层无法保证三源（label/body/cache）原子写入
+- ❌ 禁止写 managed section（`<!-- vibe3-flow-state-start -->` 块中的结构化字段）
+- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — issue 尚未进入执行池，无 flow context
+
+**记录方式**：依赖关系写在 `[governance suggest][roadmap-intake]` 评论中，由 manager 入场后通过 `vibe3 flow blocked --task <N>` 正式建立。

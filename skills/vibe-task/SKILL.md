@@ -266,3 +266,17 @@ Epic Issues（依赖图梳理）
 - **不做版本规划建议**：由 `vibe-roadmap` 管理
 - **不做复杂审计或修复**：只处理 RFC、blocked、epic issues
 - **不补充 CLI 未提供的字段**：基于真源，只读 shell 输出
+
+## Pre-flow Dependency Rules
+
+> 完整规范见 [roadmap-common.md § Pre-flow Dependency Rules](../supervisor/roadmap-common.md)
+
+vibe-task 在 pre-flow 阶段（issue 无 flow/branch context）的约束：
+
+- ✅ 在 issue body 正文中用自然语言说明依赖：`Blocked by #N`、`Depends on #N`
+- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels
+- ❌ 禁止直接添加 `state/blocked` 标签 — pre-flow 无法保证三源（label/body/cache）原子写入，会导致 dispatcher 无法识别
+- ❌ 禁止直接写 managed section（`Blocked by:` / `Dependencies:` 结构化字段）
+- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — 这两个命令需要 branch 存在
+
+依赖的正式注册（写入 managed section + flow_issue_links）由 manager 入场后完成；pre-flow 只负责把依赖关系说清楚。

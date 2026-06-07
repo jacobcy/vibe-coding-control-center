@@ -258,3 +258,17 @@ RFC (需讨论)
 - 不根据当前 runtime 现场做即时抢占排序（转 `vibe-orchestra`）
 - 所有操作通过 GitHub labels，不在本地存储
 - 所有决策必须写 `[roadmap decision]` marker，**禁止**写 `[governance suggest]`
+
+## Pre-flow Dependency Rules
+
+> 完整规范见 [roadmap-common.md § Pre-flow Dependency Rules](../supervisor/roadmap-common.md)
+
+vibe-roadmap 在 pre-flow 阶段（issue 无 flow/branch context）的约束：
+
+- ✅ 在 issue body 正文中用自然语言说明依赖：`Blocked by #N`、`Depends on #N`
+- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels
+- ❌ 禁止直接添加 `state/blocked` 标签 — pre-flow 无法保证三源（label/body/cache）原子写入，会导致 dispatcher 无法识别
+- ❌ 禁止直接写 managed section（`Blocked by:` / `Dependencies:` 结构化字段）
+- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — 这两个命令需要 branch 存在
+
+依赖的正式注册（写入 managed section + flow_issue_links）由 manager 入场后完成；pre-flow 只负责把依赖关系说清楚。
