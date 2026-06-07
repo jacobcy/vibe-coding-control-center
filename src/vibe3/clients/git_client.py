@@ -235,6 +235,20 @@ class GitClient:
             self._git_common_dir = _get_git_common_dir(self._run)
         return self._git_common_dir
 
+    def get_remote_url(self, name: str = "origin") -> str | None:
+        """Get the URL of a git remote.
+
+        Args:
+            name: Remote name (default: "origin")
+
+        Returns:
+            Remote URL string, or None if remote doesn't exist or not a git repo
+        """
+        try:
+            return self._run(["remote", "get-url", name])
+        except GitError:
+            return None
+
     def get_worktree_root(self) -> str:
         """Get the top-level path of the current worktree."""
         return _get_worktree_root(self._run)

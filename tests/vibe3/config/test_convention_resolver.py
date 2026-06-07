@@ -10,11 +10,12 @@ Tests verify that:
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
 
+from vibe3.clients.git_client import GitClient
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.exceptions import GitError
 
@@ -26,13 +27,14 @@ def test_resolver_returns_minimal_defaults_by_default():
         patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir"
         ) as mock_git_common_dir,
-        patch("subprocess.run") as mock_run,
+        patch.object(
+            GitClient,
+            "get_remote_url",
+            return_value="https://github.com/other/repo.git",
+        ),
         patch("pathlib.Path.exists") as mock_exists,
     ):
         mock_git_common_dir.return_value = "/tmp/test/.git"
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="https://github.com/other/repo.git\n"
-        )
         mock_exists.return_value = False  # No .vibe/config.yaml
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
@@ -92,13 +94,14 @@ def test_resolver_detects_vibe_center_repo():
         patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir"
         ) as mock_git_common_dir,
-        patch("subprocess.run") as mock_run,
+        patch.object(
+            GitClient,
+            "get_remote_url",
+            return_value="https://github.com/jacobcy/vibe-center.git",
+        ),
         patch("pathlib.Path.exists") as mock_exists,
     ):
         mock_git_common_dir.return_value = "/tmp/test/.git"
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
-        )
         mock_exists.return_value = False  # No .vibe/config.yaml
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
@@ -111,12 +114,13 @@ def test_resolver_falls_back_when_git_common_dir_lookup_fails():
         patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir"
         ) as mock_git_common_dir,
-        patch("subprocess.run") as mock_run,
+        patch.object(
+            GitClient,
+            "get_remote_url",
+            return_value="https://github.com/jacobcy/vibe-center.git",
+        ),
     ):
         mock_git_common_dir.side_effect = GitError("rev-parse", "not a git repository")
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
-        )
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
         assert convention.branch.task_prefix == "task/issue-"
@@ -152,13 +156,14 @@ def test_detect_profile_is_cached():
         patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir"
         ) as mock_git_common_dir,
-        patch("subprocess.run") as mock_run,
+        patch.object(
+            GitClient,
+            "get_remote_url",
+            return_value="https://github.com/other/repo.git",
+        ) as mock_get_remote_url,
         patch("pathlib.Path.exists") as mock_exists,
     ):
         mock_git_common_dir.return_value = "/tmp/test/.git"
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="https://github.com/other/repo.git\n"
-        )
         mock_exists.return_value = False
 
         resolver = ConventionResolver.from_repo()
@@ -171,9 +176,8 @@ def test_detect_profile_is_cached():
         assert convention1.branch.task_prefix == "issue-"
         assert convention2.branch.task_prefix == "issue-"
 
-        # subprocess.run should only be called once due to caching
-        # (once for git remote, not for each resolve call)
-        assert mock_run.call_count == 1
+        # get_remote_url should only be called once due to caching
+        assert mock_get_remote_url.call_count == 1
 
 
 def test_detect_profile_cache_invalidation():
@@ -182,13 +186,14 @@ def test_detect_profile_cache_invalidation():
         patch(
             "vibe3.clients.git_client.GitClient.get_git_common_dir"
         ) as mock_git_common_dir,
-        patch("subprocess.run") as mock_run,
+        patch.object(
+            GitClient,
+            "get_remote_url",
+            return_value="https://github.com/other/repo.git",
+        ) as mock_get_remote_url,
         patch("pathlib.Path.exists") as mock_exists,
     ):
         mock_git_common_dir.return_value = "/tmp/test/.git"
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="https://github.com/other/repo.git\n"
-        )
         mock_exists.return_value = False
 
         # First resolver instance
@@ -203,5 +208,5 @@ def test_detect_profile_cache_invalidation():
         assert convention1.branch.task_prefix == "issue-"
         assert convention2.branch.task_prefix == "issue-"
 
-        # Each instance should call subprocess once
-        assert mock_run.call_count == 2
+        # Each instance should call get_remote_url once
+        assert mock_get_remote_url.call_count == 2

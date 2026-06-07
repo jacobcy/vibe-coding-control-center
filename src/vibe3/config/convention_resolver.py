@@ -113,8 +113,6 @@ class ConventionResolver:
         if self._profile_cache is not None:
             return self._profile_cache
 
-        import subprocess
-
         import yaml
 
         # Step 1: Check explicit override
@@ -158,24 +156,12 @@ class ConventionResolver:
             logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo
-        try:
-            git_result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
-            if git_result.returncode == 0:
-                remote_url = git_result.stdout.strip().lower()
-                if (
-                    "vibe-center" in remote_url
-                    or "vibe-coding-control-center" in remote_url
-                ):
-                    self._profile_cache = "vibe-center"
-                    return "vibe-center"
-        except Exception as e:
-            logger.debug(f"Git remote check failed: {e}")
+        remote_url = self._get_git_client().get_remote_url()
+        if remote_url:
+            url_lower = remote_url.lower()
+            if "vibe-center" in url_lower or "vibe-coding-control-center" in url_lower:
+                self._profile_cache = "vibe-center"
+                return "vibe-center"
 
         # Step 5: Default to minimal
         self._profile_cache = "minimal"
