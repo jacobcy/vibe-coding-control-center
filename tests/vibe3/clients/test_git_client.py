@@ -94,6 +94,33 @@ class TestGetGitCommonDir:
                 client.get_git_common_dir()
 
 
+class TestGetRemoteUrl:
+    """get_remote_url 测试."""
+
+    def test_returns_remote_url_on_success(self) -> None:
+        client = GitClient()
+        url = "https://github.com/user/repo.git"
+        with patch.object(client, "_run", return_value=url) as mock_run:
+            assert client.get_remote_url() == url
+
+        mock_run.assert_called_once_with(["remote", "get-url", "origin"])
+
+    def test_returns_none_on_no_remote(self) -> None:
+        client = GitClient()
+        with patch.object(
+            client, "_run", side_effect=GitError("remote get-url", "no such remote")
+        ):
+            assert client.get_remote_url() is None
+
+    def test_passes_remote_name(self) -> None:
+        client = GitClient()
+        url = "https://github.com/user/upstream.git"
+        with patch.object(client, "_run", return_value=url) as mock_run:
+            assert client.get_remote_url(name="upstream") == url
+
+        mock_run.assert_called_once_with(["remote", "get-url", "upstream"])
+
+
 class TestListWorktrees:
     """list_worktrees 测试."""
 
