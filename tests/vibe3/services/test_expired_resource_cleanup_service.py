@@ -8,7 +8,7 @@ import pytest
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.protocols import BackendProtocol
+from vibe3.clients.protocols.backend import BackendProtocol
 from vibe3.services.expired_resource_cleanup_service import (
     ExpiredResourceCleanupService,
 )

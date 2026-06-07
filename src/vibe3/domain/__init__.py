@@ -15,16 +15,20 @@ if TYPE_CHECKING:
         MAX_INTENTS_PER_TICK,
         GlobalDispatchCoordinator,
     )
-    from vibe3.domain.events import (
-        DomainEvent,
+    from vibe3.domain.events.base import DomainEvent
+    from vibe3.domain.events.flow_lifecycle import (
         ExecutorDispatchIntent,
-        GovernanceDecisionRequired,
-        GovernanceScanCompleted,
-        GovernanceScanStarted,
         IssueFailed,
         ManagerDispatchIntent,
         PlannerDispatchIntent,
         ReviewerDispatchIntent,
+    )
+    from vibe3.domain.events.governance import (
+        GovernanceDecisionRequired,
+        GovernanceScanCompleted,
+        GovernanceScanStarted,
+    )
+    from vibe3.domain.events.supervisor_apply import (
         SupervisorApplyCompleted,
         SupervisorApplyDelegated,
         SupervisorApplyDispatched,
@@ -35,46 +39,49 @@ if TYPE_CHECKING:
     from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.flow_manager import FlowManager
     from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.domain.protocols import (
+    from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
         CheckServiceProtocol,
-        FlowManagerProtocol,
         FlowServiceProtocol,
         LabelDispatchCallable,
-        ServiceBase,
     )
+    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
+    from vibe3.domain.protocols.runtime_protocols import ServiceBase
     from vibe3.domain.publisher import EventPublisher
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
 
 _LAZY_IMPORTS: dict[str, str] = {
-    # Events
-    "DomainEvent": "vibe3.domain.events",
-    "GovernanceDecisionRequired": "vibe3.domain.events",
-    "GovernanceScanCompleted": "vibe3.domain.events",
-    "GovernanceScanStarted": "vibe3.domain.events",
-    "IssueFailed": "vibe3.domain.events",
-    "ManagerDispatchIntent": "vibe3.domain.events",
-    "PlannerDispatchIntent": "vibe3.domain.events",
-    "ExecutorDispatchIntent": "vibe3.domain.events",
-    "ReviewerDispatchIntent": "vibe3.domain.events",
-    "SupervisorApplyCompleted": "vibe3.domain.events",
-    "SupervisorApplyDelegated": "vibe3.domain.events",
-    "SupervisorApplyDispatched": "vibe3.domain.events",
-    "SupervisorApplyStarted": "vibe3.domain.events",
-    "SupervisorIssueIdentified": "vibe3.domain.events",
-    "SupervisorPromptRendered": "vibe3.domain.events",
+    # Events - base
+    "DomainEvent": "vibe3.domain.events.base",
+    # Events - flow lifecycle
+    "IssueFailed": "vibe3.domain.events.flow_lifecycle",
+    "ManagerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
+    "PlannerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
+    "ExecutorDispatchIntent": "vibe3.domain.events.flow_lifecycle",
+    "ReviewerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
+    # Events - governance
+    "GovernanceScanStarted": "vibe3.domain.events.governance",
+    "GovernanceScanCompleted": "vibe3.domain.events.governance",
+    "GovernanceDecisionRequired": "vibe3.domain.events.governance",
+    # Events - supervisor apply
+    "SupervisorApplyCompleted": "vibe3.domain.events.supervisor_apply",
+    "SupervisorApplyDelegated": "vibe3.domain.events.supervisor_apply",
+    "SupervisorApplyDispatched": "vibe3.domain.events.supervisor_apply",
+    "SupervisorApplyStarted": "vibe3.domain.events.supervisor_apply",
+    "SupervisorIssueIdentified": "vibe3.domain.events.supervisor_apply",
+    "SupervisorPromptRendered": "vibe3.domain.events.supervisor_apply",
     # Orchestration
     "FlowManager": "vibe3.domain.flow_manager",
     "GlobalDispatchCoordinator": "vibe3.domain.dispatch_coordinator",
     "FailedGate": "vibe3.domain.failed_gate",
     # Protocols
-    "CapacityServiceProtocol": "vibe3.domain.protocols",
-    "CheckServiceProtocol": "vibe3.domain.protocols",
-    "FlowServiceProtocol": "vibe3.domain.protocols",
-    "FlowManagerProtocol": "vibe3.domain.protocols",
-    "LabelDispatchCallable": "vibe3.domain.protocols",
-    "ServiceBase": "vibe3.domain.protocols",
+    "CapacityServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
+    "CheckServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
+    "FlowServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
+    "LabelDispatchCallable": "vibe3.domain.protocols.dispatch_protocols",
+    "FlowManagerProtocol": "vibe3.domain.protocols.flow_protocols",
+    "ServiceBase": "vibe3.domain.protocols.runtime_protocols",
     # Additional domain classes
     "GateResult": "vibe3.domain.failed_gate",
     "GateStatus": "vibe3.domain.failed_gate",
@@ -89,11 +96,7 @@ _LAZY_IMPORTS: dict[str, str] = {
 
 def register_event_handlers() -> None:
     """Register domain event handlers lazily to avoid import cycles."""
-    from vibe3.domain.handlers import (
-        register_event_handlers as _register_event_handlers,
-    )
-
-    _register_event_handlers()
+    import vibe3.domain.handlers  # noqa: F401 triggers @register_handler at import time
 
 
 def get_publisher() -> "EventPublisher":

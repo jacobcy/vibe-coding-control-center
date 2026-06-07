@@ -515,7 +515,7 @@ def test_check_cleanup_service_accepts_backend_parameter():
     """CheckCleanupService should accept BackendProtocol in constructor."""
     from unittest.mock import MagicMock
 
-    from vibe3.clients.protocols import BackendProtocol
+    from vibe3.clients.protocols.backend import BackendProtocol
 
     mock_backend = MagicMock(spec=BackendProtocol)
     mock_store = MagicMock()
@@ -534,7 +534,7 @@ def test_backend_propagated_to_session_registry():
     """Backend should be passed to SessionRegistryService."""
     from unittest.mock import MagicMock, patch
 
-    from vibe3.clients.protocols import BackendProtocol
+    from vibe3.clients.protocols.backend import BackendProtocol
 
     mock_backend = MagicMock(spec=BackendProtocol)
     mock_store = MagicMock()
@@ -564,7 +564,7 @@ def test_backend_passed_to_expired_resource_service():
     """Backend should be passed to ExpiredResourceCleanupService."""
     from unittest.mock import MagicMock, patch
 
-    from vibe3.clients.protocols import BackendProtocol
+    from vibe3.clients.protocols.backend import BackendProtocol
 
     mock_backend = MagicMock(spec=BackendProtocol)
     service = CheckCleanupService(

@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.domain.events import (
+from vibe3.domain.events.flow_lifecycle import (
     ExecutorDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,

@@ -83,7 +83,7 @@ def run_command(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for run command (may publish events)
-    from vibe3.domain.handlers import register_event_handlers
+    from vibe3.domain import register_event_handlers
 
     register_event_handlers()
 

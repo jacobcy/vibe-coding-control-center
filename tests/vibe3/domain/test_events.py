@@ -2,12 +2,13 @@
 
 import pytest
 
-from vibe3.domain.events import (
-    GovernanceScanCompleted,
-    GovernanceScanStarted,
-    # Flow Lifecycle
+from vibe3.domain.events.flow_lifecycle import (
     IssueFailed,
     ManagerDispatchIntent,
+)
+from vibe3.domain.events.governance import (
+    GovernanceScanCompleted,
+    GovernanceScanStarted,
 )
 from vibe3.domain.publisher import get_publisher, subscribe
 

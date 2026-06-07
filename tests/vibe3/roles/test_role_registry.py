@@ -1,6 +1,6 @@
 """Tests for role registry dispatch helpers."""
 
-from vibe3.domain.events import (
+from vibe3.domain.events.flow_lifecycle import (
     ExecutorDispatchIntent,
     ManagerDispatchIntent,
     PlannerDispatchIntent,

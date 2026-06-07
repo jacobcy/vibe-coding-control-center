@@ -7,7 +7,7 @@ from typing import TypeVar, cast
 
 from loguru import logger
 
-from vibe3.domain.events import DomainEvent
+from vibe3.domain.events.base import DomainEvent
 
 T = TypeVar("T", bound=DomainEvent)
 
