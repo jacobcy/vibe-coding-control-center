@@ -12,7 +12,7 @@ created: 2026-03-13
 last_updated: 2026-06-02
 related_docs:
   - docs/standards/glossary.md
-  - docs/standards/v3/skill-standard.md
+  - v3/skill-standard.md
   - tests/README.md
 ---
 

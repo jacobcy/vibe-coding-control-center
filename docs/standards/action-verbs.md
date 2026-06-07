@@ -14,7 +14,7 @@ related_docs:
   - CLAUDE.md
   - docs/README.md
   - docs/standards/glossary.md
-  - docs/standards/v3/command-standard.md
+  - v3/command-standard.md
 ---
 
 # 高频动作词标准

@@ -441,7 +441,7 @@ ls ~/.vibe/
 | [cognition-spec-dominion.md](docs/standards/cognition-spec-dominion.md) | 宪法大纲：Vibe Guard 流程定义 | Active |
 | [v3/command-standard.md](docs/standards/v3/command-standard.md) | 共享状态命令标准 (V3) | Active |
 | [v3/orchestra-runtime-standard.md](docs/standards/v3/orchestra-runtime-standard.md) | Orchestra 运行时与层级标准 | Active |
-| [vibe3-role-checks-and-balances-standard.md](docs/standards/vibe3-role-checks-and-balances-standard.md) | 角色制衡架构标准 (由 [Human-Mirror](docs/standards/v3/human-mirror-architecture-philosophy.md) 取代) | Deprecated |
+| [vibe3-role-checks-and-balances-standard.md](docs/archive/vibe3-role-checks-and-balances-standard.md) | 角色制衡架构标准 (由 [Human-Mirror](docs/standards/v3/human-mirror-architecture-philosophy.md) 取代，强引导至 V3 真源) | Deprecated |
 | [vibe3-command-standard.md](docs/archive/v3/vibe3-command-standard.md) | 旧版命令标准 | Archived |
 
 #### `docs/archive/` - 历史文档归档

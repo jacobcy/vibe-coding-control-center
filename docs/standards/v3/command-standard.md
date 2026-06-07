@@ -14,11 +14,11 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - STRUCTURE.md
-  - docs/README.md
-  - docs/standards/glossary.md
-  - docs/standards/issue-standard.md
-  - docs/standards/roadmap-label-management.md
-  - docs/standards/v3/handoff-store-standard.md
+  - ../../README.md
+  - ../glossary.md
+  - ../issue-standard.md
+  - ../roadmap-label-management.md
+  - handoff-store-standard.md
 ---
 
 # 共享状态命令标准 (v3 Python 版)
@@ -336,7 +336,7 @@ vibe3 task status [--all] [--format json]
 
 当前共享状态域的现行阅读顺序：
 
-1. [docs/standards/v3/command-standard.md](command-standard.md)
-2. [docs/standards/v3/handoff-store-standard.md](handoff-store-standard.md)
-3. [docs/standards/issue-standard.md](../issue-standard.md)
-4. [docs/standards/roadmap-label-management.md](../roadmap-label-management.md)
+1. [command-standard.md](command-standard.md)
+2. [handoff-store-standard.md](handoff-store-standard.md)
+3. [issue-standard.md](../issue-standard.md)
+4. [roadmap-label-management.md](../roadmap-label-management.md)

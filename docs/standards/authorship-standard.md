@@ -11,7 +11,7 @@ created: 2026-03-08
 last_updated: 2026-04-01
 related_docs:
   - docs/standards/glossary.md
-  - docs/standards/v3/data-model-standard.md
+  - v3/data-model-standard.md
   - skills/vibe-commit/SKILL.md
 ---
 
