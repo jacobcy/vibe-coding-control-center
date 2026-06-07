@@ -214,6 +214,24 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved all flows")
         return flows
 
+    def get_flows_by_status(self, status: str) -> list[dict[str, Any]]:
+        """Get flows filtered by status (excludes soft-deleted flows)."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM flow_state WHERE flow_status = ? AND deleted_at IS NULL",
+            (status,),
+        )
+        flows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_flows_by_status",
+            status=status,
+            count=len(flows),
+        ).debug("Retrieved flows by status")
+        return flows
+
     def get_active_flow_count(self) -> int:
         """Get count of active flows (excludes soft-deleted flows)."""
         conn = self._get_connection()

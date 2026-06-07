@@ -291,3 +291,69 @@ def test_get_task_issue_number_ignores_non_task_roles() -> None:
 
         result = store.get_task_issue_number("dev/issue-789")
         assert result is None
+
+
+def test_get_flows_by_status_returns_matching_flows() -> None:
+    """Test get_flows_by_status returns only flows with matching status."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Insert flows with different statuses
+        store.update_flow_state(
+            "task/issue-1", flow_slug="issue_1", flow_status="active"
+        )
+        store.update_flow_state(
+            "task/issue-2", flow_slug="issue_2", flow_status="blocked"
+        )
+        store.update_flow_state(
+            "task/issue-3", flow_slug="issue_3", flow_status="active"
+        )
+        store.update_flow_state("task/issue-4", flow_slug="issue_4", flow_status="done")
+
+        # Query for active flows
+        result = store.get_flows_by_status("active")
+
+        # Should only return active flows
+        assert len(result) == 2
+        branches = {flow["branch"] for flow in result}
+        assert branches == {"task/issue-1", "task/issue-3"}
+
+
+def test_get_flows_by_status_excludes_soft_deleted() -> None:
+    """Test get_flows_by_status excludes soft-deleted flows."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Insert an active flow
+        store.update_flow_state(
+            "task/issue-1", flow_slug="issue_1", flow_status="active"
+        )
+
+        # Soft delete it
+        store.soft_delete_flow("task/issue-1")
+
+        # Query for active flows
+        result = store.get_flows_by_status("active")
+
+        # Should be empty (soft-deleted flow excluded)
+        assert len(result) == 0
+
+
+def test_get_flows_by_status_no_match_returns_empty_list() -> None:
+    """Test get_flows_by_status returns empty list when no matches."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Insert only active flows
+        store.update_flow_state(
+            "task/issue-1", flow_slug="issue_1", flow_status="active"
+        )
+
+        # Query for blocked flows
+        result = store.get_flows_by_status("blocked")
+
+        # Should be empty
+        assert len(result) == 0
