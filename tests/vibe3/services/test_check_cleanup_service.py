@@ -325,7 +325,7 @@ class TestCleanResidualBranches:
 
         result = cleanup_service.clean_residual_branches()
 
-        # Done flow record should be soft-deleted (in cleaned, not kept_records)
+        # Done flow record should be soft-deleted (in cleaned list)
         assert len(result["cleaned"]) == 1
         assert "feature/done-branch" in result["cleaned"]
         assert "feature/done-branch" in result["cleaned_done"]

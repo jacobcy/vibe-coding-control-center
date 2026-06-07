@@ -26,7 +26,7 @@ def _make_check_pr_service():
     )
 
 
-def test_handle_closed_pr_creates_bridge_issue() -> None:
+def test_handle_pr_terminal_state_creates_bridge_issue() -> None:
     """When PR is closed (not merged), create bridge issue instead of rebuilding."""
     service = _make_check_pr_service()
 
@@ -72,7 +72,9 @@ def test_handle_closed_pr_creates_bridge_issue() -> None:
             "flow_record": True,
         }
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify bridge issue was created
         service.github_client.create_issue.assert_called_once()
@@ -102,7 +104,7 @@ def test_handle_closed_pr_creates_bridge_issue() -> None:
         assert len(issues) == 0
 
 
-def test_handle_closed_pr_does_not_call_rebuild() -> None:
+def test_handle_pr_terminal_state_does_not_call_rebuild() -> None:
     """Verify that FlowRebuildUsecase is NOT called when PR closes."""
     service = _make_check_pr_service()
 
@@ -137,7 +139,9 @@ def test_handle_closed_pr_does_not_call_rebuild() -> None:
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {}
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # CRITICAL: Verify FlowRebuildUsecase was NOT instantiated
         rebuild_cls.assert_not_called()
@@ -145,7 +149,7 @@ def test_handle_closed_pr_does_not_call_rebuild() -> None:
         assert handled is True
 
 
-def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
+def test_handle_pr_terminal_state_with_closed_issue_marks_flow_aborted() -> None:
     """When PR closed and issue already closed, mark flow as aborted and cleanup."""
     service = _make_check_pr_service()
 
@@ -176,7 +180,9 @@ def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
             "flow_record": True,
         }
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify flow was marked as aborted
         service._flow_status_service.mark_flow_aborted.assert_called_once()
@@ -200,7 +206,7 @@ def test_handle_closed_pr_with_closed_issue_marks_flow_aborted() -> None:
         assert "Issue #456 already closed" in warnings[0]
 
 
-def test_handle_closed_pr_bridge_idempotency() -> None:
+def test_handle_pr_terminal_state_bridge_idempotency() -> None:
     """When bridge marker already exists, skip creation and just cleanup."""
     service = _make_check_pr_service()
 
@@ -240,7 +246,9 @@ def test_handle_closed_pr_bridge_idempotency() -> None:
         mock_cleanup.cleanup_flow_scene.return_value = {}
         service.github_client.close_issue_if_open.return_value = "closed"
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify bridge issue was NOT created (idempotency)
         service.github_client.create_issue.assert_not_called()
@@ -263,7 +271,9 @@ def test_handle_closed_pr_bridge_idempotency() -> None:
         assert len(issues) == 0
 
 
-def test_handle_closed_pr_existing_bridge_close_failure_does_not_cleanup() -> None:
+def test_handle_pr_terminal_state_existing_bridge_close_failure_does_not_cleanup() -> (
+    None
+):  # noqa: E501
     """When bridge marker exists but original close fails, preserve flow for retry."""
     service = _make_check_pr_service()
 
@@ -300,7 +310,9 @@ def test_handle_closed_pr_existing_bridge_close_failure_does_not_cleanup() -> No
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         service.github_client.create_issue.assert_not_called()
         service._flow_status_service.mark_flow_aborted.assert_not_called()
@@ -313,7 +325,9 @@ def test_handle_closed_pr_existing_bridge_close_failure_does_not_cleanup() -> No
         assert warnings == []
 
 
-def test_handle_closed_pr_ignores_bridge_marker_for_prefixed_pr_number() -> None:
+def test_handle_pr_terminal_state_ignores_bridge_marker_for_prefixed_pr_number() -> (
+    None
+):  # noqa: E501
     """Bridge marker matching must not treat PR #1234 as PR #123."""
     service = _make_check_pr_service()
 
@@ -354,7 +368,9 @@ def test_handle_closed_pr_ignores_bridge_marker_for_prefixed_pr_number() -> None
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {}
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         service.github_client.create_issue.assert_called_once()
         service.github_client.close_issue_if_open.assert_called_once()
@@ -366,7 +382,7 @@ def test_handle_closed_pr_ignores_bridge_marker_for_prefixed_pr_number() -> None
         assert len(warnings) == 1
 
 
-def test_handle_closed_pr_when_view_issue_fails_does_not_cleanup() -> None:
+def test_handle_pr_terminal_state_when_view_issue_fails_does_not_cleanup() -> None:
     """When view_issue() fails (network/auth), do not cleanup flow, allow retry."""
     service = _make_check_pr_service()
 
@@ -388,7 +404,9 @@ def test_handle_closed_pr_when_view_issue_fails_does_not_cleanup() -> None:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify flow was NOT marked as aborted
         service._flow_status_service.mark_flow_aborted.assert_not_called()
@@ -403,7 +421,7 @@ def test_handle_closed_pr_when_view_issue_fails_does_not_cleanup() -> None:
         assert "retry" in issues[0].lower()
 
 
-def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
+def test_handle_pr_terminal_state_when_close_original_fails_does_not_cleanup() -> None:
     """When close original issue fails, do not cleanup flow, preserve for retry."""
     service = _make_check_pr_service()
 
@@ -434,7 +452,9 @@ def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify flow was NOT marked as aborted
         service._flow_status_service.mark_flow_aborted.assert_not_called()
@@ -449,7 +469,7 @@ def test_handle_closed_pr_when_close_original_fails_does_not_cleanup() -> None:
         assert "failed to add marker" in issues[0]
 
 
-def test_handle_closed_pr_when_add_marker_fails_does_not_cleanup() -> None:
+def test_handle_pr_terminal_state_when_add_marker_fails_does_not_cleanup() -> None:
     """When add bridge marker fails, do not cleanup flow, preserve for retry."""
     service = _make_check_pr_service()
 
@@ -478,7 +498,9 @@ def test_handle_closed_pr_when_add_marker_fails_does_not_cleanup() -> None:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
-        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
 
         # Verify bridge issue was created
         service.github_client.create_issue.assert_called_once()

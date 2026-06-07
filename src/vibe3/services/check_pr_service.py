@@ -160,7 +160,7 @@ class CheckPRService:
             ).warning(warning_msg)
             return (None, [warning_msg])
 
-    def handle_closed_pr(
+    def handle_pr_terminal_state(
         self,
         branch: str,
         pr: "PRResponse",
@@ -183,7 +183,7 @@ class CheckPRService:
         if pr.state == PRState.CLOSED:
             if self._already_handled_pr_closed(branch, pr):
                 return (False, [], [])
-            return self._handle_closed_pr(branch, pr)
+            return self._handle_closed_pr_flow(branch, pr)
 
         # PR still open, nothing to handle
         return (False, [], [])
@@ -213,7 +213,7 @@ class CheckPRService:
 
         return (True, [], warnings)
 
-    def _handle_closed_pr(
+    def _handle_closed_pr_flow(
         self, branch: str, pr: "PRResponse"
     ) -> tuple[bool, list[str], list[str]]:
         """Handle closed PR (without merge): reset issue, clean up.
