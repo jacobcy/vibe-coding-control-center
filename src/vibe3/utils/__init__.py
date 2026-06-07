@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from vibe3.utils.comment_utils import is_human_comment
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
+        CODEAGENT_STDIN_MODE_THRESHOLD,
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,
@@ -62,6 +63,7 @@ if TYPE_CHECKING:
 # Lazy imports
 _LAZY_IMPORTS = {
     "AUTOMATED_MARKERS": "vibe3.utils.constants",
+    "CODEAGENT_STDIN_MODE_THRESHOLD": "vibe3.utils.constants",
     "CODEAGENT_WRAPPER_ANYWHERE_RE": "vibe3.utils.error_message_cleaner",
     "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
     "EVENT_REQUIRED_REF_MISSING": "vibe3.utils.constants",
@@ -114,6 +116,7 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "AUTOMATED_MARKERS",
+    "CODEAGENT_STDIN_MODE_THRESHOLD",
     "CODEAGENT_WRAPPER_ANYWHERE_RE",
     "CODEAGENT_WRAPPER_RE",
     "EVENT_REQUIRED_REF_MISSING",

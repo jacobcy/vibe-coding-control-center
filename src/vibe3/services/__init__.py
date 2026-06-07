@@ -57,9 +57,9 @@ if TYPE_CHECKING:
         ref_to_handoff_cmd,
         sanitize_event_detail_paths,
     )
-    from vibe3.services.pr_create_usecase import PRCreateUsecase
-    from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
-    from vibe3.services.pr_service import PRService
+    from vibe3.services.pr.create import PRCreateUsecase
+    from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
+    from vibe3.services.pr.service import PRService
     from vibe3.services.role_policy_helpers import get_role_block_function
     from vibe3.services.status_query_service import StatusQueryService
     from vibe3.services.task_binding_guard import build_bind_task_hint
@@ -205,11 +205,11 @@ _SYMBOL_MODULES = {
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
     "OrchestraStatusService": "vibe3.services.orchestra_status_service",
-    "PRCreateUsecase": "vibe3.services.pr_create_usecase",
-    "PRDimensions": "vibe3.services.pr_scoring_service",
-    "PRService": "vibe3.services.pr_service",
-    "PrReadyAbortedError": "vibe3.services.pr_ready_usecase",
-    "PrReadyUsecase": "vibe3.services.pr_ready_usecase",
+    "PRCreateUsecase": "vibe3.services.pr.create",
+    "PRDimensions": "vibe3.services.pr.scoring",
+    "PRService": "vibe3.services.pr.service",
+    "PrReadyAbortedError": "vibe3.services.pr.ready",
+    "PrReadyUsecase": "vibe3.services.pr.ready",
     "ServeStatusService": "vibe3.services.serve_status_service",
     "SignatureService": "vibe3.services.signature_service",
     "SpecRefService": "vibe3.services.spec_ref_service",
@@ -221,11 +221,11 @@ _SYMBOL_MODULES = {
     "TaskStatusBucket": "vibe3.services.task_status_classifier",
     "VerdictService": "vibe3.services.verdict_service",
     # Functions
-    "analyze_critical_files": "vibe3.services.pr_analysis_service",
+    "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue_failure_service",
     "build_bind_task_hint": "vibe3.services.task_binding_guard",
-    "build_pr_analysis": "vibe3.services.pr_analysis_service",
-    "calculate_pr_risk_score": "vibe3.services.pr_analysis_service",
+    "build_pr_analysis": "vibe3.services.pr.analysis",
+    "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.path_helpers",
     "classify_flow": "vibe3.services.flow_classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task_status_service",
@@ -236,17 +236,17 @@ _SYMBOL_MODULES = {
     "fail_planner_issue": "vibe3.services.issue_failure_service",
     "fail_reviewer_issue": "vibe3.services.issue_failure_service",
     "format_agent_actor": "vibe3.services.actor_support",
-    "filter_critical_files": "vibe3.services.pr_analysis_service",
+    "filter_critical_files": "vibe3.services.pr.analysis",
     "fetch_task_status_data": "vibe3.services.task_status_service",
     "format_issue_runtime_line": "vibe3.services.orchestra_status_service",
     "format_issue_summary_line": "vibe3.services.orchestra_status_service",
-    "generate_score_report": "vibe3.services.pr_scoring_service",
+    "generate_score_report": "vibe3.services.pr.scoring",
     "get_flow_state": "vibe3.services.flow_classifier",
     "get_handoff_state_label": "vibe3.services.orchestra_helpers",
     "get_manager_usernames": "vibe3.services.orchestra_helpers",
-    "get_pr_changed_files": "vibe3.services.pr_analysis_service",
-    "get_pr_commit_count": "vibe3.services.pr_analysis_service",
-    "get_recent_commits": "vibe3.services.pr_analysis_service",
+    "get_pr_changed_files": "vibe3.services.pr.analysis",
+    "get_pr_commit_count": "vibe3.services.pr.analysis",
+    "get_recent_commits": "vibe3.services.pr.analysis",
     "get_role_block_function": "vibe3.services.role_policy_helpers",
     "has_recent_specific_error": "vibe3.services.error_helpers",
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
@@ -261,8 +261,8 @@ _SYMBOL_MODULES = {
     "requires_audit_ref": "vibe3.services.verdict_policy",
     "resolve_branch_and_issue": "vibe3.services.branch_arg",
     "resolve_branch_arg": "vibe3.services.branch_arg",
-    "resolve_branch_from_pr": "vibe3.services.pr_branch_resolver",
-    "resolve_command_branch": "vibe3.services.pr_branch_resolver",
+    "resolve_branch_from_pr": "vibe3.services.pr.resolver",
+    "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff_resolution",
     "resolve_issue_branch_input": "vibe3.services.issue_branch_resolver",
     "resolve_ref_path": "vibe3.services.path_helpers",

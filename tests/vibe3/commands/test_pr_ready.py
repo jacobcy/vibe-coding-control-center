@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.pr import app
-from vibe3.services.pr_ready_usecase import PrReadyAbortedError
+from vibe3.services.pr.ready import PrReadyAbortedError
 
 runner = CliRunner()
 

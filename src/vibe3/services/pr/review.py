@@ -27,7 +27,7 @@ class PRReviewBriefingService:
         Returns:
             Comment URL or ID
         """
-        from vibe3.services.pr_analysis_service import build_pr_analysis
+        from vibe3.services.pr.analysis import build_pr_analysis
 
         analysis = build_pr_analysis(pr_number)
         body = self._render_briefing(analysis, requested_reviewers)

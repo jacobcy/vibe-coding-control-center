@@ -175,9 +175,7 @@ def test_build_pr_analysis_dag_integration(mock_all_dependencies):
 
 def test_build_pr_analysis_error_handling():
     """Test error handling in build_pr_analysis."""
-    with patch(
-        "vibe3.services.pr_analysis_service._get_pr_changed_files"
-    ) as mock_files:
+    with patch("vibe3.services.pr.analysis._get_pr_changed_files") as mock_files:
         # Simulate error getting files
         mock_files.side_effect = Exception("GitHub API error")
 
@@ -190,27 +188,25 @@ def test_build_pr_analysis_commit_count_error():
     """Test graceful handling when _get_pr_commit_count encounters an error."""
     with (
         patch(
-            "vibe3.services.pr_analysis_service._get_pr_changed_files",
+            "vibe3.services.pr.analysis._get_pr_changed_files",
             return_value=["file.py"],
         ),
+        patch("vibe3.services.pr.analysis._filter_critical_files", return_value=[]),
         patch(
-            "vibe3.services.pr_analysis_service._filter_critical_files", return_value=[]
-        ),
-        patch(
-            "vibe3.services.pr_analysis_service._analyze_critical_files",
+            "vibe3.services.pr.analysis._analyze_critical_files",
             return_value=({}, {}),
         ),
         patch(
-            "vibe3.services.pr_analysis_service.dag_service.expand_impacted_modules"
+            "vibe3.services.pr.analysis.dag_service.expand_impacted_modules"
         ) as mock_dag,
         patch(
-            "vibe3.services.pr_analysis_service._calculate_risk_score",
+            "vibe3.services.pr.analysis._calculate_risk_score",
             return_value={"score": 1},
         ),
         patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
         # Mock _fetch_pr_commit_shas to raise (called inside real _get_pr_commit_count)
         patch(
-            "vibe3.services.pr_analysis_service._fetch_pr_commit_shas",
+            "vibe3.services.pr.analysis._fetch_pr_commit_shas",
             side_effect=Exception("API timeout"),
         ),
     ):
@@ -234,26 +230,22 @@ def test_build_pr_analysis_dataclass_fields():
     """Test that PRCriticalAnalysis dataclass has all expected fields."""
     with (
         patch(
-            "vibe3.services.pr_analysis_service._get_pr_changed_files",
+            "vibe3.services.pr.analysis._get_pr_changed_files",
             return_value=["file.py"],
         ),
+        patch("vibe3.services.pr.analysis._filter_critical_files", return_value=[]),
         patch(
-            "vibe3.services.pr_analysis_service._filter_critical_files", return_value=[]
-        ),
-        patch(
-            "vibe3.services.pr_analysis_service._analyze_critical_files",
+            "vibe3.services.pr.analysis._analyze_critical_files",
             return_value=({}, {}),
         ),
         patch(
-            "vibe3.services.pr_analysis_service.dag_service.expand_impacted_modules"
+            "vibe3.services.pr.analysis.dag_service.expand_impacted_modules"
         ) as mock_dag,
         patch(
-            "vibe3.services.pr_analysis_service._calculate_risk_score",
+            "vibe3.services.pr.analysis._calculate_risk_score",
             return_value={"score": 1},
         ),
-        patch(
-            "vibe3.services.pr_analysis_service._get_pr_commit_count", return_value=1
-        ),
+        patch("vibe3.services.pr.analysis._get_pr_commit_count", return_value=1),
         patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
     ):
         mock_dag_result = MagicMock()

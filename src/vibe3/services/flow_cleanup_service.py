@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from vibe3.clients import GitClient, SQLiteClient
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
-    from vibe3.services.pr_service import PRService
+    from vibe3.services.pr.service import PRService
 
 
 class LiveSessionsDetectedError(RuntimeError):
@@ -93,7 +93,7 @@ class FlowCleanupService:
     def pr_service(self) -> PRService:
         """Lazy-initialized PR service."""
         if self._pr_service is None:
-            from vibe3.services.pr_service import PRService
+            from vibe3.services.pr.service import PRService
 
             self._pr_service = PRService(
                 git_client=self.git_client,

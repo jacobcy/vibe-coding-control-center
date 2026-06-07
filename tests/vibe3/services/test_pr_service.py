@@ -6,14 +6,14 @@ import pytest
 
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.pr_create_usecase import PRCreateUsecase
-from vibe3.services.pr_service import PRService
+from vibe3.services.pr.create import PRCreateUsecase
+from vibe3.services.pr.service import PRService
 
 
 @pytest.fixture
 def mock_github_client():
     """Mock GitHub client."""
-    with patch("vibe3.services.pr_service.GitHubClient") as mock:
+    with patch("vibe3.services.pr.service.GitHubClient") as mock:
         yield mock
 
 
@@ -229,7 +229,7 @@ def test_mark_ready_publishes_loc_comment(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:
     """Test that mark_ready publishes LOC comment."""
-    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+    from vibe3.services.pr.loc_comment import PRLocCommentService
 
     # Setup mocks
     gh_instance = pr_service.github_client
@@ -275,7 +275,7 @@ def test_loc_comment_idempotent_update(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:
     """Test that LOC comment updates existing comment on re-run."""
-    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+    from vibe3.services.pr.loc_comment import PRLocCommentService
 
     # Setup mocks for already-ready PR (is_already_ready=True)
     gh_instance = pr_service.github_client
@@ -310,7 +310,7 @@ def test_mark_ready_handles_loc_comment_failure(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:
     """Test that LOC comment failure doesn't block mark_ready."""
-    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+    from vibe3.services.pr.loc_comment import PRLocCommentService
 
     # Setup mocks
     gh_instance = pr_service.github_client
@@ -419,7 +419,7 @@ def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
     clock = [0.0]
 
     with patch(
-        "vibe3.services.pr_service.time.monotonic",
+        "vibe3.services.pr.service.time.monotonic",
         side_effect=lambda: clock[0],
     ):
         # First call — populates cache at t=0

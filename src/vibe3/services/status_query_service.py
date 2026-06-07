@@ -269,7 +269,7 @@ class StatusQueryService:
 
         # Batch fetch all open PRs through the shared PRService cache path.
         try:
-            from vibe3.services.pr_service import PRService
+            from vibe3.services.pr.service import PRService
 
             branch_to_pr = PRService(
                 github_client=cast(GitHubClientProtocol, self.github),

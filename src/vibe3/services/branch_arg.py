@@ -5,7 +5,7 @@ Thin wrapper around resolve_command_branch for backward compatibility.
 
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_branch_resolver import resolve_command_branch
+from vibe3.services.pr.resolver import resolve_command_branch
 
 
 def resolve_branch_arg(branch_arg: str | None) -> str:

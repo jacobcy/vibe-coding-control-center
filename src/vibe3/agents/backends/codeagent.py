@@ -29,6 +29,7 @@ from vibe3.config import (
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models import AgentOptions, AgentResult
 from vibe3.utils import (
+    CODEAGENT_STDIN_MODE_THRESHOLD,
     diagnose_backend_error,
     diagnose_prompt_size_issue,
     prepare_prompt_file,
@@ -281,7 +282,7 @@ class CodeagentBackend:
             f"backend={effective_options.backend or 'default'}, "
             f"model={effective_options.model or 'default'}, "
             f"prompt_length={diagnostic_prompt_length} chars, "
-            "stdin_mode_threshold=800 chars"
+            f"stdin_mode_threshold={CODEAGENT_STDIN_MODE_THRESHOLD} chars"
         )
 
         try:

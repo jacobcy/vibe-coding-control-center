@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.exceptions import UserError
-from vibe3.services.pr_branch_resolver import (
+from vibe3.services.pr.resolver import (
     resolve_branch_from_pr,
     resolve_command_branch,
 )
@@ -94,7 +94,7 @@ class TestResolveCommandBranch:
 
         # Mock resolve_issue_branch_input
         with patch(
-            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
+            "vibe3.services.pr.resolver.resolve_issue_branch_input"
         ) as mock_resolve:
             mock_resolve.return_value = "dev/issue-476"
 
@@ -134,7 +134,7 @@ class TestResolveCommandBranch:
         mock_flow_service = Mock()
 
         with patch(
-            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
+            "vibe3.services.pr.resolver.resolve_issue_branch_input"
         ) as mock_resolve:
             mock_resolve.return_value = "task/issue-999"
 
@@ -198,7 +198,7 @@ class TestResolveCommandBranchCanonicalFallback:
         """测试：纯数字输入无 flow 时返回 canonical branch"""
         from unittest.mock import Mock
 
-        from vibe3.services.pr_branch_resolver import resolve_command_branch
+        from vibe3.services.pr.resolver import resolve_command_branch
 
         mock_store = Mock()
         mock_store.get_flows_by_issue.return_value = []  # No flows
@@ -222,7 +222,7 @@ class TestResolveCommandBranchCanonicalFallback:
         from unittest.mock import Mock
 
         from vibe3.exceptions import UserError
-        from vibe3.services.pr_branch_resolver import resolve_command_branch
+        from vibe3.services.pr.resolver import resolve_command_branch
 
         mock_store = Mock()
         mock_store.get_flows_by_issue.return_value = []
@@ -244,7 +244,7 @@ class TestResolveCommandBranchCanonicalFallback:
         """测试：非数字输入时 canonical_fallback 无效"""
         from unittest.mock import Mock
 
-        from vibe3.services.pr_branch_resolver import resolve_command_branch
+        from vibe3.services.pr.resolver import resolve_command_branch
 
         mock_flow_service = Mock()
         mock_flow_service.get_current_branch.return_value = "main"
