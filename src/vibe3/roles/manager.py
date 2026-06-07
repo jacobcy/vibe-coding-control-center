@@ -9,6 +9,8 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.clients import runtime_assets_root
+
 # public-api: pending upstream export
 from vibe3.clients.runtime_assets import check_runtime_asset
 from vibe3.config import MANAGER_GATE_CONFIG, ConventionResolver
@@ -40,7 +42,6 @@ from vibe3.roles.definitions import (
 )
 from vibe3.services import fail_manager_issue
 from vibe3.services.flow_factory import create_flow_manager
-from vibe3.utils import runtime_assets_root
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
