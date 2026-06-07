@@ -413,24 +413,6 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 - `orchestra-governed`：assignee-pool 层已决策（不管 rfc/epic/ready）
 - `roadmap-reviewed`：roadmap decider 已审查
 
-## Pre-flow Constraints
-
-当处理尚未进入执行池（无 flow context）的 issues 时：
-
-**Allowed**:
-- 在 issue body 中使用自然语言说明依赖关系（如 "Depends on #123", "Blocked by #456"）
-- 添加 `roadmap/*`, `priority/*` 等规划类 labels
-
-**Forbidden**:
-- ❌ 直接添加 `state/blocked` 标签
-- ❌ 直接修改 issue body 的 managed section（`Dependencies:`, `Blocked by:` 等结构化字段）
-- ❌ 调用 `vibe3 flow blocked` 命令
-
-**Rationale**:
-- Pre-flow 阶段无 flow context，无法保证三源（label, body, local cache）原子写入
-- 依赖关系需在 issue 进入 assignee-pool 后，由 manager 通过 `vibe3 flow blocked --task <N>` 正式建立
-- 提前添加 `state/blocked` 会导致 label 存在但 body truth 无对应记录，造成状态不一致
-
 ## Stop Point
 
 完成 intake 判断、supervisor issue 审查与最小纳入动作后停止。不要进入具体实现或单 flow 管理。

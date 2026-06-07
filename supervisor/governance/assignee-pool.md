@@ -819,24 +819,6 @@ Sub-issues 状态：
 
 注意：此场景不写评论，避免刷屏；是否添加 `orchestra-governed` 取决于 assignee 是否为 manager。
 
-## Pre-flow Constraints
-
-当处理尚未进入执行池（无 flow context）的 issues 时：
-
-**Allowed**:
-- 在 issue body 中使用自然语言说明依赖关系（如 "Depends on #123", "Blocked by #456"）
-- 添加 `roadmap/*`, `priority/*` 等规划类 labels
-
-**Forbidden**:
-- ❌ 直接添加 `state/blocked` 标签
-- ❌ 直接修改 issue body 的 managed section（`Dependencies:`, `Blocked by:` 等结构化字段）
-- ❌ 调用 `vibe3 flow blocked` 命令
-
-**Rationale**:
-- Pre-flow 阶段无 flow context，无法保证三源（label, body, local cache）原子写入
-- 依赖关系需在 issue 进入 assignee-pool 后，由 manager 通过 `vibe3 flow blocked --task <N>` 正式建立
-- 提前添加 `state/blocked` 会导致 label 存在但 body truth 无对应记录，造成状态不一致
-
 ## Stop Point
 
 完成治理建议后停止。不要进入执行分配、实现方案、代码修改或单 flow 管理。
