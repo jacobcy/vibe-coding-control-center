@@ -45,18 +45,23 @@ class TestJobEnvelope:
             branch="task/issue-123",
             source="cli-manual",
         )
-        assert envelope.command_type == CommandType.PLAN
-        assert envelope.issue_number == 123
-        assert envelope.branch == "task/issue-123"
-        assert envelope.source == "cli-manual"
-        assert envelope.actor == "orchestra:system"  # default
-        assert envelope.refs == {}  # default
-        assert envelope.tick_id == 0  # default
-        assert envelope.worktree_requirement == "none"  # default
-        assert envelope.source_event_type is None
-        assert envelope.adapter_path is None
-        assert envelope.policy_hash is None
-        assert envelope.material_hash is None
+        assert (
+            envelope.command_type,
+            envelope.issue_number,
+            envelope.branch,
+            envelope.source,
+        ) == (CommandType.PLAN, 123, "task/issue-123", "cli-manual")
+        for field, expected in {
+            "actor": "orchestra:system",
+            "refs": {},
+            "tick_id": 0,
+            "worktree_requirement": "none",
+            "source_event_type": None,
+            "adapter_path": None,
+            "policy_hash": None,
+            "material_hash": None,
+        }.items():  # noqa: E501
+            assert getattr(envelope, field) == expected
 
     def test_frozen_enforcement(self):
         """Verify envelope is immutable."""
@@ -142,13 +147,16 @@ class TestJobContext:
         context = JobContext(issue_number=123, branch="task/issue-123")
         assert context.issue_number == 123
         assert context.branch == "task/issue-123"
-        assert context.tmux_session is None
-        assert context.session_id is None
-        assert context.log_path is None
-        assert context.worktree_path is None
-        assert context.cwd is None
-        assert context.repo_path is None
-        assert context.mode == "async"  # default
+        assert context.mode == "async"
+        for field in (
+            "tmux_session",
+            "session_id",
+            "log_path",
+            "worktree_path",
+            "cwd",
+            "repo_path",
+        ):  # noqa: E501
+            assert getattr(context, field) is None
 
     def test_frozen_enforcement(self):
         """Verify context is immutable."""
@@ -192,21 +200,26 @@ class TestJobResult:
             issue_number=123,
             branch="task/issue-123",
         )
-        assert result.command_type == CommandType.PLAN
-        assert result.issue_number == 123
-        assert result.branch == "task/issue-123"
-        assert result.status == "launched"  # default
-        assert result.exit_code is None
-        assert result.adapter_path is None
-        assert result.context is None
-        assert result.policy_hash is None
-        assert result.material_hash is None
-        assert result.payload_summary == {}
-        assert result.started_at is None
-        assert result.finished_at is None
-        assert result.error_message is None
-        assert result.error_code is None
-        assert result.source is None
+        assert (result.command_type, result.issue_number, result.branch) == (
+            CommandType.PLAN,
+            123,
+            "task/issue-123",
+        )
+        for field, expected in {
+            "status": "launched",
+            "exit_code": None,
+            "adapter_path": None,
+            "context": None,
+            "policy_hash": None,
+            "material_hash": None,
+            "payload_summary": {},
+            "started_at": None,
+            "finished_at": None,
+            "error_message": None,
+            "error_code": None,
+            "source": None,
+        }.items():  # noqa: E501
+            assert getattr(result, field) == expected
 
     def test_mutability(self):
         """Verify result is mutable (not frozen)."""
@@ -395,3 +408,47 @@ class TestExistingPayloadRepresentation:
         assert envelope.source == source
         if event_type:
             assert envelope.source_event_type == event_type
+
+
+class TestNegativeValidation:
+    """Verify Pydantic validation rejects invalid inputs."""
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"source": "invalid-source"},
+            {"worktree_requirement": "unknown"},
+        ],
+    )
+    def test_invalid_envelope_literals(self, override):
+        base = {
+            "command_type": CommandType.PLAN,
+            "issue_number": 1,
+            "branch": "main",
+            "source": "cli-manual",
+        }
+        with pytest.raises(ValidationError):
+            JobEnvelope(**(base | override))
+
+    @pytest.mark.parametrize(
+        "field", ["command_type", "issue_number", "branch", "source"]
+    )  # noqa: E501
+    def test_missing_required_fields(self, field):
+        kw = {
+            "command_type": CommandType.PLAN,
+            "issue_number": 1,
+            "branch": "main",
+            "source": "cli-manual",
+        }
+        del kw[field]
+        with pytest.raises(ValidationError):
+            JobEnvelope(**kw)
+
+    def test_invalid_result_status(self):
+        with pytest.raises(ValidationError):
+            JobResult(
+                command_type=CommandType.PLAN,
+                issue_number=1,
+                branch="main",
+                status="invalid",
+            )
