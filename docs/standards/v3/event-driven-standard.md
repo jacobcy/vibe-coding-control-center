@@ -49,14 +49,15 @@
 
 ---
 
-## 二、执行链路定义
+## 二、运行执行等级定义 (Runtime Execution Levels)
+
+执行等级描述了任务执行的具体集成深度与环境隔离级别，与 Architecture Tier 职责正交。
 
 ```
-L0  Orchestra / Heartbeat          -- 调度主循环
-L1  Governance Service             -- 定期扫描，只操作 GitHub labels
-L2  Supervisor + Apply             -- 轻量治理执行，临时 worktree 隔离
-L3  Manager / Plan / Run / Review  -- 代码开发核心，独立 worktree
-L4  Human collaboration            -- 人工协作流程
+L1  Inspection Level (无 Worktree)      -- 调度主循环、定期扫描、Metadata 观察
+L2  Governance Level (临时 Worktree)    -- Supervisor + Apply 轻量治理执行
+L3  Development Level (持久 Worktree)    -- Manager / Plan / Run / Review 核心开发
+L4  Atomic Level (原子工具/协作)         -- 人工协作流程、原子指令干预
 ```
 
 **参考**: [worktree-ownership-standard.md](worktree-ownership-standard.md) — Worktree 分配与 Runtime Session
@@ -521,9 +522,9 @@ LabelService().transition(
 
 ### 11.2 术语真源
 
-- **执行层级（L0-L4）**: 以 `worktree-ownership-standard.md` 为准
+- **执行等级（L1-L4）**: 以 [glossary.md](../glossary.md) 为准
 - **事件类型与语义**: 以本文件为准
-- **Worktree 参数规则**: 以 `worktree-ownership-standard.md` 为准
+- **Worktree 参数规则**: 以 [worktree-ownership-standard.md](worktree-ownership-standard.md) 为准
 - **事件处理器行为**: 以本文件为准
 
 ---
@@ -532,26 +533,26 @@ LabelService().transition(
 
 以下三个概念容易混淆，特此明确：
 
-**governance scan**（L1）
+**governance scan**（L1 - Inspection Level）
 - 周期扫描观察，`WorktreeRequirement.NONE`，无 worktree
 - 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
 - 材料来源：`supervisor/governance/*.md`
 - `assignee-pool governance`：观察当前 assignee issue pool
 - `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool；不处理 discussion / refactor / big feature
 - `cron governance`：周期性派发过时文档治理 supervisor issue；当前固定一批最多 5 个文档
-- governance 不进入主代码实现链；动作限于观察、最小 routing、派单
+- governance 不进入主代码实现链；动作限于观察、最小 routing、派单。对应 **Tier 3 (Cognitive Layer)**。
 
-**supervisor/apply**（L2）
+**supervisor/apply**（L2 - Governance Execution Level）
 - 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
 - 事件链：`SupervisorIssueIdentified` → `SupervisorApplyDispatched` / `SupervisorApplyDelegated`
 - 材料来源：`supervisor/apply.md`
 - **只处理 supervisor issue（带 `supervisor` label），不处理 assignee issue**
 - 执行 label/comment/close/recreate 等动作
-- 可在 L2 临时分支完成文档类与测试修补类修改，并直接 commit / push / pr create
+- 可在 L2 临时分支完成文档类与测试修补类修改，并直接 commit / push / pr create。对应 **Tier 3 (Cognitive Layer)**。
 
 **runtime**
 - 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
-- 与上述两个治理概念无关，负责基础事件调度与 tick 循环
+- 与上述两个治理概念无关，负责基础事件调度与 tick 循环。对应 **Tier 1/2**。
 
 这三个概念不等价，不可混用。见 `worktree-ownership-standard.md` §二 了解完整层级定义。
 
