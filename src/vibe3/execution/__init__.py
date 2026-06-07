@@ -11,6 +11,13 @@ if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.codeagent_runner import CodeagentExecutionService
     from vibe3.execution.codeagent_support import build_self_invocation
+    from vibe3.execution.command_adapter import (
+        CommandAdapterEntry,
+        CommandAdapterError,
+        CommandAdapterRegistry,
+        ResolvedAdapter,
+        build_default_registry,
+    )
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.execution_lifecycle import (
         execution_prefix,
@@ -44,7 +51,12 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "CapacityService": "vibe3.execution.capacity_service",
     "CodeagentExecutionService": "vibe3.execution.codeagent_runner",
+    "CommandAdapterEntry": "vibe3.execution.command_adapter",
+    "CommandAdapterError": "vibe3.execution.command_adapter",
+    "CommandAdapterRegistry": "vibe3.execution.command_adapter",
     "ExecutionCoordinator": "vibe3.execution.coordinator",
+    "ResolvedAdapter": "vibe3.execution.command_adapter",
+    "build_default_registry": "vibe3.execution.command_adapter",
     "execution_prefix": "vibe3.execution.execution_lifecycle",
     "persist_execution_lifecycle_event": "vibe3.execution.execution_lifecycle",
     "apply_unified_noop_gate": "vibe3.execution.noop_gate",
@@ -91,6 +103,12 @@ __all__ = [
     "ExecutionCoordinator",
     "CodeagentExecutionService",
     "CapacityService",
+    # Command adapter registry
+    "CommandAdapterRegistry",
+    "CommandAdapterEntry",
+    "CommandAdapterError",
+    "ResolvedAdapter",
+    "build_default_registry",
     # Request/Result contracts
     "ExecutionRequest",
     "ExecutionLaunchResult",
