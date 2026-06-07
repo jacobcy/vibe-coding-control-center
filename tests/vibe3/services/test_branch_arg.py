@@ -10,7 +10,7 @@ class TestResolveBranchArg:
 
     def test_none_returns_current_branch(self):
         """测试：None 输入返回当前分支"""
-        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
             mock_flow_service.get_current_branch.return_value = "dev/issue-123"
@@ -20,7 +20,7 @@ class TestResolveBranchArg:
 
     def test_issue_number_returns_canonical_branch(self):
         """测试：纯数字输入返回 canonical branch（无 flow 时）"""
-        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
 
@@ -34,7 +34,7 @@ class TestResolveBranchArg:
 
     def test_branch_name_returns_as_is(self):
         """测试：分支名输入返回原值"""
-        with patch("vibe3.services.shared.branches.FlowService") as mock_fs_cls:
+        with patch("vibe3.services.FlowService") as mock_fs_cls:
             mock_flow_service = Mock()
             mock_fs_cls.return_value = mock_flow_service
 
@@ -53,7 +53,7 @@ class TestResolveBranchAndIssue:
     def test_none_returns_current_branch_with_issue(self):
         """测试：None 输入返回当前分支和正确的 issue number"""
         with (
-            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -66,12 +66,12 @@ class TestResolveBranchAndIssue:
 
             result = resolve_branch_and_issue(None)
             assert result == ("task/issue-123", 123)
-            mock_resolve.assert_called_once_with(None)
+            mock_resolve.assert_called_once_with(None, flow_service=None)
 
     def test_digit_arg_returns_canonical_with_issue(self):
         """测试：纯数字输入返回 canonical branch 和 issue number"""
         with (
-            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -84,12 +84,12 @@ class TestResolveBranchAndIssue:
 
             result = resolve_branch_and_issue("123")
             assert result == ("task/issue-123", 123)
-            mock_resolve.assert_called_once_with("123")
+            mock_resolve.assert_called_once_with("123", flow_service=None)
 
     def test_branch_name_with_issue(self):
         """测试：分支名输入返回原值和解析出的 issue number"""
         with (
-            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -102,12 +102,12 @@ class TestResolveBranchAndIssue:
 
             result = resolve_branch_and_issue("task/issue-456")
             assert result == ("task/issue-456", 456)
-            mock_resolve.assert_called_once_with("task/issue-456")
+            mock_resolve.assert_called_once_with("task/issue-456", flow_service=None)
 
     def test_invalid_name_no_issue(self):
         """测试：无效分支名返回原值和 None issue number"""
         with (
-            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -120,12 +120,12 @@ class TestResolveBranchAndIssue:
 
             result = resolve_branch_and_issue("invalid-name")
             assert result == ("invalid-name", None)
-            mock_resolve.assert_called_once_with("invalid-name")
+            mock_resolve.assert_called_once_with("invalid-name", flow_service=None)
 
     def test_return_type_is_tuple(self):
         """测试：返回值类型为 tuple，且元素类型正确"""
         with (
-            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
