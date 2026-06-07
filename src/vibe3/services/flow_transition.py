@@ -17,7 +17,7 @@ from vibe3.exceptions import UserError
 from vibe3.models import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.git_path_client import GitPathProtocol
-from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.signature_service import SignatureService
 
 
@@ -147,7 +147,7 @@ class FlowTransitionMixin(FlowWriteMixin):
                     issue_title = issue_data.get("title")
                     if issue_title:
                         # Use IssueTitleCacheService to update cache
-                        from vibe3.services.issue_title_cache_service import (
+                        from vibe3.services.issue.title_cache import (
                             IssueTitleCacheService,
                         )
 

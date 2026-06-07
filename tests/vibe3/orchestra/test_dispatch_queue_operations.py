@@ -312,7 +312,7 @@ class TestQueueOperations:
             raise RuntimeError("API error")
 
         monkeypatch.setattr(
-            "vibe3.services.issue_collection_service.IssueCollectionService.collect_open_issues",
+            "vibe3.services.issue.collection.IssueCollectionService.collect_open_issues",
             fail_collect,
         )
 

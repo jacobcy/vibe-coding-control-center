@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_failure_service import (
+from vibe3.services.issue.failure import (
     block_manager_noop_issue,
     fail_manager_issue,
 )
@@ -24,7 +24,7 @@ def test_fail_manager_issue_records_to_error_log_only():
         store.add_issue_link(branch, 100, "task")
 
         with patch(
-            "vibe3.services.issue_failure_service._get_issue_flow_service"
+            "vibe3.services.issue.failure._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -59,7 +59,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
         store.add_issue_link(branch, 200, "task")
 
         with patch(
-            "vibe3.services.issue_failure_service._get_issue_flow_service"
+            "vibe3.services.issue.failure._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -192,9 +192,7 @@ def test_fail_issue_records_to_error_log_only():
         flow_service.create_flow(slug="issue-500", branch=branch, actor="test-user")
         store.add_issue_link(branch, 500, "task")
 
-        with patch(
-            "vibe3.services.issue_failure_service._get_issue_flow_service"
-        ) as mock_ifs:
+        with patch("vibe3.services.issue.failure._get_issue_flow_service") as mock_ifs:
             mock_issue_flow = MagicMock()
             mock_issue_flow.store = store
             mock_ifs.return_value = mock_issue_flow
@@ -219,7 +217,7 @@ def test_fail_issue_records_to_error_log_only():
 def test_block_manager_noop_issue_no_flow():
     """block_manager_noop_issue() should return early if no flow exists."""
     with patch(
-        "vibe3.services.issue_failure_service._get_issue_flow_service"
+        "vibe3.services.issue.failure._get_issue_flow_service"
     ) as mock_get_service:
         mock_service = MagicMock()
         mock_store = MagicMock()

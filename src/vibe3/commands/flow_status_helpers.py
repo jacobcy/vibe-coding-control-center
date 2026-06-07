@@ -178,7 +178,7 @@ def _fetch_issue_titles_for_status(
         return titles, False
 
     # Server not running, use cache service with real branches
-    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+    from vibe3.services.issue.title_cache import IssueTitleCacheService
 
     branches = [flow.branch for flow in flows if flow.branch]
     title_cache = IssueTitleCacheService(

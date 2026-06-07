@@ -12,7 +12,7 @@ from vibe3.services.pr.service import PRService
 from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:
-    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+    from vibe3.services.issue.title_cache import IssueTitleCacheService
 
 
 @dataclass
@@ -82,7 +82,7 @@ class FlowProjectionService:
     def title_cache(self) -> IssueTitleCacheService:
         """Lazy-initialized title cache service."""
         if self._title_cache is None:
-            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+            from vibe3.services.issue.title_cache import IssueTitleCacheService
 
             self._title_cache = IssueTitleCacheService(self.store, self.github_client)
         return self._title_cache
@@ -123,7 +123,7 @@ class FlowProjectionService:
         Returns:
             Tuple of (issue_number -> title dict, had_network_error)
         """
-        from vibe3.services.issue_flow_service import IssueFlowService
+        from vibe3.services.issue.flow import IssueFlowService
 
         issue_flow = IssueFlowService(self.store)
 

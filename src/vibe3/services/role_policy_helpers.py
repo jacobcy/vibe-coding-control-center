@@ -2,7 +2,7 @@
 
 from typing import Callable
 
-from vibe3.services.issue_failure_service import (
+from vibe3.services.issue.failure import (
     block_executor_noop_issue,
     block_manager_noop_issue,
     block_planner_noop_issue,

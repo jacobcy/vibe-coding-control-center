@@ -198,7 +198,7 @@ class TestMarkFlowDoneIssueClose:
         mock_issue_flow_service.resolve_task_issue_number.return_value = None
 
         with patch(
-            "vibe3.services.issue_flow_service.IssueFlowService",
+            "vibe3.services.issue.flow.IssueFlowService",
             return_value=mock_issue_flow_service,
         ):
             # ACT
@@ -244,7 +244,7 @@ class TestMarkFlowDoneIssueClose:
         mock_issue_flow_service.resolve_task_issue_number.return_value = None
 
         with patch(
-            "vibe3.services.issue_flow_service.IssueFlowService",
+            "vibe3.services.issue.flow.IssueFlowService",
             return_value=mock_issue_flow_service,
         ):
             # ACT

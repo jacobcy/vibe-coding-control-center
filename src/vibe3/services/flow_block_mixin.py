@@ -69,7 +69,7 @@ class FlowLifecycleMixin:
             )
 
         issue_number: int | None = None
-        from vibe3.services.issue_flow_service import IssueFlowService
+        from vibe3.services.issue.flow import IssueFlowService
 
         issue_flow_service = IssueFlowService(store=self.store)
         issue_number = issue_flow_service.resolve_task_issue_number(branch)

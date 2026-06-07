@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+from vibe3.services.issue.title_cache import IssueTitleCacheService
 
 
 @pytest.fixture

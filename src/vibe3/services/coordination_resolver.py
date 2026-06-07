@@ -168,7 +168,7 @@ class CoordinationResolver:
             from body, or None if read failed
         """
         from vibe3.clients import GitHubClient
-        from vibe3.services.issue_body_service import parse_projection
+        from vibe3.services.issue.body import parse_projection
 
         client = GitHubClient()
 

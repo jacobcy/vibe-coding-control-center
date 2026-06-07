@@ -12,7 +12,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.services.flow_timeline_service import FlowTimelineService
-from vibe3.services.issue_flow_service import IssueFlowService
+from vibe3.services.issue.flow import IssueFlowService
 
 _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
 

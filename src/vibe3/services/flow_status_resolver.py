@@ -8,7 +8,7 @@ from loguru import logger
 
 from vibe3.models import DataSource, FlowStatusResponse
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_body_service import parse_projection
+from vibe3.services.issue.body import parse_projection
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

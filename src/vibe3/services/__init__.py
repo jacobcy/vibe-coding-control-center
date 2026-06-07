@@ -30,16 +30,16 @@ if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
     from vibe3.services.handoff_service import HandoffService
     from vibe3.services.handoff_status_service import HandoffStatusService
-    from vibe3.services.issue_collection_service import IssueCollectionService
-    from vibe3.services.issue_context_loader import load_issue_info
-    from vibe3.services.issue_failure_service import (
+    from vibe3.services.issue.collection import IssueCollectionService
+    from vibe3.services.issue.context import load_issue_info
+    from vibe3.services.issue.failure import (
         block_manager_noop_issue,
         fail_executor_issue,
         fail_manager_issue,
         fail_planner_issue,
         fail_reviewer_issue,
     )
-    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.label_service import LabelService
     from vibe3.services.label_utils import (
         clean_old_state_labels,
@@ -197,10 +197,10 @@ _SYMBOL_MODULES = {
     "HandoffService": "vibe3.services.handoff_service",
     "HandoffStatusService": "vibe3.services.handoff_status_service",
     "InitResult": "vibe3.services.check_remote",
-    "IssueCollectionService": "vibe3.services.issue_collection_service",
-    "IssueFlowService": "vibe3.services.issue_flow_service",
+    "IssueCollectionService": "vibe3.services.issue.collection",
+    "IssueFlowService": "vibe3.services.issue.flow",
     "IssueStatusEntry": "vibe3.services.orchestra_status_service",
-    "IssueTitleCacheService": "vibe3.services.issue_title_cache_service",
+    "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     "LabelService": "vibe3.services.label_service",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
@@ -222,7 +222,7 @@ _SYMBOL_MODULES = {
     "VerdictService": "vibe3.services.verdict_service",
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
-    "block_manager_noop_issue": "vibe3.services.issue_failure_service",
+    "block_manager_noop_issue": "vibe3.services.issue.failure",
     "build_bind_task_hint": "vibe3.services.task_binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
@@ -231,10 +231,10 @@ _SYMBOL_MODULES = {
     "classify_task_issues_for_rendering": "vibe3.services.task_status_service",
     "create_flow_manager": "vibe3.services.flow_factory",
     "emit_issue_failed": "vibe3.services.event_helpers",
-    "fail_executor_issue": "vibe3.services.issue_failure_service",
-    "fail_manager_issue": "vibe3.services.issue_failure_service",
-    "fail_planner_issue": "vibe3.services.issue_failure_service",
-    "fail_reviewer_issue": "vibe3.services.issue_failure_service",
+    "fail_executor_issue": "vibe3.services.issue.failure",
+    "fail_manager_issue": "vibe3.services.issue.failure",
+    "fail_planner_issue": "vibe3.services.issue.failure",
+    "fail_reviewer_issue": "vibe3.services.issue.failure",
     "format_agent_actor": "vibe3.services.actor_support",
     "filter_critical_files": "vibe3.services.pr.analysis",
     "fetch_task_status_data": "vibe3.services.task_status_service",
@@ -252,7 +252,7 @@ _SYMBOL_MODULES = {
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "is_running_issue": "vibe3.services.orchestra_status_service",
-    "load_issue_info": "vibe3.services.issue_context_loader",
+    "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.label_utils",
     "normalize_labels": "vibe3.services.label_utils",
     "record_dispatch_failure_if_unexpected": "vibe3.services.error_helpers",

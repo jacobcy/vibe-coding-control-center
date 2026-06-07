@@ -136,7 +136,7 @@ class TestRecover:
 
         with (
             patch(
-                "vibe3.services.issue_context_loader.load_issue_info",
+                "vibe3.services.issue.context.load_issue_info",
                 return_value=MagicMock(number=1),
             ),
             patch(
