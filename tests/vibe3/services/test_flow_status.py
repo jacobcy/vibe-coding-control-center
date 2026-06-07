@@ -22,7 +22,27 @@ class TestFlowStatus:
     """Tests for individual flow status."""
 
     def test_get_flow_status_success(self, mock_store) -> None:
-        """Test getting flow status successfully."""
+        """Test getting flow status successfully with cache-first pr_ref."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-slug",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+            "pr_ref": "https://github.com/test/repo/pull/42",
+        }
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store)
+        result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert result.branch == "test-branch"
+        assert result.flow_status == "active"
+        assert result.pr_number == 42
+        assert result.pr_ready_for_review is False
+
+    def test_get_flow_status_pr_ref_fallback(self, mock_store) -> None:
+        """Test fallback to PRService when pr_ref is absent."""
         mock_store.get_flow_state.return_value = {
             "branch": "test-branch",
             "flow_slug": "test-slug",
@@ -32,16 +52,19 @@ class TestFlowStatus:
         mock_store.get_issue_links.return_value = []
 
         service = FlowService(store=mock_store)
-        # GitHubClient is imported inside get_flow_status, need to patch it
-        with patch("vibe3.services.flow_read_mixin.GitHubClient") as mock_gh_class:
-            mock_gh = mock_gh_class.return_value
-            mock_gh.get_pr.return_value = None
+        # Patch PRService at the point where it's imported (lazy import)
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_service_class:
+            mock_pr_service = mock_pr_service_class.return_value
+            mock_pr = MagicMock()
+            mock_pr.number = 99
+            mock_pr.is_ready = True
+            mock_pr_service.get_branch_pr_status.return_value = mock_pr
 
             result = service.get_flow_status("test-branch")
 
         assert result is not None
-        assert result.branch == "test-branch"
-        assert result.flow_status == "active"
+        assert result.pr_number == 99
+        assert result.pr_ready_for_review is True
 
     def test_get_flow_status_not_found(self, mock_store) -> None:
         """Test getting flow status for non-existent branch."""
