@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.config.env_override import get_env_override
 from vibe3.config.profile_convention import ProfileConvention
 
 if TYPE_CHECKING:
@@ -112,7 +113,6 @@ class ConventionResolver:
         if self._profile_cache is not None:
             return self._profile_cache
 
-        import os
         import subprocess
 
         import yaml
@@ -124,7 +124,7 @@ class ConventionResolver:
             return result
 
         # Step 2: Check environment variable
-        env_profile = os.getenv("VIBE_PROFILE")
+        env_profile: str | None = get_env_override("VIBE_PROFILE")
         if env_profile:
             self._profile_cache = env_profile
             return env_profile
