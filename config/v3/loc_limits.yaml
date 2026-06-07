@@ -79,6 +79,12 @@ code_limits:
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
 
       # Services 层 —— 允许 410-540
+      - path: "src/vibe3/services/task/resume.py"
+        limit: 540
+        reason: "Task resume operations 聚合，包含 TaskResumeOperations（非破坏性 blocked issue resume）、ResumeCandidateFinder（候选查找与验证）、ResumeCoordinator（多 issue 协调恢复）等三个紧密耦合类；职责内聚（label 清除、状态恢复、一致性校验、live session 检测）且已按职责拆分为独立类，进一步拆分文件会破坏 resume domain 完整性"
+      - path: "src/vibe3/services/task/service.py"
+        limit: 480
+        reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低"
       - path: "src/vibe3/services/handoff_resolution.py"
         limit: 650
         reason: "Handoff target resolution service, 包含 @vibe/ 命名空间解析（三层 fallback：显式参数 → repo 自动检测 → 全局 ~/.vibe）、路径验证与安全检查（正则校验 + 路径遍历防护 + 边界检查）、四个命名空间统一解析逻辑（@key/@vibe/relative/absolute）等紧密耦合功能；新增 @vibe/ 命名空间支持后从 371 行增至 544 行（+173 行核心代码）"
