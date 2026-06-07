@@ -74,9 +74,10 @@ class TestQualifyGateGitHubClosed:
         state: IssueState,
         labels: list[str],
         explicit_branch: str = "auto",
-    ) -> tuple[object, Mock]:
-        """Run qualify gate for a CLOSED issue, returning (result, mock_cleanup_svc).
+    ) -> tuple[object, Mock, Mock]:
+        """Run qualify gate for a CLOSED issue.
 
+        Returns (result, mock_cleanup_svc, mock_flow_status_svc).
         Pass explicit_branch="" to test the empty-branch code path.
         """
         effective_branch = (
@@ -91,7 +92,12 @@ class TestQualifyGateGitHubClosed:
             labels=labels,
             github_state="CLOSED",
         )
-        with patch("vibe3.services.FlowCleanupService") as mock_svc:
+        with (
+            patch(
+                "vibe3.services.flow_status_service.FlowStatusService"
+            ) as mock_flow_status_svc,
+            patch("vibe3.services.FlowCleanupService") as mock_cleanup_svc,
+        ):
             result = qualify_gate_service.run_qualify_gate(
                 issue=closed_issue,
                 branch=effective_branch,
@@ -99,18 +105,26 @@ class TestQualifyGateGitHubClosed:
                 labels=labels,
                 trigger_state=state,
             )
-        return result, mock_svc
+        return result, mock_cleanup_svc, mock_flow_status_svc
 
     def test_closed_ready_issue_terminates(
         self, qualify_gate_service: QualifyGateService
     ) -> None:
         """READY + CLOSED → None and cleanup_flow_scene called with correct args."""
-        result, mock_svc = self._run_with_closed_issue(
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
             qualify_gate_service, 101, IssueState.READY, ["state/ready"]
         )
 
         assert result is None
-        mock_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+
+        # Verify mark_flow_aborted is called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_called_once_with(
+            "task/issue-101",
+            "Issue #101 closed on GitHub",
+        )
+
+        # Verify cleanup_flow_scene is called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
             "task/issue-101",
             include_remote=False,
             terminate_sessions=True,
@@ -121,12 +135,20 @@ class TestQualifyGateGitHubClosed:
         self, qualify_gate_service: QualifyGateService
     ) -> None:
         """CLAIMED + CLOSED → None and cleanup_flow_scene called with correct args."""
-        result, mock_svc = self._run_with_closed_issue(
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
             qualify_gate_service, 102, IssueState.CLAIMED, ["state/claimed"]
         )
 
         assert result is None
-        mock_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+
+        # Verify mark_flow_aborted is called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_called_once_with(
+            "task/issue-102",
+            "Issue #102 closed on GitHub",
+        )
+
+        # Verify cleanup_flow_scene is called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
             "task/issue-102",
             include_remote=False,
             terminate_sessions=True,
@@ -137,12 +159,20 @@ class TestQualifyGateGitHubClosed:
         self, qualify_gate_service: QualifyGateService
     ) -> None:
         """IN_PROGRESS + CLOSED → None and cleanup_flow_scene called correctly."""
-        result, mock_svc = self._run_with_closed_issue(
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
             qualify_gate_service, 103, IssueState.IN_PROGRESS, ["state/in-progress"]
         )
 
         assert result is None
-        mock_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+
+        # Verify mark_flow_aborted is called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_called_once_with(
+            "task/issue-103",
+            "Issue #103 closed on GitHub",
+        )
+
+        # Verify cleanup_flow_scene is called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
             "task/issue-103",
             include_remote=False,
             terminate_sessions=True,
@@ -193,7 +223,7 @@ class TestQualifyGateGitHubClosed:
         self, qualify_gate_service: QualifyGateService
     ) -> None:
         """CLOSED issue with empty branch → returns None but cleanup not called."""
-        result, mock_svc = self._run_with_closed_issue(
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
             qualify_gate_service,
             106,
             IssueState.READY,
@@ -202,4 +232,93 @@ class TestQualifyGateGitHubClosed:
         )
 
         assert result is None
-        mock_svc.assert_not_called()
+        mock_cleanup_svc.assert_not_called()
+        mock_flow_status_svc.assert_not_called()
+
+    def test_closed_issue_already_done_not_overwritten(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """flow_status=done → mark_flow_aborted NOT called.
+
+        cleanup_flow_scene still called.
+        """
+        # Setup flow_state with done status
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={"flow_status": "done"}
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 107, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted is NOT called (already done)
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-107",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_already_aborted_not_overwritten(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """flow_status=aborted → mark_flow_aborted NOT called.
+
+        cleanup_flow_scene still called.
+        """
+        # Setup flow_state with aborted status
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={"flow_status": "aborted"}
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 108, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted is NOT called (already aborted)
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-108",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_no_flow_state_marks_aborted(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """flow_state=None → mark_flow_aborted IS called.
+
+        Treats missing state as non-terminal.
+        """
+        # Setup flow_state as None (no flow record exists)
+        qualify_gate_service._store.get_flow_state = Mock(return_value=None)
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 109, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted IS called (missing state treated as non-terminal)
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_called_once_with(
+            "task/issue-109",
+            "Issue #109 closed on GitHub",
+        )
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-109",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
