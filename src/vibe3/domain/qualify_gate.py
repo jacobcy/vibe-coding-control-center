@@ -79,6 +79,22 @@ class QualifyGateService:
             f"qualify_gate skip (#{issue.number}): "
             "issue closed on GitHub — terminalizing local flow",
         )
+
+        # Mark flow as aborted unless already in a terminal state
+        flow_state = self._store.get_flow_state(branch)
+        current_status = flow_state.get("flow_status") if flow_state else None
+        if current_status not in ("done", "aborted"):
+            from vibe3.services.flow_status_service import FlowStatusService
+
+            FlowStatusService(
+                store=self._store,
+                git_client=self._flow_manager.git,
+                github_client=self._github,
+            ).mark_flow_aborted(
+                branch,
+                f"Issue #{issue.number} closed on GitHub",
+            )
+
         from vibe3.services import FlowCleanupService
 
         FlowCleanupService(store=self._store).cleanup_flow_scene(
