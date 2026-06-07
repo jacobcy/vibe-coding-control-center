@@ -28,7 +28,6 @@ if TYPE_CHECKING:
         PromptAssemblyError,
         ProviderNotFoundError,
         TemplateNotFoundError,
-        UnusedVariableError,
     )
     from vibe3.prompts.manifest import (
         PromptManifest,
@@ -74,7 +73,6 @@ _LAZY_IMPORTS = {
     "PromptAssemblyError": "vibe3.prompts.exceptions",
     "ProviderNotFoundError": "vibe3.prompts.exceptions",
     "TemplateNotFoundError": "vibe3.prompts.exceptions",
-    "UnusedVariableError": "vibe3.prompts.exceptions",
     "PromptManifest": "vibe3.prompts.manifest",
     "PromptProvider": "vibe3.prompts.manifest",
     "PromptRecipeDefinition": "vibe3.prompts.manifest",
@@ -140,7 +138,6 @@ __all__ = [
     "MissingVariableError",
     "ProviderNotFoundError",
     "TemplateNotFoundError",
-    "UnusedVariableError",
     # Validation
     "PromptValidationResult",
     "PromptValidationService",

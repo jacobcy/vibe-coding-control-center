@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from vibe3.prompts.exceptions import MissingVariableError, UnusedVariableError
+from vibe3.prompts.exceptions import MissingVariableError
 from vibe3.prompts.models import (
     PromptRecipe,
     PromptRenderResult,
@@ -141,9 +141,4 @@ class TestPromptExceptions:
     def test_missing_variable_error(self) -> None:
         exc = MissingVariableError(variable="skill_content", template_key="test.key")
         assert "skill_content" in str(exc)
-        assert "test.key" in str(exc)
-
-    def test_unused_variable_error(self) -> None:
-        exc = UnusedVariableError(variable="extra_var", template_key="test.key")
-        assert "extra_var" in str(exc)
         assert "test.key" in str(exc)
