@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.models import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_service import PRService
+from vibe3.services.pr.service import PRService
 from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:

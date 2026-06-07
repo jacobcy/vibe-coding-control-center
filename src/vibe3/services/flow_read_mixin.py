@@ -55,7 +55,7 @@ class FlowReadMixin:
         pr_number, pr_ready = None, False  # Default values
 
         try:
-            from vibe3.services.pr_service import PRService
+            from vibe3.services.pr.service import PRService
 
             gh = getattr(self, "github_client", None) or GitHubClient()
             pr = PRService(

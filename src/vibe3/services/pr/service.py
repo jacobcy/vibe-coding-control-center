@@ -21,9 +21,9 @@ from vibe3.models import (
     PRState,
     VersionBumpResponse,
 )
-from vibe3.services.pr_loc_comment_service import PRLocCommentService
-from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
-from vibe3.services.pr_utils import (
+from vibe3.services.pr.loc_comment import PRLocCommentService
+from vibe3.services.pr.review import PRReviewBriefingService
+from vibe3.services.pr.utils import (
     build_pr_body,
     check_upstream_conflicts,
     get_metadata_from_flow,

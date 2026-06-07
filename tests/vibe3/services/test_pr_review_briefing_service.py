@@ -2,7 +2,7 @@
 
 from unittest.mock import ANY, MagicMock, patch
 
-from vibe3.services.pr_review_briefing_service import (
+from vibe3.services.pr.review import (
     SENTINEL,
     PRReviewBriefingService,
 )
@@ -60,7 +60,7 @@ def test_publish_briefing_creates_new_if_no_sentinel_exists():
     analysis.critical_symbols = []
     analysis.impacted_modules = []
 
-    patch_path = "vibe3.services.pr_analysis_service.build_pr_analysis"
+    patch_path = "vibe3.services.pr.analysis.build_pr_analysis"
     with patch(patch_path, return_value=analysis):
         service = PRReviewBriefingService(gh_client)
         url = service.publish_briefing(123)
@@ -87,7 +87,7 @@ def test_publish_briefing_updates_any_existing_sentinel_regardless_of_author():
     analysis.critical_symbols = []
     analysis.impacted_modules = []
 
-    patch_path = "vibe3.services.pr_analysis_service.build_pr_analysis"
+    patch_path = "vibe3.services.pr.analysis.build_pr_analysis"
     with patch(patch_path, return_value=analysis):
         service = PRReviewBriefingService(gh_client)
         url = service.publish_briefing(123)

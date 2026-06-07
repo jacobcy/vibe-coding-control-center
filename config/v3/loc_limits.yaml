@@ -20,7 +20,7 @@ code_limits:
       - path: "src/vibe3/domain/dispatch_coordinator.py"
         limit: 700
         reason: "Global dispatch coordinator (migrated from orchestra to domain layer for domain-first architecture #1624)，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、重启恢复等紧密耦合逻辑；mixin-to-service 重构后增加委托调用，整体代码量减少（删除 mixin 250 行，新增 service 149 行）"
-      - path: "src/vibe3/services/pr_service.py"
+      - path: "src/vibe3/services/pr/service.py"
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"

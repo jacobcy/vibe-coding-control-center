@@ -12,7 +12,7 @@ from loguru import logger
 from vibe3.analysis import PRDimensions, SerenaService, dag_service
 from vibe3.config import get_config
 from vibe3.models import CommitInfo, CriticalFileInfo, PRCriticalAnalysis, PRSource
-from vibe3.services.pr_scoring_service import generate_score_report
+from vibe3.services.pr.scoring import generate_score_report
 
 
 def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalysis:

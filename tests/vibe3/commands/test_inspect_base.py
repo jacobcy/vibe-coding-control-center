@@ -113,7 +113,7 @@ def test_inspect_base_json_output():
                     with patch("pathlib.Path.exists", return_value=True):
                         # Mock score generation to avoid config loading
                         with patch(
-                            "vibe3.services.pr_scoring_service.generate_score_report"
+                            "vibe3.services.pr.scoring.generate_score_report"
                         ) as mock_score:
                             mock_score.return_value = {
                                 "score": 5,
@@ -159,7 +159,7 @@ def test_inspect_base_json_custom_branch():
                     with patch("pathlib.Path.exists", return_value=True):
                         # Mock score generation to avoid config loading
                         with patch(
-                            "vibe3.services.pr_scoring_service.generate_score_report"
+                            "vibe3.services.pr.scoring.generate_score_report"
                         ) as mock_score:
                             mock_score.return_value = {
                                 "score": 5,
