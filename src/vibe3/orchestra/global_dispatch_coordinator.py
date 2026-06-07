@@ -8,10 +8,7 @@ All symbols are also available from their canonical locations:
 """
 
 # Re-export GlobalDispatchCoordinator from domain
-from vibe3.domain import GlobalDispatchCoordinator
-
-# Re-export MAX_INTENTS_PER_TICK from orchestra (re-exported from domain)
-# Re-export QueueEntry from orchestra (still in orchestra layer)
-from vibe3.orchestra import MAX_INTENTS_PER_TICK, QueueEntry
+from vibe3.domain import MAX_INTENTS_PER_TICK, GlobalDispatchCoordinator
+from vibe3.models import QueueEntry
 
 __all__ = ["GlobalDispatchCoordinator", "QueueEntry", "MAX_INTENTS_PER_TICK"]

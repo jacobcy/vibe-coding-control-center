@@ -15,8 +15,11 @@ import uvicorn
 from vibe3.clients import GitClient
 from vibe3.config import find_missing_backend_commands, load_orchestra_config
 from vibe3.models import OrchestraConfig
-from vibe3.observability import setup_logging
-from vibe3.orchestra import orchestra_events_log_path, orchestra_log_dir
+from vibe3.observability import (
+    orchestra_events_log_path,
+    orchestra_log_dir,
+    setup_logging,
+)
 from vibe3.runtime import OrchestraInstanceInfo, write_instance_info
 
 from .registry import (

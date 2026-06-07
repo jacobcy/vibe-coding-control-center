@@ -17,11 +17,8 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.models import IssueInfo, IssueState
-from vibe3.orchestra import (
-    CheckServiceProtocol,
-    FlowServiceProtocol,
-    append_orchestra_event,
-)
+from vibe3.observability import append_orchestra_event
+from vibe3.orchestra import CheckServiceProtocol, FlowServiceProtocol
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

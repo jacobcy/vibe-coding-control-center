@@ -22,8 +22,6 @@ Prompt Builders:
   agent prompt construction
 - ``build_review_prompt_body`` / ``make_review_context_builder`` — review
   agent prompt construction
-- ``build_tools_guide_section`` — shared utility for building tools guide
-  sections (re-exported from prompts.sections)
 - ``describe_plan_sections`` / ``describe_run_plan_sections`` /
   ``describe_review_sections`` — section key inspectors for dry-run summaries
 
@@ -32,8 +30,6 @@ Review Helpers:
 - ``run_inspect_json`` — helper to call inspect subcommand for review analysis
 
 Types:
-- ``PromptContextMode`` — literal type for prompt context mode
-  (bootstrap/resume)
 - ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
 
 Backend Config:
@@ -44,9 +40,6 @@ Backend Config:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
-# Cross-module imports (not self-references) - kept minimal per modularity rules
-from vibe3.models import PromptContextMode
 
 if TYPE_CHECKING:
     from vibe3.agents.backends.async_launcher import start_async_command
@@ -81,7 +74,6 @@ if TYPE_CHECKING:
         make_run_context_builder,
         make_skill_context_builder,
     )
-    from vibe3.prompts.sections import build_tools_guide_section
 
 
 # Lazy imports for self-references (avoid circular init dependencies)
@@ -108,7 +100,6 @@ _LAZY_IMPORTS = {
     "make_publish_context_builder": "vibe3.agents.run_prompt",
     "make_run_context_builder": "vibe3.agents.run_prompt",
     "make_skill_context_builder": "vibe3.agents.run_prompt",
-    "build_tools_guide_section": "vibe3.prompts.sections",
 }
 
 
@@ -128,13 +119,11 @@ __all__ = [
     "CodeagentCommand",
     "CodeagentResult",
     "ExecutionRole",
-    "PromptContextMode",
     "RunPromptMode",
     "build_plan_prompt_body",
     "build_review_prompt_body",
     "build_run_prompt_body",
     "build_snapshot_diff",
-    "build_tools_guide_section",
     "create_codeagent_command",
     "describe_plan_sections",
     "describe_review_sections",
