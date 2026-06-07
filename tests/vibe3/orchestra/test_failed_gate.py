@@ -260,7 +260,7 @@ class TestFailedGateIntegration:
                     blocked_ticks=0,
                 )
                 runner = CliRunner()
-                with patch("vibe3.server.app.setup_logging"):
+                with patch("vibe3.observability.setup_logging"):
                     with patch("vibe3.server.app.validate_pid_file") as mock_pid:
                         mock_pid.return_value = (None, False)
                         with patch(

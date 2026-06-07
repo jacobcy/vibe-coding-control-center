@@ -91,10 +91,9 @@ agents/
 
 ## 外部依赖
 
-- **models/**: AgentOptions, AgentResult, PlanRequest, ReviewRequest
+- **models/**: AgentOptions, AgentResult, PlanRequest, ReviewRequest, PromptContextMode
 - **prompts/**: PromptContextBuilder, PromptManifest
 - **config/**: VibeConfig
-- **execution/**: PromptContextMode
 - **analysis/**: build_snapshot_diff_section (review_prompt only)
 
 ## 被依赖

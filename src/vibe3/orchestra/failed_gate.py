@@ -7,7 +7,6 @@ All symbols are also available from their canonical locations:
 - GateStatus: vibe3.domain.failed_gate.GateStatus
 """
 
-from vibe3.domain import FailedGate
-from vibe3.orchestra import GateResult, GateStatus
+from vibe3.domain import FailedGate, GateResult, GateStatus
 
 __all__ = ["FailedGate", "GateResult", "GateStatus"]

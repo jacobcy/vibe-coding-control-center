@@ -21,7 +21,7 @@ from vibe3.environment import SessionRegistryService
 from vibe3.execution import CapacityService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models import OrchestraConfig
-from vibe3.orchestra import orchestra_events_log_path, orchestra_log_dir
+from vibe3.observability import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.dispatch_coordinator_factory import (
     create_global_dispatch_coordinator,
 )
