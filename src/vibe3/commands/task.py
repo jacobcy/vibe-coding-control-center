@@ -16,10 +16,10 @@ from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
 from vibe3.observability import setup_logging
 from vibe3.services import (
-    ConventionResolver,
     FlowService,
     TaskResumeUsecase,
     TaskService,
+    get_convention,
 )
 from vibe3.ui import (
     render_task_comments,
@@ -289,7 +289,7 @@ def resume(
         # Support bare numbers ("303") and convention branches ("task/issue-303")
         issue_num = try_parse_issue_number(branch)
         if issue_num is None:
-            convention = ConventionResolver.from_repo().resolve().branch
+            convention = get_convention().branch
             issue_num = convention.parse_issue_number(branch)
         if issue_num is None:
             typer.echo(f"Error: 无法从 '{branch}' 解析 issue number", err=True)
