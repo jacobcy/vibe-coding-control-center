@@ -195,6 +195,13 @@ class QualifyGateService:
         if not branch:
             return None
 
+        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+        if truth.is_blocked and truth.blocked_by_issue:
+            dep_closed = self._is_dependency_satisfied(truth.blocked_by_issue)
+            if dep_closed:
+                self._notify_dep_resolved(branch, issue.number, truth.blocked_by_issue)
+                return IssueState.HANDOFF
+
         flow_state = self._store.get_flow_state(branch)
         result = self.run_qualify_gate(
             issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
@@ -204,6 +211,41 @@ class QualifyGateService:
             return None
 
         return result
+
+    def _notify_dep_resolved(
+        self, branch: str, issue_number: int, dep_issue_number: int
+    ) -> None:
+        """Notify that dependency has been resolved.
+
+        Uses unified FlowRecoveryService to ensure consistency checks
+        and proper rebuild if needed.
+
+        Args:
+            branch: Flow branch
+            issue_number: Issue number that was blocked
+            dep_issue_number: Dependency issue number that closed
+        """
+        from vibe3.observability import append_orchestra_event
+        from vibe3.services import FlowRecoveryService
+
+        # Use unified recovery path (includes consistency checks)
+        recovery = FlowRecoveryService(
+            store=self._store,
+            git_client=GitClient(),
+            github_client=self._github,
+        )
+        recovery.recover(
+            branch=branch,
+            issue_number=issue_number,
+            reason=f"Dependency #{dep_issue_number} closed",
+            auto=True,  # Auto-rebuild if needed
+        )
+
+        append_orchestra_event(
+            "dispatcher",
+            f"qualify_gate dep_resolved #{issue_number}: "
+            f"dependency #{dep_issue_number} closed, transitioned to HANDOFF",
+        )
 
     def _align_blocked_state(
         self,

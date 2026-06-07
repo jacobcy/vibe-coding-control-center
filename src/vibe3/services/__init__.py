@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.flow_projection_service import FlowProjectionService
     from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+    from vibe3.services.flow_recovery_service import FlowRecoveryService
     from vibe3.services.flow_resume_resolver import infer_resume_label
     from vibe3.services.flow_service import FlowService
     from vibe3.services.handoff_service import HandoffService
@@ -89,6 +90,7 @@ __all__ = [
     "FlowProjection",
     "FlowProjectionService",
     "FlowRebuildUsecase",
+    "FlowRecoveryService",
     "FlowService",
     "FlowState",
     "FlowStatusResolver",
@@ -191,6 +193,7 @@ _SYMBOL_MODULES = {
     "FlowProjection": "vibe3.services.flow_projection_service",
     "FlowProjectionService": "vibe3.services.flow_projection_service",
     "FlowRebuildUsecase": "vibe3.services.flow_rebuild_usecase",
+    "FlowRecoveryService": "vibe3.services.flow_recovery_service",
     "FlowService": "vibe3.services.flow_service",
     "FlowState": "vibe3.services.flow_classifier",
     "FlowStatusResolver": "vibe3.services.flow_status_resolver",
