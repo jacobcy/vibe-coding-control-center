@@ -16,7 +16,7 @@ from vibe3.agents import (
     make_run_context_builder,
     make_skill_context_builder,
 )
-from vibe3.clients import SQLiteClient
+from vibe3.clients import SQLiteClient, resolve_runtime_asset
 from vibe3.config import ConventionResolver, VibeConfig, load_orchestra_config
 from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.exceptions import SkillNotAvailableError
@@ -33,7 +33,6 @@ from vibe3.roles.run_helpers import (
     publish_run_command_success,
 )
 from vibe3.services import record_dispatch_failure_if_unexpected
-from vibe3.utils import resolve_runtime_asset
 
 
 def resolve_skill_path(

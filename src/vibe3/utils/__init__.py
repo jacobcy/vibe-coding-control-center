@@ -4,13 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-# Cross-module imports (not self-references)
-from vibe3.clients.runtime_assets import (
-    resolve_prompt_config,
-    resolve_runtime_asset,
-    runtime_assets_root,
-)
-
 if TYPE_CHECKING:
     from vibe3.utils.actor_utils import normalize_actor
     from vibe3.utils.branch_utils import find_parent_branch
@@ -147,11 +140,8 @@ __all__ = [
     "parse_issue_number",
     "prepare_prompt_file",
     "read_instance_info",
-    "resolve_prompt_config",
     "resolve_priority",
     "resolve_roadmap_rank",
-    "resolve_runtime_asset",
-    "runtime_assets_root",
     "sanitize_prompt_for_display",
     "sanitize_task_shell_meta",
     "stream_reader",
