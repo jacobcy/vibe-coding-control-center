@@ -264,7 +264,11 @@ def test_no_large_file_sources_in_default_recipes() -> None:
     """
     from vibe3.prompts.models import VariableSourceKind
 
-    # Size limit for kind:file sources
+    # 2048 bytes is a conservative upper bound for kind:file sources.
+    # The runtime stdin-mode threshold is ~800 chars (CODEAGENT_STDIN_MODE_THRESHOLD).
+    # Files between 801-2047 chars will pass this regression test but may still
+    # trigger stdin mode at runtime; the recipe design should prefer kind:literal
+    # for files approaching either threshold.
     max_file_size_bytes = 2048
 
     manifest = PromptManifest.load_default()
