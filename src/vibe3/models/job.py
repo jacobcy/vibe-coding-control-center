@@ -16,7 +16,10 @@ Semantic Equivalence Contract:
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+WorktreeRequirementValue = Literal["none", "permanent", "temporary"]
+"""Constrained string matching WorktreeRequirement enum values."""
 
 
 class CommandType(str, Enum):
@@ -72,7 +75,7 @@ class JobEnvelope(BaseModel):
     # e.g. "vibe3.execution.role_request_factory.build_plan_async_request"
 
     # Payload
-    refs: dict[str, str] = {}
+    refs: dict[str, str] = Field(default_factory=dict)
     # plan_ref, audit_ref, report_ref, session_id, etc.
 
     # Policy/material hashes (placeholder — current code has none)
@@ -81,9 +84,7 @@ class JobEnvelope(BaseModel):
 
     # Execution metadata
     tick_id: int = 0
-    worktree_requirement: str = "none"
-    # "none" | "permanent" | "temporary" (WorktreeRequirement values as strings
-    # to avoid importing WorktreeRequirement — but the values are constrained)
+    worktree_requirement: WorktreeRequirementValue = "none"
 
     model_config = {"frozen": True}
 
@@ -140,10 +141,10 @@ class JobResult(BaseModel):
     material_hash: str | None = None
 
     # Payload summary
-    payload_summary: dict[str, str] = {}
+    payload_summary: dict[str, str] = Field(default_factory=dict)
     # Lightweight key-value summary of what was processed
 
-    # Timing
+    # Timing (ISO 8601 strings)
     started_at: str | None = None
     finished_at: str | None = None
 
