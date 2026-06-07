@@ -101,8 +101,8 @@ code_limits:
         limit: 420
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤"
       - path: "src/vibe3/services/check_cleanup_service.py"
-        limit: 590
-        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；Task #9 重构后新增 TaskResumeOperations 集成，略微超标"
+        limit: 610
+        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）"
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
