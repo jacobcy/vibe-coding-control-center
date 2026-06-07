@@ -307,7 +307,7 @@ def _full_status_dashboard(
         render_rfc_items,
         render_supervisor_issues,
     )
-    from vibe3.services.task_status_service import (
+    from vibe3.services.task import (
         classify_task_issues_for_rendering,
         fetch_task_status_data,
     )

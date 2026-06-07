@@ -5,7 +5,7 @@ import pytest
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.exceptions import InvalidBranchLinkError
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 
 def test_link_issue_rejects_base_branch_main(tmp_path, monkeypatch):

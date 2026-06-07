@@ -59,7 +59,7 @@ class FlowLifecycleMixin:
         )
 
         if blocked_by_issue:
-            from vibe3.services.task_service import TaskService
+            from vibe3.services.task import TaskService
 
             TaskService().link_issue(
                 branch,

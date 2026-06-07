@@ -149,7 +149,7 @@ class CheckRemote:
                 continue
 
             # Update first one as task
-            from vibe3.services.task_service import TaskService
+            from vibe3.services.task import TaskService
 
             TaskService(store=this.store).link_issue(
                 branch, issues[0], "task", actor="check:init"

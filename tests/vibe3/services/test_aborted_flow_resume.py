@@ -11,7 +11,7 @@ import pytest
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestration import IssueState
 from vibe3.services.status_query_service import StatusQueryService
-from vibe3.services.task_resume_usecase import TaskResumeUsecase
+from vibe3.services.task import TaskResumeUsecase
 
 
 @pytest.fixture

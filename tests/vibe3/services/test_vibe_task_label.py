@@ -5,14 +5,14 @@ from unittest.mock import Mock
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 
 @pytest.fixture(autouse=True)
 def stable_flow_actor(monkeypatch):
     """Avoid real git identity lookups during issue-link tests."""
     monkeypatch.setattr(
-        "vibe3.services.task_service.SignatureService.resolve_for_branch",
+        "vibe3.services.task.service.SignatureService.resolve_for_branch",
         lambda store, branch, explicit_actor=None: explicit_actor or "test-actor",
     )
 

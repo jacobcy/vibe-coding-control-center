@@ -20,7 +20,7 @@ from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.pr.service import PRService
 from vibe3.services.signature_service import SignatureService
-from vibe3.services.task_service import TaskService
+from vibe3.services.task import TaskService
 
 if TYPE_CHECKING:
     from vibe3.models import IssueInfo, OrchestraConfig

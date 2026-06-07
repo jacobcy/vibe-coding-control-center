@@ -12,7 +12,7 @@ from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils import AUTOMATED_MARKERS
 
 if TYPE_CHECKING:
-    from vibe3.services.task_service import TaskShowResult
+    from vibe3.services.task import TaskShowResult
 
 # Display limits for task show output
 MAX_SUMMARY_LINES = 3  # Maximum summary lines shown in non-full mode

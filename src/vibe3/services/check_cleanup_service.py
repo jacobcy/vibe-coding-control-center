@@ -14,7 +14,7 @@ from loguru import logger
 
 from vibe3.clients import BackendProtocol
 from vibe3.models import FlowStatusResponse
-from vibe3.services.task_resume_operations import TaskResumeOperations
+from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
