@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Final
 
 from loguru import logger
 
+from vibe3.utils.constants import CODEAGENT_STDIN_MODE_THRESHOLD
+
 # Delayed import to avoid utils → config circular dependency
 # from vibe3.config import VibeConfig
 
@@ -22,10 +24,6 @@ def get_vibe_config() -> "VibeConfig":
 
     return VibeConfig.get_defaults()
 
-
-# Stdin-mode threshold for codeagent-wrapper
-# Prompts exceeding this length may trigger stdin mode and fail silently
-CODEAGENT_STDIN_MODE_THRESHOLD: Final[int] = 800
 
 # Known backend-internal error patterns with suggested fixes
 KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
