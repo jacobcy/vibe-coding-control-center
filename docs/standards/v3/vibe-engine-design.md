@@ -9,10 +9,10 @@ author: GPT-5 Codex
 created: 2026-03-13
 last_updated: 2026-03-13
 related_docs:
-  - docs/references/vibe-engine-design.md
-  - docs/standards/glossary.md
-  - docs/standards/v3/command-standard.md
-  - docs/standards/v3/skill-standard.md
+  - ../../references/vibe-engine-design.md
+  - ../glossary.md
+  - command-standard.md
+  - skill-standard.md
 ---
 
 # Vibe Workflow Engine 文档迁移说明

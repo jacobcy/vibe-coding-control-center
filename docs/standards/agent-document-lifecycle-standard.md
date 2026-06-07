@@ -15,7 +15,7 @@ related_docs:
   - docs/standards/doc-organization.md
   - docs/standards/doc-quality-standards.md
   - docs/standards/github-labels-standard.md
-  - docs/standards/v3/handoff-store-standard.md
+  - v3/handoff-store-standard.md
 ---
 
 # Agent 文档生命周期标准

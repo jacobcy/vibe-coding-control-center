@@ -13,10 +13,10 @@ last_updated: 2026-06-05
 related_docs:
   - docs/standards/label-semantics.md
   - docs/standards/glossary.md
-  - docs/standards/v3/error-severity-and-blocking-standard.md
-  - docs/standards/v3/human-mirror-architecture-philosophy.md
-  - docs/standards/v3/data-model-standard.md
-  - docs/standards/v3/event-driven-standard.md
+  - v3/error-severity-and-blocking-standard.md
+  - v3/human-mirror-architecture-philosophy.md
+  - v3/data-model-standard.md
+  - v3/event-driven-standard.md
 ---
 
 # Flow 生命周期与回收机制标准

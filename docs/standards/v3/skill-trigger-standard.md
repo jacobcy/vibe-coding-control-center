@@ -13,10 +13,10 @@ last_updated: 2026-06-03
 related_docs:
   - SOUL.md
   - CLAUDE.md
-  - docs/README.md
-  - docs/standards/glossary.md
-  - docs/standards/action-verbs.md
-  - docs/standards/v3/skill-standard.md
+  - ../../README.md
+  - ../glossary.md
+  - ../action-verbs.md
+  - skill-standard.md
   - skills/vibe-issue/SKILL.md
   - skills/vibe-roadmap/SKILL.md
   - skills/vibe-task/SKILL.md
@@ -43,7 +43,7 @@ related_docs:
 
 本文档定义具体 Vibe skills 的应用时机、自然语言触发矩阵和相邻 skill 的分流优先级。
 
-本文档**不**重新定义 `skill`、`workflow`、`task`、`roadmap`、`flow`、`worktree` 等术语；正式语义以 `docs/standards/glossary.md` 为准。skills 的源码/运行时边界以 `docs/standards/v3/skill-standard.md` 为准。
+本文档**不**重新定义 `skill`、`workflow`、`task`、`roadmap`、`flow`、`worktree` 等术语；正式语义以 `../glossary.md` 为准。skills 的源码/运行时边界以 `skill-standard.md` 为准。
 
 ## 1. 设计目标
 

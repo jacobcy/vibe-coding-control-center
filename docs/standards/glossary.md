@@ -15,10 +15,10 @@ related_docs:
   - CLAUDE.md
   - docs/README.md
   - docs/standards/action-verbs.md
-  - docs/standards/v3/command-standard.md
-  - docs/standards/v3/data-model-standard.md
-  - docs/standards/v3/python-capability-design.md
-  - docs/standards/v3/skill-standard.md
+  - v3/command-standard.md
+  - v3/data-model-standard.md
+  - v3/python-capability-design.md
+  - v3/skill-standard.md
 ---
 
 # 项目术语表
