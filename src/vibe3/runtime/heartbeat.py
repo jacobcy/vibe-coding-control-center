@@ -11,6 +11,7 @@ from loguru import logger
 
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
+from vibe3.utils import PACK_REFS_INTERVAL_TICKS
 
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
@@ -40,9 +41,6 @@ class FailedGateProtocol(Protocol):
         Called each tick when gate is ACTIVE.
         """
         ...
-
-
-PACK_REFS_INTERVAL_TICKS = 100
 
 
 class HeartbeatServer:

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         EVENT_STATE_UNCHANGED,
         EVENT_TRANSITION_COUNT_EXCEEDED,
         GENERIC_AGENT_MARKER_PATTERN,
+        PACK_REFS_INTERVAL_TICKS,
         STARTING_TIMEOUT_SECONDS,
         VERDICT_UNKNOWN,
     )
@@ -71,6 +72,7 @@ _LAZY_IMPORTS = {
     "EVENT_STATE_UNCHANGED": "vibe3.utils.constants",
     "EVENT_TRANSITION_COUNT_EXCEEDED": "vibe3.utils.constants",
     "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
+    "PACK_REFS_INTERVAL_TICKS": "vibe3.utils.constants",
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
     "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
@@ -124,6 +126,7 @@ __all__ = [
     "EVENT_STATE_UNCHANGED",
     "EVENT_TRANSITION_COUNT_EXCEEDED",
     "GENERIC_AGENT_MARKER_PATTERN",
+    "PACK_REFS_INTERVAL_TICKS",
     "STARTING_TIMEOUT_SECONDS",
     "VERDICT_UNKNOWN",
     "build_prompt_file_content",
