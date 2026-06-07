@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow_recovery_service import FlowRecoveryService
     from vibe3.services.flow_resume_resolver import infer_resume_label
     from vibe3.services.flow_service import FlowService
+    from vibe3.services.flow_status_service import FlowStatusService
     from vibe3.services.handoff_service import HandoffService
     from vibe3.services.handoff_status_service import HandoffStatusService
     from vibe3.services.issue.collection import IssueCollectionService
@@ -92,6 +93,7 @@ __all__ = [
     "FlowService",
     "FlowState",
     "FlowStatusResolver",
+    "FlowStatusService",
     "HandoffService",
     "HandoffStatusService",
     "InitResult",
@@ -196,6 +198,7 @@ _SYMBOL_MODULES = {
     "FlowService": "vibe3.services.flow_service",
     "FlowState": "vibe3.services.flow_classifier",
     "FlowStatusResolver": "vibe3.services.flow_status_resolver",
+    "FlowStatusService": "vibe3.services.flow_status_service",
     "HandoffService": "vibe3.services.handoff_service",
     "HandoffStatusService": "vibe3.services.handoff_status_service",
     "InitResult": "vibe3.services.check_remote",
