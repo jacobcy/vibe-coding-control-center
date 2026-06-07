@@ -305,7 +305,7 @@ class TestCleanResidualBranches:
 
         # Done flow should be in cleaned (both physical resources and record deleted)
         assert "feature/done-branch" in result["cleaned"]
-        assert len(result["kept_records"]) == 0  # kept_records no longer used
+        assert "feature/done-branch" in result["cleaned_done"]
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_skips_when_no_resources(
@@ -328,7 +328,7 @@ class TestCleanResidualBranches:
         # Done flow record should be soft-deleted (in cleaned, not kept_records)
         assert len(result["cleaned"]) == 1
         assert "feature/done-branch" in result["cleaned"]
-        assert len(result["kept_records"]) == 0  # kept_records no longer used
+        assert "feature/done-branch" in result["cleaned_done"]
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_aborted_deletes_record(
@@ -347,7 +347,7 @@ class TestCleanResidualBranches:
         # Aborted flow record should be deleted (in cleaned)
         assert len(result["cleaned"]) == 1
         assert "feature/aborted-branch" in result["cleaned"]
-        assert len(result["kept_records"]) == 0  # kept_records is for done/merged
+        assert "feature/aborted-branch" in result["cleaned_aborted"]
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_removes_invalid_records(
