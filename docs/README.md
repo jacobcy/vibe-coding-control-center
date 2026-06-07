@@ -53,6 +53,7 @@ docs/
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准
 
 **已废弃文档 (Archives)**：
+- **[supervisor-handoff-standard.md](archive/supervisor-handoff-standard.md)** (DEPRECATED) - 跨角色交接标准 (已废弃，见 [standards/v3/handoff-governance-standard.md](standards/v3/handoff-governance-standard.md))
 - **[vibe3-role-checks-and-balances-standard.md](archive/vibe3-role-checks-and-balances-standard.md)** (DEPRECATED) - Vibe3 角色制衡架构标准 (已废弃，见 [standards/v3/human-mirror-architecture-philosophy.md](standards/v3/human-mirror-architecture-philosophy.md))
 - **[agent-debugging-standard.md](archive/agent-debugging-standard.md)** (DEPRECATED) - Agent 调试标准 (已废弃，见 [standards/v3/serve-debugging-guide.md](standards/v3/serve-debugging-guide.md))
 - **[vibe3-worktree-ownership-standard.md](archive/vibe3-worktree-ownership-standard.md)** (DEPRECATED) - Worktree 所有权标准 (已废弃，见 standards/v3/worktree-lifecycle-standard.md)
