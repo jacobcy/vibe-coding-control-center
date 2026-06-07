@@ -5,7 +5,6 @@ Validates that:
 2. Dependency directions follow category rules
 3. Kernel (runtime + orchestra) does not import adapter/policy/observation internals
    at module level
-4. Observation (domain) has access to all categories (event core)
 
 Taxonomy alignment with kernel startup boundary (#2161/#2293):
   KERNEL: runtime, orchestra
@@ -270,7 +269,7 @@ class TestCategoryDependencyDirection:
     ) -> None:
         """Verify imports respect category dependency rules.
 
-        Category N may only import from categories >= N.
+        Category N may only import from categories <= N.
         """
         violations = []
 
