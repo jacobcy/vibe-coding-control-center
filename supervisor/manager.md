@@ -751,7 +751,7 @@ Steps:
       - 验证依赖 issue 确实完全解决（检查 GitHub state 和关闭原因）
       - 检查依赖 issue 是否以 "won't fix" / "not planned" 等非完成方式关闭
       - **验证通过**（依赖正常完成）：
-        - 清除 blocked body state：调用 `vibe3 flow blocked --clear`
+        - 清除 blocked body state：调用 `vibe3 task resume <issue-number> --yes`
         - 推进到合适状态（通常为 `state/claimed` 或继续 handoff 流程）
         - Comment：`[manager] Dependency #{dep_issue_number} fully resolved, unblocking issue`
         - `exit()`

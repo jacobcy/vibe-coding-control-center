@@ -226,7 +226,22 @@ class QualifyGateService:
             dep_issue_number: Dependency issue number that closed
         """
         from vibe3.observability import append_orchestra_event
+        from vibe3.services import BlockedStateService
 
+        # Clear blocked state in body/DB before label transition
+        blocked_svc = BlockedStateService(store=self._store, github_client=self._github)
+        blocked_svc.unblock(
+            branch=branch,
+            target_state=IssueState.HANDOFF,
+            actor="orchestra:qualify_gate",
+            issue_number=issue_number,
+            detail=(
+                f"Dependency #{dep_issue_number} closed, "
+                f"awaiting manager verification"
+            ),
+        )
+
+        # Record timeline event
         timeline_service = FlowTimelineService(store=self._store)
         timeline_service.record_timeline_event(
             branch=branch,
@@ -238,14 +253,6 @@ class QualifyGateService:
             ),
             issue_number=issue_number,
             repo=self.config.repo,
-        )
-
-        label_service = LabelService(repo=self.config.repo)
-        label_service.confirm_issue_state(
-            issue_number=issue_number,
-            to_state=IssueState.HANDOFF,
-            actor="orchestra:qualify_gate",
-            force=True,
         )
 
         append_orchestra_event(
