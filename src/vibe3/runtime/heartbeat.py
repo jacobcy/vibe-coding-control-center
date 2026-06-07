@@ -11,6 +11,7 @@ from loguru import logger
 
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
+from vibe3.utils import PACK_REFS_INTERVAL_TICKS
 
 from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
@@ -223,6 +224,26 @@ class HeartbeatServer:
                     logger.bind(domain="orchestra", action="cleanup").debug(
                         f"Cleaned up {deleted_old} old error records "
                         f"(retention={error_tracking.retention_days}d)"
+                    )
+
+            # Periodic Git ref packing to prevent stale references
+            if tick_number % PACK_REFS_INTERVAL_TICKS == 0:
+                try:
+                    from vibe3.clients import GitClient
+
+                    GitClient().pack_refs_all()
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} pack-refs completed",
+                    )
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} pack-refs failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="maintenance").warning(
+                        f"pack-refs failed: {exc}"
                     )
 
             # Periodic consistency check

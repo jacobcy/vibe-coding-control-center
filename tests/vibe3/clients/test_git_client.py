@@ -319,3 +319,18 @@ class TestFindRepoRoot:
         ):
             with pytest.raises(SystemError, match="Cannot resolve repository root"):
                 find_repo_root()
+
+
+def test_pack_refs_all_calls_git_pack_refs(monkeypatch):
+    """pack_refs_all should invoke git pack-refs --all."""
+    from vibe3.clients import GitClient
+
+    captured = {}
+
+    def mock_run(self, args, **kwargs):
+        captured["args"] = args
+        return ""
+
+    monkeypatch.setattr(GitClient, "_run", mock_run)
+    GitClient().pack_refs_all()
+    assert captured["args"] == ["pack-refs", "--all"]

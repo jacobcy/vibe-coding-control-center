@@ -53,6 +53,14 @@ ALL_CODEX_WARNINGS: Final[tuple[str, ...]] = (
 CODEAGENT_STDIN_MODE_THRESHOLD: Final[int] = 800
 
 # =============================================================================
+# Git Maintenance
+# =============================================================================
+
+# How often (in ticks) to run pack-refs during heartbeat maintenance.
+# At default 15-min tick interval, 50 ticks ≈ 12.5 hours.
+PACK_REFS_INTERVAL_TICKS: Final[int] = 50
+
+# =============================================================================
 # Worker Roles
 # =============================================================================
 

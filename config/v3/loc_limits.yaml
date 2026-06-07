@@ -40,8 +40,8 @@ code_limits:
         limit: 540
         reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
-        limit: 540
-        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化）"
+        limit: 550
+        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330）"
       - path: "src/vibe3/clients/github_pr_read_ops.py"
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"

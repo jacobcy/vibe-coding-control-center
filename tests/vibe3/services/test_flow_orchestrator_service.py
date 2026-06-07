@@ -479,10 +479,48 @@ def test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict() -> None:
     # Verify fetch was called twice with same args
     assert git.fetch.call_count == 2
     git.fetch.assert_any_call("origin", "main")
+    # Verify pack_refs_all was called once (after first failure)
+    git.pack_refs_all.assert_called_once()
     # Verify sleep was called once (after first failure)
     mock_sleep.assert_called_once()
     # Verify bootstrap succeeded
     assert result["branch"] == "dev/issue-999"
+
+
+def test_bootstrap_issue_flow_packs_refs_on_lock_conflict() -> None:
+    """Fetch should pack refs before retrying on 'cannot lock ref' error."""
+    from vibe3.exceptions import GitError
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-777"})
+    )
+
+    git.fetch.side_effect = [
+        GitError(
+            "fetch",
+            "cannot lock ref 'refs/remotes/origin/main': is at abc but expected def",
+        ),
+        None,  # Success after pack-refs
+    ]
+
+    with patch("vibe3.services.flow_orchestrator_service.time.sleep"):
+        result = service.bootstrap_issue_flow(
+            IssueInfo(number=777, title="Pack refs test"),
+            branch="dev/issue-777",
+            source="dispatch",
+        )
+
+    assert git.pack_refs_all.call_count == 1
+    assert git.fetch.call_count == 2
+    assert result["branch"] == "dev/issue-777"
 
 
 def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
@@ -514,3 +552,6 @@ def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
     # Verify fetch was called 3 times (MAX_FETCH_RETRIES)
     assert git.fetch.call_count == 3
     git.fetch.assert_any_call("origin", "main")
+    # Verify pack_refs_all called 2 times (first two retry attempts,
+    # not final attempt)
+    assert git.pack_refs_all.call_count == 2

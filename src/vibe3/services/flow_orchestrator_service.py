@@ -154,6 +154,15 @@ class FlowOrchestratorService:
                             "cannot lock ref" in str(e)
                             and attempt < MAX_FETCH_RETRIES - 1
                         ):
+                            logger.bind(
+                                domain="flow",
+                                branch=branch,
+                                issue=issue.number,
+                            ).warning(
+                                f"Git ref lock conflict "
+                                f"(attempt {attempt + 1}/{MAX_FETCH_RETRIES}): {e}"
+                            )
+                            self.git.pack_refs_all()
                             time.sleep(FETCH_RETRY_DELAY * (attempt + 1))
                             continue
                         raise
