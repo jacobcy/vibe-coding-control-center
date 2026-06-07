@@ -98,53 +98,37 @@ def test_publish_run_command_failure_emits_issue_failed() -> None:
     assert event.actor == "agent:run"
 
 
-@pytest.mark.skip(
-    reason="Test本身有问题，需要重构：config mock 导致 SQLite 参数绑定错误"
-)
 def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> None:
-    from types import SimpleNamespace
-    from unittest.mock import MagicMock, Mock
+    """When execute_sync raises in no_async mode, publish_run_command_failure is called.
 
-    from vibe3.roles.run import execute_manual_run
+    Verifies that exceptions in the non-skill no_async path trigger failure
+    publishing before re-raising.
+    """
+    from unittest.mock import MagicMock, patch
 
-    # Create a mock config that has necessary attributes
-    mock_config = MagicMock()
-    mock_config.run = MagicMock()
-    mock_config.run.run_prompt = "Test task"
-    mock_config.run.agent_config = MagicMock()
-    mock_config.run.agent_config.agent = "test-agent"
+    from vibe3.roles.run_command import execute_manual_run
 
     with (
+        patch("vibe3.roles.run_command.CodeagentExecutionService") as mock_svc_cls,
+        patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
         patch(
-            "vibe3.execution.codeagent_runner.CodeagentExecutionService"
-        ) as mock_service_cls,
-        patch("vibe3.roles.run_command.create_codeagent_command") as mock_create_cmd,
-        patch(
-            "vibe3.roles.run_helpers.publish_run_command_failure"
+            "vibe3.roles.run_command.publish_run_command_failure"
         ) as mock_publish_failure,
-        patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite,
     ):
-        # Mock SQLite to return empty flow state
-        mock_sqlite.return_value.get_flow_state.return_value = None
-
-        # Mock command creation
-        mock_cmd = Mock()
-        mock_cmd.context_builder = lambda: "mock prompt"
-        mock_create_cmd.return_value = mock_cmd
-
-        mock_service_cls.return_value.execute_sync.side_effect = RuntimeError(
+        mock_sqlite_cls.return_value.get_flow_state.return_value = None
+        mock_svc_cls.return_value.execute_sync.side_effect = RuntimeError(
             "backend returned empty result"
         )
 
         with pytest.raises(RuntimeError, match="backend returned empty result"):
             execute_manual_run(
-                config=mock_config,
+                config=MagicMock(),
                 branch="task/issue-349",
                 issue_number=349,
                 instructions=None,
-                plan_file="docs/plans/issue-349.md",
+                plan_file=None,
                 skill=None,
-                summary=SimpleNamespace(mode="plan"),
+                summary=MagicMock(mode="plan"),
                 dry_run=False,
                 no_async=True,
                 show_prompt=False,
@@ -153,10 +137,10 @@ def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> No
                 model=None,
             )
 
-        mock_publish_failure.assert_called_once_with(
-            issue_number=349,
-            reason="backend returned empty result",
-        )
+    mock_publish_failure.assert_called_once_with(
+        issue_number=349,
+        reason="backend returned empty result",
+    )
 
 
 class TestExecutorNoOpGate:
