@@ -252,6 +252,15 @@ class OrchestrationFacade(ServiceBase):
             ).debug("Skipping governance scan (min interval not reached)")
             return
 
+        # Pre-scan: tag simple test tasks for supervisor routing
+        try:
+            self._tag_simple_test_tasks()
+        except Exception as exc:
+            logger.bind(domain="orchestration_facade").warning(
+                f"Simple test task pre-scan failed: {exc}"
+            )
+            # Non-fatal: continue with normal governance dispatch
+
         # Update timestamp when actually emitting event
         self._last_governance_started_at = time.monotonic()
 
@@ -340,3 +349,46 @@ class OrchestrationFacade(ServiceBase):
             publish(event)
 
         return (total_scanned, matched_count)
+
+    def _tag_simple_test_tasks(self) -> None:
+        """Tag simple test tasks with supervisor labels for fast-track routing.
+
+        Phase 1: Pre-scan before governance agent runs.
+        Identifies simple test tasks via metadata heuristics and tags them with
+        supervisor + state/handoff + orchestra-governed labels so they bypass
+        the full manager plan→run→review cycle.
+        """
+        from vibe3.clients import GhIssueLabelPort
+        from vibe3.services import OrchestraStatusService
+        from vibe3.services.simple_test_task_assessor import (
+            is_simple_test_task_from_metadata,
+        )
+
+        status_service = OrchestraStatusService(self._config)
+        snapshot = status_service.snapshot()
+        label_port = GhIssueLabelPort(repo=self._config.repo)
+
+        for entry in snapshot.active_issues:
+            # Skip already-governed issues
+            labels = label_port.get_issue_labels(entry.number)
+            if labels is None or "orchestra-governed" in labels:
+                continue
+
+            if not is_simple_test_task_from_metadata(entry.title, labels):
+                continue
+
+            # Tag for supervisor routing
+            for label in ("supervisor", "state/handoff", "orchestra-governed"):
+                label_port.add_issue_label(entry.number, label)
+
+            self._github.add_comment(
+                entry.number,
+                "[governance decide][simple-task-router] "
+                "Routed to supervisor/apply: issue title matches simple test task "
+                "heuristic. Will be handled via fast-track path.",
+            )
+
+            logger.bind(
+                domain="orchestration_facade",
+                issue_number=entry.number,
+            ).info(f"Tagged #{entry.number} as simple test task → supervisor/apply")

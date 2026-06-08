@@ -115,6 +115,10 @@ if TYPE_CHECKING:
         sanitize_event_detail_paths,
     )
     from vibe3.services.signature_service import SignatureService
+    from vibe3.services.simple_test_task_assessor import (
+        is_simple_test_from_diff,
+        is_simple_test_task_from_metadata,
+    )
     from vibe3.services.spec_ref_service import SpecRefService
     from vibe3.services.status_query_service import (
         StatusQueryService,
@@ -221,6 +225,8 @@ __all__ = [
     "infer_resume_label",
     "is_auto_task_branch",
     "is_running_issue",
+    "is_simple_test_from_diff",
+    "is_simple_test_task_from_metadata",
     "load_issue_info",
     "normalize_assignees",
     "normalize_labels",
@@ -325,6 +331,8 @@ _SYMBOL_MODULES = {
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "is_running_issue": "vibe3.services.orchestra_status_service",
+    "is_simple_test_from_diff": "vibe3.services.simple_test_task_assessor",
+    "is_simple_test_task_from_metadata": "vibe3.services.simple_test_task_assessor",
     "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",

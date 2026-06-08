@@ -287,6 +287,7 @@ class TestIssueStateDispatchHandler:
         mock_ctx.capacity.can_dispatch.return_value = True
         mock_ctx.registry = MagicMock()
         mock_ctx.coordinator = MagicMock()
+        mock_ctx.github_client.list_prs_for_branch.return_value = None
 
         # Mock build_manager_request to return None
         with patch(
@@ -403,6 +404,7 @@ class TestIssueStateDispatchHandler:
         mock_ctx.coordinator.dispatch_execution.return_value = MagicMock(
             launched=True, reason=None
         )
+        mock_ctx.github_client.list_prs_for_branch.return_value = None
 
         # Mock build_dispatch_context to return our mock context
         mock_build_context.return_value = mock_ctx

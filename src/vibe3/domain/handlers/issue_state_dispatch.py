@@ -160,6 +160,11 @@ def handle_manager_dispatch_intent(
             _block_for_noop("Issue info is None, cannot dispatch manager role")
             return
 
+        # Phase 2: diff-based simple test task routing
+        if _should_reroute_to_supervisor(issue_info, ctx.github_client, ctx.config):
+            _reroute_to_supervisor(issue_info, ctx.github_client, ctx.config)
+            return
+
         try:
             request = await loop.run_in_executor(
                 None,
@@ -253,3 +258,122 @@ def handle_manager_dispatch_intent(
             with get_store() as store:
                 dispatch_context = build_dispatch_context(config, store)
         asyncio.run(_do_dispatch(dispatch_context))
+
+
+def _should_reroute_to_supervisor(
+    issue: IssueInfo,
+    github: "GitHubClient",
+    config: "OrchestraConfig",
+) -> bool:
+    """Check if issue has a simple test diff that can be rerouted.
+
+    Includes flow state check to ensure safe reroute:
+    - Only reroute when flow is in safe states (ready/claimed/blocked)
+    - Never reroute when in_progress or handoff with progress
+
+    Args:
+        issue: Issue information
+        github: GitHub client for PR and flow state queries
+        config: Orchestra config for repo info
+
+    Returns:
+        True if issue should be rerouted to supervisor, False otherwise
+    """
+    from vibe3.services.label_service import LabelService
+    from vibe3.services.simple_test_task_assessor import (
+        MAX_FILES,
+        MAX_LINES,
+        is_simple_test_from_diff,
+    )
+
+    # Check issue state label first - only reroute in safe states
+    label_service = LabelService(repo=config.repo)
+    issue_state = label_service.get_state(issue.number)
+
+    # Safe states: ready, claimed, or blocked (未开始执行的状态)
+    # Unsafe states: in_progress, handoff (已开始工作的状态)
+    safe_states = {IssueState.READY, IssueState.CLAIMED, IssueState.BLOCKED, None}
+    if issue_state not in safe_states:
+        state_val = issue_state.value if issue_state else "None"
+        logger.bind(
+            domain="issue_state_dispatch_handler",
+            issue_number=issue.number,
+            issue_state=issue_state.value if issue_state else None,
+        ).warning(f"Skipping reroute: issue in unsafe state '{state_val}'")
+        return False
+
+    # Find linked PRs for this issue's branch
+    branch = f"issue-{issue.number}"
+    prs = github.list_prs_for_branch(branch, repo=config.repo)
+    if not prs:
+        return False
+
+    pr = prs[0]
+    files = github.get_pr_files(pr.number)
+    diff = github.get_pr_diff(pr.number)
+
+    if not files or not diff:
+        return False
+
+    # Count additions/deletions from diff
+    additions = sum(1 for line in diff.split("\n") if line.startswith("+"))
+    deletions = sum(1 for line in diff.split("\n") if line.startswith("-"))
+
+    is_simple = is_simple_test_from_diff(files, additions, deletions)
+    if is_simple:
+        total_lines = additions + deletions
+        logger.bind(
+            domain="issue_state_dispatch_handler",
+            issue_number=issue.number,
+            pr_number=pr.number,
+            files=len(files),
+            lines=total_lines,
+        ).info(
+            f"Simple test task detected: {len(files)} files, "
+            f"{total_lines} lines (threshold: ≤{MAX_FILES} files, ≤{MAX_LINES} lines)"
+        )
+
+    return is_simple
+
+
+def _reroute_to_supervisor(
+    issue: IssueInfo,
+    github: "GitHubClient",
+    config: "OrchestraConfig",
+) -> None:
+    """Close current issue and create new one for supervisor/apply.
+
+    Args:
+        issue: Issue information
+        github: GitHub client for issue operations
+        config: Orchestra config for repo info
+    """
+    from vibe3.services.simple_test_task_assessor import MAX_FILES, MAX_LINES
+
+    # Close original with explanation
+    github.close_issue(
+        issue.number,
+        comment=(
+            "Closed: rerouted to supervisor/apply fast track "
+            "(simple test-only change detected)."
+        ),
+    )
+
+    # Create new issue with supervisor labels
+    new_number = github.create_issue(
+        title=f"[fast-track] {issue.title}",
+        body=(
+            f"Rerouted from #{issue.number} (simple test task auto-detection).\n\n"
+            f"Original issue: #{issue.number}\n"
+            f"Reason: test-only changes within complexity threshold "
+            f"(≤{MAX_FILES} files, ≤{MAX_LINES} lines)."
+        ),
+        labels=["supervisor", "state/handoff"],
+    )
+
+    if new_number:
+        logger.bind(
+            domain="issue_state_dispatch_handler",
+            original=issue.number,
+            new=new_number,
+        ).info(f"Rerouted #{issue.number} → #{new_number} (supervisor/apply)")
