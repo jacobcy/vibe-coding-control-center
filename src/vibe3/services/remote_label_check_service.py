@@ -225,37 +225,74 @@ class RemoteLabelCheckService:
             # Collect changes from all rules
             labels_removed: list[str] = []
             labels_added: list[str] = []
-            rule_name = ""
+            rule_names: list[str] = []
+
+            # Track state for Rule 3 guard
+            rule1_fired = False
+            rule2_kept_state: str | None = None
 
             # Rule 1: Roadmap label conflict
             roadmap_result = self._apply_rule_1(issue_number, labels)
             if roadmap_result:
                 labels_removed.extend(roadmap_result[0])
-                rule_name = roadmap_result[1]
+                rule_names.append(roadmap_result[1])
+                rule1_fired = True
 
             # Rule 2: Multiple state labels (only if rule 1 didn't apply)
-            if not rule_name:
+            if not rule1_fired:
                 multi_state_result = self._apply_rule_2(issue_number, labels)
                 if multi_state_result:
                     labels_removed.extend(multi_state_result[0])
-                    rule_name = multi_state_result[1]
+                    rule_names.append(multi_state_result[1])
+                    # Track which state label was kept
+                    state_labels = [
+                        label for label in labels if label.startswith("state/")
+                    ]
+                    kept = [
+                        label
+                        for label in state_labels
+                        if label not in multi_state_result[0]
+                    ]
+                    if kept:
+                        rule2_kept_state = kept[0]
 
             # Rule 3: Orphan execution state labels (only for manager-assigned)
-            if issue_number in managed_issue_numbers:
-                orphan_result = self._apply_rule_3(
-                    issue_number, labels, local_flow_branches
-                )
-                if orphan_result:
-                    labels_removed.extend(orphan_result[0])
-                    labels_added.extend(orphan_result[1])
-                    rule_name = orphan_result[2]
+            # GUARD: Skip Rule 3 if:
+            # - Rule 1 fired (roadmap issues shouldn't get state labels)
+            # - Rule 2 kept a non-execution state label (blocked/done)
+            if issue_number in managed_issue_numbers and not rule1_fired:
+                # Check if Rule 2 kept a non-execution state
+                skip_rule3 = False
+                if rule2_kept_state:
+                    kept_state_name = rule2_kept_state.replace("state/", "")
+                    if kept_state_name not in [
+                        "merge-ready",
+                        "review",
+                        "in-progress",
+                        "handoff",
+                        "claimed",
+                    ]:
+                        skip_rule3 = True
+
+                if not skip_rule3:
+                    orphan_result = self._apply_rule_3(
+                        issue_number, labels, local_flow_branches
+                    )
+                    if orphan_result:
+                        labels_removed.extend(orphan_result[0])
+                        labels_added.extend(orphan_result[1])
+                        rule_names.append(orphan_result[2])
 
             # Rule 4: Orphan orchestra-governed (only for manager-assigned)
             if issue_number in managed_issue_numbers:
                 orchestra_result = self._apply_rule_4(issue_number, labels)
                 if orchestra_result:
                     labels_removed.extend(orchestra_result[0])
-                    rule_name = orchestra_result[1]
+                    rule_names.append(orchestra_result[1])
+
+            # Deduplicate labels
+            labels_removed = list(dict.fromkeys(labels_removed))
+            labels_added = list(dict.fromkeys(labels_added))
 
             # Record result if any changes needed
             if labels_removed or labels_added:
@@ -264,7 +301,7 @@ class RemoteLabelCheckService:
                         issue_number=issue_number,
                         labels_removed=labels_removed,
                         labels_added=labels_added,
-                        rule=rule_name,
+                        rule=", ".join(rule_names),  # Join all matching rules
                     )
                 )
 

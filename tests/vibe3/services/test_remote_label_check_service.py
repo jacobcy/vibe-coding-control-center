@@ -407,3 +407,114 @@ class TestRemoteLabelCheckService:
         # Issue 17: removes state/review (1), adds state/ready
         assert result.total_removed == 3
         assert result.total_added == 1  # state/ready for issue 17
+
+    def test_rule1_plus_rule3_interaction_roadmap_issue(
+        self, service, mock_github_client, mock_store
+    ):
+        """Rule 1+3: roadmap issue should NOT get state/ready via Rule 3."""
+        # Issue with roadmap/rfc + state/in-progress, manager-assigned, no flow
+        mock_github_client.list_issues.return_value = [
+            {
+                "number": 18,
+                "title": "Roadmap issue with execution state",
+                "labels": [
+                    {"name": "roadmap/rfc"},
+                    {"name": "state/in-progress"},
+                ],
+                "assignees": [{"login": "vibe-manager-agent"}],
+            }
+        ]
+        mock_store.get_all_flows.return_value = []
+
+        result = service.check(dry_run=True)
+
+        # Should only trigger Rule 1 (remove state/in-progress)
+        # Should NOT trigger Rule 3 (add state/ready)
+        assert result.issues_found == 1
+        assert result.results[0].labels_removed == ["state/in-progress"]
+        assert result.results[0].labels_added == []
+        assert "规则 1" in result.results[0].rule
+        assert "规则 3" not in result.results[0].rule
+
+    def test_rule2_plus_rule3_interaction_blocked_state(
+        self, service, mock_github_client, mock_store
+    ):
+        """Rule 2+3: blocked state should prevent Rule 3 from adding state/ready."""
+        # Issue with state/blocked + state/in-progress, manager-assigned, no flow
+        mock_github_client.list_issues.return_value = [
+            {
+                "number": 19,
+                "title": "Blocked issue with execution state",
+                "labels": [
+                    {"name": "state/blocked"},
+                    {"name": "state/in-progress"},
+                ],
+                "assignees": [{"login": "vibe-manager-agent"}],
+            }
+        ]
+        mock_store.get_all_flows.return_value = []
+
+        result = service.check(dry_run=True)
+
+        # Should trigger Rule 2 (keep blocked, remove in-progress)
+        # Should NOT trigger Rule 3 (add state/ready)
+        assert result.issues_found == 1
+        assert result.results[0].labels_removed == ["state/in-progress"]
+        assert result.results[0].labels_added == []
+        assert "规则 2" in result.results[0].rule
+        assert "规则 3" not in result.results[0].rule
+
+    def test_rule2_plus_rule3_interaction_done_state(
+        self, service, mock_github_client, mock_store
+    ):
+        """Rule 2+3: done state should prevent Rule 3 from adding state/ready."""
+        mock_github_client.list_issues.return_value = [
+            {
+                "number": 20,
+                "title": "Done issue with execution state",
+                "labels": [
+                    {"name": "state/done"},
+                    {"name": "state/review"},
+                ],
+                "assignees": [{"login": "vibe-manager-agent"}],
+            }
+        ]
+        mock_store.get_all_flows.return_value = []
+
+        result = service.check(dry_run=True)
+
+        # Should trigger Rule 2 (keep done, remove review)
+        # Should NOT trigger Rule 3
+        assert result.issues_found == 1
+        assert result.results[0].labels_removed == ["state/review"]
+        assert result.results[0].labels_added == []
+        assert "规则 2" in result.results[0].rule
+
+    def test_rule2_plus_rule3_interaction_execution_state_allowed(
+        self, service, mock_github_client, mock_store
+    ):
+        """Rule 2+3: if Rule 2 kept execution state, Rule 3 should fire."""
+        # Issue with state/review + state/in-progress, manager-assigned, no flow
+        mock_github_client.list_issues.return_value = [
+            {
+                "number": 21,
+                "title": "Review issue with execution state",
+                "labels": [
+                    {"name": "state/review"},
+                    {"name": "state/in-progress"},
+                ],
+                "assignees": [{"login": "vibe-manager-agent"}],
+            }
+        ]
+        mock_store.get_all_flows.return_value = []
+
+        result = service.check(dry_run=True)
+
+        # Should trigger Rule 2 (keep review, remove in-progress)
+        # AND Rule 3 (remove review, add state/ready)
+        assert result.issues_found == 1
+        assert "state/in-progress" in result.results[0].labels_removed
+        assert "state/review" in result.results[0].labels_removed
+        assert result.results[0].labels_added == ["state/ready"]
+        assert "规则 2" in result.results[0].rule
+        assert "规则 3" in result.results[0].rule
