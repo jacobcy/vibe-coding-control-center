@@ -327,7 +327,7 @@ class IssueTitleCacheService:
             return None, False
 
         try:
-            from vibe3.clients import GITHUB_FIELDS_TITLE_ONLY
+            from vibe3.clients.github_field_constants import GITHUB_FIELDS_TITLE_ONLY
 
             issue = self.github_client.view_issue(
                 issue_number, fields=list(GITHUB_FIELDS_TITLE_ONLY)

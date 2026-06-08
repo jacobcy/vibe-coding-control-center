@@ -108,7 +108,7 @@ def _build_plan_task_guidance(
     sections: list[str] = []
 
     # Issue context
-    from vibe3.clients import GITHUB_FIELDS_BODY_COMMENTS
+    from vibe3.clients.github_field_constants import GITHUB_FIELDS_BODY_COMMENTS
 
     issue_payload = GitHubClient().view_issue(
         issue.number, repo=config.repo, fields=list(GITHUB_FIELDS_BODY_COMMENTS)

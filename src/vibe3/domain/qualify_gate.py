@@ -602,7 +602,7 @@ class QualifyGateService:
         Returns:
             True if dependency is satisfied, False otherwise
         """
-        from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
+        from vibe3.clients.github_field_constants import GITHUB_FIELDS_STATE_ONLY
 
         payload = self._github.view_issue(
             dep_issue_number,
