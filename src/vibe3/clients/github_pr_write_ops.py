@@ -9,11 +9,7 @@ from vibe3.clients.github_client_base import raise_gh_pr_error
 from vibe3.exceptions import PRNotFoundError
 
 # public-api: pending upstream export
-from vibe3.models.pr import (
-    CreatePRRequest,
-    PRResponse,
-    UpdatePRRequest,
-)
+from vibe3.models import CreatePRRequest, PRResponse, UpdatePRRequest
 
 
 class PRWriteMixin:

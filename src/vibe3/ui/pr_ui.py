@@ -2,9 +2,9 @@
 
 from typing import TYPE_CHECKING
 
-from vibe3.models.pr import PRResponse
+from vibe3.models import PRResponse
 from vibe3.ui.console_impl import console
-from vibe3.utils.time_format import format_age_aware_time
+from vibe3.utils import format_age_aware_time
 
 if TYPE_CHECKING:
     from vibe3.analysis.local_review_report import LocalReviewReport

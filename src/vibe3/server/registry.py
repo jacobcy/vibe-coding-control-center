@@ -15,26 +15,21 @@ from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
 from vibe3.clients import GitHubClient, SQLiteClient
-from vibe3.domain import FailedGate, FlowManager
-from vibe3.domain.orchestration_facade import OrchestrationFacade
+from vibe3.domain import FailedGate, FlowManager, OrchestrationFacade
 from vibe3.environment import SessionRegistryService
-from vibe3.execution import CapacityService
-from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+from vibe3.execution import CapacityService, resolve_orchestra_repo_root
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra.dispatch_coordinator_factory import (
-    create_global_dispatch_coordinator,
-)
+from vibe3.orchestra import create_global_dispatch_coordinator
 from vibe3.runtime import (
     CircuitBreaker,
+    FailedGateProtocol,
     HeartbeatServer,
     OrchestraInstanceInfo,
     read_instance_info,
     validate_instance,
 )
-from vibe3.runtime.heartbeat import FailedGateProtocol
-from vibe3.services import OrchestraStatusService
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services import OrchestraSnapshot, OrchestraStatusService
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
@@ -136,7 +131,7 @@ def _build_server_with_launch_cwd(
         capacity=shared_capacity,
         failed_gate=failed_gate,
         store=shared_store,
-        coordinator_factory=create_global_dispatch_coordinator,
+        coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
     )
 
     heartbeat = HeartbeatServer(

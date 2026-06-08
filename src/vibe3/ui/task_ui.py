@@ -4,15 +4,11 @@ import json
 import re
 from dataclasses import asdict
 from types import ModuleType
-from typing import TYPE_CHECKING
 
-from vibe3.services import ref_to_handoff_cmd
+from vibe3.services import TaskShowResult, ref_to_handoff_cmd
 from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils import AUTOMATED_MARKERS
-
-if TYPE_CHECKING:
-    from vibe3.services.task import TaskShowResult
 
 # Display limits for task show output
 MAX_SUMMARY_LINES = 3  # Maximum summary lines shown in non-full mode
@@ -28,7 +24,7 @@ def _get_yaml() -> ModuleType:
 
 def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
     """Build a single JSON payload for task show."""
-    return task_result.to_payload()
+    return task_result.to_payload()  # type: ignore[no-any-return]
 
 
 def render_task_show(

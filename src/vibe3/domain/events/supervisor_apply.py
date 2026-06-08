@@ -12,7 +12,7 @@ Reference: docs/standards/vibe3-worktree-ownership-standard.md §二 (L2)
 from dataclasses import dataclass
 
 # Re-exported from models to allow roles layer to import without domain dependency
-from vibe3.models.domain_events import SupervisorIssueIdentified
+from vibe3.models import SupervisorIssueIdentified
 
 from .base import DomainEvent
 

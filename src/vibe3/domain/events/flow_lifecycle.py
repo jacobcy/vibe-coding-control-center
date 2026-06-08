@@ -4,7 +4,7 @@ Re-exported from models layer to break the roles↔domain circular dependency.
 See vibe3.models.domain_events for the canonical definitions.
 """
 
-from vibe3.models.domain_events import (
+from vibe3.models import (
     ExecutorDispatchIntent,
     IssueFailed,
     ManagerDispatchIntent,

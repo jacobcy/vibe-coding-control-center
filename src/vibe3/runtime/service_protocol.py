@@ -5,6 +5,6 @@ Actual definition moved to domain/protocols/runtime_protocols.py to break
 the domain→runtime circular dependency.
 """
 
-from vibe3.domain.protocols.runtime_protocols import ServiceBase
+from vibe3.domain import ServiceBase
 
 __all__ = ["ServiceBase"]

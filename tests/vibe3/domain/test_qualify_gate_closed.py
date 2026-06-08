@@ -94,7 +94,7 @@ class TestQualifyGateGitHubClosed:
         )
         with (
             patch(
-                "vibe3.services.flow_status_service.FlowStatusService"
+                "vibe3.domain.qualify_gate.FlowStatusService"
             ) as mock_flow_status_svc,
             patch("vibe3.services.FlowCleanupService") as mock_cleanup_svc,
         ):

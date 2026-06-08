@@ -17,7 +17,7 @@ from .periodic_check_executor import execute_periodic_check
 from .service_protocol import ServiceBase
 
 if TYPE_CHECKING:
-    from vibe3.domain.failed_gate import GateResult
+    from vibe3.domain import GateResult
 
 
 class FailedGateProtocol(Protocol):

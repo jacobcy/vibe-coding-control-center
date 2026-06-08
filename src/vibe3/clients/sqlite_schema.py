@@ -363,7 +363,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Backfill NULL/missing severity values using registry
     # Runs both for newly added column and for any rows with NULL severity
     # (handles interrupted migrations or earlier code writing without severity)
-    from vibe3.exceptions.error_classification import get_error_handling_contract
+    from vibe3.exceptions import get_error_handling_contract
 
     before_changes = conn.total_changes
     # Fetch all error codes with NULL severity

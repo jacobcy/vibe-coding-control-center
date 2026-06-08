@@ -9,7 +9,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.runtime_assets import resolve_runtime_asset
+from vibe3.clients import resolve_runtime_asset
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
@@ -37,7 +37,7 @@ def resolve_skill_content(
         return None
 
     # Resolve relative path against repo root for CWD-independent access
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients import GitClient
 
     try:
         git_client = GitClient()
