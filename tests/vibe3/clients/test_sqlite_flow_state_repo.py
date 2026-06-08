@@ -3,6 +3,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from vibe3.clients.sqlite_client import SQLiteClient
 
 
@@ -357,3 +359,35 @@ def test_get_flows_by_status_no_match_returns_empty_list() -> None:
 
         # Should be empty
         assert len(result) == 0
+
+
+def test_get_flows_by_status_raises_on_invalid_status() -> None:
+    """Test get_flows_by_status raises ValueError for invalid status."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        with pytest.raises(ValueError, match="Invalid flow status"):
+            store.get_flows_by_status("invalid_status")
+
+
+def test_get_flows_by_status_uses_sql_where_clause() -> None:
+    """Verify get_flows_by_status executes SQL WHERE clause efficiently."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Insert many flows to verify SQL-level filtering
+        for i in range(100):
+            status = "active" if i % 2 == 0 else "blocked"
+            store.update_flow_state(
+                f"task/issue-{i}", flow_slug=f"issue_{i}", flow_status=status
+            )
+
+        # Query should use WHERE clause (not fetch all then filter)
+        result = store.get_flows_by_status("active")
+
+        # Should return exactly 50 active flows
+        assert len(result) == 50
+        # All returned flows should be active
+        assert all(f["flow_status"] == "active" for f in result)

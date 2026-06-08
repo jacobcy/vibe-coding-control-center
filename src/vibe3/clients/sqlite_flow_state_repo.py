@@ -13,6 +13,8 @@ class SQLiteFlowStateRepo(_HasConnection):
 
     db_path: str
 
+    VALID_FLOW_STATUSES = {"active", "blocked", "done", "stale"}
+
     VALID_FLOW_STATE_FIELDS = {
         "branch",
         "flow_slug",
@@ -215,7 +217,23 @@ class SQLiteFlowStateRepo(_HasConnection):
         return flows
 
     def get_flows_by_status(self, status: str) -> list[dict[str, Any]]:
-        """Get flows filtered by status (excludes soft-deleted flows)."""
+        """Get flows filtered by status (excludes soft-deleted flows).
+
+        Args:
+            status: Must be one of 'active', 'blocked', 'done', 'stale'
+
+        Returns:
+            List of flow dictionaries matching the status
+
+        Raises:
+            ValueError: If status is not a valid flow status value
+        """
+        if status not in self.VALID_FLOW_STATUSES:
+            raise ValueError(
+                f"Invalid flow status: {status}. "
+                f"Must be one of: {', '.join(sorted(self.VALID_FLOW_STATUSES))}"
+            )
+
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
