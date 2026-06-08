@@ -375,6 +375,14 @@ Steps:
    - 若被依赖的 issue 未关闭或未处于 `state/done`，从候选中排除
    - 已有有效 flow / live dispatch 的 issue，从候选中排除
    - 被硬规则阻塞的 issue，从候选中排除
+2.5. **简单测试任务路由**：对通过依赖过滤的候选，判断是否应路由到 supervisor/apply：
+   - 阅读 issue 内容，评估完成该任务是否只需要修改测试文件、不涉及业务代码改动、且工作量小
+   - 如果判断为简单测试任务，直接执行：
+     - 添加 `supervisor` + `state/handoff` 标签
+     - 写 `[governance decide][assignee-pool]` comment 说明路由原因
+     - 打 `orchestra-governed`
+     - 跳过后续入池评估（该 issue 由 supervisor/apply 处理）
+   - 如果不确定或涉及业务代码，继续正常入池评估
 3. 对 ready candidates 按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 排序
 4. **入池评估与标签补齐**：
    - 扫描 assignee issue pool 中有 manager assignee 但缺少 `state/*` label 的 issue

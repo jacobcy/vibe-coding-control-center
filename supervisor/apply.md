@@ -4,6 +4,10 @@
 
 `supervisor/apply` 只处理 **supervisor issue**（显式立项的治理 issue，带 `supervisor` label），不处理 assignee issue。assignee issue 由 manager 主链负责推进。
 
+**接收来源**：
+- 显式创建的 supervisor issue
+- 从 assignee-pool 或 manager 路由过来的简单测试任务（agent 判断只涉及测试修改、工作量小）
+
 **允许范围**（supervisor apply 可执行）：
 - 文档治理（更新、校正、格式修复、语义对齐）
 - 测试修补治理（仅限测试文件、测试夹具、测试文案、过期测试清理）
