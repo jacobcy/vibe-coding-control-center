@@ -169,36 +169,3 @@ def internal_bootstrap(
         dependency_issue_numbers=tuple(dependency_issue_numbers or ()),
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))
-
-
-@app.command("backfill-worktree-paths")
-def backfill_worktree_paths() -> None:
-    """Backfill worktree_path for existing active task/ flows."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.status_query_service import is_auto_task_branch
-
-    git = GitClient()
-    store = SQLiteClient()
-
-    worktrees = git.list_worktrees()
-    backfilled_count = 0
-
-    for wt_path, branch_ref in worktrees:
-        branch = branch_ref.removeprefix("refs/heads/")
-        if not is_auto_task_branch(branch):
-            continue
-
-        flow = store.get_flow_state(branch)
-        if not flow:
-            continue
-        if flow.get("flow_status") != "active":
-            continue
-        if flow.get("worktree_path"):
-            continue
-
-        store.update_flow_state(branch, worktree_path=str(wt_path))
-        backfilled_count += 1
-        typer.echo(f"Backfilled {branch}: {wt_path}")
-
-    typer.echo(f"\nBackfilled {backfilled_count} flows")
