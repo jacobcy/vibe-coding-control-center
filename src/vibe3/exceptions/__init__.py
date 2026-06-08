@@ -6,12 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-# Direct imports for git_error_patterns (no circular dependency)
-from vibe3.exceptions.git_error_patterns import (
-    TRANSIENT_GIT_ERROR_PATTERNS,
-    is_transient_git_error,
-)
-
 if TYPE_CHECKING:
     from vibe3.exceptions.error_classification import (
         classify_error_hybrid,
@@ -23,6 +17,10 @@ if TYPE_CHECKING:
         is_model_error,
     )
     from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
+    from vibe3.exceptions.git_error_patterns import (
+        TRANSIENT_GIT_ERROR_PATTERNS,
+        is_transient_git_error,
+    )
     from vibe3.exceptions.runtime_errors import GitHubAPIError
 
 
@@ -241,10 +239,12 @@ _LAZY_IMPORTS = {
     "ErrorHandlingContract": "vibe3.exceptions.error_severity",
     "ErrorSeverity": "vibe3.exceptions.error_severity",
     "GitHubAPIError": "vibe3.exceptions.runtime_errors",
+    "TRANSIENT_GIT_ERROR_PATTERNS": "vibe3.exceptions.git_error_patterns",
     "classify_error_hybrid": "vibe3.exceptions.error_classification",
     "get_error_handling_contract": "vibe3.exceptions.error_classification",
     "is_api_error": "vibe3.exceptions.error_codes",
     "is_model_error": "vibe3.exceptions.error_codes",
+    "is_transient_git_error": "vibe3.exceptions.git_error_patterns",
 }
 
 
