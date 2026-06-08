@@ -1,12 +1,17 @@
 """GitHub client issues operations."""
 
+import difflib
 import json
+import os
 import re
 from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.clients.github_field_constants import GITHUB_DEFAULT_VIEW_FIELDS
+from vibe3.clients.github_field_constants import (
+    GITHUB_DEFAULT_VIEW_FIELDS,
+    GITHUB_KNOWN_ISSUE_FIELDS,
+)
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 
 # Patterns GitHub uses to auto-close issues via PR body
@@ -22,6 +27,36 @@ _BLOCKED_BY_RE = re.compile(
 )
 
 _DEFAULT_LIST_FIELDS = "number,title,state,updatedAt,labels,assignees,milestone"
+
+# Pre-computed set for O(1) field validation lookups
+_KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_ISSUE_FIELDS)
+
+
+def _validate_issue_fields(fields: list[str]) -> None:
+    """Validate that all field names are known GitHub issue API fields.
+
+    Raises ValueError with typo suggestions for unknown fields.
+
+    Args:
+        fields: List of field names to validate
+
+    Raises:
+        ValueError: If any unknown fields are found, with suggestions for typos
+    """
+    invalid = [f for f in fields if f not in _KNOWN_FIELDS_SET]
+    if not invalid:
+        return
+    suggestions = []
+    for f in invalid:
+        matches = difflib.get_close_matches(f, _KNOWN_FIELDS_SET, n=1, cutoff=0.6)
+        if matches:
+            suggestions.append(f"'{f}' (did you mean '{matches[0]}'?)")
+        else:
+            suggestions.append(f"'{f}'")
+    raise ValueError(
+        f"Unknown GitHub issue field(s): {', '.join(suggestions)}. "
+        f"Known fields: {', '.join(sorted(_KNOWN_FIELDS_SET))}"
+    )
 
 
 def parse_blocked_by(body: str) -> list[int]:
@@ -248,6 +283,10 @@ class IssuesMixin(IssueAdminMixin):
             operation="view_issue",
             issue_number=issue_number,
         ).debug("Calling GitHub API: view_issue")
+
+        # Validate fields if provided and validation is not skipped
+        if fields is not None and not os.environ.get("VIBE_SKIP_FIELD_VALIDATION"):
+            _validate_issue_fields(fields)
 
         fields_str = (
             ",".join(fields)
