@@ -235,6 +235,9 @@ code_limits:
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
+      - path: "tests/vibe3/clients/test_github_client_issues.py"
+        limit: 440
+        reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
         limit: 520
         reason: "Health check failure 测试集，7 个独立测试用例验证 coordinator 对 CheckService 结果的处理逻辑，每个测试需要完整 mock setup，拆分会降低可读性；新增 mock_flow_blocker 注入对齐测试模式（#1723）；新增 _make_mock_coordinator_dependencies helper function 后略微超标（#1887）"
