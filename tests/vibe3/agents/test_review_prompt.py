@@ -15,6 +15,7 @@ from vibe3.agents.review_prompt import (
     build_policy_section,
     build_review_prompt_body,
     build_review_task_section,
+    describe_review_sections,
 )
 from vibe3.models import ReviewRequest, ReviewScope
 
@@ -207,3 +208,46 @@ class TestBuildReviewPromptBody:
         assert "canonical audit report under `docs/reports/`" in context
         assert "handoff audit" in context
         assert "PASS` and `REFUSE` may omit `audit_ref`" in context
+
+
+class TestDescribeReviewSections:
+    """Tests for describe_review_sections (unit test)."""
+
+    def test_first_bootstrap(self) -> None:
+        """Should return 6 sections for first.bootstrap variant."""
+        sections = describe_review_sections("first", "bootstrap")
+        assert sections == [
+            "review.policy",
+            "common.rules",
+            "review.snapshot_diff",
+            "review.ast_analysis",
+            "review.output_format",
+            "review.exit_contract",
+        ]
+
+    def test_retry_bootstrap(self) -> None:
+        """Should return 7 sections for retry.bootstrap variant."""
+        sections = describe_review_sections("retry", "bootstrap")
+        assert sections == [
+            "review.policy",
+            "common.rules",
+            "review.snapshot_diff",
+            "review.ast_analysis",
+            "review.output_format",
+            "review.retry_task",
+            "review.exit_contract",
+        ]
+
+    def test_retry_resume(self) -> None:
+        """Should return 3 sections for retry.resume variant."""
+        sections = describe_review_sections("retry", "resume")
+        assert sections == [
+            "review.output_format",
+            "review.retry_task",
+            "review.exit_contract",
+        ]
+
+    def test_first_resume_raises(self) -> None:
+        """Should raise KeyError for first.resume variant (not defined in YAML)."""
+        with pytest.raises(KeyError, match="Prompt recipe variant not found"):
+            describe_review_sections("first", "resume")
