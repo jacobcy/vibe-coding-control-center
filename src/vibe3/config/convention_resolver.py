@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
@@ -19,6 +19,7 @@ from vibe3.config.profile_convention import ProfileConvention
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
     from vibe3.config.profile_config import ProfileConfig
+    from vibe3.models.adapter_manifest import AdapterManifest
 
 
 @dataclass
@@ -50,6 +51,7 @@ class ConventionResolver:
     profile: str | None = None
     _profile_cache: str | None = None
     _git_client: GitClient | None = None
+    _adapter_resolver: Callable[[str], "AdapterManifest | None"] | None = None
 
     def _get_git_client(self) -> GitClient:
         """Get GitClient instance with lazy initialization.
@@ -209,15 +211,19 @@ class ConventionResolver:
         Returns:
             ProfileConfig instance with detected or explicit profile.
         """
-        from vibe3.adapters import get_adapter
         from vibe3.config.profile_config import ProfileConfig
 
         detected_profile = self.profile or self._detect_profile()
-        return ProfileConfig(profile=detected_profile, adapter_resolver=get_adapter)
+        return ProfileConfig(
+            profile=detected_profile, adapter_resolver=self._adapter_resolver
+        )
 
     @classmethod
     def from_repo(
-        cls, profile: str | None = None, git_client: GitClient | None = None
+        cls,
+        profile: str | None = None,
+        git_client: GitClient | None = None,
+        adapter_resolver: Callable[[str], "AdapterManifest | None"] | None = None,
     ) -> "ConventionResolver":
         """Create resolver from current repo context.
 
@@ -227,6 +233,8 @@ class ConventionResolver:
         Args:
             profile: Optional profile name override
             git_client: Optional GitClient instance for dependency injection
+            adapter_resolver: Optional adapter resolver function for
+                dependency injection
 
         Returns:
             ConventionResolver instance configured for current repo.
@@ -238,7 +246,9 @@ class ConventionResolver:
         logger.debug(
             f"Creating ConventionResolver from repo context (profile={profile})"
         )
-        return cls(profile=profile, _git_client=git_client)
+        return cls(
+            profile=profile, _git_client=git_client, _adapter_resolver=adapter_resolver
+        )
 
 
 def diagnose_profile() -> str:
@@ -286,4 +296,6 @@ def get_resolver() -> ConventionResolver:
         >>> resolver.get_skill_path("review")
         'skills/review/SKILL.md'
     """
-    return ConventionResolver.from_repo()
+    from vibe3.adapters import get_adapter
+
+    return ConventionResolver.from_repo(adapter_resolver=get_adapter)
