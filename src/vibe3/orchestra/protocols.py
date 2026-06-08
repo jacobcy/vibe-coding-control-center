@@ -8,18 +8,39 @@ Note: Most protocols have been migrated to domain layer (dispatch_protocols.py).
 The definitions below are maintained for backward compatibility during migration.
 """
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from vibe3.clients import GitClient
-
-# Re-export protocols from domain for backward compatibility
-from vibe3.domain import (
-    CapacityServiceProtocol,
-    CheckServiceProtocol,
-    FlowServiceProtocol,
-    LabelDispatchCallable,
-)
 from vibe3.models import IssueInfo
+
+if TYPE_CHECKING:
+    from vibe3.domain import (
+        CapacityServiceProtocol,
+        CheckServiceProtocol,
+        FlowServiceProtocol,
+        LabelDispatchCallable,
+    )
+
+
+def __getattr__(name: str) -> object:
+    from vibe3.domain import (
+        CapacityServiceProtocol,
+        CheckServiceProtocol,
+        FlowServiceProtocol,
+        LabelDispatchCallable,
+    )
+
+    _map = {
+        "CapacityServiceProtocol": CapacityServiceProtocol,
+        "CheckServiceProtocol": CheckServiceProtocol,
+        "FlowServiceProtocol": FlowServiceProtocol,
+        "LabelDispatchCallable": LabelDispatchCallable,
+    }
+    try:
+        return _map[name]
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "CapacityServiceProtocol",

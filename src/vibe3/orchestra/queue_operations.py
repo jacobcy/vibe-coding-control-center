@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Callable
 
-from vibe3.domain import QualifyGateService, find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
 from vibe3.orchestra import get_flow_context, is_auto_task_branch, load_issue
@@ -13,8 +12,10 @@ from vibe3.utils import sort_ready_issues
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.domain import QualifyGateService
     from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
+
 
 # Cooldown mechanism for auto-resume circuit breaker
 AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -57,6 +58,8 @@ def select_ready_issues_from_collected_issues(
     supervisor_label: str,
 ) -> list[IssueInfo]:
     """Select ready issues from already-collected IssueInfo objects."""
+    from vibe3.domain import find_role_for_state
+
     selected: list[IssueInfo] = []
     role = find_role_for_state(trigger_state)
     if role is None:

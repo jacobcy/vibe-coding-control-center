@@ -213,12 +213,6 @@ class TestCoreBudget:
                 f"at module level:\n{violation_list}",
             )
 
-    @pytest.mark.xfail(
-        reason="Architectural debt: orchestra submodules import domain business "
-        "entities (FailedGate, FlowManager, GlobalDispatchCoordinator) at module "
-        "level. domain.protocols imports are explicitly allowed. Tracked by #2318.",
-        strict=True,
-    )
     def test_core_no_domain_business_entity_imports(self) -> None:
         """Verify core does not import domain business entities at module level.
 
