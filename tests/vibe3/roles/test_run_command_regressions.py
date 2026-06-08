@@ -111,7 +111,9 @@ def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
     previous_adapter = adapter_registry._ADAPTERS.pop("github-flow", None)
     was_loaded = "github-flow" in adapter_registry._LOADED
     adapter_registry._LOADED.discard("github-flow")
-    adapter_registry.register_adapter(github_flow._build_github_flow_manifest())
+    adapter_registry.register_adapter(
+        github_flow._build_github_flow_manifest(global_skills=runtime_root / "skills")
+    )
 
     captured_prompt: dict[str, str] = {}
 
