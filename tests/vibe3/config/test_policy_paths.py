@@ -8,7 +8,9 @@ from vibe3.config.settings import PlanConfig, ReviewConfig, RunConfig
 
 def test_convention_resolver_vibe_center_policy_path() -> None:
     """ConventionResolver returns standard supervisor policy paths."""
-    resolver = ConventionResolver(profile="vibe-center")
+    from vibe3.adapters import get_adapter
+
+    resolver = ConventionResolver(profile="vibe-center", _adapter_resolver=get_adapter)
 
     plan_path = resolver.get_policy_path("plan")
     assert plan_path == "supervisor/policies/plan.md"
