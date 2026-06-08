@@ -23,6 +23,7 @@ from vibe3.models import (
 from vibe3.services import (
     CoordinationResolver,
     FlowService,
+    FlowStatusService,
     IssueFlowService,
     LabelService,
     TaskResumeOperations,
@@ -84,8 +85,6 @@ class QualifyGateService:
         flow_state = self._store.get_flow_state(branch)
         current_status = flow_state.get("flow_status") if flow_state else None
         if current_status not in ("done", "aborted"):
-            from vibe3.services.flow_status_service import FlowStatusService
-
             FlowStatusService(
                 store=self._store,
                 git_client=self._flow_manager.git,
@@ -602,12 +601,12 @@ class QualifyGateService:
         Returns:
             True if dependency is satisfied, False otherwise
         """
-        from vibe3.clients.github_field_constants import GITHUB_FIELDS_STATE_ONLY
+        from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
 
         payload = self._github.view_issue(
             dep_issue_number,
             repo=self.config.repo,
-            fields=list(GITHUB_FIELDS_STATE_ONLY),
+            fields=list(GITHUB_FIELDS_STATE_ONLY),  # type: ignore[call-overload]
         )
         if not isinstance(payload, dict):
             return False

@@ -11,11 +11,7 @@ Import paths:
 from typing import Any, Protocol
 
 # public-api: pending upstream export
-from vibe3.models.pr import (
-    CreatePRRequest,
-    PRResponse,
-    UpdatePRRequest,
-)
+from vibe3.models import CreatePRRequest, PRResponse, UpdatePRRequest
 
 
 class GitHubAuthPort(Protocol):

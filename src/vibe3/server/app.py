@@ -233,7 +233,7 @@ def start(
         raise typer.Exit(1)
 
     # Warning: Manager token isolation
-    from vibe3.roles.manager import resolve_manager_token
+    from vibe3.roles import resolve_manager_token
 
     manager_token = resolve_manager_token(config)
     if not manager_token:
@@ -345,8 +345,7 @@ def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
     from rich.console import Console
 
-    from vibe3.services import get_manager_usernames
-    from vibe3.services.serve_status_service import ServeStatusService
+    from vibe3.services import ServeStatusService, get_manager_usernames
 
     console = Console()
 

@@ -14,7 +14,7 @@ def orchestra_log_dir(repo_root: Path | None = None) -> Path:
     if override_dir:
         path = Path(override_dir).expanduser().resolve() / "orchestra"
     else:
-        from vibe3.clients.git_client import find_repo_root
+        from vibe3.clients import find_repo_root
 
         root = repo_root or find_repo_root()
         path = root / "temp" / "logs" / "orchestra"

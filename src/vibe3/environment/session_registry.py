@@ -316,7 +316,7 @@ class SessionRegistryService:
             from vibe3.environment.worktree_context import WorktreeContext
 
             repo_root = find_repo_root()
-            from vibe3.config.orchestra_settings import load_orchestra_config
+            from vibe3.config import load_orchestra_config
 
             config = load_orchestra_config()
             context = WorktreeContext(

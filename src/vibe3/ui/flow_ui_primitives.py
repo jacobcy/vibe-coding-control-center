@@ -39,9 +39,9 @@ def display_actor(actor: str | None) -> tuple[str, bool]:
     Uses ``normalize_actor`` from utils.actor_utils which maps legacy aliases and
     filters placeholders, giving consistent output across PR body and UI.
     """
-    from vibe3.utils.actor_utils import normalize_actor
+    from vibe3.utils import normalize_actor
 
-    normalized = normalize_actor(actor)
+    normalized = normalize_actor(actor)  # type: ignore[operator]
     if normalized is not None:
         return normalized, False
 

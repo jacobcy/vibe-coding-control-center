@@ -8,7 +8,7 @@ from typing import Any
 from loguru import logger
 
 # public-api: pending upstream export
-from vibe3.models.pr import CICheck, PRMetadata, PRResponse, PRState
+from vibe3.models import CICheck, PRMetadata, PRResponse, PRState
 
 _ACTIONS_RUN_LINK_RE = re.compile(
     r"actions/runs/(?P<run_id>\d+)(?:/job/(?P<job_id>\d+))?"
