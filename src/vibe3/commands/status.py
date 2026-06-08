@@ -356,7 +356,9 @@ def _full_status_dashboard(
         classified["waiting_for_pool_items"], classified["governed_anomaly_items"]
     )
     render_rfc_items(classified["roadmap_rfc_items"])
-    render_epic_items(classified["roadmap_epic_items"], data.orchestrated_issues)
+    render_epic_items(
+        classified["roadmap_epic_items"], classified["open_issue_numbers"]
+    )
     render_blocked_items(classified["blocked_items"])
 
     if all_flows:

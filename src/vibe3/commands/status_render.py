@@ -232,20 +232,11 @@ def render_rfc_items(rfc_items: list[dict[str, object]]) -> None:
 
 def render_epic_items(
     epic_items: list[dict[str, object]],
-    orchestrated_issues: list[dict[str, object]] | None = None,
+    open_issue_numbers: set[int],
 ) -> None:
     """Render Roadmap Epic section (parent governance containers)."""
     console.print("\n[bold cyan]Roadmap Epic:[/]")
     if epic_items:
-        # Build set of open issue numbers for dependency status checking
-        # Filter out DONE issues since they're no longer blocking
-        open_issue_numbers: set[int] = set()
-        if orchestrated_issues:
-            open_issue_numbers = {
-                cast(int, issue["number"])
-                for issue in orchestrated_issues
-                if cast(IssueState, issue["state"]) != IssueState.DONE
-            }
 
         for item in epic_items:
             number = cast(int, item["number"])
@@ -335,32 +326,6 @@ def render_missing_state_items(
             console.print(
                 "         [yellow]⚠️  orchestra-governed label present"
                 " but state missing[/]"
-            )
-    else:
-        console.print("  [dim](none)[/]")
-
-
-def render_scene_sections(
-    flows: list[FlowStatusResponse],
-    worktree_map: dict[str, str],
-) -> None:
-    """Render active flow scenes."""
-    active_flows = [
-        flow
-        for flow in flows
-        if getattr(flow, "flow_status", "active") not in {"done", "aborted", "merged"}
-    ]
-
-    console.print("\n[bold cyan]Active Scenes:[/]")
-    if active_flows:
-        for flow in active_flows:
-            wt = worktree_map.get(flow.branch, "(no worktree)")
-            task = (
-                f"#{flow.task_issue_number}" if flow.task_issue_number else "(no task)"
-            )
-            console.print(
-                f"  [cyan]{flow.branch:30}[/] "
-                f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
             )
     else:
         console.print("  [dim](none)[/]")

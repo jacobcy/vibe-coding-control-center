@@ -140,7 +140,8 @@ def classify_task_issues_for_rendering(
     Returns:
         Dict with keys: supervisor_items, roadmap_rfc_items, roadmap_epic_items,
         waiting_for_pool_items, governed_anomaly_items, task_progress_items,
-        remote_items, bucketed_items, pr_ref_items, blocked_items.
+        remote_items, bucketed_items, pr_ref_items, blocked_items,
+        open_issue_numbers.
     """
     from vibe3.services.orchestra_helpers import get_manager_usernames
 
@@ -260,6 +261,14 @@ def classify_task_issues_for_rendering(
         and cast(int, item["number"]) not in supervisor_numbers
     ]
 
+    # Build set of open issue numbers for dependency status checking
+    # Filter out DONE issues since they're no longer blocking
+    open_issue_numbers: set[int] = {
+        cast(int, issue["number"])
+        for issue in orchestrated_issues
+        if cast(IssueState | None, issue.get("state")) != IssueState.DONE
+    }
+
     return {
         "supervisor_items": supervisor_items,
         "roadmap_rfc_items": roadmap_rfc_items,
@@ -271,4 +280,5 @@ def classify_task_issues_for_rendering(
         "bucketed_items": bucketed_items,
         "pr_ref_items": pr_ref_items,
         "blocked_items": blocked_items,
+        "open_issue_numbers": open_issue_numbers,
     }
