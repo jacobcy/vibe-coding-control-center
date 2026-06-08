@@ -293,7 +293,10 @@ def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
 
 
 def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
-    """list_issue_comments should return empty list on timeout."""
+    """list_issue_comments should return empty list on network error.
+
+    view_issue returns "network_error" sentinel for network/auth failures.
+    """
     with patch.object(github_client, "view_issue") as mock_view:
         mock_view.return_value = "network_error"
 
@@ -303,7 +306,10 @@ def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
 
 
 def test_list_issue_comments_failure(github_client: GitHubClient) -> None:
-    """list_issue_comments should return empty list on failure."""
+    """list_issue_comments should return empty list when issue not found.
+
+    view_issue returns None for missing/inaccessible issues.
+    """
     with patch.object(github_client, "view_issue") as mock_view:
         mock_view.return_value = None
 
