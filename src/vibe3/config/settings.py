@@ -257,17 +257,7 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=1)
 
 
-class PolicyResolverMixin:
-    """Mixin providing a common base type for policy config classes.
-
-    Used by ReviewConfig, PlanConfig, RunConfig to share type identity.
-    Subclasses declare policy_file and common_rules as their own Pydantic fields.
-    """
-
-    __slots__ = ()
-
-
-class ReviewConfig(BaseModel, PolicyResolverMixin):
+class ReviewConfig(BaseModel):
     """Review configuration."""
 
     policy_file: str | None = Field(
@@ -284,7 +274,7 @@ class ReviewConfig(BaseModel, PolicyResolverMixin):
     review_prompt: str = Field(default="")
 
 
-class PlanConfig(BaseModel, PolicyResolverMixin):
+class PlanConfig(BaseModel):
     """Plan command configuration."""
 
     policy_file: str | None = Field(
@@ -300,7 +290,7 @@ class PlanConfig(BaseModel, PolicyResolverMixin):
     plan_prompt: str = Field(default="")
 
 
-class RunConfig(BaseModel, PolicyResolverMixin):
+class RunConfig(BaseModel):
     """Run command configuration."""
 
     policy_file: str | None = Field(
