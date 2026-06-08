@@ -19,6 +19,15 @@ class IssueCollectionService:
             state="open",
             assignee=None,
             repo=self._repo,
+            fields=[
+                "number",
+                "title",
+                "state",
+                "labels",
+                "assignees",
+                "milestone",
+                "body",
+            ],
         )
 
         issues: list[IssueInfo] = []

@@ -503,12 +503,16 @@ class OrchestraStatusService:
 
         for username in get_manager_usernames(self.config):
             try:
+                # fmt: off
                 result = self._github.list_issues(
                     state="open",
                     assignee=username,
                     limit=50,
                     repo=self.config.repo,
+                    fields=["number", "title", "state", "labels",
+                            "assignees", "milestone", "body"],
                 )
+                # fmt: on
                 if not result:
                     continue
                 for issue in result:

@@ -37,6 +37,15 @@ def test_collect_open_issues_calls_github_once_without_label_filter() -> None:
         state="open",
         assignee=None,
         repo="owner/repo",
+        fields=[
+            "number",
+            "title",
+            "state",
+            "labels",
+            "assignees",
+            "milestone",
+            "body",
+        ],
     )
     assert [issue.number for issue in issues] == [1521, 1492]
     assert issues[0].state is None
