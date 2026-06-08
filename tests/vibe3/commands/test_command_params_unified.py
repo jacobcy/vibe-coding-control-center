@@ -210,7 +210,7 @@ def test_run_dry_run_forwards_to_execution(
 
     runner.invoke(run_app, ["--dry-run", "--no-async", "test instructions"])
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
 
 
@@ -246,7 +246,7 @@ def test_review_base_dry_run_returns_dry_run_verdict(
     result = runner.invoke(review_app, ["base", "main", "--dry-run", "--no-async"])
 
     assert result.exit_code == 0
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
 
 
@@ -261,7 +261,7 @@ def test_internal_manager_dry_run_forwards_param(
 
     runner.invoke(internal_app, ["manager", "123", "--no-async", "--dry-run"])
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
 
 
@@ -317,7 +317,7 @@ def test_run_show_prompt_forwarded(
         run_app, ["--dry-run", "--show-prompt", "--no-async", "test instructions"]
     )
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
     assert mock_execute.call_args.kwargs.get("show_prompt") is True
 
@@ -331,7 +331,7 @@ def test_review_show_prompt_forwarded(
 
     runner.invoke(review_app, ["--branch", "42", "--dry-run", "--show-prompt"])
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("show_prompt") is True
 
 
@@ -348,7 +348,7 @@ def test_internal_manager_show_prompt_forwarded(
         internal_app, ["manager", "123", "--no-async", "--dry-run", "--show-prompt"]
     )
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("show_prompt") is True
 
 
@@ -368,7 +368,7 @@ def test_run_cli_agent_overrides_config(
         run_app, ["--agent", "override-agent", "--no-async", "test instructions"]
     )
 
-    assert mock_execute.called
+    mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("agent") == "override-agent"
 
 
