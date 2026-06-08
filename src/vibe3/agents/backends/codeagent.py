@@ -21,6 +21,7 @@ from vibe3.agents.backends.session_manager import (
     extract_session_id,
     should_retry_without_session,
 )
+from vibe3.agents.codeagent_prompts import prepare_prompt_file
 from vibe3.config import (
     has_agent_env_override,
     resolve_effective_agent_options,
@@ -32,7 +33,6 @@ from vibe3.utils import (
     CODEAGENT_STDIN_MODE_THRESHOLD,
     diagnose_backend_error,
     diagnose_prompt_size_issue,
-    prepare_prompt_file,
     sanitize_prompt_for_display,
     sanitize_task_shell_meta,
     stream_reader,

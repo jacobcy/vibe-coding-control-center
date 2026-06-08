@@ -18,9 +18,12 @@ MODULE_REPO = Path(__file__).resolve().parents[3]
 
 def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent() -> None:
     """Normal orchestra operations should anchor to the main repository root."""
-    with patch("vibe3.clients.git_client.GitClient") as mock_git:
-        mock_git.return_value.get_git_common_dir.return_value = f"{MAIN_REPO}/.git"
+    from vibe3.utils.git_helpers import find_repo_root as _impl
 
+    _impl.cache_clear()
+    with patch(
+        "vibe3.utils.git_helpers.get_git_common_dir", return_value=f"{MAIN_REPO}/.git"
+    ):
         root = resolve_orchestra_repo_root()
 
     assert root == MAIN_REPO

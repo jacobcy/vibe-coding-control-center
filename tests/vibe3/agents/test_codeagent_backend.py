@@ -11,13 +11,15 @@ from vibe3.agents.backends.async_launcher import (
 from vibe3.agents.backends.codeagent import (
     CodeagentBackend,
 )
+from vibe3.agents.codeagent_prompts import (
+    build_prompt_file_content,
+)
 from vibe3.config.settings import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
 )
 from vibe3.utils.codeagent_helpers import (
-    build_prompt_file_content,
     summarize_backend_output,
 )
 
@@ -148,7 +150,7 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.utils.codeagent_helpers.get_vibe_config",
+            "vibe3.agents.codeagent_prompts.get_vibe_config",
             return_value=config,
         ):
             content = build_prompt_file_content("prompt body")
@@ -158,7 +160,7 @@ class TestCodeagentBackend:
 
     def test_build_prompt_file_content_keeps_prompt_when_notice_empty(self) -> None:
         with patch(
-            "vibe3.utils.codeagent_helpers.get_vibe_config",
+            "vibe3.agents.codeagent_prompts.get_vibe_config",
             return_value=VibeConfig(),
         ):
             content = build_prompt_file_content("prompt body")
@@ -171,7 +173,7 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.utils.codeagent_helpers.get_vibe_config",
+            "vibe3.agents.codeagent_prompts.get_vibe_config",
             return_value=config,
         ):
             content = build_prompt_file_content(
@@ -391,7 +393,7 @@ class TestCodeagentBackend:
 
         with (
             patch(
-                "vibe3.utils.codeagent_helpers.get_vibe_config",
+                "vibe3.agents.codeagent_prompts.get_vibe_config",
                 return_value=config,
             ),
             patch("pathlib.Path.home", return_value=tmp_path),
@@ -438,7 +440,7 @@ class TestCodeagentBackend:
 
         with (
             patch(
-                "vibe3.utils.codeagent_helpers.get_vibe_config",
+                "vibe3.agents.codeagent_prompts.get_vibe_config",
                 return_value=config,
             ),
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,

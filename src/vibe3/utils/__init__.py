@@ -8,10 +8,8 @@ if TYPE_CHECKING:
     from vibe3.utils.actor_utils import normalize_actor
     from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.codeagent_helpers import (
-        build_prompt_file_content,
         diagnose_backend_error,
         diagnose_prompt_size_issue,
-        prepare_prompt_file,
         sanitize_prompt_for_display,
         sanitize_task_shell_meta,
         stream_reader,
@@ -69,7 +67,6 @@ _LAZY_IMPORTS = {
     "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
     "PACK_REFS_INTERVAL_TICKS": "vibe3.utils.constants",
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
-    "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
     "diagnose_prompt_size_issue": "vibe3.utils.codeagent_helpers",
@@ -86,7 +83,6 @@ _LAZY_IMPORTS = {
     "normalize_actor": "vibe3.utils.actor_utils",
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
     "parse_issue_number": "vibe3.utils.issue_ref",
-    "prepare_prompt_file": "vibe3.utils.codeagent_helpers",
     "read_instance_info": "vibe3.utils.orchestra_instance",
     "resolve_priority": "vibe3.utils.queue_ordering",
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
@@ -126,7 +122,6 @@ __all__ = [
     "PACK_REFS_INTERVAL_TICKS",
     "STARTING_TIMEOUT_SECONDS",
     "VERDICT_UNKNOWN",
-    "build_prompt_file_content",
     "clean_error_message",
     "check_branch_behind",
     "diagnose_backend_error",
@@ -144,7 +139,6 @@ __all__ = [
     "normalize_actor",
     "OrchestraInstanceInfo",
     "parse_issue_number",
-    "prepare_prompt_file",
     "read_instance_info",
     "resolve_priority",
     "resolve_roadmap_rank",

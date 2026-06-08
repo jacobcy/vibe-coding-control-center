@@ -17,8 +17,9 @@ runner = CliRunner(env={"NO_COLOR": "1"})
 class TestAnalyzeOrchestraConfigSources:
     """Tests for _analyze_orchestra_config_sources function."""
 
-    def test_all_fields_default(self) -> None:
+    def test_all_fields_default(self, monkeypatch) -> None:
         """When config matches Pydantic defaults, all sources are 'default'."""
+        monkeypatch.delenv("MANAGER_USERNAMES", raising=False)
         config = OrchestraConfig()
         sources = _analyze_orchestra_config_sources(config)
 
@@ -194,7 +195,10 @@ class TestRenderConfigurationOutput:
             active_worktrees=0,
         )
 
-        with patch("vibe3.clients.git_client.find_repo_root", return_value=tmp_path):
+        from vibe3.utils.git_helpers import find_repo_root as _impl
+
+        _impl.cache_clear()
+        with patch("vibe3.utils.git_helpers.find_repo_root", return_value=tmp_path):
             result = runner.invoke(app, ["status"])
 
         assert result.exit_code == 0
