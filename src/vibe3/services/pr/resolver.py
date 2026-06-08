@@ -132,7 +132,7 @@ def resolve_command_branch(
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and branch_opt.isdigit():
             convention = get_convention()
-            return convention.branch.canonical_branch(int(branch_opt))
+            return convention.branch.canonical_branch(int(branch_opt))  # type: ignore[no-any-return]
         return branch_opt
 
     # Step 3: Priority 2 - --pr option
@@ -155,7 +155,7 @@ def resolve_command_branch(
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and position_arg.isdigit():
             convention = get_convention()
-            return convention.branch.canonical_branch(int(position_arg))
+            return convention.branch.canonical_branch(int(position_arg))  # type: ignore[no-any-return]
         return position_arg
 
     # Step 5: Priority 4 - Current branch (fallback)

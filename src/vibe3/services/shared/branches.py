@@ -67,7 +67,7 @@ def resolve_branch_and_issue(
     """
     # Import through public API for test patch compatibility
     # (cross-module import allows patching "vibe3.services.resolve_branch_arg")
-    from vibe3.config.convention_resolver import get_convention
+    from vibe3.config import get_convention
     from vibe3.services import resolve_branch_arg as resolve_via_public_api
 
     branch = resolve_via_public_api(branch_arg, flow_service=flow_service)

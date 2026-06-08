@@ -236,7 +236,7 @@ def test_task_status_excludes_system_status_sections(
     assert "Vibe3 Configuration" not in result.output
 
 
-@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch("vibe3.config.load_orchestra_config")
 @patch(
     "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
 )
@@ -375,7 +375,7 @@ def test_task_status_shows_active_exception_for_missing_assignee(
     assert "missing assignee" in output
 
 
-@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch("vibe3.config.load_orchestra_config")
 @patch(
     "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
 )

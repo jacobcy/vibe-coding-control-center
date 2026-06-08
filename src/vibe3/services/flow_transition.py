@@ -141,13 +141,11 @@ class FlowTransitionMixin(FlowWriteMixin):
         # Try to fetch issue title from GitHub and update cache
         if effective_issue_number:
             try:
-                from vibe3.clients.github_field_constants import (
-                    GITHUB_FIELDS_TITLE_ONLY,
-                )
+                from vibe3.clients import GITHUB_FIELDS_TITLE_ONLY
 
                 gh = GitHubClient()
                 issue_data = gh.view_issue(
-                    effective_issue_number, fields=list(GITHUB_FIELDS_TITLE_ONLY)
+                    effective_issue_number, fields=list(GITHUB_FIELDS_TITLE_ONLY)  # type: ignore[call-overload]
                 )
                 if isinstance(issue_data, dict):
                     issue_title = issue_data.get("title")
