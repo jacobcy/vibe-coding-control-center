@@ -56,8 +56,8 @@ def load_issue(
     issue_number: int, config: OrchestraConfig, github: "GitHubClient"
 ) -> "IssueInfo | None":
     """Load the current issue snapshot for an already-frozen issue."""
+    from vibe3.clients import GITHUB_DEFAULT_VIEW_FIELDS
     from vibe3.models import IssueInfo
-    from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
 
     try:
         payload = github.view_issue(

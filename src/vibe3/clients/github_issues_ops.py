@@ -6,8 +6,8 @@ from typing import Any, cast
 
 from loguru import logger
 
+from vibe3.clients.github_field_constants import GITHUB_DEFAULT_VIEW_FIELDS
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
-from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(

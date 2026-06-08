@@ -4,6 +4,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+# Import GitHub field constants directly (no circular dependency)
+# These are simple tuple constants with no complex dependencies
+from vibe3.clients.github_field_constants import (
+    GITHUB_DEFAULT_VIEW_FIELDS,
+    GITHUB_FIELDS_BODY_COMMENTS,
+    GITHUB_FIELDS_BODY_ONLY,
+    GITHUB_FIELDS_COMMENTS_ONLY,
+    GITHUB_FIELDS_FULL_WITH_COMMENTS,
+    GITHUB_FIELDS_STATE_ONLY,
+    GITHUB_FIELDS_TITLE_ONLY,
+)
+
 if TYPE_CHECKING:
     from vibe3.clients.ai_client import AIClient
     from vibe3.clients.ai_suggestion_client import AISuggestionClient
@@ -34,7 +46,7 @@ if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.clients.store_context import get_store
 
-# Lazy imports
+# Lazy imports (for complex dependencies only)
 _LAZY_IMPORTS = {
     "AIClient": "vibe3.clients.ai_client",
     "AISuggestionClient": "vibe3.clients.ai_suggestion_client",
@@ -84,6 +96,13 @@ __all__ = [
     "BackendProtocol",
     "BaseResolver",
     "FlowReader",
+    "GITHUB_DEFAULT_VIEW_FIELDS",
+    "GITHUB_FIELDS_BODY_COMMENTS",
+    "GITHUB_FIELDS_BODY_ONLY",
+    "GITHUB_FIELDS_COMMENTS_ONLY",
+    "GITHUB_FIELDS_FULL_WITH_COMMENTS",
+    "GITHUB_FIELDS_STATE_ONLY",
+    "GITHUB_FIELDS_TITLE_ONLY",
     "GhIssueLabelPort",
     "GitClient",
     "GitClientProtocol",

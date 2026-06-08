@@ -25,7 +25,7 @@ def load_issue_info(
         UserError: If issue cannot be loaded or parsed
     """
     github = github or GitHubClient()
-    from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
+    from vibe3.clients import GITHUB_DEFAULT_VIEW_FIELDS
 
     payload = github.view_issue(
         issue_number, repo=config.repo, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)

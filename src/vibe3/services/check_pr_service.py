@@ -478,7 +478,7 @@ The unresolved work continues in #{bridge_issue_number}.
             )
 
         # Check if issue already closed
-        from vibe3.utils.constants import GITHUB_FIELDS_STATE_ONLY
+        from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
 
         gh_issue = self.github_client.view_issue(
             task_issue_number, fields=list(GITHUB_FIELDS_STATE_ONLY)
