@@ -232,14 +232,11 @@ def render_rfc_items(rfc_items: list[dict[str, object]]) -> None:
 
 def render_epic_items(
     epic_items: list[dict[str, object]],
-    open_issue_numbers: set[int] | None = None,
+    open_issue_numbers: set[int],
 ) -> None:
     """Render Roadmap Epic section (parent governance containers)."""
     console.print("\n[bold cyan]Roadmap Epic:[/]")
     if epic_items:
-        # Use provided open_issue_numbers or default to empty set
-        if open_issue_numbers is None:
-            open_issue_numbers = set()
 
         for item in epic_items:
             number = cast(int, item["number"])

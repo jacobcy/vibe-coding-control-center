@@ -143,7 +143,8 @@ def classify_task_issues_for_rendering(
     Returns:
         Dict with keys: supervisor_items, roadmap_rfc_items, roadmap_epic_items,
         waiting_for_pool_items, governed_anomaly_items, task_progress_items,
-        remote_items, bucketed_items, pr_ref_items, blocked_items.
+        remote_items, bucketed_items, pr_ref_items, blocked_items,
+        open_issue_numbers.
     """
     from vibe3.services.orchestra_helpers import get_manager_usernames
 
@@ -268,7 +269,7 @@ def classify_task_issues_for_rendering(
     open_issue_numbers: set[int] = {
         cast(int, issue["number"])
         for issue in orchestrated_issues
-        if cast(IssueState, issue["state"]) != IssueState.DONE
+        if cast(IssueState | None, issue.get("state")) != IssueState.DONE
     }
 
     return {
