@@ -307,38 +307,7 @@ class IssuesMixin(IssueAdminMixin):
         Returns:
             List of comment dicts with keys: id, body, author, etc.
         """
-        logger.bind(
-            external="github",
-            operation="list_issue_comments",
-            issue_number=issue_number,
-        ).debug("Calling GitHub API: list_issue_comments")
-
-        cmd = [
-            "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--comments",
-            "--json",
-            "comments",
-        ]
-        if repo:
-            cmd.extend(["--repo", repo])
-
-        result = self._run_gh_command(cmd, pager=True)  # type: ignore[attr-defined]
-        if result is None or result.returncode != 0:
-            if result is not None:
-                logger.bind(external="github", error=result.stderr).error(
-                    f"Failed to list comments on issue #{issue_number}"
-                )
-            return []
-
-        try:
-            data = json.loads(result.stdout)
-            comments = data.get("comments", [])
-            return cast(list[dict[str, Any]], comments)
-        except json.JSONDecodeError as exc:
-            logger.bind(external="github", error=str(exc)).error(
-                "Failed to parse comments JSON"
-            )
-            return []
+        result = self.view_issue(issue_number, repo=repo)
+        if isinstance(result, dict):
+            return cast(list[dict[str, Any]], result.get("comments", []))
+        return []

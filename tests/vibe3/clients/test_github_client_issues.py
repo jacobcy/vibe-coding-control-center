@@ -1,7 +1,6 @@
 """Tests for GitHub client - Issues."""
 
 import json
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -260,26 +259,21 @@ def test_create_issue_failure_returns_none(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_success(github_client: GitHubClient) -> None:
     """list_issue_comments should return comments on success."""
-    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(
+    with patch.object(github_client, "view_issue") as mock_view:
+        mock_view.return_value = {
+            "comments": [
                 {
-                    "comments": [
-                        {
-                            "id": 1,
-                            "body": "First comment",
-                            "author": {"login": "user1"},
-                        },
-                        {
-                            "id": 2,
-                            "body": "Second comment",
-                            "author": {"login": "user2"},
-                        },
-                    ]
-                }
-            ),
-        )
+                    "id": 1,
+                    "body": "First comment",
+                    "author": {"login": "user1"},
+                },
+                {
+                    "id": 2,
+                    "body": "Second comment",
+                    "author": {"login": "user2"},
+                },
+            ]
+        }
 
         result = github_client.list_issue_comments(issue_number=123)
 
@@ -290,11 +284,8 @@ def test_list_issue_comments_success(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list when no comments."""
-    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps({"comments": []}),
-        )
+    with patch.object(github_client, "view_issue") as mock_view:
+        mock_view.return_value = {"comments": []}
 
         result = github_client.list_issue_comments(issue_number=123)
 
@@ -303,8 +294,8 @@ def test_list_issue_comments_empty(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list on timeout."""
-    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="gh", timeout=30)
+    with patch.object(github_client, "view_issue") as mock_view:
+        mock_view.return_value = "network_error"
 
         result = github_client.list_issue_comments(issue_number=123)
 
@@ -313,11 +304,8 @@ def test_list_issue_comments_timeout(github_client: GitHubClient) -> None:
 
 def test_list_issue_comments_failure(github_client: GitHubClient) -> None:
     """list_issue_comments should return empty list on failure."""
-    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stderr="Not found",
-        )
+    with patch.object(github_client, "view_issue") as mock_view:
+        mock_view.return_value = None
 
         result = github_client.list_issue_comments(issue_number=999)
 
