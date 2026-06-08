@@ -160,6 +160,50 @@ class CheckPRService:
             ).warning(warning_msg)
             return (None, [warning_msg])
 
+    def _transfer_dependencies(
+        self,
+        old_branch: str,
+        old_issue_number: int,
+        bridge_issue_number: int,
+    ) -> int:
+        """Transfer dependency links from old issue to bridge issue.
+
+        Args:
+            old_branch: Branch name of the old issue
+            old_issue_number: Issue number of the old (closed) issue
+            bridge_issue_number: Issue number of the new bridge issue
+
+        Returns:
+            Number of dependent flows updated
+        """
+        dependents = self.store.get_flow_dependents(old_branch)
+        if not dependents:
+            return 0
+
+        transferred = 0
+        for dep_branch in dependents:
+            try:
+                self.store.add_issue_link(dep_branch, bridge_issue_number, "dependency")
+                transferred += 1
+                logger.bind(
+                    domain="check",
+                    action="transfer_dependency",
+                    branch=dep_branch,
+                    old_issue=old_issue_number,
+                    new_issue=bridge_issue_number,
+                ).info(
+                    f"Transferred dependency from #{old_issue_number} "
+                    f"to #{bridge_issue_number} for branch {dep_branch}"
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain="check",
+                    action="transfer_dependency",
+                    branch=dep_branch,
+                ).warning(f"Failed to transfer dependency: {exc}")
+
+        return transferred
+
     def handle_pr_terminal_state(
         self,
         branch: str,
@@ -620,6 +664,9 @@ The unresolved work continues in #{bridge_issue_number}.
             )
 
         # Success - abort and cleanup old flow
+        # Transfer dependencies from old issue to bridge issue
+        self._transfer_dependencies(branch, task_issue_number, bridge_number)
+
         assignee_names = [
             a.get("login", "")
             for a in gh_issue.get("assignees", [])

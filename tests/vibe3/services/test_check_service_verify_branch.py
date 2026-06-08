@@ -384,16 +384,33 @@ def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
     }
     mock_github.list_all_prs.return_value = []
     mock_github.list_prs_for_branch.return_value = []
+    # Mock issue body operations for BlockedStateService
+    mock_github.get_issue_body.return_value = ""
+    mock_github.update_issue_body.return_value = True
+    mock_github.add_issue_labels.return_value = True
+    mock_github.remove_issue_labels.return_value = True
 
-    service = CheckService(store=store, git_client=mock_git, github_client=mock_github)
-    service._initialize_pr_cache()
-    result = service.verify_branch(branch)
+    # Mock LabelService to avoid gh CLI calls
+    from unittest.mock import patch
 
-    assert result.is_valid is True
+    with patch(
+        "vibe3.services.blocked_state_io.LabelService"
+    ) as mock_label_service_cls:
+        mock_label_service = MagicMock()
+        mock_label_service.confirm_issue_state.return_value = "confirmed"
+        mock_label_service_cls.return_value = mock_label_service
 
-    # DB blocked state must be cleared
-    flow = store.get_flow_state(branch)
-    assert flow is not None
-    assert flow.get("flow_status") == "active"
-    assert flow.get("blocked_by_issue") is None
-    assert flow.get("blocked_reason") is None
+        service = CheckService(
+            store=store, git_client=mock_git, github_client=mock_github
+        )
+        service._initialize_pr_cache()
+        result = service.verify_branch(branch)
+
+        assert result.is_valid is True
+
+        # DB blocked state must be cleared
+        flow = store.get_flow_state(branch)
+        assert flow is not None
+        assert flow.get("flow_status") == "active"
+        assert flow.get("blocked_by_issue") is None
+        assert flow.get("blocked_reason") is None

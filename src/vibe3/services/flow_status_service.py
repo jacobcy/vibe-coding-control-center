@@ -190,6 +190,10 @@ class FlowStatusService:
         Clears blocked_by_issue and blocked_reason in addition to flow_status,
         matching what BlockedStateIO.clear_database_cache() does.
         Only updates local state — GitHub label sync is left to qualify_gate.
+
+        .. deprecated::
+            Use FlowRecoveryService.recover() or BlockedStateService.unblock() instead.
+            Will be removed in a future version.
         """
         logger.bind(
             domain="check",
