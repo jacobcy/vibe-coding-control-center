@@ -122,9 +122,10 @@ class FlowReadMixin:
             action="list",
             status=status,
         ).debug("Listing flows")
-        flows_data = self.store.get_all_flows()
         if status:
-            flows_data = [f for f in flows_data if f.get("flow_status") == status]
+            flows_data = self.store.get_flows_by_status(status)
+        else:
+            flows_data = self.store.get_all_flows()
 
         flows: list[FlowStatusResponse] = []
         for flow in flows_data:
