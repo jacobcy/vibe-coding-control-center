@@ -95,13 +95,14 @@ This project has **two parallel implementations**:
 
 1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
 2. **检查当前 flow**: 运行 `vibe3 flow show`
-3. **查看全局状态**: 运行 `vibe3 status`
+3. **查看全局状态**: 运行 `vibe3 task status`
 4. **了解执行规则**: 阅读 [.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)
 
 ## 🔁 Handoff 命令约定
 
 - `vibe3 handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
 - `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
+- `vibe3 handoff append "内容"`：追加 handoff 记录，提供后续上下文
 - `vibe3 handoff verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
 - `vibe3 handoff plan/report/audit/next`：记录特定阶段的责任链上下文
 - `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取

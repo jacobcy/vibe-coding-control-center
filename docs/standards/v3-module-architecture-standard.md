@@ -113,7 +113,7 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 | `roles` | L3 Orchestration Core | 角色行为定义。包含 Plan, Run, Review, Supervisor 等角色的专属逻辑。 |
 | `runtime` | L3 Orchestration Core | 运行时内核。负责心跳循环、异步任务分发、事件总线与路由。 |
 | `server` | L2 Gateway | 服务入口。负责 HTTP/Webhook Server 启停与 Driver 装配。 |
-| `services` | L3 Orchestration Core | 业务逻辑封装。如 `TaskService`, `FlowService`, `AuditService` 等。 |
+| `services` | L3 Orchestration Core | 核心业务逻辑封装。包含 `issue`, `pr`, `task`, `handoff`, `shared` 等核心业务域的拆分实现。 |
 | `shared` | L3 Orchestration Core | 跨领域公共能力承载层。负责 labels, paths, errors, branches 等通用逻辑。 |
 | `ui` | L2 Gateway | 展示原语。负责控制台 UI 组件、时间轴视图、表格格式化与着色。 |
 | `utils` | L6 Infrastructure | 系统工具集。提供文件操作、字符串处理、路径解析等通用辅助。 |
