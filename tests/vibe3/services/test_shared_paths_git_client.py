@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.services.git_path_client import (
+from vibe3.services.shared.paths import (
     GitPathProtocol,
     _get_git_client,
     find_worktree_path_for_branch,

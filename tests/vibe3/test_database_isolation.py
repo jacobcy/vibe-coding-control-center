@@ -6,8 +6,8 @@ import sqlite3
 from pathlib import Path
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.error_helpers import record_error
 from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services.shared.errors import record_error
 
 
 def test_default_sqlite_client_uses_isolated_database(isolate_database: Path) -> None:

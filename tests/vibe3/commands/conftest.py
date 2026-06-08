@@ -135,7 +135,7 @@ def mock_git_client() -> MagicMock:
 
     Returns a MagicMock with sensible defaults for GitClient methods.
     Tests should still patch at the correct module path, e.g.:
-        patch("vibe3.services.branch_arg.GitClient", return_value=mock_git_client)
+        patch("vibe3.clients.git_client.GitClient", return_value=mock_git_client)
     """
     client = MagicMock()
     client.get_current_branch.return_value = "task/test-branch"
