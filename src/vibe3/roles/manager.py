@@ -186,7 +186,7 @@ def build_manager_request(
 
         # Record to error_log table (with guard to avoid masking original error)
         try:
-            from vibe3.services.shared.errors import record_error
+            from vibe3.services import record_error
 
             record_error(
                 error_code="E_DISPATCH_FAILURE",

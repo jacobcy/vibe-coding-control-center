@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from vibe3.services.shared.paths import (
         check_ref_exists,
         ref_to_handoff_cmd,
+        resolve_ref_path,
         sanitize_event_detail_paths,
     )
     from vibe3.services.status_query_service import StatusQueryService
