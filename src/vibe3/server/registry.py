@@ -3,47 +3,32 @@
 Extracted from orchestra/serve_utils.py.
 """
 
+from __future__ import annotations
+
 import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
 from loguru import logger
-from starlette.concurrency import run_in_threadpool
 
-from vibe3.clients import GitHubClient, SQLiteClient
-from vibe3.domain import (
-    FailedGate,
-    FlowManager,
-    GlobalDispatchCoordinator,
-    OrchestrationFacade,
-)
-from vibe3.environment import SessionRegistryService
-from vibe3.execution import CapacityService, resolve_orchestra_repo_root
-from vibe3.models import OrchestraConfig
-from vibe3.observability import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra import create_global_dispatch_coordinator
-from vibe3.runtime import (
-    CircuitBreaker,
-    FailedGateProtocol,
-    HeartbeatServer,
-    OrchestraInstanceInfo,
-    read_instance_info,
-    validate_instance,
-)
-from vibe3.services import OrchestraSnapshot, OrchestraStatusService
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from vibe3.models import OrchestraConfig
+    from vibe3.runtime import HeartbeatServer, OrchestraInstanceInfo
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
 def _resolve_dispatcher_models_root(
-    config: OrchestraConfig,
+    config: "OrchestraConfig",
     launch_cwd: Path | None = None,
 ) -> Path:
     """Resolve control-plane models root for dispatcher-managed execution."""
+    from vibe3.execution import resolve_orchestra_repo_root
+
     resolved_cwd = (launch_cwd or Path.cwd()).resolve()
     if config.debug:
         return resolved_cwd
@@ -51,7 +36,7 @@ def _resolve_dispatcher_models_root(
 
 
 def _resolve_async_cli_override_root(
-    config: OrchestraConfig,
+    config: "OrchestraConfig",
     launch_cwd: Path | None = None,
 ) -> Path | None:
     """Resolve optional async child code-root override.
@@ -79,17 +64,39 @@ def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
     return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
 
 
-def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
+def _build_server(config: "OrchestraConfig") -> tuple["HeartbeatServer", "FastAPI"]:
     """Instantiate heartbeat + FastAPI app with registered services."""
     return _build_server_with_launch_cwd(config)
 
 
 def _build_server_with_launch_cwd(
-    config: OrchestraConfig,
+    config: "OrchestraConfig",
     launch_cwd: Path | None = None,
-) -> tuple[HeartbeatServer, FastAPI]:
+) -> tuple["HeartbeatServer", "FastAPI"]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
+    from typing import cast
+
+    from fastapi import FastAPI
+    from fastapi.responses import HTMLResponse
+    from starlette.concurrency import run_in_threadpool
+
     from vibe3.agents import CodeagentBackend
+    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.domain import (
+        FailedGate,
+        FlowManager,
+        GlobalDispatchCoordinator,
+        OrchestrationFacade,
+    )
+    from vibe3.environment import SessionRegistryService
+    from vibe3.execution import CapacityService
+    from vibe3.orchestra import create_global_dispatch_coordinator
+    from vibe3.runtime import (
+        CircuitBreaker,
+        FailedGateProtocol,
+        HeartbeatServer,
+    )
+    from vibe3.services import OrchestraSnapshot, OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -276,7 +283,7 @@ def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
     return True, stdout or f"Tailscale webhook configured for port {port}"
 
 
-def validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, bool]:
+def validate_pid_file(pid_file: Path) -> tuple["OrchestraInstanceInfo | None", bool]:
     """Validate PID file and check if process is a running orchestra instance.
 
     Returns:
@@ -285,6 +292,11 @@ def validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, boo
         - (info, False): Valid PID file but process is dead/not orchestra
         - (info, True): Valid PID file and process is running orchestra
     """
+    from vibe3.runtime import (
+        read_instance_info,
+        validate_instance,
+    )
+
     info = read_instance_info(pid_file)
     if info is None:
         return None, False
@@ -294,11 +306,12 @@ def validate_pid_file(pid_file: Path) -> tuple[OrchestraInstanceInfo | None, boo
 
 
 def _build_async_serve_command(
-    config: OrchestraConfig,
+    config: "OrchestraConfig",
     verbose: int,
     launch_cwd: Path | None = None,
 ) -> list[str]:
     """Build self-invocation command for async tmux startup."""
+
     models_root = _resolve_dispatcher_models_root(config, launch_cwd)
     log_dir = _resolve_orchestra_log_dir(launch_cwd)
     async_cli_root = _resolve_async_cli_override_root(config, launch_cwd)
@@ -354,8 +367,10 @@ def _build_async_serve_command(
     return cmd
 
 
-def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
+def _start_async_serve(config: "OrchestraConfig", verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session with streaming output."""
+    from vibe3.observability import orchestra_events_log_path, orchestra_log_dir
+
     session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)

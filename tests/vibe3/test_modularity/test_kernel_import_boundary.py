@@ -28,8 +28,6 @@ import sys
 import textwrap
 from pathlib import Path
 
-import pytest
-
 # Modules that must NOT appear in sys.modules after kernel import.
 # Checked at package granularity (e.g. vibe3.roles matches vibe3.roles.manager).
 FORBIDDEN_MODULES = [
@@ -104,11 +102,6 @@ else:
     return []
 
 
-@pytest.mark.xfail(
-    reason="registry.py still has top-level imports of forbidden modules; "
-    "will pass after lazy-import refactor",
-    strict=True,
-)
 def test_kernel_no_eager_business_imports() -> None:
     """Kernel startup must not import forbidden business modules."""
     violations = _check_kernel_import_boundary()
