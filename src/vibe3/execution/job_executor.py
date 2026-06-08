@@ -17,7 +17,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.execution.execution_lifecycle import ExecutionLifecycleService, ExecutionRole
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.execution_request import ExecutionLaunchResult
-from vibe3.models.job import CommandType, JobContext, JobEnvelope, JobResult
+from vibe3.models.job import CommandType, JobContext, JobEnvelope, JobResult, JobSource
 
 if TYPE_CHECKING:
     from vibe3.execution.command_adapter import CommandAdapterRegistry
@@ -40,12 +40,13 @@ def build_envelope_from_dispatch_params(
     command_type: CommandType,
     issue_number: int,
     branch: str,
-    source: str,
+    source: JobSource,
     actor: str,
     refs: dict[str, str] | None = None,
     mode: Literal["sync", "async"] = "async",
     cli_overrides: dict[str, str] | None = None,
     governance_tick_count: int = 0,
+    governance_execution_count: int = 0,
     governance_material_override: str | None = None,
 ) -> JobEnvelope:
     """Build a JobEnvelope from common dispatch parameters.
@@ -63,6 +64,7 @@ def build_envelope_from_dispatch_params(
         mode: Dispatch mode ("sync" or "async")
         cli_overrides: Optional CLI overrides for sync mode
         governance_tick_count: Tick count for governance dispatch
+        governance_execution_count: Execution count for governance dispatch
         governance_material_override: Material override for governance
 
     Returns:
@@ -72,12 +74,13 @@ def build_envelope_from_dispatch_params(
         command_type=command_type,
         issue_number=issue_number,
         branch=branch,
-        source=source,  # type: ignore[arg-type]
+        source=source,
         actor=actor,
         refs=refs or {},
         mode=mode,
         cli_overrides=cli_overrides,
         governance_tick_count=governance_tick_count,
+        governance_execution_count=governance_execution_count,
         governance_material_override=governance_material_override,
     )
 
@@ -355,7 +358,7 @@ class JobExecutor:
         from vibe3.execution.issue_role_sync_runner import format_agent_actor
 
         cli_overrides = envelope.cli_overrides or {}
-        options = spec.resolve_options(config, cli_overrides or None)
+        options = spec.resolve_options(config, cli_overrides)
         actor = format_agent_actor(options)
 
         sync_request = spec.build_sync_request(
@@ -481,6 +484,7 @@ class JobExecutor:
 
         # Build environment
         env = dict(os.environ)
+        env.pop("VIBE3_ASYNC_CLI_PROJECT_ROOT", None)
         env["VIBE3_ASYNC_CHILD"] = "1"
         env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         # Force logs to be written to the target project, not the vibe repo
