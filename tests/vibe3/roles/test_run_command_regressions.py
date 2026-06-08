@@ -165,8 +165,12 @@ def test_async_publish_dispatch_preserves_publish_cli_mode() -> None:
     """Default async publish dispatch must re-enter the child as run --publish."""
     captured: dict[str, object] = {}
 
-    def fake_dispatch(**kwargs: object) -> None:
+    def fake_dispatch(**kwargs: object):
         captured.update(kwargs)
+        # Return AsyncDispatchResult to match new return type
+        from vibe3.roles.run_command import AsyncDispatchResult
+
+        return AsyncDispatchResult(tmux_session=None, log_path=None)
 
     with (
         patch(
