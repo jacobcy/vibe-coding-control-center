@@ -19,64 +19,14 @@ from vibe3.exceptions import ConfigError
 
 
 class TestExpandVariables:
-    """Tests for _expand_variables pure function."""
+    """Smoke tests: _expand_variables delegates to expand_config_variables."""
 
     def test_expand_variables_simple(self) -> None:
         config = {"paths": {"root": "/app"}, "file": "${paths.root}/data"}
         result = _expand_variables(config)
         assert result["file"] == "/app/data"
 
-    def test_expand_variables_nested(self) -> None:
-        config = {"a": {"b": "value"}, "c": "${a.b}_suffix"}
-        result = _expand_variables(config)
-        assert result["c"] == "value_suffix"
-
-    def test_expand_variables_chained(self) -> None:
-        """A refs B, B refs C — full chain resolves."""
-        config = {"base": "/tmp", "mid": "${base}/sub", "final": "${mid}/file.txt"}
-        result = _expand_variables(config)
-        assert result["final"] == "/tmp/sub/file.txt"
-
-    def test_expand_variables_cycle(self) -> None:
-        """Circular references terminate without hanging; both keys present."""
-        config = {"a": "${b}", "b": "${a}"}
-        result = _expand_variables(config)
-        assert "a" in result
-        assert "b" in result
-        # Both should be unresolved since they reference each other
-
-    def test_expand_variables_missing(self) -> None:
-        """Unresolvable references keep original string."""
-        config = {"val": "${paths.missing}"}
-        result = _expand_variables(config)
-        assert result["val"] == "${paths.missing}"
-
-    def test_expand_variables_non_string(self) -> None:
-        """Int and list values passed through unchanged."""
-        config = {"count": 42, "items": [1, 2, 3]}
-        result = _expand_variables(config)
-        assert result["count"] == 42
-        assert result["items"] == [1, 2, 3]
-
-    def test_expand_variables_dict_recursion(self) -> None:
-        """Nested dict with var refs: inner and outer both expanded."""
-        config = {
-            "root": "/app",
-            "nested": {"path": "${root}/inner", "ref": "${nested.path}/deep"},
-        }
-        result = _expand_variables(config)
-        assert result["nested"]["path"] == "/app/inner"
-        assert result["nested"]["ref"] == "/app/inner/deep"
-
-    def test_expand_variables_tilde_expansion(self) -> None:
-        """~ prefix expanded via Path.expanduser(), but /~/ embedded is not."""
-        config = {"home_path": "~/data", "embedded": "/tmp/~/data"}
-        result = _expand_variables(config)
-        assert result["home_path"] == str(Path("~/data").expanduser())
-        assert result["embedded"] == str(Path("/tmp/~/data").expanduser())
-
     def test_expand_variables_with_context(self) -> None:
-        """Explicit context param resolves against context, not config root."""
         config = {"val": "${external.key}"}
         context = {"external": {"key": "resolved"}}
         result = _expand_variables(config, context=context)
