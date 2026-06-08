@@ -18,94 +18,161 @@ def mock_store():
     return MagicMock()
 
 
+@pytest.fixture
+def mock_git():
+    """Mock git client."""
+    return MagicMock()
+
+
 class TestFlowStatus:
     """Tests for individual flow status."""
 
-    def test_get_flow_status_success(self, mock_store) -> None:
-        """Test getting flow status successfully with cache-first pr_ref."""
+    def test_get_flow_status_success(self, mock_store, mock_git) -> None:
+        """Test getting flow status successfully."""
         mock_store.get_flow_state.return_value = {
             "branch": "test-branch",
             "flow_slug": "test-slug",
             "flow_status": "active",
             "updated_at": "2026-03-16T00:00:00",
-            "pr_ref": "https://github.com/test/repo/pull/42",
         }
-        mock_store.get_issue_links.return_value = []
+        mock_store.get_issue_links.return_value = [
+            {
+                "branch": "test-branch",
+                "issue_number": 476,
+                "issue_role": "task",
+                "created_at": "2026-03-16T00:00:00",
+            }
+        ]
 
-        service = FlowService(store=mock_store)
-        result = service.get_flow_status("test-branch")
+        service = FlowService(store=mock_store, git_client=mock_git)
+        # PRService is imported inside get_flow_status, need to patch it
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_class:
+            mock_pr_svc = mock_pr_class.return_value
+            mock_pr_result = MagicMock(number=42, is_ready=True)
+            mock_pr_svc.get_branch_pr_status.return_value = mock_pr_result
+
+            mock_git.find_worktree_path_for_branch.return_value = Path(
+                "/path/to/worktree"
+            )
+
+            result = service.get_flow_status("test-branch")
 
         assert result is not None
         assert result.branch == "test-branch"
         assert result.flow_status == "active"
+        # Verify hydrated fields
         assert result.pr_number == 42
-        assert result.pr_ready_for_review is False
-
-    def test_get_flow_status_pr_ref_fallback(self, mock_store) -> None:
-        """Test fallback to PRService when pr_ref is absent."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "test-branch",
-            "flow_slug": "test-slug",
-            "flow_status": "active",
-            "updated_at": "2026-03-16T00:00:00",
-        }
-        mock_store.get_issue_links.return_value = []
-
-        service = FlowService(store=mock_store)
-        # Patch PRService at the point where it's imported (lazy import)
-        with patch("vibe3.services.pr.service.PRService") as mock_pr_service_class:
-            mock_pr_service = mock_pr_service_class.return_value
-            mock_pr = MagicMock()
-            mock_pr.number = 99
-            mock_pr.is_ready = True
-            mock_pr_service.get_branch_pr_status.return_value = mock_pr
-
-            result = service.get_flow_status("test-branch")
-
-        assert result is not None
-        assert result.pr_number == 99
         assert result.pr_ready_for_review is True
+        assert result.worktree_root == "/path/to/worktree"
+        assert result.task_issue_number == 476
+        assert len(result.issues) == 1
+        assert result.issues[0].issue_number == 476
 
-    def test_get_flow_status_malformed_pr_ref(self, mock_store) -> None:
-        """Test fallback when pr_ref is malformed (triggers ValueError/IndexError)."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "test-branch",
-            "flow_slug": "test-slug",
-            "flow_status": "active",
-            "updated_at": "2026-03-16T00:00:00",
-            "pr_ref": "https://github.com/test/repo/pull/not-a-number",
-        }
-        mock_store.get_issue_links.return_value = []
-
-        service = FlowService(store=mock_store)
-        # Should fall back to PRService when int() fails
-        with patch("vibe3.services.pr.service.PRService") as mock_pr_service_class:
-            mock_pr_service = mock_pr_service_class.return_value
-            mock_pr = MagicMock()
-            mock_pr.number = 88
-            mock_pr.is_ready = False
-            mock_pr_service.get_branch_pr_status.return_value = mock_pr
-
-            result = service.get_flow_status("test-branch")
-
-        assert result is not None
-        assert result.pr_number == 88  # From PRService fallback
-        assert result.pr_ready_for_review is False
-
-    def test_get_flow_status_not_found(self, mock_store) -> None:
+    def test_get_flow_status_not_found(self, mock_store, mock_git) -> None:
         """Test getting flow status for non-existent branch."""
         mock_store.get_flow_state.return_value = None
 
-        service = FlowService(store=mock_store)
+        service = FlowService(store=mock_store, git_client=mock_git)
         result = service.get_flow_status("non-existent")
 
         assert result is None
+
+    def test_get_flow_status_no_pr_no_worktree(self, mock_store, mock_git) -> None:
+        """Test flow status when no PR exists and no worktree found."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-slug",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+        }
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store, git_client=mock_git)
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_class:
+            mock_pr_svc = mock_pr_class.return_value
+            mock_pr_svc.get_branch_pr_status.return_value = None
+
+            mock_git.find_worktree_path_for_branch.return_value = None
+
+            result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert result.branch == "test-branch"
+        assert result.pr_number is None
+        assert result.pr_ready_for_review is False
+        assert result.worktree_root is None
+        assert result.task_issue_number is None
+
+    def test_get_flow_status_pr_hydration_failure(self, mock_store, mock_git) -> None:
+        """Test flow status gracefully handles PR hydration failure."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-slug",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+        }
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store, git_client=mock_git)
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_class:
+            mock_pr_svc = mock_pr_class.return_value
+            mock_pr_svc.get_branch_pr_status.side_effect = Exception("GitHub down")
+
+            result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert result.branch == "test-branch"
+        assert result.flow_status == "active"
+        # PR hydration failure should result in default values
+        assert result.pr_number is None
+        assert result.pr_ready_for_review is False
+
+    def test_get_flow_status_task_issue_number_resolution(
+        self, mock_store, mock_git
+    ) -> None:
+        """Test task_issue_number is correctly resolved from issue links."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-slug",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+        }
+        mock_store.get_issue_links.return_value = [
+            {
+                "branch": "test-branch",
+                "issue_number": 100,
+                "issue_role": "related",
+                "created_at": "2026-03-16T00:00:00",
+            },
+            {
+                "branch": "test-branch",
+                "issue_number": 200,
+                "issue_role": "task",
+                "created_at": "2026-03-16T00:00:00",
+            },
+        ]
+
+        service = FlowService(store=mock_store, git_client=mock_git)
+        with patch("vibe3.services.pr.service.PRService") as mock_pr_class:
+            mock_pr_svc = mock_pr_class.return_value
+            mock_pr_svc.get_branch_pr_status.return_value = None
+
+            mock_git.find_worktree_path_for_branch.return_value = None
+
+            result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        # Only task-role issue should be resolved
+        assert result.task_issue_number == 200
+        assert len(result.issues) == 2
+        assert result.issues[0].issue_number == 100
+        assert result.issues[1].issue_number == 200
 
 
 class TestFlowList:
     """Tests for listing flows."""
 
-    def test_list_flows_no_filter(self, mock_store) -> None:
+    def test_list_flows_no_filter(self, mock_store, mock_git) -> None:
         """Test listing all flows."""
         mock_store.get_all_flows.return_value = [
             {
@@ -121,16 +188,36 @@ class TestFlowList:
                 "updated_at": "2026-03-16T00:00:00",
             },
         ]
-        mock_store.get_issue_links.return_value = []
+        # First call returns links for branch-1
+        mock_store.get_issue_links.side_effect = [
+            [
+                {
+                    "branch": "branch-1",
+                    "issue_number": 10,
+                    "issue_role": "task",
+                    "created_at": "2026-03-16T00:00:00",
+                }
+            ],
+            [],  # Second call for branch-2
+        ]
 
-        service = FlowService(store=mock_store)
+        # First call finds worktree for branch-1, second returns None
+        mock_git.find_worktree_path_for_branch.side_effect = [
+            Path("/wt/branch-1"),
+            None,
+        ]
+
+        service = FlowService(store=mock_store, git_client=mock_git)
         result = service.list_flows()
 
         assert len(result) == 2
         assert result[0].branch == "branch-1"
+        assert result[0].worktree_root == "/wt/branch-1"
+        assert result[0].task_issue_number == 10
         assert result[1].branch == "branch-2"
+        assert result[1].worktree_root is None
 
-    def test_list_flows_with_status_filter(self, mock_store) -> None:
+    def test_list_flows_with_status_filter(self, mock_store, mock_git) -> None:
         """Test listing flows with status filter."""
         mock_store.get_flows_by_status.return_value = [
             {
@@ -141,14 +228,16 @@ class TestFlowList:
             },
         ]
         mock_store.get_issue_links.return_value = []
+        mock_git.find_worktree_path_for_branch.return_value = Path("/wt/branch-1")
 
-        service = FlowService(store=mock_store)
+        service = FlowService(store=mock_store, git_client=mock_git)
         result = service.list_flows(status="active")
 
         assert len(result) == 1
         assert result[0].branch == "branch-1"
+        assert result[0].worktree_root == "/wt/branch-1"
 
-    def test_list_flows_skips_unparseable_rows(self, mock_store) -> None:
+    def test_list_flows_skips_unparseable_rows(self, mock_store, mock_git) -> None:
         """Test list_flows skips rows with unknown flow_status without crashing."""
         mock_store.get_all_flows.return_value = [
             {
@@ -165,12 +254,14 @@ class TestFlowList:
             },
         ]
         mock_store.get_issue_links.return_value = []
+        mock_git.find_worktree_path_for_branch.return_value = Path("/wt/branch-ok")
 
-        service = FlowService(store=mock_store)
+        service = FlowService(store=mock_store, git_client=mock_git)
         result = service.list_flows()
 
         assert len(result) == 1
         assert result[0].branch == "branch-ok"
+        assert result[0].worktree_root == "/wt/branch-ok"
 
 
 class TestFlowStatusResolver:
