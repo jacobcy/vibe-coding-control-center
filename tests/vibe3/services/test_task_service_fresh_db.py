@@ -137,9 +137,15 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path, monkeypatch)
                 )
             ]
 
-        def view_issue(self, issue_number: int, repo: str | None = None):
+        def view_issue(
+            self,
+            issue_number: int,
+            repo: str | None = None,
+            fields: list[str] | None = None,
+        ):
             assert issue_number == 467
             assert repo == "owner/repo"
+            _ = fields  # Accept but ignore fields parameter
             return {
                 "state": "open",
                 "assignees": [{"login": "alice"}],
