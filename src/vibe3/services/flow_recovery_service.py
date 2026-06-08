@@ -257,7 +257,7 @@ class FlowRecoveryService:
         include_remote: bool = False,
     ) -> None:
         """Hard rebuild through the canonical rebuild usecase."""
-        from vibe3.config.orchestra_settings import load_orchestra_config
+        from vibe3.config import load_orchestra_config
         from vibe3.models import IssueInfo, IssueState
         from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
         from vibe3.services.issue.context import load_issue_info

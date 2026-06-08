@@ -19,7 +19,7 @@ def _default_store() -> SQLiteClient:
 
 def _default_resolver() -> "ConventionResolver":
     """Default factory for resolver."""
-    from vibe3.config.convention_resolver import get_resolver
+    from vibe3.config import get_resolver
 
     return get_resolver()
 
@@ -64,7 +64,7 @@ class IssueFlowService:
             "task/issue-372"
         """
         convention = self.resolver.resolve()
-        return convention.branch.canonical_branch(issue_number)
+        return convention.branch.canonical_branch(issue_number)  # type: ignore[no-any-return]
 
     def parse_issue_number(self, branch: str) -> int | None:
         """Extract issue number from canonical task branch.
@@ -89,7 +89,7 @@ class IssueFlowService:
         if not branch.startswith(task_prefix):
             return None
         # Delegate to convention's parsing
-        return convention.branch.parse_issue_number(branch)
+        return convention.branch.parse_issue_number(branch)  # type: ignore[no-any-return]
 
     def parse_issue_number_any(self, branch: str) -> int | None:
         """Extract issue number from task or dev issue branch.
@@ -113,7 +113,7 @@ class IssueFlowService:
             None
         """
         convention = self.resolver.resolve()
-        return convention.branch.parse_issue_number(branch)
+        return convention.branch.parse_issue_number(branch)  # type: ignore[no-any-return]
 
     def is_issue_branch(self, branch: str) -> bool:
         """Check if branch is an issue branch (task/issue-N or dev/issue-N).
