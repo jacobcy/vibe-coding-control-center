@@ -29,20 +29,22 @@ def resolve_resource_root(
 
     Git common dir is validated instead of trusted because tests may isolate
     database access by mocking it to a temp directory that has no resources.
+
+    Args:
+        required_marker: Directory or file that must exist in the root
+        git_common_dir: Git common directory path (from GitClient)
+        additional_roots: Additional paths to check for root
+
+    Returns:
+        Path to the resolved resource root
+
+    Raises:
+        ResourceRootNotFoundError: If no root with required_marker is found
     """
     candidates: list[Path] = []
 
     if git_common_dir:
         candidates.append(Path(git_common_dir).parent)
-    else:
-        try:
-            from vibe3.clients.git_client import GitClient
-
-            detected_common_dir = GitClient().get_git_common_dir()
-            if detected_common_dir:
-                candidates.append(Path(detected_common_dir).parent)
-        except Exception:
-            pass
 
     candidates.extend(additional_roots)
     candidates.extend(_with_parents(Path.cwd()))
