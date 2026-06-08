@@ -15,193 +15,58 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # For type checkers, import all symbols
-    from vibe3.roles.definitions import (
-        IssueRoleSyncSpec,
-        RoleDefinition,
-        RoleOutputContract,
-        TriggerableRoleDefinition,
-        TriggerName,
-    )
+    # For type checkers, import all symbols that are externally used
+    from vibe3.roles.definitions import TriggerableRoleDefinition
     from vibe3.roles.governance import (
-        GOVERNANCE_ROLE,
-        GOVERNANCE_TASK_PROMPT,
         build_governance_execution_name,
-        build_governance_recipe,
-        build_governance_request,
-        build_governance_snapshot_context,
         load_governance_material_catalog,
-        render_governance_prompt,
-        resolve_governance_options,
     )
     from vibe3.roles.governance_factory import build_default_governance_fns
-    from vibe3.roles.governance_utils import (
-        find_material_in_catalog,
-        normalize_material_name,
-    )
-    from vibe3.roles.manager import (
-        HANDOFF_MANAGER_ROLE,
-        MANAGER_BRANCH_RESOLVER,
-        MANAGER_ROLE,
-        MANAGER_SYNC_SPEC,
-        build_manager_request,
-        build_manager_sync_request,
-        resolve_manager_options,
-        resolve_manager_token,
-    )
-    from vibe3.roles.plan import (
-        PLAN_BRANCH_RESOLVER,
-        PLAN_SYNC_SPEC,
-        PLANNER_ROLE,
-        build_plan_prompt,
-        build_plan_request,
-        build_plan_sync_request,
-        execute_spec_plan_async,
-        execute_spec_plan_sync,
-        resolve_plan_options,
-        resolve_spec_plan_input,
-    )
+    from vibe3.roles.governance_utils import find_material_in_catalog
+    from vibe3.roles.manager import build_manager_request
+    from vibe3.roles.plan import build_plan_request
     from vibe3.roles.registry import (
         LABEL_DISPATCH_ROLES,
         build_label_dispatch_event,
     )
-    from vibe3.roles.review import (
-        REVIEW_BRANCH_RESOLVER,
-        REVIEW_SYNC_SPEC,
-        REVIEWER_ROLE,
-        build_base_review_request,
-        build_issue_review_request,
-        build_manual_review_request_payload,
-        build_review_request,
-        build_review_sync_request,
-        execute_manual_review_async,
-        execute_manual_review_sync,
-        resolve_review_options,
-        validate_review_prerequisites,
-    )
+    from vibe3.roles.review import build_review_request
     from vibe3.roles.run import (
-        EXECUTOR_PUBLISH_ROLE,
-        EXECUTOR_ROLE,
-        RUN_BRANCH_RESOLVER,
-        RUN_SYNC_SPEC,
         build_run_request,
-        build_run_sync_request,
-        dispatch_run_command_async,
-        ensure_plan_file_exists,
-        execute_manual_run,
-        publish_run_command_failure,
-        publish_run_command_success,
-        resolve_run_mode,
-        resolve_run_options,
         resolve_skill_path,
-        validate_run_prerequisites,
     )
     from vibe3.roles.supervisor import (
         SUPERVISOR_APPLY_ROLE,
         SUPERVISOR_CLI_SYNC_SPEC,
-        SUPERVISOR_IDENTIFY_ROLE,
-        build_supervisor_apply_request,
-        build_supervisor_cli_request,
-        build_supervisor_cli_sync_request,
-        build_supervisor_handoff_payload,
-        build_supervisor_task_string,
-        get_supervisor_prompt_path,
         iter_supervisor_identified_events,
     )
 
 # Lazy import mapping: symbol_name -> module_path
 # Symbol name is the same in both this module and the source module
 _LAZY_IMPORTS: dict[str, str] = {
-    # definitions (no circular dependency risk, but moved to lazy per modularity test)
-    "IssueRoleSyncSpec": "vibe3.roles.definitions",
-    "RoleDefinition": "vibe3.roles.definitions",
-    "RoleOutputContract": "vibe3.roles.definitions",
-    "TriggerName": "vibe3.roles.definitions",
+    # definitions
     "TriggerableRoleDefinition": "vibe3.roles.definitions",
-    # registry (imports from manager, so must be lazy)
+    # registry
     "LABEL_DISPATCH_ROLES": "vibe3.roles.registry",
     "build_label_dispatch_event": "vibe3.roles.registry",
     # manager
-    "HANDOFF_MANAGER_ROLE": "vibe3.roles.manager",
-    "MANAGER_BRANCH_RESOLVER": "vibe3.roles.manager",
-    "MANAGER_ROLE": "vibe3.roles.manager",
-    "MANAGER_SYNC_SPEC": "vibe3.roles.manager",
     "build_manager_request": "vibe3.roles.manager",
-    "build_manager_sync_request": "vibe3.roles.manager",
-    "resolve_manager_token": "vibe3.roles.manager",
-    "resolve_manager_options": "vibe3.roles.manager",
     # planner
-    "PLAN_BRANCH_RESOLVER": "vibe3.roles.plan",
-    "PLAN_SYNC_SPEC": "vibe3.roles.plan",
-    "PLANNER_ROLE": "vibe3.roles.plan",
-    "build_plan_prompt": "vibe3.roles.plan",
     "build_plan_request": "vibe3.roles.plan",
-    "build_plan_sync_request": "vibe3.roles.plan",
-    "execute_spec_plan_async": "vibe3.roles.plan",
-    "execute_spec_plan_sync": "vibe3.roles.plan",
-    "resolve_plan_options": "vibe3.roles.plan",
-    "resolve_spec_plan_input": "vibe3.roles.plan",
     # executor
-    "EXECUTOR_PUBLISH_ROLE": "vibe3.roles.run",
-    "EXECUTOR_ROLE": "vibe3.roles.run",
-    "RUN_BRANCH_RESOLVER": "vibe3.roles.run",
-    "RUN_SYNC_SPEC": "vibe3.roles.run",
     "build_run_request": "vibe3.roles.run",
-    "build_run_sync_request": "vibe3.roles.run",
-    "dispatch_run_command_async": "vibe3.roles.run",
-    "ensure_plan_file_exists": "vibe3.roles.run",
-    "execute_manual_run": "vibe3.roles.run",
-    "publish_run_command_failure": "vibe3.roles.run",
-    "publish_run_command_success": "vibe3.roles.run",
-    "resolve_run_mode": "vibe3.roles.run",
-    "resolve_run_options": "vibe3.roles.run",
     "resolve_skill_path": "vibe3.roles.run",
-    "validate_run_prerequisites": "vibe3.roles.run",
     # reviewer
-    "REVIEW_BRANCH_RESOLVER": "vibe3.roles.review",
-    "REVIEW_SYNC_SPEC": "vibe3.roles.review",
-    "REVIEWER_ROLE": "vibe3.roles.review",
-    "build_base_review_request": "vibe3.roles.review",
-    "build_issue_review_request": "vibe3.roles.review",
-    "build_manual_review_request_payload": "vibe3.roles.review",
     "build_review_request": "vibe3.roles.review",
-    "build_review_sync_request": "vibe3.roles.review",
-    "execute_manual_review_async": "vibe3.roles.review",
-    "execute_manual_review_sync": "vibe3.roles.review",
-    "resolve_review_options": "vibe3.roles.review",
-    "validate_review_prerequisites": "vibe3.roles.review",
     # supervisor
     "SUPERVISOR_APPLY_ROLE": "vibe3.roles.supervisor",
     "SUPERVISOR_CLI_SYNC_SPEC": "vibe3.roles.supervisor",
-    "SUPERVISOR_IDENTIFY_ROLE": "vibe3.roles.supervisor",
-    "build_supervisor_apply_request": "vibe3.roles.supervisor",
-    "build_supervisor_cli_request": "vibe3.roles.supervisor",
-    "build_supervisor_cli_sync_request": "vibe3.roles.supervisor",
-    "build_supervisor_handoff_payload": "vibe3.roles.supervisor",
-    "build_supervisor_task_string": "vibe3.roles.supervisor",
-    "get_supervisor_prompt_path": "vibe3.roles.supervisor",
     "iter_supervisor_identified_events": "vibe3.roles.supervisor",
     # governance
-    "GOVERNANCE_ROLE": "vibe3.roles.governance",
-    "GOVERNANCE_TASK_PROMPT": "vibe3.roles.governance",
     "build_governance_execution_name": "vibe3.roles.governance",
-    "build_governance_recipe": "vibe3.roles.governance",
-    "build_governance_request": "vibe3.roles.governance",
-    "build_governance_snapshot_context": "vibe3.roles.governance",
     "load_governance_material_catalog": "vibe3.roles.governance",
-    "render_governance_prompt": "vibe3.roles.governance",
-    "resolve_governance_options": "vibe3.roles.governance",
     # governance factory & utils
     "build_default_governance_fns": "vibe3.roles.governance_factory",
     "find_material_in_catalog": "vibe3.roles.governance_utils",
-    "normalize_material_name": "vibe3.roles.governance_utils",
-    # scan service
-    "dispatch_governance_execution": "vibe3.roles.scan_service",
-    "dispatch_supervisor_execution": "vibe3.roles.scan_service",
-    "fetch_supervisor_candidates": "vibe3.roles.scan_service",
-    "get_available_governance_materials": "vibe3.roles.scan_service",
-    "governance_material_exists": "vibe3.roles.scan_service",
-    "list_governance_materials": "vibe3.roles.scan_service",
 }
 
 
@@ -217,96 +82,30 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    # definitions (lazy)
-    "IssueRoleSyncSpec",
-    "RoleDefinition",
-    "RoleOutputContract",
-    "TriggerName",
+    # definitions
     "TriggerableRoleDefinition",
-    # registry (lazy)
+    # registry
     "LABEL_DISPATCH_ROLES",
     "build_label_dispatch_event",
-    # manager (lazy)
-    "HANDOFF_MANAGER_ROLE",
-    "MANAGER_BRANCH_RESOLVER",
-    "MANAGER_SYNC_SPEC",
-    "MANAGER_ROLE",
+    # manager
     "build_manager_request",
-    "build_manager_sync_request",
-    "resolve_manager_token",
-    "resolve_manager_options",
-    # planner (lazy)
-    "PLAN_BRANCH_RESOLVER",
-    "PLAN_SYNC_SPEC",
-    "PLANNER_ROLE",
-    "build_plan_prompt",
+    # planner
     "build_plan_request",
-    "build_plan_sync_request",
-    "resolve_plan_options",
-    "resolve_spec_plan_input",
-    "execute_spec_plan_async",
-    "execute_spec_plan_sync",
-    # executor (lazy)
-    "EXECUTOR_PUBLISH_ROLE",
-    "EXECUTOR_ROLE",
-    "RUN_BRANCH_RESOLVER",
-    "RUN_SYNC_SPEC",
+    # executor
     "build_run_request",
-    "build_run_sync_request",
-    "dispatch_run_command_async",
-    "ensure_plan_file_exists",
-    "execute_manual_run",
-    "publish_run_command_failure",
-    "publish_run_command_success",
-    "resolve_run_mode",
-    "resolve_run_options",
     "resolve_skill_path",
-    "validate_run_prerequisites",
-    # reviewer (lazy)
-    "REVIEW_BRANCH_RESOLVER",
-    "REVIEW_SYNC_SPEC",
-    "REVIEWER_ROLE",
-    "build_base_review_request",
-    "build_issue_review_request",
-    "build_manual_review_request_payload",
+    # reviewer
     "build_review_request",
-    "build_review_sync_request",
-    "execute_manual_review_async",
-    "execute_manual_review_sync",
-    "resolve_review_options",
-    "validate_review_prerequisites",
-    # supervisor (lazy)
+    # supervisor
     "SUPERVISOR_APPLY_ROLE",
     "SUPERVISOR_CLI_SYNC_SPEC",
-    "SUPERVISOR_IDENTIFY_ROLE",
-    "build_supervisor_apply_request",
-    "build_supervisor_cli_request",
-    "build_supervisor_cli_sync_request",
-    "build_supervisor_handoff_payload",
-    "build_supervisor_task_string",
-    "get_supervisor_prompt_path",
     "iter_supervisor_identified_events",
-    # governance (lazy)
-    "GOVERNANCE_ROLE",
-    "GOVERNANCE_TASK_PROMPT",
+    # governance
     "build_governance_execution_name",
-    "build_governance_recipe",
-    "build_governance_request",
-    "build_governance_snapshot_context",
     "load_governance_material_catalog",
-    "render_governance_prompt",
-    "resolve_governance_options",
-    # governance factory & utils (lazy)
+    # governance factory & utils
     "build_default_governance_fns",
     "find_material_in_catalog",
-    "normalize_material_name",
-    # scan service
-    "dispatch_governance_execution",
-    "dispatch_supervisor_execution",
-    "fetch_supervisor_candidates",
-    "get_available_governance_materials",
-    "governance_material_exists",
-    "list_governance_materials",
 ]
 
 # Consistency check: ensure __all__ matches lazy symbols
