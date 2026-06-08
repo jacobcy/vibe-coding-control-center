@@ -136,7 +136,7 @@ def test_registry_resolve_plan_adapter():
     assert "PLAN_SYNC_SPEC" in resolved.qualname
 
     # Verify it's the actual spec
-    from vibe3.roles.plan import PLAN_SYNC_SPEC
+    from vibe3.roles import PLAN_SYNC_SPEC
 
     assert resolved.callable is PLAN_SYNC_SPEC
 
@@ -153,7 +153,7 @@ def test_registry_resolve_run_adapter():
     assert resolved.entry.callable_name == "RUN_SYNC_SPEC"
 
     # Verify it's the actual spec
-    from vibe3.roles.run_request import RUN_SYNC_SPEC
+    from vibe3.roles import RUN_SYNC_SPEC
 
     assert resolved.callable is RUN_SYNC_SPEC
 
@@ -170,7 +170,7 @@ def test_registry_resolve_review_adapter():
     assert resolved.entry.callable_name == "REVIEW_SYNC_SPEC"
 
     # Verify it's the actual spec
-    from vibe3.roles.review import REVIEW_SYNC_SPEC
+    from vibe3.roles import REVIEW_SYNC_SPEC
 
     assert resolved.callable is REVIEW_SYNC_SPEC
 
@@ -187,7 +187,7 @@ def test_registry_resolve_manager_adapter():
     assert resolved.entry.callable_name == "MANAGER_SYNC_SPEC"
 
     # Verify it's the actual spec
-    from vibe3.roles.manager import MANAGER_SYNC_SPEC
+    from vibe3.roles import MANAGER_SYNC_SPEC
 
     assert resolved.callable is MANAGER_SYNC_SPEC
 
@@ -204,7 +204,7 @@ def test_registry_resolve_governance_adapter():
     assert resolved.entry.callable_name == "GOVERNANCE_ROLE"
 
     # Verify it's the actual role definition
-    from vibe3.roles.governance import GOVERNANCE_ROLE
+    from vibe3.roles import GOVERNANCE_ROLE
 
     assert resolved.callable is GOVERNANCE_ROLE
 
@@ -221,7 +221,7 @@ def test_registry_resolve_supervisor_adapter():
     assert resolved.entry.callable_name == "SUPERVISOR_CLI_SYNC_SPEC"
 
     # Verify it's the actual spec
-    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
+    from vibe3.roles import SUPERVISOR_CLI_SYNC_SPEC
 
     assert resolved.callable is SUPERVISOR_CLI_SYNC_SPEC
 

@@ -5,7 +5,7 @@ from vibe3.clients.store_context import get_store
 
 def test_get_store_provides_client():
     """get_store should yield SQLiteClient instance."""
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     with get_store() as store:
         assert isinstance(store, SQLiteClient)

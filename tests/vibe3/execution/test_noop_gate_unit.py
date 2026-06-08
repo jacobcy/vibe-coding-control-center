@@ -185,7 +185,7 @@ class TestApplyUnifiedNoopGate:
 
     def test_retries_when_github_returns_none(self) -> None:
         """Gate retries when GitHub returns None (runtime error with retry limit)."""
-        from vibe3.exceptions.runtime_errors import GitHubAPIError
+        from vibe3.exceptions import GitHubAPIError
 
         store = _make_mock_store()
         flow_state = {}  # Track retry count

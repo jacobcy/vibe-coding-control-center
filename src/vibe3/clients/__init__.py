@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         extract_function_names,
     )
     from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients.sqlite_schema import init_schema
     from vibe3.clients.store_context import get_store
 
 # Lazy imports (for complex dependencies and GitHub field constants)
@@ -65,6 +66,7 @@ _LAZY_IMPORTS = {
     "extract_function_names": "vibe3.clients.serena_client",
     "find_repo_root": "vibe3.clients.git_client",
     "get_store": "vibe3.clients.store_context",
+    "init_schema": "vibe3.clients.sqlite_schema",
     "parse_blocked_by": "vibe3.clients.github_issues_ops",
     "parse_linked_issues": "vibe3.clients.github_issues_ops",
     "prune_worktrees": "vibe3.clients.git_worktree_ops",
@@ -115,6 +117,7 @@ __all__ = [
     "extract_function_names",
     "find_repo_root",
     "get_store",
+    "init_schema",
     "parse_blocked_by",
     "parse_linked_issues",
     "prune_worktrees",

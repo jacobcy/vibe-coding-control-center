@@ -8,11 +8,11 @@ def test_execution_contracts_reexport_moved_contracts() -> None:
         ExecutionRequest,
         WorktreeRequirement,
     )
-    from vibe3.models.execution_request import (
+    from vibe3.models import (
         ExecutionLaunchResult as ModelExecutionLaunchResult,
     )
-    from vibe3.models.execution_request import ExecutionRequest as ModelExecutionRequest
-    from vibe3.models.worktree import WorktreeRequirement as ModelWorktreeRequirement
+    from vibe3.models import ExecutionRequest as ModelExecutionRequest
+    from vibe3.models import WorktreeRequirement as ModelWorktreeRequirement
 
     assert ExecutionRequest is ModelExecutionRequest
     assert ExecutionLaunchResult is ModelExecutionLaunchResult
@@ -22,6 +22,6 @@ def test_execution_contracts_reexport_moved_contracts() -> None:
 def test_execution_session_service_reexports_session_role() -> None:
     """Legacy session_service SessionRole import should remain available."""
     from vibe3.execution.session_service import SessionRole
-    from vibe3.models.session_types import SessionRole as ModelSessionRole
+    from vibe3.models import SessionRole as ModelSessionRole
 
     assert SessionRole is ModelSessionRole
