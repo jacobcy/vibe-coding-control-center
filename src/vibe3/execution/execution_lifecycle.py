@@ -7,7 +7,7 @@ from typing import Any, Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions.error_severity import ErrorHandlingContract
+from vibe3.exceptions import ErrorHandlingContract
 
 ExecutionRole = Literal[
     "planner", "executor", "reviewer", "manager", "supervisor", "governance"

@@ -1,6 +1,6 @@
 """Command adapter registry for lazy loading of command job handlers.
 
-This module provides a registry that maps command types (from vibe3.models.job)
+This module provides a registry that maps command types (from vibe3.models)
 to import paths, resolving the actual callable only at execution time.
 
 Uses CommandType from the job contracts module (#2163) as the canonical
@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from vibe3.models.job import CommandType
+from vibe3.models import CommandType
 
 
 @dataclass(frozen=True)

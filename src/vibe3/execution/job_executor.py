@@ -16,8 +16,14 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.execution.execution_lifecycle import ExecutionLifecycleService, ExecutionRole
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.models.execution_request import ExecutionLaunchResult
-from vibe3.models.job import CommandType, JobContext, JobEnvelope, JobResult, JobSource
+from vibe3.models import (
+    CommandType,
+    ExecutionLaunchResult,
+    JobContext,
+    JobEnvelope,
+    JobResult,
+    JobSource,
+)
 
 if TYPE_CHECKING:
     from vibe3.execution.command_adapter import CommandAdapterRegistry

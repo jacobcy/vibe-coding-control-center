@@ -103,6 +103,52 @@ vibe3 run --publish --branch <branch-name>
 - `run` 和 `review` 默认异步执行（tmux session），用 `--no-async` 改为同步
 - 每步之间可用 `vibe3 flow show` 检查进度
 
+### 并行执行（无依赖任务）
+
+当多个任务之间没有依赖关系时，可以 3 个一组并行执行：
+
+```bash
+# Step 1: 并行 bootstrap（每个任务创建独立 flow scene）
+vibe3 internal bootstrap <issue-A> --branch dev/issue-<A> &
+vibe3 internal bootstrap <issue-B> --branch dev/issue-<B> &
+vibe3 internal bootstrap <issue-C> --branch dev/issue-<C> &
+wait
+
+# Step 2: 并行 plan
+vibe3 plan --branch <A> &
+vibe3 plan --branch <B> &
+vibe3 plan --branch <C> &
+# 等待 plan 完成后检查
+vibe3 handoff show @plan --branch <A>
+vibe3 handoff show @plan --branch <B>
+vibe3 handoff show @plan --branch <C>
+
+# Step 3: 并行 run（每个在独立 tmux session 中执行）
+vibe3 run --branch <A>
+vibe3 run --branch <B>
+vibe3 run --branch <C>
+# 等待 run 完成后检查
+vibe3 handoff show @report --branch <A>
+vibe3 handoff show @report --branch <B>
+vibe3 handoff show @report --branch <C>
+
+# Step 4: 并行 review
+vibe3 review --branch <A>
+vibe3 review --branch <B>
+vibe3 review --branch <C>
+
+# Step 5: 逐个 publish（避免 git 冲突）
+vibe3 run --publish --branch <A>
+vibe3 run --publish --branch <B>
+vibe3 run --publish --branch <C>
+```
+
+**并行注意事项**：
+- bootstrap 和 plan 可以真正并行（`&` + `wait`）
+- `run` 和 `review` 默认异步（tmux），调用后立即返回，可连续启动
+- `publish`（commit + PR）应逐个执行，避免 git 分支冲突
+- 每个任务在独立 worktree 中工作，互不干扰
+
 ## Human-Facing Workflow
 
 ### Step 1: Identify Current Flow & Task

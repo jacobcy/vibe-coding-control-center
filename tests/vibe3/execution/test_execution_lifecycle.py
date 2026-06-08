@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.execution.execution_lifecycle import (
     ExecutionLifecycleService,
     persist_execution_lifecycle_event,
@@ -50,10 +50,7 @@ class TestExecutionLifecycleSessionCleanup:
 
     def test_runtime_error_preserves_role_status(self, mock_store: MagicMock) -> None:
         """Runtime error with record_only should NOT update ANY flow state fields."""
-        from vibe3.exceptions.error_severity import (
-            ErrorHandlingContract,
-            ErrorSeverity,
-        )
+        from vibe3.exceptions import ErrorHandlingContract, ErrorSeverity
 
         error_contract = ErrorHandlingContract(
             code="E_EXEC_TIMEOUT",

@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from vibe3.services.branch_arg import resolve_branch_and_issue, resolve_branch_arg
+from vibe3.services.shared.branches import resolve_branch_and_issue, resolve_branch_arg
 
 
 class TestResolveBranchArg:

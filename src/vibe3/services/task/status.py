@@ -35,7 +35,7 @@ def fetch_task_status_data(
     """
     import time
 
-    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.config import load_orchestra_config
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.orchestra_helpers import get_manager_usernames
     from vibe3.services.orchestra_status_service import OrchestraStatusService
