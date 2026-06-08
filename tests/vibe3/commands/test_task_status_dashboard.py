@@ -583,3 +583,108 @@ def test_task_status_shows_remote_tasks_section(
         output.index("Assignee Intake:") : output.index("Ready Queue:")
     ]
     assert "# 505" not in intake_section
+
+
+@patch(
+    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    return_value=["manager-bot"],
+)
+@patch("vibe3.config.orchestra_settings.load_orchestra_config")
+@patch(
+    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+)
+@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.task.status.StatusQueryService")
+def test_human_collab_section_appears_for_dev_issue_flow(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+    mock_get_manager_usernames,
+) -> None:
+    """dev/issue-N flows should appear in Human Collaboration Flows section."""
+    mock_load_orchestra_config.return_value = _make_config_mock()
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    # Create a dev/issue-* flow
+    dev_flow = SimpleNamespace(
+        branch="dev/issue-2122",
+        flow_status="active",
+        task_issue_number=2122,
+        plan_ref=None,
+        report_ref=None,
+        latest_verdict=None,
+        pr_number=None,
+        pr_ref=None,
+    )
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 2122,
+            "title": "Dev collaboration issue",
+            "state": IssueState.IN_PROGRESS,
+            "assignee": "human-dev",
+            "flow": dev_flow,
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "remote": False,
+        },
+        {
+            "number": 303,
+            "title": "Auto task",
+            "state": IssueState.READY,
+            "assignee": "manager-bot",
+            "flow": _make_flow(303),
+            "queued": False,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "remote": False,
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+
+    # Human Collaboration Flows section should appear
+    assert "Human Collaboration Flows:" in output
+
+    # dev/issue-* flow should be in Human Collaboration section
+    assert "#2122" in output or "# 2122" in output
+    assert "Dev collaboration issue" in output
+    assert "dev/issue-2122" in output
+
+    # Auto task should still be in Issue Progress (Ready Queue)
+    assert "Ready Queue:" in output
+    assert "#303" in output or "# 303" in output
+
+    # dev/issue-* flow should NOT be in Issue Progress section
+    issue_progress_section = output[
+        output.index("Issue Progress:") : output.index("Human Collaboration Flows:")
+    ]
+    assert (
+        "#2122" not in issue_progress_section and "# 2122" not in issue_progress_section
+    )

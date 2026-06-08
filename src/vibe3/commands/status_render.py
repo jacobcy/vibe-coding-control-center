@@ -156,6 +156,28 @@ def render_supervisor_issues(supervisor_items: list[dict[str, object]]) -> None:
         console.print("  [dim](none)[/]")
 
 
+def render_human_collab_flows(
+    human_collab_items: list[dict[str, object]],
+) -> None:
+    """Render Human Collaboration Flows section (dev/issue-N branches)."""
+    console.print("\n[bold cyan]Human Collaboration Flows:[/]")
+    if human_collab_items:
+        for item in human_collab_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState | None, item["state"])
+            flow = cast(FlowStatusResponse | None, item["flow"])
+
+            state_str = state.value.upper() if state else "NO STATE"
+            display_title = title[:52] + ("..." if len(title) > 52 else "")
+            branch_str = f"[dim]branch:[/] [cyan]{flow.branch}[/]" if flow else ""
+            console.print(f"  #{number:4}  [yellow]{state_str:10}[/]  {display_title}")
+            if branch_str:
+                console.print(f"         {branch_str}")
+    else:
+        console.print("  [dim](none)[/]")
+
+
 def render_pr_ref_items(pr_ref_items: list[dict[str, object]]) -> None:
     """Render Flows with PRs section."""
     console.print("[bold cyan]Flows with PRs (Merge-Ready/Done):[/]")

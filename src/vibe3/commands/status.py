@@ -299,6 +299,7 @@ def _full_status_dashboard(
         render_blocked_items,
         render_completed_flows,
         render_epic_items,
+        render_human_collab_flows,
         render_issue_progress,
         render_missing_state_items,
         render_pr_ref_items,
@@ -342,6 +343,9 @@ def _full_status_dashboard(
 
     # Render all progress panels
     render_issue_progress(classified["bucketed_items"], data.config)
+    console.print()
+
+    render_human_collab_flows(classified["human_collab_items"])
     console.print()
 
     render_remote_items(classified["remote_items"])

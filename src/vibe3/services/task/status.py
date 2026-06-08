@@ -6,7 +6,11 @@ from typing import Any, cast
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
-from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
+from vibe3.services.status_query_service import (
+    StatusQueryService,
+    is_auto_task_branch,
+    is_dev_collab_branch,
+)
 from vibe3.services.task.classifier import TaskStatusBucket, classify_task_status
 
 
@@ -127,6 +131,14 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     return is_auto_task_branch(flow.branch)
 
 
+def _is_dev_collab_item(item: dict[str, object]) -> bool:
+    """Check if item belongs to a human-collaboration dev/issue-N flow."""
+    flow = cast(FlowStatusResponse | None, item.get("flow"))
+    if flow is None:
+        return False
+    return is_dev_collab_branch(flow.branch)
+
+
 def classify_task_issues_for_rendering(
     orchestrated_issues: list[dict[str, object]],
     config: OrchestraConfig,
@@ -202,6 +214,17 @@ def classify_task_issues_for_rendering(
         for item in waiting_for_pool_items + governed_anomaly_items
     }
 
+    # Filter human collaboration items (dev/issue-* branches)
+    human_collab_items = [
+        item
+        for item in orchestrated_issues
+        if _is_dev_collab_item(item)
+        and cast(int, item["number"]) not in supervisor_numbers
+        and cast(int, item["number"]) not in roadmap_rfc_numbers
+        and cast(int, item["number"]) not in roadmap_epic_numbers
+        and cast(int, item["number"]) not in missing_state_numbers
+    ]
+
     # Filter task progress items
     task_progress_items = [
         item
@@ -275,6 +298,7 @@ def classify_task_issues_for_rendering(
         "roadmap_epic_items": roadmap_epic_items,
         "waiting_for_pool_items": waiting_for_pool_items,
         "governed_anomaly_items": governed_anomaly_items,
+        "human_collab_items": human_collab_items,
         "task_progress_items": task_progress_items,
         "remote_items": remote_items,
         "bucketed_items": bucketed_items,
