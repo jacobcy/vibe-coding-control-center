@@ -155,6 +155,66 @@ def test_diff_summary_from_metrics():
     assert result.dependencies_removed == 0
 
 
+def test_diff_summary_from_metrics_negative_delta():
+    """Test DiffSummary.from_metrics with code shrinkage (negative delta)."""
+    baseline = StructureMetrics(
+        total_files=10,
+        total_loc=350,
+        total_functions=17,
+    )
+    current = StructureMetrics(
+        total_files=5,
+        total_loc=100,
+        total_functions=5,
+    )
+
+    result = DiffSummary.from_metrics(baseline, current)
+
+    assert result.total_loc_delta == -250  # 100 - 350
+    assert result.total_functions_delta == -12  # 5 - 17
+
+
+def test_diff_summary_add():
+    """Test DiffSummary.__add__ sums all fields correctly."""
+    a = DiffSummary(
+        files_added=1,
+        files_removed=0,
+        files_modified=2,
+        modules_added=1,
+        modules_removed=0,
+        modules_modified=1,
+        dependencies_added=1,
+        dependencies_removed=0,
+        total_loc_delta=100,
+        total_functions_delta=10,
+    )
+    b = DiffSummary(
+        files_added=0,
+        files_removed=1,
+        files_modified=1,
+        modules_added=0,
+        modules_removed=1,
+        modules_modified=0,
+        dependencies_added=0,
+        dependencies_removed=1,
+        total_loc_delta=-30,
+        total_functions_delta=-3,
+    )
+
+    result = a + b
+
+    assert result.files_added == 1
+    assert result.files_removed == 1
+    assert result.files_modified == 3
+    assert result.modules_added == 1
+    assert result.modules_removed == 1
+    assert result.modules_modified == 1
+    assert result.dependencies_added == 1
+    assert result.dependencies_removed == 1
+    assert result.total_loc_delta == 70
+    assert result.total_functions_delta == 7
+
+
 def test_compute_diff_identical_snapshots():
     """Test compute_diff with identical snapshots (zero delta edge case)."""
     snapshot = StructureSnapshot(

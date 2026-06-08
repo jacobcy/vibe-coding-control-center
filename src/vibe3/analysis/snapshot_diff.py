@@ -217,6 +217,7 @@ def compute_diff(
         module_changes, module_summary, warnings = _diff_modules(baseline, current)
         dep_changes, dep_summary = _diff_dependencies(baseline, current)
 
+        # Aggregate all sub-summaries including global metrics via __add__
         metrics_summary = DiffSummary.from_metrics(baseline.metrics, current.metrics)
         summary = file_summary + module_summary + dep_summary + metrics_summary
 
