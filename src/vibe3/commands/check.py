@@ -1,11 +1,11 @@
 """Check command implementation."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
-from rich.markup import escape
 
+from vibe3.commands.check_output import emit_check_details
 from vibe3.commands.check_support import execute_check_mode, execute_remote_check
 from vibe3.commands.common import enable_method_trace
 from vibe3.observability import setup_logging
@@ -16,142 +16,6 @@ app = typer.Typer(
     no_args_is_help=False,  # callback handles no-args case
     rich_markup_mode="rich",
 )
-
-_console = Console()
-_err_console = Console(stderr=True)
-
-
-def _emit(line: str, *, err: bool = False) -> None:
-    """Print a detail line, rendering Rich markup (typer.echo does not).
-
-    ``typer.echo`` writes raw text, so inline tags like ``[green]`` would be
-    printed literally (issue #2033). Routing through a Rich Console renders the
-    markup as colour instead.
-    """
-    console = _err_console if err else _console
-    console.print(line, highlight=False, soft_wrap=True)
-
-
-def _emit_list(label: str, items: Any, *, style: str) -> None:
-    """Emit a labelled, comma-joined list line (stdout) when non-empty.
-
-    Interpolated values are escaped so branch names never inject markup.
-    """
-    values = [str(item) for item in (items or [])]
-    if values:
-        _emit(f"  [{style}]{label}[/{style}]: {escape(', '.join(values))}")
-
-
-def _emit_failures(label: str, items: Any) -> None:
-    """Emit one stderr line per failure (red) when any are present."""
-    for failure in items or []:
-        _emit(f"  [red]{label}[/red]: {escape(str(failure))}", err=True)
-
-
-def _emit_agent_worktree_details(agent_worktrees: dict[str, Any]) -> None:
-    """Render agent worktree cleanup details."""
-    _emit_list("Agent worktrees cleaned", agent_worktrees.get("cleaned"), style="green")
-    _emit_list(
-        "Agent worktrees skipped (live)",
-        agent_worktrees.get("skipped_live"),
-        style="cyan",
-    )
-    _emit_failures("Agent worktrees failed", agent_worktrees.get("failed"))
-
-
-def _emit_remote_branch_details(remote_branches: dict[str, Any]) -> None:
-    """Render remote branch cleanup details."""
-    _emit_list("Remote branches cleaned", remote_branches.get("cleaned"), style="green")
-    _emit_list(
-        "Remote branches skipped (protected)",
-        remote_branches.get("skipped_protected"),
-        style="dim",
-    )
-    _emit_list(
-        "Remote branches skipped (open PR)",
-        remote_branches.get("skipped_pr"),
-        style="cyan",
-    )
-    _emit_failures("Remote branches failed", remote_branches.get("failed"))
-
-
-def _emit_local_branch_details(local_branches: dict[str, Any]) -> None:
-    """Render local branch cleanup details."""
-    _emit_list("Local branches cleaned", local_branches.get("cleaned"), style="green")
-    _emit_list(
-        "Local branches skipped (protected)",
-        local_branches.get("skipped_protected"),
-        style="dim",
-    )
-    _emit_list(
-        "Local branches skipped (current)",
-        local_branches.get("skipped_current"),
-        style="dim",
-    )
-    _emit_list(
-        "Local branches skipped (active/blocked flow)",
-        local_branches.get("skipped_active_flow"),
-        style="dim",
-    )
-    _emit_list(
-        "Local branches skipped (live)",
-        local_branches.get("skipped_live"),
-        style="cyan",
-    )
-    _emit_list(
-        "Local worktrees removed",
-        local_branches.get("skipped_worktree"),
-        style="cyan",
-    )
-    _emit_failures("Local branches failed", local_branches.get("failed"))
-
-
-def _emit_clean_branch_details(details: dict[str, Any]) -> None:
-    """Render --clean-branch cleanup details with rendered Rich markup."""
-    _emit_list("Cleaned", details.get("cleaned"), style="green")
-    _emit_list("Removed invalid records", details.get("removed_invalid"), style="dim")
-    _emit_failures("Failed", details.get("failed"))
-    _emit_agent_worktree_details(details.get("agent_worktrees") or {})
-    _emit_remote_branch_details(details.get("remote_branches") or {})
-    _emit_local_branch_details(details.get("local_branches") or {})
-
-
-def _emit_check_details(
-    mode: Literal["init", "fix_all", "clean_branch", "branch"],
-    details: dict[str, Any],
-    *,
-    fix_requested: bool,
-) -> None:
-    """Render mode-specific check details for CLI visibility.
-
-    Uses a Rich Console so inline markup (e.g. ``[green]``) renders as colour
-    instead of being printed literally (issue #2033).
-    """
-    if mode == "init":
-        unresolvable = details.get("unresolvable") or []
-        if unresolvable:
-            _emit(
-                f"  [yellow]Unresolvable[/yellow] ({len(unresolvable)} branches — "
-                "no linked issues found in PR body):"
-            )
-            for branch in unresolvable:
-                _emit(f"    {escape(str(branch))}")
-        return
-
-    if mode == "fix_all":
-        fixed_count = details.get("fixed", 0)
-        if fixed_count:
-            _emit(f"  [green]Fixed[/green]: {fixed_count} flows")
-        _emit_failures("Failed", details.get("failed"))
-        return
-
-    if mode == "clean_branch":
-        _emit_clean_branch_details(details)
-        return
-
-    if mode == "branch":
-        # Branch mode details are already in the summary
-        return
 
 
 @app.callback(invoke_without_command=True)
@@ -303,10 +167,10 @@ def check_local(
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
-            _emit_check_details(mode, result.details, fix_requested=True)
+            emit_check_details(mode, result.details, fix_requested=True)
         else:
             typer.echo(f"✗ {result.summary}", err=True)
-            _emit_check_details(mode, result.details, fix_requested=True)
+            emit_check_details(mode, result.details, fix_requested=True)
             raise typer.Exit(code=1)
 
         # Hint for clean-branch after regular check
@@ -422,10 +286,10 @@ def check_init(
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
-            _emit_check_details("init", result.details, fix_requested=True)
+            emit_check_details("init", result.details, fix_requested=True)
         else:
             typer.echo(f"✗ {result.summary}", err=True)
-            _emit_check_details("init", result.details, fix_requested=True)
+            emit_check_details("init", result.details, fix_requested=True)
             raise typer.Exit(code=1)
     finally:
         pass
@@ -475,10 +339,10 @@ def check_clean(
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
-            _emit_check_details("clean_branch", result.details, fix_requested=True)
+            emit_check_details("clean_branch", result.details, fix_requested=True)
         else:
             typer.echo(f"✗ {result.summary}", err=True)
-            _emit_check_details("clean_branch", result.details, fix_requested=True)
+            emit_check_details("clean_branch", result.details, fix_requested=True)
             raise typer.Exit(code=1)
     finally:
         pass
