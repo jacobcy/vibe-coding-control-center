@@ -46,3 +46,29 @@ GITHUB_FIELDS_FULL_WITH_COMMENTS: Final[tuple[str, ...]] = (
     "milestone",
     "assignees",
 )
+
+# Complete set of all valid GitHub Issue API fields (for validation)
+# Sourced from `gh issue view --help` and `gh issue list --help` JSON FIELDS sections
+GITHUB_KNOWN_ISSUE_FIELDS: Final[tuple[str, ...]] = (
+    "assignees",
+    "author",
+    "body",
+    "closed",
+    "closedAt",
+    "closedByPullRequestsReferences",
+    "comments",
+    "createdAt",
+    "id",
+    "isPinned",
+    "labels",
+    "milestone",
+    "number",
+    "projectCards",
+    "projectItems",
+    "reactionGroups",
+    "state",
+    "stateReason",
+    "title",
+    "updatedAt",
+    "url",
+)
