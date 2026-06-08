@@ -260,8 +260,8 @@ code_limits:
         limit: 650
         reason: "Error tracking 测试集，新增 9 个测试（5 个 get_all_errors_status + 4 个 _display_error_tracking），覆盖 severity 分类、threshold 计数、时间窗口逻辑、NULL severity 默认处理、历史 vs 窗口错误显示"
       - path: "tests/vibe3/services/test_task_service_fresh_db.py"
-        limit: 420
-        reason: "TaskService fresh DB 测试集，覆盖 issue 链接、角色重分类、flow 降级、ref 选择等核心业务逻辑，包含完整的 mock setup 和参数化状态转换测试，拆分会破坏测试场景完整性"
+        limit: 430
+        reason: "TaskService fresh DB 测试集，覆盖 issue 链接、角色重分类、flow 降级、ref 选择等核心业务逻辑，包含完整的 mock setup 和参数化状态转换测试，拆分会破坏测试场景完整性；更新 FakeGitHub.view_issue 添加 fields 参数支持后略微超标（+4 行）"
       - path: "tests/vibe3/commands/test_handoff_advanced_commands.py"
         limit: 420
         reason: "Handoff 高级命令测试集（从 test_handoff_commands.py 拆分），覆盖 append/plan/report/audit 命令、next step 逻辑、real service path 测试等紧密耦合场景"
