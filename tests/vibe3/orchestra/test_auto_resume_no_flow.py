@@ -24,14 +24,6 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -42,7 +34,7 @@ class TestAutoResumeNoFlowScene:
             mock_append_event,
         )
 
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         mock_label_service.transition.assert_called_once_with(
             100,
@@ -67,16 +59,8 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         # Call the function with READY issue
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Verify transition is NOT called (defensive guard)
         mock_label_service.transition.assert_not_called()
@@ -93,16 +77,8 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         # Call the function with BLOCKED issue
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Verify transition is NOT called (state machine invariant)
         mock_label_service.transition.assert_not_called()
@@ -110,7 +86,7 @@ class TestAutoResumeNoFlowScene:
     def test_auto_resume_failure_does_not_crash(
         self, make_issue_info, monkeypatch
     ) -> None:
-        """LabelService.transition() raises exception — verify log and no crash."""
+        """LabelService.transition() raises exception - verify log and no crash."""
         from vibe3.models.orchestra_config import OrchestraConfig
 
         config = OrchestraConfig(repo="owner/repo")
@@ -118,14 +94,6 @@ class TestAutoResumeNoFlowScene:
 
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock(side_effect=RuntimeError("API error"))
-
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
 
         event_calls = []
 
@@ -138,7 +106,7 @@ class TestAutoResumeNoFlowScene:
         )
 
         # Should not raise exception
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         mock_label_service.transition.assert_called_once()
 
@@ -165,14 +133,6 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -193,6 +153,7 @@ class TestAutoResumeNoFlowScene:
             flow_manager=coordinator._flow_manager,
             qualify_gate=coordinator._qualify_gate,
             supervisor_label=coordinator._config.supervisor_handoff.issue_label,
+            label_service=mock_label_service,
         )
 
         # Manager role skips branch check, so no auto-resume should be triggered
@@ -234,14 +195,6 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -262,6 +215,7 @@ class TestAutoResumeNoFlowScene:
             flow_manager=coordinator._flow_manager,
             qualify_gate=coordinator._qualify_gate,
             supervisor_label=coordinator._config.supervisor_handoff.issue_label,
+            label_service=mock_label_service,
         )
 
         # Verify auto-resume was triggered
@@ -310,14 +264,6 @@ class TestAutoResumeNoFlowScene:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -338,6 +284,7 @@ class TestAutoResumeNoFlowScene:
             flow_manager=coordinator._flow_manager,
             qualify_gate=coordinator._qualify_gate,
             supervisor_label=coordinator._config.supervisor_handoff.issue_label,
+            label_service=mock_label_service,
         )
 
         # Verify auto-resume was NOT triggered (state machine invariant)

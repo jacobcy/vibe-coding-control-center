@@ -1,48 +1,56 @@
 """Cleanup executor for expired resources (worktrees, branches)."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from vibe3.config import PeriodicCheckConfig
 from vibe3.observability import append_orchestra_event
 
+if TYPE_CHECKING:
+    from vibe3.orchestra import CleanupServiceProtocol
+
 
 async def execute_expired_resource_cleanup(
     config: PeriodicCheckConfig,
     tick_number: int,
+    cleanup_service: CleanupServiceProtocol | None = None,
 ) -> None:
     """Execute expired resource cleanup (worktrees, local/remote branches).
 
-    This function is called from HeartbeatServer's tick loop when
-    tick_number % interval_ticks == 0.
-
     Args:
-        config: Cleanup configuration (enabled flags, max_age_days, etc.)
+        config: Cleanup configuration
         tick_number: Current tick number (for logging)
+        cleanup_service: Injected cleanup service (optional, created if None)
     """
-    # Delay imports to avoid circular dependencies
-    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-    from vibe3.services import ExpiredResourceCleanupService
+    if cleanup_service is None:
+        import importlib
 
-    # Initialize services
-    store = SQLiteClient()
-    git_client = GitClient()
-    github_client: GitHubClient | None = None
+        _clients = importlib.import_module("vibe3.clients")
+        _services = importlib.import_module("vibe3.services")
 
-    # Only initialize GitHub client if remote branch cleanup is enabled
-    if config.enable_remote_branch_cleanup:
-        try:
-            github_client = GitHubClient()
-        except Exception as exc:
-            logger.bind(domain="orchestra", action="cleanup").warning(
-                "Failed to initialize GitHub client, "
-                f"skipping remote branch cleanup: {exc}"
-            )
+        store = _clients.SQLiteClient()
+        git_client = _clients.GitClient()
+        github_client = None
 
-    service = ExpiredResourceCleanupService(
-        store=store,
-        git_client=git_client,
-        github_client=github_client,
-    )
+        if config.enable_remote_branch_cleanup:
+            try:
+                github_client = _clients.GitHubClient()
+            except Exception as exc:
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    "Failed to initialize GitHub client, "
+                    f"skipping remote branch cleanup: {exc}"
+                )
+
+        cleanup_service = _services.ExpiredResourceCleanupService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+        )
+
+    service = cleanup_service
 
     # Cleanup worktrees
     if config.enable_worktree_cleanup:

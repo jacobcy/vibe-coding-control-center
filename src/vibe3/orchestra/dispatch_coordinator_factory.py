@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from vibe3.orchestra import (
@@ -14,10 +15,14 @@ from vibe3.orchestra import (
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.domain import FlowManagerProtocol, GlobalDispatchCoordinator
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
     from vibe3.models import IssueInfo, OrchestraConfig
+    from vibe3.orchestra import FlowManagerProtocol
+    from vibe3.orchestra.domain_types import (
+        CheckServiceProtocol,
+        FlowServiceProtocol,
+    )
 
 
 def create_global_dispatch_coordinator(
@@ -28,21 +33,12 @@ def create_global_dispatch_coordinator(
     store: "SQLiteClient",
     flow_manager: "FlowManagerProtocol",
     registry: "SessionRegistryService | None",
-) -> GlobalDispatchCoordinator:
+    coordinator_class: type,
+    check_service: "CheckServiceProtocol",
+    flow_service: "FlowServiceProtocol",
+    queue_filter: Callable[..., bool] | None = None,
+) -> object:
     """Create GlobalDispatchCoordinator with orchestra runtime services."""
-    # Delay imports to avoid circular dependencies
-    from vibe3.domain import GlobalDispatchCoordinator
-    from vibe3.services import CheckService, FlowService
-
-    check_service = CheckService(
-        store=store,
-        git_client=flow_manager.git,
-        github_client=github,
-    )
-    flow_blocker = FlowService(
-        store=store,
-        git_client=flow_manager.git,
-    )
 
     def flow_context_resolver(
         issue_number: int,
@@ -54,7 +50,7 @@ def create_global_dispatch_coordinator(
 
     health_check_service = DispatchHealthCheckService(
         check_service=check_service,
-        flow_blocker=flow_blocker,
+        flow_blocker=flow_service,
         store=store,
         flow_context_resolver=flow_context_resolver,
     )
@@ -65,9 +61,10 @@ def create_global_dispatch_coordinator(
         registry=registry,
         supervisor_label=config.supervisor_handoff.issue_label,
         load_issue=issue_loader,
+        queue_filter=queue_filter,
     )
 
-    return GlobalDispatchCoordinator(
+    return coordinator_class(
         config=config,
         capacity=capacity,
         github=github,

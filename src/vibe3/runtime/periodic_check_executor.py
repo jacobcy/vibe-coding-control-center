@@ -15,15 +15,19 @@ from loguru import logger
 
 from vibe3.config import PeriodicCheckConfig
 from vibe3.observability import append_orchestra_event
+from vibe3.orchestra import CheckServiceProtocol
+
+from .cleanup_executor import execute_expired_resource_cleanup
 
 if TYPE_CHECKING:
-    from vibe3.domain import CheckServiceProtocol
+    from vibe3.orchestra import CleanupServiceProtocol
 
 
 async def execute_periodic_check(
     config: PeriodicCheckConfig,
     tick_number: int,
     check_service: CheckServiceProtocol,
+    cleanup_service: CleanupServiceProtocol | None = None,
 ) -> None:
     """Execute periodic consistency check via vibe3 check.
 
@@ -40,20 +44,17 @@ async def execute_periodic_check(
     import asyncio
 
     try:
-        # Run consistency check for all active flows
         logger.bind(domain="orchestra", action="periodic_check").info(
             f"Running periodic consistency check (tick #{tick_number})"
         )
 
-        # Offload blocking I/O work to a thread to avoid blocking the event loop
         results = await asyncio.to_thread(
             check_service.verify_all_flows, ["active", "blocked"]
         )
 
-        # Summary logging
         total = len(results)
         invalid = sum(1 for r in results if not r.is_valid)
-        fixed = sum(1 for r in results if r.warnings)  # warnings = auto-fixed issues
+        fixed = sum(1 for r in results if r.warnings)
 
         if invalid > 0 or fixed > 0:
             append_orchestra_event(
@@ -83,7 +84,6 @@ async def execute_periodic_check(
         )
 
     # Phase 2: Expired resource cleanup (if enabled)
-    # Import cleanup executor to reuse existing logic
-    from .cleanup_executor import execute_expired_resource_cleanup
-
-    await execute_expired_resource_cleanup(config, tick_number)
+    await execute_expired_resource_cleanup(
+        config, tick_number, cleanup_service=cleanup_service
+    )

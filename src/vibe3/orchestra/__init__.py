@@ -14,18 +14,24 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
+    from vibe3.orchestra.domain_types import (
+        CapacityServiceProtocol,
+        CheckServiceProtocol,
+        CleanupServiceProtocol,
+        FlowManagerProtocol,
+        FlowServiceProtocol,
+        GateResult,
+        GateStatus,
+        IssueCollectionServiceProtocol,
+        LabelDispatchCallable,
+        LabelServiceProtocol,
+        QualifyGateServiceProtocol,
+        ServiceBase,
+    )
     from vibe3.orchestra.issue_loader import (
         get_flow_context,
         is_auto_task_branch,
         load_issue,
-    )
-    from vibe3.orchestra.protocols import (
-        CapacityServiceProtocol,
-        CheckServiceProtocol,
-        FlowManagerProtocol,
-        FlowServiceProtocol,
-        IssueCollectionServiceProtocol,
-        LabelDispatchCallable,
     )
     from vibe3.orchestra.queue_operations import (
         promote_progressed_entries,
@@ -52,6 +58,13 @@ _LAZY_IMPORTS: dict[str, str] = {
     "IssueCollectionServiceProtocol": "vibe3.orchestra.protocols",
     "FlowManagerProtocol": "vibe3.orchestra.protocols",
     "LabelDispatchCallable": "vibe3.orchestra.protocols",
+    # Domain types (from orchestra.domain_types)
+    "ServiceBase": "vibe3.orchestra.domain_types",
+    "GateResult": "vibe3.orchestra.domain_types",
+    "GateStatus": "vibe3.orchestra.domain_types",
+    "CleanupServiceProtocol": "vibe3.orchestra.domain_types",
+    "LabelServiceProtocol": "vibe3.orchestra.domain_types",
+    "QualifyGateServiceProtocol": "vibe3.orchestra.domain_types",
 }
 
 
@@ -81,4 +94,11 @@ __all__ = [
     "IssueCollectionServiceProtocol",
     "FlowManagerProtocol",
     "LabelDispatchCallable",
+    # Domain types
+    "ServiceBase",
+    "GateResult",
+    "GateStatus",
+    "CleanupServiceProtocol",
+    "LabelServiceProtocol",
+    "QualifyGateServiceProtocol",
 ]

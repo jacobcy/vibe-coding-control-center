@@ -53,6 +53,10 @@ class OrchestrationFacade(ServiceBase):
         flow_manager: "FlowManagerProtocol | None" = None,
         registry: "SessionRegistryService | None" = None,
         coordinator_factory: CoordinatorFactory | None = None,
+        coordinator_class: type | None = None,
+        check_service: object | None = None,
+        flow_service: object | None = None,
+        queue_filter: object | None = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -118,6 +122,10 @@ class OrchestrationFacade(ServiceBase):
                 store=actual_store,
                 flow_manager=self._flow_manager,
                 registry=self._registry,
+                coordinator_class=coordinator_class or type(None),
+                check_service=check_service,
+                flow_service=flow_service,
+                queue_filter=queue_filter,
             )
 
     def shutdown(self) -> None:

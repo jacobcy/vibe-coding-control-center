@@ -7,24 +7,24 @@ All symbols are also available from their canonical locations:
 - MAX_INTENTS_PER_TICK: vibe3.domain.dispatch_coordinator.MAX_INTENTS_PER_TICK
 """
 
-from typing import TYPE_CHECKING
+import importlib
 
 from vibe3.models import QueueEntry
 
-if TYPE_CHECKING:
-    from vibe3.domain import MAX_INTENTS_PER_TICK, GlobalDispatchCoordinator
-
 
 def __getattr__(name: str) -> object:
+    """Lazy import for backward compatibility symbols."""
     if name == "GlobalDispatchCoordinator":
-        from vibe3.domain import GlobalDispatchCoordinator
-
-        return GlobalDispatchCoordinator
+        return getattr(
+            importlib.import_module("vibe3.domain"), "GlobalDispatchCoordinator"
+        )
     if name == "MAX_INTENTS_PER_TICK":
-        from vibe3.domain import MAX_INTENTS_PER_TICK
-
-        return MAX_INTENTS_PER_TICK
+        return getattr(importlib.import_module("vibe3.domain"), "MAX_INTENTS_PER_TICK")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["GlobalDispatchCoordinator", "QueueEntry", "MAX_INTENTS_PER_TICK"]
+__all__ = [  # noqa: F822
+    "GlobalDispatchCoordinator",
+    "QueueEntry",
+    "MAX_INTENTS_PER_TICK",
+]

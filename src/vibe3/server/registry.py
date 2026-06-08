@@ -15,7 +15,12 @@ from loguru import logger
 from starlette.concurrency import run_in_threadpool
 
 from vibe3.clients import GitHubClient, SQLiteClient
-from vibe3.domain import FailedGate, FlowManager, OrchestrationFacade
+from vibe3.domain import (
+    FailedGate,
+    FlowManager,
+    GlobalDispatchCoordinator,
+    OrchestrationFacade,
+)
 from vibe3.environment import SessionRegistryService
 from vibe3.execution import CapacityService, resolve_orchestra_repo_root
 from vibe3.models import OrchestraConfig
@@ -132,12 +137,20 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
         store=shared_store,
         coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
+        coordinator_class=GlobalDispatchCoordinator,
+        check_service=None,  # created by factory
+        flow_service=None,  # created by factory
+        queue_filter=None,  # default behavior
     )
 
     heartbeat = HeartbeatServer(
-        config, failed_gate=cast(FailedGateProtocol | None, failed_gate)
+        config,
+        failed_gate=cast(FailedGateProtocol | None, failed_gate),
+        error_tracker=None,
+        check_service=None,
+        cleanup_service=None,
     )
-    heartbeat.register(facade)
+    heartbeat.register(facade)  # type: ignore[arg-type]
 
     # Combined shutdown callback for all services
     def shutdown_all() -> None:

@@ -97,6 +97,7 @@ class GlobalDispatchCoordinator:
             Callable[[], IssueCollectionServiceProtocol] | None
         ) = None,
         label_dispatcher: LabelDispatchCallable | None = None,
+        queue_filter: Callable[..., bool] | None = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -139,6 +140,7 @@ class GlobalDispatchCoordinator:
 
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
+        self._queue_filter = queue_filter
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -224,6 +226,7 @@ class GlobalDispatchCoordinator:
                     self._flow_manager,
                     self._qualify_gate,
                     self._supervisor_label,
+                    queue_filter=self._queue_filter,
                 )
                 for issue in issues:
                     if issue.number in seen_issue_numbers:

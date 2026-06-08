@@ -55,6 +55,9 @@ class HeartbeatServer:
         self,
         config: OrchestraConfig,
         failed_gate: FailedGateProtocol | None = None,
+        error_tracker: object | None = None,
+        check_service: object | None = None,
+        cleanup_service: object | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -63,6 +66,9 @@ class HeartbeatServer:
         self._running = False
         self._tick_count = 0
         self._shutdown_callback: Callable[[], object] | None = None
+        self._error_tracker: object | None = error_tracker
+        self._check_service: object | None = check_service
+        self._cleanup_service: object | None = cleanup_service
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -194,14 +200,17 @@ class HeartbeatServer:
                     continue
 
             # Cleanup old error records (maintenance)
-            # Delay import to avoid circular dependency
-            from vibe3.services import ErrorTrackingService
+            if self._error_tracker is not None:
+                error_tracking = self._error_tracker
+            else:
+                import importlib
 
-            error_tracking = ErrorTrackingService.get_instance()
+                _services = importlib.import_module("vibe3.services")
+                error_tracking = _services.ErrorTrackingService.get_instance()
 
             # Cleanup retention-based errors
             try:
-                deleted_old = error_tracking.cleanup_old_errors()
+                deleted_old = error_tracking.cleanup_old_errors()  # type: ignore[attr-defined]
             except Exception as exc:
                 append_orchestra_event(
                     "server",
@@ -223,7 +232,7 @@ class HeartbeatServer:
                     )
                     logger.bind(domain="orchestra", action="cleanup").debug(
                         f"Cleaned up {deleted_old} old error records "
-                        f"(retention={error_tracking.retention_days}d)"
+                        f"(retention={error_tracking.retention_days}d)"  # type: ignore[attr-defined]
                     )
 
             # Periodic Git ref packing to prevent stale references
@@ -314,17 +323,21 @@ class HeartbeatServer:
 
     async def _run_periodic_check(self, tick_number: int) -> None:
         """Run periodic consistency check (every N ticks)."""
-        # Delay imports to avoid circular dependencies
-        from vibe3.clients import SQLiteClient
-        from vibe3.services import CheckService
+        if self._check_service is not None:
+            check_service = self._check_service
+        else:
+            import importlib
 
-        store = SQLiteClient()
-        check_service = CheckService(store=store)
+            _clients = importlib.import_module("vibe3.clients")
+            _services = importlib.import_module("vibe3.services")
+            store = _clients.SQLiteClient()
+            check_service = _services.CheckService(store=store)
 
         await execute_periodic_check(
             self.config.periodic_check,
             tick_number,
-            check_service,
+            check_service,  # type: ignore[arg-type]
+            cleanup_service=self._cleanup_service,  # type: ignore[arg-type]
         )
 
     async def _idle_loop(self) -> None:

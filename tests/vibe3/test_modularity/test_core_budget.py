@@ -80,6 +80,9 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     "protocols": [
         "orchestra.protocols",
     ],
+    "domain_types": [
+        "orchestra.domain_types",
+    ],
     "cleanup": [
         "runtime.cleanup_executor",
     ],

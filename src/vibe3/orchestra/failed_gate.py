@@ -3,30 +3,20 @@
 Re-exports FailedGate from domain layer for legacy imports.
 All symbols are also available from their canonical locations:
 - FailedGate: vibe3.domain.failed_gate.FailedGate
-- GateResult: vibe3.domain.failed_gate.GateResult
-- GateStatus: vibe3.domain.failed_gate.GateStatus
+- GateResult: vibe3.orchestra.GateResult
+- GateStatus: vibe3.orchestra.GateStatus
 """
 
-from typing import TYPE_CHECKING
+import importlib
 
-if TYPE_CHECKING:
-    from vibe3.domain import FailedGate, GateResult, GateStatus
+from vibe3.orchestra import GateResult, GateStatus
 
 
 def __getattr__(name: str) -> object:
+    """Lazy import for backward compatibility symbols."""
     if name == "FailedGate":
-        from vibe3.domain import FailedGate
-
-        return FailedGate
-    if name == "GateResult":
-        from vibe3.domain import GateResult
-
-        return GateResult
-    if name == "GateStatus":
-        from vibe3.domain import GateStatus
-
-        return GateStatus
+        return getattr(importlib.import_module("vibe3.domain"), "FailedGate")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["FailedGate", "GateResult", "GateStatus"]
+__all__ = ["FailedGate", "GateResult", "GateStatus"]  # noqa: F822

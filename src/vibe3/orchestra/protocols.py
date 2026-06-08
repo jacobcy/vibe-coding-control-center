@@ -8,39 +8,18 @@ Note: Most protocols have been migrated to domain layer (dispatch_protocols.py).
 The definitions below are maintained for backward compatibility during migration.
 """
 
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from vibe3.clients import GitClient
 from vibe3.models import IssueInfo
 
-if TYPE_CHECKING:
-    from vibe3.domain import (
-        CapacityServiceProtocol,
-        CheckServiceProtocol,
-        FlowServiceProtocol,
-        LabelDispatchCallable,
-    )
-
-
-def __getattr__(name: str) -> object:
-    from vibe3.domain import (
-        CapacityServiceProtocol,
-        CheckServiceProtocol,
-        FlowServiceProtocol,
-        LabelDispatchCallable,
-    )
-
-    _map = {
-        "CapacityServiceProtocol": CapacityServiceProtocol,
-        "CheckServiceProtocol": CheckServiceProtocol,
-        "FlowServiceProtocol": FlowServiceProtocol,
-        "LabelDispatchCallable": LabelDispatchCallable,
-    }
-    try:
-        return _map[name]
-    except KeyError:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
+# Re-export protocols from orchestra.domain_types (KERNEL) for backward compatibility
+from vibe3.orchestra.domain_types import (
+    CapacityServiceProtocol,
+    CheckServiceProtocol,
+    FlowServiceProtocol,
+    LabelDispatchCallable,
+)
 
 __all__ = [
     "CapacityServiceProtocol",
@@ -56,44 +35,19 @@ class IssueCollectionServiceProtocol(Protocol):
     """Protocol for issue collection service operations."""
 
     def collect_open_issues(self, limit: int = 100) -> list[IssueInfo]:
-        """Collect open GitHub issues.
-
-        Args:
-            limit: Maximum number of issues to collect
-
-        Returns:
-            List of normalized IssueInfo objects
-        """
+        """Collect open GitHub issues."""
         ...
 
 
 class FlowManagerProtocol(Protocol):
-    """Protocol for flow manager operations (external consumer interface).
-
-    This protocol exposes only the methods used by external consumers,
-    not the internal service dependencies of FlowManager.
-    """
+    """Protocol for flow manager operations (external consumer interface)."""
 
     git: GitClient
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
-        """Find the latest flow for an issue.
-
-        Args:
-            issue_number: GitHub issue number
-
-        Returns:
-            Flow dict if found, None otherwise
-        """
+        """Find the latest flow for an issue."""
         ...
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict | None:
-        """Create or reuse a flow for an issue.
-
-        Args:
-            issue: IssueInfo object
-
-        Returns:
-            Flow dict if created/reused, None on failure
-        """
+        """Create or reuse a flow for an issue."""
         ...
