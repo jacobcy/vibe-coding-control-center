@@ -35,9 +35,12 @@ if TYPE_CHECKING:
         clean_error_message,
     )
     from vibe3.utils.git_helpers import (
+        find_repo_root,
         get_branch_handoff_dir,
         get_commit_message,
         get_current_branch,
+        get_git_common_dir,
+        get_remote_url,
     )
     from vibe3.utils.issue_ref import parse_issue_number, try_parse_issue_number
     from vibe3.utils.orchestra_instance import (
@@ -77,6 +80,9 @@ _LAZY_IMPORTS = {
     "get_branch_handoff_dir": "vibe3.utils.git_helpers",
     "get_commit_message": "vibe3.utils.git_helpers",
     "get_current_branch": "vibe3.utils.git_helpers",
+    "get_git_common_dir": "vibe3.utils.git_helpers",
+    "get_remote_url": "vibe3.utils.git_helpers",
+    "find_repo_root": "vibe3.utils.git_helpers",
     "normalize_actor": "vibe3.utils.actor_utils",
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
     "parse_issue_number": "vibe3.utils.issue_ref",
@@ -132,6 +138,9 @@ __all__ = [
     "get_branch_handoff_dir",
     "get_commit_message",
     "get_current_branch",
+    "get_git_common_dir",
+    "get_remote_url",
+    "find_repo_root",
     "normalize_actor",
     "OrchestraInstanceInfo",
     "parse_issue_number",

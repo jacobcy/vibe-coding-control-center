@@ -1,6 +1,5 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
-import functools
 import os
 import re
 import subprocess
@@ -87,9 +86,12 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
 
 
-@functools.lru_cache(maxsize=1)
 def find_repo_root() -> Path:
     """Resolve the main repository root deterministically.
+
+    Delegates to vibe3.utils.git_helpers.find_repo_root.
+    Kept for backward compatibility — callers should migrate to
+    vibe3.utils.find_repo_root.
 
     Never returns a linked worktree root as the main repo — that would cause
     nested-worktree creation and wrong-directory DB access.
@@ -107,41 +109,16 @@ def find_repo_root() -> Path:
     3. .git is a directory → cwd IS main repo
     4. Walk up directory tree to find .git directory
     5. Raise SystemError if not in a git repository
+
+    Returns:
+        Path to the main repository root
+
+    Raises:
+        SystemError: If not in a git repository
     """
-    # Primary: git common dir (works in both main repo and worktrees)
-    try:
-        git_common = GitClient().get_git_common_dir()
-        if git_common:
-            return Path(git_common).parent
-    except Exception:
-        pass
+    from vibe3.utils.git_helpers import find_repo_root as _find_repo_root
 
-    # Fallback: parse .git file to find main repo from worktree pointer
-    # In a worktree, .git is a file containing "gitdir: /path/.git/worktrees/name"
-    cwd = Path.cwd()
-    git_path = cwd / ".git"
-    if git_path.is_file():
-        try:
-            content = git_path.read_text().strip()
-            if content.startswith("gitdir: "):
-                raw = content[len("gitdir: ") :]
-                gitdir = Path(raw)
-                if not gitdir.is_absolute():
-                    gitdir = (cwd / gitdir).resolve()
-                return gitdir.parent.parent.parent
-        except Exception:
-            pass
-
-    # If .git is a directory, cwd IS the main repo
-    if git_path.is_dir():
-        return cwd
-
-    # Last resort: walk up to find .git directory
-    for parent in cwd.parents:
-        if (parent / ".git").is_dir():
-            return parent
-
-    raise SystemError("Cannot resolve repository root — not inside a git repository")
+    return _find_repo_root()
 
 
 class GitClientProtocol(Protocol):

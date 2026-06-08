@@ -34,7 +34,7 @@ def clear_find_repo_root_cache():
     See: https://github.com/jacobcy/vibe-coding-control-center/pull/1840
     Copilot review comment on test isolation with lru_cache.
     """
-    from vibe3.clients.git_client import find_repo_root
+    from vibe3.utils.git_helpers import find_repo_root
 
     find_repo_root.cache_clear()
     yield
