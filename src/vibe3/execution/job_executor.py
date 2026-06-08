@@ -17,17 +17,16 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.execution.execution_lifecycle import ExecutionLifecycleService, ExecutionRole
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.execution.session_service import load_session_id
 from vibe3.models.execution_request import ExecutionLaunchResult
 from vibe3.models.job import CommandType, JobContext, JobEnvelope, JobResult
-from vibe3.models.session_types import SessionRole
 
 if TYPE_CHECKING:
     from vibe3.execution.command_adapter import CommandAdapterRegistry
+    from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 
-
-# Mapping from CommandType to ExecutionRole for lifecycle events
+# Mapping from CommandType to ExecutionRole for lifecycle events.
+# Also used for SessionRole lookup since both share the same string values.
 COMMAND_TYPE_TO_EXECUTION_ROLE: dict[CommandType, ExecutionRole] = {
     CommandType.PLAN: "planner",
     CommandType.RUN: "executor",
@@ -48,15 +47,25 @@ class JobExecutor:
     codeagent-wrapper launch semantics, but calls through to existing runners.
     """
 
-    def __init__(self, registry: CommandAdapterRegistry, store: SQLiteClient) -> None:
+    def __init__(
+        self,
+        registry: CommandAdapterRegistry,
+        store: SQLiteClient,
+        coordinator: ExecutionCoordinator | None = None,
+    ) -> None:
         """Initialize executor with adapter registry and store.
 
         Args:
             registry: Command adapter registry for resolving handlers
             store: SQLite client for event persistence
+            coordinator: Optional pre-built ExecutionCoordinator for dispatch.
+                When provided, _execute_issue_role uses it instead of creating
+                a new one per invocation. When None, a coordinator is created
+                on each call (preserving the original behavior).
         """
         self._registry = registry
         self._lifecycle = ExecutionLifecycleService(store)
+        self._coordinator = coordinator
 
     def execute(self, envelope: JobEnvelope) -> JobResult:
         """Execute a job from its envelope.
@@ -90,7 +99,8 @@ class JobExecutor:
                 source=envelope.source,
             )
 
-        # Build context
+        # Build context (no premature session ID loading —
+        # session metadata comes from ExecutionLaunchResult after dispatch)
         context = self._build_context(envelope)
 
         # Record lifecycle started event
@@ -193,63 +203,37 @@ class JobExecutor:
     def _build_context(self, envelope: JobEnvelope) -> JobContext:
         """Build runtime context from envelope and environment.
 
+        Does not attempt to load session IDs — session metadata is populated
+        from ExecutionLaunchResult after dispatch, avoiding race conditions
+        with concurrent dispatches for the same branch/role.
+
         Args:
             envelope: The job envelope
 
         Returns:
-            Populated CommandContext with runtime metadata
+            Populated JobContext with runtime metadata
         """
         repo = resolve_orchestra_repo_root()
-
-        # Try to get tmux session from environment
-        tmux_session = os.environ.get("TMUX_PANE") or os.environ.get("TMUX")
-
-        # Try to load session ID
-        session_id = None
-        try:
-            # Map CommandType to SessionRole for load_session_id
-            role_mapping: dict[CommandType, SessionRole] = {
-                CommandType.PLAN: "planner",
-                CommandType.RUN: "executor",
-                CommandType.REVIEW: "reviewer",
-                CommandType.MANAGER: "manager",
-                CommandType.SUPERVISOR_APPLY: "supervisor",
-                CommandType.GOVERNANCE_SCAN: "governance",
-            }
-            session_role = role_mapping.get(envelope.command_type)
-            if session_role:
-                session_id = load_session_id(session_role, envelope.branch)
-        except Exception:
-            # Session ID may not exist for all commands
-            pass
-
-        # Derive log path from execution naming convention
-        # Note: This will be overwritten by actual launch result if available
-        log_path = None
-        if session_id:
-            log_path = (
-                f"logs/{envelope.command_type.value}-"
-                f"{envelope.issue_number}-{session_id}.log"
-            )
 
         return JobContext(
             issue_number=envelope.issue_number,
             branch=envelope.branch,
-            tmux_session=tmux_session,
-            session_id=session_id,
-            log_path=log_path,
+            tmux_session=os.environ.get("TMUX_PANE") or os.environ.get("TMUX"),
             worktree_path=(repo.worktree if hasattr(repo, "worktree") else None),
             cwd=os.getcwd(),
             repo_path=(
                 repo.repo if hasattr(repo, "repo") else str(repo) if repo else None
             ),
-            mode="async",  # Default to async mode
+            mode="async",
         )
 
     def _execute_issue_role(
         self, envelope: JobEnvelope, spec: IssueRoleSyncSpec
     ) -> ExecutionLaunchResult:
-        """Execute an issue-scoped role via run_issue_role_async.
+        """Execute an issue-scoped role via ExecutionCoordinator.
+
+        Uses the injected coordinator when available, otherwise creates one
+        per invocation (original behavior).
 
         Args:
             envelope: The job envelope
@@ -257,30 +241,50 @@ class JobExecutor:
 
         Returns:
             Execution launch result from the coordinator
-
-        Note:
-            This uses dry_run=False and provides None for optional CLI overrides.
-            The spec handles default resolution.
         """
-        # Import coordinator to get result directly
+        if self._coordinator is not None:
+            return self._dispatch_via_coordinator(self._coordinator, envelope, spec)
+
+        # Fallback: create coordinator per invocation (original behavior)
         from vibe3.agents import CodeagentBackend
-        from vibe3.config import (
-            load_orchestra_config,
-        )
+        from vibe3.config import load_orchestra_config
         from vibe3.execution.coordinator import ExecutionCoordinator
+
+        repo = resolve_orchestra_repo_root()
+        config = load_orchestra_config(target_repo=repo)
+
+        store = SQLiteClient()
+        backend_instance = CodeagentBackend()
+        coordinator = ExecutionCoordinator(config, store, backend_instance)
+
+        return self._dispatch_via_coordinator(coordinator, envelope, spec)
+
+    def _dispatch_via_coordinator(
+        self,
+        coordinator: ExecutionCoordinator,
+        envelope: JobEnvelope,
+        spec: IssueRoleSyncSpec,
+    ) -> ExecutionLaunchResult:
+        """Build async request and dispatch through coordinator.
+
+        Args:
+            coordinator: Execution coordinator to use
+            envelope: The job envelope
+            spec: The role sync spec
+
+        Returns:
+            Execution launch result
+        """
+        from vibe3.config import load_orchestra_config
         from vibe3.services import load_issue_info
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)
         issue = load_issue_info(envelope.issue_number, config=config)
 
-        store = SQLiteClient()
-        backend_instance = CodeagentBackend()
-        coordinator = ExecutionCoordinator(config, store, backend_instance)
-
-        # Build async request
-        actor = envelope.actor
-        request = spec.build_async_request(config, issue, actor, envelope.branch)
+        request = spec.build_async_request(
+            config, issue, envelope.actor, envelope.branch
+        )
         if request is None:
             return ExecutionLaunchResult(
                 launched=False,
@@ -289,10 +293,8 @@ class JobExecutor:
                 reason_code="REQUEST_BUILD_ERROR",
             )
 
-        # Dispatch execution
         try:
-            result = coordinator.dispatch_execution(request)
-            return result
+            return coordinator.dispatch_execution(request)
         except Exception as e:
             logger.exception(f"Failed to dispatch {envelope.command_type}: {e}")
             return ExecutionLaunchResult(

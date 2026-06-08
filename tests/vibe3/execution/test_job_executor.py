@@ -98,12 +98,10 @@ class TestJobExecutorInit:
 class TestBuildContext:
     """Tests for _build_context method."""
 
-    @patch("vibe3.execution.job_executor.load_session_id")
     @patch("vibe3.execution.job_executor.resolve_orchestra_repo_root")
     def test_build_context_populates_issue_and_branch(
         self,
         mock_resolve_repo: Mock,
-        mock_load_session: Mock,
         mock_store: SQLiteClient,
         test_envelope: JobEnvelope,
     ) -> None:
@@ -111,7 +109,6 @@ class TestBuildContext:
         mock_resolve_repo.return_value = Mock(
             worktree="/path/to/worktree", repo="/path/to/repo"
         )
-        mock_load_session.return_value = "session-456"
 
         registry = CommandAdapterRegistry()
         executor = JobExecutor(registry, mock_store)
@@ -121,29 +118,6 @@ class TestBuildContext:
 
         assert context.issue_number == 123
         assert context.branch == "task/issue-123-test"
-
-    @patch("vibe3.execution.job_executor.load_session_id")
-    @patch("vibe3.execution.job_executor.resolve_orchestra_repo_root")
-    def test_build_context_loads_session_id(
-        self,
-        mock_resolve_repo: Mock,
-        mock_load_session: Mock,
-        mock_store: SQLiteClient,
-        test_envelope: JobEnvelope,
-    ) -> None:
-        """Context should include session_id from load_session_id."""
-        mock_resolve_repo.return_value = Mock(worktree=None, repo=None)
-        mock_load_session.return_value = "session-789"
-
-        registry = CommandAdapterRegistry()
-        executor = JobExecutor(registry, mock_store)
-
-        with patch.object(executor, "_lifecycle", Mock()):
-            context = executor._build_context(test_envelope)
-
-        # Should call load_session_id with planner role for PLAN command
-        mock_load_session.assert_called_once_with("planner", "task/issue-123-test")
-        assert context.session_id == "session-789"
 
 
 class TestExecute:
