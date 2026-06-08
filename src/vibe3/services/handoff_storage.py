@@ -6,8 +6,11 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.clients import GitClient
-from vibe3.services.git_path_client import GitPathProtocol
-from vibe3.services.path_helpers import get_git_common_dir, normalize_ref_path
+from vibe3.services.shared.paths import (
+    GitPathProtocol,
+    get_git_common_dir,
+    normalize_ref_path,
+)
 from vibe3.utils import get_branch_handoff_dir
 
 

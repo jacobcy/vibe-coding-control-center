@@ -17,7 +17,7 @@ class TestWorkingDirectoryIndependence:
         """Verify repo root detection works from any subdirectory."""
         import os
 
-        from vibe3.services.path_helpers import get_worktree_root
+        from vibe3.services.shared.paths import get_worktree_root
 
         # Save current working directory
         original_cwd = os.getcwd()
@@ -45,7 +45,7 @@ class TestWorkingDirectoryIndependence:
         import os
 
         from vibe3.config.loader import get_config
-        from vibe3.services.path_helpers import get_worktree_root
+        from vibe3.services.shared.paths import get_worktree_root
 
         # Save current working directory
         original_cwd = os.getcwd()

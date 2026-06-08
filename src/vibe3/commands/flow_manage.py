@@ -171,7 +171,7 @@ def update(
         output_format = "json"
     from vibe3.clients.git_client import GitClient
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.branch_arg import resolve_branch_arg
+    from vibe3.services.shared.branches import resolve_branch_arg
     from vibe3.utils.issue_ref import try_parse_issue_number
 
     target_branch = resolve_branch_arg(branch)
@@ -444,7 +444,7 @@ def restore_flow(
         typer.echo("Error: Branch is required for flow restore", err=True)
         raise typer.Exit(1)
 
-    from vibe3.services.branch_arg import resolve_branch_arg
+    from vibe3.services.shared.branches import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from vibe3.exceptions import UserError
-from vibe3.services.git_path_client import GitPathProtocol
+from vibe3.services.shared.paths import GitPathProtocol
 
 
 def is_log_like_path(path: Path) -> bool:

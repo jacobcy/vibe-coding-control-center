@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import FlowEvent, FlowState, FlowStatusResponse, IssueLink
-from vibe3.services.git_path_client import GitPathProtocol, get_git_common_dir
+from vibe3.services.shared.paths import GitPathProtocol, get_git_common_dir
 
 
 class FlowReadMixin:

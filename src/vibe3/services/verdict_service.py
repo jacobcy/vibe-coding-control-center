@@ -15,8 +15,8 @@ from vibe3.clients import GitClient, SQLiteClient
 from vibe3.models import VerdictRecord, VerdictValue
 from vibe3.services.actor_support import extract_role_from_actor
 from vibe3.services.flow_service import FlowService
-from vibe3.services.git_path_client import GitPathProtocol
 from vibe3.services.handoff_storage import HandoffStorage
+from vibe3.services.shared.paths import GitPathProtocol
 from vibe3.services.signature_service import SignatureService
 
 

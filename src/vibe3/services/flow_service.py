@@ -4,7 +4,7 @@ from vibe3.clients import GitClient, SQLiteClient
 from vibe3.config import VibeConfig
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin
-from vibe3.services.git_path_client import GitPathProtocol
+from vibe3.services.shared.paths import GitPathProtocol
 
 
 class FlowService(FlowLifecycleMixin, FlowTransitionMixin):

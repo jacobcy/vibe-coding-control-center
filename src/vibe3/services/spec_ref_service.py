@@ -127,7 +127,7 @@ class SpecRefService:
             return "\n".join(parts) if parts else None
 
         if info.kind == "file" and info.file_path:
-            from vibe3.services.path_helpers import resolve_handoff_target
+            from vibe3.services.handoff_resolution import resolve_handoff_target
 
             # Use resolve_handoff_target for correct worktree path resolution
             try:
@@ -153,7 +153,7 @@ class SpecRefService:
         if issue_number is not None:
             return True, ""
 
-        from vibe3.services.path_helpers import resolve_handoff_target
+        from vibe3.services.handoff_resolution import resolve_handoff_target
 
         try:
             resolve_handoff_target(spec_ref, branch=branch)

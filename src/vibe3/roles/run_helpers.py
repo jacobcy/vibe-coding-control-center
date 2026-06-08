@@ -199,7 +199,8 @@ def ensure_plan_file_exists(
         return
     if Path(plan_file).is_absolute() and Path(plan_file).exists():
         return
-    from vibe3.services.path_helpers import resolve_handoff_target
+    # Import via public API for cross-module call (allows test patching)
+    from vibe3.services import resolve_handoff_target
 
     try:
         resolve_handoff_target(plan_file, branch=branch)
