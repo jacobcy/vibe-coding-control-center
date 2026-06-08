@@ -296,7 +296,9 @@ class TaskService:
             return
 
         config = self._get_orchestra_config()
-        issue_payload = self.github_client.view_issue(issue_number, repo=config.repo)
+        issue_payload = self.github_client.view_issue(
+            issue_number, repo=config.repo, fields=["state", "assignees"]
+        )
         if not isinstance(issue_payload, dict):
             logger.bind(
                 domain="task",

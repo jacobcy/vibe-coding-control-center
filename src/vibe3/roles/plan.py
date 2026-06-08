@@ -108,7 +108,11 @@ def _build_plan_task_guidance(
     sections: list[str] = []
 
     # Issue context
-    issue_payload = GitHubClient().view_issue(issue.number, repo=config.repo)
+    from vibe3.utils.constants import GITHUB_FIELDS_BODY_COMMENTS
+
+    issue_payload = GitHubClient().view_issue(
+        issue.number, repo=config.repo, fields=list(GITHUB_FIELDS_BODY_COMMENTS)
+    )
     if isinstance(issue_payload, dict):
         title = issue_payload.get("title")
         body = issue_payload.get("body")

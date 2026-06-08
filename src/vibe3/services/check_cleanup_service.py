@@ -370,7 +370,11 @@ class CheckCleanupService:
             from vibe3.services.label_service import LabelService
 
             gh = self._github_client or GitHubClient()
-            gh_issue = gh.view_issue(issue_number)
+            from vibe3.utils.constants import GITHUB_FIELDS_STATE_ONLY
+
+            gh_issue = gh.view_issue(
+                issue_number, fields=list(GITHUB_FIELDS_STATE_ONLY)
+            )
             if (
                 isinstance(gh_issue, dict)
                 and str(gh_issue.get("state", "")).upper() == "CLOSED"

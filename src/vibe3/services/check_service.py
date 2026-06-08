@@ -318,7 +318,12 @@ class CheckService(CheckRemote):
             orchestration_state: IssueState | None = None
             issue_payload: dict | None = None
             if task_issue:
-                issue = self.github_client.view_issue(task_issue)
+                from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
+
+                # Need state, labels, and body for state validation
+                issue = self.github_client.view_issue(
+                    task_issue, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)
+                )
                 if issue == "network_error":
                     issues.append(
                         f"Cannot verify task issue #{task_issue}: network/auth error"

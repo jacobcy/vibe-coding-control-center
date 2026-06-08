@@ -7,6 +7,7 @@ from typing import Any, cast
 from loguru import logger
 
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
+from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -65,9 +66,6 @@ def parse_linked_issues(body: str) -> list[int]:
             seen.add(n)
             result.append(n)
     return result
-
-
-_DEFAULT_VIEW_FIELDS = "number,title,body,state,updatedAt,labels,milestone,assignees"
 
 
 class IssuesMixin(IssueAdminMixin):
@@ -216,10 +214,6 @@ class IssuesMixin(IssueAdminMixin):
         ).debug("Batch fetch completed")
         return titles
 
-    _DEFAULT_VIEW_FIELDS = (
-        "number,title,body,state,updatedAt,labels,milestone,assignees"
-    )
-
     def view_issue(
         self: Any,
         issue_number: int,
@@ -248,7 +242,9 @@ class IssuesMixin(IssueAdminMixin):
         ).debug("Calling GitHub API: view_issue")
 
         fields_str = (
-            ",".join(fields) if fields is not None else self._DEFAULT_VIEW_FIELDS
+            ",".join(fields)
+            if fields is not None
+            else ",".join(GITHUB_DEFAULT_VIEW_FIELDS)
         )
         cmd = [
             "gh",

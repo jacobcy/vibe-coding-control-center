@@ -123,3 +123,44 @@ AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
 # Matches: [agent], [agent:planner], [agent:executor], [agent:custom-role]
 # Does NOT match: [agent discussion], [agent:123] (numeric suffix)
 GENERIC_AGENT_MARKER_PATTERN: Final[str] = r"\[agent(?::[a-zA-Z][a-zA-Z0-9_-]*)?\]"
+
+# =============================================================================
+# GitHub Issue Field Constants
+# =============================================================================
+
+# Default fields for view_issue - excludes expensive 'comments' field
+# Suitable for callers that need issue metadata but not comments
+GITHUB_DEFAULT_VIEW_FIELDS: Final[tuple[str, ...]] = (
+    "number",
+    "title",
+    "body",
+    "state",
+    "updatedAt",
+    "labels",
+    "milestone",
+    "assignees",
+)
+
+# Minimal field sets for specific operations
+GITHUB_FIELDS_BODY_ONLY: Final[tuple[str, ...]] = ("body",)
+GITHUB_FIELDS_STATE_ONLY: Final[tuple[str, ...]] = ("state",)
+GITHUB_FIELDS_TITLE_ONLY: Final[tuple[str, ...]] = ("title",)
+
+# Fields for operations that need body and comments
+GITHUB_FIELDS_BODY_COMMENTS: Final[tuple[str, ...]] = ("body", "comments")
+
+# Fields for operations that need comments only
+GITHUB_FIELDS_COMMENTS_ONLY: Final[tuple[str, ...]] = ("comments",)
+
+# Full field set including comments - for comprehensive issue views
+GITHUB_FIELDS_FULL_WITH_COMMENTS: Final[tuple[str, ...]] = (
+    "number",
+    "title",
+    "body",
+    "state",
+    "updatedAt",
+    "labels",
+    "comments",
+    "milestone",
+    "assignees",
+)

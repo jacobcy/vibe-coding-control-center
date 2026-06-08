@@ -241,9 +241,11 @@ class CodeagentExecutionService:
             try:
                 from vibe3.clients import GitHubClient
 
+                # Only need labels and state for state label extraction
                 issue_payload = GitHubClient().view_issue(
                     command.issue_number,
                     repo=getattr(self.config, "repo", None),
+                    fields=["labels", "state"],
                 )
                 if isinstance(issue_payload, dict):
                     # Extract state label

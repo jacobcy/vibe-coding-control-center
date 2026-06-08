@@ -131,8 +131,13 @@ def handle_manager_dispatch_intent(
                 state=target_state,
             )
         else:
+            from vibe3.utils.constants import GITHUB_DEFAULT_VIEW_FIELDS
+
             issue_data = await loop.run_in_executor(
-                None, lambda: ctx.github_client.view_issue(event.issue_number)
+                None,
+                lambda: ctx.github_client.view_issue(
+                    event.issue_number, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)
+                ),
             )
 
             if issue_data is None or isinstance(issue_data, str):
