@@ -86,6 +86,18 @@ class JobEnvelope(BaseModel):
     tick_id: int = 0
     worktree_requirement: WorktreeRequirementValue = "none"
 
+    # Dispatch mode
+    mode: Literal["sync", "async"] = "async"
+    # Sync mode uses build_sync_request, async uses build_async_request
+
+    # CLI overrides for sync runner
+    cli_overrides: dict[str, str] | None = None
+    # agent/backend/model/fresh_session overrides
+
+    # Governance-specific parameters
+    governance_tick_count: int = 0
+    governance_material_override: str | None = None
+
     model_config = {"frozen": True}
 
 

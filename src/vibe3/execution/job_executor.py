@@ -37,6 +37,52 @@ COMMAND_TYPE_TO_EXECUTION_ROLE: dict[CommandType, ExecutionRole] = {
 }
 
 
+def build_envelope_from_dispatch_params(
+    command_type: CommandType,
+    issue_number: int,
+    branch: str,
+    source: str,
+    actor: str,
+    refs: dict[str, str] | None = None,
+    mode: Literal["sync", "async"] = "async",
+    cli_overrides: dict[str, str] | None = None,
+    governance_tick_count: int = 0,
+    governance_material_override: str | None = None,
+) -> JobEnvelope:
+    """Build a JobEnvelope from common dispatch parameters.
+
+    This helper reduces boilerplate when migrating call sites that previously
+    created ExecutionRequest directly.
+
+    Args:
+        command_type: Type of command to dispatch
+        issue_number: Issue number (0 for governance)
+        branch: Target branch
+        source: Dispatch source (e.g., "cli-manual", "heartbeat-tick")
+        actor: Actor string (e.g., "agent:plan", "orchestra:governance")
+        refs: Optional refs dict (plan_ref, session_id, etc.)
+        mode: Dispatch mode ("sync" or "async")
+        cli_overrides: Optional CLI overrides for sync mode
+        governance_tick_count: Tick count for governance dispatch
+        governance_material_override: Material override for governance
+
+    Returns:
+        Populated JobEnvelope ready for dispatch
+    """
+    return JobEnvelope(
+        command_type=command_type,
+        issue_number=issue_number,
+        branch=branch,
+        source=source,  # type: ignore[arg-type]
+        actor=actor,
+        refs=refs or {},
+        mode=mode,
+        cli_overrides=cli_overrides,
+        governance_tick_count=governance_tick_count,
+        governance_material_override=governance_material_override,
+    )
+
+
 class JobExecutor:
     """Executor service for isolated async command jobs.
 
@@ -138,7 +184,11 @@ class JobExecutor:
                         f"Resolved callable for {envelope.command_type} "
                         "is not an IssueRoleSyncSpec"
                     )
-                result = self._execute_issue_role(envelope, spec)  # type: ignore[arg-type]
+                # Route based on mode
+                if envelope.mode == "sync":
+                    result = self._execute_issue_role_sync(envelope, spec)  # type: ignore[arg-type]
+                else:
+                    result = self._execute_issue_role(envelope, spec)  # type: ignore[arg-type]
 
             # Map to JobResult
             job_result = self._map_launch_result(result, envelope, context)
@@ -230,7 +280,7 @@ class JobExecutor:
     def _execute_issue_role(
         self, envelope: JobEnvelope, spec: IssueRoleSyncSpec
     ) -> ExecutionLaunchResult:
-        """Execute an issue-scoped role via ExecutionCoordinator.
+        """Execute an issue-scoped role via ExecutionCoordinator (async mode).
 
         Uses the injected coordinator when available, otherwise creates one
         per invocation (original behavior).
@@ -258,6 +308,75 @@ class JobExecutor:
         coordinator = ExecutionCoordinator(config, store, backend_instance)
 
         return self._dispatch_via_coordinator(coordinator, envelope, spec)
+
+    def _execute_issue_role_sync(
+        self, envelope: JobEnvelope, spec: IssueRoleSyncSpec
+    ) -> ExecutionLaunchResult:
+        """Execute an issue-scoped role via ExecutionCoordinator (sync mode).
+
+        Uses build_sync_request instead of build_async_request, supporting
+        flow_state, session_id, dry_run, and show_prompt parameters.
+
+        Args:
+            envelope: The job envelope
+            spec: The role sync spec
+
+        Returns:
+            Execution launch result from the coordinator
+        """
+        from vibe3.agents import CodeagentBackend
+        from vibe3.config import load_orchestra_config
+        from vibe3.execution.coordinator import ExecutionCoordinator
+        from vibe3.services import load_issue_info
+
+        repo = resolve_orchestra_repo_root()
+        config = load_orchestra_config(target_repo=repo)
+        issue = load_issue_info(envelope.issue_number, config=config)
+
+        # Get or create coordinator
+        if self._coordinator is not None:
+            coordinator = self._coordinator
+        else:
+            store = SQLiteClient()
+            backend_instance = CodeagentBackend()
+            coordinator = ExecutionCoordinator(config, store, backend_instance)
+
+        # Extract sync-specific parameters from envelope
+        flow_state = envelope.refs.get("flow_state")
+        session_id = envelope.refs.get("session_id")
+        dry_run = envelope.refs.get("dry_run", "false").lower() == "true"
+        show_prompt = envelope.refs.get("show_prompt", "false").lower() == "true"
+
+        # Build sync request
+        # Note: options and actor are derived from config and envelope
+        from vibe3.execution.issue_role_sync_runner import format_agent_actor
+
+        cli_overrides = envelope.cli_overrides or {}
+        options = spec.resolve_options(config, cli_overrides or None)
+        actor = format_agent_actor(options)
+
+        sync_request = spec.build_sync_request(
+            config,
+            issue,
+            envelope.branch,
+            flow_state,
+            session_id,
+            options,
+            actor,
+            dry_run,
+            show_prompt,
+        )
+
+        try:
+            return coordinator.dispatch_execution(sync_request)
+        except Exception as e:
+            logger.exception(f"Failed to dispatch {envelope.command_type} (sync): {e}")
+            return ExecutionLaunchResult(
+                launched=False,
+                skipped=False,
+                reason=str(e),
+                reason_code="DISPATCH_ERROR",
+            )
 
     def _dispatch_via_coordinator(
         self,
@@ -314,21 +433,84 @@ class JobExecutor:
             Execution launch result
 
         Note:
-            Governance uses run_governance_sync with injected functions.
-            For MVP, this is stubbed as governance requires different dispatch path.
+            Governance dispatch builds an ExecutionRequest that calls the CLI
+            self-invocation pattern, similar to governance_scan.py and
+            governance_sync_runner.py.
         """
-        # TODO: Implement governance execution path
-        # Governance requires run_governance_sync with injected GovernanceFunctions
-        # For now, return a placeholder result
-        logger.warning(
-            "Governance execution not yet implemented - returning skipped result"
+        from vibe3.agents import CodeagentBackend
+        from vibe3.config import load_orchestra_config
+        from vibe3.execution.coordinator import ExecutionCoordinator
+        from vibe3.execution.governance_support import GOVERNANCE_GATE_CONFIG
+        from vibe3.execution.issue_role_support import resolve_async_cli_project_root
+        from vibe3.models.execution_request import ExecutionRequest
+
+        repo = resolve_orchestra_repo_root()
+        config = load_orchestra_config(target_repo=repo)
+
+        # Build execution name and CLI self-invocation command
+        tick_count = envelope.governance_tick_count
+        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+        execution_name = f"governance-{tick_count}-{timestamp}"
+
+        command_root = resolve_async_cli_project_root(repo)
+        cmd = [
+            "uv",
+            "run",
+            "--project",
+            str(command_root),
+            "python",
+            "-I",
+            str((command_root / "src" / "vibe3" / "cli.py").resolve()),
+            "internal",
+            "governance",
+            str(tick_count),
+            str(tick_count),  # execution_count same as tick_count for CLI dispatch
+        ]
+
+        # Add material override if provided
+        if envelope.governance_material_override:
+            cmd.extend(["--material", envelope.governance_material_override])
+
+        # Build environment
+        env = dict(os.environ)
+        env["VIBE3_ASYNC_CHILD"] = "1"
+        env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+        # Force logs to be written to the target project, not the vibe repo
+        env["VIBE3_ASYNC_LOG_DIR"] = str(repo / "temp" / "logs")
+
+        # Build execution request
+        request = ExecutionRequest(
+            role="governance",
+            target_branch="governance",
+            target_id=1,
+            execution_name=execution_name,
+            cmd=cmd,
+            repo_path=str(repo),
+            env=env,
+            refs={"tick": str(tick_count)},
+            actor=envelope.actor,
+            mode="async",
+            worktree_requirement=GOVERNANCE_GATE_CONFIG,
         )
-        return ExecutionLaunchResult(
-            launched=False,
-            skipped=True,
-            reason="Governance execution not implemented in MVP",
-            reason_code="NOT_IMPLEMENTED",
-        )
+
+        # Get or create coordinator
+        if self._coordinator is not None:
+            coordinator = self._coordinator
+        else:
+            store = SQLiteClient()
+            backend_instance = CodeagentBackend()
+            coordinator = ExecutionCoordinator(config, store, backend_instance)
+
+        try:
+            return coordinator.dispatch_execution(request)
+        except Exception as e:
+            logger.exception(f"Failed to dispatch governance: {e}")
+            return ExecutionLaunchResult(
+                launched=False,
+                skipped=False,
+                reason=str(e),
+                reason_code="DISPATCH_ERROR",
+            )
 
     def _map_launch_result(
         self,
