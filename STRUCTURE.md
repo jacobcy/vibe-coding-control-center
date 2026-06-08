@@ -210,6 +210,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
+  - `services/shared/` - 跨领域公共能力（labels, paths, errors, branches）
 - `ui/` - CLI 输出格式化（Rich 渲染）
 - `utils/` - 通用工具函数（Git 辅助、分支工具、评论处理等）
 

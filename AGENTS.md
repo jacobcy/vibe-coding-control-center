@@ -85,6 +85,7 @@ This project has **two parallel implementations**:
 
 - **V2 (Shell)**: `bin/`, `lib/`, `config/shell/`
 - **V3 (Python)**: `src/vibe3/` (Support global `vibe3` command via `uv tool install -e .`)
+  - **Shared Module**: `src/vibe3/services/shared/` (Cross-domain public capability layer)
 - **V3 Hub**: `lib3/` (V3 Python 核心包装器与仓库重定向)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`

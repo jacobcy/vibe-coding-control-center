@@ -71,7 +71,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 正式术语：`Tier 2`
 - 别称：`技能层`、`编排层`、`Skill Layer`
 - 定义：负责 Flow 状态机、任务编排、Agent 执行（Plan/Run/Review）的系统层级。
-- 核心组件：Manager Role, Agent Runners, Domain Handlers, Execution Coordinator.
+- 核心组件：Manager Role, Agent Runners, Domain Handlers, Execution Coordinator, Services, Shared Module.
 - 核心命令：`flow`, `task`, `run`, `plan`, `review`
 - 对应执行等级：L3 (持久 issue-worktree)
 - 落点：详见 [CLAUDE.md](../../CLAUDE.md) §架构分层
@@ -551,7 +551,27 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 不直接持有全局状态，仅作为原子操作的代理。
 - 落点：`src/vibe3/clients/`
 
-### 7.7 `调度`
+### 7.7 Services 层
+
+- 正式术语：`Services 层`
+- 别称：`业务逻辑层`
+- 定义：负责具体的业务功能逻辑封装，如 FlowService, TaskService, PRService 等。
+- 边界：
+  - 作为 Domain 层的实现支持。
+  - 允许多个 Service 协作完成复杂用例。
+- 落点：`src/vibe3/services/`
+
+### 7.8 Shared 模块
+
+- 正式术语：`Shared 模块`
+- 别称：`公共能力层`
+- 定义：跨领域公共能力承载层。提供 labels, paths, errors, branches 等通用逻辑。
+- 边界：
+  - **严禁反向导入** domain/、execution/ 或具体角色逻辑。
+  - 必须作为纯粹的工具或公共契约存在。
+- 落点：`src/vibe3/services/shared/`
+
+### 7.9 `调度`
 
 - 正式术语：`调度`
 - 别称：无
@@ -564,7 +584,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
-### 7.8 `编排`
+### 7.10 `编排`
 
 - 正式术语：`编排`
 - 别称：无
@@ -577,7 +597,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
-### 7.9 `执行代理`
+### 7.11 `执行代理`
 
 - 正式术语：`执行代理`
 - 别称：`执行器`
@@ -593,7 +613,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
 
-### 7.10 Role Adapters (角色适配器)
+### 7.12 Role Adapters (角色适配器)
 
 - 正式术语：`Role Adapters`
 - 别称：`Skill 层`, `胶水层`
@@ -608,7 +628,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 文档中优先使用 `Role Adapters`
   - `Skill 层` 作为历史叫法保留
 
-### 7.11 Orchestra
+### 7.13 Orchestra
 
 - 正式术语：`Orchestra`
 - 别称：`Orchestrator`
@@ -627,7 +647,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - Skill: `skills/vibe-orchestra/SKILL.md`
 
 
-### 7.12 `Manager`
+### 7.14 `Manager`
 
 - 正式术语：`Manager`
 - 别称：`Execution Proxy`, `执行负责人`
@@ -642,7 +662,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - Python 模块：`src/vibe3/roles/manager.py`（Manager 角色定义）
   - Skill: `skills/vibe-manager/SKILL.md`
 
-### 7.13 `Shell 能力层`
+### 7.15 `Shell 能力层`
 
 - 正式术语：`Shell 能力层`
 - 别称：`capability layer`
@@ -658,7 +678,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - **V3 Python (`vibe3`) 是当前主能力层**，负责 flow/handoff/orchestra 逻辑
   - **V2 Shell (`vibe`) 是次要/兼容层**，负责环境初始化、密钥管理和 legacy 工具
 
-### 7.14 `共享状态真源`
+### 7.16 `共享状态真源`
 
 - 正式术语：`共享状态真源`
 - 别称：无
@@ -674,7 +694,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - `roadmap.json` 当前只按 mirror / cache / projection / backup 理解
   - 不要再用“物理真源”同时指 shell 和 JSON 文件
 
-### 7.15 `shell 命令`
+### 7.17 `shell 命令`
 
 - 正式术语：`shell 命令`
 - 别称：`vibe3 shell`, `vibe shell`
@@ -688,7 +708,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 文档和沟通中首次提及时，建议显式写成 `vibe3 flow (shell)` 这类格式
   - 优先调用 V3 命令，仅在环境管理等特定场景使用 V2 命令
 
-### 7.16 `skill 命令`
+### 7.18 `skill 命令`
 
 - 正式术语：`skill 命令`
 - 别称：`vibe skill`
@@ -699,7 +719,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 使用规则：
   - 文档和沟通中首次提及时，建议显式写成 `/vibe-save (skill)` 这类格式
 
-### 7.17 `调用面标注规则`
+### 7.19 `调用面标注规则`
 
 - 当同一段内容同时出现 shell 与 skill 能力时，首次提及必须显式标注调用面：
   - `vibe flow (shell)`
