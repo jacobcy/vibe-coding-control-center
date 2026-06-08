@@ -13,14 +13,12 @@ if TYPE_CHECKING:
     from vibe3.clients.github_issues_ops import parse_blocked_by, parse_linked_issues
     from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
     from vibe3.clients.merged_pr_cache import MergedPRCache
-    from vibe3.clients.protocols import (
-        BackendProtocol,
-        BaseResolver,
-        FlowReader,
-        GitHubClientProtocol,
-        GitPathProtocol,
-        TriggerableRoleDefinitionProtocol,
-    )
+    from vibe3.clients.protocols.backend import BackendProtocol
+    from vibe3.clients.protocols.flow import FlowReader
+    from vibe3.clients.protocols.git import GitPathProtocol
+    from vibe3.clients.protocols.github import GitHubClientProtocol
+    from vibe3.clients.protocols.pr import BaseResolver
+    from vibe3.clients.protocols.role import TriggerableRoleDefinitionProtocol
     from vibe3.clients.recent_pr_cache import RecentPRCache
     from vibe3.clients.runtime_assets import (
         check_runtime_asset,
@@ -40,21 +38,21 @@ if TYPE_CHECKING:
 _LAZY_IMPORTS = {
     "AIClient": "vibe3.clients.ai_client",
     "AISuggestionClient": "vibe3.clients.ai_suggestion_client",
-    "BackendProtocol": "vibe3.clients.protocols",
-    "BaseResolver": "vibe3.clients.protocols",
-    "FlowReader": "vibe3.clients.protocols",
+    "BackendProtocol": "vibe3.clients.protocols.backend",
+    "BaseResolver": "vibe3.clients.protocols.pr",
+    "FlowReader": "vibe3.clients.protocols.flow",
     "GhIssueLabelPort": "vibe3.clients.github_labels",
     "GitClient": "vibe3.clients.git_client",
     "GitClientProtocol": "vibe3.clients.git_client",
     "GitHubClient": "vibe3.clients.github_client",
-    "GitHubClientProtocol": "vibe3.clients.protocols",
-    "GitPathProtocol": "vibe3.clients.protocols",
+    "GitHubClientProtocol": "vibe3.clients.protocols.github",
+    "GitPathProtocol": "vibe3.clients.protocols.git",
     "IssueLabelPort": "vibe3.clients.github_labels",
     "MergedPRCache": "vibe3.clients.merged_pr_cache",
     "RecentPRCache": "vibe3.clients.recent_pr_cache",
     "SerenaClient": "vibe3.clients.serena_client",
     "SQLiteClient": "vibe3.clients.sqlite_client",
-    "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols",
+    "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols.role",
     "check_runtime_asset": "vibe3.clients.runtime_assets",
     "count_references": "vibe3.clients.serena_client",
     "extract_function_names": "vibe3.clients.serena_client",

@@ -5,7 +5,7 @@ Verifies that when coordinator does not launch, handler logs warning without err
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.domain.events import PlannerDispatchIntent
+from vibe3.domain.events.flow_lifecycle import PlannerDispatchIntent
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 
 

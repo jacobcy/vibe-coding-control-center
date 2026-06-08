@@ -299,7 +299,7 @@ def resume(
         setup_logging(verbose=2)
 
     # Register EDA event handlers
-    from vibe3.domain.handlers import register_event_handlers
+    from vibe3.domain import register_event_handlers
 
     register_event_handlers()
 

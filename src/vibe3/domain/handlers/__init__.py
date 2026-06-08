@@ -36,19 +36,3 @@ _HANDLER_MODULES = (
     _issue_state_dispatch,
     _supervisor_scan,
 )
-
-
-def register_event_handlers() -> None:
-    """Register all event handlers with the global publisher.
-
-    Note: With @register_handler decorator, handlers are registered
-    at module import time. This function exists for backward compatibility
-    and to ensure all handler modules are imported.
-
-    Registration happens automatically when modules are imported above.
-    """
-
-
-__all__ = [
-    "register_event_handlers",
-]

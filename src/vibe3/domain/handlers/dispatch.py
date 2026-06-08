@@ -13,7 +13,7 @@ from loguru import logger
 
 from vibe3.clients import get_store
 from vibe3.config import load_orchestra_config
-from vibe3.domain.events import (
+from vibe3.domain.events.flow_lifecycle import (
     ExecutorDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
