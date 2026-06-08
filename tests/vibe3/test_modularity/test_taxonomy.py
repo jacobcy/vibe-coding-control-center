@@ -257,13 +257,6 @@ class TestCategoryBoundaries:
 class TestCategoryDependencyDirection:
     """Test that dependencies follow category rules."""
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: L3 modules have cross-category imports. "
-        "runtime imports from domain/services (lazy). "
-        "execution/services import from domain/orchestra. "
-        "roles imports from domain. "
-        "Tracked by follow-up issues #2163, #2167, #2182, #2183."
-    )
     def test_category_dependency_direction(
         self, import_graph: dict[str, list[str]], module_layer_map: dict[str, int]
     ) -> None:
