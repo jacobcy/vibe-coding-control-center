@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.agents.models import CodeagentCommand
+from vibe3.agents import CodeagentCommand
 from vibe3.exceptions import AgentExecutionError
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,

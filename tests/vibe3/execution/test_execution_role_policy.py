@@ -5,13 +5,13 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
-from vibe3.models.orchestra_config import (
+from vibe3.models import (
+    AgentOptions,
     AssigneeDispatchConfig,
     GovernanceConfig,
     OrchestraConfig,
     SupervisorHandoffConfig,
 )
-from vibe3.models.review_runner import AgentOptions
 
 
 @pytest.fixture

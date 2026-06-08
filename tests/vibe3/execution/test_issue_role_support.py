@@ -9,8 +9,7 @@ from vibe3.execution.issue_role_support import (
     resolve_async_cli_project_root,
     resolve_orchestra_repo_root,
 )
-from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.models.orchestration import IssueInfo
+from vibe3.models import IssueInfo, WorktreeRequirement
 
 MAIN_REPO = Path("/test/repos/vibe-center/main")
 WORKTREE_REPO = Path("/test/repos/vibe-center/main/.worktrees/wt-dev")

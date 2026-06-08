@@ -15,7 +15,7 @@ from vibe3.models import (
     ExecutionRequest,
     IssueInfo,
 )
-from vibe3.roles.definitions import IssueRoleSyncSpec
+from vibe3.roles import IssueRoleSyncSpec
 
 
 class _FakeCapacity:

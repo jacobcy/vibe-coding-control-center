@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from vibe3.clients.sqlite_schema import init_schema
+from vibe3.clients import init_schema
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 
 
