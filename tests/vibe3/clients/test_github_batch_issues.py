@@ -24,6 +24,7 @@ class TestIssuesBatchFetch:
             state="all",
             repo=None,
             search="#123 #456",
+            fields=["number", "title"],
         )
 
     def test_batch_get_issues_includes_closed_issues_and_filters_results(self):
@@ -42,6 +43,7 @@ class TestIssuesBatchFetch:
             state="all",
             repo=None,
             search="#123",
+            fields=["number", "title"],
         )
 
     def test_batch_get_issues_empty_list(self):

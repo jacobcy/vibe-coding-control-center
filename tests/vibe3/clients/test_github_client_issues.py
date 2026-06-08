@@ -316,3 +316,68 @@ def test_list_issue_comments_failure(github_client: GitHubClient) -> None:
         result = github_client.list_issue_comments(issue_number=999)
 
         assert result == []
+
+
+def test_list_issues_default_fields_excludes_body(github_client: GitHubClient) -> None:
+    """list_issues should exclude body field by default."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps([{"number": 1, "title": "Test"}]),
+        )
+
+        github_client.list_issues()
+
+        args = mock_run.call_args[0][0]
+        json_arg = args[args.index("--json") + 1]
+        assert "body" not in json_arg
+        assert "number" in json_arg
+        assert "title" in json_arg
+
+
+def test_list_issues_custom_fields(github_client: GitHubClient) -> None:
+    """list_issues should use custom fields when provided."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps([{"number": 1, "title": "Test"}]),
+        )
+
+        github_client.list_issues(fields=["number", "title"])
+
+        args = mock_run.call_args[0][0]
+        json_arg = args[args.index("--json") + 1]
+        assert json_arg == "number,title"
+
+
+def test_list_issues_default_fields_backward_compat(
+    github_client: GitHubClient,
+) -> None:
+    """list_issues default fields should return expected shape."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                [
+                    {
+                        "number": 1,
+                        "title": "Test Issue",
+                        "state": "open",
+                        "updatedAt": "2024-01-01T00:00:00Z",
+                        "labels": [{"name": "bug"}],
+                        "assignees": [{"login": "user1"}],
+                        "milestone": {"title": "v1.0"},
+                    }
+                ]
+            ),
+        )
+
+        issues = github_client.list_issues()
+
+        assert len(issues) == 1
+        assert issues[0]["number"] == 1
+        assert issues[0]["title"] == "Test Issue"
+        assert issues[0]["state"] == "open"
+        assert "labels" in issues[0]
+        assert "assignees" in issues[0]
+        assert "milestone" in issues[0]

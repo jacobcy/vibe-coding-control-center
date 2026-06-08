@@ -20,6 +20,8 @@ _BLOCKED_BY_RE = re.compile(
     re.IGNORECASE,
 )
 
+_DEFAULT_LIST_FIELDS = "number,title,state,updatedAt,labels,assignees,milestone"
+
 
 def parse_blocked_by(body: str) -> list[int]:
     """Parse issue numbers from 'Blocked by' or 'Depends on' lines in issue body.
@@ -118,6 +120,7 @@ class IssuesMixin(IssueAdminMixin):
         repo: str | None = None,
         label: str | None = None,
         search: str | None = None,
+        fields: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -129,6 +132,8 @@ class IssuesMixin(IssueAdminMixin):
                 CLI so GitHub returns only matching issues, reducing both network
                 payload and client-side filtering work.
             search: Server-side GitHub issue search query.
+            fields: List of fields to fetch. If None, defaults to a set that
+                excludes the expensive ``body`` field.
         """
         logger.bind(
             external="github",
@@ -138,7 +143,9 @@ class IssuesMixin(IssueAdminMixin):
             assignee=assignee,
             label=label,
             search=search,
+            fields=fields,
         ).debug("Calling GitHub API: list_issues")
+        json_fields = ",".join(fields) if fields is not None else _DEFAULT_LIST_FIELDS
         cmd = [
             "gh",
             "issue",
@@ -148,7 +155,7 @@ class IssuesMixin(IssueAdminMixin):
             "--state",
             state,
             "--json",
-            "number,title,body,state,updatedAt,labels,assignees,milestone",
+            json_fields,
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
@@ -189,6 +196,7 @@ class IssuesMixin(IssueAdminMixin):
                 state="all",
                 repo=repo,
                 search=search_terms,
+                fields=["number", "title"],
             )
         except Exception as e:
             logger.bind(
