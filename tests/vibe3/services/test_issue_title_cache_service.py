@@ -72,7 +72,7 @@ class TestIssueTitleCacheService:
 
         assert title == "Fetched Title"
         assert error is False
-        mock_github.view_issue.assert_called_once_with(123)
+        mock_github.view_issue.assert_called_once_with(123, fields=["title"])
 
     def test_get_titles_batch(self, mock_store, mock_github):
         """Test batch title retrieval."""
@@ -293,7 +293,7 @@ class TestIssueTitleCacheService:
 
         # Should attempt batch first, then fallback
         mock_github.batch_get_issues.assert_called_once_with([123])
-        mock_github.view_issue.assert_called_once_with(123)
+        mock_github.view_issue.assert_called_once_with(123, fields=["title"])
 
     def test_get_titles_with_fallback_partial_batch_result_falls_back(
         self, mock_store, mock_github
@@ -326,4 +326,4 @@ class TestIssueTitleCacheService:
         assert titles["task/issue-456"] == "Fallback Title"
         assert error is False
         mock_github.batch_get_issues.assert_called_once_with([123, 456])
-        mock_github.view_issue.assert_called_once_with(456)
+        mock_github.view_issue.assert_called_once_with(456, fields=["title"])

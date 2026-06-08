@@ -327,7 +327,11 @@ class IssueTitleCacheService:
             return None, False
 
         try:
-            issue = self.github_client.view_issue(issue_number)
+            from vibe3.clients.github_field_constants import GITHUB_FIELDS_TITLE_ONLY
+
+            issue = self.github_client.view_issue(
+                issue_number, fields=list(GITHUB_FIELDS_TITLE_ONLY)
+            )
             if isinstance(issue, dict):
                 title = issue.get("title", f"Issue #{issue_number}")
                 self.update_title(branch, title)

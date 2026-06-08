@@ -64,7 +64,9 @@ class StateVerificationService:
         from vibe3.clients import GitHubClient
 
         try:
-            issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
+            issue_payload = GitHubClient().view_issue(
+                issue_number, repo=repo, fields=["labels", "state"]
+            )
         except Exception as exc:
             self._handle_github_api_failure(
                 exc, issue_number, branch, flow_state, tick_id

@@ -602,7 +602,13 @@ class QualifyGateService:
         Returns:
             True if dependency is satisfied, False otherwise
         """
-        payload = self._github.view_issue(dep_issue_number, repo=self.config.repo)
+        from vibe3.clients.github_field_constants import GITHUB_FIELDS_STATE_ONLY
+
+        payload = self._github.view_issue(
+            dep_issue_number,
+            repo=self.config.repo,
+            fields=list(GITHUB_FIELDS_STATE_ONLY),
+        )
         if not isinstance(payload, dict):
             return False
 

@@ -224,7 +224,9 @@ class IssueAdminMixin:
 
         # Check if already closed (avoid unnecessary API call)
         try:
-            issue_payload = self.view_issue(issue_number, repo=repo)  # type: ignore[attr-defined]
+            issue_payload = self.view_issue(  # type: ignore[attr-defined]
+                issue_number, repo=repo, fields=["state"]
+            )
         except (FileNotFoundError, OSError, RuntimeError) as exc:
             logger.bind(
                 external="github",

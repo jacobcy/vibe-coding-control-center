@@ -25,7 +25,11 @@ def load_issue_info(
         UserError: If issue cannot be loaded or parsed
     """
     github = github or GitHubClient()
-    payload = github.view_issue(issue_number, repo=config.repo)
+    from vibe3.clients.github_field_constants import GITHUB_DEFAULT_VIEW_FIELDS
+
+    payload = github.view_issue(
+        issue_number, repo=config.repo, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)
+    )
 
     if payload == "network_error":
         raise UserError(f"无法读取 issue #{issue_number}，请检查 GitHub 网络或认证状态")

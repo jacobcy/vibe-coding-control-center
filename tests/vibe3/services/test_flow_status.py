@@ -335,4 +335,6 @@ class TestFlowStatusResolver:
                 assert result.blocked_by_issue == 456
                 assert result.blocked_reason == "Waiting for dependency"
                 assert result.data_source == DataSource.ISSUE_BODY_FALLBACK
-                mock_github_client.view_issue.assert_called_once_with(123)
+                mock_github_client.view_issue.assert_called_once_with(
+                    123, fields=["body", "comments"]
+                )

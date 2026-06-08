@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from loguru import logger
 
+from vibe3.clients.github_field_constants import GITHUB_DEFAULT_VIEW_FIELDS
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 
 # Patterns GitHub uses to auto-close issues via PR body
@@ -214,7 +215,10 @@ class IssuesMixin(IssueAdminMixin):
         return titles
 
     def view_issue(
-        self: Any, issue_number: int, repo: str | None = None
+        self: Any,
+        issue_number: int,
+        repo: str | None = None,
+        fields: list[str] | None = None,
     ) -> "dict[str, Any] | None | str":
         """View a GitHub issue.
 
@@ -223,6 +227,8 @@ class IssuesMixin(IssueAdminMixin):
             repo: Optional ``owner/repo`` string. When provided, passes
                 ``--repo`` to ``gh`` so the correct repository is queried
                 regardless of the current working directory.
+            fields: Optional list of fields to request. If None, uses default
+                set excluding comments.
 
         Returns:
             dict: issue data on success
@@ -234,13 +240,19 @@ class IssuesMixin(IssueAdminMixin):
             operation="view_issue",
             issue_number=issue_number,
         ).debug("Calling GitHub API: view_issue")
+
+        fields_str = (
+            ",".join(fields)
+            if fields is not None
+            else ",".join(GITHUB_DEFAULT_VIEW_FIELDS)
+        )
         cmd = [
             "gh",
             "issue",
             "view",
             str(issue_number),
             "--json",
-            "number,title,body,state,updatedAt,labels,comments,milestone,assignees",
+            fields_str,
         ]
         if repo:
             cmd.extend(["--repo", repo])
@@ -290,7 +302,7 @@ class IssuesMixin(IssueAdminMixin):
         Returns:
             Issue body text, or None if not found
         """
-        result = self.view_issue(issue_number, repo=repo)
+        result = self.view_issue(issue_number, repo=repo, fields=["body"])
         if isinstance(result, dict):
             return cast(str | None, result.get("body", ""))
         return None

@@ -34,13 +34,20 @@ if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.clients.store_context import get_store
 
-# Lazy imports
+# Lazy imports (for complex dependencies and GitHub field constants)
 _LAZY_IMPORTS = {
     "AIClient": "vibe3.clients.ai_client",
     "AISuggestionClient": "vibe3.clients.ai_suggestion_client",
     "BackendProtocol": "vibe3.clients.protocols.backend",
     "BaseResolver": "vibe3.clients.protocols.pr",
     "FlowReader": "vibe3.clients.protocols.flow",
+    "GITHUB_DEFAULT_VIEW_FIELDS": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_BODY_COMMENTS": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_BODY_ONLY": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_COMMENTS_ONLY": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_FULL_WITH_COMMENTS": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_STATE_ONLY": "vibe3.clients.github_field_constants",
+    "GITHUB_FIELDS_TITLE_ONLY": "vibe3.clients.github_field_constants",
     "GhIssueLabelPort": "vibe3.clients.github_labels",
     "GitClient": "vibe3.clients.git_client",
     "GitClientProtocol": "vibe3.clients.git_client",
@@ -84,6 +91,13 @@ __all__ = [
     "BackendProtocol",
     "BaseResolver",
     "FlowReader",
+    "GITHUB_DEFAULT_VIEW_FIELDS",
+    "GITHUB_FIELDS_BODY_COMMENTS",
+    "GITHUB_FIELDS_BODY_ONLY",
+    "GITHUB_FIELDS_COMMENTS_ONLY",
+    "GITHUB_FIELDS_FULL_WITH_COMMENTS",
+    "GITHUB_FIELDS_STATE_ONLY",
+    "GITHUB_FIELDS_TITLE_ONLY",
     "GhIssueLabelPort",
     "GitClient",
     "GitClientProtocol",

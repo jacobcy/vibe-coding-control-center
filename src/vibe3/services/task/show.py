@@ -105,7 +105,20 @@ class TaskShowService:
         self, issue_number: int
     ) -> dict[str, object] | str | None:
         """Fetch issue data including comments from GitHub."""
-        return self.github_client.view_issue(issue_number)
+        return self.github_client.view_issue(
+            issue_number,
+            fields=[
+                "number",
+                "title",
+                "body",
+                "state",
+                "updatedAt",
+                "labels",
+                "comments",
+                "milestone",
+                "assignees",
+            ],
+        )
 
     def resolve_branch(
         self,

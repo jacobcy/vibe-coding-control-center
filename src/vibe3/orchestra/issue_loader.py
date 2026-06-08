@@ -56,10 +56,13 @@ def load_issue(
     issue_number: int, config: OrchestraConfig, github: "GitHubClient"
 ) -> "IssueInfo | None":
     """Load the current issue snapshot for an already-frozen issue."""
+    from vibe3.clients.github_field_constants import GITHUB_DEFAULT_VIEW_FIELDS
     from vibe3.models import IssueInfo
 
     try:
-        payload = github.view_issue(issue_number, repo=config.repo)
+        payload = github.view_issue(
+            issue_number, repo=config.repo, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)
+        )
     except Exception as exc:
         logger.bind(domain="global_dispatch", issue=issue_number).error(
             f"view_issue failed for #{issue_number}: {exc}"

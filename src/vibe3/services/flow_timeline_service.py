@@ -161,7 +161,9 @@ class FlowTimelineService:
         import re
 
         try:
-            issue_payload = self.github_client.view_issue(issue_number)
+            issue_payload = self.github_client.view_issue(
+                issue_number, fields=["comments"]
+            )
             if not isinstance(issue_payload, dict):
                 return False
 

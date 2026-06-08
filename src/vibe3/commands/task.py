@@ -189,7 +189,7 @@ def intake(
     local_manager = managers[0]
 
     client = GitHubClient()
-    issue = client.view_issue(issue_id)
+    issue = client.view_issue(issue_id, fields=["labels", "assignees", "state"])
 
     if issue is None:
         typer.echo(f"Error: Issue #{issue_id} not found.", err=True)
