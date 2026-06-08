@@ -12,7 +12,7 @@ from vibe3.roles.governance import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.execution.role_interfaces import GovernanceFunctions
+    from vibe3.execution import GovernanceFunctions
 
 
 def build_default_governance_fns() -> GovernanceFunctions:

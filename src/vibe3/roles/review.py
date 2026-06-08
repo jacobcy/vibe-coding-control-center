@@ -17,16 +17,16 @@ from vibe3.agents import (
     run_inspect_json,
 )
 from vibe3.analysis import changed_symbols
+
+# public-api: pending upstream export
 from vibe3.config import (
     REVIEWER_GATE_CONFIG,
+    RoleCliOverrides,
     VibeConfig,
     get_convention,
     load_orchestra_config,
     load_runtime_config,
 )
-
-# public-api: pending upstream export
-from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.execution import (
     CodeagentExecutionService,
     ExecutionCoordinator,
@@ -264,7 +264,7 @@ def build_review_sync_request(
     dry_run: bool,
     show_prompt: bool,
 ) -> ExecutionRequest:
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     return build_issue_review_request(
@@ -407,7 +407,7 @@ def execute_manual_review_sync(
     show_prompt: bool = False,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
-    from vibe3.execution.session_service import load_session_id
+    from vibe3.execution import load_session_id
 
     _ = flow_service
     cfg = config or VibeConfig.get_defaults()
@@ -463,8 +463,8 @@ def _dispatch_async_manual_review(
         if issue_number is not None
         else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
     )
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+    from vibe3.clients import SQLiteClient
+    from vibe3.execution import resolve_orchestra_repo_root
 
     repo_root = resolve_orchestra_repo_root()
 

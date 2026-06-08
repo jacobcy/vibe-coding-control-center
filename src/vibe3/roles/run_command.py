@@ -21,8 +21,12 @@ from vibe3.agents import (
     make_skill_context_builder,
 )
 from vibe3.clients import SQLiteClient, resolve_runtime_asset
-from vibe3.config import VibeConfig, get_resolver, load_orchestra_config
-from vibe3.config.cli_overrides import RoleCliOverrides
+from vibe3.config import (
+    RoleCliOverrides,
+    VibeConfig,
+    get_resolver,
+    load_orchestra_config,
+)
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution import (
     CodeagentExecutionService,
@@ -71,7 +75,7 @@ def dispatch_run_command_async(
     handoff_metadata: dict[str, object] | None,
 ) -> None:
     """Dispatch manual run command asynchronously through execution."""
-    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+    from vibe3.execution import resolve_orchestra_repo_root
 
     refs: dict[str, str] = {}
     if issue_number is not None:
@@ -131,7 +135,7 @@ def execute_manual_run(
     if skill:
         skill_path = resolve_skill_path(skill)
         if not skill_path:
-            from vibe3.config.convention_resolver import diagnose_profile
+            from vibe3.config import diagnose_profile
 
             detected_profile = diagnose_profile()
             raise SkillNotAvailableError(skill, profile=detected_profile)
@@ -273,7 +277,7 @@ def execute_manual_run(
             }.items()
             if v
         }
-        from vibe3.execution.prompt_meta import PromptMeta
+        from vibe3.execution import PromptMeta
 
         meta = PromptMeta(
             prompt_mode=prompt_mode,

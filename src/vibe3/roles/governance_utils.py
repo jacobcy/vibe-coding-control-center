@@ -7,18 +7,16 @@ from typing import Any
 
 from vibe3.clients import GitHubClient
 from vibe3.models import OrchestraConfig
-from vibe3.services import (
-    get_manager_usernames,
-    normalize_assignees,
-    normalize_labels,
-)
 
 # public-api: pending upstream export
-from vibe3.services.orchestra_status_service import (
+from vibe3.services import (
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
+    get_manager_usernames,
     is_running_issue,
+    normalize_assignees,
+    normalize_labels,
 )
 
 
