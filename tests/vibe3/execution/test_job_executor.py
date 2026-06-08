@@ -11,8 +11,7 @@ from vibe3.execution.job_executor import (
     COMMAND_TYPE_TO_EXECUTION_ROLE,
     JobExecutor,
 )
-from vibe3.models.execution_request import ExecutionLaunchResult
-from vibe3.models.job import CommandType, JobContext, JobEnvelope
+from vibe3.models import CommandType, ExecutionLaunchResult, JobContext, JobEnvelope
 
 
 @pytest.fixture

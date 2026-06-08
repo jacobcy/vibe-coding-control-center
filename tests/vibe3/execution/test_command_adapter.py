@@ -13,7 +13,7 @@ from vibe3.execution.command_adapter import (
     ResolvedAdapter,
     build_default_registry,
 )
-from vibe3.models.job import CommandType
+from vibe3.models import CommandType
 
 
 def test_command_type_enum():
