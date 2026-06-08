@@ -394,6 +394,19 @@ class CheckService(CheckRemote):
             flow_status = flow_data.get("flow_status", "active")
             is_active_flow = flow_status not in self.INACTIVE_FLOW_STATUSES
 
+            # Instantiate FlowRecoveryService early for use in blocked state recovery
+            # and flow consistency check
+            from vibe3.services.flow_recovery_service import (
+                FlowRecoveryService,
+                RecoveryAction,
+            )
+
+            recovery_svc = FlowRecoveryService(
+                store=self.store,
+                git_client=self.git_client,
+                github_client=self.github_client,
+            )
+
             if task_issue_closed:
                 if is_active_flow:
                     # Active flow with closed issue and no open PR = anomaly
@@ -415,10 +428,28 @@ class CheckService(CheckRemote):
                 and orchestration_state is not None
                 and orchestration_state != IssueState.BLOCKED
             ):
-                self._flow_status_service.mark_flow_unblocked(
-                    branch, "Remote state/blocked label removed"
-                )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+                try:
+                    result = recovery_svc.recover(
+                        branch=branch,
+                        issue_number=task_issue,
+                        reason="Remote state/blocked label removed",
+                        auto=True,
+                        ensure_worktree=True,
+                    )
+                    logger.info(
+                        "Auto-resumed stale blocked flow",
+                        branch=branch,
+                        action=result.action.value,
+                        detail=result.detail,
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+                except Exception as e:
+                    logger.error(
+                        "Failed to auto-resume blocked flow",
+                        branch=branch,
+                        error=str(e),
+                    )
+                    issues.append(f"Blocked flow auto-resume failed: {e}")
 
             # Handle stale ready flow rebuild
             if (
@@ -490,16 +521,6 @@ class CheckService(CheckRemote):
 
             # Flow consistency check and auto-recovery
             if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.flow_recovery_service import (
-                    FlowRecoveryService,
-                    RecoveryAction,
-                )
-
-                recovery_svc = FlowRecoveryService(
-                    store=self.store,
-                    git_client=self.git_client,
-                    github_client=self.github_client,
-                )
                 action, consistency = recovery_svc.classify(branch)
 
                 if action != RecoveryAction.RESUME_ONLY:
@@ -534,6 +555,27 @@ class CheckService(CheckRemote):
                             f"{consistency_error}. "
                             f"Auto-recovery failed: {e}. "
                             f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
+                        )
+
+            # Read-only dependency check
+            if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
+                from vibe3.services.coordination_resolver import CoordinationResolver
+
+                resolver = CoordinationResolver(store=self.store)
+                truth = resolver.resolve_coordination(branch, task_issue)
+                if truth.dependencies:
+                    unresolved = []
+                    for dep in truth.dependencies:
+                        dep_issue = self.github_client.view_issue(dep)
+                        if (
+                            not isinstance(dep_issue, dict)
+                            or dep_issue.get("state") != "closed"
+                        ):
+                            unresolved.append(dep)
+                    if unresolved:
+                        warnings.append(
+                            f"Unresolved dependencies: "
+                            f"{', '.join(f'#{d}' for d in unresolved)}"
                         )
 
             is_valid = len(issues) == 0
