@@ -18,8 +18,8 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.analysis import build_snapshot_diff_section
+from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
-from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
 from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (

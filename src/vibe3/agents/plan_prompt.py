@@ -14,8 +14,8 @@ from typing import Literal
 
 from loguru import logger
 
+from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
-from vibe3.environment import resolve_runtime_asset
 from vibe3.exceptions import VibeError
 from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (

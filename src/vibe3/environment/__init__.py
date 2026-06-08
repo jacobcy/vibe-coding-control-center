@@ -4,13 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-# Cross-module imports (not self-references)
-from vibe3.clients.runtime_assets import (
-    resolve_prompt_config,
-    resolve_runtime_asset,
-    runtime_assets_root,
-)
-
 if TYPE_CHECKING:
     from vibe3.environment.session import (
         CodeagentSessionContext,
@@ -60,7 +53,4 @@ __all__ = [
     "find_worktree_by_path",
     "find_worktree_for_branch",
     "get_manager_session_name",
-    "resolve_prompt_config",
-    "resolve_runtime_asset",
-    "runtime_assets_root",
 ]
