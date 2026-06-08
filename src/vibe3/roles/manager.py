@@ -25,6 +25,7 @@ from vibe3.exceptions import (
     CapacityDeferredError,
     DiagnosticContext,
     MissingResourceError,
+    is_transient_git_error,
 )
 from vibe3.execution import (
     ExecutionRolePolicyService,
@@ -178,11 +179,15 @@ def build_manager_request(
         # Re-raise capacity defer so handler can defer properly
         raise
     except Exception as exc:
-        # Log full exception traceback
-        logger.bind(
+        error_msg = str(exc)
+        bound_logger = logger.bind(
             domain="manager",
             issue_number=issue.number,
-        ).exception(f"create_flow_for_issue failed: {exc}")
+        )
+        if is_transient_git_error(error_msg):
+            bound_logger.warning(f"create_flow_for_issue failed (transient): {exc}")
+        else:
+            bound_logger.exception(f"create_flow_for_issue failed: {exc}")
 
         # Record to error_log table (with guard to avoid masking original error)
         try:

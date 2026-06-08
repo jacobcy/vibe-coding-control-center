@@ -1,7 +1,7 @@
 """Tests for manager role service request preparation."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -66,3 +66,62 @@ class TestManagerRoleServicePreparation:
         assert request.cmd[-2:] == ["102", "--no-async"]
         assert "VIBE3_ASYNC_CHILD" in request.env
         assert request.refs["issue_title"] == "Manager real dispatch"
+
+
+class TestTransientErrorLogging:
+    """Manager should use warning for transient git errors, exception for others."""
+
+    def test_transient_error_uses_warning(self):
+        """Git ref lock conflict should be logged as warning, not exception."""
+        issue = make_issue()
+
+        with patch(
+            "vibe3.domain.flow_manager.FlowManager.create_flow_for_issue",
+            side_effect=RuntimeError(
+                "Failed to create flow for issue #42: "
+                "Git fetch origin failed: error: cannot lock ref "
+                "'refs/remotes/origin/main': is at abc but expected def"
+            ),
+        ):
+            with patch("vibe3.roles.manager.logger") as mock_logger:
+                mock_bound = MagicMock()
+                mock_logger.bind.return_value = mock_bound
+
+                result = build_manager_dispatch_request(
+                    make_config(), issue, repo_path=Path("/tmp/repo")
+                )
+
+        assert result is None
+        mock_bound.warning.assert_called()
+        mock_bound.exception.assert_not_called()
+
+    def test_unexpected_error_uses_exception(self):
+        """Unexpected errors should still log full traceback."""
+        issue = make_issue()
+
+        with patch(
+            "vibe3.domain.flow_manager.FlowManager.create_flow_for_issue",
+            side_effect=RuntimeError("Database connection refused"),
+        ):
+            with patch("vibe3.roles.manager.logger") as mock_logger:
+                mock_bound = MagicMock()
+                mock_logger.bind.return_value = mock_bound
+
+                result = build_manager_dispatch_request(
+                    make_config(), issue, repo_path=Path("/tmp/repo")
+                )
+
+        assert result is None
+        mock_bound.exception.assert_called()
+        mock_bound.warning.assert_not_called()
+
+    def test_is_transient_git_error_patterns(self):
+        """Unit test for classification logic."""
+        from vibe3.exceptions import is_transient_git_error
+
+        assert is_transient_git_error(
+            "error: cannot lock ref 'refs/remotes/origin/main'"
+        )
+        assert is_transient_git_error("fatal: unable to update local ref")
+        assert not is_transient_git_error("Database connection refused")
+        assert not is_transient_git_error("Permission denied")

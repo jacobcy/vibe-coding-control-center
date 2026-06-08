@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# Direct imports for git_error_patterns (no circular dependency)
+from vibe3.exceptions.git_error_patterns import (
+    TRANSIENT_GIT_ERROR_PATTERNS,
+    is_transient_git_error,
+)
+
 if TYPE_CHECKING:
     from vibe3.exceptions.error_classification import (
         classify_error_hybrid,
@@ -270,6 +276,7 @@ __all__ = [
     "MissingResourceError",
     "ModelsJsonSyncError",
     "PRNotFoundError",
+    "TRANSIENT_GIT_ERROR_PATTERNS",
     "SerenaError",
     "SkillNotAvailableError",
     "SystemError",
@@ -279,4 +286,5 @@ __all__ = [
     "get_error_handling_contract",
     "is_api_error",
     "is_model_error",
+    "is_transient_git_error",
 ]
