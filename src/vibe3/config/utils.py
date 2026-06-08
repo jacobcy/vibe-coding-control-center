@@ -1,8 +1,11 @@
-"""Shared utilities for configuration processing."""
+"""Variable expansion utilities for YAML configuration dictionaries."""
 
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
+
+_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
+_MAX_EXPANSION_ITERATIONS = 10  # Prevent infinite loops from circular ${} references
 
 
 def expand_config_variables(
@@ -25,36 +28,25 @@ def expand_config_variables(
     if context is None:
         context = config
 
+    def replace_var(match: re.Match[str]) -> str:
+        var_path = match.group(1)
+        current: Any = context
+        for part in var_path.split("."):
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return match.group(0)
+        return str(current) if not isinstance(current, dict) else match.group(0)
+
     def expand_value(value: Any, ctx: dict[str, Any]) -> Any:
         if isinstance(value, str):
-            # Expand ${...} variable references iteratively
             expanded = value
-            max_iterations = 10  # Prevent infinite loops
-            for _ in range(max_iterations):
-                pattern = r"\$\{([^}]+)\}"
-
-                def replace_var(match: re.Match[str]) -> str:
-                    var_path = match.group(1)
-                    # Navigate to referenced value
-                    current: Any = ctx
-                    for part in var_path.split("."):
-                        if isinstance(current, dict) and part in current:
-                            current = current[part]
-                        else:
-                            # Variable not found, keep original reference
-                            return match.group(0)
-                    return (
-                        str(current)
-                        if not isinstance(current, dict)
-                        else match.group(0)
-                    )
-
-                new_expanded = re.sub(pattern, replace_var, expanded)
+            for _ in range(_MAX_EXPANSION_ITERATIONS):
+                new_expanded = _VAR_PATTERN.sub(replace_var, expanded)
                 if new_expanded == expanded:
-                    break  # No more changes, reached fixpoint
+                    break
                 expanded = new_expanded
 
-            # Expand ~ to home directory for path values
             if expanded.startswith("~") or "/~" in expanded:
                 expanded = str(Path(expanded).expanduser())
 
@@ -64,4 +56,4 @@ def expand_config_variables(
         else:
             return value
 
-    return cast(dict, expand_value(config, context))
+    return expand_value(config, context)  # type: ignore[no-any-return]

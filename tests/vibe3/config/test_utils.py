@@ -29,13 +29,11 @@ class TestExpandConfigVariables:
         assert result["final"] == "/tmp/sub/file.txt"
 
     def test_expand_cycle_detection(self) -> None:
-        """Circular references terminate without hanging; both keys present."""
+        """Circular references terminate without hanging; values stay unresolved."""
         config = {"a": "${b}", "b": "${a}"}
         result = expand_config_variables(config)
-        # Should not hang; both keys should still be present
-        assert "a" in result
-        assert "b" in result
-        # Both should be unresolved since they reference each other
+        assert result["a"] == "${b}"
+        assert result["b"] == "${a}"
 
     def test_expand_missing_variable(self) -> None:
         """Unresolvable references keep original string."""
