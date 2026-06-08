@@ -6,11 +6,12 @@
 
 **接收来源**：
 - 显式创建的 supervisor issue
-- 从 assignee-pool 或 manager 路由过来的简单测试任务（agent 判断只涉及测试修改、工作量小）
+- 从 assignee-pool 或 manager 路由过来的简单测试任务（agent 判断只涉及测试修改、≤ 5 文件、≤ 100 行、不涉及业务代码；路由时原 issue 会添加 `supervisor` 标签，视同 supervisor issue 处理）
 
 **允许范围**（supervisor apply 可执行）：
 - 文档治理（更新、校正、格式修复、语义对齐）
 - 测试修补治理（仅限测试文件、测试夹具、测试文案、过期测试清理）
+  - **路由任务注意**：如果执行中发现任务实际超出测试范围、需要修改业务代码，应停止并在 supervisor issue 上 comment 说明，请求转回 task issue，不得自行扩大范围
 - supervisor issue 操作：label、comment、close、recreate
 - 安排 supervisor 任务（创建 supervisor issue）
 
