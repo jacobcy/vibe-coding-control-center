@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     from vibe3.observability.trace_method import (
         set_trace_max_lines,
         set_trace_min_ms,
-        trace_method,
     )
 
 # Lazy imports (using absolute module paths)
@@ -90,5 +89,4 @@ __all__ = [
     "set_trace_max_lines",
     "set_trace_min_ms",
     "setup_logging",
-    "trace_method",
 ]
