@@ -438,9 +438,8 @@ class JobExecutor:
             governance_sync_runner.py.
         """
         from vibe3.agents import CodeagentBackend
-        from vibe3.config import load_orchestra_config
+        from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
         from vibe3.execution.coordinator import ExecutionCoordinator
-        from vibe3.execution.governance_support import GOVERNANCE_GATE_CONFIG
         from vibe3.execution.issue_role_support import resolve_async_cli_project_root
         from vibe3.models.execution_request import ExecutionRequest
 
@@ -464,7 +463,6 @@ class JobExecutor:
             "internal",
             "governance",
             str(tick_count),
-            str(tick_count),  # execution_count same as tick_count for CLI dispatch
         ]
 
         # Add material override if provided
