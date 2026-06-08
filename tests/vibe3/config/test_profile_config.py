@@ -22,7 +22,7 @@ def test_profile_config_minimal_returns_none() -> None:
 
 def test_convention_resolver_gets_policy_path() -> None:
     """Test ConventionResolver can resolve policy paths."""
-    resolver = ConventionResolver(profile="vibe-center")
+    resolver = ConventionResolver(profile="vibe-center", _adapter_resolver=get_adapter)
     path = resolver.get_policy_path("common")
     assert path == "supervisor/policies/common.md"
 

@@ -3,18 +3,20 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe3.adapters.vibe_center import VIBE_CENTER_ADAPTER
+from vibe3.adapters import get_adapter
 
 
 def test_vibe_center_adapter_exists():
     """Test Vibe Center adapter is defined."""
-    assert VIBE_CENTER_ADAPTER is not None
-    assert VIBE_CENTER_ADAPTER.name == "vibe-center"
+    adapter = get_adapter("vibe-center")
+    assert adapter is not None
+    assert adapter.name == "vibe-center"
 
 
 def test_vibe_center_adapter_has_policies():
     """Test Vibe Center adapter declares policies."""
-    policies = VIBE_CENTER_ADAPTER.get_resources_by_type("policy")
+    adapter = get_adapter("vibe-center")
+    policies = adapter.get_resources_by_type("policy")
     policy_names = {p.name for p in policies}
 
     # Must have core policies
@@ -26,14 +28,16 @@ def test_vibe_center_adapter_has_policies():
 
 def test_vibe_center_adapter_has_supervisor():
     """Test Vibe Center adapter declares supervisor template."""
-    supervisor = VIBE_CENTER_ADAPTER.get_resource("supervisor", "apply")
+    adapter = get_adapter("vibe-center")
+    supervisor = adapter.get_resource("supervisor", "apply")
     assert supervisor is not None
     assert supervisor.path == "supervisor/apply.md"
 
 
 def test_vibe_center_adapter_skills_nonempty():
     """Test Vibe Center adapter declares some skills."""
-    skills = VIBE_CENTER_ADAPTER.get_resources_by_type("skill")
+    adapter = get_adapter("vibe-center")
+    skills = adapter.get_resources_by_type("skill")
     assert len(skills) > 0
 
     # At least vibe-commit should be present
@@ -72,8 +76,11 @@ def test_vibe_center_adapter_global_skills_fallback():
 
                 mock_runtime_root.return_value = mock_global
 
-                # Rebuild manifest
-                manifest = _build_vibe_center_manifest()
+                # Rebuild manifest with parameters
+                manifest = _build_vibe_center_manifest(
+                    git_common_dir=None,
+                    global_skills=skills_dir,
+                )
                 skills = manifest.get_resources_by_type("skill")
 
                 # Should find test-skill from global fallback

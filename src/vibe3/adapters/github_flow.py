@@ -1,15 +1,21 @@
 """GitHub Flow adapter — lightweight skill distribution from global runtime."""
 
-from vibe3.adapters import register_adapter
-from vibe3.clients.runtime_assets import runtime_assets_root
+from pathlib import Path
+
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 
 
-def _build_github_flow_manifest() -> AdapterManifest:
-    """Build GitHub Flow adapter manifest from global ~/.vibe/skills resources."""
+def _build_github_flow_manifest(global_skills: Path | None = None) -> AdapterManifest:
+    """Build GitHub Flow adapter manifest from global ~/.vibe/skills resources.
+
+    Args:
+        global_skills: Path to global skills directory (from runtime_assets_root)
+
+    Returns:
+        AdapterManifest with all GitHub Flow skills
+    """
     resources: list[AdapterResource] = []
-    global_skills = runtime_assets_root() / "skills"
-    if global_skills.exists():
+    if global_skills and global_skills.exists():
         for skill_path in global_skills.iterdir():
             if skill_path.is_dir():
                 skill_md = skill_path / "SKILL.md"
@@ -28,7 +34,3 @@ def _build_github_flow_manifest() -> AdapterManifest:
         description="Lightweight skill distribution from global ~/.vibe runtime",
         resources=resources,
     )
-
-
-GITHUB_FLOW_ADAPTER = _build_github_flow_manifest()
-register_adapter(GITHUB_FLOW_ADAPTER)

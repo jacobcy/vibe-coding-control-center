@@ -13,19 +13,19 @@ from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
 _SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _build_vibe_center_manifest() -> AdapterManifest:
+def _build_vibe_center_manifest(
+    git_common_dir: str | None = None,
+    global_skills: Path | None = None,
+) -> AdapterManifest:
     """Build Vibe Center adapter manifest from actual repo resources.
 
-    Uses GitClient to find repo root, ensuring correct resource discovery
-    regardless of current working directory.
-    """
-    from vibe3.clients.git_client import GitClient
+    Args:
+        git_common_dir: Git common directory path (from GitClient)
+        global_skills: Path to global skills directory (from runtime_assets_root)
 
-    git_common_dir = None
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-    except Exception:
-        pass
+    Returns:
+        AdapterManifest with all Vibe Center resources
+    """
 
     repo_root = resolve_resource_root(
         required_marker="skills",
@@ -82,13 +82,13 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    from vibe3.clients.runtime_assets import runtime_assets_root
-
     skills_dirs = [repo_root / "skills"]
-    global_skills = runtime_assets_root() / "skills"
-    if global_skills.exists() and global_skills.resolve() not in [
-        d.resolve() for d in skills_dirs if d.exists()
-    ]:
+    if (
+        global_skills
+        and global_skills.exists()
+        and global_skills.resolve()
+        not in [d.resolve() for d in skills_dirs if d.exists()]
+    ):
         skills_dirs.append(global_skills)
 
     for skills_dir in skills_dirs:
@@ -134,13 +134,3 @@ def _build_vibe_center_manifest() -> AdapterManifest:
         ),
         resources=resources,
     )
-
-
-# Build and register
-VIBE_CENTER_ADAPTER = _build_vibe_center_manifest()
-
-# Self-register with parent module on import (avoids circular import)
-from . import _ADAPTERS, _LOADED  # noqa: E402
-
-_ADAPTERS[VIBE_CENTER_ADAPTER.name] = VIBE_CENTER_ADAPTER
-_LOADED.add(VIBE_CENTER_ADAPTER.name)
