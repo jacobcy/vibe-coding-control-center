@@ -91,6 +91,10 @@ if TYPE_CHECKING:
         generate_score_report,
     )
     from vibe3.services.pr.service import PRService
+    from vibe3.services.remote_label_check_service import (
+        RemoteLabelCheckResult,
+        RemoteLabelCheckService,
+    )
     from vibe3.services.role_policy_helpers import get_role_block_function
     from vibe3.services.serve_status_service import ServeStatusService
     from vibe3.services.shared.branches import (
@@ -178,6 +182,8 @@ __all__ = [
     "PRService",
     "PrReadyAbortedError",
     "PrReadyUsecase",
+    "RemoteLabelCheckResult",
+    "RemoteLabelCheckService",
     "ServeStatusService",
     "SignatureService",
     "SpecRefService",
@@ -282,6 +288,8 @@ _SYMBOL_MODULES = {
     "PRService": "vibe3.services.pr.service",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
+    "RemoteLabelCheckResult": "vibe3.services.remote_label_check_service",
+    "RemoteLabelCheckService": "vibe3.services.remote_label_check_service",
     "ServeStatusService": "vibe3.services.serve_status_service",
     "SignatureService": "vibe3.services.signature_service",
     "SpecRefService": "vibe3.services.spec_ref_service",

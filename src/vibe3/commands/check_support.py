@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import typer
 from rich.progress import (
@@ -13,6 +13,9 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
+
+if TYPE_CHECKING:
+    from vibe3.services import RemoteLabelCheckResult
 
 from vibe3.services import CheckResult, CheckService, InitResult
 
@@ -261,3 +264,33 @@ def execute_check_mode(
         ),
         details={"issues": default_result.issues},
     )
+
+
+def execute_remote_check(
+    *,
+    dry_run: bool = False,
+) -> RemoteLabelCheckResult:
+    """Execute remote label consistency check.
+
+    Args:
+        dry_run: If True, only report changes without applying them
+
+    Returns:
+        RemoteLabelCheckResult with all issues found
+    """
+    from vibe3.clients import GhIssueLabelPort, GitHubClient, SQLiteClient
+    from vibe3.config import load_orchestra_config
+    from vibe3.services import RemoteLabelCheckService
+    from vibe3.services.orchestra_helpers import get_manager_usernames
+
+    config = load_orchestra_config()
+    manager_usernames = get_manager_usernames(config)
+
+    service = RemoteLabelCheckService(
+        github_client=GitHubClient(),
+        store=SQLiteClient(),
+        label_port=GhIssueLabelPort(repo=config.repo),
+        manager_usernames=manager_usernames,
+    )
+
+    return service.check(dry_run=dry_run)
