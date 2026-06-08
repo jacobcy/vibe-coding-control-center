@@ -6,7 +6,7 @@ import typer
 
 if TYPE_CHECKING:
     from vibe3.config import VibeConfig
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services import FlowService
 
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
@@ -88,8 +88,7 @@ def load_config_and_validate_model(
         typer.Exit: If config loading fails or --model used without backend
         ConfigError: If config loading fails
     """
-    from vibe3.config import load_runtime_config
-    from vibe3.config.cli_overrides import build_role_cli_overrides
+    from vibe3.config import build_role_cli_overrides, load_runtime_config
     from vibe3.exceptions import ConfigError
 
     cli_overrides = build_role_cli_overrides(role, agent, backend, model)
@@ -180,7 +179,7 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
         typer.Exit: If on main branch or flow creation fails
     """
     from vibe3.models.flow import MainBranchProtectedError
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services import FlowService
 
     flow_service = FlowService()
     branch = flow_service.get_current_branch()

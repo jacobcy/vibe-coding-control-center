@@ -8,12 +8,12 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.config import load_orchestra_config
 from vibe3.services import (
+    FlowRebuildUsecase,
     FlowService,
     load_issue_info,
     resolve_branch_and_issue,
     resolve_branch_arg,
 )
-from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
 
 
 def blocked(
@@ -177,7 +177,7 @@ def rebuild(
         )
         return
 
-    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients import GitHubClient
 
     config = load_orchestra_config()
     issue = load_issue_info(issue_number, config=config, github=GitHubClient())

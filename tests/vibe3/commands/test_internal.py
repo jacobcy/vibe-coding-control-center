@@ -167,9 +167,7 @@ def test_internal_bootstrap_dispatch() -> None:
         with patch("vibe3.clients.sqlite_client.SQLiteClient"):
             with patch("vibe3.clients.git_client.GitClient"):
                 with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
-                    with patch(
-                        "vibe3.services.flow_orchestrator_service.FlowOrchestratorService"
-                    ) as service_cls:
+                    with patch("vibe3.services.FlowOrchestratorService") as service_cls:
                         github = MagicMock()
                         github.view_issue.return_value = issue_payload
                         github_cls.return_value = github

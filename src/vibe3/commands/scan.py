@@ -27,7 +27,7 @@ def _execute_governance_internal(material_override: str | None = None) -> None:
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.roles.scan_service import dispatch_governance_execution
+    from vibe3.roles import dispatch_governance_execution
 
     dispatch_governance_execution(material_override=material_override)
 
@@ -49,7 +49,7 @@ def _run_governance_scan(
         logger.bind(domain="orchestra").info("Governance scan completed")
     else:
         from vibe3.execution.governance_sync_runner import run_governance_async
-        from vibe3.roles.governance import build_governance_execution_name
+        from vibe3.roles import build_governance_execution_name
 
         run_governance_async(
             tick_count=0,
@@ -69,7 +69,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
     from vibe3.observability import append_governance_event
-    from vibe3.roles.governance_factory import build_default_governance_fns
+    from vibe3.roles import build_default_governance_fns
 
     # Call internal governance runner with dry_run=True
     # This uses real snapshot instead of synthetic dry-run context
@@ -93,7 +93,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
-    from vibe3.roles.scan_service import (
+    from vibe3.roles import (
         dispatch_supervisor_execution,
         fetch_supervisor_candidates,
     )
@@ -120,9 +120,9 @@ def _run_supervisor_scan_dry_run() -> None:
     """
     from rich.console import Console
 
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.roles.scan_service import fetch_supervisor_candidates
+    from vibe3.clients import GitHubClient
+    from vibe3.config import load_orchestra_config
+    from vibe3.roles import fetch_supervisor_candidates
     from vibe3.ui.scan_display import display_supervisor_dry_run
 
     console = Console()
@@ -175,7 +175,7 @@ def governance(
     """
     from rich.console import Console
 
-    from vibe3.roles.scan_service import (
+    from vibe3.roles import (
         get_available_governance_materials,
         governance_material_exists,
         list_governance_materials,

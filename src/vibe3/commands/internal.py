@@ -41,7 +41,7 @@ def internal_manager_dispatch(
         run_issue_role_async,
         run_issue_role_sync,
     )
-    from vibe3.roles.manager import MANAGER_SYNC_SPEC
+    from vibe3.roles import MANAGER_SYNC_SPEC
 
     if no_async:
         run_issue_role_sync(
@@ -73,7 +73,7 @@ def internal_apply_dispatch(
     ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
-    from vibe3.roles.scan_service import dispatch_supervisor_execution
+    from vibe3.roles import dispatch_supervisor_execution
 
     dispatch_supervisor_execution(issue_number=issue, no_async=no_async)
 
@@ -104,7 +104,7 @@ def internal_governance_dispatch(
     Note: This command is only called via CLI self-invocation (internal governance)
     from the tmux wrapper launched by governance_scan handler. It always runs sync.
     """
-    from vibe3.roles.scan_service import dispatch_governance_execution
+    from vibe3.roles import dispatch_governance_execution
 
     dispatch_governance_execution(
         tick_count=tick, execution_count=execution_count, material_override=material
@@ -146,10 +146,8 @@ def internal_bootstrap(
     ] = False,
 ) -> None:
     """Bootstrap a standardized flow scene through the shared service path."""
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+    from vibe3.services import FlowOrchestratorService
 
     config = load_orchestra_config()
     store = SQLiteClient()

@@ -30,9 +30,7 @@ def test_flow_show_format_json() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch(
-            "vibe3.services.flow_status_resolver.FlowStatusResolver"
-        ) as mock_resolver_class:
+        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -69,9 +67,7 @@ def test_flow_show_format_yaml() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch(
-            "vibe3.services.flow_status_resolver.FlowStatusResolver"
-        ) as mock_resolver_class:
+        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -208,9 +204,7 @@ def test_flow_show_default_format() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch(
-            "vibe3.services.flow_status_resolver.FlowStatusResolver"
-        ) as mock_resolver_class:
+        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:

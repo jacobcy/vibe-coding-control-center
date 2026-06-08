@@ -20,7 +20,7 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
-from vibe3.config.env_override import OVERRIDE_RULES
+from vibe3.config import OVERRIDE_RULES
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
 from vibe3.server import validate_pid_file
@@ -29,7 +29,7 @@ from vibe3.ui import console
 from vibe3.utils import format_age_aware_time
 
 if TYPE_CHECKING:
-    from vibe3.services.orchestra_status_service import OrchestraSnapshot
+    from vibe3.services import OrchestraSnapshot
 
 
 def _resolve_server_label(
@@ -219,8 +219,7 @@ def _fetch_system_snapshot(
     import time
     from dataclasses import replace
 
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services import FlowOrchestratorService, OrchestraStatusService
 
     snapshot = OrchestraStatusService.fetch_live_snapshot(config)
     if snapshot is None:
@@ -307,7 +306,7 @@ def _full_status_dashboard(
         render_rfc_items,
         render_supervisor_issues,
     )
-    from vibe3.services.task import (
+    from vibe3.services import (
         classify_task_issues_for_rendering,
         fetch_task_status_data,
     )
@@ -400,7 +399,7 @@ def status(
     if check:
         run_full_check_shortcut()
 
-    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.config import load_orchestra_config
 
     config = load_orchestra_config()
     orch_snapshot, snapshot_found = _fetch_system_snapshot(config)

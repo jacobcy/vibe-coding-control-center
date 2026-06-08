@@ -10,8 +10,11 @@ import typer
 from vibe3.clients import GitHubClient
 from vibe3.commands.command_options import FormatOption
 from vibe3.commands.common import enable_method_trace
-from vibe3.config import get_convention, get_manager_usernames
-from vibe3.config.loader import get_config_with_env_override
+from vibe3.config import (
+    get_config_with_env_override,
+    get_convention,
+    get_manager_usernames,
+)
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
 from vibe3.observability import setup_logging

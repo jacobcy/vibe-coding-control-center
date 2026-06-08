@@ -22,7 +22,7 @@ def test_inspect_base_default_parent():
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
                 with patch(
@@ -45,7 +45,7 @@ def test_inspect_base_custom_base_branch():
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
 
@@ -72,7 +72,7 @@ def test_inspect_base_with_core_files():
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
                 dag_mod = "vibe3.analysis.dag_service"
@@ -104,7 +104,7 @@ def test_inspect_base_json_output():
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
                 dag_mod = "vibe3.analysis.dag_service"
@@ -150,7 +150,7 @@ def test_inspect_base_json_custom_branch():
         mock_git_client.return_value = mock_git
         with patch("vibe3.utils.git_helpers.get_current_branch") as mock_branch:
             mock_branch.return_value = "feature/test"
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
                 dag_mod = "vibe3.analysis.dag_service"
@@ -192,7 +192,7 @@ def test_inspect_base_uses_shared_base_resolver():
         with patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ):
-            with patch("vibe3.config.loader.get_config") as mock_config:
+            with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
                 with patch(
