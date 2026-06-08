@@ -17,7 +17,6 @@ if TYPE_CHECKING:
         stream_reader,
         summarize_backend_output,
     )
-    from vibe3.utils.comment_utils import is_human_comment
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
         CODEAGENT_STDIN_MODE_THRESHOLD,
@@ -78,7 +77,6 @@ _LAZY_IMPORTS = {
     "get_branch_handoff_dir": "vibe3.utils.git_helpers",
     "get_commit_message": "vibe3.utils.git_helpers",
     "get_current_branch": "vibe3.utils.git_helpers",
-    "is_human_comment": "vibe3.utils.comment_utils",
     "normalize_actor": "vibe3.utils.actor_utils",
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
     "parse_issue_number": "vibe3.utils.issue_ref",
@@ -134,7 +132,6 @@ __all__ = [
     "get_branch_handoff_dir",
     "get_commit_message",
     "get_current_branch",
-    "is_human_comment",
     "normalize_actor",
     "OrchestraInstanceInfo",
     "parse_issue_number",
