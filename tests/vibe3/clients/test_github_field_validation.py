@@ -86,7 +86,7 @@ class TestFieldValidation:
         # This should NOT raise ValueError because validation is skipped
         result = IssuesMixin.view_issue(mock_instance, 123, fields=["commnts"])
         # The function will return empty dict due to mock, but no ValueError
-        assert result is not None or result == {} or isinstance(result, dict)
+        assert isinstance(result, dict)
 
     def test_view_issue_no_fields_no_validation(self) -> None:
         """view_issue should not validate when fields=None (default)."""
@@ -101,4 +101,4 @@ class TestFieldValidation:
         # This should NOT raise ValueError because fields=None uses default set
         result = IssuesMixin.view_issue(mock_instance, 123)
         # The function will return empty dict due to mock, but no ValueError
-        assert result is not None or result == {} or isinstance(result, dict)
+        assert isinstance(result, dict)
