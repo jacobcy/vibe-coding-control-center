@@ -414,3 +414,82 @@ def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
         assert flow.get("flow_status") == "active"
         assert flow.get("blocked_by_issue") is None
         assert flow.get("blocked_reason") is None
+
+
+def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
+    """_check_branch should report warnings for unresolved dependencies."""
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.models.coordination_truth import CoordinationTruth
+    from vibe3.models.data_source import DataSource
+
+    # Create temp store
+    store = SQLiteClient(db_path=tmp_path / "test.db")
+    branch = "task/test-dependency-check"
+
+    # Set up active flow with task issue
+    store.update_flow_state(branch, flow_status="active")
+    store.add_issue_link(branch, 100, "task")
+
+    # Mock git client
+    mock_git = MagicMock(spec=GitClient)
+    mock_git.get_git_common_dir.return_value = tmp_path
+    # Non-empty return means branch exists locally
+    mock_git._run.return_value = f"  {branch}\n"
+
+    # Mock GitHub client
+    mock_github = MagicMock(spec=GitHubClient)
+    # Task issue is open
+    mock_github.view_issue.side_effect = lambda issue_num: {
+        "state": "OPEN",
+        "title": "Test Issue",
+        "body": "",
+        "labels": [],
+    }
+    mock_github.list_all_prs.return_value = []
+    mock_github.list_prs_for_branch.return_value = []
+
+    service = CheckService(store=store, git_client=mock_git, github_client=mock_github)
+
+    # Mock IssueFlowService to return task issue number
+    with (
+        patch("vibe3.services.issue.flow.IssueFlowService") as mock_issue_flow_cls,
+        patch(
+            "vibe3.services.coordination_resolver.CoordinationResolver"
+        ) as mock_resolver_cls,
+    ):
+        mock_issue_flow = MagicMock()
+        mock_issue_flow_cls.return_value = mock_issue_flow
+        mock_issue_flow.resolve_task_issue_number.return_value = 100
+
+        # Mock CoordinationResolver to return unresolved dependency
+        mock_resolver = MagicMock()
+        mock_resolver_cls.return_value = mock_resolver
+        mock_resolver.resolve_coordination.return_value = CoordinationTruth(
+            dependencies=[200],
+            dependencies_source=DataSource.LOCAL_SQLITE,
+        )
+
+        # Need to update view_issue side_effect to handle dependency issue
+        def view_issue_side_effect(issue_num: int, **kwargs):  # type: ignore[no-untyped-def]
+            if issue_num == 100:
+                return {
+                    "state": "OPEN",
+                    "title": "Task Issue",
+                    "body": "",
+                    "labels": [],
+                }
+            elif issue_num == 200:
+                return {
+                    "state": "OPEN",  # Dependency is not closed
+                    "title": "Dependency Issue",
+                }
+            return {"state": "OPEN"}
+
+        mock_github.view_issue.side_effect = view_issue_side_effect
+
+        result = service._check_branch(branch)
+
+        # Should have warning about unresolved dependency
+        assert any("Unresolved dependencies" in warning for warning in result.warnings)
+        assert any("#200" in warning for warning in result.warnings)
