@@ -60,59 +60,6 @@ def test_resolve_backend_unknown_role(sample_config: OrchestraConfig) -> None:
         service.resolve_backend("unknown_role")
 
 
-def test_resolve_prompt_contract_manager(sample_config: OrchestraConfig) -> None:
-    """Test prompt contract resolution for manager role."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    contract = service.resolve_prompt_contract("manager")
-
-    assert contract.template == "orchestra.assignee_dispatch.manager"
-
-
-def test_resolve_prompt_contract_supervisor(sample_config: OrchestraConfig) -> None:
-    """Test prompt contract resolution for supervisor role."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    contract = service.resolve_prompt_contract("supervisor")
-
-    assert contract.template == "orchestra.supervisor.apply"
-
-
-def test_resolve_session_strategy_manager(sample_config: OrchestraConfig) -> None:
-    """Test session strategy resolution for manager role."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    strategy = service.resolve_session_strategy("manager")
-
-    # Manager with use_worktree=True and async_mode=True should use tmux
-    assert strategy.mode == "tmux"
-    assert strategy.timeout == 3600
-
-
-def test_resolve_session_strategy_unknown_role(sample_config: OrchestraConfig) -> None:
-    """Test session strategy for unknown role defaults to async."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    strategy = service.resolve_session_strategy("unknown_role")
-
-    assert strategy.mode == "async"
-    assert strategy.timeout is None
-
-
-def test_resolve_concurrency_class_manager(sample_config: OrchestraConfig) -> None:
-    """Test concurrency class resolution for manager role."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    concurrency = service.resolve_concurrency_class("manager")
-
-    assert concurrency.max_concurrent == 3  # From max_concurrent_flows
-    assert concurrency.semaphore_key == "manager"
-
-
-def test_resolve_concurrency_class_other_role(sample_config: OrchestraConfig) -> None:
-    """Test concurrency class resolution for non-manager role."""
-    service = ExecutionRolePolicyService(config=sample_config)
-    concurrency = service.resolve_concurrency_class("planner")
-
-    assert concurrency.max_concurrent == 10  # Default for agents
-    assert concurrency.semaphore_key == "planner"
-
-
 def test_all_roles_resolve_backend(sample_config: OrchestraConfig) -> None:
     """Test that all valid orchestra roles can resolve backend."""
     service = ExecutionRolePolicyService(config=sample_config)
@@ -125,20 +72,6 @@ def test_all_roles_resolve_backend(sample_config: OrchestraConfig) -> None:
     for role, expected_backend in expected_backends.items():
         backend = service.resolve_backend(role)
         assert backend == expected_backend
-
-
-def test_all_roles_resolve_prompt_contract(sample_config: OrchestraConfig) -> None:
-    """Test that all valid orchestra roles can resolve prompt contract."""
-    service = ExecutionRolePolicyService(config=sample_config)
-
-    expected_templates = {
-        "manager": "orchestra.assignee_dispatch.manager",
-        "supervisor": "orchestra.supervisor.apply",
-        "governance": "orchestra.governance.plan",
-    }
-    for role, expected_template in expected_templates.items():
-        contract = service.resolve_prompt_contract(role)
-        assert contract.template == expected_template
 
 
 @patch("vibe3.execution.execution_role_policy.sync_models_json")

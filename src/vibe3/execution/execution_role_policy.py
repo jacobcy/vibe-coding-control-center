@@ -1,38 +1,13 @@
 """Execution role policy service."""
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
-
 from loguru import logger
 
 from vibe3.agents import sync_models_json
-from vibe3.config import (
-    diagnose_profile,
-    load_orchestra_config,
-)
+from vibe3.config import load_orchestra_config
 from vibe3.config import (
     resolve_effective_agent_options as resolve_backend_effective_agent_options,
 )
-from vibe3.exceptions import DiagnosticContext, MissingResourceError
 from vibe3.models import AgentOptions, OrchestraConfig
-
-
-@dataclass(frozen=True)
-class PromptContract:
-    template: str
-
-
-@dataclass(frozen=True)
-class SessionStrategy:
-    mode: Literal["tmux", "inline", "async"]
-    timeout: int | None = None
-
-
-@dataclass(frozen=True)
-class ConcurrencyClass:
-    max_concurrent: int = 3
-    semaphore_key: str = "default"
 
 
 class ExecutionRolePolicyService:
@@ -124,74 +99,3 @@ class ExecutionRolePolicyService:
         )
         sync_models_json(effective)
         return effective
-
-    def resolve_prompt_contract(self, role: str) -> PromptContract:
-        section_name = self._ROLE_CONFIG_MAP.get(role)
-        if not section_name:
-            raise ValueError(f"Unknown role: {role}")
-
-        section = getattr(self._config, section_name, None)
-        if not section:
-            raise MissingResourceError(
-                resource=f"config section for role '{role}'",
-                context=DiagnosticContext(
-                    resource_type="role-config",
-                    search_paths=[str(Path("config/v3/settings.yaml"))],
-                    profile=diagnose_profile(),
-                    remediation=(
-                        f"Add {section_name} configuration to config/v3/settings.yaml"
-                    ),
-                    ref_issue=1925,
-                ),
-            )
-
-        template = getattr(section, "prompt_template", None)
-        if not template:
-            raise MissingResourceError(
-                resource=f"prompt_template for role '{role}'",
-                context=DiagnosticContext(
-                    resource_type="role-config",
-                    search_paths=[str(Path("config/v3/settings.yaml"))],
-                    profile=diagnose_profile(),
-                    remediation=(
-                        f"Add prompt_template to {section_name} in "
-                        "config/v3/settings.yaml"
-                    ),
-                    ref_issue=1907,
-                ),
-            )
-
-        return PromptContract(template=template)
-
-    def resolve_session_strategy(self, role: str) -> SessionStrategy:
-        section_name = self._ROLE_CONFIG_MAP.get(role)
-        if not section_name:
-            return SessionStrategy(mode="async")
-
-        section = getattr(self._config, section_name, None)
-        if not section:
-            return SessionStrategy(mode="async")
-
-        use_worktree = getattr(section, "use_worktree", True)
-        async_mode = getattr(section, "async_mode", True)
-        timeout = getattr(section, "timeout_seconds", None)
-
-        mode: Literal["tmux", "inline", "async"] = "async"
-        if use_worktree and async_mode:
-            mode = "tmux"
-        elif not async_mode:
-            mode = "inline"
-
-        return SessionStrategy(mode=mode, timeout=timeout)
-
-    def resolve_concurrency_class(self, role: str) -> ConcurrencyClass:
-        if role == "manager":
-            return ConcurrencyClass(
-                max_concurrent=self._config.max_concurrent_flows,
-                semaphore_key="manager",
-            )
-
-        return ConcurrencyClass(
-            max_concurrent=10,
-            semaphore_key=role,
-        )

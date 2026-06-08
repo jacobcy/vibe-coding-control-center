@@ -80,14 +80,6 @@ policy_service = ExecutionRolePolicyService(config)
 # 解析 backend
 backend = policy_service.resolve_backend("planner")  # "claude" 或 "openai"
 
-# 解析 prompt contract
-prompt_contract = policy_service.resolve_prompt_contract("planner")
-# 返回 PromptContract(template="orchestra.plan", supervisor_file="...")
-
-# 解析 session 策略
-session_strategy = policy_service.resolve_session_strategy("planner")
-# 返回 SessionStrategy(mode="tmux", timeout=1800)
-
 # 解析 agent options（完整配置）
 agent_options = policy_service.resolve_agent_options("planner")
 # 返回 AgentOptions(agent=..., backend=..., model=..., timeout_seconds=...)
@@ -144,7 +136,6 @@ def run_command():
 
     agent_options = policy_service.resolve_agent_options("executor")
     backend = policy_service.resolve_backend("executor")
-    prompt_contract = policy_service.resolve_prompt_contract("executor")
 
     # 使用解析的配置执行 agent
     ...
