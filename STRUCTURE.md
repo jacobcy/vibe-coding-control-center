@@ -209,8 +209,13 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `roles/` - 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
-- `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
+- `services/` - 核心业务逻辑（issue, pr, task, handoff, check）
+  - `services/issue/` - Issue 生命流程、标题缓存与失败处理
+  - `services/pr/` - PR 创建、评审、质量评分与分析
+  - `services/task/` - Task 绑定、状态分类与恢复逻辑
+  - `services/handoff/` - Handoff 记录、存储与验证
   - `services/shared/` - 跨领域公共能力（labels, paths, errors, branches）
+  - `services/protocols/` - 内部服务协议
 - `ui/` - CLI 输出格式化（Rich 渲染）
 - `utils/` - 通用工具函数（Git 辅助、分支工具、评论处理等）
 
