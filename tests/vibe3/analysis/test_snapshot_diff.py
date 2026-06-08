@@ -3,6 +3,7 @@
 from vibe3.analysis.snapshot_diff import compute_diff
 from vibe3.models.snapshot import (
     DependencyEdge,
+    DiffSummary,
     FileSnapshot,
     ModuleSnapshot,
     StructureMetrics,
@@ -117,3 +118,97 @@ def test_compute_diff_merges_summaries():
     # LOC and function deltas
     assert diff.summary.total_loc_delta == 250  # 350 - 100 = 250
     assert diff.summary.total_functions_delta == 12  # 17 - 5 = 12
+
+
+def test_diff_summary_from_metrics():
+    """Test DiffSummary.from_metrics classmethod."""
+    baseline = StructureMetrics(
+        total_files=5,
+        total_loc=100,
+        total_functions=5,
+        python_files=4,
+        shell_files=1,
+    )
+
+    current = StructureMetrics(
+        total_files=10,
+        total_loc=350,
+        total_functions=17,
+        python_files=9,
+        shell_files=1,
+    )
+
+    result = DiffSummary.from_metrics(baseline, current)
+
+    # Should have only metric deltas populated
+    assert result.total_loc_delta == 250  # 350 - 100
+    assert result.total_functions_delta == 12  # 17 - 5
+
+    # All other fields should be 0 (default)
+    assert result.files_added == 0
+    assert result.files_removed == 0
+    assert result.files_modified == 0
+    assert result.modules_added == 0
+    assert result.modules_removed == 0
+    assert result.modules_modified == 0
+    assert result.dependencies_added == 0
+    assert result.dependencies_removed == 0
+
+
+def test_compute_diff_identical_snapshots():
+    """Test compute_diff with identical snapshots (zero delta edge case)."""
+    snapshot = StructureSnapshot(
+        snapshot_id="2026-03-20T10-00-00_main_abc1234",
+        branch="main",
+        commit="abc1234567890",
+        commit_short="abc1234",
+        created_at="2026-03-20T10:00:00",
+        root="src/vibe3",
+        files=[
+            FileSnapshot(
+                path="services/service.py",
+                language="python",
+                total_loc=100,
+                function_count=5,
+            ),
+        ],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=100,
+                total_functions=5,
+                files=["services/service.py"],
+            ),
+        ],
+        dependencies=[
+            DependencyEdge(from_module="services", to_module="utils"),
+        ],
+        metrics=StructureMetrics(
+            total_files=1,
+            total_loc=100,
+            total_functions=5,
+        ),
+    )
+
+    # Compare identical snapshots
+    diff = compute_diff(snapshot, snapshot)
+
+    # Should have zero deltas
+    assert diff.summary.total_loc_delta == 0
+    assert diff.summary.total_functions_delta == 0
+
+    # Should have no changes
+    assert diff.summary.files_added == 0
+    assert diff.summary.files_removed == 0
+    assert diff.summary.files_modified == 0
+    assert diff.summary.modules_added == 0
+    assert diff.summary.modules_removed == 0
+    assert diff.summary.modules_modified == 0
+    assert diff.summary.dependencies_added == 0
+    assert diff.summary.dependencies_removed == 0
+
+    # Should have empty change lists
+    assert len(diff.file_changes) == 0
+    assert len(diff.module_changes) == 0
+    assert len(diff.dependency_changes) == 0
