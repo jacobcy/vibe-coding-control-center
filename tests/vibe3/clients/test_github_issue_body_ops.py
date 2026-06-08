@@ -27,7 +27,7 @@ def test_get_issue_body_success() -> None:
         mock_view.return_value = {"body": "Test issue body"}
         body = ops.get_issue_body(123)
         assert body == "Test issue body"
-        mock_view.assert_called_once_with(123, repo=None)
+        mock_view.assert_called_once_with(123, repo=None, fields=["body"])
 
 
 def test_get_issue_body_with_repo() -> None:
@@ -38,7 +38,7 @@ def test_get_issue_body_with_repo() -> None:
         mock_view.return_value = {"body": "Test issue body"}
         body = ops.get_issue_body(123, repo="owner/repo")
         assert body == "Test issue body"
-        mock_view.assert_called_once_with(123, repo="owner/repo")
+        mock_view.assert_called_once_with(123, repo="owner/repo", fields=["body"])
 
 
 def test_get_issue_body_not_found() -> None:

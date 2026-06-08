@@ -133,7 +133,7 @@ class FlowStatusResolver:
         ).debug("Reading complete remote state from GitHub")
 
         # Fetch issue with comments
-        issue_data = github_client.view_issue(issue_number)
+        issue_data = github_client.view_issue(issue_number, fields=["body", "comments"])
         if not issue_data or issue_data == "network_error":
             from vibe3.exceptions import SystemError
 

@@ -144,11 +144,14 @@ def test_add_comment_passes_repo():
 def test_close_issue_if_open_already_closed(github_client: GitHubClient) -> None:
     """Issue already closed should return 'already_closed' without calling close."""
     with (
-        patch.object(github_client, "view_issue", return_value={"state": "closed"}),
+        patch.object(
+            github_client, "view_issue", return_value={"state": "closed"}
+        ) as mock_view,
         patch.object(github_client, "close_issue") as mock_close,
     ):
         result = github_client.close_issue_if_open(issue_number=123)
 
+        mock_view.assert_called_once_with(123, repo=None, fields=["state"])
         mock_close.assert_not_called()
         assert result == "already_closed"
 
@@ -156,13 +159,16 @@ def test_close_issue_if_open_already_closed(github_client: GitHubClient) -> None
 def test_close_issue_if_open_calls_close_once(github_client: GitHubClient) -> None:
     """Open issue should call close_issue once and return 'closed'."""
     with (
-        patch.object(github_client, "view_issue", return_value={"state": "open"}),
+        patch.object(
+            github_client, "view_issue", return_value={"state": "open"}
+        ) as mock_view,
         patch.object(github_client, "close_issue", return_value=True) as mock_close,
     ):
         result = github_client.close_issue_if_open(
             issue_number=123, closing_comment="Task not suitable"
         )
 
+        mock_view.assert_called_once_with(123, repo=None, fields=["state"])
         mock_close.assert_called_once_with(
             issue_number=123, comment="Task not suitable", repo=None
         )
@@ -174,12 +180,61 @@ def test_close_issue_if_open_returns_failure_when_close_fails(
 ) -> None:
     """Failed close operation should return 'failed'."""
     with (
-        patch.object(github_client, "view_issue", return_value={"state": "open"}),
+        patch.object(
+            github_client, "view_issue", return_value={"state": "open"}
+        ) as mock_view,
         patch.object(github_client, "close_issue", return_value=False),
     ):
         result = github_client.close_issue_if_open(issue_number=123)
 
+        mock_view.assert_called_once_with(123, repo=None, fields=["state"])
         assert result == "failed"
+
+
+def test_view_issue_with_custom_fields(github_client: GitHubClient) -> None:
+    """view_issue should use custom fields when provided."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps({"number": 123, "title": "Test Issue"}),
+        )
+
+        result = github_client.view_issue(issue_number=123, fields=["number", "title"])
+
+        assert result == {"number": 123, "title": "Test Issue"}
+        # Verify the --json argument uses the custom fields
+        call_args = mock_run.call_args[0][0]
+        assert "--json" in call_args
+        json_index = call_args.index("--json")
+        assert call_args[json_index + 1] == "number,title"
+
+
+def test_view_issue_with_default_fields(github_client: GitHubClient) -> None:
+    """view_issue should use default fields when fields parameter is None."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "number": 123,
+                    "title": "Test Issue",
+                    "body": "Test body",
+                    "state": "open",
+                }
+            ),
+        )
+
+        result = github_client.view_issue(issue_number=123)
+
+        assert result["number"] == 123
+        # Verify the --json argument uses the default fields (excluding comments)
+        call_args = mock_run.call_args[0][0]
+        assert "--json" in call_args
+        json_index = call_args.index("--json")
+        assert (
+            call_args[json_index + 1]
+            == "number,title,body,state,updatedAt,labels,milestone,assignees"
+        )
 
 
 def test_create_issue_success(github_client: GitHubClient) -> None:
