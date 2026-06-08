@@ -139,34 +139,44 @@ cat config/v3/loc_limits.yaml
 #### run - Agent 执行引擎
 
 ```bash
-uv run python src/vibe3/cli.py run --skill <name>        # 派发特定 skill 执行（默认异步）
-uv run python src/vibe3/cli.py run "指令描述"             # 派发自定义指令执行
-uv run python src/vibe3/cli.py run --plan <file>         # 执行指定的实现计划
-uv run python src/vibe3/cli.py run --plan <file> --no-async  # 同步执行（阻塞）
-uv run python src/vibe3/cli.py run --publish             # 发布模式：自动创建 commit + PR
+vibe3 run --branch <branch>              # 执行 flow 的 plan（自动读取 plan_ref）
+vibe3 run --branch <branch> --no-async   # 同步执行（阻塞）
+vibe3 run --branch <branch> --publish    # 提交模式：创建 commit + PR
+vibe3 run --skill <name>                 # 派发特定 skill 执行
+vibe3 run "指令描述"                      # 派发自定义指令执行（lightweight 模式）
 ```
 
 补充语义：
 
 - 默认异步执行（在 tmux session 中），无需指定 `--async`。
-- 使用 `--no-async` 可改为同步阻塞执行。
-- `--publish` 模式会自动创建 commit 和 PR，适用于完整交付流程。
+- `--branch` 可接受分支名或 issue 编号（如 `2428` 或 `dev/issue-2428`）。
+- 无 `--plan` 参数时，自动从 flow_state.plan_ref 读取计划。
+- `--publish` 模式会自动创建 commit 和 PR。
+- `--skill` 和 `--publish` 互斥。
 
 #### plan - 计划生成
 
 ```bash
-uv run python src/vibe3/cli.py plan --branch <issue-or-branch>  # 基于 issue/branch 现场生成实现计划
-uv run python src/vibe3/cli.py plan --spec <spec-ref>            # 基于 spec 文件、issue number 或 @spec 生成实现计划
+vibe3 plan --branch <branch>        # 基于 issue/branch 现场生成实现计划
+vibe3 plan --spec <spec-ref>        # 基于 spec 文件、issue number 或 @spec 生成实现计划
 ```
 
 #### handoff - 协作交接记录
 
 ```bash
-uv run python src/vibe3/cli.py handoff status     # 查看当前分支的 agent 交接链 / 交接现场
-uv run python src/vibe3/cli.py handoff show <path> # 读取共享 handoff artifact
-uv run python src/vibe3/cli.py handoff append "..." --kind note # 记录关键发现或里程碑
-uv run python src/vibe3/cli.py handoff plan/report/audit # 记录标准阶段交接
+vibe3 handoff status                      # 查看当前分支的 agent 交接链
+vibe3 handoff show @plan --branch <b>     # 读取计划 artifact
+vibe3 handoff show @report --branch <b>   # 读取执行报告
+vibe3 handoff show @audit --branch <b>    # 读取审查报告
+vibe3 handoff show @current               # 读取当前分支的 handoff
+vibe3 handoff append "..." --kind note    # 记录关键发现或里程碑
 ```
+
+补充语义：
+
+- `@plan`、`@report`、`@audit`、`@spec` 是特殊别名，从 flow_state 的对应 ref 字段解析。
+- `@current` 读取当前分支的 `current.md`。
+- 其他路径（如 `@task-xxx/run.md`）为共享 artifact，忽略 `--branch`。
 
 #### inspect - 代码智能分析
 
@@ -187,8 +197,8 @@ vibe3 pr ready                        # 标记 PR 为 ready for review
 #### review - 代码审查
 
 ```bash
-vibe3 review --branch <issue-or-branch>  # 审查 issue 实现（orchestra-driven）
-vibe3 review base origin/main            # 审查本地变更 vs base branch（对比快照）
+vibe3 review --branch <branch>         # 审查 issue 实现（orchestra-driven）
+vibe3 review base origin/main          # 审查本地变更 vs base branch（对比快照）
 ```
 
 #### snapshot - 项目级结构跟踪（持久化）
@@ -249,27 +259,29 @@ vibe3 ask "问题内容"  # 询问关于项目的问题
 
 ## 标准开发工作流
 
+完整的 vibe3 工作流由 `/vibe-continue` 定义。以下是核心步骤：
+
 ### 1. 启动任务
 
 ```bash
-# 使用 skill 自动化（推荐）
-/vibe-new <feature-description>  # 选/建 issue -> 切到 dev/issue-<id> -> flow update/bind -> 按需创联 PR
-
-# 或手动启动人机协作流
-git checkout -b dev/issue-123
-uv run python src/vibe3/cli.py flow update
-uv run python src/vibe3/cli.py flow bind 123 --role task
-uv run python src/vibe3/cli.py pr create --base main --yes   # 按需
+/vibe-new <issue-number>        # 创建 flow/branch/worktree，完成后指引到 /vibe-continue
+/vibe-continue                  # 恢复已有 branch，查看工作流方法
 ```
 
-### 2. 执行与观察
+### 2. 执行工作流（详见 /vibe-continue）
 
 ```bash
-uv run python src/vibe3/cli.py plan --branch 123  # 生成计划
-uv run python src/vibe3/cli.py run --plan @plan   # 派发执行（默认异步）
-uv run python src/vibe3/cli.py flow show          # 轮询 Timeline 观察进度
-uv run python src/vibe3/cli.py handoff status     # 阅读 agent 留下的 Findings 与交接现场
+vibe3 plan --branch <branch>                    # 1. 生成计划
+vibe3 handoff show @plan --branch <branch>      # 2. 检查计划
+vibe3 run --branch <branch>                     # 3. 执行实现
+vibe3 handoff show @report --branch <branch>    # 4. 检查执行结果
+vibe3 review --branch <branch>                  # 5. 代码审查
+vibe3 handoff show @audit --branch <branch>     # 6. 检查审查结果
+vibe3 flow show --branch <branch>               # 7. 查看整体进度
+vibe3 run --publish --branch <branch>           # 8. 提交并创建 PR
 ```
+
+**注意**：`--branch` 可接受分支名或 issue 编号。
 
 ### 3. 提交与收口
 

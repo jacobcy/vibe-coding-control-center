@@ -53,6 +53,56 @@ description: Use when the user wants to resume work on an existing branch or flo
 - 再读 handoff（本地补充）
 - 交叉核对现场
 
+## 标准工作流方法
+
+以下是 vibe3 工作流的标准命令序列。每一步都是独立命令，可按需执行。
+
+### 完整流程
+
+```bash
+# 1. 创建计划
+vibe3 plan --branch <branch-name>
+
+# 2. 检查计划
+vibe3 handoff show @plan --branch <branch-name>
+
+# 3. 执行实现
+vibe3 run --branch <branch-name>
+
+# 4. 检查执行结果
+vibe3 handoff show @report --branch <branch-name>
+
+# 5. 代码审查
+vibe3 review --branch <branch-name>
+
+# 6. 检查审查结果
+vibe3 handoff show @audit --branch <branch-name>
+
+# 7. 查看整体进度
+vibe3 flow show --branch <branch-name>
+
+# 8. 提交并创建 PR
+vibe3 run --publish --branch <branch-name>
+```
+
+### 单步说明
+
+| 步骤 | 命令 | 作用 |
+|------|------|------|
+| 计划 | `vibe3 plan --branch <b>` | 基于 issue/branch 生成实现计划 |
+| 检查计划 | `vibe3 handoff show @plan --branch <b>` | 读取 plan artifact，确认方案 |
+| 执行 | `vibe3 run --branch <b>` | 按 plan 执行代码实现（异步） |
+| 检查结果 | `vibe3 handoff show @report --branch <b>` | 读取执行报告，确认变更 |
+| 审查 | `vibe3 review --branch <b>` | 对实现进行代码审查 |
+| 检查审查 | `vibe3 handoff show @audit --branch <b>` | 读取审查报告，确认通过 |
+| 进度 | `vibe3 flow show --branch <b>` | 查看 flow 状态和 timeline |
+| 提交 | `vibe3 run --publish --branch <b>` | 创建 commit + PR |
+
+**注意**：
+- `--branch` 可接受分支名或 issue 编号（如 `2428` 或 `dev/issue-2428`）
+- `run` 和 `review` 默认异步执行（tmux session），用 `--no-async` 改为同步
+- 每步之间可用 `vibe3 flow show` 检查进度
+
 ## Human-Facing Workflow
 
 ### Step 1: Identify Current Flow & Task
