@@ -286,7 +286,7 @@ def main() -> None:
         if isinstance(e, MissingResourceError):
             try:
                 from vibe3.exceptions.error_codes import E_CONFIG_MISSING
-                from vibe3.services.error_helpers import record_error
+                from vibe3.services import record_error
 
                 record_error(
                     error_code=E_CONFIG_MISSING,

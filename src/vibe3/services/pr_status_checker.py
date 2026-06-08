@@ -14,7 +14,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients import GitHubClient, MergedPRCache
-from vibe3.services.git_path_client import get_git_common_dir
+from vibe3.services.shared.paths import get_git_common_dir
 
 
 def get_merged_pr_for_issue(

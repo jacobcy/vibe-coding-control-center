@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from vibe3.models import IssueInfo, IssueState
-from vibe3.services.label_utils import has_manager_assignee
+from vibe3.services.shared.labels import has_manager_assignee
 
 
 @dataclass(frozen=True)

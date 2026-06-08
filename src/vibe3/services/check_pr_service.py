@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models import PRState
-from vibe3.services.label_utils import normalize_labels
+from vibe3.services.shared.labels import normalize_labels
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient

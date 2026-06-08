@@ -254,9 +254,9 @@ class TestEnsurePlanFileExists:
                 return plan_file
             raise FileNotFoundError(f"Mock: {target}")
 
-        # Mock the import inside ensure_plan_file_exists
+        # Mock the public API import (cross-module call uses public API)
         monkeypatch.setattr(
-            "vibe3.services.path_helpers.resolve_handoff_target",
+            "vibe3.services.resolve_handoff_target",
             mock_resolve,
         )
 

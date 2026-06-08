@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Mapping
 
-from vibe3.services.path_helpers import check_ref_exists
+from vibe3.services.shared.paths import check_ref_exists
 
 
 class FlowConsistencyCode(StrEnum):

@@ -125,7 +125,7 @@ def show(
     if trace:
         enable_method_trace()
 
-    from vibe3.services.path_helpers import resolve_handoff_target
+    from vibe3.services import resolve_handoff_target
 
     if target is None:
         typer.echo(_HANDOFF_SHOW_HELP)

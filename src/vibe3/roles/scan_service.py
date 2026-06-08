@@ -121,7 +121,7 @@ def fetch_supervisor_candidates(
         - total_issues_scanned: Total number of open issues queried
         - matching_candidates: List of candidate issues (number, title, labels)
     """
-    from vibe3.services.label_utils import normalize_labels
+    from vibe3.services import normalize_labels
 
     try:
         raw_issues = github_client.list_issues(limit=100, state="open", repo=repo)

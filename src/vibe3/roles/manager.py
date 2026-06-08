@@ -40,8 +40,7 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services import fail_manager_issue
-from vibe3.services.flow_factory import create_flow_manager
+from vibe3.services import create_flow_manager, fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -186,7 +185,7 @@ def build_manager_request(
 
         # Record to error_log table (with guard to avoid masking original error)
         try:
-            from vibe3.services.error_helpers import record_error
+            from vibe3.services import record_error
 
             record_error(
                 error_code="E_DISPATCH_FAILURE",

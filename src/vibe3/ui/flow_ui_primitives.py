@@ -62,8 +62,8 @@ def resolve_ref_path(
 ) -> str:
     """Resolve a reference path for display.
 
-    Redirects to vibe3.services.path_helpers.resolve_ref_path.
+    Redirects to vibe3.services (public API).
     """
-    from vibe3.services.path_helpers import resolve_ref_path as _resolve
+    from vibe3.services import resolve_ref_path as _resolve
 
     return _resolve(ref_value, worktree_root, absolute=absolute)
