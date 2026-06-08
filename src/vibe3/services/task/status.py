@@ -263,6 +263,14 @@ def classify_task_issues_for_rendering(
         and cast(int, item["number"]) not in supervisor_numbers
     ]
 
+    # Build set of open issue numbers for dependency status checking
+    # Filter out DONE issues since they're no longer blocking
+    open_issue_numbers: set[int] = {
+        cast(int, issue["number"])
+        for issue in orchestrated_issues
+        if cast(IssueState, issue["state"]) != IssueState.DONE
+    }
+
     return {
         "supervisor_items": supervisor_items,
         "roadmap_rfc_items": roadmap_rfc_items,
@@ -274,4 +282,5 @@ def classify_task_issues_for_rendering(
         "bucketed_items": bucketed_items,
         "pr_ref_items": pr_ref_items,
         "blocked_items": blocked_items,
+        "open_issue_numbers": open_issue_numbers,
     }
