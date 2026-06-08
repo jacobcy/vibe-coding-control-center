@@ -146,16 +146,15 @@ bootstrap 成功后记录稳定恢复点：
 vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
 ```
 
-## 8. 指向 vibe-continue 工作流
+## 8. 按需继续
 
-bootstrap 完成后，**必须**告知用户下一步是 `/vibe-continue`：
+如果已经具备条件，可以继续：
 
-> Flow 已 ready。如选择 vibe3 工作流，请执行 `/vibe-continue` 查看标准工作流方法并开始执行。
+```bash
+vibe3 pr create --agent -t "..." -b "..."
+```
 
-标准 vibe3 工作流由 `/vibe-continue` 定义，包含：
-- `vibe3 plan` → `vibe3 run` → `vibe3 review` → `vibe3 run --publish`
-- 每步之间可用 `vibe3 handoff show @<artifact>` 检查结果
-- 详见 `/vibe-continue` 的"标准工作流方法"章节
+或者停在这里，转入用户选择的实现 workflow。
 
 ## 停止条件
 
