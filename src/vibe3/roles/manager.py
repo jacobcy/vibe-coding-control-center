@@ -40,8 +40,7 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services import fail_manager_issue
-from vibe3.services.flow_factory import create_flow_manager
+from vibe3.services import create_flow_manager, fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",

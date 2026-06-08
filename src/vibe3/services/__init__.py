@@ -15,7 +15,11 @@ if TYPE_CHECKING:
     from vibe3.services.check_service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
     from vibe3.services.error_tracking_service import ErrorTrackingService
+
+    # Functions used in domain/execution/roles
+    from vibe3.services.event_helpers import emit_issue_failed
     from vibe3.services.flow_cleanup_service import FlowCleanupService
+    from vibe3.services.flow_factory import create_flow_manager
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.flow_projection_service import FlowProjectionService
     from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
@@ -45,8 +49,6 @@ if TYPE_CHECKING:
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
     from vibe3.services.pr.service import PRService
     from vibe3.services.role_policy_helpers import get_role_block_function
-
-    # Functions used in domain/execution/roles
     from vibe3.services.shared.errors import (
         record_dispatch_failure_if_unexpected,
         record_error,
@@ -63,6 +65,7 @@ if TYPE_CHECKING:
         resolve_ref_path,
         sanitize_event_detail_paths,
     )
+    from vibe3.services.signature_service import SignatureService
     from vibe3.services.status_query_service import StatusQueryService
     from vibe3.services.task_binding_guard import build_bind_task_hint
     from vibe3.services.task_resume_operations import TaskResumeOperations

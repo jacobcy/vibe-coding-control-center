@@ -210,7 +210,7 @@ def update(
         if name:
             updates["flow_slug"] = name
         if actor:
-            from vibe3.services.signature_service import SignatureService
+            from vibe3.services import SignatureService
 
             updates["latest_actor"] = SignatureService.resolve_actor(
                 explicit_actor=actor
