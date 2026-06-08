@@ -217,6 +217,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 520
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标"
+      - path: "tests/vibe3/execution/test_job_executor.py"
+        limit: 550
+        reason: "JobExecutor 核心服务测试集，覆盖 10 个紧密耦合场景（映射正确性、context 构建、success/failure/skip 路径、governance dispatch、equivalence regression、lifecycle 事件、adapter resolution error），共享 mock setup（registry/store/lifecycle），拆分收益低；测试覆盖 JobEnvelope → JobResult 完整执行流程与生命周期事件记录"
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"

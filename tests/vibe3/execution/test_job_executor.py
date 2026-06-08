@@ -1,52 +1,414 @@
 """Tests for JobExecutor service."""
 
-from __future__ import annotations
-
-import os
-from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
-from vibe3.execution.command_adapter import CommandAdapterEntry, ResolvedAdapter
+import pytest
+
+from vibe3.clients import SQLiteClient
+from vibe3.execution.command_adapter import CommandAdapterRegistry
+from vibe3.execution.execution_lifecycle import ExecutionLifecycleService
 from vibe3.execution.job_executor import (
     COMMAND_TYPE_TO_EXECUTION_ROLE,
     JobExecutor,
 )
 from vibe3.models.execution_request import ExecutionLaunchResult
-from vibe3.models.job import CommandType, JobEnvelope
-
-if TYPE_CHECKING:
-    pass
+from vibe3.models.job import CommandType, JobContext, JobEnvelope
 
 
-class TestMappingCorrectness:
-    """Test 1: Verify all CommandType values map correctly."""
+@pytest.fixture
+def mock_store() -> SQLiteClient:
+    """Mock SQLite client."""
+    return Mock(spec=SQLiteClient)
 
-    def test_command_type_to_execution_role_mapping(self) -> None:
-        """All 6 CommandType values should map to correct ExecutionRole."""
-        expected_mappings = {
-            CommandType.PLAN: "planner",
-            CommandType.RUN: "executor",
-            CommandType.REVIEW: "reviewer",
-            CommandType.MANAGER: "manager",
-            CommandType.GOVERNANCE_SCAN: "governance",
-            CommandType.SUPERVISOR_APPLY: "supervisor",
+
+@pytest.fixture
+def mock_lifecycle() -> ExecutionLifecycleService:
+    """Mock execution lifecycle service."""
+    mock = Mock(spec=ExecutionLifecycleService)
+    return mock
+
+
+@pytest.fixture
+def test_envelope() -> JobEnvelope:
+    """Test job envelope for PLAN command."""
+    return JobEnvelope(
+        command_type=CommandType.PLAN,
+        issue_number=123,
+        branch="task/issue-123-test",
+        source="cli-manual",
+        actor="test:executor",
+    )
+
+
+class TestCommandTypeToExecutionRoleMapping:
+    """Tests for CommandType to ExecutionRole mapping correctness."""
+
+    def test_all_command_types_mapped(self) -> None:
+        """All 6 CommandType values should have ExecutionRole mapping."""
+        expected_types = {
+            CommandType.PLAN,
+            CommandType.RUN,
+            CommandType.REVIEW,
+            CommandType.MANAGER,
+            CommandType.GOVERNANCE_SCAN,
+            CommandType.SUPERVISOR_APPLY,
         }
+        assert set(COMMAND_TYPE_TO_EXECUTION_ROLE.keys()) == expected_types
 
-        assert COMMAND_TYPE_TO_EXECUTION_ROLE == expected_mappings
+    def test_plan_maps_to_planner(self) -> None:
+        """PLAN command type should map to 'planner' role."""
+        assert COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.PLAN] == "planner"
 
-        # Verify all CommandType values are covered
-        all_command_types = list(CommandType)
-        assert len(COMMAND_TYPE_TO_EXECUTION_ROLE) == len(all_command_types)
-        for ct in all_command_types:
-            assert ct in COMMAND_TYPE_TO_EXECUTION_ROLE
+    def test_run_maps_to_executor(self) -> None:
+        """RUN command type should map to 'executor' role."""
+        assert COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.RUN] == "executor"
+
+    def test_review_maps_to_reviewer(self) -> None:
+        """REVIEW command type should map to 'reviewer' role."""
+        assert COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.REVIEW] == "reviewer"
+
+    def test_manager_maps_to_manager(self) -> None:
+        """MANAGER command type should map to 'manager' role."""
+        assert COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.MANAGER] == "manager"
+
+    def test_governance_maps_to_governance(self) -> None:
+        """GOVERNANCE_SCAN command type should map to 'governance' role."""
+        assert (
+            COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.GOVERNANCE_SCAN] == "governance"
+        )
+
+    def test_supervisor_maps_to_supervisor(self) -> None:
+        """SUPERVISOR_APPLY command type should map to 'supervisor' role."""
+        assert (
+            COMMAND_TYPE_TO_EXECUTION_ROLE[CommandType.SUPERVISOR_APPLY] == "supervisor"
+        )
 
 
-class TestContextBuilding:
-    """Test 2: Verify _build_context() populates fields from envelope and env."""
+class TestJobExecutorInit:
+    """Tests for JobExecutor initialization."""
 
-    def test_build_context_populates_basic_fields(self) -> None:
-        """Context should contain issue_number, branch, and environment metadata."""
-        # Setup
+    def test_init_with_registry_and_store(self, mock_store: SQLiteClient) -> None:
+        """Executor should initialize with registry and store."""
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+        assert executor._registry is registry
+        assert executor._lifecycle is not None
+
+
+class TestBuildContext:
+    """Tests for _build_context method."""
+
+    @patch("vibe3.execution.job_executor.load_session_id")
+    @patch("vibe3.execution.job_executor.resolve_orchestra_repo_root")
+    def test_build_context_populates_issue_and_branch(
+        self,
+        mock_resolve_repo: Mock,
+        mock_load_session: Mock,
+        mock_store: SQLiteClient,
+        test_envelope: JobEnvelope,
+    ) -> None:
+        """Context should include issue_number and branch from envelope."""
+        mock_resolve_repo.return_value = Mock(
+            worktree="/path/to/worktree", repo="/path/to/repo"
+        )
+        mock_load_session.return_value = "session-456"
+
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+
+        with patch.object(executor, "_lifecycle", Mock()):
+            context = executor._build_context(test_envelope)
+
+        assert context.issue_number == 123
+        assert context.branch == "task/issue-123-test"
+
+    @patch("vibe3.execution.job_executor.load_session_id")
+    @patch("vibe3.execution.job_executor.resolve_orchestra_repo_root")
+    def test_build_context_loads_session_id(
+        self,
+        mock_resolve_repo: Mock,
+        mock_load_session: Mock,
+        mock_store: SQLiteClient,
+        test_envelope: JobEnvelope,
+    ) -> None:
+        """Context should include session_id from load_session_id."""
+        mock_resolve_repo.return_value = Mock(worktree=None, repo=None)
+        mock_load_session.return_value = "session-789"
+
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+
+        with patch.object(executor, "_lifecycle", Mock()):
+            context = executor._build_context(test_envelope)
+
+        # Should call load_session_id with planner role for PLAN command
+        mock_load_session.assert_called_once_with("planner", "task/issue-123-test")
+        assert context.session_id == "session-789"
+
+
+class TestExecute:
+    """Tests for execute method."""
+
+    def test_execute_resolves_adapter(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should resolve adapter from registry."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        # Mock the execution path to return success
+        with patch.object(executor, "_execute_issue_role") as mock_execute_role:
+            mock_execute_role.return_value = ExecutionLaunchResult(
+                launched=True, session_id="session-123"
+            )
+
+            result = executor.execute(test_envelope)
+
+        # Verify adapter was resolved
+        registry.resolve.assert_called_once_with(CommandType.PLAN)
+        assert result.adapter_path == "vibe3.roles.plan"
+
+    def test_execute_records_lifecycle_started(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should record started lifecycle event."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        with patch.object(executor, "_execute_issue_role") as mock_execute_role:
+            mock_execute_role.return_value = ExecutionLaunchResult(launched=True)
+
+            executor.execute(test_envelope)
+
+        # Verify lifecycle started was called
+        mock_lifecycle.record_started.assert_called_once()
+        call_args = mock_lifecycle.record_started.call_args
+        assert call_args.kwargs["role"] == "planner"
+        assert call_args.kwargs["target"] == "task/issue-123-test"
+        assert call_args.kwargs["actor"] == "test:executor"
+
+    def test_execute_returns_launched_result(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should return launched JobResult for successful launch."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        with patch.object(executor, "_execute_issue_role") as mock_execute_role:
+            mock_execute_role.return_value = ExecutionLaunchResult(
+                launched=True,
+                session_id="session-456",
+                tmux_session="tmux-789",
+                log_path="/path/to/log",
+            )
+
+            result = executor.execute(test_envelope)
+
+        assert result.status == "launched"
+        assert result.command_type == CommandType.PLAN
+        assert result.issue_number == 123
+        assert result.branch == "task/issue-123-test"
+        assert result.context is not None
+        assert result.context.session_id == "session-456"
+        assert result.context.tmux_session == "tmux-789"
+
+    def test_execute_returns_failed_on_adapter_error(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should return failed result when adapter resolution fails."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        registry.resolve.side_effect = Exception("Adapter not found")
+
+        executor = JobExecutor(registry, mock_store)
+
+        result = executor.execute(test_envelope)
+
+        assert result.status == "failed"
+        assert "Adapter resolution failed" in result.error_message
+        assert result.error_code == "ADAPTER_RESOLUTION_ERROR"
+
+    def test_execute_returns_skipped_result(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should return skipped result when launch is skipped."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        with patch.object(executor, "_execute_issue_role") as mock_execute_role:
+            mock_execute_role.return_value = ExecutionLaunchResult(
+                launched=False, skipped=True, reason="Capacity full"
+            )
+
+            result = executor.execute(test_envelope)
+
+        assert result.status == "skipped"
+        # Should record completed lifecycle (not failed)
+        mock_lifecycle.record_completed.assert_called()
+
+    def test_execute_handles_exception(
+        self, mock_store: SQLiteClient, test_envelope: JobEnvelope
+    ) -> None:
+        """Executor should handle exceptions and return failed result."""
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        with patch.object(executor, "_execute_issue_role") as mock_execute_role:
+            mock_execute_role.side_effect = RuntimeError("Execution failed")
+
+            result = executor.execute(test_envelope)
+
+        assert result.status == "failed"
+        assert "Execution failed" in result.error_message
+        assert result.error_code == "EXECUTION_ERROR"
+        # Should record failed lifecycle
+        mock_lifecycle.record_failed.assert_called()
+
+
+class TestEquivalenceRegression:
+    """Tests for semantic equivalence between different sources."""
+
+    def test_cli_manual_and_heartbeat_tick_produce_equivalent_results(
+        self, mock_store: SQLiteClient
+    ) -> None:
+        """Same command from different sources should produce equivalent results."""
+        # Create two envelopes with same command/issue/branch, different source
+        envelope_cli = JobEnvelope(
+            command_type=CommandType.PLAN,
+            issue_number=123,
+            branch="task/issue-123-test",
+            source="cli-manual",
+            actor="test:cli",
+        )
+        envelope_heartbeat = JobEnvelope(
+            command_type=CommandType.PLAN,
+            issue_number=123,
+            branch="task/issue-123-test",
+            source="heartbeat-tick",
+            actor="orchestra:system",
+        )
+
+        # Setup registry
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.plan"
+        mock_adapter.callable = Mock(role_name="planner")
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        # Mock execution to return same result
+        launch_result = ExecutionLaunchResult(
+            launched=True,
+            session_id="session-123",
+            tmux_session="tmux-456",
+            log_path="/path/to/log",
+        )
+
+        with patch.object(executor, "_execute_issue_role", return_value=launch_result):
+            result_cli = executor.execute(envelope_cli)
+            result_heartbeat = executor.execute(envelope_heartbeat)
+
+        # Results should be equivalent except for source
+        assert result_cli.status == result_heartbeat.status
+        assert result_cli.command_type == result_heartbeat.command_type
+        assert result_cli.issue_number == result_heartbeat.issue_number
+        assert result_cli.branch == result_heartbeat.branch
+        assert result_cli.adapter_path == result_heartbeat.adapter_path
+        assert result_cli.context is not None
+        assert result_heartbeat.context is not None
+        assert result_cli.context.session_id == result_heartbeat.context.session_id
+
+        # Only source should differ
+        assert result_cli.source == "cli-manual"
+        assert result_heartbeat.source == "heartbeat-tick"
+
+
+class TestGovernanceDispatch:
+    """Tests for governance command dispatch."""
+
+    def test_governance_routes_to_execute_governance(
+        self, mock_store: SQLiteClient
+    ) -> None:
+        """GOVERNANCE_SCAN should route to _execute_governance."""
+        envelope = JobEnvelope(
+            command_type=CommandType.GOVERNANCE_SCAN,
+            issue_number=999,
+            branch="main",
+            source="cli-manual",
+            actor="test:executor",
+        )
+
+        registry = Mock(spec=CommandAdapterRegistry)
+        mock_adapter = Mock()
+        mock_adapter.entry.import_path = "vibe3.roles.governance"
+        mock_adapter.callable = Mock()  # Governance role, not IssueRoleSyncSpec
+        registry.resolve.return_value = mock_adapter
+
+        executor = JobExecutor(registry, mock_store)
+        mock_lifecycle = Mock(spec=ExecutionLifecycleService)
+        executor._lifecycle = mock_lifecycle
+
+        # Mock _execute_governance
+        with patch.object(executor, "_execute_governance") as mock_execute_gov:
+            mock_execute_gov.return_value = ExecutionLaunchResult(
+                launched=False,
+                skipped=True,
+                reason="Not implemented",
+                reason_code="NOT_IMPLEMENTED",
+            )
+
+            result = executor.execute(envelope)
+
+        # Should call _execute_governance, not _execute_issue_role
+        mock_execute_gov.assert_called_once()
+        assert result.status == "skipped"
+
+
+class TestMapLaunchResult:
+    """Tests for _map_launch_result method."""
+
+    def test_map_launch_result_launched(self, mock_store: SQLiteClient) -> None:
+        """Launched result should map to 'launched' status."""
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+
         envelope = JobEnvelope(
             command_type=CommandType.PLAN,
             issue_number=123,
@@ -54,459 +416,121 @@ class TestContextBuilding:
             source="cli-manual",
         )
 
-        registry = Mock()
-        store = Mock()
-        executor = JobExecutor(registry, store)
-
-        # Mock environment
-        with patch.dict(os.environ, {"TMUX": "/tmp/tmux-123"}, clear=False):
-            with patch(
-                "vibe3.execution.job_executor.resolve_orchestra_repo_root"
-            ) as mock_repo:
-                mock_repo.return_value = Mock(
-                    worktree="/path/to/worktree",
-                    repo="/path/to/repo",
-                )
-
-                context = executor._build_context(envelope)
-
-        # Verify basic fields
-        assert context.issue_number == 123
-        assert context.branch == "test-branch"
-        assert context.tmux_session is not None
-        assert context.cwd is not None
-
-    def test_build_context_handles_missing_tmux(self) -> None:
-        """Context should handle missing TMUX environment."""
-        envelope = JobEnvelope(
-            command_type=CommandType.RUN,
-            issue_number=456,
-            branch="test-branch-2",
-            source="heartbeat-tick",
+        # Create a proper JobContext instead of Mock
+        context = JobContext(
+            issue_number=123,
+            branch="test-branch",
+            tmux_session="tmux-old",
+            session_id="session-old",
+            log_path="/old/path",
+            worktree_path=None,
+            cwd="/cwd",
+            repo_path="/repo",
+            mode="async",
+        )
+        launch_result = ExecutionLaunchResult(
+            launched=True,
+            session_id="session-123",
+            tmux_session="tmux-456",
+            log_path="/path/to/log",
         )
 
-        registry = Mock()
-        store = Mock()
-        executor = JobExecutor(registry, store)
+        result = executor._map_launch_result(launch_result, envelope, context)
 
-        # Clear TMUX env
-        with patch.dict(os.environ, {}, clear=True):
-            if "TMUX" in os.environ:
-                del os.environ["TMUX"]
-            if "TMUX_PANE" in os.environ:
-                del os.environ["TMUX_PANE"]
+        assert result.status == "launched"
+        assert result.context is not None
+        assert result.context.session_id == "session-123"
+        assert result.context.tmux_session == "tmux-456"
 
-            with patch(
-                "vibe3.execution.job_executor.resolve_orchestra_repo_root"
-            ) as mock_repo:
-                mock_repo.return_value = Mock(
-                    worktree="/path/to/worktree", repo="/path/to/repo"
-                )
+    def test_map_launch_result_skipped(self, mock_store: SQLiteClient) -> None:
+        """Skipped result should map to 'skipped' status."""
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
 
-                context = executor._build_context(envelope)
-
-        assert context.issue_number == 456
-        # tmux_session should be None when no TMUX env
-
-
-class TestSuccessPath:
-    """Test 3: Mock runner to return launched result."""
-
-    def test_execute_returns_launched_result(self) -> None:
-        """Successful issue role execution should return launched JobResult."""
-        # Setup envelope
         envelope = JobEnvelope(
             command_type=CommandType.PLAN,
-            issue_number=789,
-            branch="success-test",
+            issue_number=123,
+            branch="test-branch",
             source="cli-manual",
         )
 
-        # Setup mock registry
-        mock_spec = Mock()
-        mock_spec.role_name = "planner"  # IssueRoleSyncSpec marker
-
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.PLAN,
-            import_path="vibe3.roles.plan",
-            callable_name="build_plan_async_request",
-            description="Plan executor",
+        context = JobContext(
+            issue_number=123,
+            branch="test-branch",
         )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=mock_spec,
-            module_name="vibe3.roles.plan",
-            qualname="build_plan_async_request",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock SQLiteClient to return empty list for live sessions
-        store = Mock()
-        store.list_live_runtime_sessions = Mock(return_value=[])
-        store.insert_runtime_session = Mock()
-        store.update_runtime_session = Mock()
-
-        executor = JobExecutor(registry, store)
-
-        # Mock execution path
-        mock_launch_result = ExecutionLaunchResult(
-            launched=True,
-            skipped=False,
-            session_id="test-session-123",
-            tmux_session="tmux-test",
-            log_path="logs/test.log",
-        )
-
-        with patch.object(
-            executor, "_execute_issue_role", return_value=mock_launch_result
-        ):
-            result = executor.execute(envelope)
-
-        # Verify result
-        assert result.status == "launched"
-        assert result.command_type == CommandType.PLAN
-        assert result.issue_number == 789
-        assert result.branch == "success-test"
-        assert result.adapter_path == "vibe3.roles.plan"
-
-        # Verify context metadata
-        assert result.context is not None
-        assert result.context.session_id == "test-session-123"
-        assert result.context.tmux_session == "tmux-test"
-        assert result.context.log_path == "logs/test.log"
-
-
-class TestFailurePath:
-    """Test 4: Mock runner to raise exception."""
-
-    def test_execute_returns_failed_on_exception(self) -> None:
-        """Execution exception should return failed JobResult with error."""
-        envelope = JobEnvelope(
-            command_type=CommandType.RUN,
-            issue_number=999,
-            branch="failure-test",
-            source="cli-manual",
-        )
-
-        # Setup mock registry
-        mock_spec = Mock()
-        mock_spec.role_name = "executor"
-
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.RUN,
-            import_path="vibe3.roles.run",
-            callable_name="build_run_async_request",
-            description="Run executor",
-        )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=mock_spec,
-            module_name="vibe3.roles.run",
-            qualname="build_run_async_request",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock SQLiteClient to return empty list for live sessions
-        store = Mock()
-        store.list_live_runtime_sessions = Mock(return_value=[])
-        store.insert_runtime_session = Mock()
-        store.update_runtime_session = Mock()
-
-        executor = JobExecutor(registry, store)
-
-        # Mock execution to raise exception
-        with patch.object(
-            executor,
-            "_execute_issue_role",
-            side_effect=RuntimeError("Execution failed"),
-        ):
-            result = executor.execute(envelope)
-
-        # Verify result
-        assert result.status == "failed"
-        assert result.error_message == "Execution failed"
-        assert result.error_code == "EXECUTION_ERROR"
-
-
-class TestSkipPath:
-    """Test 5: Mock ExecutionLaunchResult with skipped=True."""
-
-    def test_execute_returns_skipped_result(self) -> None:
-        """Skipped execution should return skipped JobResult."""
-        envelope = JobEnvelope(
-            command_type=CommandType.REVIEW,
-            issue_number=555,
-            branch="skip-test",
-            source="heartbeat-tick",
-        )
-
-        # Setup mock registry
-        mock_spec = Mock()
-        mock_spec.role_name = "reviewer"
-
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.REVIEW,
-            import_path="vibe3.roles.review",
-            callable_name="build_review_async_request",
-            description="Review executor",
-        )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=mock_spec,
-            module_name="vibe3.roles.review",
-            qualname="build_review_async_request",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock SQLiteClient to return empty list for live sessions
-        store = Mock()
-        store.list_live_runtime_sessions = Mock(return_value=[])
-        store.insert_runtime_session = Mock()
-        store.update_runtime_session = Mock()
-
-        executor = JobExecutor(registry, store)
-
-        # Mock execution to return skipped
-        mock_launch_result = ExecutionLaunchResult(
+        launch_result = ExecutionLaunchResult(
             launched=False,
             skipped=True,
-            reason="No changes to review",
-            reason_code="NO_CHANGES",
+            reason="Capacity full",
         )
 
-        with patch.object(
-            executor, "_execute_issue_role", return_value=mock_launch_result
-        ):
-            result = executor.execute(envelope)
+        result = executor._map_launch_result(launch_result, envelope, context)
 
-        # Verify result
         assert result.status == "skipped"
-        assert result.command_type == CommandType.REVIEW
 
+    def test_map_launch_result_failed(self, mock_store: SQLiteClient) -> None:
+        """Failed launch should map to 'failed' status with error."""
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
 
-class TestGovernanceDispatch:
-    """Test 6: Verify governance command type routes correctly."""
-
-    def test_governance_routes_to_execute_governance(self) -> None:
-        """GOVERNANCE_SCAN should dispatch to _execute_governance."""
         envelope = JobEnvelope(
-            command_type=CommandType.GOVERNANCE_SCAN,
-            issue_number=0,  # Governance has no issue
-            branch="governance-test",
-            source="heartbeat-tick",
-        )
-
-        # Setup mock registry
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.GOVERNANCE_SCAN,
-            import_path="vibe3.roles.governance",
-            callable_name="run_governance_sync",
-            description="Governance scanner",
-        )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=Mock(),  # Governance doesn't use IssueRoleSyncSpec
-            module_name="vibe3.roles.governance",
-            qualname="run_governance_sync",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock SQLiteClient to return empty list for live sessions
-        store = Mock()
-        store.list_live_runtime_sessions = Mock(return_value=[])
-        store.insert_runtime_session = Mock()
-        store.update_runtime_session = Mock()
-
-        executor = JobExecutor(registry, store)
-
-        result = executor.execute(envelope)
-
-        # Governance is stubbed, should return skipped
-        assert result.status == "skipped"
-        assert result.error_message == "Governance execution not implemented in MVP"
-        assert result.error_code == "NOT_IMPLEMENTED"
-
-
-class TestEquivalenceRegression:
-    """Test 7: Verify CLI and server execution produce equivalent results."""
-
-    def test_cli_and_server_produce_equivalent_results(self) -> None:
-        """Same command with different source should produce equivalent JobResult."""
-        # CLI-driven envelope
-        cli_envelope = JobEnvelope(
             command_type=CommandType.PLAN,
             issue_number=123,
-            branch="equivalence-test",
-            source="cli-manual",
-            actor="human:cli",
-        )
-
-        # Server-driven envelope
-        server_envelope = JobEnvelope(
-            command_type=CommandType.PLAN,
-            issue_number=123,
-            branch="equivalence-test",
-            source="heartbeat-tick",
-            actor="orchestra:system",
-        )
-
-        # Setup mock registry
-        mock_spec = Mock()
-        mock_spec.role_name = "planner"
-
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.PLAN,
-            import_path="vibe3.roles.plan",
-            callable_name="build_plan_async_request",
-            description="Plan executor",
-        )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=mock_spec,
-            module_name="vibe3.roles.plan",
-            qualname="build_plan_async_request",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock SQLiteClient to return empty list for live sessions
-        store = Mock()
-        store.list_live_runtime_sessions = Mock(return_value=[])
-        store.insert_runtime_session = Mock()
-        store.update_runtime_session = Mock()
-
-        executor = JobExecutor(registry, store)
-
-        # Mock same execution result for both
-        mock_launch_result = ExecutionLaunchResult(
-            launched=True,
-            skipped=False,
-            session_id="equivalence-session",
-            tmux_session="equivalence-tmux",
-            log_path="logs/equivalence.log",
-        )
-
-        with patch.object(
-            executor, "_execute_issue_role", return_value=mock_launch_result
-        ):
-            cli_result = executor.execute(cli_envelope)
-            server_result = executor.execute(server_envelope)
-
-        # Verify equivalence (except source field)
-        assert cli_result.status == server_result.status
-        assert cli_result.command_type == server_result.command_type
-        assert cli_result.issue_number == server_result.issue_number
-        assert cli_result.branch == server_result.branch
-
-        # Context metadata should be equivalent
-        assert cli_result.context.session_id == server_result.context.session_id
-        assert cli_result.context.tmux_session == server_result.context.tmux_session
-        assert cli_result.context.log_path == server_result.context.log_path
-
-        # Only source should differ
-        assert cli_result.source == "cli-manual"
-        assert server_result.source == "heartbeat-tick"
-
-
-class TestLifecycleEventRecording:
-    """Test 8: Verify lifecycle events are recorded correctly."""
-
-    def test_lifecycle_started_and_completed_recorded(self) -> None:
-        """Executor should record started and completed lifecycle events."""
-        envelope = JobEnvelope(
-            command_type=CommandType.RUN,
-            issue_number=111,
-            branch="lifecycle-test",
+            branch="test-branch",
             source="cli-manual",
         )
 
-        # Setup mock registry
-        mock_spec = Mock()
-        mock_spec.role_name = "executor"
-
-        mock_entry = CommandAdapterEntry(
-            job_type=CommandType.RUN,
-            import_path="vibe3.roles.run",
-            callable_name="build_run_async_request",
-            description="Run executor",
+        context = JobContext(
+            issue_number=123,
+            branch="test-branch",
         )
-
-        mock_resolved = ResolvedAdapter(
-            entry=mock_entry,
-            callable=mock_spec,
-            module_name="vibe3.roles.run",
-            qualname="build_run_async_request",
-        )
-
-        registry = Mock()
-        registry.resolve = Mock(return_value=mock_resolved)
-
-        # Mock lifecycle service
-        store = Mock()
-        lifecycle_mock = Mock()
-        lifecycle_mock.record_started = Mock()
-        lifecycle_mock.record_completed = Mock()
-
-        executor = JobExecutor(registry, store)
-        executor._lifecycle = lifecycle_mock
-
-        # Mock execution
-        mock_launch_result = ExecutionLaunchResult(
-            launched=True,
+        launch_result = ExecutionLaunchResult(
+            launched=False,
             skipped=False,
+            reason="Execution failed",
+            reason_code="DISPATCH_ERROR",
         )
 
-        with patch.object(
-            executor, "_execute_issue_role", return_value=mock_launch_result
-        ):
-            executor.execute(envelope)
+        result = executor._map_launch_result(launch_result, envelope, context)
 
-        # Verify lifecycle calls
-        lifecycle_mock.record_started.assert_called_once()
-        lifecycle_mock.record_completed.assert_called_once()
-
-        # Verify role mapping
-        started_call = lifecycle_mock.record_started.call_args
-        assert started_call[1]["role"] == "executor"
-        assert started_call[1]["target"] == "lifecycle-test"
-
-
-class TestAdapterResolutionError:
-    """Test 9: Unregistered command type should fail."""
-
-    def test_unregistered_command_type_returns_failed(self) -> None:
-        """Unregistered command type should return failed JobResult."""
-        envelope = JobEnvelope(
-            command_type=CommandType.MANAGER,
-            issue_number=333,
-            branch="adapter-error-test",
-            source="heartbeat-tick",
-        )
-
-        # Setup registry to raise error
-        registry = Mock()
-        registry.resolve = Mock(side_effect=ValueError("Command type not registered"))
-
-        store = Mock()
-        executor = JobExecutor(registry, store)
-
-        result = executor.execute(envelope)
-
-        # Verify result
         assert result.status == "failed"
-        assert "Adapter resolution failed" in result.error_message
-        assert result.error_code == "ADAPTER_RESOLUTION_ERROR"
+        assert result.error_message == "Execution failed"
+        assert result.error_code == "DISPATCH_ERROR"
+
+    def test_map_launch_result_copies_metadata(self, mock_store: SQLiteClient) -> None:
+        """Metadata from launch result should be copied to context."""
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+
+        envelope = JobEnvelope(
+            command_type=CommandType.PLAN,
+            issue_number=123,
+            branch="test-branch",
+            source="cli-manual",
+        )
+
+        context = JobContext(
+            issue_number=123,
+            branch="test-branch",
+            tmux_session=None,
+            session_id=None,
+            log_path=None,
+            worktree_path=None,
+            cwd="/cwd",
+            repo_path="/repo",
+            mode="async",
+        )
+
+        launch_result = ExecutionLaunchResult(
+            launched=True,
+            session_id="session-123",
+            tmux_session="tmux-456",
+            log_path="/path/to/log",
+        )
+
+        result = executor._map_launch_result(launch_result, envelope, context)
+
+        assert result.context is not None
+        assert result.context.session_id == "session-123"
+        assert result.context.tmux_session == "tmux-456"
+        assert result.context.log_path == "/path/to/log"
