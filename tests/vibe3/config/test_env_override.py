@@ -170,7 +170,7 @@ class TestLoadKeysEnvFallback:
         )
 
         monkeypatch.setattr(
-            "vibe3.clients.git_client.find_repo_root",
+            "vibe3.utils.git_helpers.find_repo_root",
             lambda: tmp_path,
         )
         monkeypatch.chdir(tmp_path)
@@ -193,11 +193,11 @@ class TestLoadKeysEnvFallback:
         keys_file.write_text(keys_content)
 
         # Mock find_repo_root to return tmp_path (simulating repo root)
-        from vibe3.clients.git_client import find_repo_root
+        from vibe3.utils.git_helpers import find_repo_root
 
         monkeypatch.setattr(find_repo_root, "cache_clear", lambda: None)
         monkeypatch.setattr(
-            "vibe3.clients.git_client.find_repo_root",
+            "vibe3.utils.git_helpers.find_repo_root",
             lambda: tmp_path,
         )
 
@@ -231,7 +231,7 @@ class TestLoadKeysEnvFallback:
         try:
             # Mock find_repo_root to raise SystemError (not in git repo)
             monkeypatch.setattr(
-                "vibe3.clients.git_client.find_repo_root",
+                "vibe3.utils.git_helpers.find_repo_root",
                 _mock_repo_root_not_found,
             )
             # Ensure no home-dir keys.env interferes
@@ -264,7 +264,7 @@ class TestLoadKeysEnvFallback:
 
         # Mock find_repo_root to return tmp_path
         monkeypatch.setattr(
-            "vibe3.clients.git_client.find_repo_root",
+            "vibe3.utils.git_helpers.find_repo_root",
             lambda: tmp_path,
         )
 

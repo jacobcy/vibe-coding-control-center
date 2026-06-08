@@ -157,7 +157,7 @@ class ExecutionCoordinator:
 
         Delegates to the single-source-of-truth function in git_client.
         """
-        from vibe3.clients import find_repo_root
+        from vibe3.utils import find_repo_root
 
         return find_repo_root()
 

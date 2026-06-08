@@ -10,12 +10,12 @@ Tests verify that:
 """
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
 
-from vibe3.clients.git_client import GitClient
 from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.exceptions import GitError
 
@@ -24,17 +24,14 @@ def test_resolver_returns_minimal_defaults_by_default():
     """Test resolver returns minimal defaults when no profile specified."""
     # Mock git remote to return non-vibe-center repo and config file to not exist
     with (
+        patch("vibe3.utils.git_helpers.find_repo_root") as mock_find_repo_root,
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir"
-        ) as mock_git_common_dir,
-        patch.object(
-            GitClient,
-            "get_remote_url",
+            "vibe3.utils.git_helpers.get_remote_url",
             return_value="https://github.com/other/repo.git",
         ),
         patch("pathlib.Path.exists") as mock_exists,
     ):
-        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_find_repo_root.return_value = Path("/tmp/test")
         mock_exists.return_value = False  # No .vibe/config.yaml
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
@@ -91,17 +88,14 @@ def test_resolver_detects_vibe_center_repo():
     """Test resolver detects Vibe Center repo via git remote."""
     # Mock config file to not exist so git remote detection is tested
     with (
+        patch("vibe3.utils.git_helpers.find_repo_root") as mock_find_repo_root,
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir"
-        ) as mock_git_common_dir,
-        patch.object(
-            GitClient,
-            "get_remote_url",
+            "vibe3.utils.git_helpers.get_remote_url",
             return_value="https://github.com/jacobcy/vibe-center.git",
         ),
         patch("pathlib.Path.exists") as mock_exists,
     ):
-        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_find_repo_root.return_value = Path("/tmp/test")
         mock_exists.return_value = False  # No .vibe/config.yaml
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
@@ -111,16 +105,13 @@ def test_resolver_detects_vibe_center_repo():
 def test_resolver_falls_back_when_git_common_dir_lookup_fails():
     """Test resolver fallback when git common dir lookup raises GitError."""
     with (
+        patch("vibe3.utils.git_helpers.find_repo_root") as mock_find_repo_root,
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir"
-        ) as mock_git_common_dir,
-        patch.object(
-            GitClient,
-            "get_remote_url",
+            "vibe3.utils.git_helpers.get_remote_url",
             return_value="https://github.com/jacobcy/vibe-center.git",
         ),
     ):
-        mock_git_common_dir.side_effect = GitError("rev-parse", "not a git repository")
+        mock_find_repo_root.side_effect = GitError("rev-parse", "not a git repository")
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
         assert convention.branch.task_prefix == "task/issue-"
@@ -153,17 +144,14 @@ def test_convention_no_prefix_state_label():
 def test_detect_profile_is_cached():
     """Test that _detect_profile result is cached to avoid repeated subprocess calls."""
     with (
+        patch("vibe3.utils.git_helpers.find_repo_root") as mock_find_repo_root,
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir"
-        ) as mock_git_common_dir,
-        patch.object(
-            GitClient,
-            "get_remote_url",
+            "vibe3.utils.git_helpers.get_remote_url",
             return_value="https://github.com/other/repo.git",
         ) as mock_get_remote_url,
         patch("pathlib.Path.exists") as mock_exists,
     ):
-        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_find_repo_root.return_value = Path("/tmp/test")
         mock_exists.return_value = False
 
         resolver = ConventionResolver.from_repo()
@@ -183,17 +171,14 @@ def test_detect_profile_is_cached():
 def test_detect_profile_cache_invalidation():
     """Test that cache can be cleared by creating a new resolver instance."""
     with (
+        patch("vibe3.utils.git_helpers.find_repo_root") as mock_find_repo_root,
         patch(
-            "vibe3.clients.git_client.GitClient.get_git_common_dir"
-        ) as mock_git_common_dir,
-        patch.object(
-            GitClient,
-            "get_remote_url",
+            "vibe3.utils.git_helpers.get_remote_url",
             return_value="https://github.com/other/repo.git",
         ) as mock_get_remote_url,
         patch("pathlib.Path.exists") as mock_exists,
     ):
-        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_find_repo_root.return_value = Path("/tmp/test")
         mock_exists.return_value = False
 
         # First resolver instance

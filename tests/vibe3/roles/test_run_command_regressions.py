@@ -86,8 +86,10 @@ def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
     """External repos using github-flow discover and read global skills."""
     # Clear resolver cache to ensure fresh resolver for custom test environment
     from vibe3.config.convention_resolver import get_resolver
+    from vibe3.utils.git_helpers import find_repo_root as _find_repo_root_impl
 
     get_resolver.cache_clear()
+    _find_repo_root_impl.cache_clear()
 
     external_repo = tmp_path / "external-repo"
     external_repo.mkdir()
@@ -124,7 +126,7 @@ def test_execute_manual_run_resolves_github_flow_skill_from_global_runtime(
     try:
         with (
             patch(
-                "vibe3.clients.git_client.GitClient.get_git_common_dir",
+                "vibe3.utils.git_helpers.get_git_common_dir",
                 return_value=str(git_dir),
             ),
             patch("vibe3.roles.run_command.CodeagentExecutionService") as service_cls,

@@ -8,10 +8,8 @@ if TYPE_CHECKING:
     from vibe3.utils.actor_utils import normalize_actor
     from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.codeagent_helpers import (
-        build_prompt_file_content,
         diagnose_backend_error,
         diagnose_prompt_size_issue,
-        prepare_prompt_file,
         sanitize_prompt_for_display,
         sanitize_task_shell_meta,
         stream_reader,
@@ -35,9 +33,12 @@ if TYPE_CHECKING:
         clean_error_message,
     )
     from vibe3.utils.git_helpers import (
+        find_repo_root,
         get_branch_handoff_dir,
         get_commit_message,
         get_current_branch,
+        get_git_common_dir,
+        get_remote_url,
     )
     from vibe3.utils.issue_ref import parse_issue_number, try_parse_issue_number
     from vibe3.utils.orchestra_instance import (
@@ -66,7 +67,6 @@ _LAZY_IMPORTS = {
     "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
     "PACK_REFS_INTERVAL_TICKS": "vibe3.utils.constants",
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
-    "build_prompt_file_content": "vibe3.utils.codeagent_helpers",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
     "diagnose_prompt_size_issue": "vibe3.utils.codeagent_helpers",
@@ -77,10 +77,12 @@ _LAZY_IMPORTS = {
     "get_branch_handoff_dir": "vibe3.utils.git_helpers",
     "get_commit_message": "vibe3.utils.git_helpers",
     "get_current_branch": "vibe3.utils.git_helpers",
+    "get_git_common_dir": "vibe3.utils.git_helpers",
+    "get_remote_url": "vibe3.utils.git_helpers",
+    "find_repo_root": "vibe3.utils.git_helpers",
     "normalize_actor": "vibe3.utils.actor_utils",
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
     "parse_issue_number": "vibe3.utils.issue_ref",
-    "prepare_prompt_file": "vibe3.utils.codeagent_helpers",
     "read_instance_info": "vibe3.utils.orchestra_instance",
     "resolve_priority": "vibe3.utils.queue_ordering",
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
@@ -120,7 +122,6 @@ __all__ = [
     "PACK_REFS_INTERVAL_TICKS",
     "STARTING_TIMEOUT_SECONDS",
     "VERDICT_UNKNOWN",
-    "build_prompt_file_content",
     "clean_error_message",
     "check_branch_behind",
     "diagnose_backend_error",
@@ -132,10 +133,12 @@ __all__ = [
     "get_branch_handoff_dir",
     "get_commit_message",
     "get_current_branch",
+    "get_git_common_dir",
+    "get_remote_url",
+    "find_repo_root",
     "normalize_actor",
     "OrchestraInstanceInfo",
     "parse_issue_number",
-    "prepare_prompt_file",
     "read_instance_info",
     "resolve_priority",
     "resolve_roadmap_rank",

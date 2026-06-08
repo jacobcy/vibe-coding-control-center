@@ -419,7 +419,7 @@ def load_keys_env_fallback() -> None:
     # (git_client imports from config module)
     repo_root: Path | None = None
     try:
-        from vibe3.clients import find_repo_root
+        from vibe3.utils import find_repo_root
 
         repo_root = find_repo_root()
     except SystemError:

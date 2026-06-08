@@ -17,7 +17,6 @@ from vibe3.config.env_override import get_env_override
 from vibe3.config.profile_convention import ProfileConvention
 
 if TYPE_CHECKING:
-    from vibe3.clients import GitClient
     from vibe3.config.profile_config import ProfileConfig
     from vibe3.models.adapter_manifest import AdapterManifest
 
@@ -50,25 +49,7 @@ class ConventionResolver:
 
     profile: str | None = None
     _profile_cache: str | None = None
-    _git_client: GitClient | None = None
     _adapter_resolver: Callable[[str], "AdapterManifest | None"] | None = None
-
-    def _get_git_client(self) -> GitClient:
-        """Get GitClient instance with lazy initialization.
-
-        Uses dependency injection pattern to break circular dependency
-        between config and clients layers.
-
-        Note: Not thread-safe. CLI is single-threaded so this is acceptable.
-
-        Returns:
-            GitClient instance (injected or lazy-loaded)
-        """
-        if self._git_client is None:
-            from vibe3.clients import GitClient
-
-            self._git_client = GitClient()
-        return self._git_client
 
     def resolve(self) -> ProfileConvention:
         """Resolve the effective convention for current repo.
@@ -132,12 +113,11 @@ class ConventionResolver:
 
         # Step 3: Check .vibe/config.yaml for profile field
         try:
-            from pathlib import Path
 
-            # Delayed import to break circular dependency
-            git_client = self._get_git_client()
-            git_common_dir = git_client.get_git_common_dir()
-            repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+            # Use standalone git helpers to avoid config → clients dependency
+            from vibe3.utils.git_helpers import find_repo_root
+
+            repo_root = find_repo_root()
             config_path = repo_root / ".vibe/config.yaml"
             if config_path.exists():
                 with config_path.open(encoding="utf-8") as f:
@@ -159,7 +139,9 @@ class ConventionResolver:
             logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo
-        remote_url = self._get_git_client().get_remote_url()
+        from vibe3.utils.git_helpers import get_remote_url
+
+        remote_url = get_remote_url()
         if remote_url:
             url_lower = remote_url.lower()
             if "vibe-center" in url_lower or "vibe-coding-control-center" in url_lower:
@@ -222,7 +204,6 @@ class ConventionResolver:
     def from_repo(
         cls,
         profile: str | None = None,
-        git_client: GitClient | None = None,
         adapter_resolver: Callable[[str], "AdapterManifest | None"] | None = None,
     ) -> "ConventionResolver":
         """Create resolver from current repo context.
@@ -232,7 +213,6 @@ class ConventionResolver:
 
         Args:
             profile: Optional profile name override
-            git_client: Optional GitClient instance for dependency injection
             adapter_resolver: Optional adapter resolver function for
                 dependency injection
 
@@ -246,9 +226,7 @@ class ConventionResolver:
         logger.debug(
             f"Creating ConventionResolver from repo context (profile={profile})"
         )
-        return cls(
-            profile=profile, _git_client=git_client, _adapter_resolver=adapter_resolver
-        )
+        return cls(profile=profile, _adapter_resolver=adapter_resolver)
 
 
 def diagnose_profile() -> str:

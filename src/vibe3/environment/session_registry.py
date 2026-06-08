@@ -311,9 +311,9 @@ class SessionRegistryService:
             return
 
         try:
-            from vibe3.clients import find_repo_root
             from vibe3.environment.worktree import WorktreeManager
             from vibe3.environment.worktree_context import WorktreeContext
+            from vibe3.utils import find_repo_root
 
             repo_root = find_repo_root()
             from vibe3.config import load_orchestra_config
