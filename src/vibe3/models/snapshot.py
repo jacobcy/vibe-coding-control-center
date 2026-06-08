@@ -153,6 +153,29 @@ class DiffSummary(BaseModel):
             + other.total_functions_delta,
         )
 
+    @classmethod
+    def from_metrics(
+        cls, baseline: StructureMetrics, current: StructureMetrics
+    ) -> DiffSummary:
+        """Create a DiffSummary with global metric deltas.
+
+        This is used to compute snapshot-level metric deltas
+        (total_loc, total_functions) which sub-functions
+        (_diff_files, _diff_modules, _diff_dependencies) don't have
+        access to, as they only operate on individual files/modules/deps.
+
+        Args:
+            baseline: Baseline snapshot metrics
+            current: Current snapshot metrics
+
+        Returns:
+            DiffSummary with only total_loc_delta and total_functions_delta populated
+        """
+        return DiffSummary(
+            total_loc_delta=current.total_loc - baseline.total_loc,
+            total_functions_delta=current.total_functions - baseline.total_functions,
+        )
+
 
 class DiffWarning(BaseModel):
     """Warning in structure diff."""
