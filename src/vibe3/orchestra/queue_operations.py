@@ -15,15 +15,6 @@ if TYPE_CHECKING:
     from vibe3.domain import QualifyGateService
     from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
-    from vibe3.roles import TriggerableRoleDefinition
-
-
-def _find_role_for_state_lazy(
-    trigger_state: IssueState,
-) -> "TriggerableRoleDefinition | None":
-    from vibe3.domain import find_role_for_state
-
-    return find_role_for_state(trigger_state)
 
 
 # Cooldown mechanism for auto-resume circuit breaker
@@ -67,8 +58,10 @@ def select_ready_issues_from_collected_issues(
     supervisor_label: str,
 ) -> list[IssueInfo]:
     """Select ready issues from already-collected IssueInfo objects."""
+    from vibe3.domain import find_role_for_state
+
     selected: list[IssueInfo] = []
-    role = _find_role_for_state_lazy(trigger_state)
+    role = find_role_for_state(trigger_state)
     if role is None:
         return selected
 
