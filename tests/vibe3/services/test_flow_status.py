@@ -117,6 +117,7 @@ class TestFlowStatus:
         with patch("vibe3.services.pr.service.PRService") as mock_pr_class:
             mock_pr_svc = mock_pr_class.return_value
             mock_pr_svc.get_branch_pr_status.side_effect = Exception("GitHub down")
+            mock_git.find_worktree_path_for_branch.return_value = None
 
             result = service.get_flow_status("test-branch")
 
@@ -126,6 +127,7 @@ class TestFlowStatus:
         # PR hydration failure should result in default values
         assert result.pr_number is None
         assert result.pr_ready_for_review is False
+        assert result.worktree_root is None
 
     def test_get_flow_status_task_issue_number_resolution(
         self, mock_store, mock_git
