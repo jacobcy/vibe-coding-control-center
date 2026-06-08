@@ -401,7 +401,10 @@ class CodeagentExecutionService:
         ctx = self._prepare_sync_context(command)
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
-        echo(f"-> Executing with {ctx.options.agent or ctx.options.backend}...")
+        effective = ctx.options
+        echo(f"-> Executing with {effective.agent or effective.backend}...")
+        if effective.model:
+            echo(f"   model: {effective.model}")
 
         try:
             agent_result = CodeagentBackend().run(

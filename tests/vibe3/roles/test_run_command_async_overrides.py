@@ -14,6 +14,10 @@ class TestAsyncOverrideForwarding:
 
         def capture_cli_args(*, cli_args, **kwargs):
             captured_cli_args["args"] = cli_args
+            # Return AsyncDispatchResult to match new return type
+            from vibe3.roles.run_command import AsyncDispatchResult
+
+            return AsyncDispatchResult(tmux_session=None, log_path=None)
 
         with (
             patch(
@@ -65,6 +69,10 @@ class TestAsyncOverrideForwarding:
 
         def capture_cli_args(*, cli_args, **kwargs):
             captured_cli_args["args"] = cli_args
+            # Return AsyncDispatchResult to match new return type
+            from vibe3.roles.run_command import AsyncDispatchResult
+
+            return AsyncDispatchResult(tmux_session=None, log_path=None)
 
         with (
             patch(
@@ -110,6 +118,10 @@ class TestAsyncOverrideForwarding:
 
         def capture_cli_args(*, cli_args, **kwargs):
             captured_cli_args["args"] = cli_args
+            # Return AsyncDispatchResult to match new return type
+            from vibe3.roles.run_command import AsyncDispatchResult
+
+            return AsyncDispatchResult(tmux_session=None, log_path=None)
 
         with (
             patch(

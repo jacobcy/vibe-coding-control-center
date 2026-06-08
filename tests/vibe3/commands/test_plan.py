@@ -154,10 +154,10 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
         "vibe3.commands.plan.resolve_spec_plan_input",
         MagicMock(),
     )
-    # Mock load_runtime_config since we added it in issue #2023
+    # Mock load_config_and_validate_model since we refactored config loading
     monkeypatch.setattr(
-        "vibe3.commands.plan.load_runtime_config",
-        MagicMock(),
+        "vibe3.commands.plan.load_config_and_validate_model",
+        lambda *a, **kw: MagicMock(),
     )
 
     with patch.object(Path, "exists", return_value=True):
@@ -271,7 +271,7 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["--branch", "42"])
     assert result.exit_code == 0
     # Should display tmux and log info
-    assert "tmux: vibe3-planner-issue-42" in result.output
+    assert "tmux session: vibe3-planner-issue-42" in result.output
     assert "log: /path/to/log.md" in result.output
 
 
@@ -340,7 +340,16 @@ def test_plan_model_option_propagates(monkeypatch) -> None:
     )
 
     result = runner.invoke(
-        plan_app, ["--branch", "42", "--no-async", "--model", "claude-opus-4-8"]
+        plan_app,
+        [
+            "--branch",
+            "42",
+            "--no-async",
+            "--backend",
+            "claude",
+            "--model",
+            "claude-opus-4-8",
+        ],
     )
     assert result.exit_code == 0
     mock_sync.assert_called_once()
@@ -371,3 +380,44 @@ def test_plan_fresh_session_propagates(monkeypatch) -> None:
     mock_sync.assert_called_once()
     call_kwargs = mock_sync.call_args[1]
     assert call_kwargs["fresh_session"] is True
+
+
+def test_plan_model_with_config_backend_succeeds(monkeypatch) -> None:
+    """Test --model works when config provides backend (the #2435 fix).
+
+    When user has backend: "claude" in settings.yaml and runs:
+      vibe3 plan --model opus
+    This should succeed — config provides backend, CLI provides model.
+    """
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+
+    mock_sync = MagicMock()
+    mock_resolve = MagicMock()
+
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+
+    # Mock config with backend set (simulating settings.yaml)
+    mock_config = MagicMock()
+    mock_config.plan.agent_config.backend = "claude"
+    mock_config.plan.agent_config.model = None
+    mock_config.plan.agent_config.agent = None
+    mock_config.plan.agent_config.timeout_seconds = 3600
+    monkeypatch.setattr(
+        "vibe3.commands.plan.load_config_and_validate_model",
+        lambda *a, **kw: mock_config,
+    )
+
+    result = runner.invoke(
+        plan_app, ["--branch", "42", "--no-async", "--model", "opus"]
+    )
+    assert result.exit_code == 0, f"Expected success but got: {result.output}"
+    mock_sync.assert_called_once()
+    call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["model"] == "opus"

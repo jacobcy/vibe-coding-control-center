@@ -15,12 +15,11 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    load_config_and_validate_model,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config import load_runtime_config
-from vibe3.config.cli_overrides import build_role_cli_overrides
-from vibe3.exceptions import ConfigError, UserError
+from vibe3.exceptions import UserError
 from vibe3.roles import resolve_skill_path
 from vibe3.roles.run import (
     ensure_plan_file_exists,
@@ -87,15 +86,8 @@ def run_command(
 
     register_event_handlers()
 
-    cli_overrides = build_role_cli_overrides("run", agent, backend, model)
-
-    try:
-        config = load_runtime_config(
-            cli_overrides=cli_overrides if cli_overrides else None
-        )
-    except ConfigError as e:
-        typer.echo(f"Configuration error: {e}", err=True)
-        raise typer.Exit(1) from e
+    # Load config and validate --model requires backend (CLI or config)
+    config = load_config_and_validate_model("run", agent, backend, model)
 
     target_branch = resolve_branch_arg(branch)
 

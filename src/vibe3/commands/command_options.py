@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 import typer
 
 if TYPE_CHECKING:
+    from vibe3.config import VibeConfig
     from vibe3.services.flow_service import FlowService
 
 _TRACE_OPT = Annotated[
@@ -38,6 +39,72 @@ def validate_show_prompt_dependency(dry_run: bool, show_prompt: bool) -> None:
     if show_prompt and not dry_run:
         typer.echo("Error: --show-prompt requires --dry-run", err=True)
         raise typer.Exit(1)
+
+
+def validate_model_backend_dependency(
+    model: str | None,
+    backend: str | None,
+    config_backend: str | None = None,
+) -> None:
+    """Validate that --model requires backend (CLI or config).
+
+    Args:
+        model: The model specified via --model flag
+        backend: The backend specified via --backend flag
+        config_backend: The backend from runtime config
+
+    Raises:
+        typer.Exit: If --model is used without backend (CLI or config)
+    """
+    if model and not backend and not config_backend:
+        typer.echo(
+            "Error: --model requires --backend to be specified on CLI or in config.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
+def load_config_and_validate_model(
+    role: str,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> "VibeConfig":
+    """Load runtime config and validate --model requires backend.
+
+    Combines config loading with model-backend validation into a single step.
+    Extracts config_backend with defensive getattr to handle malformed configs.
+
+    Args:
+        role: Role name (run/plan/review)
+        agent: CLI --agent value
+        backend: CLI --backend value
+        model: CLI --model value
+
+    Returns:
+        Loaded VibeConfig
+
+    Raises:
+        typer.Exit: If config loading fails or --model used without backend
+        ConfigError: If config loading fails
+    """
+    from vibe3.config import load_runtime_config
+    from vibe3.config.cli_overrides import build_role_cli_overrides
+    from vibe3.exceptions import ConfigError
+
+    cli_overrides = build_role_cli_overrides(role, agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Configuration error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    role_config = getattr(config, role, None)
+    agent_config = getattr(role_config, "agent_config", None) if role_config else None
+    config_backend = agent_config.backend if agent_config else None
+    validate_model_backend_dependency(model, backend, config_backend)
+
+    return config
 
 
 _ASYNC_OPT = Annotated[

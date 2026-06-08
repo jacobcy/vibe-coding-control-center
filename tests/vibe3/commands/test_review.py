@@ -312,7 +312,9 @@ def test_review_model_option_propagates():
         mock_validate.return_value = (mock_flow, 42)
         mock_resolve.return_value = "task/issue-42"
 
-        result = runner.invoke(app, ["--no-async", "--model", "claude-opus-4-8"])
+        result = runner.invoke(
+            app, ["--no-async", "--backend", "claude", "--model", "claude-opus-4-8"]
+        )
 
     assert result.exit_code == 0
     mock_sync.assert_called_once()

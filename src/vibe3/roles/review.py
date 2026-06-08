@@ -385,8 +385,12 @@ def execute_manual_review_async(
                 f"Review dispatch failed unexpectedly: {launch.reason}",
                 reason_code=reason_code,
             )
-        return ReviewRunResult("ERROR", None, issue_number)
-    return ReviewRunResult("ASYNC", None, issue_number)
+        return ReviewRunResult(
+            "ERROR", None, issue_number, launch.tmux_session, launch.log_path
+        )
+    return ReviewRunResult(
+        "ASYNC", None, issue_number, launch.tmux_session, launch.log_path
+    )
 
 
 def execute_manual_review_sync(

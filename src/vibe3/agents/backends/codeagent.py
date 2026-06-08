@@ -77,8 +77,12 @@ class CodeagentBackend:
 
         if preset_name:
             command.extend(["--agent", preset_name])
+            if options.model:
+                command.extend(["--model", options.model])
         elif options.agent:
             command.extend(["--agent", options.agent])
+            if options.model:
+                command.extend(["--model", options.model])
         elif options.backend:
             command.extend(["--backend", options.backend])
             if options.model:

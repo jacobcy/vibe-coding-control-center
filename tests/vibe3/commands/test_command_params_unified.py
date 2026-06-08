@@ -61,7 +61,8 @@ def mock_run_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
         MagicMock(return_value=(mock_flow, 42)),
     )
     monkeypatch.setattr(
-        "vibe3.commands.run.load_runtime_config", lambda cli_overrides=None: MagicMock()
+        "vibe3.commands.run.load_config_and_validate_model",
+        lambda *a, **kw: MagicMock(),
     )
     return {"flow": mock_flow}
 
@@ -375,40 +376,56 @@ def test_run_cli_agent_overrides_config(
 def test_run_cli_backend_overrides_config(
     monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
 ) -> None:
-    """--backend CLI option is passed as cli_overrides to load_runtime_config."""
+    """--backend CLI option is passed to load_config_and_validate_model."""
     mock_execute = MagicMock()
     monkeypatch.setattr("vibe3.commands.run.execute_manual_run", mock_execute)
 
-    captured_overrides: dict = {}
+    captured_args: dict = {}
 
-    def capture_config(cli_overrides: dict | None = None) -> MagicMock:
-        captured_overrides.update(cli_overrides or {})
+    def capture_config(
+        role: str, agent: str | None, backend: str | None, model: str | None
+    ) -> MagicMock:
+        captured_args["role"] = role
+        captured_args["agent"] = agent
+        captured_args["backend"] = backend
+        captured_args["model"] = model
         return MagicMock()
 
-    monkeypatch.setattr("vibe3.commands.run.load_runtime_config", capture_config)
+    monkeypatch.setattr(
+        "vibe3.commands.run.load_config_and_validate_model", capture_config
+    )
 
     runner.invoke(
         run_app, ["--backend", "override-backend", "--no-async", "test instructions"]
     )
 
-    assert "run.agent_config.backend" in captured_overrides
-    assert captured_overrides["run.agent_config.backend"] == "override-backend"
+    assert captured_args["backend"] == "override-backend"
+    assert captured_args["role"] == "run"
 
 
 def test_run_no_cli_override_uses_config(
     monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
 ) -> None:
-    """Without CLI overrides, load_runtime_config receives an empty dict."""
+    """Without CLI overrides, load_config_and_validate_model receives None args."""
     monkeypatch.setattr("vibe3.commands.run.execute_manual_run", MagicMock())
 
-    captured_overrides: dict = {}
+    captured_args: dict = {}
 
-    def capture_config(cli_overrides: dict | None = None) -> MagicMock:
-        captured_overrides.update(cli_overrides or {})
+    def capture_config(
+        role: str, agent: str | None, backend: str | None, model: str | None
+    ) -> MagicMock:
+        captured_args["role"] = role
+        captured_args["agent"] = agent
+        captured_args["backend"] = backend
+        captured_args["model"] = model
         return MagicMock()
 
-    monkeypatch.setattr("vibe3.commands.run.load_runtime_config", capture_config)
+    monkeypatch.setattr(
+        "vibe3.commands.run.load_config_and_validate_model", capture_config
+    )
 
     runner.invoke(run_app, ["--no-async", "test instructions"])
 
-    assert captured_overrides == {}
+    assert captured_args.get("agent") is None
+    assert captured_args.get("backend") is None
+    assert captured_args.get("model") is None

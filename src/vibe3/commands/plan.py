@@ -15,12 +15,11 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    load_config_and_validate_model,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config import load_runtime_config
-from vibe3.config.cli_overrides import RoleCliOverrides, build_role_cli_overrides
-from vibe3.exceptions import ConfigError
+from vibe3.config.cli_overrides import RoleCliOverrides
 from vibe3.execution import CodeagentExecutionService
 from vibe3.roles.plan import (
     execute_spec_plan_async,
@@ -57,6 +56,9 @@ def _plan_for_branch(
     if trace:
         enable_method_trace()
 
+    # Load config and validate --model requires backend (CLI or config)
+    config = load_config_and_validate_model("plan", agent, backend, model)
+
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
 
@@ -88,14 +90,6 @@ def _plan_for_branch(
         spec_input = resolve_spec_plan_input(branch)
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-    # Build cli_overrides and load config
-    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
-    try:
-        config = load_runtime_config(cli_overrides=cli_overrides or None)
-    except ConfigError as e:
-        typer.echo(f"Config error: {e}", err=True)
         raise typer.Exit(1)
 
     # Handle dry_run early return
@@ -146,7 +140,7 @@ def _plan_for_branch(
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"tmux session: {result.tmux_session}")
         typer.echo(f"log: {result.log_path}")
 
 
@@ -165,6 +159,9 @@ def _plan_spec_impl(
     """Create implementation plan from a specification file."""
     if trace:
         enable_method_trace()
+
+    # Load config and validate --model requires backend (CLI or config)
+    config = load_config_and_validate_model("plan", agent, backend, model)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -253,14 +250,6 @@ def _plan_spec_impl(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # Build cli_overrides and load config
-    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
-    try:
-        config = load_runtime_config(cli_overrides=cli_overrides or None)
-    except ConfigError as e:
-        typer.echo(f"Config error: {e}", err=True)
-        raise typer.Exit(1)
-
     # Handle dry_run early return
     # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
     # (aligned with run command's proven dry_run handling)
@@ -312,7 +301,7 @@ def _plan_spec_impl(
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"tmux session: {result.tmux_session}")
         typer.echo(f"log: {result.log_path}")
 
 

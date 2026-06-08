@@ -132,6 +132,9 @@ code_limits:
       - path: "src/vibe3/roles/plan.py"
         limit: 480
         reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑"
+      - path: "src/vibe3/roles/run_command.py"
+        limit: 420
+        reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #2435 新增 AsyncDispatchResult dataclass 和 tmux/log 输出（+28 行）"
 
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"
@@ -189,8 +192,8 @@ code_limits:
         limit: 600
         reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录等紧密耦合的统一调度入口逻辑；Issue #2430 扩展支持 sync 和 governance dispatch 后略微超标（+65 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 590
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标"
+        limit: 600
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多"
@@ -208,6 +211,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
+      - path: "tests/vibe3/commands/test_plan.py"
+        limit: 450
+        reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；Issue #2435 新增 test_plan_model_with_config_backend_succeeds 验证 MAJOR fix 后略微超标（423 行）"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"

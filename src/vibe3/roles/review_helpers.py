@@ -17,6 +17,8 @@ class ReviewRunResult:
     verdict: str
     handoff_file: str | None
     issue_number: int | None
+    tmux_session: str | None = None  # NEW
+    log_path: str | None = None  # NEW
 
 
 def _load_existing_audit_ref(branch: str | None) -> str | None:
