@@ -32,6 +32,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         "initiated_by",
         "blocked_by_issue",  # NEW: Dependency issue number (INT)
         "blocked_reason",  # Block reason text (TEXT)
+        "blocked_reason_summary",  # Pre-computed display summary
         "next_step",
         "flow_status",
         "updated_at",
