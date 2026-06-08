@@ -40,6 +40,24 @@ def validate_show_prompt_dependency(dry_run: bool, show_prompt: bool) -> None:
         raise typer.Exit(1)
 
 
+def validate_model_backend_dependency(
+    model: str | None,
+    backend: str | None,
+) -> None:
+    """Validate that --model requires --backend to be specified on CLI.
+
+    Args:
+        model: The model specified via --model flag
+        backend: The backend specified via --backend flag
+
+    Raises:
+        typer.Exit: If --model is used without --backend
+    """
+    if model and not backend:
+        typer.echo("Error: --model requires --backend to be specified.", err=True)
+        raise typer.Exit(1)
+
+
 _ASYNC_OPT = Annotated[
     bool,
     typer.Option(

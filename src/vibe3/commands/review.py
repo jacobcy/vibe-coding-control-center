@@ -15,6 +15,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
+    validate_model_backend_dependency,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
@@ -70,6 +71,9 @@ def _review_branch_impl(
     """Review implementation for a branch via role sync runner."""
     if trace:
         enable_method_trace()
+
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
 
     flow_service = FlowService()
     try:
@@ -223,6 +227,9 @@ def base(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
+
     flow_service, current_branch = ensure_flow_for_current_branch()
     try:
         resolved_base = build_base_resolution_usecase().resolve_review_base(
@@ -274,6 +281,10 @@ def base(
             model=model,
             fresh_session=fresh_session,
         )
+        if result.tmux_session:
+            typer.echo(f"tmux session: {result.tmux_session}")
+        if result.log_path:
+            typer.echo(f"log: {result.log_path}")
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
         raise typer.Exit(1)

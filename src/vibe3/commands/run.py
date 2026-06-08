@@ -15,6 +15,7 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    validate_model_backend_dependency,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
@@ -81,6 +82,9 @@ def run_command(
 
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
+
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
 
     # Register EDA event handlers for run command (may publish events)
     from vibe3.domain import register_event_handlers
@@ -255,6 +259,9 @@ def default(
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
+
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
 
     run_command(
         branch=branch,

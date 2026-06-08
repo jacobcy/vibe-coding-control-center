@@ -271,7 +271,7 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["--branch", "42"])
     assert result.exit_code == 0
     # Should display tmux and log info
-    assert "tmux: vibe3-planner-issue-42" in result.output
+    assert "tmux session: vibe3-planner-issue-42" in result.output
     assert "log: /path/to/log.md" in result.output
 
 
@@ -340,7 +340,16 @@ def test_plan_model_option_propagates(monkeypatch) -> None:
     )
 
     result = runner.invoke(
-        plan_app, ["--branch", "42", "--no-async", "--model", "claude-opus-4-8"]
+        plan_app,
+        [
+            "--branch",
+            "42",
+            "--no-async",
+            "--backend",
+            "claude",
+            "--model",
+            "claude-opus-4-8",
+        ],
     )
     assert result.exit_code == 0
     mock_sync.assert_called_once()

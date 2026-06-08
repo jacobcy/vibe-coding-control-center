@@ -50,7 +50,7 @@ def resolve_command_agent_options(
     if config_backend:
         return AgentOptions(
             backend=config_backend,
-            model=config_model,
+            model=model or config_model,  # CLI model takes precedence
             timeout_seconds=config_timeout,
         )
 

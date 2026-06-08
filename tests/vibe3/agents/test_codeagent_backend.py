@@ -231,7 +231,9 @@ class TestCodeagentBackend:
         assert "--agent" in command
         assert "vibe-reviewer" in command
         assert "--backend" not in command
-        assert "--model" not in command
+        # Model from preset should be forwarded to codeagent-wrapper
+        assert "--model" in command
+        assert "claude-sonnet-4-6" in command
 
     def test_run_falls_back_to_default_backend_when_preset_missing(
         self, tmp_path: Path

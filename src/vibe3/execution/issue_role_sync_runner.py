@@ -103,8 +103,8 @@ def run_issue_role_async(
                 return
 
             typer.echo(f"-> {spec.role_name} run: issue #{issue_number}")
-            typer.echo(f"Tmux session: {result.tmux_session}")
-            typer.echo(f"Session log: {result.log_path}")
+            typer.echo(f"tmux session: {result.tmux_session}")
+            typer.echo(f"log: {result.log_path}")
             return
         except Exception as exc:
             record_dispatch_failure_if_unexpected(

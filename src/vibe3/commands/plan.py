@@ -15,6 +15,7 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
+    validate_model_backend_dependency,
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
@@ -56,6 +57,9 @@ def _plan_for_branch(
     """Create implementation plan for a branch with spec_ref."""
     if trace:
         enable_method_trace()
+
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -146,7 +150,7 @@ def _plan_for_branch(
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"tmux session: {result.tmux_session}")
         typer.echo(f"log: {result.log_path}")
 
 
@@ -165,6 +169,9 @@ def _plan_spec_impl(
     """Create implementation plan from a specification file."""
     if trace:
         enable_method_trace()
+
+    # Validate --model requires --backend
+    validate_model_backend_dependency(model, backend)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -312,7 +319,7 @@ def _plan_spec_impl(
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux: {result.tmux_session}")
+        typer.echo(f"tmux session: {result.tmux_session}")
         typer.echo(f"log: {result.log_path}")
 
 

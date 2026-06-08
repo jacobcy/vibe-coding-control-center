@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -43,6 +44,14 @@ from vibe3.roles.run_helpers import (
 from vibe3.services import record_dispatch_failure_if_unexpected
 
 
+@dataclass
+class AsyncDispatchResult:
+    """Result of async dispatch operation."""
+
+    tmux_session: str | None
+    log_path: str | None
+
+
 def resolve_skill_path(
     skill: str, resolver: ConventionResolver | None = None
 ) -> str | None:
@@ -73,7 +82,7 @@ def dispatch_run_command_async(
     issue_number: int | None,
     execution_name: str,
     handoff_metadata: dict[str, object] | None,
-) -> None:
+) -> AsyncDispatchResult:
     """Dispatch manual run command asynchronously through execution."""
     from vibe3.execution import resolve_orchestra_repo_root
 
@@ -110,6 +119,11 @@ def dispatch_run_command_async(
         role="executor",
         issue_number=issue_number,
         branch=branch,
+    )
+
+    return AsyncDispatchResult(
+        tmux_session=launch.tmux_session,
+        log_path=launch.log_path,
     )
 
 
@@ -168,7 +182,7 @@ def execute_manual_run(
             handoff_metadata: dict[str, object] = {"skill": skill}
             if publish:
                 handoff_metadata["publish"] = True
-            dispatch_run_command_async(
+            dispatch_result = dispatch_run_command_async(
                 branch=branch,
                 cli_args=cli_args,
                 issue_number=issue_number,
@@ -179,6 +193,10 @@ def execute_manual_run(
                 ),
                 handoff_metadata=handoff_metadata,
             )
+            if dispatch_result.tmux_session:
+                logger.info(f"tmux session: {dispatch_result.tmux_session}")
+            if dispatch_result.log_path:
+                logger.info(f"log: {dispatch_result.log_path}")
             return None
 
         # Check if this is a publish path execution
@@ -347,7 +365,7 @@ def execute_manual_run(
             agent=agent, backend=backend, model=model, fresh_session=fresh_session
         )
         cli_args += overrides.to_argv()
-        dispatch_run_command_async(
+        dispatch_result = dispatch_run_command_async(
             branch=branch,
             cli_args=cli_args,
             issue_number=issue_number,
@@ -358,6 +376,10 @@ def execute_manual_run(
             ),
             handoff_metadata={"plan_ref": plan_file} if plan_file else None,
         )
+        if dispatch_result.tmux_session:
+            logger.info(f"tmux session: {dispatch_result.tmux_session}")
+        if dispatch_result.log_path:
+            logger.info(f"log: {dispatch_result.log_path}")
         return None
 
     execution_service = CodeagentExecutionService(config)
