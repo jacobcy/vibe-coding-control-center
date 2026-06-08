@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from vibe3.models.actor_utils import (
+        ACTOR_ALIAS_MAP,
+        DISPLAY_PLACEHOLDER_ACTORS,
+        PLACEHOLDER_ACTORS,
+        normalize_actor,
+    )
+    from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
     from vibe3.models.branch_convention import BranchConvention
     from vibe3.models.change_source import (
         BranchSource,
@@ -27,6 +34,13 @@ if TYPE_CHECKING:
         ReviewerDispatchIntent,
         SupervisorIssueIdentified,
     )
+    from vibe3.models.event_bus import (
+        EventHandler,
+        EventPublisher,
+        get_publisher,
+        publish,
+        subscribe,
+    )
     from vibe3.models.execution_handle import AsyncExecutionHandle
     from vibe3.models.execution_request import ExecutionLaunchResult, ExecutionRequest
     from vibe3.models.flow import (
@@ -46,7 +60,18 @@ if TYPE_CHECKING:
         JobResult,
         JobSource,
     )
-    from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
+    from vibe3.models.orchestra_config import (
+        AssigneeDispatchConfig,
+        CircuitBreakerConfig,
+        GovernanceConfig,
+        OrchestraConfig,
+        PeriodicCheckConfig,
+        PollingConfig,
+        PRReviewDispatchConfig,
+        StateLabelDispatchConfig,
+        SupervisorHandoffConfig,
+        default_pid_file,
+    )
     from vibe3.models.orchestration import (
         ALLOWED_TRANSITIONS,
         FORBIDDEN_TRANSITIONS,
@@ -95,7 +120,7 @@ if TYPE_CHECKING:
         can_transition,
         validate_transition,
     )
-    from vibe3.models.trace import ExecutionStep, TraceOutput
+    from vibe3.models.trace import ExecutionStep, TraceOutput, format_result_entries
     from vibe3.models.verdict import VerdictRecord
     from vibe3.models.verdict_types import VerdictValue
     from vibe3.models.worktree import WorktreeRequirement

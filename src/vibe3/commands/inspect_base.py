@@ -58,8 +58,8 @@ def register(app: typer.Typer) -> None:
         """
         from vibe3.clients import GitClient, GitHubClient
         from vibe3.config import get_config
-        from vibe3.models.change_source import BranchSource
-        from vibe3.utils.git_helpers import get_current_branch
+        from vibe3.models import BranchSource
+        from vibe3.utils import get_current_branch
 
         if trace:
             enable_method_trace()

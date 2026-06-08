@@ -6,6 +6,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.utils.actor_utils import normalize_actor
+    from vibe3.utils.branch_compare import (
+        check_branch_behind,
+        format_branch_behind_body,
+        format_branch_behind_console,
+    )
     from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.codeagent_helpers import (
         diagnose_backend_error,

@@ -7,7 +7,7 @@ from loguru import logger
 from rich.console import Console
 from rich.panel import Panel
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents import CodeagentBackend
 from vibe3.execution import resolve_orchestra_repo_root
 from vibe3.models import AgentOptions
 from vibe3.prompts import (

@@ -295,7 +295,7 @@ def _full_status_dashboard(
     if trace:
         enable_method_trace(min_ms=min_ms)
 
-    from vibe3.commands.status_render import (
+    from vibe3.commands import (
         render_blocked_items,
         render_completed_flows,
         render_epic_items,

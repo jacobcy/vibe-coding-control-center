@@ -7,8 +7,7 @@ which would create a circular dependency.
 
 from __future__ import annotations
 
-from vibe3.models.domain_events import IssueFailed
-from vibe3.models.event_bus import publish
+from vibe3.models import IssueFailed, publish
 
 
 def emit_issue_failed(

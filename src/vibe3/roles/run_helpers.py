@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from vibe3.config import EXECUTOR_GATE_CONFIG, load_runtime_config
 from vibe3.exceptions import UserError
@@ -12,13 +12,9 @@ from vibe3.execution import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
-from vibe3.models import IssueState
+from vibe3.models import AgentOptions, FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
 from vibe3.services import FlowService
-
-if TYPE_CHECKING:
-    from vibe3.models.flow import FlowStatusResponse
-    from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def validate_run_prerequisites(
@@ -73,8 +69,6 @@ def resolve_run_options(
     cli_overrides: dict[str, str] | None = None,
 ) -> Any:
     """Resolve executor agent options with env override support."""
-    from vibe3.models.review_runner import AgentOptions
-
     runtime_config = load_runtime_config(cli_overrides=cli_overrides)
 
     return resolve_env_overridable_agent_options(

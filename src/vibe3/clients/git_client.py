@@ -116,7 +116,7 @@ def find_repo_root() -> Path:
     Raises:
         SystemError: If not in a git repository
     """
-    from vibe3.utils.git_helpers import find_repo_root as _find_repo_root
+    from vibe3.utils import find_repo_root as _find_repo_root
 
     return _find_repo_root()
 

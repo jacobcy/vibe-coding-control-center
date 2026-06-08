@@ -1,6 +1,7 @@
 """Adapter registry for vibe3 distributions."""
 
-from vibe3.models.adapter_manifest import AdapterManifest
+from vibe3.clients import GitClient, runtime_assets_root
+from vibe3.models import AdapterManifest
 
 # Registry of known adapters
 _ADAPTERS: dict[str, AdapterManifest] = {}
@@ -33,8 +34,6 @@ def get_adapter(name: str) -> AdapterManifest | None:
     # Lazy load and build vibe-center adapter
     if name == "vibe-center" and "vibe-center" not in _LOADED:
         from vibe3.adapters.vibe_center import _build_vibe_center_manifest
-        from vibe3.clients.git_client import GitClient
-        from vibe3.clients.runtime_assets import runtime_assets_root
 
         # Resolve git_common_dir
         git_common_dir = None
@@ -53,7 +52,6 @@ def get_adapter(name: str) -> AdapterManifest | None:
     # Lazy load and build github-flow adapter
     if name == "github-flow" and "github-flow" not in _LOADED:
         from vibe3.adapters.github_flow import _build_github_flow_manifest
-        from vibe3.clients.runtime_assets import runtime_assets_root
 
         manifest = _build_github_flow_manifest(
             global_skills=runtime_assets_root() / "skills",

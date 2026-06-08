@@ -7,7 +7,7 @@ from vibe3.ui.console_impl import console
 from vibe3.utils import format_age_aware_time
 
 if TYPE_CHECKING:
-    from vibe3.analysis.local_review_report import LocalReviewReport
+    from vibe3.analysis import LocalReviewReport
 
 
 def render_pr_created(pr: PRResponse) -> None:

@@ -10,6 +10,15 @@ if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient, GitClientProtocol, find_repo_root
     from vibe3.clients.git_worktree_ops import prune_worktrees, remove_worktree
     from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.github_field_constants import (
+        GITHUB_DEFAULT_VIEW_FIELDS,
+        GITHUB_FIELDS_BODY_COMMENTS,
+        GITHUB_FIELDS_BODY_ONLY,
+        GITHUB_FIELDS_COMMENTS_ONLY,
+        GITHUB_FIELDS_FULL_WITH_COMMENTS,
+        GITHUB_FIELDS_STATE_ONLY,
+        GITHUB_FIELDS_TITLE_ONLY,
+    )
     from vibe3.clients.github_issues_ops import parse_blocked_by, parse_linked_issues
     from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
     from vibe3.clients.merged_pr_cache import MergedPRCache

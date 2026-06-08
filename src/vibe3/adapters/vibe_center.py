@@ -8,7 +8,7 @@ distribution, making it an explicit adapter instead of implicit
 from pathlib import Path
 
 from vibe3.adapters.resource_root import resolve_resource_root
-from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+from vibe3.models import AdapterManifest, AdapterResource
 
 _SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 

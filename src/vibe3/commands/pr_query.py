@@ -15,16 +15,14 @@ import typer
 from loguru import logger
 from rich.console import Console
 
-from vibe3.analysis.inspect_output_adapter import (
+from vibe3.analysis import (
+    LocalReviewReport,
     as_list,
     dag,
+    find_latest_prepush_report,
     impact,
     pr_analysis_summary,
     score,
-)
-from vibe3.analysis.local_review_report import (
-    LocalReviewReport,
-    find_latest_prepush_report,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.output_format import (
@@ -40,7 +38,7 @@ from vibe3.services import (
     resolve_issue_branch_input,
 )
 from vibe3.ui import render_local_review_summary, render_pr_details
-from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_console
+from vibe3.utils import check_branch_behind, format_branch_behind_console
 
 
 def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
@@ -234,7 +232,7 @@ def _build_missing_pr_message(
 
 def _load_pr_analysis_summary(pr_number: int) -> dict[str, Any]:
     """Load inspect summary used by command outputs."""
-    from vibe3.analysis.inspect_query_service import build_change_analysis
+    from vibe3.analysis import build_change_analysis
 
     analysis = build_change_analysis("pr", str(pr_number))
     return pr_analysis_summary(analysis)

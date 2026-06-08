@@ -48,7 +48,7 @@ def _run_governance_scan(
         _execute_governance_internal(material_override=material_override)
         logger.bind(domain="orchestra").info("Governance scan completed")
     else:
-        from vibe3.execution.governance_sync_runner import run_governance_async
+        from vibe3.execution import run_governance_async
         from vibe3.roles import build_governance_execution_name
 
         run_governance_async(
@@ -67,7 +67,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.execution import run_governance_sync
     from vibe3.observability import append_governance_event
     from vibe3.roles import build_default_governance_fns
 
@@ -123,7 +123,7 @@ def _run_supervisor_scan_dry_run() -> None:
     from vibe3.clients import GitHubClient
     from vibe3.config import load_orchestra_config
     from vibe3.roles import fetch_supervisor_candidates
-    from vibe3.ui.scan_display import display_supervisor_dry_run
+    from vibe3.ui import display_supervisor_dry_run
 
     console = Console()
     config = load_orchestra_config()
@@ -190,7 +190,7 @@ def governance(
 
     # Handle --list option (highest priority)
     if list_materials:
-        from vibe3.ui.scan_display import display_material_list
+        from vibe3.ui import display_material_list
 
         console = Console()
         list_governance_materials(console, display_fn=display_material_list)

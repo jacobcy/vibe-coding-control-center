@@ -7,11 +7,18 @@ from typing import Annotated
 import typer
 import yaml
 
-from vibe3.analysis import command_analyzer, dag_service, structure_service
+from vibe3.analysis import (
+    SerenaService,
+    command_analyzer,
+    dag_service,
+    structure_service,
+)
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
 from vibe3.commands.inspect_symbols import register as register_symbols
+from vibe3.exceptions import SerenaError
+from vibe3.models import CallNode, CommandInspection
 
 app = typer.Typer(
     name="inspect",
@@ -213,8 +220,6 @@ def commands(
     if not command:
         names = _list_analyzable_top_level_commands()
         if any([json_out, yaml_out, tree_out, mermaid_out]):
-            from vibe3.models.inspection import CallNode, CommandInspection
-
             call_tree = [CallNode(name=name, line=0) for name in names]
             result = CommandInspection(
                 command="vibe",
@@ -293,9 +298,6 @@ def dead_code(
     """
     if trace:
         enable_method_trace()
-
-    from vibe3.analysis.serena_service import SerenaService
-    from vibe3.exceptions import SerenaError
 
     # Validate min_confidence
     valid_confidences = ["high", "medium", "low"]

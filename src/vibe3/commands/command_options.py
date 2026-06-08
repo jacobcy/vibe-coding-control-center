@@ -178,7 +178,7 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
     Raises:
         typer.Exit: If on main branch or flow creation fails
     """
-    from vibe3.models.flow import MainBranchProtectedError
+    from vibe3.models import MainBranchProtectedError
     from vibe3.services import FlowService
 
     flow_service = FlowService()

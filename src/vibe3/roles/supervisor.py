@@ -21,7 +21,14 @@ from vibe3.models import (
     OrchestraConfig,
     SupervisorIssueIdentified,
 )
+from vibe3.prompts import (
+    DEFAULT_PROMPTS_PATH,
+    PromptAssembler,
+    PromptManifest,
+    PromptRecipe,
+)
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
+from vibe3.roles.governance import _build_runtime_registry
 from vibe3.services import IssueFlowService, get_handoff_state_label
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
@@ -77,12 +84,6 @@ def build_supervisor_handoff_payload(
     Returns:
         Tuple of (prompt, agent_options, task_string).
     """
-    from vibe3.prompts.assembler import PromptAssembler
-    from vibe3.prompts.manifest import PromptManifest
-    from vibe3.prompts.models import PromptRecipe
-    from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
-    from vibe3.roles.governance import _build_runtime_registry
-
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
 
     # Build empty snapshot context — supervisor handoff uses template rendering

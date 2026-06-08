@@ -8,7 +8,7 @@ import re
 
 from vibe3.models import FlowStatusResponse, OrchestraConfig
 from vibe3.ui import console
-from vibe3.utils.error_message_cleaner import (
+from vibe3.utils import (
     CODEAGENT_WRAPPER_ANYWHERE_RE,
     clean_error_message,
 )
