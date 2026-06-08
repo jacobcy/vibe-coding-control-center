@@ -13,7 +13,7 @@ from typing import Protocol
 from vibe3.clients import GitClient
 
 # Re-export protocols from domain for backward compatibility
-from vibe3.domain.protocols.dispatch_protocols import (
+from vibe3.domain import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
     FlowServiceProtocol,

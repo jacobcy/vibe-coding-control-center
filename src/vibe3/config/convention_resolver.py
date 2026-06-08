@@ -18,7 +18,7 @@ from vibe3.config.profile_convention import ProfileConvention
 
 if TYPE_CHECKING:
     from vibe3.config.profile_config import ProfileConfig
-    from vibe3.models.adapter_manifest import AdapterManifest
+    from vibe3.models import AdapterManifest
 
 
 @dataclass
@@ -115,7 +115,7 @@ class ConventionResolver:
         try:
 
             # Use standalone git helpers to avoid config → clients dependency
-            from vibe3.utils.git_helpers import find_repo_root
+            from vibe3.utils import find_repo_root
 
             repo_root = find_repo_root()
             config_path = repo_root / ".vibe/config.yaml"
@@ -139,7 +139,7 @@ class ConventionResolver:
             logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo
-        from vibe3.utils.git_helpers import get_remote_url
+        from vibe3.utils import get_remote_url
 
         remote_url = get_remote_url()
         if remote_url:

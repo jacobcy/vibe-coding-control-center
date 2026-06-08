@@ -459,7 +459,7 @@ class JobExecutor:
         """
         from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
         from vibe3.execution.issue_role_support import resolve_async_cli_project_root
-        from vibe3.models.execution_request import ExecutionRequest
+        from vibe3.models import ExecutionRequest
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)

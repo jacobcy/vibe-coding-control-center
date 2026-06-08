@@ -12,21 +12,37 @@ if TYPE_CHECKING:
         BootstrapContextService,
         BootstrapPlan,
     )
+    from vibe3.services.check_cleanup_service import CheckCleanupService
+    from vibe3.services.check_remote import InitResult
     from vibe3.services.check_service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
     from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Functions used in domain/execution/roles
     from vibe3.services.event_helpers import emit_issue_failed
+    from vibe3.services.expired_resource_cleanup_service import (
+        ExpiredResourceCleanupService,
+    )
+    from vibe3.services.flow_classifier import (
+        FlowCategory,
+        FlowState,
+        classify_flow,
+        get_flow_state,
+    )
     from vibe3.services.flow_cleanup_service import FlowCleanupService
     from vibe3.services.flow_factory import create_flow_manager
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.flow_projection_service import FlowProjectionService
+    from vibe3.services.flow_projection_service import (
+        FlowProjection,
+        FlowProjectionService,
+    )
     from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
     from vibe3.services.flow_recovery_service import FlowRecoveryService
     from vibe3.services.flow_resume_resolver import infer_resume_label
     from vibe3.services.flow_service import FlowService
+    from vibe3.services.flow_status_resolver import FlowStatusResolver
     from vibe3.services.flow_status_service import FlowStatusService
+    from vibe3.services.handoff_resolution import resolve_handoff_target
     from vibe3.services.handoff_service import HandoffService
     from vibe3.services.handoff_status_service import HandoffStatusService
     from vibe3.services.issue.collection import IssueCollectionService
@@ -40,17 +56,49 @@ if TYPE_CHECKING:
         fail_reviewer_issue,
     )
     from vibe3.services.issue.flow import IssueFlowService
+    from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
     from vibe3.services.label_service import LabelService
     from vibe3.services.orchestra_helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services.orchestra_status_service import (
+        IssueStatusEntry,
+        OrchestraSnapshot,
+        OrchestraStatusService,
+        format_issue_runtime_line,
+        format_issue_summary_line,
+        is_running_issue,
+    )
+    from vibe3.services.pr.analysis import (
+        analyze_critical_files,
+        build_pr_analysis,
+        calculate_pr_risk_score,
+        filter_critical_files,
+        get_pr_changed_files,
+        get_pr_commit_count,
+        get_recent_commits,
+    )
     from vibe3.services.pr.create import PRCreateUsecase
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
+    from vibe3.services.pr.resolver import (
+        resolve_branch_from_pr,
+        resolve_command_branch,
+    )
+    from vibe3.services.pr.scoring import (
+        PRDimensions,
+        generate_score_report,
+    )
     from vibe3.services.pr.service import PRService
     from vibe3.services.role_policy_helpers import get_role_block_function
+    from vibe3.services.serve_status_service import ServeStatusService
+    from vibe3.services.shared.branches import (
+        resolve_branch_and_issue,
+        resolve_branch_arg,
+    )
     from vibe3.services.shared.errors import (
+        has_recent_specific_error,
         record_dispatch_failure_if_unexpected,
         record_error,
     )
@@ -67,12 +115,27 @@ if TYPE_CHECKING:
         sanitize_event_detail_paths,
     )
     from vibe3.services.signature_service import SignatureService
-    from vibe3.services.status_query_service import StatusQueryService
-    from vibe3.services.task_binding_guard import build_bind_task_hint
-    from vibe3.services.task_resume_operations import TaskResumeOperations
-    from vibe3.services.task_resume_usecase import TaskResumeUsecase
-    from vibe3.services.task_service import TaskService
-    from vibe3.services.task_status_classifier import TaskStatusBucket
+    from vibe3.services.spec_ref_service import SpecRefService
+    from vibe3.services.status_query_service import (
+        StatusQueryService,
+        is_auto_task_branch,
+    )
+    from vibe3.services.task.classifier import TaskStatusBucket
+    from vibe3.services.task.resume import (
+        TaskResumeOperations,
+        TaskResumeUsecase,
+    )
+    from vibe3.services.task.service import TaskService
+    from vibe3.services.task.show import TaskShowResult
+    from vibe3.services.task.status import (
+        classify_task_issues_for_rendering,
+        fetch_task_status_data,
+    )
+    from vibe3.services.task_binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
+    )
+    from vibe3.services.verdict_policy import requires_audit_ref
     from vibe3.services.verdict_service import VerdictService
 
 __all__ = [

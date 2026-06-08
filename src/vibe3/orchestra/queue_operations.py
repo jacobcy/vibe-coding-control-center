@@ -9,7 +9,7 @@ from vibe3.domain import QualifyGateService, find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
 from vibe3.orchestra import get_flow_context, is_auto_task_branch, load_issue
-from vibe3.utils.queue_ordering import sort_ready_issues
+from vibe3.utils import sort_ready_issues
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
@@ -121,8 +121,6 @@ def _auto_resume_to_ready(
         issue: Issue to auto-resume
         config: Orchestra configuration
     """
-    from vibe3.services.label_service import LabelService
-
     # Cooldown guard: prevent repeated attempts within cooldown period
     now = time.time()
 
@@ -150,6 +148,8 @@ def _auto_resume_to_ready(
         return
 
     try:
+        from vibe3.services import LabelService
+
         label_service = LabelService(repo=config.repo)
         label_service.transition(
             issue.number,

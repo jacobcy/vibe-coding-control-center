@@ -8,7 +8,7 @@ and this module provides a convenient import path for other layers.
 """
 
 # Re-export from canonical location in models layer
-from vibe3.models.actor_utils import (
+from vibe3.models import (
     ACTOR_ALIAS_MAP,
     DISPLAY_PLACEHOLDER_ACTORS,
     PLACEHOLDER_ACTORS,

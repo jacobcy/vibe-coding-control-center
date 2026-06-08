@@ -26,10 +26,8 @@ from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    make_context_builder,
-)
-from vibe3.prompts.sections import (
     build_tools_guide_section,
+    make_context_builder,
     resolve_common_rules_path,
 )
 

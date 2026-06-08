@@ -5,7 +5,7 @@ This module provides:
 2. Standalone helper functions for resolving config values with service dependencies
 """
 
-from vibe3.models.orchestra_config import (
+from vibe3.models import (
     AssigneeDispatchConfig,
     CircuitBreakerConfig,
     GovernanceConfig,

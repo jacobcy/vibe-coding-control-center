@@ -4,10 +4,11 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.analysis import SerenaService, dag_service
-from vibe3.analysis.change_scope_service import (
+from vibe3.analysis import (
+    SerenaService,
     collect_changed_symbols,
     count_changed_lines,
+    dag_service,
 )
 from vibe3.clients import GitClient
 from vibe3.config import get_config

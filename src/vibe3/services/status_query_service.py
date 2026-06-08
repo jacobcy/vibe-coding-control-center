@@ -14,7 +14,7 @@ from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteC
 from vibe3.models import IssueInfo, IssueState
 from vibe3.services.issue.collection import IssueCollectionService
 from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
-from vibe3.utils.queue_ordering import (
+from vibe3.utils import (
     resolve_priority,
     resolve_roadmap_rank,
     sort_ready_issues,

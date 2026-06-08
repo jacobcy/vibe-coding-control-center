@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         count_changed_lines,
         is_test_file,
     )
+    from vibe3.analysis.coverage_service import CoverageService
 
     # DAG impact analysis
     from vibe3.analysis.dag_service import (
@@ -44,6 +45,10 @@ if TYPE_CHECKING:
         score,
     )
     from vibe3.analysis.inspect_query_service import build_change_analysis
+    from vibe3.analysis.local_review_report import (
+        LocalReviewReport,
+        find_latest_prepush_report,
+    )
     from vibe3.analysis.pr_scoring import (
         PRDimensions,
         RiskLevel,

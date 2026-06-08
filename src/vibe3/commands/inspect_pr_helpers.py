@@ -6,7 +6,7 @@ build_pr_analysis for backward compatibility.
 """
 
 # Re-export types for backward compatibility
-from vibe3.models.pr_analysis import (  # noqa: F401
+from vibe3.models import (  # noqa: F401
     CommitInfo,
     CriticalFileInfo,
     PRCriticalAnalysis,

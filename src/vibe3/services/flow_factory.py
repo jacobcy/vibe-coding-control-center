@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from vibe3.domain.flow_manager import FlowManager
+    from vibe3.domain import FlowManager
     from vibe3.environment import SessionRegistryService
     from vibe3.models import OrchestraConfig
 

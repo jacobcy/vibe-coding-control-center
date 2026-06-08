@@ -242,7 +242,7 @@ def show(
             for m in snapshot.modules:
                 typer.echo(f"    {m.module}: {m.file_count} files, {m.total_loc} LOC")
 
-            from vibe3.commands.inspect_helpers import suggest_next_step
+            from vibe3.commands import suggest_next_step
 
             suggest_next_step("snapshot_show", quiet)
 
@@ -351,7 +351,7 @@ def diff(
                 for w in result.warnings:
                     typer.echo(f"    [{w.severity}] {w.message}")
 
-            from vibe3.commands.inspect_helpers import suggest_next_step
+            from vibe3.commands import suggest_next_step
 
             suggest_next_step("snapshot_diff", quiet)
 

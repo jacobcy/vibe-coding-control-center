@@ -37,7 +37,7 @@ def enable_method_trace(min_ms: float | None = None) -> None:
     """
     os.environ["VIBE3_TRACE"] = "1"
 
-    from vibe3.observability.trace_method import set_trace_min_ms
+    from vibe3.observability import set_trace_min_ms
 
     if min_ms is not None:
         set_trace_min_ms(min_ms)

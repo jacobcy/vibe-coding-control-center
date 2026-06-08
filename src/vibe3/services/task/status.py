@@ -50,10 +50,7 @@ def fetch_task_status_data(
     snapshot_found = orch_snapshot is not None
 
     if not orch_snapshot:
-        from vibe3.utils.orchestra_instance import (
-            read_instance_info,
-            validate_instance,
-        )
+        from vibe3.utils import read_instance_info, validate_instance
 
         info = read_instance_info(config.pid_file)
         pid_alive = validate_instance(info) if info else False

@@ -19,10 +19,9 @@ from vibe3.config import (
     get_convention,
     get_resolver,
 )
-from vibe3.environment import SessionRegistryService
+from vibe3.environment import SessionRegistryService, get_manager_session_name
 
 # public-api: pending upstream export
-from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.exceptions import (
     CapacityDeferredError,
     DiagnosticContext,
@@ -37,7 +36,12 @@ from vibe3.execution import (
     resolve_orchestra_repo_root,
 )
 from vibe3.models import ExecutionRequest, IssueInfo, IssueState, OrchestraConfig
-from vibe3.prompts import PromptManifest, PromptProvider
+from vibe3.prompts import (
+    PromptManifest,
+    PromptProvider,
+    ProviderRegistry,
+    resolve_source,
+)
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -331,9 +335,6 @@ def build_manager_sync_request(
         variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
         if variant_spec is not None:
             # For sections with source declarations, resolve directly
-            from vibe3.prompts.builtin_providers import resolve_source
-            from vibe3.prompts.provider_registry import ProviderRegistry
-
             registry = ProviderRegistry()
             runtime_context: dict[str, Any] = {}
 

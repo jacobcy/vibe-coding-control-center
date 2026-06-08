@@ -37,7 +37,7 @@ def internal_manager_dispatch(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    from vibe3.execution.issue_role_sync_runner import (
+    from vibe3.execution import (
         run_issue_role_async,
         run_issue_role_sync,
     )

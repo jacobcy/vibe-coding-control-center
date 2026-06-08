@@ -21,7 +21,7 @@ from vibe3.commands.command_options import (
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
-from vibe3.execution.issue_role_sync_runner import (
+from vibe3.execution import (
     run_issue_role_async,
     run_issue_role_sync,
 )

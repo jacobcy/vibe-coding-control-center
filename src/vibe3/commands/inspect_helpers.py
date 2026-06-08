@@ -9,11 +9,11 @@ The actual implementation lives in:
 
 import typer
 
-from vibe3.analysis.inspect_query_service import (  # noqa: F401
+from vibe3.analysis import (  # noqa: F401
     build_change_analysis,
 )
 from vibe3.commands.inspect_pr_helpers import build_pr_analysis  # noqa: F401
-from vibe3.models.pr_analysis import (  # noqa: F401
+from vibe3.models import (  # noqa: F401
     CommitInfo,
     CriticalFileInfo,
     PRCriticalAnalysis,

@@ -32,6 +32,7 @@ from vibe3.execution import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.models import (
+    AgentOptions,
     ExecutionRequest,
     IssueInfo,
     IssueState,
@@ -63,8 +64,6 @@ def resolve_plan_options(
     cli_overrides: dict[str, str] | None = None,
 ) -> Any:
     """Resolve planner agent options with env override support."""
-    from vibe3.models.review_runner import AgentOptions
-
     runtime_config = load_runtime_config(cli_overrides=cli_overrides)
     return resolve_env_overridable_agent_options(
         backend_env_key="VIBE3_PLANNER_BACKEND",

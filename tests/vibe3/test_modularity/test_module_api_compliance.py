@@ -80,9 +80,6 @@ class TestModuleAPICompliance:
                 + "\n".join(f"  - {v}" for v in violations)
             )
 
-    @pytest.mark.xfail(
-        reason="Enforcing top-level imports only (222 violations tracked in #2414)"
-    )
     def test_no_deep_imports(self, module_registry: list[str]) -> None:
         """Verify all cross-module imports go through top-level module __init__.py.
 

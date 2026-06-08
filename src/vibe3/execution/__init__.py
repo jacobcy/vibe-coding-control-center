@@ -21,7 +21,10 @@ if TYPE_CHECKING:
         persist_execution_lifecycle_event,
     )
     from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
-    from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.execution.governance_sync_runner import (
+        run_governance_async,
+        run_governance_sync,
+    )
     from vibe3.execution.issue_role_support import (
         build_issue_async_cli_request,
         build_issue_sync_prompt_request,

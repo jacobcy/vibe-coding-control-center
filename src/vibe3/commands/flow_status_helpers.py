@@ -14,7 +14,7 @@ from vibe3.ui import render_error, render_flow_status
 from vibe3.utils import find_parent_branch
 
 if TYPE_CHECKING:
-    from vibe3.models.flow import FlowEvent, TimelineEvent
+    from vibe3.models import FlowEvent, TimelineEvent
 
 
 def _parse_remote_issue_number(raw: str) -> int:
@@ -32,7 +32,7 @@ def _timeline_to_flow_events(
     branch: str,
 ) -> list["FlowEvent"]:
     """Convert TimelineEvent objects to FlowEvent for timeline rendering."""
-    from vibe3.models.flow import FlowEvent
+    from vibe3.models import FlowEvent
 
     return [
         FlowEvent(

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+from vibe3.models import AdapterManifest, AdapterResource
 
 
 def _build_github_flow_manifest(global_skills: Path | None = None) -> AdapterManifest:

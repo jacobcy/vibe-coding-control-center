@@ -209,7 +209,7 @@ def show(
 
     # Build timeline using resolver's source-aware flow_status
     # Do NOT call service.get_flow_timeline (reads from local)
-    from vibe3.models.data_source import DataSource
+    from vibe3.models import DataSource
 
     # Use data_source alone to decide timeline source
     # For remote-sourced data (ISSUE_BODY_FALLBACK), always use remote timeline
@@ -219,7 +219,7 @@ def show(
     else:
         # Local mode: read from SQLite
         events_data = service.store.get_events(target_branch, limit=100)
-        from vibe3.models.flow import FlowEvent
+        from vibe3.models import FlowEvent
 
         events = [FlowEvent(**e) for e in events_data]
 
@@ -238,7 +238,7 @@ def show(
 
     if output_format in ("json", "yaml"):
         # Apply filtering for structured output
-        from vibe3.ui.flow_ui_timeline import filter_passive_if_active_exists
+        from vibe3.ui import filter_passive_if_active_exists
 
         filtered_events = events
         filtered_events = filter_passive_if_active_exists(filtered_events)

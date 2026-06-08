@@ -12,8 +12,7 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
-from vibe3.models import PRResponse
-from vibe3.models.pr import UpdatePRRequest
+from vibe3.models import PRResponse, UpdatePRRequest
 from vibe3.observability import setup_logging
 from vibe3.services import (
     FlowService,
@@ -22,7 +21,7 @@ from vibe3.services import (
     PRService,
 )
 from vibe3.ui import console, render_pr_confirmed, render_pr_created
-from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_body
+from vibe3.utils import check_branch_behind, format_branch_behind_body
 
 
 def _is_interactive(json_output: bool, yaml_output: bool) -> bool:

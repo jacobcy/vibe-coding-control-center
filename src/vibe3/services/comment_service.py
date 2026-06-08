@@ -7,7 +7,7 @@ from typing import Any
 
 from vibe3.config import get_manager_usernames as _get_manager_usernames
 from vibe3.config import load_orchestra_config
-from vibe3.utils.constants import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
+from vibe3.utils import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 
 
 def is_human_comment(comment: dict[str, Any]) -> bool:

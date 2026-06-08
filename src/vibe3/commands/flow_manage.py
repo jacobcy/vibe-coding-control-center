@@ -116,8 +116,8 @@ def _ensure_branch_has_no_live_runtime_session(
     flow_service: FlowService, branch: str
 ) -> None:
     """Block flow mutations when branch has live runtime sessions."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.agents import CodeagentBackend
+    from vibe3.environment import SessionRegistryService
 
     backend = CodeagentBackend()
     registry = SessionRegistryService(store=flow_service.store, backend=backend)
@@ -172,7 +172,7 @@ def update(
     from vibe3.clients import GitClient
     from vibe3.config import load_orchestra_config
     from vibe3.services import resolve_branch_arg
-    from vibe3.utils.issue_ref import try_parse_issue_number
+    from vibe3.utils import try_parse_issue_number
 
     target_branch = resolve_branch_arg(branch)
 
@@ -287,7 +287,7 @@ def bind(
             err=True,
         )
         output_format = "json"
-    from vibe3.utils.issue_ref import parse_issue_number
+    from vibe3.utils import parse_issue_number
 
     issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
     if issue_refs is None:  # pragma: no cover - defensive
