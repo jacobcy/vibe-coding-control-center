@@ -43,18 +43,23 @@ def validate_show_prompt_dependency(dry_run: bool, show_prompt: bool) -> None:
 def validate_model_backend_dependency(
     model: str | None,
     backend: str | None,
+    config_backend: str | None = None,
 ) -> None:
-    """Validate that --model requires --backend to be specified on CLI.
+    """Validate that --model requires backend (CLI or config).
 
     Args:
         model: The model specified via --model flag
         backend: The backend specified via --backend flag
+        config_backend: The backend from runtime config
 
     Raises:
-        typer.Exit: If --model is used without --backend
+        typer.Exit: If --model is used without backend (CLI or config)
     """
-    if model and not backend:
-        typer.echo("Error: --model requires --backend to be specified.", err=True)
+    if model and not backend and not config_backend:
+        typer.echo(
+            "Error: --model requires --backend to be specified on CLI or in config.",
+            err=True,
+        )
         raise typer.Exit(1)
 
 

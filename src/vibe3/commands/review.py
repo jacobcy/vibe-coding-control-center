@@ -20,7 +20,9 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.exceptions import UserError
+from vibe3.config import load_runtime_config
+from vibe3.config.cli_overrides import build_role_cli_overrides
+from vibe3.exceptions import ConfigError, UserError
 from vibe3.execution.issue_role_sync_runner import (
     run_issue_role_async,
     run_issue_role_sync,
@@ -72,8 +74,17 @@ def _review_branch_impl(
     if trace:
         enable_method_trace()
 
-    # Validate --model requires --backend
-    validate_model_backend_dependency(model, backend)
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("review", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Configuration error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    # Validate --model requires backend (CLI or config)
+    config_backend = config.review.agent_config.backend if config else None
+    validate_model_backend_dependency(model, backend, config_backend)
 
     flow_service = FlowService()
     try:
@@ -227,8 +238,17 @@ def base(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    # Validate --model requires --backend
-    validate_model_backend_dependency(model, backend)
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("review", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Configuration error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    # Validate --model requires backend (CLI or config)
+    config_backend = config.review.agent_config.backend if config else None
+    validate_model_backend_dependency(model, backend, config_backend)
 
     flow_service, current_branch = ensure_flow_for_current_branch()
     try:

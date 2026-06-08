@@ -58,8 +58,17 @@ def _plan_for_branch(
     if trace:
         enable_method_trace()
 
-    # Validate --model requires --backend
-    validate_model_backend_dependency(model, backend)
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Config error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Validate --model requires backend (CLI or config)
+    config_backend = config.plan.agent_config.backend if config else None
+    validate_model_backend_dependency(model, backend, config_backend)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -92,14 +101,6 @@ def _plan_for_branch(
         spec_input = resolve_spec_plan_input(branch)
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-    # Build cli_overrides and load config
-    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
-    try:
-        config = load_runtime_config(cli_overrides=cli_overrides or None)
-    except ConfigError as e:
-        typer.echo(f"Config error: {e}", err=True)
         raise typer.Exit(1)
 
     # Handle dry_run early return
@@ -170,8 +171,17 @@ def _plan_spec_impl(
     if trace:
         enable_method_trace()
 
-    # Validate --model requires --backend
-    validate_model_backend_dependency(model, backend)
+    # Build cli_overrides and load config
+    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
+    try:
+        config = load_runtime_config(cli_overrides=cli_overrides or None)
+    except ConfigError as e:
+        typer.echo(f"Config error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Validate --model requires backend (CLI or config)
+    config_backend = config.plan.agent_config.backend if config else None
+    validate_model_backend_dependency(model, backend, config_backend)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -258,14 +268,6 @@ def _plan_spec_impl(
         )
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-    # Build cli_overrides and load config
-    cli_overrides = build_role_cli_overrides("plan", agent, backend, model)
-    try:
-        config = load_runtime_config(cli_overrides=cli_overrides or None)
-    except ConfigError as e:
-        typer.echo(f"Config error: {e}", err=True)
         raise typer.Exit(1)
 
     # Handle dry_run early return
