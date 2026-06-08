@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +65,7 @@ class PromptManifest:
     recipes: dict[str, PromptRecipeDefinition]
 
     @classmethod
+    @functools.lru_cache(maxsize=1)
     def load_default(cls) -> "PromptManifest":
         """Load prompt recipes from the repository config directory."""
         return cls.load(_resolve_repo_path(DEFAULT_PROMPT_RECIPES_PATH))

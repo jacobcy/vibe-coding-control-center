@@ -43,6 +43,22 @@ def clear_find_repo_root_cache():
 
 
 @pytest.fixture(autouse=True)
+def clear_prompt_manifest_cache():
+    """Clear PromptManifest.load_default cache before each test to ensure isolation.
+
+    The load_default() function uses @functools.lru_cache(maxsize=1) for
+    performance, but this can leak across tests when DEFAULT_PROMPT_RECIPES_PATH
+    is monkeypatched. This autouse fixture ensures each test starts with a clean cache.
+    """
+    from vibe3.prompts.manifest import PromptManifest
+
+    PromptManifest.load_default.cache_clear()
+    yield
+    # Clear again after test to clean up for subsequent tests
+    PromptManifest.load_default.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def isolate_database(request):
     """Use temporary database for tests to prevent production DB contamination.
 
