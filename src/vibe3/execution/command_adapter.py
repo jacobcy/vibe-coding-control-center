@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from vibe3.models.job import CommandType
+from vibe3.models import CommandType
 
 
 @dataclass(frozen=True)
