@@ -37,7 +37,7 @@ class TestAutoResumeCooldown:
             return mock_label_service
 
         monkeypatch.setattr(
-            "vibe3.services.label_service.LabelService",
+            "vibe3.services.LabelService",
             mock_label_service_init,
         )
 
@@ -99,7 +99,7 @@ class TestAutoResumeCooldown:
             return mock_label_service
 
         monkeypatch.setattr(
-            "vibe3.services.label_service.LabelService",
+            "vibe3.services.LabelService",
             mock_label_service_init,
         )
 
@@ -158,7 +158,7 @@ class TestAutoResumeCooldown:
             return mock_label_service
 
         monkeypatch.setattr(
-            "vibe3.services.label_service.LabelService",
+            "vibe3.services.LabelService",
             mock_label_service_init,
         )
 
@@ -215,7 +215,7 @@ class TestAutoResumeCooldown:
             return mock_label_service
 
         monkeypatch.setattr(
-            "vibe3.services.label_service.LabelService",
+            "vibe3.services.LabelService",
             mock_label_service_init,
         )
 
@@ -270,7 +270,7 @@ class TestAutoResumeCooldown:
             return mock_label_service
 
         monkeypatch.setattr(
-            "vibe3.services.label_service.LabelService",
+            "vibe3.services.LabelService",
             mock_label_service_init,
         )
 
