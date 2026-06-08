@@ -71,51 +71,28 @@ def handle_supervisor_issue_identified(
         with get_store() as store:
             coordinator = ExecutionCoordinator(config, store)
 
-            try:
-                result = coordinator.dispatch_execution(request)
-                record_dispatch_failure_if_unexpected(
-                    result=result,
-                    role="supervisor",
-                    issue_number=event.issue_number,
-                    branch=f"issue-{event.issue_number}",
-                    dispatch_source="automatic",
-                )
-            except Exception as exc:
-                record_dispatch_failure_if_unexpected(
-                    role="supervisor",
-                    issue_number=event.issue_number,
-                    branch=f"issue-{event.issue_number}",
-                    exception=exc,
-                    dispatch_source="automatic",
-                )
-                logger.bind(
-                    domain="supervisor_handler",
-                    issue_number=event.issue_number,
-                ).exception(f"Supervisor apply dispatch failed: {exc}")
-                return
-    else:
-        try:
-            result = coordinator.dispatch_execution(request)
-            record_dispatch_failure_if_unexpected(
-                result=result,
-                role="supervisor",
-                issue_number=event.issue_number,
-                branch=f"issue-{event.issue_number}",
-                dispatch_source="automatic",
-            )
-        except Exception as exc:
-            record_dispatch_failure_if_unexpected(
-                role="supervisor",
-                issue_number=event.issue_number,
-                branch=f"issue-{event.issue_number}",
-                exception=exc,
-                dispatch_source="automatic",
-            )
-            logger.bind(
-                domain="supervisor_handler",
-                issue_number=event.issue_number,
-            ).exception(f"Supervisor apply dispatch failed: {exc}")
-            return
+    try:
+        result = coordinator.dispatch_execution(request)
+        record_dispatch_failure_if_unexpected(
+            result=result,
+            role="supervisor",
+            issue_number=event.issue_number,
+            branch=f"issue-{event.issue_number}",
+            dispatch_source="automatic",
+        )
+    except Exception as exc:
+        record_dispatch_failure_if_unexpected(
+            role="supervisor",
+            issue_number=event.issue_number,
+            branch=f"issue-{event.issue_number}",
+            exception=exc,
+            dispatch_source="automatic",
+        )
+        logger.bind(
+            domain="supervisor_handler",
+            issue_number=event.issue_number,
+        ).exception(f"Supervisor apply dispatch failed: {exc}")
+        return
 
     if result and result.launched:
         append_orchestra_event(
