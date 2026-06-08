@@ -25,7 +25,7 @@ from vibe3.execution.issue_role_sync_runner import (
     run_issue_role_async,
     run_issue_role_sync,
 )
-from vibe3.roles.review import (
+from vibe3.roles import (
     REVIEW_SYNC_SPEC,
     build_base_review_request,
     execute_manual_review_async,

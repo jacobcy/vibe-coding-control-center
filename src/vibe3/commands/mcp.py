@@ -35,12 +35,10 @@ def run() -> None:
       - orchestra://issues: List of managed issues
       - orchestra://circuit-breaker: Circuit breaker state
     """
-    from vibe3.clients.git_client import GitClient
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+    from vibe3.config import load_orchestra_config
     from vibe3.domain import FlowManager
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services import OrchestraStatusService
 
     config = load_orchestra_config()
 

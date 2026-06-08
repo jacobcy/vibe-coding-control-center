@@ -66,7 +66,7 @@ def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
 
         # Fallback: use unified method if no DB link exists
         if not task_issues:
-            from vibe3.services.issue.flow import IssueFlowService
+            from vibe3.services import IssueFlowService
 
             issue_flow_service = IssueFlowService(store=pr_svc.store)
             task_issue_number = issue_flow_service.resolve_task_issue_number(branch)

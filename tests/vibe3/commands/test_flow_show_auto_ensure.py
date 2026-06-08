@@ -30,7 +30,7 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
-@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
+@patch("vibe3.services.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_timeline_when_registered(
@@ -78,7 +78,7 @@ def test_flow_show_timeline_when_registered(
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
-@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
+@patch("vibe3.services.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_numeric_issue_resolves_branch(

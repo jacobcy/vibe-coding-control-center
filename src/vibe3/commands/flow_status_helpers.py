@@ -113,7 +113,7 @@ def _fetch_worktree_map() -> dict[str, str]:
     """Fetch worktree mapping from git worktree list."""
     worktree_map: dict[str, str] = {}
     try:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients import GitClient
 
         git = GitClient()
         worktree_output = git._run(["worktree", "list", "--porcelain"])
@@ -178,7 +178,7 @@ def _fetch_issue_titles_for_status(
         return titles, False
 
     # Server not running, use cache service with real branches
-    from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services import IssueTitleCacheService
 
     branches = [flow.branch for flow in flows if flow.branch]
     title_cache = IssueTitleCacheService(

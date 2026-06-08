@@ -20,11 +20,11 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import UserError
-from vibe3.roles import resolve_skill_path
-from vibe3.roles.run import (
+from vibe3.roles import (
     ensure_plan_file_exists,
     execute_manual_run,
     resolve_run_mode,
+    resolve_skill_path,
     validate_run_prerequisites,
 )
 from vibe3.services import FlowService, resolve_branch_arg, resolve_handoff_target

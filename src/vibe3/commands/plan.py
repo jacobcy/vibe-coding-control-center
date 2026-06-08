@@ -19,9 +19,9 @@ from vibe3.commands.command_options import (
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config.cli_overrides import RoleCliOverrides
+from vibe3.config import RoleCliOverrides
 from vibe3.execution import CodeagentExecutionService
-from vibe3.roles.plan import (
+from vibe3.roles import (
     execute_spec_plan_async,
     execute_spec_plan_sync,
     resolve_spec_plan_input,

@@ -169,8 +169,8 @@ def update(
             err=True,
         )
         output_format = "json"
-    from vibe3.clients.git_client import GitClient
-    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.clients import GitClient
+    from vibe3.config import load_orchestra_config
     from vibe3.services import resolve_branch_arg
     from vibe3.utils.issue_ref import try_parse_issue_number
 

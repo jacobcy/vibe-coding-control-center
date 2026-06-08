@@ -64,9 +64,7 @@ class TestGovernanceScan:
 
     def test_governance_scan_does_not_call_on_heartbeat_tick(self):
         """Sync path (--no-async) calls service layer directly, not through facade."""
-        with patch(
-            "vibe3.roles.scan_service.dispatch_governance_execution"
-        ) as mock_service_run:
+        with patch("vibe3.roles.dispatch_governance_execution") as mock_service_run:
             with patch(
                 "vibe3.domain.orchestration_facade.OrchestrationFacade"
             ) as mock_facade:
@@ -112,9 +110,7 @@ class TestCombinedScan:
 class TestScanIntegration:
     def test_governance_scan_registers_handlers(self):
         """Sync governance scan calls service layer directly, not facade."""
-        with patch(
-            "vibe3.roles.scan_service.dispatch_governance_execution"
-        ) as mock_service:
+        with patch("vibe3.roles.dispatch_governance_execution") as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan(no_async=True)
@@ -123,10 +119,8 @@ class TestScanIntegration:
     def test_supervisor_scan_registers_handlers(self):
         """Supervisor scan calls service layer directly, not facade."""
         with (
-            patch("vibe3.roles.scan_service.fetch_supervisor_candidates") as mock_fetch,
-            patch(
-                "vibe3.roles.scan_service.dispatch_supervisor_execution"
-            ) as mock_apply,
+            patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+            patch("vibe3.roles.dispatch_supervisor_execution") as mock_apply,
         ):
             mock_fetch.return_value = (
                 1,
@@ -149,9 +143,7 @@ class TestScanIntegration:
 class TestFailedGateBlocking:
     def test_governance_scan_blocked_by_failed_gate(self):
         """Sync governance scan ignores FailedGate (only for heartbeat)."""
-        with patch(
-            "vibe3.roles.scan_service.dispatch_governance_execution"
-        ) as mock_service:
+        with patch("vibe3.roles.dispatch_governance_execution") as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan(no_async=True)
@@ -159,9 +151,7 @@ class TestFailedGateBlocking:
 
     def test_supervisor_scan_blocked_by_failed_gate(self):
         """Manual supervisor scan ignores FailedGate (only for heartbeat)."""
-        with patch(
-            "vibe3.roles.scan_service.fetch_supervisor_candidates"
-        ) as mock_fetch:
+        with patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch:
             mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_supervisor_scan
@@ -173,11 +163,9 @@ class TestFailedGateBlocking:
     async def test_combined_scan_blocked_by_failed_gate(self):
         """Combined scan bypasses FailedGate for both governance and supervisor."""
         with (
-            patch(
-                "vibe3.roles.scan_service.dispatch_governance_execution"
-            ) as mock_governance,
-            patch("vibe3.roles.scan_service.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.roles.scan_service.dispatch_supervisor_execution"),
+            patch("vibe3.roles.dispatch_governance_execution") as mock_governance,
+            patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+            patch("vibe3.roles.dispatch_supervisor_execution"),
         ):
             mock_fetch.return_value = (0, [])
 
@@ -191,8 +179,8 @@ class TestFailedGateBlocking:
 def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
     """Manual supervisor scan fetches candidates and dispatches each."""
     with (
-        patch("vibe3.roles.scan_service.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.roles.scan_service.dispatch_supervisor_execution") as mock_apply,
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.roles.dispatch_supervisor_execution") as mock_apply,
     ):
         mock_fetch.return_value = (
             2,
