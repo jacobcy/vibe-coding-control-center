@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Optional
 import typer
 
 if TYPE_CHECKING:
-    from vibe3.config import RuntimeConfig
+    from vibe3.config import VibeConfig
     from vibe3.services.flow_service import FlowService
 
 _TRACE_OPT = Annotated[
@@ -69,7 +69,7 @@ def load_config_and_validate_model(
     agent: str | None,
     backend: str | None,
     model: str | None,
-) -> "RuntimeConfig":
+) -> "VibeConfig":
     """Load runtime config and validate --model requires backend.
 
     Combines config loading with model-backend validation into a single step.
@@ -82,7 +82,7 @@ def load_config_and_validate_model(
         model: CLI --model value
 
     Returns:
-        Loaded RuntimeConfig
+        Loaded VibeConfig
 
     Raises:
         typer.Exit: If config loading fails or --model used without backend
