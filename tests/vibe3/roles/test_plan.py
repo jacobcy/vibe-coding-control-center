@@ -140,8 +140,8 @@ class TestResolveSpecPlanInputDefaultSpecRef:
 
         # Patch at the source module, not where it's imported
         with (
-            patch("vibe3.services.flow_service.FlowService") as mock_fs,
-            patch("vibe3.services.spec_ref_service.SpecRefService") as mock_ss,
+            patch("vibe3.services.FlowService") as mock_fs,
+            patch("vibe3.services.SpecRefService") as mock_ss,
         ):
             mock_fs.return_value.get_flow_status.return_value = mock_flow
             mock_ss.return_value.parse_spec_ref.return_value = mock_spec_info
@@ -169,8 +169,8 @@ class TestResolveSpecPlanInputDefaultSpecRef:
 
         # Patch at the source module
         with (
-            patch("vibe3.services.flow_service.FlowService") as mock_fs,
-            patch("vibe3.services.spec_ref_service.SpecRefService") as mock_ss,
+            patch("vibe3.services.FlowService") as mock_fs,
+            patch("vibe3.services.SpecRefService") as mock_ss,
         ):
             mock_fs.return_value.get_flow_status.return_value = mock_flow
             mock_ss.return_value.parse_spec_ref.return_value = mock_spec_info
@@ -189,7 +189,7 @@ class TestResolveSpecPlanInputDefaultSpecRef:
         mock_flow.spec_ref = None
 
         # Patch at the source module
-        with patch("vibe3.services.flow_service.FlowService") as mock_fs:
+        with patch("vibe3.services.FlowService") as mock_fs:
             mock_fs.return_value.get_flow_status.return_value = mock_flow
 
             with pytest.raises(ValueError) as exc_info:
@@ -200,7 +200,7 @@ class TestResolveSpecPlanInputDefaultSpecRef:
     def test_no_explicit_input_raises_when_no_flow(self) -> None:
         """Raise ValueError when flow does not exist."""
         # Patch at the source module
-        with patch("vibe3.services.flow_service.FlowService") as mock_fs:
+        with patch("vibe3.services.FlowService") as mock_fs:
             mock_fs.return_value.get_flow_status.return_value = None
 
             with pytest.raises(ValueError) as exc_info:
@@ -215,8 +215,8 @@ class TestResolveSpecPlanInputDefaultSpecRef:
 
         # Patch at the source module
         with (
-            patch("vibe3.services.flow_service.FlowService") as mock_fs,
-            patch("vibe3.services.spec_ref_service.SpecRefService") as mock_ss,
+            patch("vibe3.services.FlowService") as mock_fs,
+            patch("vibe3.services.SpecRefService") as mock_ss,
         ):
             mock_fs.return_value.get_flow_status.return_value = mock_flow
             mock_ss.return_value.validate_spec_ref.return_value = (
@@ -236,8 +236,8 @@ class TestResolveSpecPlanInputDefaultSpecRef:
 
         # Patch at the source module
         with (
-            patch("vibe3.services.flow_service.FlowService") as mock_fs,
-            patch("vibe3.services.spec_ref_service.SpecRefService") as mock_ss,
+            patch("vibe3.services.FlowService") as mock_fs,
+            patch("vibe3.services.SpecRefService") as mock_ss,
         ):
             mock_fs.return_value.get_flow_status.return_value = mock_flow
             mock_ss.return_value.validate_spec_ref.return_value = (True, "")

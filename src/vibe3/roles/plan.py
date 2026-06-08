@@ -97,8 +97,7 @@ def _build_plan_task_guidance(
     branch: str,
 ) -> str | None:
     """Build plan task guidance from flow and issue context."""
-    from vibe3.services.flow_service import FlowService
-    from vibe3.services.spec_ref_service import SpecRefService
+    from vibe3.services import FlowService, SpecRefService
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -108,10 +107,10 @@ def _build_plan_task_guidance(
     sections: list[str] = []
 
     # Issue context
-    from vibe3.clients.github_field_constants import GITHUB_FIELDS_BODY_COMMENTS
+    from vibe3.clients import GITHUB_FIELDS_BODY_COMMENTS
 
     issue_payload = GitHubClient().view_issue(
-        issue.number, repo=config.repo, fields=list(GITHUB_FIELDS_BODY_COMMENTS)
+        issue.number, repo=config.repo, fields=list(GITHUB_FIELDS_BODY_COMMENTS)  # type: ignore[call-overload]
     )
     if isinstance(issue_payload, dict):
         title = issue_payload.get("title")
@@ -223,7 +222,7 @@ def build_plan_sync_request(
     tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     (
@@ -286,8 +285,7 @@ def resolve_spec_plan_input(
     2. Flow's existing spec_ref (if available)
     3. Error if none available
     """
-    from vibe3.services.flow_service import FlowService
-    from vibe3.services.spec_ref_service import SpecRefService
+    from vibe3.services import FlowService, SpecRefService
 
     # Case 1: Explicit file provided
     if file:
@@ -382,10 +380,10 @@ def execute_spec_plan_async(
     because they should already be included in ``cli_args`` by the caller.
     """
     _ = request, config, agent, backend, model, fresh_session
-    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
-    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+    from vibe3.execution import resolve_orchestra_repo_root
 
     repo_root = resolve_orchestra_repo_root()
 
@@ -442,7 +440,7 @@ def execute_spec_plan_sync(
     show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
-    from vibe3.execution.session_service import load_session_id
+    from vibe3.execution import load_session_id
 
     cfg = config or VibeConfig.get_defaults()
     session_id = None if fresh_session else load_session_id("planner", branch)

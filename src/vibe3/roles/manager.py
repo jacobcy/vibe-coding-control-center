@@ -9,14 +9,16 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.clients import runtime_assets_root
+# public-api: pending upstream export
+from vibe3.clients import check_runtime_asset, runtime_assets_root
 
 # public-api: pending upstream export
-from vibe3.clients.runtime_assets import check_runtime_asset
-from vibe3.config import MANAGER_GATE_CONFIG, get_convention, get_resolver
-
-# public-api: pending upstream export
-from vibe3.config.convention_resolver import diagnose_profile
+from vibe3.config import (
+    MANAGER_GATE_CONFIG,
+    diagnose_profile,
+    get_convention,
+    get_resolver,
+)
 from vibe3.environment import SessionRegistryService
 
 # public-api: pending upstream export
@@ -122,7 +124,7 @@ def resolve_manager_token(config: OrchestraConfig) -> str | None:
 
     # 2. Fallback to config/keys.env
     try:
-        from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+        from vibe3.execution import resolve_orchestra_repo_root
 
         keys_path = resolve_orchestra_repo_root() / "config" / "keys.env"
         if keys_path.exists():
