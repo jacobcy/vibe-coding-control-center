@@ -30,7 +30,6 @@ from vibe3.services.task.show import (
     TaskRefSummary,
     TaskShowResult,
     TaskShowService,
-    is_human_comment,
 )
 
 __all__ = [
@@ -40,7 +39,6 @@ __all__ = [
     "TaskRefSummary",
     "TaskCommentSummary",
     "TaskPRSummary",
-    "is_human_comment",
 ]
 
 
