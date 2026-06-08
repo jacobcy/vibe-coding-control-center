@@ -1,7 +1,6 @@
 """Configuration loader for Vibe Center."""
 
 import os
-import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -14,59 +13,10 @@ from vibe3.config.settings import VibeConfig, _vibe3_config_root
 def _expand_variables(
     config: dict[str, Any], context: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    """Expand variable references in configuration values.
+    """Expand variable references in configuration values."""
+    from vibe3.config.utils import expand_config_variables
 
-    Supports ${path.to.value} syntax for referencing other config values.
-    Performs iterative expansion to handle nested references with cycle detection.
-    Also expands ~ to home directory in path values.
-    """
-    from pathlib import Path
-
-    if context is None:
-        context = config
-
-    result: dict[str, Any] = {}
-
-    for key, value in config.items():
-        if isinstance(value, str):
-            # Expand ${...} variable references iteratively
-            expanded = value
-            max_iterations = 10  # Prevent infinite loops
-            for _ in range(max_iterations):
-                pattern = r"\$\{([^}]+)\}"
-
-                def replace_var(match: re.Match[str]) -> str:
-                    var_path = match.group(1)
-                    # Navigate to referenced value
-                    current: Any = context
-                    for part in var_path.split("."):
-                        if isinstance(current, dict) and part in current:
-                            current = current[part]
-                        else:
-                            # Variable not found, keep original reference
-                            return match.group(0)
-                    return (
-                        str(current)
-                        if not isinstance(current, dict)
-                        else match.group(0)
-                    )
-
-                new_expanded = re.sub(pattern, replace_var, expanded)
-                if new_expanded == expanded:
-                    break  # No more changes, reached fixpoint
-                expanded = new_expanded
-
-            # Expand ~ to home directory for path values
-            if expanded.startswith("~") or "/~" in expanded:
-                expanded = str(Path(expanded).expanduser())
-
-            result[key] = expanded
-        elif isinstance(value, dict):
-            result[key] = _expand_variables(value, context)
-        else:
-            result[key] = value
-
-    return result
+    return expand_config_variables(config, context)
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
