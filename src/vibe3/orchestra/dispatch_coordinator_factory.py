@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from vibe3.domain import GlobalDispatchCoordinator
 from vibe3.orchestra import (
     DispatchHealthCheckService,
     QueuePersistenceService,
@@ -15,7 +14,7 @@ from vibe3.orchestra import (
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.domain import FlowManagerProtocol
+    from vibe3.domain import FlowManagerProtocol, GlobalDispatchCoordinator
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
     from vibe3.models import IssueInfo, OrchestraConfig
@@ -32,6 +31,7 @@ def create_global_dispatch_coordinator(
 ) -> GlobalDispatchCoordinator:
     """Create GlobalDispatchCoordinator with orchestra runtime services."""
     # Delay imports to avoid circular dependencies
+    from vibe3.domain import GlobalDispatchCoordinator
     from vibe3.services import CheckService, FlowService
 
     check_service = CheckService(
