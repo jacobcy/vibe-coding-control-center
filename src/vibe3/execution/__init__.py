@@ -35,6 +35,10 @@ if TYPE_CHECKING:
         run_issue_role_async,
         run_issue_role_sync,
     )
+    from vibe3.execution.job_executor import (
+        COMMAND_TYPE_TO_EXECUTION_ROLE,
+        JobExecutor,
+    )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
     from vibe3.execution.prompt_meta import PromptMeta, build_prompt_meta
     from vibe3.execution.role_interfaces import GovernanceFunctions
@@ -82,6 +86,9 @@ _LAZY_IMPORTS = {
     "run_governance_async": "vibe3.execution.governance_sync_runner",
     "run_issue_role_async": "vibe3.execution.issue_role_sync_runner",
     "run_issue_role_sync": "vibe3.execution.issue_role_sync_runner",
+    # Job executor
+    "JobExecutor": "vibe3.execution.job_executor",
+    "COMMAND_TYPE_TO_EXECUTION_ROLE": "vibe3.execution.job_executor",
 }
 
 
@@ -136,4 +143,7 @@ __all__ = [
     "run_governance_async",
     "run_issue_role_async",
     "run_issue_role_sync",
+    # Job executor
+    "JobExecutor",
+    "COMMAND_TYPE_TO_EXECUTION_ROLE",
 ]
