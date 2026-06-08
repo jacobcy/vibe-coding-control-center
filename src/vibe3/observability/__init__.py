@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     from vibe3.observability.trace_method import (
         set_trace_max_lines,
         set_trace_min_ms,
-        trace_method,
     )
 
 # Lazy imports (using absolute module paths)
@@ -68,8 +67,20 @@ def __getattr__(name: str) -> object:
     if name in _LAZY_IMPORTS:
         import importlib
 
-        module = importlib.import_module(_LAZY_IMPORTS[name])
-        return getattr(module, name)
+        module_path = _LAZY_IMPORTS[name]
+        module = importlib.import_module(module_path)
+
+        # Get the actual symbol from the module.
+        # For trace_method, module IS the trace_method submodule,
+        # but we want the trace_method FUNCTION inside it.
+        if hasattr(module, name):
+            symbol = getattr(module, name)
+        else:
+            symbol = module
+
+        # Cache to prevent repeated __getattr__ calls
+        globals()[name] = symbol
+        return symbol
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -90,5 +101,4 @@ __all__ = [
     "set_trace_max_lines",
     "set_trace_min_ms",
     "setup_logging",
-    "trace_method",
 ]

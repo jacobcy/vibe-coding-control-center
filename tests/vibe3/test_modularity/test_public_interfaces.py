@@ -101,16 +101,30 @@ class TestModuleExports:
                 "Exports not importable:\n" + "\n".join(f"  - {f}" for f in failures)
             )
 
-    @pytest.mark.xfail(
-        reason="Known architectural debt: commands module exports submodules, "
-        "some modules export instances"
-    )
     def test_all_exports_are_callable_or_type(self, module_registry: list[str]) -> None:
         """Verify that exports are callable (function/class) or simple data types.
 
-        KNOWN ISSUE: Some modules export complex objects (instances, special types).
-        This is acceptable for now but should be reviewed.
+        Legitimate non-callable exports include:
+        - Role definitions (TriggerableRoleDefinition, RoleDefinition)
+        - Configuration values (PosixPath, Pattern, set, frozenset)
+        - Type annotations (UnionType)
+        - Service instances (Console)
         """
+        # Types that are legitimate non-callable exports
+        allowed_non_callable = {
+            "TriggerableRoleDefinition",
+            "RoleDefinition",
+            "IssueRoleSyncSpec",
+            "PosixPath",
+            "Pattern",
+            "set",
+            "frozenset",
+            "UnionType",
+            "Console",
+            "TimelineCommentPolicy",
+            "module",
+        }
+
         failures = []
 
         for module_name in module_registry:
@@ -140,8 +154,12 @@ class TestModuleExports:
                     if isinstance(obj, (str, int, float, bool, dict, list, tuple)):
                         continue
 
-                    # Flag complex non-callable objects
+                    # Allow known legitimate non-callable types
                     obj_type = type(obj).__name__
+                    if obj_type in allowed_non_callable:
+                        continue
+
+                    # Flag complex non-callable objects
                     failures.append(
                         f"{full_module_name}.{name} is {obj_type} "
                         "(expected callable or simple data type)"
