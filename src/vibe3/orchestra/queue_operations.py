@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable, cast
 
+from vibe3.config import get_manager_usernames
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
 from vibe3.orchestra import get_flow_context, is_auto_task_branch, load_issue
@@ -12,39 +14,18 @@ from vibe3.utils import sort_ready_issues
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.domain import QualifyGateService
     from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
+    from vibe3.orchestra.domain_types import (
+        LabelServiceProtocol,
+        QualifyGateServiceProtocol,
+    )
 
 
 # Cooldown mechanism for auto-resume circuit breaker
 AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
 _COOLDOWN_EVICTION_SECONDS = 86400  # 24 hours
 _last_auto_resume_attempt: dict[int, float] = {}
-
-
-def _get_manager_usernames_lazy(config: OrchestraConfig) -> tuple[str, ...]:
-    """Lazy import wrapper for get_manager_usernames."""
-    from vibe3.services import get_manager_usernames
-
-    return get_manager_usernames(config)
-
-
-def _should_skip_from_queue_lazy(
-    issue: IssueInfo,
-    supervisor_label: str,
-    manager_usernames: tuple[str, ...],
-    require_manager_assignee: bool,
-) -> bool:
-    """Lazy import wrapper for should_skip_from_queue."""
-    from vibe3.services import should_skip_from_queue
-
-    return should_skip_from_queue(
-        issue,
-        supervisor_label=supervisor_label,
-        manager_usernames=manager_usernames,
-        require_manager_assignee=require_manager_assignee,
-    )
 
 
 def select_ready_issues_from_collected_issues(
@@ -54,50 +35,49 @@ def select_ready_issues_from_collected_issues(
     github: "GitHubClient",
     store: "SQLiteClient",
     flow_manager: "FlowManagerProtocol",
-    qualify_gate: QualifyGateService,
+    qualify_gate: QualifyGateServiceProtocol,
     supervisor_label: str,
+    *,
+    role_resolver: Callable[[IssueState], object | None] | None = None,
+    queue_filter: Callable[..., bool] | None = None,
+    label_service: LabelServiceProtocol | None = None,
 ) -> list[IssueInfo]:
     """Select ready issues from already-collected IssueInfo objects."""
-    from vibe3.domain import find_role_for_state
-
     selected: list[IssueInfo] = []
-    role = find_role_for_state(trigger_state)
+    if role_resolver is not None:
+        role = role_resolver(trigger_state)
+    else:
+        # Fallback: lazy import for backward compatibility
+        _finder = importlib.import_module("vibe3.domain")
+        role = cast("Any", _finder.find_role_for_state)(trigger_state)  # type: ignore[attr-defined]
     if role is None:
         return selected
 
     for issue in issues:
         if issue.state != trigger_state:
             continue
-        # Verify assignee/supervisor filters
-        # Always require manager assignee for all dispatch stages
-        if _should_skip_from_queue_lazy(
+        if queue_filter is not None and queue_filter(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=_get_manager_usernames_lazy(config),
+            manager_usernames=get_manager_usernames(config),
             require_manager_assignee=True,
         ):
             continue
 
-        # All roles go through Qualify Gate for body-truth alignment.
-        # Blocked issues from label are re-evaluated against body truth
-        # before retention, removal, or promotion.
         branch, flow_state = get_flow_context(
             issue.number, config, github, store, flow_manager
         )
 
-        # Qualify Gate — returns target state or None if blocked
         target = qualify_gate.run_qualify_gate(
             issue, branch, flow_state, issue.labels, trigger_state
         )
         if target is None or target != trigger_state:
             continue
 
-        # Role-specific branch existence requirements
-        if role.trigger_name != "manager":
+        if role.trigger_name != "manager":  # type: ignore[attr-defined]
             if not branch or not is_auto_task_branch(branch):
-                # Auto-resume orphaned issues without flow scene
                 if issue.state not in {IssueState.READY, IssueState.BLOCKED}:
-                    _auto_resume_to_ready(issue, config)
+                    _auto_resume_to_ready(issue, config, label_service=label_service)
                 continue
             if not flow_manager.git.branch_exists(branch):
                 append_orchestra_event(
@@ -114,20 +94,11 @@ def select_ready_issues_from_collected_issues(
 def _auto_resume_to_ready(
     issue: IssueInfo,
     config: OrchestraConfig,
+    label_service: LabelServiceProtocol | None = None,
 ) -> None:
-    """Auto-resume orphaned issue without flow scene back to READY state.
-
-    Used when an issue has no flow scene (branch=None) but is in a non-ready/blocked
-    state. This recovers orphaned issues that got stuck due to missing branch/flow.
-
-    Args:
-        issue: Issue to auto-resume
-        config: Orchestra configuration
-    """
-    # Cooldown guard: prevent repeated attempts within cooldown period
+    """Auto-resume orphaned issue without flow scene back to READY state."""
     now = time.time()
 
-    # Evict stale entries older than eviction threshold to bound memory
     stale = [
         k
         for k, t in _last_auto_resume_attempt.items()
@@ -144,16 +115,13 @@ def _auto_resume_to_ready(
     if issue.state is None:
         return
 
-    # Defensive guard: never auto-resume READY or BLOCKED issues
-    # READY issues are already in target state
-    # BLOCKED issues require human intervention per state machine invariant
     if issue.state in {IssueState.READY, IssueState.BLOCKED}:
         return
 
-    try:
-        from vibe3.services import LabelService
+    if label_service is None:
+        return
 
-        label_service = LabelService(repo=config.repo)
+    try:
         label_service.transition(
             issue.number,
             IssueState.READY,
@@ -165,7 +133,6 @@ def _auto_resume_to_ready(
             f"auto-resume #{issue.number}: no flow scene, "
             f"state={issue.state.value}, recovered to ready",
         )
-        # Clear cooldown on success to allow immediate future resume
         _last_auto_resume_attempt.pop(issue.number, None)
     except Exception as exc:
         append_orchestra_event(
@@ -181,26 +148,14 @@ def promote_progressed_entries(
     registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
+    *,
+    queue_filter: Callable[..., bool] | None = None,
 ) -> tuple[list[QueueEntry], list[QueueEntry], list[QueueEntry]]:
-    """Process frozen queue entries and categorize them.
-
-    Args:
-        frozen_queue: Current frozen queue entries
-        config: Orchestra configuration
-        github: GitHub client
-        registry: Session registry (optional)
-        supervisor_label: Supervisor label to check
-        load_issue_func: Optional function to load issues (for backward compatibility)
-
-    Returns:
-        Tuple of (promoted, retained, removed) entries
-    """
-
+    """Process frozen queue entries and categorize them."""
     promoted: list[QueueEntry] = []
     retained: list[QueueEntry] = []
     removed: list[QueueEntry] = []
 
-    # Use provided loader or default
     issue_loader = load_issue_func or (lambda num: load_issue(num, config, github))
 
     for entry in frozen_queue:
@@ -212,10 +167,10 @@ def promote_progressed_entries(
         if issue is None or issue.state is None:
             continue
 
-        if _should_skip_from_queue_lazy(
+        if queue_filter is not None and queue_filter(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=_get_manager_usernames_lazy(config),
+            manager_usernames=get_manager_usernames(config),
             require_manager_assignee=True,
         ):
             removed.append(entry)
@@ -228,13 +183,11 @@ def promote_progressed_entries(
 
         current_state = issue.state.value
         if current_state == entry.waiting_state:
-            # State unchanged - retain entry for next tick
             retained.append(entry)
             continue
 
-        # Progress detected (state changed to non-terminal) - promote to front
         entry.waiting_state = None
-        entry.collected_state = current_state  # Sync with current state
+        entry.collected_state = current_state
         promoted.append(entry)
         append_orchestra_event(
             "dispatcher",

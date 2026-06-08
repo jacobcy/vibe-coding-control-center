@@ -119,6 +119,10 @@ class QueueSelectorProtocol(Protocol):
         flow_manager: "FlowManagerProtocol",
         qualify_gate: "QualifyGateService",
         supervisor_label: str,
+        *,
+        role_resolver: Callable[["IssueState"], object | None] | None = None,
+        queue_filter: Callable[..., bool] | None = None,
+        label_service: object | None = None,
     ) -> list["IssueInfo"]:
         """Select ready issues from collected issues.
 

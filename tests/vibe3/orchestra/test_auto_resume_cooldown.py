@@ -33,14 +33,6 @@ class TestAutoResumeCooldown:
             side_effect=[RuntimeError("API error"), None]
         )
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -63,13 +55,13 @@ class TestAutoResumeCooldown:
         )
 
         # First call - fails but sets cooldown
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Advance time by 60s (within cooldown)
         current_time[0] = 1060.0
 
         # Second call - should be skipped by cooldown (transition not called)
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Verify transition was called only once (second was skipped by cooldown)
         mock_label_service.transition.assert_called_once_with(
@@ -95,14 +87,6 @@ class TestAutoResumeCooldown:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -125,13 +109,13 @@ class TestAutoResumeCooldown:
         )
 
         # First call
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Advance time by 301s (beyond cooldown)
         current_time[0] = 1301.0
 
         # Second call - should be allowed
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Verify transition was called twice
         assert mock_label_service.transition.call_count == 2
@@ -153,14 +137,6 @@ class TestAutoResumeCooldown:
 
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
-
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
 
         event_calls = []
 
@@ -184,10 +160,10 @@ class TestAutoResumeCooldown:
         )
 
         # First call - succeeds and clears cooldown
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # No time advance - should still work because cooldown was cleared
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Verify transition was called twice (cooldown cleared after success)
         assert mock_label_service.transition.call_count == 2
@@ -211,14 +187,6 @@ class TestAutoResumeCooldown:
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
 
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
-
         event_calls = []
 
         def mock_append_event(source: str, message: str) -> None:
@@ -241,10 +209,10 @@ class TestAutoResumeCooldown:
         )
 
         # Call for issue #100
-        _auto_resume_to_ready(issue_100, config)
+        _auto_resume_to_ready(issue_100, config, label_service=mock_label_service)
 
         # Immediately call for issue #200 - should work (different issue)
-        _auto_resume_to_ready(issue_200, config)
+        _auto_resume_to_ready(issue_200, config, label_service=mock_label_service)
 
         # Verify both calls went through
         assert mock_label_service.transition.call_count == 2
@@ -265,14 +233,6 @@ class TestAutoResumeCooldown:
 
         mock_label_service = MagicMock()
         mock_label_service.transition = MagicMock()
-
-        def mock_label_service_init(*args, **kwargs):
-            return mock_label_service
-
-        monkeypatch.setattr(
-            "vibe3.services.LabelService",
-            mock_label_service_init,
-        )
 
         event_calls = []
 
@@ -296,7 +256,7 @@ class TestAutoResumeCooldown:
         )
 
         # Call triggers eviction + proceeds with resume
-        _auto_resume_to_ready(issue, config)
+        _auto_resume_to_ready(issue, config, label_service=mock_label_service)
 
         # Entry for 999 should be evicted (stale)
         assert 999 not in _last_auto_resume_attempt

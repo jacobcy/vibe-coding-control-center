@@ -13,6 +13,7 @@ from vibe3.orchestra.global_dispatch_coordinator import (
 )
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
+from vibe3.services import should_skip_from_queue
 
 
 @pytest.fixture
@@ -113,6 +114,7 @@ def make_coordinator() -> callable:
             registry=None,
             supervisor_label=config.supervisor_handoff.issue_label,
             load_issue=mock_issue_loader,
+            queue_filter=should_skip_from_queue,
         )
 
         coordinator = GlobalDispatchCoordinator(
@@ -127,6 +129,7 @@ def make_coordinator() -> callable:
             issue_loader=mock_issue_loader,
             flow_context_resolver=mock_flow_context_resolver,
             queue_selector=select_ready_issues_from_collected_issues,
+            queue_filter=should_skip_from_queue,
         )
 
         # Mock health check to bypass CheckService for queue operation tests

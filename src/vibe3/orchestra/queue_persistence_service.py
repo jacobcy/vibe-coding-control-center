@@ -16,10 +16,6 @@ from vibe3.orchestra import promote_progressed_entries
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.environment import SessionRegistryService
-    from vibe3.services import (  # noqa: F401
-        get_manager_usernames,
-        should_skip_from_queue,
-    )
 
 
 @dataclass
@@ -38,20 +34,29 @@ class QueuePersistenceService:
     supervisor_label: str
     load_issue: Callable[[int], IssueInfo | None]
     frozen_queue: list[QueueEntry] | None = None
+    queue_filter: Callable[..., bool] | None = None
 
     def _get_manager_usernames(self) -> tuple[str, ...]:
-        """Lazy import wrapper for get_manager_usernames."""
-        from vibe3.services import get_manager_usernames
+        """Get manager usernames from config."""
+        from vibe3.config import get_manager_usernames
 
         return get_manager_usernames(self.config)
 
     def _should_skip_from_queue(
         self, issue: IssueInfo, *, require_manager_assignee: bool = True
     ) -> bool:
-        """Lazy import wrapper for should_skip_from_queue."""
-        from vibe3.services import should_skip_from_queue
+        """Filter issue using injected queue_filter or default."""
+        if self.queue_filter is not None:
+            return self.queue_filter(
+                issue,
+                supervisor_label=self.supervisor_label,
+                manager_usernames=self._get_manager_usernames(),
+                require_manager_assignee=require_manager_assignee,
+            )
+        import importlib
 
-        return should_skip_from_queue(
+        _mod = importlib.import_module("vibe3.services")
+        return _mod.should_skip_from_queue(  # type: ignore[no-any-return]
             issue,
             supervisor_label=self.supervisor_label,
             manager_usernames=self._get_manager_usernames(),

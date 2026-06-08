@@ -5,18 +5,13 @@ FlowManager is also available from its canonical location:
 - vibe3.domain.flow_manager.FlowManager
 """
 
-from typing import TYPE_CHECKING
+import importlib
 
-if TYPE_CHECKING:
-    from vibe3.domain import FlowManager
+__all__ = ["FlowManager"]  # noqa: F822
 
 
 def __getattr__(name: str) -> object:
+    """Lazy import for backward compatibility symbols."""
     if name == "FlowManager":
-        from vibe3.domain import FlowManager
-
-        return FlowManager
+        return getattr(importlib.import_module("vibe3.domain"), "FlowManager")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-__all__ = ["FlowManager"]
