@@ -185,6 +185,9 @@ code_limits:
       - path: "src/vibe3/execution/noop_gate.py"
         limit: 650
         reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
+      - path: "src/vibe3/execution/job_executor.py"
+        limit: 600
+        reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录等紧密耦合的统一调度入口逻辑；Issue #2430 扩展支持 sync 和 governance dispatch 后略微超标（+65 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
         limit: 590
         reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标"
