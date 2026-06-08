@@ -286,11 +286,56 @@ class TestGovernanceDispatchImplementation:
         assert (
             tick_count_occurrences == 1
         ), f"tick_count should appear once in cmd, found {tick_count_occurrences}"
+        # Should have execution_count (default 0) after tick_count
+        assert "0" in request.cmd, "execution_count should be in cmd"
 
         # Check other request properties
         assert request.role == "governance"
         assert request.actor == "orchestra:governance"
-        assert request.refs == {"tick": "42"}
+        assert request.refs == {"tick": "42", "execution_count": "0"}
+
+    def test_governance_passes_execution_count(self, mock_store: SQLiteClient) -> None:
+        """Governance dispatch should pass execution_count in cmd and refs."""
+        envelope = JobEnvelope(
+            command_type=CommandType.GOVERNANCE_SCAN,
+            issue_number=999,
+            branch="governance",
+            source="heartbeat-tick",
+            actor="orchestra:governance",
+            governance_tick_count=42,
+            governance_execution_count=7,
+        )
+
+        registry = Mock(spec=CommandAdapterRegistry)
+        executor = JobExecutor(registry, mock_store)
+
+        with patch(
+            "vibe3.execution.coordinator.ExecutionCoordinator"
+        ) as mock_coordinator_class:
+            mock_coordinator = Mock()
+            mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+                launched=True
+            )
+            mock_coordinator_class.return_value = mock_coordinator
+
+            with patch(
+                "vibe3.execution.job_executor.resolve_orchestra_repo_root"
+            ) as mock_repo:
+                from pathlib import Path
+
+                mock_repo.return_value = Path("/test/repo")
+
+                executor._execute_governance(envelope)
+
+        call_args = mock_coordinator.dispatch_execution.call_args
+        request = call_args[0][0]
+
+        # Verify execution_count is in cmd after tick_count
+        assert request.cmd[-2:] == ["42", "7"], (
+            f"Expected tick_count=42 and execution_count=7 at end of cmd, "
+            f"got {request.cmd[-2:]}"
+        )
+        assert request.refs == {"tick": "42", "execution_count": "7"}
 
     def test_governance_passes_material_override(
         self, mock_store: SQLiteClient

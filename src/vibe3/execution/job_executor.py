@@ -1,9 +1,8 @@
 """Job executor service for isolated async command execution.
 
 This module provides a thin orchestration layer that accepts a JobEnvelope,
-resolves the command adapter via the registry, dispatches through existing
-execution paths (run_issue_role_async for issue roles, run_governance_sync
-for governance), and returns a structured JobResult.
+resolves the command adapter via the registry, dispatches through
+ExecutionCoordinator (sync or async mode), and returns a structured JobResult.
 """
 
 from __future__ import annotations
@@ -112,6 +111,28 @@ class JobExecutor:
         self._registry = registry
         self._lifecycle = ExecutionLifecycleService(store)
         self._coordinator = coordinator
+
+    def _resolve_coordinator(self, config: object) -> ExecutionCoordinator:
+        """Resolve or create an ExecutionCoordinator.
+
+        Uses the injected coordinator when available, otherwise creates a
+        new one per invocation (original behavior).
+
+        Args:
+            config: Orchestra configuration
+
+        Returns:
+            ExecutionCoordinator instance
+        """
+        if self._coordinator is not None:
+            return self._coordinator
+
+        from vibe3.agents import CodeagentBackend
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        store = SQLiteClient()
+        backend_instance = CodeagentBackend()
+        return ExecutionCoordinator(config, store, backend_instance)  # type: ignore[arg-type]
 
     def execute(self, envelope: JobEnvelope) -> JobResult:
         """Execute a job from its envelope.
@@ -274,7 +295,7 @@ class JobExecutor:
             repo_path=(
                 repo.repo if hasattr(repo, "repo") else str(repo) if repo else None
             ),
-            mode="async",
+            mode=envelope.mode,
         )
 
     def _execute_issue_role(
@@ -292,20 +313,11 @@ class JobExecutor:
         Returns:
             Execution launch result from the coordinator
         """
-        if self._coordinator is not None:
-            return self._dispatch_via_coordinator(self._coordinator, envelope, spec)
-
-        # Fallback: create coordinator per invocation (original behavior)
-        from vibe3.agents import CodeagentBackend
         from vibe3.config import load_orchestra_config
-        from vibe3.execution.coordinator import ExecutionCoordinator
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)
-
-        store = SQLiteClient()
-        backend_instance = CodeagentBackend()
-        coordinator = ExecutionCoordinator(config, store, backend_instance)
+        coordinator = self._resolve_coordinator(config)
 
         return self._dispatch_via_coordinator(coordinator, envelope, spec)
 
@@ -324,22 +336,13 @@ class JobExecutor:
         Returns:
             Execution launch result from the coordinator
         """
-        from vibe3.agents import CodeagentBackend
         from vibe3.config import load_orchestra_config
-        from vibe3.execution.coordinator import ExecutionCoordinator
         from vibe3.services import load_issue_info
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)
         issue = load_issue_info(envelope.issue_number, config=config)
-
-        # Get or create coordinator
-        if self._coordinator is not None:
-            coordinator = self._coordinator
-        else:
-            store = SQLiteClient()
-            backend_instance = CodeagentBackend()
-            coordinator = ExecutionCoordinator(config, store, backend_instance)
+        coordinator = self._resolve_coordinator(config)
 
         # Extract sync-specific parameters from envelope
         flow_state = envelope.refs.get("flow_state")
@@ -366,6 +369,14 @@ class JobExecutor:
             dry_run,
             show_prompt,
         )
+
+        if sync_request is None:
+            return ExecutionLaunchResult(
+                launched=False,
+                skipped=False,
+                reason="Failed to build sync request",
+                reason_code="REQUEST_BUILD_ERROR",
+            )
 
         try:
             return coordinator.dispatch_execution(sync_request)
@@ -437,9 +448,7 @@ class JobExecutor:
             self-invocation pattern, similar to governance_scan.py and
             governance_sync_runner.py.
         """
-        from vibe3.agents import CodeagentBackend
         from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
-        from vibe3.execution.coordinator import ExecutionCoordinator
         from vibe3.execution.issue_role_support import resolve_async_cli_project_root
         from vibe3.models.execution_request import ExecutionRequest
 
@@ -463,6 +472,7 @@ class JobExecutor:
             "internal",
             "governance",
             str(tick_count),
+            str(envelope.governance_execution_count),
         ]
 
         # Add material override if provided
@@ -485,19 +495,16 @@ class JobExecutor:
             cmd=cmd,
             repo_path=str(repo),
             env=env,
-            refs={"tick": str(tick_count)},
+            refs={
+                "tick": str(tick_count),
+                "execution_count": str(envelope.governance_execution_count),
+            },
             actor=envelope.actor,
             mode="async",
             worktree_requirement=GOVERNANCE_GATE_CONFIG,
         )
 
-        # Get or create coordinator
-        if self._coordinator is not None:
-            coordinator = self._coordinator
-        else:
-            store = SQLiteClient()
-            backend_instance = CodeagentBackend()
-            coordinator = ExecutionCoordinator(config, store, backend_instance)
+        coordinator = self._resolve_coordinator(config)
 
         try:
             return coordinator.dispatch_execution(request)

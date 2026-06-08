@@ -96,6 +96,7 @@ class JobEnvelope(BaseModel):
 
     # Governance-specific parameters
     governance_tick_count: int = 0
+    governance_execution_count: int = 0
     governance_material_override: str | None = None
 
     model_config = {"frozen": True}
