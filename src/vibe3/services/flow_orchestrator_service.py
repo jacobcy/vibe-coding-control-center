@@ -11,7 +11,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.environment import WorktreeManager
-from vibe3.exceptions import GitError
+from vibe3.exceptions import GitError, is_transient_git_error
 from vibe3.models import PRState
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
@@ -151,7 +151,7 @@ class FlowOrchestratorService:
                         break
                     except GitError as e:
                         if (
-                            "cannot lock ref" in str(e)
+                            is_transient_git_error(str(e))
                             and attempt < MAX_FETCH_RETRIES - 1
                         ):
                             logger.bind(
