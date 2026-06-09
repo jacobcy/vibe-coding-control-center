@@ -60,6 +60,28 @@ description: Use when the user wants project-level roadmap planning, version goa
    - 再处理 `waiting on #X`（依赖校验）
    - 最后处理 `Skipped (needs human)`（判断是 rfc 还是可继续）
 
+3.5. **依赖验证（写 `proceed` / `unblock` 决策前必须执行）**：
+
+   当决策意图是解除阻塞（`proceed`、`unblock`）并声称"依赖已解除"时，**必须先验证依赖项的实际状态**，不可仅凭 governance suggest 的描述或 issue body 中的自然语言声明。
+
+   **验证方法**：
+   ```bash
+   # 对每个被引用的依赖 issue，检查其 GitHub 状态和标签
+   gh issue view <dep_number> --json state,labels --jq '{state, labels: [.labels[].name]}'
+   ```
+
+   **判定标准**（全部满足才可写 `proceed`）：
+   - 依赖 issue 的 GitHub `state` 为 `CLOSED`，或
+   - 依赖 issue 带有 `state/done` 或 `state/merge-ready` 标签，或
+   - 依赖 issue 有已合并的 PR（`gh pr list --search "<dep_number>" --state merged`）
+
+   **不满足时**：
+   - 写 `[roadmap decision] hold: 依赖 #N 未完成（当前状态: <state/label>），不解除阻塞`
+   - 打 `roadmap-reviewed`
+   - 不写 `proceed`
+
+   **背景**：#2171 被错误解除阻塞的根因是 roadmap decider 声称"依赖 #2169 已完成"，但 #2169 实际仍在 `state/handoff`。此步骤防止同类错误。
+
 4. **闭环要求**：处理完每个 suggest 后：
    - 写 `[roadmap decision]` 评论（marker 含义见 roadmap-common.md Comment Marker Contract）
    - decision 不是 `rfc` → **打 `roadmap-reviewed`**：`gh issue edit <number> --add-label "roadmap-reviewed"`
