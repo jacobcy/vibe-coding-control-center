@@ -7,16 +7,32 @@ description: Use when starting or switching to a new human-collaboration task. C
 
 从 issue 进入一个新的协作 flow。
 
-## 1. 强制前置检查
+## 输入解析（优化：减少确认步骤）
 
-进入 `/vibe-new` 前，**必须**先确认当前现场：
+从用户输入提取意图：
+
+- `/vibe-new 2540` → issue=2540, branch=dev/issue-2540
+- `/vibe-new 2540 create worktree` → issue=2540, worktree=true
+- `/vibe-new 2540 superpowers` → issue=2540, workflow=superpowers
+- `/vibe-new`（无参数）→ 询问 issue 号
+
+**推断规则**：
+- branch 名：`dev/issue-<id>`（自动推断，不问）
+- worktree：用户说了 "worktree"/"create worktree" → true
+- workflow：用户说了 "superpowers"/"vibe3" 等 → 直接用
+
+## 1. 强制前置检查（优化：并行执行）
+
+**并行执行**以下 4 条命令（不要串行）：
 
 ```bash
 vibe3 flow show
 git status
+git fetch origin main
+gh issue view <issue-number> --json labels,body,state
 ```
 
-根据检查结果决策：
+然后一次性判断：
 - 如果已有活跃 flow 且目标 issue 相同 → 留在当前 scope，不要重新 bootstrap
 - 如果已有活跃 flow 但需要恢复已有 branch → 改用 `/vibe-continue`
 - 如果有明确 issue number 或用户已通过 `/vibe-issue` 完成 intake → 继续
@@ -67,11 +83,14 @@ gh issue view <issue-number> --json labels,body
 
 **注意**：必须同时满足标签和 section 两个条件才是有效的 Epic 主 issue。
 
-## 4. 询问两件事
+## 4. 确认未提供的信息（优化：只问未指定的）
 
-只需要确认：
-- 用当前仓库还是新建 worktree
-- 后续打算走哪条实现 workflow
+从输入解析中已确认的信息**不再询问**：
+- worktree 已在输入中指定 → 不问
+- workflow 已在输入中指定 → 不问
+- 两者都未指定 → 依次询问：
+  - 用当前仓库还是新建 worktree
+  - 后续打算走哪条实现 workflow
 
 可推荐但不强绑：
 - `superpowers:writing-plans`
