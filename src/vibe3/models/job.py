@@ -131,6 +131,11 @@ class JobResult(BaseModel):
     Outcome of a job execution.
 
     Not frozen — downstream may update status incrementally.
+
+    Provenance tracking:
+        ``source`` is set automatically by :class:`JobExecutor` from the
+        originating ``JobEnvelope``.  When ``None``, the result was created
+        outside the standard dispatch path and trigger type is unknown.
     """
 
     command_type: CommandType
@@ -165,5 +170,9 @@ class JobResult(BaseModel):
     error_message: str | None = None
     error_code: str | None = None
 
-    # Semantic equivalence marker
+    # Semantic equivalence marker — mirrors JobEnvelope.source when the result
+    # is produced by JobExecutor.  None means the result was constructed outside
+    # the standard dispatch path (e.g. tests, legacy code, or intermediate state
+    # before source is known).  Downstream consumers that require provenance
+    # should treat None as "unknown trigger".
     source: JobSource | None = None
