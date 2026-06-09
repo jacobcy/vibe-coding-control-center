@@ -162,11 +162,13 @@
 | `state/claimed` | 已认领，待进入执行 | 已认领，准备执行 |
 | `state/in-progress` | 执行中 | 正在执行 |
 | `state/blocked` | 阻塞中 | 被阻塞，无法继续 |
-| `state/failed` | 执行失败 | 执行过程中发生不可恢复错误，需要人工干预 |
+| `state/failed` | (已弃用) 执行失败 | **不再建议使用**。请迁移至 `active` + `blocked_reason` 或 `state/blocked` |
 | `state/handoff` | 待交接 | 需要交接 |
 | `state/review` | 待 review | 等待 review |
 | `state/merge-ready` | 已满足合并条件 | 可合并 |
 | `state/done` | 已完成 | 已完成 |
+
+> **注意**：`failed` 状态字面值已从核心模型中移除。目前的失败语义由 `active` 状态配合 `blocked_reason` 表达，或在基础设施错误时触发 `FailedGate`（由 Orchestra 监控）。
 
 #### 状态机约束
 
