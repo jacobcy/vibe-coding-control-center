@@ -1,8 +1,9 @@
 """Unit tests for find_parent_branch performance optimization."""
 
+import subprocess
 from unittest.mock import patch
 
-from vibe3.utils.branch_utils import find_parent_branch
+from vibe3.utils.branch_utils import find_parent_branch, is_branch_merged_to_main
 
 
 class TestFindParentBranch:
@@ -116,3 +117,43 @@ class TestFindParentBranch:
             result = find_parent_branch()
             # Should return None on error (logged but not raised)
             assert result is None
+
+
+class TestIsBranchMergedToMain:
+    """Tests for is_branch_merged_to_main function."""
+
+    def test_is_branch_merged_to_main_returns_true_when_merged(self) -> None:
+        """Test that merged branch returns True."""
+        with patch("vibe3.utils.branch_utils._run_git") as mock_git:
+            # When branch is an ancestor, _run_git returns normally (exit 0)
+            mock_git.return_value = ""
+
+            result = is_branch_merged_to_main("task/old-branch")
+
+            assert result is True
+            mock_git.assert_called_once_with(
+                ["merge-base", "--is-ancestor", "task/old-branch", "origin/main"]
+            )
+
+    def test_is_branch_merged_to_main_returns_false_when_not_merged(self) -> None:
+        """Test that unmerged branch returns False."""
+        with patch("vibe3.utils.branch_utils._run_git") as mock_git:
+            # When branch is not an ancestor, _run_git raises CalledProcessError
+            mock_git.side_effect = subprocess.CalledProcessError(1, "git")
+
+            result = is_branch_merged_to_main("task/active-branch")
+
+            assert result is False
+            mock_git.assert_called_once_with(
+                ["merge-base", "--is-ancestor", "task/active-branch", "origin/main"]
+            )
+
+    def test_is_branch_merged_to_main_returns_false_on_git_error(self) -> None:
+        """Test that git errors (e.g., branch doesn't exist) return False."""
+        with patch("vibe3.utils.branch_utils._run_git") as mock_git:
+            # Simulate other git error (e.g., branch doesn't exist)
+            mock_git.side_effect = Exception("fatal: not a valid object name")
+
+            result = is_branch_merged_to_main("nonexistent-branch")
+
+            assert result is False

@@ -112,3 +112,19 @@ def find_parent_branch(current_branch: str | None = None) -> str | None:
             error=str(e),
         ).error("Failed to find parent branch")
         return None
+
+
+def is_branch_merged_to_main(branch: str, main_ref: str = "origin/main") -> bool:
+    """Check if a branch has been merged into main.
+
+    Uses `git merge-base --is-ancestor` to check if the branch tip
+    is reachable from main_ref. Returns True if the branch is already
+    contained in main (i.e., merged).
+    """
+    try:
+        _run_git(["merge-base", "--is-ancestor", branch, main_ref])
+        return True  # exit 0 = is ancestor = merged
+    except subprocess.CalledProcessError:
+        return False  # exit 1 = not ancestor = not merged
+    except Exception:
+        return False  # git error (branch doesn't exist, etc.)

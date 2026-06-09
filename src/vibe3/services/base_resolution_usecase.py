@@ -7,6 +7,7 @@ from vibe3.clients import GitClient, GitClientProtocol
 from vibe3.exceptions import UserError
 from vibe3.models import BranchSource
 from vibe3.utils import find_parent_branch
+from vibe3.utils.branch_utils import is_branch_merged_to_main
 
 MAIN_BRANCH_NAME = "main"
 MAIN_BRANCH_REF = "origin/main"
@@ -105,6 +106,9 @@ class BaseResolutionUsecase:
                     "Could not auto-detect parent branch. "
                     "Please specify base branch explicitly."
                 )
+            # If detected parent is already merged into main, use origin/main
+            if is_branch_merged_to_main(inferred):
+                return ResolvedBase(base_branch=MAIN_BRANCH_REF, auto_detected=True)
             return ResolvedBase(base_branch=inferred, auto_detected=True)
         if token == "current":
             return ResolvedBase(base_branch=current_branch, auto_detected=False)
