@@ -162,3 +162,57 @@ class TestCheckCommand:
         assert "feature-x" in result.output
         assert "Local branches failed" in result.output
         assert "feature-y: boom" in result.output
+
+
+# ==============================================================================
+# Remote check tests
+# ==============================================================================
+
+
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_dry_run(mock_remote):
+    """--dry-run flag is passed to execute_remote_check."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_remote.return_value = ExecuteCheckResult(
+        mode="remote",
+        success=True,
+        summary="Checked 0 issues, found 0 anomalies",
+        details={"anomalies": [], "removed": 0, "added": 0, "dry_run": True},
+    )
+    result = runner.invoke(app, ["check", "remote", "--dry-run"])
+
+    assert result.exit_code == 0
+    mock_remote.assert_called_once_with(dry_run=True)
+
+
+@patch("vibe3.commands.check.CheckService")
+def test_check_backward_compat(mock_service_class):
+    """vibe3 check (no subcommand) still routes to legacy behavior."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_service_class.return_value = MagicMock()
+    result_obj = ExecuteCheckResult(
+        mode="fix_all", success=True, summary="All checks passed", details={}
+    )
+    with patch("vibe3.commands.check.execute_check_mode", return_value=result_obj):
+        result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "All checks passed" in result.output
+
+
+@patch("vibe3.commands.check.CheckService")
+def test_check_local_subcommand(mock_service_class):
+    """vibe3 check local invokes same path as vibe3 check."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_service_class.return_value = MagicMock()
+    result_obj = ExecuteCheckResult(
+        mode="fix_all", success=True, summary="All checks passed", details={}
+    )
+    with patch("vibe3.commands.check.execute_check_mode", return_value=result_obj):
+        result = runner.invoke(app, ["check", "local"])
+
+    assert result.exit_code == 0
+    assert "All checks passed" in result.output
