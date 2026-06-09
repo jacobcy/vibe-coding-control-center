@@ -13,7 +13,6 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
-from vibe3.utils import get_vibe3_db_path
 
 if TYPE_CHECKING:
     from vibe3.models import OrchestraConfig
@@ -43,9 +42,7 @@ class WorktreePRMixin:
         try:
             # Calculate db path directly from repo_path without git command
             # This avoids extra git invocation in unit tests
-            git_common_dir = self.repo_path / ".git"
-            db_path = str(get_vibe3_db_path(git_common_dir))
-            store = SQLiteClient(db_path=db_path)
+            store = SQLiteClient.from_repo_path(self.repo_path)
             events = store.get_events(flow_branch, event_type="flow_unblocked")
         except Exception:
             # Failed to access SQLite store (e.g. in test temp directory)
