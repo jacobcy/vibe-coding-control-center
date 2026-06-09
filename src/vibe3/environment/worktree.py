@@ -17,6 +17,7 @@ from vibe3.environment.worktree_support import (
     recycle_worktree_path,
 )
 from vibe3.exceptions import SystemError
+from vibe3.services.shared.paths import get_vibe3_db_path
 
 if TYPE_CHECKING:
     from vibe3.clients import FlowStatePort
@@ -122,8 +123,7 @@ class WorktreeManager(WorktreePRMixin):
             try:
                 # Calculate db path directly from repo_path without git command
                 git_common_dir = self.repo_path / ".git"
-                vibe3_dir = git_common_dir / "vibe3"
-                db_path = str(vibe3_dir / "handoff.db")
+                db_path = str(get_vibe3_db_path(git_common_dir))
                 store = SQLiteClient(db_path=db_path)
                 store.add_event(
                     branch,

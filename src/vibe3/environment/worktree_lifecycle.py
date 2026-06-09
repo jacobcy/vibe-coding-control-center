@@ -20,7 +20,6 @@ from vibe3.environment.worktree_support import (
     recycle_worktree_path,
 )
 from vibe3.exceptions import SystemError
-from vibe3.services.shared.paths import get_vibe3_db_path
 
 if TYPE_CHECKING:
     from vibe3.clients import FlowStatePort
