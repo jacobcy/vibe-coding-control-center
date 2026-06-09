@@ -176,3 +176,6 @@ class JobResult(BaseModel):
     # before source is known).  Downstream consumers that require provenance
     # should treat None as "unknown trigger".
     source: JobSource | None = None
+
+    # Actor supervision link
+    actor_id: str | None = None

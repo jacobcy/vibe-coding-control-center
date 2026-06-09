@@ -26,6 +26,7 @@ from vibe3.models import (
 )
 
 if TYPE_CHECKING:
+    from vibe3.execution.actor import ActorRegistry
     from vibe3.execution.command_adapter import CommandAdapterRegistry
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.role_interfaces import IssueRoleSyncSpec
@@ -106,6 +107,7 @@ class JobExecutor:
         registry: CommandAdapterRegistry,
         store: SQLiteClient,
         coordinator: ExecutionCoordinator | None = None,
+        actor_registry: ActorRegistry | None = None,
     ) -> None:
         """Initialize executor with adapter registry and store.
 
@@ -116,10 +118,14 @@ class JobExecutor:
                 When provided, _execute_issue_role uses it instead of creating
                 a new one per invocation. When None, a coordinator is created
                 on each call (preserving the original behavior).
+            actor_registry: Optional actor registry for supervision tracking.
+                When provided, actor_id from envelope.refs is propagated to
+                JobResult for cross-referencing.
         """
         self._registry = registry
         self._lifecycle = ExecutionLifecycleService(store)
         self._coordinator = coordinator
+        self._actor_registry = actor_registry
 
     def _resolve_coordinator(self, config: object) -> ExecutionCoordinator:
         """Resolve or create an ExecutionCoordinator.
@@ -254,6 +260,11 @@ class JobExecutor:
             # Fill in execution metadata
             job_result.started_at = started_at
             job_result.adapter_path = adapter_path
+
+            # Propagate actor_id from envelope if present
+            actor_id = envelope.refs.get("actor_id")
+            if actor_id:
+                job_result.actor_id = actor_id
 
             return job_result
 
