@@ -1,8 +1,8 @@
 """Tests for label utility functions."""
 
+from vibe3.services.shared.label_anomalies import collect_label_anomalies
 from vibe3.services.shared.labels import (
     classify_dispatch_eligibility,
-    collect_label_anomalies,
     get_conflicting_states,
     get_highest_priority_state,
     get_state_labels,

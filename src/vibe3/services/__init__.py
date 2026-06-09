@@ -102,11 +102,14 @@ if TYPE_CHECKING:
         record_dispatch_failure_if_unexpected,
         record_error,
     )
-    from vibe3.services.shared.labels import (
+    from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
+        collect_label_anomalies,
+    )
+    from vibe3.services.shared.labels import (
+        ORCHESTRA_GOVERNED_LABEL,
         classify_dispatch_eligibility,
         clean_old_state_labels,
-        collect_label_anomalies,
         get_conflicting_states,
         get_highest_priority_state,
         get_state_labels,
@@ -186,6 +189,7 @@ __all__ = [
     "MissingTaskIssueError",
     "OrchestraSnapshot",
     "OrchestraStatusService",
+    "ORCHESTRA_GOVERNED_LABEL",
     "PRCreateUsecase",
     "PRDimensions",
     "PRService",
@@ -297,7 +301,7 @@ _SYMBOL_MODULES = {
     "IssueFlowService": "vibe3.services.issue.flow",
     "IssueStatusEntry": "vibe3.services.orchestra_status_service",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
-    "LabelAnomaly": "vibe3.services.shared.labels",
+    "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "LabelService": "vibe3.services.label_service",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
@@ -376,8 +380,9 @@ _SYMBOL_MODULES = {
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     "clean_old_state_labels": "vibe3.services.shared.labels",
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
-    "collect_label_anomalies": "vibe3.services.shared.labels",
+    "collect_label_anomalies": "vibe3.services.shared.label_anomalies",
     "should_skip_from_queue": "vibe3.services.shared.labels",
+    "ORCHESTRA_GOVERNED_LABEL": "vibe3.services.shared.labels",
 }
 
 

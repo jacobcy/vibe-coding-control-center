@@ -8,15 +8,17 @@ from typing import Any
 from vibe3.clients import GitHubClient
 from vibe3.models import OrchestraConfig
 from vibe3.services import (
+    ORCHESTRA_GOVERNED_LABEL,
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
     get_manager_usernames,
+    has_orchestra_governed,
+    has_roadmap_label,
     is_running_issue,
     normalize_assignees,
     normalize_labels,
 )
-from vibe3.services.shared.labels import has_orchestra_governed, has_roadmap_label
 
 
 def build_issue_context(
@@ -172,7 +174,7 @@ def get_governed_issue_numbers(
         Set of issue numbers that have orchestra-governed label
     """
     governed_issues = github.list_issues(
-        label="orchestra-governed",
+        label=ORCHESTRA_GOVERNED_LABEL,
         state="open",
         repo=config.repo,
         limit=5000,  # Fetch all governed issues to avoid truncation

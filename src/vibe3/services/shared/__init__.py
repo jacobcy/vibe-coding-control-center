@@ -12,11 +12,14 @@ if TYPE_CHECKING:
         record_dispatch_failure_if_unexpected,
         record_error,
     )
-    from vibe3.services.shared.labels import (
+    from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
+        collect_label_anomalies,
+    )
+    from vibe3.services.shared.labels import (
+        ORCHESTRA_GOVERNED_LABEL,
         classify_dispatch_eligibility,
         clean_old_state_labels,
-        collect_label_anomalies,
         get_conflicting_states,
         get_highest_priority_state,
         get_state_labels,
@@ -71,6 +74,7 @@ __all__ = [
     "has_roadmap_label",
     "normalize_assignees",
     "normalize_labels",
+    "ORCHESTRA_GOVERNED_LABEL",
     "should_skip_from_queue",
     # branches
     "resolve_branch_and_issue",
@@ -90,10 +94,10 @@ _SYMBOL_MODULES = {
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
-    "LabelAnomaly": "vibe3.services.shared.labels",
+    "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
-    "collect_label_anomalies": "vibe3.services.shared.labels",
+    "collect_label_anomalies": "vibe3.services.shared.label_anomalies",
     "get_conflicting_states": "vibe3.services.shared.labels",
     "get_highest_priority_state": "vibe3.services.shared.labels",
     "get_state_labels": "vibe3.services.shared.labels",
@@ -104,6 +108,7 @@ _SYMBOL_MODULES = {
     "has_roadmap_label": "vibe3.services.shared.labels",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",
+    "ORCHESTRA_GOVERNED_LABEL": "vibe3.services.shared.labels",
     "should_skip_from_queue": "vibe3.services.shared.labels",
     "resolve_branch_and_issue": "vibe3.services.shared.branches",
     "resolve_branch_arg": "vibe3.services.shared.branches",
