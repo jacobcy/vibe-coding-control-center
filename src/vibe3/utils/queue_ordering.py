@@ -166,3 +166,52 @@ def sort_ready_issues(issues: list[IssueInfo]) -> list[IssueInfo]:
 
     # Sort by key
     return sorted(issues, key=get_sort_key)
+
+
+def sort_queue_entries(
+    entries: list[Any],
+    issue_infos: dict[int, IssueInfo],
+) -> list[Any]:
+    """Re-sort queue entries by priority/roadmap/milestone from IssueInfo.
+
+    Preserves waiting_state per issue_number across the sort.
+    Entries with missing IssueInfo are placed at the end (unchanged order).
+
+    Args:
+        entries: List of QueueEntry objects
+        issue_infos: Dict mapping issue_number to IssueInfo
+
+    Returns:
+        Sorted list of QueueEntry objects
+    """
+    # Import QueueEntry here to avoid circular dependency
+    from vibe3.models import QueueEntry
+
+    # Preserve waiting_state for each entry
+    waiting_states: dict[int, str | None] = {
+        e.issue_number: e.waiting_state for e in entries
+    }
+
+    # Separate entries with and without IssueInfo
+    entries_with_info = [e for e in entries if e.issue_number in issue_infos]
+    entries_without_info = [e for e in entries if e.issue_number not in issue_infos]
+
+    def sort_key(entry: QueueEntry) -> tuple[int, int, int, int]:
+        """Compute sort key for a queue entry."""
+        info = issue_infos[entry.issue_number]
+        milestone_dict: dict[str, Any] | None = None
+        if info.milestone:
+            milestone_dict = {"title": info.milestone, "number": 0}
+        milestone_rank, _ = resolve_milestone_rank(milestone_dict)
+        roadmap_rank, _ = resolve_roadmap_rank(info.labels)
+        priority = resolve_priority(info.labels)
+        return (milestone_rank, roadmap_rank, -priority, entry.issue_number)
+
+    # Sort entries with IssueInfo
+    sorted_entries = sorted(entries_with_info, key=sort_key) + entries_without_info
+
+    # Restore waiting_state
+    for entry in sorted_entries:
+        entry.waiting_state = waiting_states.get(entry.issue_number)
+
+    return sorted_entries

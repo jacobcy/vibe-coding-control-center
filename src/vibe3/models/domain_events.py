@@ -91,3 +91,24 @@ class SupervisorIssueIdentified(DomainEvent):
     supervisor_file: str
     actor: str = "system:supervisor"
     timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class LabelChanged(DomainEvent):
+    """Published when an issue label is added or removed."""
+
+    issue_number: int
+    label: str
+    action: str  # "added" | "removed"
+    actor: str = "system"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class IssueUpdated(DomainEvent):
+    """Published when issue metadata is updated (title, body, labels, etc.)."""
+
+    issue_number: int
+    updated_fields: tuple[str, ...] = ()
+    actor: str = "system"
+    timestamp: str | None = None

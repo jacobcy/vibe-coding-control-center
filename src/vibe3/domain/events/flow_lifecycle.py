@@ -7,6 +7,8 @@ See vibe3.models.domain_events for the canonical definitions.
 from vibe3.models import (
     ExecutorDispatchIntent,
     IssueFailed,
+    IssueUpdated,
+    LabelChanged,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
@@ -15,6 +17,8 @@ from vibe3.models import (
 __all__ = [
     "ExecutorDispatchIntent",
     "IssueFailed",
+    "IssueUpdated",
+    "LabelChanged",
     "ManagerDispatchIntent",
     "PlannerDispatchIntent",
     "ReviewerDispatchIntent",

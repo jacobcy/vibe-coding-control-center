@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from vibe3.utils.queue_ordering import (
         resolve_priority,
         resolve_roadmap_rank,
+        sort_queue_entries,
         sort_ready_issues,
     )
     from vibe3.utils.time_format import format_age_aware_time
@@ -104,6 +105,7 @@ _LAZY_IMPORTS = {
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
     "sanitize_prompt_for_display": "vibe3.utils.codeagent_helpers",
     "sanitize_task_shell_meta": "vibe3.utils.codeagent_helpers",
+    "sort_queue_entries": "vibe3.utils.queue_ordering",
     "sort_ready_issues": "vibe3.utils.queue_ordering",
     "stream_reader": "vibe3.utils.codeagent_helpers",
     "summarize_backend_output": "vibe3.utils.codeagent_helpers",
@@ -166,6 +168,7 @@ __all__ = [
     "sanitize_prompt_for_display",
     "sanitize_task_shell_meta",
     "stream_reader",
+    "sort_queue_entries",
     "sort_ready_issues",
     "summarize_backend_output",
     "try_parse_issue_number",

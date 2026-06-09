@@ -143,12 +143,16 @@ class LabelService:
         # Add new state label first so a mid-transition failure does not leave
         # the issue without any state label.
         self._add_label(issue_number, state.to_label())
+        # Emit label change event for added state label
+        self._emit_label_changed(issue_number, state.to_label(), "added")
 
         # Remove old state labels
         for label in current_labels:
             if label == state.to_label():
                 continue
             self._remove_label(issue_number, label)
+            # Emit label change event for removed state label
+            self._emit_label_changed(issue_number, label, "removed")
 
     def _get_all_state_labels(self, issue_number: int) -> list[str]:
         """Get all state/* labels of an issue."""
@@ -199,6 +203,23 @@ class LabelService:
             raise SystemError(
                 f"Failed to remove label '{label}' on issue #{issue_number}"
             )
+
+    def _emit_label_changed(self, issue_number: int, label: str, action: str) -> None:
+        """Publish LabelChanged event if event bus is available."""
+        try:
+            from vibe3.domain.publisher import publish
+            from vibe3.models.domain_events import LabelChanged
+
+            publish(
+                LabelChanged(
+                    issue_number=issue_number,
+                    label=label,
+                    action=action,
+                    actor="label_service",
+                )
+            )
+        except Exception:
+            pass  # Event publishing should not break label operations
 
     def _ensure_state_label_exists(self, state: IssueState) -> None:
         color, description = STATE_LABEL_META[state]

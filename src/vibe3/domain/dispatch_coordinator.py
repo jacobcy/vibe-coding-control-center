@@ -139,6 +139,8 @@ class GlobalDispatchCoordinator:
             self._label_dispatcher = label_dispatcher
 
         self._dispatch_paused = False
+        self._dispatch_active = False
+        self._pending_refresh_issues: set[int] = set()
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
 
@@ -155,6 +157,43 @@ class GlobalDispatchCoordinator:
         """Get the set of issue numbers currently in the frozen queue."""
         self._queue_persistence.frozen_queue = self._frozen_queue
         return self._queue_persistence.get_queued_issue_numbers()
+
+    def request_queue_refresh(self, issue_number: int) -> None:
+        """Mark an issue for priority re-sort on next coordinate() tick."""
+        self._pending_refresh_issues.add(issue_number)
+
+    async def refresh_queue_priority(self) -> bool:
+        """Re-sort frozen queue entries by current priority labels.
+
+        Returns True if queue was re-sorted, False if skipped.
+        """
+        if self._dispatch_active:
+            logger.bind(domain="global_dispatch").info(
+                "Skipping event-driven queue refresh (dispatch active)"
+            )
+            return False
+
+        if not self._frozen_queue or len(self._frozen_queue) < 2:
+            return False
+
+        issue_infos: dict[int, IssueInfo] = {}
+        for entry in list(self._frozen_queue):
+            issue = self._load_issue(entry.issue_number)
+            if issue is not None:
+                issue_infos[entry.issue_number] = issue
+
+        from vibe3.utils import sort_queue_entries
+
+        self._frozen_queue = sort_queue_entries(self._frozen_queue, issue_infos)
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.persist()
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: event-driven queue priority refresh "
+            f"({len(self._frozen_queue)} entries re-sorted)",
+        )
+        return True
 
     def _sync_queue_persistence_issue_loader(self) -> None:
         """Keep queue persistence aligned with the coordinator issue loader."""
@@ -540,6 +579,12 @@ class GlobalDispatchCoordinator:
             self._frozen_queue = fresh
             queue_refreshed = True
 
+        # Step 2b: Event-driven queue priority refresh
+        if self._pending_refresh_issues:
+            self._pending_refresh_issues.clear()
+            if not queue_refreshed:  # Skip if periodic rebuild already ran
+                await self.refresh_queue_priority()
+
         paused_with_pending_blocked = False
 
         # Step 3: Paused mode waits for human task resume to create a
@@ -558,7 +603,11 @@ class GlobalDispatchCoordinator:
 
         # Step 4: Dispatch actionable entries FIRST
         # Note: dispatch event logging is handled by _dispatch_loop internally
-        dispatched_count = self._dispatch_loop(tick_id)
+        self._dispatch_active = True
+        try:
+            dispatched_count = self._dispatch_loop(tick_id)
+        finally:
+            self._dispatch_active = False
 
         # Step 5: Persist queue state AFTER dispatch but BEFORE collection.
         # Entries that were dispatched this tick have been popped (blocked entries
