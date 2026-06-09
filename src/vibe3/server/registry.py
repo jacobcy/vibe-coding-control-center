@@ -89,8 +89,15 @@ def _build_server_with_launch_cwd(
         GlobalDispatchCoordinator,
         OrchestrationFacade,
     )
+    from vibe3.domain.event_rules import (
+        build_action_handlers,
+        evaluate_rules,
+        load_rules,
+    )
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
+    from vibe3.models.domain_events import DomainEvent
+    from vibe3.models.event_bus import get_publisher
     from vibe3.orchestra import create_global_dispatch_coordinator
     from vibe3.runtime import (
         CircuitBreaker,
@@ -182,6 +189,27 @@ def _build_server_with_launch_cwd(
         cleanup_service=None,
     )
     heartbeat.register(facade)  # type: ignore[arg-type]
+
+    # Wire event rules engine into EventPublisher
+    try:
+        from vibe3.config.settings import _vibe3_config_root
+
+        rules_dir = _vibe3_config_root() / "config" / "policies"
+        rules = load_rules(rules_dir)
+        action_handlers = build_action_handlers()
+        publisher = get_publisher()
+
+        def rule_engine_hook(event: DomainEvent) -> None:  # type: ignore[valid-type]
+            evaluate_rules(event, rules, action_handlers)
+
+        publisher.add_publish_hook(rule_engine_hook)
+        logger.bind(domain="orchestra").info(
+            f"Event rules engine initialized with {len(rules)} rules"
+        )
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Event rules engine initialization failed (non-fatal): {exc}"
+        )
 
     # Combined shutdown callback for all services
     def shutdown_all() -> None:
