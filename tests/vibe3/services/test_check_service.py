@@ -1,11 +1,15 @@
 """Tests for CheckService PR closed handling."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.pr import PRState
 
+if TYPE_CHECKING:
+    from vibe3.services.check_pr_service import CheckPRService
 
-def _make_check_pr_service():
+
+def _make_check_pr_service() -> "CheckPRService":
     """Create a CheckPRService instance with mocked dependencies."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
@@ -520,3 +524,126 @@ def test_handle_pr_terminal_state_when_add_marker_fails_does_not_cleanup() -> No
         assert "Created bridge issue #789" in issues[0]
         assert "failed to add marker" in issues[0]
         assert "manually add marker comment" in issues[0]
+
+
+def test_transfer_dependencies_transfers_links() -> None:
+    """_transfer_dependencies should transfer dependency links to bridge issue."""
+    service = _make_check_pr_service()
+
+    # Mock dependents
+    service.store.get_flow_dependents.return_value = ["task/dep-1", "task/dep-2"]
+
+    # Call _transfer_dependencies
+    result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+    # Verify add_issue_link called for each dependent
+    assert service.store.add_issue_link.call_count == 2
+    service.store.add_issue_link.assert_any_call("task/dep-1", 200, "dependency")
+    service.store.add_issue_link.assert_any_call("task/dep-2", 200, "dependency")
+
+    # Verify return value
+    assert result == 2
+
+
+def test_transfer_dependencies_partial_failure_returns_successful_count() -> None:
+    """Should return successful transfer count when some fail."""
+    service = _make_check_pr_service()
+
+    # Mock dependents
+    service.store.get_flow_dependents.return_value = [
+        "task/dep-1",
+        "task/dep-2",
+        "task/dep-3",
+    ]
+
+    # Second call raises exception
+    service.store.add_issue_link.side_effect = [
+        None,
+        RuntimeError("DB write failed"),
+        None,
+    ]
+
+    result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+    # All 3 were attempted, but only 2 succeeded
+    assert service.store.add_issue_link.call_count == 3
+    assert result == 2
+
+
+def test_transfer_dependencies_no_dependents_returns_zero() -> None:
+    """_transfer_dependencies should return 0 when no dependents exist."""
+    service = _make_check_pr_service()
+
+    # Mock no dependents
+    service.store.get_flow_dependents.return_value = []
+
+    # Call _transfer_dependencies
+    result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+    # Verify add_issue_link not called
+    service.store.add_issue_link.assert_not_called()
+
+    # Verify return value
+    assert result == 0
+
+
+def test_reset_issue_after_pr_closed_transfers_dependencies() -> None:
+    """_reset_issue_after_pr_closed should transfer dependencies to bridge issue."""
+    service = _make_check_pr_service()
+
+    # Mock PR closed (not merged)
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    # Mock issue links
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+
+    # Mock issue state (open)
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+        "title": "Original Issue",
+        "body": "Original body",
+        "labels": [{"name": "bug"}, {"name": "state/ready"}],
+        "assignees": [],
+    }
+
+    # Mock no existing bridge marker
+    service.github_client.list_issue_comments.return_value = []
+
+    # Mock bridge issue creation
+    service.github_client.create_issue.return_value = 789
+
+    # Mock successful comment and close operations
+    service.github_client.add_comment.return_value = True
+    service.github_client.close_issue_if_open.return_value = "closed"
+
+    # Mock dependents for _transfer_dependencies
+    service.store.get_flow_dependents.return_value = ["task/dep-1", "task/dep-2"]
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup_cls.return_value = mock_cleanup
+        mock_cleanup.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": False,
+            "flow_record": True,
+        }
+
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/issue-456", mock_pr
+        )
+
+        # Verify dependencies were transferred to bridge issue #789
+        assert service.store.add_issue_link.call_count == 2
+        service.store.add_issue_link.assert_any_call("task/dep-1", 789, "dependency")
+        service.store.add_issue_link.assert_any_call("task/dep-2", 789, "dependency")
+
+        assert handled is True
+        assert len(issues) == 0

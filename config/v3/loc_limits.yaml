@@ -296,11 +296,11 @@ code_limits:
         limit: 600
         reason: "Check PR 状态测试集，覆盖 PR closed 检测、terminal 状态判断、duplicate handling、check priority fix (PR merged before issue-closed) 等紧密耦合场景，新增 PR merged with closed issue 回归测试后略微超标（#2284）"
       - path: "tests/vibe3/services/test_check_service.py"
-        limit: 540
-        reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）；Issue #2329 rename handle_closed_pr → handle_pr_terminal_state 增加行数（长方法名需换行，2个超长函数名需 noqa 注释）"
+        limit: 650
+        reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）；Issue #2329 rename handle_closed_pr → handle_pr_terminal_state 增加行数（长方法名需换行，2个超长函数名需 noqa 注释）；Issue #2432 新增 3 个测试覆盖 _transfer_dependencies 方法及其集成（+82 行）"
       - path: "tests/vibe3/services/test_check_service_verify_branch.py"
-        limit: 420
-        reason: "CheckService.verify_branch 测试集，覆盖 9 个紧密耦合场景（正常返回、缺失 flow、protected branch、merged/closed PR、missing worktree、runtime ownership warnings 回归、closed issue、stale blocked flow 解锁），共享 mock setup 和 SQLite fixture，拆分收益低"
+        limit: 500
+        reason: "CheckService.verify_branch 测试集，覆盖 9 个紧密耦合场景（正常返回、缺失 flow、protected branch、merged/closed PR、missing worktree、runtime ownership warnings 回归、closed issue、stale blocked flow 解锁），共享 mock setup 和 SQLite fixture，拆分收益低；Issue #2432 新增 dependency check warning 测试（+75 行）"
       - path: "tests/vibe3/services/test_handoff_service.py"
         limit: 500
         reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）"
