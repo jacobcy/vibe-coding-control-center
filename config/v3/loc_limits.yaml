@@ -289,9 +289,6 @@ code_limits:
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
-      - path: "tests/vibe3/commands/test_task_status_dashboard.py"
-        limit: 380
-        reason: "Task status dashboard core 测试集，覆盖 assignee intake/ready queue/ready anomalies、PR flows 显示、missing state label 分类、active exceptions 等场景，共享 mock setup；原文件 690 行拆分为本文件和 test_task_status_human_collab.py"
       - path: "tests/vibe3/commands/test_task_status_human_collab.py"
         limit: 420
         reason: "Task status dashboard special sections 测试集，覆盖 governed anomaly、server label resolution、compute effective server running、remote tasks、human collaboration flows (dev/issue-N) 等场景，共享 mock setup，拆分收益低"
