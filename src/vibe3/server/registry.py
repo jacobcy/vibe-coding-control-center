@@ -97,7 +97,7 @@ def _build_server_with_launch_cwd(
         FailedGateProtocol,
         HeartbeatServer,
     )
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services import CheckService, FlowService, OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -135,6 +135,17 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
+    # Create shared service instances for the assembly layer.
+    shared_check_service = CheckService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+        github_client=shared_github,
+    )
+    shared_flow_service = FlowService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+    )
+
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
@@ -167,7 +178,7 @@ def _build_server_with_launch_cwd(
         config,
         failed_gate=cast(FailedGateProtocol | None, failed_gate),
         error_tracker=None,
-        check_service=None,
+        check_service=shared_check_service,
         cleanup_service=None,
     )
     heartbeat.register(facade)  # type: ignore[arg-type]
