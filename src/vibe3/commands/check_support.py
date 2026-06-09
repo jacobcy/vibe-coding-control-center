@@ -285,7 +285,7 @@ def execute_remote_check(*, dry_run: bool = True) -> ExecuteCheckResult:
     """
     from vibe3.clients import GhIssueLabelPort, GitHubClient, SQLiteClient
     from vibe3.config import get_manager_usernames, load_orchestra_config
-    from vibe3.services.shared import (
+    from vibe3.services import (
         collect_label_anomalies,
         has_manager_assignee,
         normalize_assignees,
