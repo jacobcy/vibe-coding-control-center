@@ -280,8 +280,7 @@ def execute_remote_check(
     """
     from vibe3.clients import GhIssueLabelPort, GitHubClient, SQLiteClient
     from vibe3.config import load_orchestra_config
-    from vibe3.services import RemoteLabelCheckService
-    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services import RemoteLabelCheckService, get_manager_usernames
 
     config = load_orchestra_config()
     manager_usernames = get_manager_usernames(config)
