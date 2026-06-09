@@ -82,7 +82,7 @@ def _render_runtime_versions() -> None:
     """
     import hashlib
 
-    from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+    from vibe3.execution import resolve_orchestra_repo_root
     from vibe3.services import material_loader, policy_loader
 
     console.print("[bold]Runtime Versions[/] [dim](current)[/]")
