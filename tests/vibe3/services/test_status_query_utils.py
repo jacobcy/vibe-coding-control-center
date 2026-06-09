@@ -7,6 +7,7 @@ from vibe3.services.status_query_service import (
     StatusQueryService,
     is_auto_task_branch,
     is_canonical_task_branch,
+    is_dev_collab_branch,
     issue_priority,
 )
 
@@ -48,6 +49,21 @@ class TestBranchClassification:
         assert is_canonical_task_branch("task/issue-278", 278) is True
         assert is_canonical_task_branch("task/issue-278", 320) is False
         assert is_canonical_task_branch("dev/issue-278", 278) is False
+
+    def test_is_dev_collab_branch_recognizes_pattern(self) -> None:
+        """Should recognize dev/issue-N pattern."""
+        assert is_dev_collab_branch("dev/issue-2122") is True
+        assert is_dev_collab_branch("dev/issue-123") is True
+        assert is_dev_collab_branch("dev/feature") is False
+        assert is_dev_collab_branch("main") is False
+        assert is_dev_collab_branch("task/issue-123") is False
+        assert is_dev_collab_branch(None) is False
+
+    def test_is_auto_task_branch_does_not_match_dev_issue(self) -> None:
+        """Should not match dev/issue-N pattern (only task/issue-N)."""
+        assert is_auto_task_branch("task/issue-278") is True
+        assert is_auto_task_branch("dev/issue-278") is False
+        assert is_auto_task_branch("dev/issue-2122") is False
         assert is_canonical_task_branch("task/issue-278", None) is False
 
 
@@ -328,3 +344,37 @@ class TestRemoteField:
         assert len(result) == 1
         assert result[0]["remote"] is True
         assert result[0]["state"] == IssueState.MERGE_READY
+
+    def test_dev_collab_flow_passes_through_fetch(self) -> None:
+        """dev/issue-N flows should pass through fetch_orchestrated_issues."""
+        from vibe3.models import FlowStatusResponse
+
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 2122,
+                "title": "Dev collab issue",
+                "labels": [{"name": "state/in-progress"}],
+                "assignees": [{"login": "human-dev"}],
+                "milestone": None,
+            }
+        ]
+
+        # Create a dev/issue-* flow
+        dev_flow = FlowStatusResponse(
+            branch="dev/issue-2122",
+            flow_slug="issue-2122",
+            flow_status="active",
+            task_issue_number=2122,
+        )
+
+        result = service.fetch_orchestrated_issues(
+            flows=[dev_flow],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        # dev/issue-* flow should pass through and be included in results
+        assert len(result) == 1
+        assert result[0]["number"] == 2122
+        assert result[0]["flow"].branch == "dev/issue-2122"

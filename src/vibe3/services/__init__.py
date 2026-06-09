@@ -119,6 +119,7 @@ if TYPE_CHECKING:
     from vibe3.services.status_query_service import (
         StatusQueryService,
         is_auto_task_branch,
+        is_dev_collab_branch,
     )
     from vibe3.services.task.classifier import TaskStatusBucket
     from vibe3.services.task.resume import (
@@ -220,6 +221,7 @@ __all__ = [
     "has_recent_specific_error",
     "infer_resume_label",
     "is_auto_task_branch",
+    "is_dev_collab_branch",
     "is_running_issue",
     "load_issue_info",
     "normalize_assignees",
@@ -324,6 +326,7 @@ _SYMBOL_MODULES = {
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "infer_resume_label": "vibe3.services.flow_resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
+    "is_dev_collab_branch": "vibe3.services.status_query_service",
     "is_running_issue": "vibe3.services.orchestra_status_service",
     "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.shared.labels",

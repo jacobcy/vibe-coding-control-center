@@ -99,6 +99,11 @@ def is_auto_task_branch(branch: str) -> bool:
     return branch.startswith("task/issue-")
 
 
+def is_dev_collab_branch(branch: str | None) -> bool:
+    """Check if branch follows the dev/issue-N human-collaboration pattern."""
+    return isinstance(branch, str) and branch.startswith("dev/issue-")
+
+
 def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
     """Check if branch matches the canonical task/issue-N pattern.
 
@@ -288,7 +293,8 @@ class StatusQueryService:
             # It will be filtered at the UI layer or grouped into PR section.
             flow = issue_to_flow.get(number)
             if flow and not is_orchestra_managed_flow_branch(flow.branch):
-                continue
+                if not is_dev_collab_branch(flow.branch):
+                    continue
 
             # Get blocked_by and blocked_reason from flow state
             blocked_by: tuple[int, ...] | None = None
