@@ -17,14 +17,14 @@ from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue.failure import block_manager_noop_issue
 from vibe3.services.issue.flow import IssueFlowService
-from vibe3.services.orchestra_status_service import OrchestraStatusService
+from vibe3.services.orchestra.status import OrchestraStatusService
 from vibe3.services.pr.service import PRService
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.task import TaskService
 
 if TYPE_CHECKING:
     from vibe3.models import IssueInfo, OrchestraConfig
-    from vibe3.services.orchestra_status_service import OrchestraSnapshot
+    from vibe3.services.orchestra.status import OrchestraSnapshot
 
 # Retry configuration for Git fetch operations
 MAX_FETCH_RETRIES = 3

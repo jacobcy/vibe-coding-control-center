@@ -108,6 +108,22 @@
   .empty { color: var(--text-mute); font-size: 13px; padding: 20px 0; text-align: center; }
   .error-state { color: #ef4444; padding: 40px; text-align: center; }
 
+  .job-running { background: #1e3a5f; color: #60a5fa; }
+  .job-done { background: #1c3028; color: #4ade80; }
+  .job-failed { background: #3b1414; color: #f87171; }
+  .job-dead { background: #2d1f4e; color: #a78bfa; }
+  .job-queued { background: #2d2a10; color: #fbbf24; }
+
+  @media (prefers-color-scheme: light) {
+    .job-running { background: #dbeafe; color: #1d4ed8; }
+    .job-done { background: #dcfce7; color: #15803d; }
+    .job-failed { background: #fee2e2; color: #b91c1c; }
+    .job-dead { background: #ede9fe; color: #6d28d9; }
+    .job-queued { background: #fef9c3; color: #a16207; }
+  }
+
+  .summary-line { padding: 8px 10px; font-size: 12px; color: var(--text-dim); }
+
   .footer { padding: 12px 24px; color: var(--footer-c); font-size: 11px; border-top: 1px solid var(--border); margin-top: 8px; }
 </style>
 </head>
@@ -225,6 +241,71 @@ function renderIssues(issues) {
   return html;
 }
 
+const JOB_STATUSES = ['queued', 'running', 'done', 'failed', 'dead'];
+
+function jobStatusBadge(status) {
+  const s = (status || '').toLowerCase();
+  const cls = JOB_STATUSES.includes(s) ? `job-${s}` : 'job-other';
+  return `<span class="badge ${cls}">${escapeHtml(status || 'unknown')}</span>`;
+}
+
+function renderJobs(jobs) {
+  if (!jobs) return '';
+  const active = jobs.active || [];
+  const recent = jobs.recent || [];
+  const summary = jobs.summary || {};
+
+  if (!active.length && !recent.length) {
+    return '<div class="section"><div class="section-title">Active Jobs</div><div class="empty">No active jobs</div></div>';
+  }
+
+  let html = '';
+
+  if (active.length) {
+    html += `<div class="section"><div class="section-title">Running / Queued (${active.length})</div>
+    <table><thead><tr>
+      <th>Actor</th><th>Type</th><th>Status</th><th>Issue</th><th>Branch</th><th>Started</th>
+    </tr></thead><tbody>`;
+    active.forEach(j => {
+      const issueCell = j.issue_number > 0 ? `#${j.issue_number}` : '-';
+      html += `<tr>
+        <td style="font-family:monospace;font-size:12px">${escapeHtml(j.actor_id)}</td>
+        <td>${escapeHtml(j.job_type)}</td>
+        <td>${jobStatusBadge(j.status)}</td>
+        <td style="color:#60a5fa">${issueCell}</td>
+        <td style="font-size:12px">${escapeHtml(j.branch)}</td>
+        <td style="font-size:12px;color:var(--text-dim)">${escapeHtml(j.started_at || '-')}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if (recent.length) {
+    html += `<div class="section"><div class="section-title">Recent (last 30m, ${recent.length})</div>
+    <table><thead><tr>
+      <th>Actor</th><th>Type</th><th>Status</th><th>Issue</th><th>Branch</th><th>Completed</th>
+    </tr></thead><tbody>`;
+    recent.forEach(j => {
+      const issueCell = j.issue_number > 0 ? `#${j.issue_number}` : '-';
+      html += `<tr>
+        <td style="font-family:monospace;font-size:12px">${escapeHtml(j.actor_id)}</td>
+        <td>${escapeHtml(j.job_type)}</td>
+        <td>${jobStatusBadge(j.status)}</td>
+        <td style="color:#60a5fa">${issueCell}</td>
+        <td style="font-size:12px">${escapeHtml(j.branch)}</td>
+        <td style="font-size:12px;color:var(--text-dim)">${escapeHtml(j.completed_at || '-')}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if (summary) {
+    html += `<div class="summary-line">${summary.running || 0} running, ${summary.completed || 0} completed, ${summary.failed || 0} failed (last 30m)</div>`;
+  }
+
+  return html;
+}
+
 async function load() {
   try {
     const r = await fetch('/status');
@@ -252,7 +333,12 @@ async function load() {
     document.getElementById('s-total').textContent = (d.active_issues || []).length;
 
     // Issues
-    document.getElementById('main-content').innerHTML = renderIssues(d.active_issues || []);
+    const issueHtml = renderIssues(d.active_issues || []);
+
+    // Jobs
+    const jobsHtml = renderJobs(d.jobs);
+
+    document.getElementById('main-content').innerHTML = jobsHtml + issueHtml;
 
     // Footer
     document.getElementById('footer').textContent =

@@ -65,11 +65,11 @@ if TYPE_CHECKING:
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
     from vibe3.services.label_service import LabelService
-    from vibe3.services.orchestra_helpers import (
+    from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.services.orchestra_status_service import (
+    from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
         OrchestraStatusService,
@@ -309,15 +309,15 @@ _SYMBOL_MODULES = {
     "InitResult": "vibe3.services.check_remote",
     "IssueCollectionService": "vibe3.services.issue.collection",
     "IssueFlowService": "vibe3.services.issue.flow",
-    "IssueStatusEntry": "vibe3.services.orchestra_status_service",
+    "IssueStatusEntry": "vibe3.services.orchestra.status",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "LabelService": "vibe3.services.label_service",
     "FileLoader": "vibe3.services.file_loader",
     "material_loader": "vibe3.services.file_loader",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
-    "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
-    "OrchestraStatusService": "vibe3.services.orchestra_status_service",
+    "OrchestraSnapshot": "vibe3.services.orchestra.status",
+    "OrchestraStatusService": "vibe3.services.orchestra.status",
     "PRCreateUsecase": "vibe3.services.pr.create",
     "PRDimensions": "vibe3.services.pr.scoring",
     "PRService": "vibe3.services.pr.service",
@@ -353,14 +353,14 @@ _SYMBOL_MODULES = {
     "format_agent_actor": "vibe3.services.actor_support",
     "filter_critical_files": "vibe3.services.pr.analysis",
     "fetch_task_status_data": "vibe3.services.task.status",
-    "format_issue_runtime_line": "vibe3.services.orchestra_status_service",
-    "format_issue_summary_line": "vibe3.services.orchestra_status_service",
+    "format_issue_runtime_line": "vibe3.services.orchestra.status",
+    "format_issue_summary_line": "vibe3.services.orchestra.status",
     "generate_score_report": "vibe3.services.pr.scoring",
     "get_conflicting_states": "vibe3.services.shared.labels",
     "get_flow_state": "vibe3.services.flow.classifier",
     "get_highest_priority_state": "vibe3.services.shared.labels",
-    "get_handoff_state_label": "vibe3.services.orchestra_helpers",
-    "get_manager_usernames": "vibe3.services.orchestra_helpers",
+    "get_handoff_state_label": "vibe3.services.orchestra.helpers",
+    "get_manager_usernames": "vibe3.services.orchestra.helpers",
     "get_pr_changed_files": "vibe3.services.pr.analysis",
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
@@ -375,7 +375,7 @@ _SYMBOL_MODULES = {
     "infer_resume_label": "vibe3.services.flow.resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "is_dev_collab_branch": "vibe3.services.status_query_service",
-    "is_running_issue": "vibe3.services.orchestra_status_service",
+    "is_running_issue": "vibe3.services.orchestra.status",
     "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",

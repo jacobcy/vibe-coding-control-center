@@ -12,6 +12,7 @@ Design notes:
 
 from __future__ import annotations
 
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -166,6 +167,9 @@ class JobActor:
         event_detail = detail or "Actor completed"
         self._record_event("actor_done", detail=event_detail)
 
+        # Notify registry of terminal state for TTL tracking
+        self._notify_terminal()
+
     def record_failure(self, error: str) -> None:
         """Record that the job has failed.
 
@@ -181,6 +185,9 @@ class JobActor:
         self.completed_at = datetime.now(tz=timezone.utc).isoformat()
 
         self._record_event("actor_failed", detail=error)
+
+        # Notify registry of terminal state for TTL tracking
+        self._notify_terminal()
 
     def record_dead(self, detail: str | None = None) -> None:
         """Record that the job has died (cancelled or unexpected termination).
@@ -199,11 +206,27 @@ class JobActor:
         event_detail = detail or "Actor died"
         self._record_event("actor_dead", detail=event_detail)
 
+        # Notify registry of terminal state for TTL tracking
+        self._notify_terminal()
+
+    def _notify_terminal(self) -> None:
+        """Notify the module-level registry of terminal state for TTL tracking."""
+        try:
+            registry = get_actor_registry()
+            registry.mark_terminal(self.actor_id)
+        except Exception:
+            # Registry not initialized or other error — non-fatal
+            pass
+
 
 class ActorRegistry:
-    """Registry for tracking active actors.
+    """Registry for tracking active and recently completed actors.
 
     This is a module-level singleton accessed via get_actor_registry().
+
+    Active actors (QUEUED/RUNNING) are tracked in _actors.
+    Terminal actors (DONE/FAILED/DEAD) remain in _actors for TTL
+    period to support job monitoring, then expire via cleanup_expired().
 
     Note:
         The registry is in-memory only. Actors are lost if the orchestrator
@@ -211,9 +234,16 @@ class ActorRegistry:
         runtime_session table remains the durable session store.
     """
 
-    def __init__(self) -> None:
-        """Initialize the registry."""
+    def __init__(self, ttl_seconds: int = 1800) -> None:
+        """Initialize the registry.
+
+        Args:
+            ttl_seconds: How long terminal actors are retained (default 30min)
+        """
         self._actors: dict[str, JobActor] = {}
+        self._ttl_seconds = ttl_seconds
+        self._completed_at: dict[str, datetime] = {}
+        self._lock = threading.Lock()
 
     def create_actor(
         self,
@@ -244,7 +274,11 @@ class ActorRegistry:
             _store=store,
         )
 
-        self._actors[actor_id] = actor
+        self._lock.acquire()
+        try:
+            self._actors[actor_id] = actor
+        finally:
+            self._lock.release()
 
         # Record creation event
         try:
@@ -269,7 +303,8 @@ class ActorRegistry:
         Returns:
             The actor if found, None otherwise
         """
-        return self._actors.get(actor_id)
+        with self._lock:
+            return self._actors.get(actor_id)
 
     def get_active_actors(self) -> list[JobActor]:
         """Get all non-terminal actors.
@@ -277,11 +312,56 @@ class ActorRegistry:
         Returns:
             List of actors in QUEUED or RUNNING status
         """
-        return [
-            actor
-            for actor in self._actors.values()
-            if actor.status in (ActorStatus.QUEUED, ActorStatus.RUNNING)
-        ]
+        with self._lock:
+            return [
+                actor
+                for actor in self._actors.values()
+                if actor.status in (ActorStatus.QUEUED, ActorStatus.RUNNING)
+            ]
+
+    def get_recent_actors(self) -> list[JobActor]:
+        """Get terminal actors still within the TTL window.
+
+        Returns:
+            List of actors in DONE, FAILED, or DEAD status within TTL
+        """
+        now = datetime.now(tz=timezone.utc)
+        with self._lock:
+            result: list[JobActor] = []
+            for actor_id, completed in self._completed_at.items():
+                elapsed = (now - completed).total_seconds()
+                if elapsed < self._ttl_seconds:
+                    actor = self._actors.get(actor_id)
+                    if actor is not None:
+                        result.append(actor)
+            return result
+
+    def mark_terminal(self, actor_id: str) -> None:
+        """Record the terminal timestamp for an actor.
+
+        Called by JobActor after transitioning to a terminal state.
+
+        Args:
+            actor_id: Actor ID that reached a terminal state
+        """
+        with self._lock:
+            self._completed_at[actor_id] = datetime.now(tz=timezone.utc)
+
+    def cleanup_expired(self) -> list[str]:
+        """Remove terminal actors whose TTL has expired.
+
+        Returns:
+            List of removed actor IDs
+        """
+        now = datetime.now(tz=timezone.utc)
+        with self._lock:
+            expired_ids: list[str] = []
+            for actor_id, completed in list(self._completed_at.items()):
+                if (now - completed).total_seconds() >= self._ttl_seconds:
+                    self._actors.pop(actor_id, None)
+                    self._completed_at.pop(actor_id, None)
+                    expired_ids.append(actor_id)
+            return expired_ids
 
     def remove_actor(self, actor_id: str) -> None:
         """Remove an actor from the registry.
@@ -289,7 +369,9 @@ class ActorRegistry:
         Args:
             actor_id: Actor ID
         """
-        self._actors.pop(actor_id, None)
+        with self._lock:
+            self._actors.pop(actor_id, None)
+            self._completed_at.pop(actor_id, None)
 
 
 # Module-level singleton

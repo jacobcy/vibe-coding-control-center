@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.models.orchestration import IssueState
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -37,13 +37,11 @@ def _make_config_mock() -> MagicMock:
 
 
 @patch(
-    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    "vibe3.services.orchestra.helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-@patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-)
+@patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.services.task.status.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_splits_assignee_ready_and_anomaly(
@@ -133,13 +131,11 @@ def test_task_status_splits_assignee_ready_and_anomaly(
 
 
 @patch(
-    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    "vibe3.services.orchestra.helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-@patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-)
+@patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.services.task.status.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_flows_with_prs(
@@ -188,13 +184,11 @@ def test_task_status_shows_flows_with_prs(
 
 
 @patch(
-    "vibe3.services.orchestra_helpers.get_manager_usernames",
+    "vibe3.services.orchestra.helpers.get_manager_usernames",
     return_value=["manager-bot"],
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-@patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-)
+@patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.services.task.status.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_excludes_system_status_sections(
@@ -237,9 +231,7 @@ def test_task_status_excludes_system_status_sections(
 
 
 @patch("vibe3.config.load_orchestra_config")
-@patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-)
+@patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.services.task.status.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_missing_state_label_section(
@@ -316,9 +308,7 @@ def test_task_status_shows_missing_state_label_section(
 
 
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-@patch(
-    "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-)
+@patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
 @patch("vibe3.services.task.status.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_active_exception_for_missing_assignee(

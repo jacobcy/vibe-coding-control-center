@@ -8,7 +8,7 @@ from unittest.mock import patch
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.roles.governance import build_governance_snapshot_context
 from vibe3.roles.governance_utils import resolve_test_path, select_audit_module
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 
 # ---------------------------------------------------------------------------
 # select_audit_module

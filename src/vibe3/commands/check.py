@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from vibe3.commands.check_support import execute_check_mode
+from vibe3.commands.check_support import execute_check_mode, execute_remote_check
 from vibe3.commands.common import enable_method_trace
 from vibe3.observability import setup_logging
 from vibe3.services import CheckService
@@ -228,6 +228,21 @@ def check(
     [green]vibe3 check --branch <name>[/green]  Verify a single branch
                          instead of all active flows.
     """
+    if ctx.invoked_subcommand is not None:
+        return  # subcommand handles the work
+    _run_legacy_check(ctx, init, clean_branch, force, branch, no_progress, trace)
+
+
+def _run_legacy_check(
+    ctx: typer.Context,
+    init: bool,
+    clean_branch: bool,
+    force: bool,
+    branch: str | None,
+    no_progress: bool,
+    trace: bool,
+) -> None:
+    """Legacy check logic, shared by check() callback and local() subcommand."""
     if trace:
         setup_logging(verbose=2)
 
@@ -305,3 +320,57 @@ def check(
             )
     finally:
         pass
+
+
+@app.command()
+def local(
+    ctx: typer.Context,
+    init: Annotated[bool, typer.Option("--init")] = False,
+    clean_branch: Annotated[bool, typer.Option("--clean-branch")] = False,
+    force: Annotated[bool, typer.Option("--force")] = False,
+    branch: Annotated[str | None, typer.Option("--branch")] = None,
+    no_progress: Annotated[bool, typer.Option("--no-progress")] = False,
+    trace: Annotated[bool, typer.Option("--trace")] = False,
+) -> None:
+    """Verify handoff store consistency (default behavior)."""
+    _run_legacy_check(ctx, init, clean_branch, force, branch, no_progress, trace)
+
+
+@app.command()
+def remote(
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Only report, don't modify labels.")
+    ] = False,
+) -> None:
+    """Audit remote issue labels using label anomaly rules."""
+    result = execute_remote_check(dry_run=dry_run)
+    anomalies = result.details.get("anomalies", [])
+
+    if not anomalies:
+        typer.echo(f"{result.summary}")
+        return
+
+    typer.echo(f"{result.summary}:\n")
+
+    by_rule: dict[str, list] = {}
+    for a in anomalies:
+        for part in a.rule.split(", "):
+            by_rule.setdefault(part, []).append(a)
+
+    for rule, items in by_rule.items():
+        typer.echo(f"{rule}:")
+        for a in items:
+            parts = []
+            if a.removed:
+                parts.append(f"remove {', '.join(a.removed)}")
+            if a.added:
+                parts.append(f"add {', '.join(a.added)}")
+            typer.echo(f"  #{a.issue_number}: {'; '.join(parts)}")
+        typer.echo("")
+
+    removed = result.details.get("removed", 0)
+    added = result.details.get("added", 0)
+    typer.echo(f"Total: {removed} labels removed, {added} labels added")
+
+    if dry_run:
+        typer.echo("[DRY RUN] No labels were modified")
