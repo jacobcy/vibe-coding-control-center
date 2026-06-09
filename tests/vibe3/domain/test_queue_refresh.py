@@ -104,6 +104,8 @@ class TestHandleLabelChanged:
 
     def test_handle_label_changed_priority_label(self):
         """Test handler triggers refresh for priority labels."""
+        from vibe3.domain.orchestration_facade import OrchestrationFacade
+
         event = LabelChanged(
             issue_number=123,
             label="priority/9",
@@ -111,16 +113,28 @@ class TestHandleLabelChanged:
             actor="test",
         )
 
-        # Test that handler processes priority label without error
-        # (actual facade integration would be tested in integration tests)
+        # Create a mock facade and coordinator
+        mock_coordinator = MagicMock()
+        mock_facade = MagicMock()
+        mock_facade._coordinator = mock_coordinator
+
+        # Save original instance and set mock
+        original_instance = OrchestrationFacade._instance
+        OrchestrationFacade._instance = mock_facade
+
         try:
             handle_label_changed(event)
-            # Handler should process without exception (even if facade not initialized)
-        except Exception as e:
-            pytest.fail(f"Handler raised unexpected exception: {e}")
+
+            # Verify the coordinator was actually called
+            mock_coordinator.request_queue_refresh.assert_called_once_with(123)
+        finally:
+            # Restore original instance
+            OrchestrationFacade._instance = original_instance
 
     def test_handle_label_changed_roadmap_label(self):
         """Test handler triggers refresh for roadmap labels."""
+        from vibe3.domain.orchestration_facade import OrchestrationFacade
+
         event = LabelChanged(
             issue_number=456,
             label="roadmap/p0",
@@ -128,12 +142,23 @@ class TestHandleLabelChanged:
             actor="test",
         )
 
-        # Test that handler processes roadmap label without error
+        # Create a mock facade and coordinator
+        mock_coordinator = MagicMock()
+        mock_facade = MagicMock()
+        mock_facade._coordinator = mock_coordinator
+
+        # Save original instance and set mock
+        original_instance = OrchestrationFacade._instance
+        OrchestrationFacade._instance = mock_facade
+
         try:
             handle_label_changed(event)
-            # Handler should process without exception
-        except Exception as e:
-            pytest.fail(f"Handler raised unexpected exception: {e}")
+
+            # Verify the coordinator was actually called
+            mock_coordinator.request_queue_refresh.assert_called_once_with(456)
+        finally:
+            # Restore original instance
+            OrchestrationFacade._instance = original_instance
 
     def test_handle_label_changed_ignores_state_label(self):
         """Test handler ignores non-priority labels."""

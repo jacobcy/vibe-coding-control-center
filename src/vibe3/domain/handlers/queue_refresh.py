@@ -34,7 +34,7 @@ def handle_label_changed(event: LabelChanged) -> None:
     try:
         from vibe3.domain.orchestration_facade import OrchestrationFacade
 
-        facade = OrchestrationFacade._instance  # type: ignore[attr-defined]
+        facade = OrchestrationFacade._instance
         if facade and facade._coordinator:
             facade._coordinator.request_queue_refresh(event.issue_number)
     except Exception as exc:

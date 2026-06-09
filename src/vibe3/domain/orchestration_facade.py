@@ -42,6 +42,8 @@ class OrchestrationFacade(ServiceBase):
     只发布事件；执行装配由订阅对应事件的 domain handler 完成。
     """
 
+    _instance: OrchestrationFacade | None = None  # Singleton instance
+
     def __init__(
         self,
         tick_count: int = 0,
@@ -86,6 +88,7 @@ class OrchestrationFacade(ServiceBase):
                 GlobalDispatchCoordinator with runtime services. Required when
                 capacity is provided.
         """
+        OrchestrationFacade._instance = self  # Set singleton instance
         self._tick_count = tick_count
         self._governance_execution_count = (
             0  # Independent counter for material rotation
