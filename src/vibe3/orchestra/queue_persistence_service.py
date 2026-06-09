@@ -156,7 +156,6 @@ class QueuePersistenceService:
             self.frozen_queue,
             self.config,
             self.github,
-            self.registry,
             self.supervisor_label,
             load_issue_func=self.load_issue,
         )

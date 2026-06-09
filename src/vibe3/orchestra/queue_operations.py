@@ -14,7 +14,6 @@ from vibe3.utils import sort_ready_issues
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.environment import SessionRegistryService
     from vibe3.orchestra import FlowManagerProtocol
     from vibe3.orchestra.domain_types import (
         LabelServiceProtocol,
@@ -145,7 +144,6 @@ def promote_progressed_entries(
     frozen_queue: list[QueueEntry],
     config: OrchestraConfig,
     github: "GitHubClient",
-    registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
     *,
