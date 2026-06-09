@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from vibe3.config.profile_convention import ProfileConvention
 from vibe3.models.branch_convention import BranchConvention
 from vibe3.services.issue.flow import IssueFlowService
@@ -295,3 +297,169 @@ class TestIssueFlowServiceResolveTaskIssueNumber:
 
         result = service.resolve_task_issue_number("feature/my-branch")
         assert result is None
+
+
+class TestIssueFlowServiceResolveBestFlow:
+    """Tests for resolve_best_flow priority logic and protected branch guard.
+
+    Resolves the IMPORTANT items from PR #2581 code review:
+    1. Test priority logic (canonical > non-canonical > fallback)
+    2. Test protected branch guard (InvalidBranchLinkError)
+    """
+
+    def test_returns_none_for_empty_flows(self) -> None:
+        """Should return None when flows list is empty."""
+        service = IssueFlowService()
+        result = service.resolve_best_flow(100, [])
+        assert result is None
+
+    def test_prefers_canonical_active_over_non_canonical(self) -> None:
+        """Canonical active flow should win over non-canonical active."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-100"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [
+            {"branch": "task/issue-100", "flow_status": "active"},
+            {"branch": "task/issue-100-worktree", "flow_status": "active"},
+        ]
+        result = service.resolve_best_flow(100, flows)
+        assert result is not None
+        assert result["branch"] == "task/issue-100"
+
+    def test_falls_back_to_non_canonical_when_canonical_inactive(self) -> None:
+        """Non-canonical active should win when canonical is done/aborted."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-100"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [
+            {"branch": "task/issue-100", "flow_status": "done"},
+            {"branch": "task/issue-100-worktree", "flow_status": "active"},
+        ]
+        result = service.resolve_best_flow(100, flows)
+        assert result is not None
+        assert result["branch"] == "task/issue-100-worktree"
+
+    def test_falls_back_to_first_available_when_no_active(self) -> None:
+        """First flow should be returned when no active flows exist."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-100"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [
+            {"branch": "task/issue-100", "flow_status": "done"},
+            {"branch": "task/issue-100-v2", "flow_status": "aborted"},
+        ]
+        result = service.resolve_best_flow(100, flows)
+        assert result is not None
+        assert result["branch"] == "task/issue-100"
+
+    def test_raises_for_protected_branch_guard(self) -> None:
+        """Should raise InvalidBranchLinkError when flow points to protected branch."""
+        from unittest.mock import MagicMock
+
+        from vibe3.exceptions import InvalidBranchLinkError
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-100"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [{"branch": "main", "flow_status": "active"}]
+        with pytest.raises(InvalidBranchLinkError) as exc_info:
+            service.resolve_best_flow(100, flows)
+        assert exc_info.value.branch == "main"
+        assert exc_info.value.issue_number == 100
+
+    def test_raises_for_develop_as_protected_branch(self) -> None:
+        """Should raise InvalidBranchLinkError for develop (in protected_branches)."""
+        from unittest.mock import MagicMock
+
+        from vibe3.exceptions import InvalidBranchLinkError
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-200"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [{"branch": "develop", "flow_status": "active"}]
+        with pytest.raises(InvalidBranchLinkError) as exc_info:
+            service.resolve_best_flow(200, flows)
+        assert exc_info.value.branch == "develop"
+        assert exc_info.value.issue_number == 200
+
+    def test_raises_for_scene_base_ref_match(self) -> None:
+        """Should raise when branch matches scene_base_ref (non-origin prefix)."""
+        from unittest.mock import MagicMock
+
+        from vibe3.exceptions import InvalidBranchLinkError
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "develop"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-300"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [{"branch": "develop", "flow_status": "active"}]
+        with pytest.raises(InvalidBranchLinkError) as exc_info:
+            service.resolve_best_flow(300, flows)
+        assert exc_info.value.branch == "develop"
+        assert exc_info.value.issue_number == 300
+
+    def test_normal_branch_passes_guard(self) -> None:
+        """Normal task branch should not trigger guard check."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.scene_base_ref = "origin/main"
+
+        mock_resolver = MagicMock()
+        convention = MagicMock()
+        convention.branch.canonical_branch.return_value = "task/issue-100"
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(config=mock_config, resolver=mock_resolver)
+
+        flows = [{"branch": "task/issue-100", "flow_status": "active"}]
+        result = service.resolve_best_flow(100, flows)
+        assert result is not None
+        assert result["branch"] == "task/issue-100"
