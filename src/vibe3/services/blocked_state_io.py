@@ -18,7 +18,7 @@ from vibe3.models import FlowStateProjection, IssueState
 from vibe3.services.blocked_state_types import BlockedState
 from vibe3.services.issue.body import merge_projection, parse_projection
 from vibe3.services.label_service import LabelService
-from vibe3.utils.error_message_cleaner import compute_blocked_reason_summary
+from vibe3.utils import compute_blocked_reason_summary
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

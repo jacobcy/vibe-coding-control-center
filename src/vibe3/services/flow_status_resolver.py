@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.models import DataSource, FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue.body import parse_projection
-from vibe3.utils.error_message_cleaner import compute_blocked_reason_summary
+from vibe3.utils import compute_blocked_reason_summary
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

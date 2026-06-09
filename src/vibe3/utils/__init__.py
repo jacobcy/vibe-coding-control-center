@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         CODEAGENT_WRAPPER_ANYWHERE_RE,
         CODEAGENT_WRAPPER_RE,
         clean_error_message,
+        compute_blocked_reason_summary,
     )
     from vibe3.utils.git_helpers import (
         find_repo_root,
@@ -65,6 +66,7 @@ _LAZY_IMPORTS = {
     "CODEAGENT_STDIN_MODE_THRESHOLD": "vibe3.utils.constants",
     "CODEAGENT_WRAPPER_ANYWHERE_RE": "vibe3.utils.error_message_cleaner",
     "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
+    "compute_blocked_reason_summary": "vibe3.utils.error_message_cleaner",
     "EVENT_REQUIRED_REF_MISSING": "vibe3.utils.constants",
     "EVENT_STATE_TRANSITIONED": "vibe3.utils.constants",
     "EVENT_STATE_UNCHANGED": "vibe3.utils.constants",
@@ -129,6 +131,7 @@ __all__ = [
     "VERDICT_UNKNOWN",
     "clean_error_message",
     "check_branch_behind",
+    "compute_blocked_reason_summary",
     "diagnose_backend_error",
     "diagnose_prompt_size_issue",
     "find_parent_branch",
