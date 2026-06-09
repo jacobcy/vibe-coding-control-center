@@ -88,9 +88,19 @@ def select_ready_issues_from_collected_issues(
 
         branch, flow_state = flow_contexts.get(issue.number, ("", None))
 
-        target = qualify_gate.run_qualify_gate(
-            issue, branch, flow_state, issue.labels, trigger_state
-        )
+        try:
+            target = qualify_gate.run_qualify_gate(
+                issue, branch, flow_state, issue.labels, trigger_state
+            )
+        except Exception:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Skipping issue #{issue.number} during queue selection for "
+                f"{trigger_state.value}: qualify gate failed"
+            )
+            continue
         if target is None or target != trigger_state:
             continue
 
