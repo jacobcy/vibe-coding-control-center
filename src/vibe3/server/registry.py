@@ -15,6 +15,7 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from fastapi.responses import RedirectResponse
 
     from vibe3.models import OrchestraConfig
     from vibe3.runtime import HeartbeatServer, OrchestraInstanceInfo
@@ -96,7 +97,7 @@ def _build_server_with_launch_cwd(
         FailedGateProtocol,
         HeartbeatServer,
     )
-    from vibe3.services import OrchestraSnapshot, OrchestraStatusService
+    from vibe3.services import OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -176,9 +177,46 @@ def _build_server_with_launch_cwd(
     fastapi_app.state.status_service = status_service
 
     @fastapi_app.get("/status")
-    async def get_status() -> OrchestraSnapshot:
-        """Get current orchestra status snapshot."""
-        return await run_in_threadpool(status_service.snapshot)
+    async def get_status() -> dict:
+        """Get current orchestra status snapshot with job monitoring data."""
+        from vibe3.services import ActiveJob, JobMonitorService
+
+        snapshot = await run_in_threadpool(status_service.snapshot)
+        job_svc = JobMonitorService()
+        jobs = job_svc.snapshot()
+
+        def _job_to_dict(job: ActiveJob) -> dict:
+            return {
+                "actor_id": job.actor_id,
+                "job_type": job.job_type,
+                "status": job.status,
+                "issue_number": job.issue_number,
+                "branch": job.branch,
+                "started_at": job.started_at,
+                "completed_at": job.completed_at,
+                "pid": job.pid,
+            }
+
+        result = {
+            **snapshot.__dict__,
+            "jobs": {
+                "active": [_job_to_dict(j) for j in jobs.active_jobs],
+                "recent": [_job_to_dict(j) for j in jobs.recent_jobs],
+                "summary": {
+                    "running": jobs.running_count,
+                    "completed": jobs.completed_count,
+                    "failed": jobs.failed_count,
+                },
+            },
+        }
+        return result
+
+    @fastapi_app.get("/")
+    async def root_redirect() -> RedirectResponse:
+        """Redirect root to /status."""
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(url="/status", status_code=301)
 
     @fastapi_app.get("/web", response_class=HTMLResponse)
     async def get_web_dashboard() -> str:
