@@ -545,6 +545,31 @@ def test_transfer_dependencies_transfers_links() -> None:
     assert result == 2
 
 
+def test_transfer_dependencies_partial_failure_returns_successful_count() -> None:
+    """Should return successful transfer count when some fail."""
+    service = _make_check_pr_service()
+
+    # Mock dependents
+    service.store.get_flow_dependents.return_value = [
+        "task/dep-1",
+        "task/dep-2",
+        "task/dep-3",
+    ]
+
+    # Second call raises exception
+    service.store.add_issue_link.side_effect = [
+        None,
+        RuntimeError("DB write failed"),
+        None,
+    ]
+
+    result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+    # All 3 were attempted, but only 2 succeeded
+    assert service.store.add_issue_link.call_count == 3
+    assert result == 2
+
+
 def test_transfer_dependencies_no_dependents_returns_zero() -> None:
     """_transfer_dependencies should return 0 when no dependents exist."""
     service = _make_check_pr_service()
@@ -562,8 +587,8 @@ def test_transfer_dependencies_no_dependents_returns_zero() -> None:
     assert result == 0
 
 
-def test_reset_issue_after_pr_closed_calls_transfer_dependencies() -> None:
-    """_reset_issue_after_pr_closed should call _transfer_dependencies."""
+def test_reset_issue_after_pr_closed_transfers_dependencies() -> None:
+    """_reset_issue_after_pr_closed should transfer dependencies to bridge issue."""
     service = _make_check_pr_service()
 
     # Mock PR closed (not merged)
@@ -596,12 +621,12 @@ def test_reset_issue_after_pr_closed_calls_transfer_dependencies() -> None:
     service.github_client.add_comment.return_value = True
     service.github_client.close_issue_if_open.return_value = "closed"
 
-    with (
-        patch(
-            "vibe3.services.flow_cleanup_service.FlowCleanupService"
-        ) as mock_cleanup_cls,
-        patch.object(service, "_transfer_dependencies") as mock_transfer,
-    ):
+    # Mock dependents for _transfer_dependencies
+    service.store.get_flow_dependents.return_value = ["task/dep-1", "task/dep-2"]
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {
@@ -615,8 +640,10 @@ def test_reset_issue_after_pr_closed_calls_transfer_dependencies() -> None:
             "task/issue-456", mock_pr
         )
 
-        # Verify _transfer_dependencies was called
-        mock_transfer.assert_called_once_with("task/issue-456", 456, 789)
+        # Verify dependencies were transferred to bridge issue #789
+        assert service.store.add_issue_link.call_count == 2
+        service.store.add_issue_link.assert_any_call("task/dep-1", 789, "dependency")
+        service.store.add_issue_link.assert_any_call("task/dep-2", 789, "dependency")
 
         assert handled is True
         assert len(issues) == 0

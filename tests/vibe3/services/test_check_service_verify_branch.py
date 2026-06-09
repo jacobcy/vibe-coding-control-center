@@ -471,7 +471,9 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
         )
 
         # Need to update view_issue side_effect to handle dependency issue
-        def view_issue_side_effect(issue_num: int, **kwargs):  # type: ignore[no-untyped-def]
+        def view_issue_side_effect(
+            issue_num: int, **kwargs: object
+        ) -> dict[str, object]:
             if issue_num == 100:
                 return {
                     "state": "OPEN",
