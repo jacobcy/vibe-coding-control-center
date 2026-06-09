@@ -110,9 +110,6 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.paths import (
         check_ref_exists,
-        get_vibe3_cache_path,
-        get_vibe3_db_path,
-        get_vibe3_log_dir,
         ref_to_handoff_cmd,
         resolve_ref_path,
         sanitize_event_detail_paths,

@@ -53,6 +53,11 @@ if TYPE_CHECKING:
         validate_instance,
         write_instance_info,
     )
+    from vibe3.utils.paths import (
+        get_vibe3_cache_path,
+        get_vibe3_db_path,
+        get_vibe3_log_dir,
+    )
     from vibe3.utils.queue_ordering import (
         resolve_priority,
         resolve_roadmap_rank,
@@ -87,6 +92,9 @@ _LAZY_IMPORTS = {
     "get_current_branch": "vibe3.utils.git_helpers",
     "get_git_common_dir": "vibe3.utils.git_helpers",
     "get_remote_url": "vibe3.utils.git_helpers",
+    "get_vibe3_cache_path": "vibe3.utils.paths",
+    "get_vibe3_db_path": "vibe3.utils.paths",
+    "get_vibe3_log_dir": "vibe3.utils.paths",
     "find_repo_root": "vibe3.utils.git_helpers",
     "normalize_actor": "vibe3.utils.actor_utils",
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
@@ -145,6 +153,9 @@ __all__ = [
     "get_current_branch",
     "get_git_common_dir",
     "get_remote_url",
+    "get_vibe3_cache_path",
+    "get_vibe3_db_path",
+    "get_vibe3_log_dir",
     "find_repo_root",
     "normalize_actor",
     "OrchestraInstanceInfo",

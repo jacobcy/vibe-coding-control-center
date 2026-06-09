@@ -13,7 +13,7 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
-from vibe3.services import get_vibe3_db_path
+from vibe3.utils import get_vibe3_db_path
 
 if TYPE_CHECKING:
     from vibe3.models import OrchestraConfig

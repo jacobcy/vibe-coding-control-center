@@ -12,7 +12,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.exceptions import GitError
-from vibe3.services.shared.paths import get_vibe3_db_path
+from vibe3.utils import get_vibe3_db_path
 
 # Module-level singleton connection to avoid FD exhaustion
 # Shared across all SQLiteClient instances

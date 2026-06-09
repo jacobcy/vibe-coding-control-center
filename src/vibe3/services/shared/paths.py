@@ -52,30 +52,12 @@ def find_worktree_path_for_branch(
 GitClientProtocol = GitPathProtocol
 
 
-def get_vibe3_cache_path(repo_path: str | Path, filename: str) -> Path:
-    """Get path to a vibe3 cache file under .git/vibe3/."""
-    return Path(repo_path) / ".git" / "vibe3" / filename
-
-
-def get_vibe3_db_path(git_dir: str | Path) -> Path:
-    """Get path to handoff.db under .git/vibe3/."""
-    return Path(git_dir) / "vibe3" / "handoff.db"
-
-
-def get_vibe3_log_dir(repo_path: str | Path) -> Path:
-    """Get path to vibe3 log directory under .git/vibe3/logs/."""
-    return Path(repo_path) / ".git" / "vibe3" / "logs"
-
-
 __all__ = [
     "GitPathProtocol",
     "GitClientProtocol",
     "get_git_common_dir",
     "get_worktree_root",
     "find_worktree_path_for_branch",
-    "get_vibe3_cache_path",
-    "get_vibe3_db_path",
-    "get_vibe3_log_dir",
     "normalize_ref_path",
     "check_ref_exists",
     "resolve_ref_path",

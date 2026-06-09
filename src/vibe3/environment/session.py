@@ -10,7 +10,7 @@ from typing import Optional
 from loguru import logger
 
 from vibe3.exceptions import SystemError
-from vibe3.services import get_vibe3_log_dir
+from vibe3.utils import get_vibe3_log_dir
 
 
 @dataclass
