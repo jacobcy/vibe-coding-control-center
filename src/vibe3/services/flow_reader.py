@@ -1,5 +1,5 @@
-"""Re-export shim — FlowReader has moved to clients.protocols.flow."""
+"""Re-export shim — FlowReader has moved to vibe3.services.flow.reader."""
 
-from vibe3.clients import FlowReader
+from vibe3.services.flow.reader import FlowReader
 
 __all__ = ["FlowReader"]

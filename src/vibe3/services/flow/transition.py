@@ -15,7 +15,7 @@ from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.config import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.models import FlowStatusResponse, MainBranchProtectedError
-from vibe3.services.flow_write_mixin import FlowWriteMixin
+from vibe3.services.flow.write_mixin import FlowWriteMixin
 from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.shared.paths import GitPathProtocol
 from vibe3.services.signature_service import SignatureService

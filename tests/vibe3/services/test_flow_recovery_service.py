@@ -56,7 +56,7 @@ class TestClassifyRecovery:
             },
         )
         with patch(
-            "vibe3.services.flow_consistency_check.check_ref_exists",
+            "vibe3.services.flow.consistency.check_ref_exists",
             return_value=("docs/plans/missing.md", False),
         ):
             action, _ = svc.classify("task/issue-1")
@@ -139,9 +139,7 @@ class TestRecover:
                 "vibe3.services.issue.context.load_issue_info",
                 return_value=MagicMock(number=1),
             ),
-            patch(
-                "vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase"
-            ) as rebuild_cls,
+            patch("vibe3.services.flow.rebuild.FlowRebuildUsecase") as rebuild_cls,
             pytest.raises(RuntimeError, match="Rebuild postcondition failed"),
         ):
             rebuild_cls.return_value.rebuild_issue_flow.side_effect = RuntimeError(
