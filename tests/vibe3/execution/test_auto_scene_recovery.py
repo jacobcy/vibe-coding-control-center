@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.models import ExecutionRequest
 
 
 @pytest.fixture

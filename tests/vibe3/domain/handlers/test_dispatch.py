@@ -7,7 +7,7 @@ from vibe3.domain.events.flow_lifecycle import (
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 
 
 def _make_mock_request(

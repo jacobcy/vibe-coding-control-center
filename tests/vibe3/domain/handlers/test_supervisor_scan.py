@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
-from vibe3.execution.contracts import ExecutionLaunchResult
+from vibe3.models import ExecutionLaunchResult
 
 
 class TestSupervisorScanHandler:
