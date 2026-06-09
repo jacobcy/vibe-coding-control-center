@@ -25,7 +25,7 @@ def stable_flow_actor(monkeypatch):
     mock_gh.get_pr.return_value = None
 
     monkeypatch.setattr(
-        "vibe3.services.flow_read_mixin.GitHubClient",
+        "vibe3.services.flow.read_mixin.GitHubClient",
         lambda: mock_gh,
     )
 
