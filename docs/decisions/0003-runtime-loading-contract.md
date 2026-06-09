@@ -2,7 +2,7 @@
 document_type: decision
 title: 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界
 adr_id: 0003
-status: proposed
+status: accepted
 date: 2026-06-09
 supersedes: null
 superseded_by: null
