@@ -5,7 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.execution.actor import ActorRegistry, ActorStatus, JobActor, JobType
+    from vibe3.execution.actor import (
+        ActorRegistry,
+        ActorStatus,
+        JobActor,
+        JobType,
+        get_actor_registry,
+    )
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.codeagent_runner import CodeagentExecutionService
     from vibe3.execution.codeagent_support import build_self_invocation
@@ -58,6 +64,7 @@ _LAZY_IMPORTS = {
     "ActorStatus": "vibe3.execution.actor",
     "JobActor": "vibe3.execution.actor",
     "JobType": "vibe3.execution.actor",
+    "get_actor_registry": "vibe3.execution.actor",
     "CapacityService": "vibe3.execution.capacity_service",
     "CodeagentExecutionService": "vibe3.execution.codeagent_runner",
     "CommandAdapterEntry": "vibe3.execution.command_adapter",
@@ -116,6 +123,7 @@ __all__ = [
     "ActorStatus",
     "JobActor",
     "JobType",
+    "get_actor_registry",
     # Core services
     "ExecutionCoordinator",
     "CodeagentExecutionService",

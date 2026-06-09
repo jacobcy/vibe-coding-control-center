@@ -19,7 +19,7 @@ from vibe3.domain.events.flow_lifecycle import (
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution.actor import JobType, get_actor_registry
+from vibe3.execution import JobType, get_actor_registry
 from vibe3.models import ExecutionRequest
 from vibe3.services import load_issue_info
 
