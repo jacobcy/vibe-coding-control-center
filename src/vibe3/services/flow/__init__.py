@@ -10,7 +10,10 @@ if TYPE_CHECKING:
         classify_flow,
         get_flow_state,
     )
-    from vibe3.services.flow.cleanup import FlowCleanupService
+    from vibe3.services.flow.cleanup import (
+        FlowCleanupService,
+        LiveSessionsDetectedError,
+    )
     from vibe3.services.flow.consistency import (
         FlowConsistencyCode,
         FlowConsistencyResult,
@@ -32,7 +35,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow.service import FlowService
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
-    from vibe3.services.flow.timeline import FlowTimelineService
+    from vibe3.services.flow.timeline import TIMELINE_DISPLAY_MAP, FlowTimelineService
     from vibe3.services.flow.transition import FlowTransitionMixin
     from vibe3.services.flow.write_mixin import FlowWriteMixin
 
@@ -43,6 +46,7 @@ __all__ = [
     "classify_flow",
     "get_flow_state",
     "FlowCleanupService",
+    "LiveSessionsDetectedError",
     "create_flow_manager",
     "FlowProjection",
     "FlowProjectionService",
@@ -66,6 +70,7 @@ __all__ = [
     "RecoveryResult",
     "FlowReader",
     "FlowTimelineService",
+    "TIMELINE_DISPLAY_MAP",
 ]
 
 _SYMBOL_MODULES = {
@@ -75,6 +80,7 @@ _SYMBOL_MODULES = {
     "classify_flow": "vibe3.services.flow.classifier",
     "get_flow_state": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
+    "LiveSessionsDetectedError": "vibe3.services.flow.cleanup",
     "create_flow_manager": "vibe3.services.flow.factory",
     "FlowProjection": "vibe3.services.flow.projection",
     "FlowProjectionService": "vibe3.services.flow.projection",
@@ -98,6 +104,7 @@ _SYMBOL_MODULES = {
     "RecoveryResult": "vibe3.services.flow.recovery",
     "FlowReader": "vibe3.services.flow.reader",
     "FlowTimelineService": "vibe3.services.flow.timeline",
+    "TIMELINE_DISPLAY_MAP": "vibe3.services.flow.timeline",
 }
 
 
