@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -26,7 +27,7 @@ from vibe3.models import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.execution.command_adapter import CommandAdapterRegistry
+    from vibe3.execution.command_adapter import CommandAdapterRegistry, ResolvedAdapter
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 
@@ -649,7 +650,7 @@ class JobExecutor:
 
         return job_result
 
-    def _compute_adapter_hash(self, resolved: object) -> str | None:
+    def _compute_adapter_hash(self, resolved: "ResolvedAdapter") -> str | None:
         """Compute SHA-256 hash of the resolved adapter's source file.
 
         Args:
@@ -660,35 +661,27 @@ class JobExecutor:
         """
         import hashlib
         import importlib
+        from pathlib import Path
 
         try:
             # Get the module name from the resolved adapter
-            if not hasattr(resolved, "entry") or not hasattr(
-                resolved.entry, "import_path"
-            ):
+            if not hasattr(resolved, "module_name"):
                 return None
 
-            import_path = resolved.entry.import_path
-            # Extract module path
-            # e.g., "vibe3.roles.plan.PLAN_SYNC_SPEC" → "vibe3.roles.plan"
-            module_name = import_path.rsplit(".", 1)[0]
-
+            module_name = resolved.module_name
             module = importlib.import_module(module_name)
             if not hasattr(module, "__file__") or module.__file__ is None:
                 return None
 
-            source_path = module.__file__
-            if hasattr(source_path, "read_text"):
-                content = source_path.read_text(encoding="utf-8")
-            else:
-                content = open(source_path).read()
+            source_path = Path(module.__file__)
+            content = source_path.read_text(encoding="utf-8")
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
             return content_hash
         except Exception as e:
             logger.warning(f"Failed to compute adapter hash: {e}")
             return None
 
-    def _compute_policy_hash(self, repo_root: object) -> str | None:
+    def _compute_policy_hash(self, repo_root: Path) -> str | None:
         """Compute aggregate hash of all policy files.
 
         Args:
@@ -698,18 +691,11 @@ class JobExecutor:
             First 16 hex chars of aggregate SHA-256 hash, or None if no policies found
         """
         import hashlib
-        from pathlib import Path
 
         try:
             from vibe3.services import policy_loader
 
-            # Convert repo_root to Path if needed
-            if hasattr(repo_root, "repo"):
-                base_path = Path(repo_root.repo)
-            else:
-                base_path = Path(str(repo_root))
-
-            policies_dir = base_path / ".vibe" / "governance" / "policies"
+            policies_dir = repo_root / ".vibe" / "governance" / "policies"
             loader = policy_loader(policies_dir)
             entries = loader.load_all()
 
@@ -729,7 +715,7 @@ class JobExecutor:
             logger.warning(f"Failed to compute policy hash: {e}")
             return None
 
-    def _compute_material_hash(self, repo_root: object) -> str | None:
+    def _compute_material_hash(self, repo_root: Path) -> str | None:
         """Compute aggregate hash of all material files.
 
         Args:
@@ -739,18 +725,11 @@ class JobExecutor:
             First 16 hex chars of aggregate SHA-256 hash, or None if no materials found
         """
         import hashlib
-        from pathlib import Path
 
         try:
             from vibe3.services import material_loader
 
-            # Convert repo_root to Path if needed
-            if hasattr(repo_root, "repo"):
-                base_path = Path(repo_root.repo)
-            else:
-                base_path = Path(str(repo_root))
-
-            materials_dir = base_path / ".vibe" / "governance" / "materials"
+            materials_dir = repo_root / ".vibe" / "governance" / "materials"
             loader = material_loader(materials_dir)
             entries = loader.load_all()
 

@@ -437,8 +437,7 @@ class TestVersionHashComputation:
             # Create mock resolved object
             from types import SimpleNamespace
 
-            mock_entry = SimpleNamespace(import_path="test_module.adapter.Adapter")
-            mock_resolved = SimpleNamespace(entry=mock_entry)
+            mock_resolved = SimpleNamespace(module_name="test_module.adapter")
 
             # Compute hash
             registry = CommandAdapterRegistry()
@@ -535,3 +534,26 @@ class TestVersionHashComputation:
 
         # Verify hashes are different
         assert hash1 != hash2
+
+    def test_adapter_hash_none_when_module_file_missing(
+        self, mock_store: SQLiteClient
+    ) -> None:
+        """Adapter hash should return None when module.__file__ is None."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        registry = CommandAdapterRegistry()
+        executor = JobExecutor(registry, mock_store)
+
+        # Create mock resolved adapter
+        mock_resolved = SimpleNamespace(module_name="namespace_package")
+
+        # Mock module with __file__ = None (namespace package)
+        mock_module = Mock()
+        mock_module.__file__ = None
+
+        with patch("importlib.import_module", return_value=mock_module):
+            adapter_hash = executor._compute_adapter_hash(mock_resolved)
+
+        # Verify hash is None
+        assert adapter_hash is None

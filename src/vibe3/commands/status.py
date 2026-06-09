@@ -81,7 +81,6 @@ def _render_runtime_versions() -> None:
     governance directory contents.
     """
     import hashlib
-    from pathlib import Path
 
     from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
     from vibe3.services import material_loader, policy_loader
@@ -90,13 +89,9 @@ def _render_runtime_versions() -> None:
 
     try:
         repo_root = resolve_orchestra_repo_root()
-        if hasattr(repo_root, "repo"):
-            base_path = Path(repo_root.repo)
-        else:
-            base_path = Path(str(repo_root))
 
         # Compute policy hash
-        policies_dir = base_path / ".vibe" / "governance" / "policies"
+        policies_dir = repo_root / ".vibe" / "governance" / "policies"
         policy_loader_instance = policy_loader(policies_dir)
         policy_entries = policy_loader_instance.load_all()
         if policy_entries:
@@ -110,7 +105,7 @@ def _render_runtime_versions() -> None:
             console.print("  Policy hash:  [dim](no policies found)[/]")
 
         # Compute material hash
-        materials_dir = base_path / ".vibe" / "governance" / "materials"
+        materials_dir = repo_root / ".vibe" / "governance" / "materials"
         material_loader_instance = material_loader(materials_dir)
         material_entries = material_loader_instance.load_all()
         if material_entries:
