@@ -33,7 +33,7 @@ class TestFindDependencyWakeupPR:
         manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
             return_value=store,
         ):
             # Execute
@@ -61,7 +61,7 @@ class TestFindDependencyWakeupPR:
         manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
             return_value=store,
         ):
             # Execute
@@ -103,7 +103,7 @@ class TestFindDependencyWakeupPR:
         manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
             return_value=store,
         ):
             # Execute
@@ -136,7 +136,7 @@ class TestFindDependencyWakeupPR:
         manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
             return_value=store,
         ):
             # Execute

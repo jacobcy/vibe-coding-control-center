@@ -5,7 +5,7 @@ import datetime
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from loguru import logger
 
@@ -93,6 +93,9 @@ def _utcnow_iso() -> str:
 atexit.register(_close_global_connection)
 
 
+T = TypeVar("T", bound="SQLiteClientBase")
+
+
 class SQLiteClientBase:
     """Connection/bootstrap layer shared by focused SQLite repositories."""
 
@@ -108,14 +111,31 @@ class SQLiteClientBase:
                     "rev-parse --git-common-dir",
                     f"returned non-absolute path: {git_dir}",
                 )
-            db_path = str(get_vibe3_db_path(git_dir))
             git_dir.joinpath("vibe3").mkdir(parents=True, exist_ok=True)
+            db_path = str(get_vibe3_db_path(git_dir))
 
         self.db_path = db_path
         self._init_db()
         logger.bind(external="sqlite", operation="init", db_path=db_path).debug(
             "SQLite client initialized"
         )
+
+    @classmethod
+    def from_repo_path(cls: type[T], repo_path: Path) -> T:
+        """Create a SQLiteClient resolved from a repository root path.
+
+        Centralizes the handoff.db path resolution to avoid duplication
+        across worktree environment modules.
+
+        Args:
+            repo_path: Path to the main repository root
+
+        Returns:
+            New SQLiteClient instance with the resolved db path
+        """
+        git_dir = repo_path / ".git"
+        db_path = str(get_vibe3_db_path(git_dir))
+        return cls(db_path=db_path)
 
     def _init_db(self) -> None:
         """Initialize schema and run migrations (idempotent).

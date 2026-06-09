@@ -124,3 +124,14 @@ def test_default_db_path_reopens_closed_singleton_connection(tmp_path, monkeypat
     state = second.get_flow_state("task/reopen")
     assert state is not None
     assert state["branch"] == "task/reopen"
+
+
+class TestFromRepoPath:
+    """Test SQLiteClient.from_repo_path classmethod."""
+
+    def test_resolves_db_path_from_repo_path(self, tmp_path):
+        """from_repo_path should resolve handoff.db from .git/vibe3/."""
+        git_dir = tmp_path / ".git" / "vibe3"
+        git_dir.mkdir(parents=True)
+        store = SQLiteClient.from_repo_path(tmp_path)
+        assert store.db_path == str(tmp_path / ".git" / "vibe3" / "handoff.db")
