@@ -10,11 +10,11 @@ This migration adds automatic dependency handling with `waiting` flow status and
 
 ### New Features
 
-1. **`waiting` flow status**: Flows with unsatisfied dependencies are now marked `waiting` instead of `blocked`
-   - `waiting`: Waiting for external dependencies (can auto-recover)
-   - `blocked`: Internal execution error (requires manual intervention)
+1. **`active` + `blocked_reason` (Legacy `waiting`)**: Flows with unsatisfied dependencies are now represented as `active` with a specific `blocked_reason` indicating they are waiting for dependencies.
+   - `active`: Normal state. If `blocked_reason` contains dependency info, it's logically "waiting".
+   - `blocked`: Manual block or execution error (requires manual intervention).
 
-2. **Automatic wake-up**: When a dependency completes (PR created), all waiting flows depending on it are automatically woken up
+2. **Automatic wake-up**: When a dependency completes (PR created), all flows waiting on it are automatically woken up (clearing the `blocked_reason`).
 
 3. **Smart branch creation**: When a flow is woken up from dependency waiting, its worktree is created from the dependency's PR branch instead of `origin/main`
    - Ensures dependent code always builds on the latest dependency code
@@ -60,11 +60,11 @@ vibe3 flow bind --dependency B <issue-A>
 1. Issue B is a dependency of issue A
 2. Orchestra dispatcher collects ready issues:
    - B has no dependencies → B marked `active`, gets processed
-   - A depends on B → B not done yet → A marked `waiting`
+   - A depends on B → B not done yet → A marked `active` with `blocked_reason` (waiting on B)
 3. B completes, PR created → `DependencySatisfied` event triggered
 4. Dependency wake-up handler finds A waiting on B:
    - Checks all dependencies of A
-   - If all satisfied → wake up A: `waiting` → `active`
+   - If all satisfied → wake up A: clear `blocked_reason`
 5. When manager creates worktree for A:
    - Finds `dependency_wake_up` event with `source_pr` = PR of B
    - Fetches B's PR branch
