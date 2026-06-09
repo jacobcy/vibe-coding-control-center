@@ -8,10 +8,15 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.services.label_consistency_rules import (
+    EXECUTION_STATE_LABELS,
     apply_rule_1,
     apply_rule_2,
     apply_rule_3,
     apply_rule_4,
+)
+
+_EXECUTION_STATE_NAMES: frozenset[str] = frozenset(
+    label.replace("state/", "") for label in EXECUTION_STATE_LABELS
 )
 
 if TYPE_CHECKING:
@@ -132,7 +137,7 @@ class RemoteLabelCheckService:
             state="open",
             fields=["number", "title", "labels", "assignees"],
         )
-        logger.info(f"Fetched {len(issues)} open issues")
+        logger.info("Fetched {} open issues", len(issues))
         return issues
 
     def _get_managed_issue_numbers(self, all_issues: list[dict]) -> set[int]:
@@ -163,7 +168,7 @@ class RemoteLabelCheckService:
                     managed.add(issue_number)
                     break
 
-        logger.info(f"Found {len(managed)} issues assigned to managers")
+        logger.info("Found {} issues assigned to managers", len(managed))
         return managed
 
     def _get_local_flow_branches(self) -> set[str]:
@@ -175,7 +180,7 @@ class RemoteLabelCheckService:
         logger.info("Fetching local flow records...")
         flows = self.store.get_all_flows()
         branches = {flow.get("branch", "") for flow in flows if flow.get("branch")}
-        logger.info(f"Found {len(branches)} branches with local flow records")
+        logger.info("Found {} branches with local flow records", len(branches))
         return branches
 
     def _run_rules(
@@ -249,13 +254,7 @@ class RemoteLabelCheckService:
                 skip_rule3 = False
                 if rule2_kept_state:
                     kept_state_name = rule2_kept_state.replace("state/", "")
-                    if kept_state_name not in [
-                        "merge-ready",
-                        "review",
-                        "in-progress",
-                        "handoff",
-                        "claimed",
-                    ]:
+                    if kept_state_name not in _EXECUTION_STATE_NAMES:
                         skip_rule3 = True
 
                 if not skip_rule3:

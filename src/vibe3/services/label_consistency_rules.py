@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from loguru import logger
-
-if TYPE_CHECKING:
-    pass
-
 
 # State label priority (highest to lowest)
 # Note: This order differs from check_service.py intentionally
