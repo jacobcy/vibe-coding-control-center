@@ -50,7 +50,7 @@
   - `state/in-progress`: 正在执行中
   - `state/done`: 已完成
   - `state/blocked`: 已阻塞
-  - `state/failed`: 已失败（需要人工介入）
+  - `state/failed`: [Deprecated] 已失败（需要人工介入），建议迁移到 `state/active` + `blocked_reason`
 
 ### 2.3 队列排序规则
 

@@ -5,6 +5,8 @@
 ## 基本原则
 
 - 请先阅读 `SOUL.md` 与 `CLAUDE.md`，遵循项目规则与工作流。
+- **3-Tier 治理模型**：了解 Tier 3 (Governance), Tier 2 (Skill/Execution), Tier 1 (Shell/Atomic) 的职责边界。
+- **V3 核心优先**：本项目以 V3 (Python 实现) 为核心，V2 (Shell 实现) 处于维护/兼容状态。
 - 保持最小改动范围，避免无关重构。
 - 变更需要有清晰的动机与说明，便于 review。
 
