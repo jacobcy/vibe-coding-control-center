@@ -7,6 +7,7 @@ ExecutionCoordinator (sync or async mode), and returns a structured JobResult.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,7 @@ from vibe3.models import (
     JobResult,
     JobSource,
 )
+from vibe3.utils import compute_hash_from_loader
 
 if TYPE_CHECKING:
     from vibe3.execution.command_adapter import CommandAdapterRegistry, ResolvedAdapter
@@ -185,8 +187,6 @@ class JobExecutor:
             # Resolve adapter
             resolved = self._registry.resolve(envelope.command_type)
             adapter_path = resolved.entry.import_path
-            # Compute adapter hash
-            adapter_hash = self._compute_adapter_hash(resolved)
         except Exception as e:
             # Pre-launch failure: actor still QUEUED, just clean up
             registry.remove_actor(actor_obj.actor_id)
@@ -206,10 +206,22 @@ class JobExecutor:
         # session metadata comes from ExecutionLaunchResult after dispatch)
         context = self._build_context(envelope)
 
-        # Compute version hashes
+        # Compute version hashes (non-blocking: failure returns None)
+        try:
+            adapter_hash = self._compute_adapter_hash(resolved)
+        except Exception:
+            adapter_hash = None
+
         repo_root = resolve_orchestra_repo_root()
-        policy_hash = self._compute_policy_hash(repo_root)
-        material_hash = self._compute_material_hash(repo_root)
+        from vibe3.services import material_loader, policy_loader
+
+        governance_dir = repo_root / ".vibe" / "governance"
+        policy_hash = compute_hash_from_loader(
+            policy_loader, governance_dir / "policies"
+        )
+        material_hash = compute_hash_from_loader(
+            material_loader, governance_dir / "materials"
+        )
 
         # Record lifecycle started event
         role = COMMAND_TYPE_TO_EXECUTION_ROLE.get(envelope.command_type)
@@ -232,7 +244,7 @@ class JobExecutor:
         actor_obj.record_launch()
 
         # Prepare version refs for lifecycle events
-        version_refs = {
+        version_refs: dict[str, str] = {
             "adapter_hash": adapter_hash or "",
             "policy_hash": policy_hash or "",
             "material_hash": material_hash or "",
@@ -659,92 +671,18 @@ class JobExecutor:
         Returns:
             First 16 hex chars of SHA-256 hash, or None if module file cannot be found
         """
-        import hashlib
         import importlib
-        from pathlib import Path
 
         try:
-            # Get the module name from the resolved adapter
             if not hasattr(resolved, "module_name"):
                 return None
 
-            module_name = resolved.module_name
-            module = importlib.import_module(module_name)
+            module = importlib.import_module(resolved.module_name)
             if not hasattr(module, "__file__") or module.__file__ is None:
                 return None
 
-            source_path = Path(module.__file__)
-            content = source_path.read_text(encoding="utf-8")
-            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
-            return content_hash
+            content = Path(module.__file__).read_text(encoding="utf-8")
+            return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         except Exception as e:
             logger.warning(f"Failed to compute adapter hash: {e}")
-            return None
-
-    def _compute_policy_hash(self, repo_root: Path) -> str | None:
-        """Compute aggregate hash of all policy files.
-
-        Args:
-            repo_root: The repository root path
-
-        Returns:
-            First 16 hex chars of aggregate SHA-256 hash, or None if no policies found
-        """
-        import hashlib
-
-        try:
-            from vibe3.services import policy_loader
-
-            policies_dir = repo_root / ".vibe" / "governance" / "policies"
-            loader = policy_loader(policies_dir)
-            entries = loader.load_all()
-
-            if not entries:
-                return None
-
-            # Aggregate all content_hash values sorted by name
-            hash_parts = sorted(
-                [f"{entry.name}|{entry.content_hash}" for entry in entries]
-            )
-            concatenated = "|".join(hash_parts)
-            aggregate_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
-                :16
-            ]
-            return aggregate_hash
-        except Exception as e:
-            logger.warning(f"Failed to compute policy hash: {e}")
-            return None
-
-    def _compute_material_hash(self, repo_root: Path) -> str | None:
-        """Compute aggregate hash of all material files.
-
-        Args:
-            repo_root: The repository root path
-
-        Returns:
-            First 16 hex chars of aggregate SHA-256 hash, or None if no materials found
-        """
-        import hashlib
-
-        try:
-            from vibe3.services import material_loader
-
-            materials_dir = repo_root / ".vibe" / "governance" / "materials"
-            loader = material_loader(materials_dir)
-            entries = loader.load_all()
-
-            if not entries:
-                return None
-
-            # Aggregate all content_hash values sorted by name
-            hash_parts = sorted(
-                [f"{entry.name}|{entry.content_hash}" for entry in entries]
-            )
-            concatenated = "|".join(hash_parts)
-            aggregate_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
-                :16
-            ]
-            return aggregate_hash
-        except Exception as e:
-            logger.warning(f"Failed to compute material hash: {e}")
             return None

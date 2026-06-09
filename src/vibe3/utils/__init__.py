@@ -46,6 +46,10 @@ if TYPE_CHECKING:
         get_git_common_dir,
         get_remote_url,
     )
+    from vibe3.utils.hash_helpers import (
+        compute_governance_hash,
+        compute_hash_from_loader,
+    )
     from vibe3.utils.issue_ref import parse_issue_number, try_parse_issue_number
     from vibe3.utils.orchestra_instance import (
         OrchestraInstanceInfo,
@@ -92,6 +96,8 @@ _LAZY_IMPORTS = {
     "get_current_branch": "vibe3.utils.git_helpers",
     "get_git_common_dir": "vibe3.utils.git_helpers",
     "get_remote_url": "vibe3.utils.git_helpers",
+    "compute_governance_hash": "vibe3.utils.hash_helpers",
+    "compute_hash_from_loader": "vibe3.utils.hash_helpers",
     "get_vibe3_cache_path": "vibe3.utils.paths",
     "get_vibe3_db_path": "vibe3.utils.paths",
     "get_vibe3_log_dir": "vibe3.utils.paths",
@@ -141,6 +147,8 @@ __all__ = [
     "clean_error_message",
     "check_branch_behind",
     "compute_blocked_reason_summary",
+    "compute_governance_hash",
+    "compute_hash_from_loader",
     "diagnose_backend_error",
     "diagnose_prompt_size_issue",
     "find_parent_branch",
