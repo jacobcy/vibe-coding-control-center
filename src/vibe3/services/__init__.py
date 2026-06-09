@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
     from vibe3.services.label_service import LabelService
+    from vibe3.services.material_loader import MaterialLoader
     from vibe3.services.orchestra_helpers import (
         get_handoff_state_label,
         get_manager_usernames,
@@ -71,6 +72,7 @@ if TYPE_CHECKING:
         format_issue_summary_line,
         is_running_issue,
     )
+    from vibe3.services.policy_loader import PolicyLoader, resolve_manager_usernames
     from vibe3.services.pr.analysis import (
         analyze_critical_files,
         build_pr_analysis,
@@ -186,6 +188,7 @@ __all__ = [
     "IssueTitleCacheService",
     "LabelAnomaly",
     "LabelService",
+    "MaterialLoader",
     "MissingTaskIssueError",
     "OrchestraSnapshot",
     "OrchestraStatusService",
@@ -193,6 +196,7 @@ __all__ = [
     "PRCreateUsecase",
     "PRDimensions",
     "PRService",
+    "PolicyLoader",
     "PrReadyAbortedError",
     "PrReadyUsecase",
     "ServeStatusService",
@@ -262,6 +266,7 @@ __all__ = [
     "resolve_command_branch",
     "resolve_handoff_target",
     "resolve_issue_branch_input",
+    "resolve_manager_usernames",
     "resolve_ref_path",
     "sanitize_event_detail_paths",
     "should_skip_from_queue",
@@ -303,12 +308,14 @@ _SYMBOL_MODULES = {
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "LabelService": "vibe3.services.label_service",
+    "MaterialLoader": "vibe3.services.material_loader",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
     "OrchestraStatusService": "vibe3.services.orchestra_status_service",
     "PRCreateUsecase": "vibe3.services.pr.create",
     "PRDimensions": "vibe3.services.pr.scoring",
     "PRService": "vibe3.services.pr.service",
+    "PolicyLoader": "vibe3.services.policy_loader",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
     "ServeStatusService": "vibe3.services.serve_status_service",
@@ -376,6 +383,7 @@ _SYMBOL_MODULES = {
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff_resolution",
     "resolve_issue_branch_input": "vibe3.services.issue_branch_resolver",
+    "resolve_manager_usernames": "vibe3.services.policy_loader",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     "clean_old_state_labels": "vibe3.services.shared.labels",
