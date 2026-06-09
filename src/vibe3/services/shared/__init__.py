@@ -13,6 +13,10 @@ if TYPE_CHECKING:
         record_error,
     )
     from vibe3.services.shared.labels import (
+        audit_multiple_state_labels,
+        audit_orphan_execution_state,
+        audit_orphan_orchestra_governed,
+        audit_roadmap_state_conflict,
         clean_old_state_labels,
         normalize_assignees,
         normalize_labels,
@@ -46,6 +50,10 @@ __all__ = [
     "record_dispatch_failure_if_unexpected",
     "record_error",
     # labels
+    "audit_multiple_state_labels",
+    "audit_orphan_execution_state",
+    "audit_orphan_orchestra_governed",
+    "audit_roadmap_state_conflict",
     "clean_old_state_labels",
     "normalize_assignees",
     "normalize_labels",
@@ -68,6 +76,10 @@ _SYMBOL_MODULES = {
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
+    "audit_multiple_state_labels": "vibe3.services.shared.labels",
+    "audit_orphan_execution_state": "vibe3.services.shared.labels",
+    "audit_orphan_orchestra_governed": "vibe3.services.shared.labels",
+    "audit_roadmap_state_conflict": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",

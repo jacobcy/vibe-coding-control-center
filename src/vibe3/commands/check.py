@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from vibe3.commands.check_support import execute_check_mode
+from vibe3.commands.check_support import execute_check_mode, execute_remote_check
 from vibe3.commands.common import enable_method_trace
 from vibe3.observability import setup_logging
 from vibe3.services import CheckService
@@ -207,6 +207,19 @@ def check(
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
+    remote: Annotated[
+        bool,
+        typer.Option(
+            "--remote",
+            help="Audit remote GitHub issue label consistency.",
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", help="With --remote: only report, don't modify labels."
+        ),
+    ] = False,
 ) -> None:
     """Verify handoff store consistency.
 
@@ -227,9 +240,17 @@ def check(
 
     [green]vibe3 check --branch <name>[/green]  Verify a single branch
                          instead of all active flows.
+
+    [green]vibe3 check --remote[/green]  Audit remote issue label consistency
+                         (Rules 1-4). Use --dry-run to preview.
     """
     if trace:
         setup_logging(verbose=2)
+
+    # Route --remote early (standalone mode, not combinable with local flags)
+    if remote:
+        _run_remote_check(dry_run=dry_run)
+        return
 
     # Mutual exclusion check
     options_count = sum([init, clean_branch, branch is not None])
@@ -305,3 +326,47 @@ def check(
             )
     finally:
         pass
+
+
+def _run_remote_check(*, dry_run: bool) -> None:
+    """Execute and display remote label audit results."""
+    result = execute_remote_check(dry_run=dry_run)
+
+    if result.issues_found == 0:
+        typer.echo(f"检查 {result.total_issues} 个 issue，未发现问题。")
+        return
+
+    typer.echo(
+        f"检查 {result.total_issues} 个 issue，"
+        f"发现 {result.issues_found} 个问题：\n"
+    )
+
+    # Group by rule for display
+    by_rule: dict[str, list[dict[str, object]]] = {}
+    for r in result.results:
+        rule = r["rules"]  # type: ignore[index]
+        # If multiple rules matched, split and file under each
+        for part in str(rule).split(", "):
+            by_rule.setdefault(part, []).append(r)
+
+    for rule_label, items in by_rule.items():
+        typer.echo(f"{rule_label}:")
+        for r in items:
+            num = r["number"]  # type: ignore[index]
+            rm = r["removed"]  # type: ignore[index]
+            ad = r["added"]  # type: ignore[index]
+            parts = []
+            if rm:
+                parts.append(f"移除 {', '.join(rm)}")  # type: ignore[arg-type]
+            if ad:
+                parts.append(f"添加 {', '.join(ad)}")  # type: ignore[arg-type]
+            typer.echo(f"  - #{num}: {'，'.join(parts)}")
+        typer.echo("")
+
+    typer.echo(
+        f"总计: 移除 {result.total_removed} 个标签，"
+        f"添加 {result.total_added} 个标签"
+    )
+
+    if dry_run:
+        typer.echo("\n[DRY RUN] 以上为预览，未实际修改标签")

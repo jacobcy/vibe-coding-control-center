@@ -103,7 +103,12 @@ if TYPE_CHECKING:
         record_error,
     )
     from vibe3.services.shared.labels import (
+        audit_multiple_state_labels,
+        audit_orphan_execution_state,
+        audit_orphan_orchestra_governed,
+        audit_roadmap_state_conflict,
         clean_old_state_labels,
+        has_manager_assignee,
         normalize_assignees,
         normalize_labels,
         should_skip_from_queue,
@@ -140,6 +145,10 @@ if TYPE_CHECKING:
     from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
+    "audit_multiple_state_labels",
+    "audit_orphan_execution_state",
+    "audit_orphan_orchestra_governed",
+    "audit_roadmap_state_conflict",
     "BaseResolutionUsecase",
     "BlockedStateService",
     "BootstrapAction",
@@ -218,6 +227,7 @@ __all__ = [
     "get_pr_commit_count",
     "get_recent_commits",
     "get_role_block_function",
+    "has_manager_assignee",
     "has_recent_specific_error",
     "infer_resume_label",
     "is_auto_task_branch",
@@ -243,6 +253,12 @@ __all__ = [
 
 # Lazy import mapping for symbols not directly imported above
 _SYMBOL_MODULES = {
+    # Label audit functions
+    "audit_multiple_state_labels": "vibe3.services.shared.labels",
+    "audit_orphan_execution_state": "vibe3.services.shared.labels",
+    "audit_orphan_orchestra_governed": "vibe3.services.shared.labels",
+    "audit_roadmap_state_conflict": "vibe3.services.shared.labels",
+    "has_manager_assignee": "vibe3.services.shared.labels",
     # Bootstrap symbols
     "BootstrapAction": "vibe3.services.bootstrap_context_service",
     "BootstrapActionKind": "vibe3.services.bootstrap_context_service",

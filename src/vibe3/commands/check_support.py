@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import typer
 from rich.progress import (
@@ -260,4 +260,130 @@ def execute_check_mode(
             else f"Issues found for branch '{default_result.branch}'"
         ),
         details={"issues": default_result.issues},
+    )
+
+
+@dataclass
+class RemoteAuditResult:
+    """Result of remote label audit."""
+
+    total_issues: int
+    issues_found: int
+    total_removed: int
+    total_added: int
+    results: list[Any] = field(default_factory=list)
+
+
+def execute_remote_check(*, dry_run: bool = False) -> RemoteAuditResult:
+    """Execute remote label consistency audit by wiring existing capabilities.
+
+    Uses audit functions from shared/labels.py (Rules 1-4) and
+    GhIssueLabelPort for label mutations.
+    """
+    from vibe3.clients import GhIssueLabelPort, GitHubClient, SQLiteClient
+    from vibe3.config import get_manager_usernames, load_orchestra_config
+    from vibe3.services import (
+        audit_multiple_state_labels,
+        audit_orphan_execution_state,
+        audit_orphan_orchestra_governed,
+        audit_roadmap_state_conflict,
+        has_manager_assignee,
+        normalize_assignees,
+        normalize_labels,
+    )
+
+    config = load_orchestra_config()
+    manager_usernames = get_manager_usernames(config)
+
+    github = GitHubClient()
+    store = SQLiteClient()
+    label_port = GhIssueLabelPort(repo=config.repo)
+
+    # Fetch all open issues
+    all_issues = github.list_issues(
+        limit=5000, state="open", fields=["number", "title", "labels", "assignees"]
+    )
+
+    # Build set of branches with local flow records
+    flow_branches = {f["branch"] for f in store.get_all_flows() if f.get("branch")}
+
+    results: list[dict[str, object]] = []
+
+    for issue in all_issues:
+        number = issue.get("number")
+        if not isinstance(number, int):
+            continue
+
+        labels = normalize_labels(issue.get("labels", []))
+        assignees = normalize_assignees(issue.get("assignees", []))
+        is_manager = has_manager_assignee(assignees, manager_usernames)
+
+        removed: list[str] = []
+        added: list[str] = []
+        rules: list[str] = []
+
+        # Rule 1: roadmap + state conflict
+        r1 = audit_roadmap_state_conflict(labels)
+        if r1:
+            removed.extend(r1)
+            rules.append("规则 1 (roadmap 标签冲突)")
+            # Rule 1 fires → skip Rules 2/3 (roadmap issues get all state removed)
+
+        if not r1:
+            # Rule 2: multiple state labels
+            r2 = audit_multiple_state_labels(labels)
+            if r2:
+                removed.extend(r2)
+                rules.append("规则 2 (多个 state 标签)")
+
+            # Rule 3: orphan execution state (manager-assigned only)
+            if is_manager:
+                r3_rm, r3_add = audit_orphan_execution_state(
+                    labels,
+                    has_local_flow=f"task/issue-{number}" in flow_branches,
+                )
+                if r3_rm:
+                    removed.extend(r3_rm)
+                    added.extend(r3_add)
+                    rules.append("规则 3 (孤儿执行态标签)")
+
+        # Rule 4: orphan orchestra-governed (manager-assigned only)
+        if is_manager:
+            r4 = audit_orphan_orchestra_governed(labels)
+            if r4:
+                removed.extend(r4)
+                rules.append("规则 4 (孤儿 orchestra-governed)")
+
+        if removed or added:
+            # Deduplicate
+            removed = list(dict.fromkeys(removed))
+            added = list(dict.fromkeys(added))
+
+            results.append(
+                {
+                    "number": number,
+                    "removed": removed,
+                    "added": added,
+                    "rules": ", ".join(rules),
+                }
+            )
+
+            if not dry_run:
+                for lb in removed:
+                    label_port.remove_issue_label(number, lb)
+                for lb in added:
+                    label_port.add_issue_label(number, lb)
+
+    total_removed = 0
+    total_added = 0
+    for r in results:
+        total_removed += len(r["removed"])  # type: ignore[arg-type]
+        total_added += len(r["added"])  # type: ignore[arg-type]
+
+    return RemoteAuditResult(
+        total_issues=len(all_issues),
+        issues_found=len(results),
+        total_removed=total_removed,
+        total_added=total_added,
+        results=results,
     )
