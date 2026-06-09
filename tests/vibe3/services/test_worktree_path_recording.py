@@ -24,8 +24,11 @@ def mock_repo_path():
 
 @pytest.fixture
 def lifecycle(mock_config, mock_repo_path):
-    """Create WorktreeLifecycle instance."""
-    return WorktreeLifecycle(mock_config, mock_repo_path)
+    """Create WorktreeLifecycle instance with mock FlowService."""
+    mock_flow_service = MagicMock()
+    return WorktreeLifecycle(
+        mock_config, mock_repo_path, flow_service=mock_flow_service
+    )
 
 
 class TestStep3RecordWorktreePath:
