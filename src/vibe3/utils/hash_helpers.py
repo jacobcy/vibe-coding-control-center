@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 
-@runtime_checkable
 class _HashableEntry(Protocol):
     """Protocol for entries with name and content_hash attributes."""
 
