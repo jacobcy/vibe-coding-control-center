@@ -1,19 +1,23 @@
-"""FlowReader Protocol — read-only interface for flow state queries.
+"""Flow protocols — interfaces for flow state access.
 
-Defines the minimal read interface that OrchestraStatusService needs,
-decoupling orchestra from the manager implementation layer.
+Defines Protocol interfaces for reading and writing flow state,
+decoupling consumers (environment, orchestra) from the concrete
+FlowService implementation in the services layer.
 
 Import paths:
     # Recommended (explicit source)
-    from vibe3.clients.protocols.flow import FlowReader
+    from vibe3.clients.protocols.flow import FlowReader, FlowStatePort
 
     # Backward compatible (package re-export)
-    from vibe3.clients.protocols import FlowReader
+    from vibe3.clients.protocols import FlowReader, FlowStatePort
 """
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from vibe3.models import FlowState
 
 
 class FlowReader(Protocol):
@@ -32,4 +36,22 @@ class FlowReader(Protocol):
         ...
 
 
-__all__ = ["FlowReader"]
+class FlowStatePort(Protocol):
+    """Minimal protocol for flow state read/write used by environment layer.
+
+    Decouples the environment module (layer 5) from the concrete FlowService
+    (layer 3) by defining only the methods environment needs. The concrete
+    FlowService satisfies this protocol via its FlowReadMixin and
+    FlowWriteMixin methods.
+    """
+
+    def get_flow_state(self, branch: str) -> FlowState | None:
+        """Return FlowState for the given branch, or None if not found."""
+        ...
+
+    def update_flow_metadata(self, branch: str, **updates: Any) -> None:
+        """Update flow metadata fields for the given branch."""
+        ...
+
+
+__all__ = ["FlowReader", "FlowStatePort"]

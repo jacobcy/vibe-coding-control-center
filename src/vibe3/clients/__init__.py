@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
     from vibe3.clients.merged_pr_cache import MergedPRCache
     from vibe3.clients.protocols.backend import BackendProtocol
-    from vibe3.clients.protocols.flow import FlowReader
+    from vibe3.clients.protocols.flow import FlowReader, FlowStatePort
     from vibe3.clients.protocols.git import GitPathProtocol
     from vibe3.clients.protocols.github import GitHubClientProtocol
     from vibe3.clients.protocols.pr import BaseResolver
@@ -51,6 +51,7 @@ _LAZY_IMPORTS = {
     "BackendProtocol": "vibe3.clients.protocols.backend",
     "BaseResolver": "vibe3.clients.protocols.pr",
     "FlowReader": "vibe3.clients.protocols.flow",
+    "FlowStatePort": "vibe3.clients.protocols.flow",
     "GITHUB_DEFAULT_VIEW_FIELDS": "vibe3.clients.github_field_constants",
     "GITHUB_FIELDS_BODY_COMMENTS": "vibe3.clients.github_field_constants",
     "GITHUB_FIELDS_BODY_ONLY": "vibe3.clients.github_field_constants",
@@ -102,6 +103,7 @@ __all__ = [
     "BackendProtocol",
     "BaseResolver",
     "FlowReader",
+    "FlowStatePort",
     "GITHUB_DEFAULT_VIEW_FIELDS",
     "GITHUB_FIELDS_BODY_COMMENTS",
     "GITHUB_FIELDS_BODY_ONLY",

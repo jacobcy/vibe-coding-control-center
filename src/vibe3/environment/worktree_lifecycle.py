@@ -22,13 +22,27 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
+    from vibe3.clients import FlowStatePort
     from vibe3.models import OrchestraConfig
-    from vibe3.services.flow_service import FlowService
 
 
 def _is_auto_task_branch(branch: str) -> bool:
     """Check if branch follows auto-managed task naming convention."""
     return branch.startswith("task/issue-")
+
+
+class _NullFlowService:
+    """No-op FlowStatePort implementation for callers that don't need flow state.
+
+    Used as default when no FlowService is injected (e.g. session_registry
+    cleanup paths that only call release_temporary_worktree).
+    """
+
+    def get_flow_state(self, branch: str) -> None:
+        return None
+
+    def update_flow_metadata(self, branch: str, **updates: object) -> None:
+        pass
 
 
 class WorktreeLifecycle:
@@ -44,23 +58,18 @@ class WorktreeLifecycle:
         self,
         config: "OrchestraConfig",
         repo_path: Path,
-        flow_service: "FlowService | None" = None,
+        flow_service: "FlowStatePort | None" = None,
     ):
         """Initialize lifecycle handler.
 
         Args:
             config: Orchestra configuration
             repo_path: Path to the main repository
-            flow_service: FlowService instance (optional, creates default if None)
+            flow_service: FlowStatePort instance (optional, uses no-op if None)
         """
         self.config = config
         self.repo_path = repo_path
-        if flow_service is None:
-            from vibe3.services.flow_service import FlowService
-
-            self.flow_service = FlowService()
-        else:
-            self.flow_service = flow_service
+        self.flow_service: FlowStatePort = flow_service or _NullFlowService()
 
     def create_issue_worktree(
         self,
