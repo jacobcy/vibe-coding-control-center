@@ -17,7 +17,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_issues_ops import parse_linked_issues
-from vibe3.services.shared.paths import get_vibe3_cache_path
+from vibe3.services import get_vibe3_cache_path
 
 
 class MergedPRCache:
