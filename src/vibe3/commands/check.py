@@ -6,7 +6,11 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from vibe3.commands.check_support import execute_check_mode
+from vibe3.commands.check_support import (
+    ExecuteCheckResult,
+    execute_check_mode,
+    execute_remote_check,
+)
 from vibe3.commands.common import enable_method_trace
 from vibe3.observability import setup_logging
 from vibe3.services import CheckService
@@ -154,80 +158,63 @@ def _emit_check_details(
         return
 
 
-@app.callback(invoke_without_command=True)
-def check(
-    ctx: typer.Context,
-    init: Annotated[
-        bool,
-        typer.Option(
-            "--init",
-            help=(
-                "Scan merged PRs on GitHub and back-fill missing task_issue_number "
-                "for all flows. Requires network. Writes to local store. "
-                "Safe to re-run (skips flows that already have task_issue_number)."
-            ),
-        ),
-    ] = False,
-    clean_branch: Annotated[
-        bool,
-        typer.Option(
-            "--clean-branch",
-            help=(
-                "Clean residual resources: terminal flows, expired agent "
-                "worktrees (>7d), expired remote branches (>7d), and local "
-                "branches with no active/blocked flow record (>7d, merge "
-                "status ignored)."
-            ),
-        ),
-    ] = False,
-    force: Annotated[
-        bool,
-        typer.Option(
-            "--force",
-            help=(
-                "With --clean-branch: bypass the 7-day age gate and delete "
-                "every eligible branch (still skips active/blocked flows)."
-            ),
-        ),
-    ] = False,
-    branch: Annotated[
-        str | None,
-        typer.Option(
-            "--branch",
-            help="Check a single branch instead of all active flows.",
-        ),
-    ] = None,
-    no_progress: Annotated[
-        bool,
-        typer.Option(
-            "--no-progress",
-            help="Disable progress bar for 'all' and 'fix_all' modes.",
-        ),
-    ] = False,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
-    ] = False,
+def _emit_remote_check_details(result: ExecuteCheckResult) -> None:
+    """Render remote check results grouped by anomaly rule."""
+    details = result.details
+    anomalies = details.get("anomalies", [])
+    errors = details.get("errors", [])
+    dry_run = details.get("dry_run", True)
+    removed_count = details.get("removed_count", 0)
+    added_count = details.get("added_count", 0)
+
+    if not anomalies:
+        _emit(f"  [green]{result.summary}[/green]")
+        return
+
+    # Group anomalies by rule
+    by_rule: dict[str, list[dict]] = {}
+    for anomaly in anomalies:
+        rule = anomaly.get("rule", "unknown")
+        by_rule.setdefault(rule, []).append(anomaly)
+
+    _emit(f"  [yellow]{result.summary}[/yellow]:")
+    _emit("")
+
+    for rule, rule_anomalies in sorted(by_rule.items()):
+        _emit(f"  [bold]{rule}[/bold]:")
+        for anomaly in rule_anomalies:
+            inum = anomaly["issue_number"]
+            removed = anomaly.get("removed", [])
+            added = anomaly.get("added", [])
+            parts: list[str] = []
+            if removed:
+                parts.append(f"remove {', '.join(removed)}")
+            if added:
+                parts.append(f"add {', '.join(added)}")
+            if parts:
+                _emit(f"    [cyan]#{inum}[/cyan]: {', '.join(parts)}")
+        _emit("")
+
+    action = "Would remove" if dry_run else "Removed"
+    action_add = "Would add" if dry_run else "Added"
+    _emit(
+        f"  [bold]Total:[/bold] {action} {removed_count} label(s), "
+        f"{action_add} {added_count} label(s)"
+    )
+
+    if errors:
+        _emit_failures("Errors", errors)
+
+
+def _run_legacy_check(
+    init: bool = False,
+    clean_branch: bool = False,
+    force: bool = False,
+    branch: str | None = None,
+    no_progress: bool = False,
+    trace: bool = False,
 ) -> None:
-    """Verify handoff store consistency.
-
-    Default mode: Check + fix all active flows.
-    (Fixable: missing handoff file, missing pr_number, aborted status)
-
-    [green]vibe3 check[/green]         Verify all flows + auto-fix
-
-    [green]vibe3 check --init[/green]  Scan merged PRs + GitHub items,
-                         back-fill task_issue_number for all flows.
-
-    [green]vibe3 check --clean-branch[/green]  Clean residual branches:
-                         terminal flows + branches with no active/blocked
-                         flow record older than 7 days (merge status ignored).
-
-    [green]vibe3 check --clean-branch --force[/green]  Also delete eligible
-                         branches younger than 7 days (skips active/blocked).
-
-    [green]vibe3 check --branch <name>[/green]  Verify a single branch
-                         instead of all active flows.
-    """
+    """Execute the original check logic (forward-compat for check / check local)."""
     if trace:
         setup_logging(verbose=2)
 
@@ -305,3 +292,169 @@ def check(
             )
     finally:
         pass
+
+
+@app.callback(invoke_without_command=True)
+def check(
+    ctx: typer.Context,
+    init: Annotated[
+        bool,
+        typer.Option(
+            "--init",
+            help=(
+                "Scan merged PRs on GitHub and back-fill missing task_issue_number "
+                "for all flows. Requires network. Writes to local store. "
+                "Safe to re-run (skips flows that already have task_issue_number)."
+            ),
+        ),
+    ] = False,
+    clean_branch: Annotated[
+        bool,
+        typer.Option(
+            "--clean-branch",
+            help=(
+                "Clean residual resources: terminal flows, expired agent "
+                "worktrees (>7d), expired remote branches (>7d), and local "
+                "branches with no active/blocked flow record (>7d, merge "
+                "status ignored)."
+            ),
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help=(
+                "With --clean-branch: bypass the 7-day age gate and delete "
+                "every eligible branch (still skips active/blocked flows)."
+            ),
+        ),
+    ] = False,
+    branch: Annotated[
+        str | None,
+        typer.Option(
+            "--branch",
+            help="Check a single branch instead of all active flows.",
+        ),
+    ] = None,
+    no_progress: Annotated[
+        bool,
+        typer.Option(
+            "--no-progress",
+            help="Disable progress bar for 'all' and 'fix_all' modes.",
+        ),
+    ] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
+    ] = False,
+) -> None:
+    """Verify handoff store consistency.
+
+    Default mode: Check + fix all active flows.
+    (Fixable: missing handoff file, missing pr_number, aborted status)
+
+    [green]vibe3 check[/green]         Verify all flows + auto-fix
+
+    [green]vibe3 check --init[/green]  Scan merged PRs + GitHub items,
+                         back-fill task_issue_number for all flows.
+
+    [green]vibe3 check --clean-branch[/green]  Clean residual branches:
+                         terminal flows + branches with no active/blocked
+                         flow record older than 7 days (merge status ignored).
+
+    [green]vibe3 check --clean-branch --force[/green]  Also delete eligible
+                         branches younger than 7 days (skips active/blocked).
+
+    [green]vibe3 check --branch <name>[/green]  Verify a single branch
+                         instead of all active flows.
+
+    [green]vibe3 check local[/green]   Alias for default behavior.
+
+    [green]vibe3 check remote[/green]  Audit remote issue labels.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    _run_legacy_check(init, clean_branch, force, branch, no_progress, trace)
+
+
+@app.command()
+def local(
+    init: Annotated[
+        bool,
+        typer.Option(
+            "--init",
+            help=(
+                "Scan merged PRs on GitHub and back-fill missing task_issue_number "
+                "for all flows. Requires network. Writes to local store. "
+                "Safe to re-run (skips flows that already have task_issue_number)."
+            ),
+        ),
+    ] = False,
+    clean_branch: Annotated[
+        bool,
+        typer.Option(
+            "--clean-branch",
+            help=(
+                "Clean residual resources: terminal flows, expired agent "
+                "worktrees (>7d), expired remote branches (>7d), and local "
+                "branches with no active/blocked flow record (>7d, merge "
+                "status ignored)."
+            ),
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help=(
+                "With --clean-branch: bypass the 7-day age gate and delete "
+                "every eligible branch (still skips active/blocked flows)."
+            ),
+        ),
+    ] = False,
+    branch: Annotated[
+        str | None,
+        typer.Option(
+            "--branch",
+            help="Check a single branch instead of all active flows.",
+        ),
+    ] = None,
+    no_progress: Annotated[
+        bool,
+        typer.Option(
+            "--no-progress",
+            help="Disable progress bar for 'all' and 'fix_all' modes.",
+        ),
+    ] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
+    ] = False,
+) -> None:
+    """Verify handoff store consistency (default behavior)."""
+    _run_legacy_check(init, clean_branch, force, branch, no_progress, trace)
+
+
+@app.command()
+def remote(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Only report, don't modify labels."),
+    ] = False,
+    no_progress: Annotated[
+        bool,
+        typer.Option("--no-progress", help="Disable progress bar."),
+    ] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
+    ] = False,
+) -> None:
+    """Audit and fix remote issue labels using label anomaly rules."""
+    if trace:
+        setup_logging(verbose=2)
+        enable_method_trace()
+
+    result = execute_remote_check(dry_run=dry_run, show_progress=not no_progress)
+    _emit_remote_check_details(result)
+
+    if not result.success:
+        raise typer.Exit(code=1)
