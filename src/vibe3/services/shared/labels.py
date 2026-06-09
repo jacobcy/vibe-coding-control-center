@@ -133,3 +133,77 @@ def clean_old_state_labels(
             logger.bind(domain="orchestra").warning(
                 f"Failed to clean old state labels for #{issue.number}: {exc}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Label semantic constants (single source of truth)
+# ---------------------------------------------------------------------------
+
+_ROADMAP_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
+_EXECUTION_STATES = frozenset(
+    {"merge-ready", "review", "in-progress", "handoff", "claimed"}
+)
+_STATE_PRIORITY_ORDER = [
+    "blocked",
+    "done",
+    "merge-ready",
+    "review",
+    "in-progress",
+    "handoff",
+    "claimed",
+    "ready",
+]
+
+
+# ---------------------------------------------------------------------------
+# Predicates (pure functions, no I/O)
+# ---------------------------------------------------------------------------
+
+
+def has_roadmap_label(labels: list[str]) -> bool:
+    """Whether labels contain roadmap/rfc or roadmap/epic."""
+    return bool(_ROADMAP_LABELS & set(labels))
+
+
+def has_roadmap_conflict(labels: list[str]) -> bool:
+    """Whether labels have both a roadmap label and a state/* label."""
+    if not has_roadmap_label(labels):
+        return False
+    return any(lb.startswith("state/") for lb in labels)
+
+
+def has_execution_state(labels: list[str]) -> bool:
+    """Whether labels contain an execution-phase state/* label."""
+    return bool(
+        _EXECUTION_STATES
+        & {lb.removeprefix("state/") for lb in labels if lb.startswith("state/")}
+    )
+
+
+def has_orchestra_governed(labels: list[str]) -> bool:
+    """Whether labels contain orchestra-governed."""
+    return "orchestra-governed" in labels
+
+
+def get_state_labels(labels: list[str]) -> list[str]:
+    """Extract all state/* labels."""
+    return [lb for lb in labels if lb.startswith("state/")]
+
+
+def get_highest_priority_state(labels: list[str]) -> str | None:
+    """Return highest-priority state/* label from labels, or None."""
+    state_set = set(get_state_labels(labels))
+    for priority_state in _STATE_PRIORITY_ORDER:
+        candidate = f"state/{priority_state}"
+        if candidate in state_set:
+            return candidate
+    return None
+
+
+def get_conflicting_states(labels: list[str]) -> list[str]:
+    """Return lower-priority state/* labels that should be removed."""
+    states = get_state_labels(labels)
+    if len(states) <= 1:
+        return []
+    highest = get_highest_priority_state(labels)
+    return [lb for lb in states if lb != highest]

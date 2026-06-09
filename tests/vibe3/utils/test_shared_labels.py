@@ -1,7 +1,14 @@
 """Tests for label utility functions."""
 
 from vibe3.services.shared.labels import (
+    get_conflicting_states,
+    get_highest_priority_state,
+    get_state_labels,
+    has_execution_state,
     has_manager_assignee,
+    has_orchestra_governed,
+    has_roadmap_conflict,
+    has_roadmap_label,
     normalize_assignees,
     normalize_labels,
 )
@@ -97,3 +104,124 @@ class TestNormalizeAssignees:
         assert normalize_assignees("not-a-list") == []
         assert normalize_assignees(None) == []
         assert normalize_assignees(123) == []
+
+
+class TestHasRoadmapLabel:
+    def test_rfc(self) -> None:
+        assert has_roadmap_label(["roadmap/rfc"]) is True
+
+    def test_epic(self) -> None:
+        assert has_roadmap_label(["roadmap/epic"]) is True
+
+    def test_both(self) -> None:
+        assert has_roadmap_label(["roadmap/rfc", "roadmap/epic"]) is True
+
+    def test_no_roadmap(self) -> None:
+        assert has_roadmap_label(["bug", "state/ready"]) is False
+
+    def test_empty(self) -> None:
+        assert has_roadmap_label([]) is False
+
+
+class TestHasRoadmapConflict:
+    def test_rfc_with_state(self) -> None:
+        assert has_roadmap_conflict(["roadmap/rfc", "state/claimed"]) is True
+
+    def test_epic_with_multiple_states(self) -> None:
+        assert (
+            has_roadmap_conflict(["roadmap/epic", "state/blocked", "state/review"])
+            is True
+        )
+
+    def test_rfc_without_state(self) -> None:
+        assert has_roadmap_conflict(["roadmap/rfc"]) is False
+
+    def test_state_without_roadmap(self) -> None:
+        assert has_roadmap_conflict(["state/ready", "bug"]) is False
+
+    def test_empty(self) -> None:
+        assert has_roadmap_conflict([]) is False
+
+
+class TestHasExecutionState:
+    def test_in_progress(self) -> None:
+        assert has_execution_state(["state/in-progress"]) is True
+
+    def test_claimed(self) -> None:
+        assert has_execution_state(["state/claimed"]) is True
+
+    def test_merge_ready(self) -> None:
+        assert has_execution_state(["state/merge-ready"]) is True
+
+    def test_ready_is_not_execution(self) -> None:
+        assert has_execution_state(["state/ready"]) is False
+
+    def test_blocked_is_not_execution(self) -> None:
+        assert has_execution_state(["state/blocked"]) is False
+
+    def test_no_states(self) -> None:
+        assert has_execution_state(["bug"]) is False
+
+
+class TestHasOrchestraGoverned:
+    def test_present(self) -> None:
+        assert has_orchestra_governed(["orchestra-governed"]) is True
+
+    def test_absent(self) -> None:
+        assert has_orchestra_governed(["state/ready"]) is False
+
+    def test_empty(self) -> None:
+        assert has_orchestra_governed([]) is False
+
+
+class TestGetStateLabels:
+    def test_multiple(self) -> None:
+        result = get_state_labels(["bug", "state/ready", "state/blocked"])
+        assert result == ["state/ready", "state/blocked"]
+
+    def test_none(self) -> None:
+        assert get_state_labels(["bug", "enhancement"]) == []
+
+    def test_empty(self) -> None:
+        assert get_state_labels([]) == []
+
+
+class TestGetHighestPriorityState:
+    def test_blocked_wins(self) -> None:
+        assert (
+            get_highest_priority_state(["state/review", "state/blocked"])
+            == "state/blocked"
+        )
+
+    def test_single_state(self) -> None:
+        assert get_highest_priority_state(["state/ready"]) == "state/ready"
+
+    def test_done_beats_in_progress(self) -> None:
+        assert (
+            get_highest_priority_state(["state/in-progress", "state/done"])
+            == "state/done"
+        )
+
+    def test_no_states(self) -> None:
+        assert get_highest_priority_state([]) is None
+
+    def test_unknown_only(self) -> None:
+        assert get_highest_priority_state(["state/new-future"]) is None
+
+
+class TestGetConflictingStates:
+    def test_keeps_blocked_removes_others(self) -> None:
+        result = get_conflicting_states(["state/blocked", "state/review"])
+        assert result == ["state/review"]
+
+    def test_single_state_no_conflict(self) -> None:
+        assert get_conflicting_states(["state/ready"]) == []
+
+    def test_no_states(self) -> None:
+        assert get_conflicting_states([]) == []
+
+    def test_keeps_done(self) -> None:
+        result = get_conflicting_states(
+            ["state/done", "state/ready", "state/in-progress"]
+        )
+        assert set(result) == {"state/ready", "state/in-progress"}
