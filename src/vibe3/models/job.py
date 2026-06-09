@@ -136,6 +136,12 @@ class JobResult(BaseModel):
         ``source`` is set automatically by :class:`JobExecutor` from the
         originating ``JobEnvelope``.  When ``None``, the result was created
         outside the standard dispatch path and trigger type is unknown.
+
+    Version metadata:
+        ``adapter_hash``, ``policy_hash``, and ``material_hash`` track the
+        content versions of the resolved adapter, policies, and materials
+        used at dispatch time. These enable explainability and reproducibility
+        by capturing the runtime versions that influenced the job execution.
     """
 
     command_type: CommandType
@@ -150,6 +156,7 @@ class JobResult(BaseModel):
 
     # Resolved adapter
     adapter_path: str | None = None
+    adapter_hash: str | None = None
 
     # Execution metadata
     context: JobContext | None = None

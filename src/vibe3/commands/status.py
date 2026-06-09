@@ -74,6 +74,58 @@ def _resolve_repo_name(config_repo: str | None) -> str:
     return "(unknown)"
 
 
+def _render_runtime_versions() -> None:
+    """Render Runtime Versions section showing current versions.
+
+    Displays the current policy and material hashes computed from the
+    governance directory contents.
+    """
+    import hashlib
+
+    from vibe3.execution import resolve_orchestra_repo_root
+    from vibe3.services import material_loader, policy_loader
+
+    console.print("[bold]Runtime Versions[/] [dim](current)[/]")
+
+    try:
+        repo_root = resolve_orchestra_repo_root()
+
+        # Compute policy hash
+        policies_dir = repo_root / ".vibe" / "governance" / "policies"
+        policy_loader_instance = policy_loader(policies_dir)
+        policy_entries = policy_loader_instance.load_all()
+        if policy_entries:
+            hash_parts = sorted(
+                [f"{entry.name}|{entry.content_hash}" for entry in policy_entries]
+            )
+            concatenated = "|".join(hash_parts)
+            policy_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[:16]
+            console.print(f"  Policy hash:  {policy_hash}")
+        else:
+            console.print("  Policy hash:  [dim](no policies found)[/]")
+
+        # Compute material hash
+        materials_dir = repo_root / ".vibe" / "governance" / "materials"
+        material_loader_instance = material_loader(materials_dir)
+        material_entries = material_loader_instance.load_all()
+        if material_entries:
+            hash_parts = sorted(
+                [f"{entry.name}|{entry.content_hash}" for entry in material_entries]
+            )
+            concatenated = "|".join(hash_parts)
+            material_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
+                :16
+            ]
+            console.print(f"  Material hash: {material_hash}")
+        else:
+            console.print("  Material hash: [dim](no materials found)[/]")
+
+    except Exception as e:
+        console.print(f"  [dim]Error computing versions: {e}[/]")
+
+    console.print()
+
+
 def _analyze_orchestra_config_sources(config: OrchestraConfig) -> dict[str, str]:
     """Determine the source of each displayed orchestra config value.
 
@@ -423,6 +475,7 @@ def status(
         return
 
     _render_system_status(config, orch_snapshot, snapshot_found)
+    _render_runtime_versions()
     typer.echo(
         "Use 'vibe3 task status' to view issue progress and ready queue",
         err=True,
