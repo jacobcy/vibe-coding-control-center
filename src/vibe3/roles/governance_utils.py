@@ -8,10 +8,13 @@ from typing import Any
 from vibe3.clients import GitHubClient
 from vibe3.models import OrchestraConfig
 from vibe3.services import (
+    ORCHESTRA_GOVERNED_LABEL,
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
     get_manager_usernames,
+    has_orchestra_governed,
+    has_roadmap_label,
     is_running_issue,
     normalize_assignees,
     normalize_labels,
@@ -113,15 +116,14 @@ def build_broader_repo_entries(
             if (
                 "supervisor" in labels
                 or "orchestra-scanned" in labels
-                or "roadmap/rfc" in labels
-                or "roadmap/epic" in labels
+                or has_roadmap_label(labels)
                 or "orchestra" in labels
             ):
                 continue
         elif (
             "supervisor" in labels
             or "orchestra-scanned" in labels
-            or "orchestra-governed" in labels
+            or has_orchestra_governed(labels)
             or "orchestra" in labels
         ):
             continue
@@ -172,7 +174,7 @@ def get_governed_issue_numbers(
         Set of issue numbers that have orchestra-governed label
     """
     governed_issues = github.list_issues(
-        label="orchestra-governed",
+        label=ORCHESTRA_GOVERNED_LABEL,
         state="open",
         repo=config.repo,
         limit=5000,  # Fetch all governed issues to avoid truncation

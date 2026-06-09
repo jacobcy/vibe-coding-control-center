@@ -189,50 +189,39 @@ class CheckService(CheckRemote):
             Tuple of (warnings, issues). Warnings for successful auto-fix,
             issues for cases requiring manual intervention.
         """
-        labels = issue_payload.get("labels", [])
-        state_labels = [
-            lbl["name"]
-            for lbl in labels
-            if isinstance(lbl, dict) and lbl.get("name", "").startswith("state/")
-        ]
+        from vibe3.services.shared.labels import (
+            get_conflicting_states,
+            get_highest_priority_state,
+            normalize_labels,
+        )
 
-        if len(state_labels) <= 1:
+        labels = normalize_labels(issue_payload.get("labels", []))
+
+        if not get_conflicting_states(labels):
             return ([], [], None)
 
-        # Determine which state to keep (highest priority)
-        priority_order = [
-            IssueState.BLOCKED,
-            IssueState.DONE,
-            IssueState.IN_PROGRESS,
-            IssueState.REVIEW,
-            IssueState.MERGE_READY,
-            IssueState.HANDOFF,
-            IssueState.CLAIMED,
-            IssueState.READY,
-        ]
-
-        # Find the highest priority state from existing labels
-        target_state = None
-        for candidate in priority_order:
-            if candidate.to_label() in state_labels:
-                target_state = candidate
-                break
-
-        # If no known IssueState found, flag for manual fix
-        if target_state is None:
+        target_label = get_highest_priority_state(labels)
+        if target_label is None:
             logger.bind(domain="check", action="fix").warning(
                 f"Issue #{issue_number} has multiple state labels with "
-                f"unknown states: {state_labels}"
+                f"unknown states: {[lb for lb in labels if lb.startswith('state/')]}"
             )
             return (
                 [],
                 [
                     f"Issue #{issue_number} has multiple state labels "
-                    f"({', '.join(state_labels)}) with unknown state, "
-                    f"manual fix required"
+                    f"({', '.join(lb for lb in labels if lb.startswith('state/'))}) "
+                    f"with unknown state, manual fix required"
                 ],
                 None,
             )
+
+        # Resolve to IssueState enum
+        target_state = IssueState.from_label(target_label)
+        assert (
+            target_state is not None
+        )  # get_highest_priority_state guarantees known state
+        state_labels = [lb for lb in labels if lb.startswith("state/")]
 
         # Auto-fix using LabelService (atomic: add new, remove old)
         try:
