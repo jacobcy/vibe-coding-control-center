@@ -218,6 +218,7 @@ class TestJobResult:
             "error_message": None,
             "error_code": None,
             "source": None,
+            "actor_id": None,
         }.items():  # noqa: E501
             assert getattr(result, field) == expected
 
@@ -249,6 +250,7 @@ class TestJobResult:
             started_at="2026-06-06T10:00:00Z",
             finished_at="2026-06-06T10:30:00Z",
             source="cli-manual",
+            actor_id="actor-abc123def456",
         )
         data = original.model_dump()
         restored = JobResult.model_validate(data)
@@ -263,6 +265,7 @@ class TestJobResult:
         assert restored.started_at == "2026-06-06T10:00:00Z"
         assert restored.finished_at == "2026-06-06T10:30:00Z"
         assert restored.source == "cli-manual"
+        assert restored.actor_id == "actor-abc123def456"
 
     def test_status_transitions(self):
         """Verify status can transition from launched to completed/failed."""
@@ -285,6 +288,29 @@ class TestJobResult:
         failed_result.status = "failed"
         failed_result.error_message = "Test failure"
         assert failed_result.status == "failed"
+
+    def test_actor_id_field(self):
+        """Verify actor_id field can be set and updated."""
+        result = JobResult(
+            command_type=CommandType.PLAN,
+            issue_number=123,
+            branch="task/issue-123",
+            actor_id="actor-test-123",
+        )
+        assert result.actor_id == "actor-test-123"
+
+        # Can be updated (result is mutable)
+        result.actor_id = "actor-updated-456"
+        assert result.actor_id == "actor-updated-456"
+
+    def test_actor_id_defaults_to_none(self):
+        """Verify actor_id defaults to None."""
+        result = JobResult(
+            command_type=CommandType.RUN,
+            issue_number=123,
+            branch="main",
+        )
+        assert result.actor_id is None
 
 
 class TestSemanticEquivalence:

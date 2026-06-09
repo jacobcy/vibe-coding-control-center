@@ -120,6 +120,7 @@ class JobExecutor:
         self._registry = registry
         self._lifecycle = ExecutionLifecycleService(store)
         self._coordinator = coordinator
+        self._store = store
 
     def _resolve_coordinator(self, config: object) -> ExecutionCoordinator:
         """Resolve or create an ExecutionCoordinator.
@@ -146,6 +147,10 @@ class JobExecutor:
     def execute(self, envelope: JobEnvelope) -> JobResult:
         """Execute a job from its envelope.
 
+        Manages actor lifecycle (create → launch → complete/fail/die) as a
+        lightweight supervision wrapper around the existing execution path.
+        Actor state is tracked in-memory and written to event_log.
+
         Args:
             envelope: The job envelope containing all execution parameters
 
@@ -156,13 +161,32 @@ class JobExecutor:
             For async commands, status will be "launched" not "completed".
             The executor returns immediately after tmux launch.
         """
+        from vibe3.execution.actor import JobType, get_actor_registry
+
         started_at = datetime.now(tz=timezone.utc).isoformat()
+
+        # Map CommandType to actor JobType
+        _command_to_job_type: dict[CommandType, JobType] = {
+            CommandType.GOVERNANCE_SCAN: JobType.GOVERNANCE,
+        }
+        job_type = _command_to_job_type.get(envelope.command_type, JobType.DISPATCH)
+
+        # Create actor for supervision tracking
+        registry = get_actor_registry()
+        actor_obj = registry.create_actor(
+            job_type=job_type,
+            issue_number=envelope.issue_number,
+            branch=envelope.branch,
+            store=self._store,
+        )
 
         try:
             # Resolve adapter
             resolved = self._registry.resolve(envelope.command_type)
             adapter_path = resolved.entry.import_path
         except Exception as e:
+            # Pre-launch failure: actor still QUEUED, just clean up
+            registry.remove_actor(actor_obj.actor_id)
             logger.error(f"Failed to resolve adapter for {envelope.command_type}: {e}")
             return JobResult(
                 command_type=envelope.command_type,
@@ -182,6 +206,8 @@ class JobExecutor:
         # Record lifecycle started event
         role = COMMAND_TYPE_TO_EXECUTION_ROLE.get(envelope.command_type)
         if role is None:
+            # Pre-launch failure: actor still QUEUED, just clean up
+            registry.remove_actor(actor_obj.actor_id)
             logger.error(f"No execution role mapping for {envelope.command_type}")
             return JobResult(
                 command_type=envelope.command_type,
@@ -194,12 +220,14 @@ class JobExecutor:
                 source=envelope.source,
             )
 
+        # Record actor launch and lifecycle started
+        actor_obj.record_launch()
         self._lifecycle.record_started(
             role=role,
             target=envelope.branch,
             actor=envelope.actor,
             session_id=context.session_id,
-            refs=envelope.refs,
+            refs={**(envelope.refs or {}), "actor_id": actor_obj.actor_id},
         )
 
         try:
@@ -223,8 +251,11 @@ class JobExecutor:
             # Map to JobResult
             job_result = self._map_launch_result(result, envelope, context)
 
-            # Record lifecycle completion
+            # Record lifecycle completion and actor terminal state
             if job_result.status == "failed":
+                actor_obj.record_failure(
+                    error=job_result.error_message or "dispatch failed"
+                )
                 self._lifecycle.record_failed(
                     role=role,
                     target=envelope.branch,
@@ -233,7 +264,7 @@ class JobExecutor:
                     refs=envelope.refs,
                 )
             elif job_result.status == "skipped":
-                # Skipped is treated as a successful no-op
+                actor_obj.record_completion(detail=f"{envelope.command_type} skipped")
                 self._lifecycle.record_completed(
                     role=role,
                     target=envelope.branch,
@@ -243,6 +274,9 @@ class JobExecutor:
                 )
             else:
                 # launched or completed
+                actor_obj.record_completion(
+                    detail=f"{envelope.command_type} {job_result.status}"
+                )
                 self._lifecycle.record_completed(
                     role=role,
                     target=envelope.branch,
@@ -254,13 +288,18 @@ class JobExecutor:
             # Fill in execution metadata
             job_result.started_at = started_at
             job_result.adapter_path = adapter_path
+            job_result.actor_id = actor_obj.actor_id
+
+            # Clean up actor from registry (terminal state reached)
+            registry.remove_actor(actor_obj.actor_id)
 
             return job_result
 
         except Exception as e:
             logger.exception(f"Job execution failed: {e}")
 
-            # Record lifecycle failure
+            # Record actor failure and lifecycle failure
+            actor_obj.record_failure(error=str(e))
             self._lifecycle.record_failed(
                 role=role,
                 target=envelope.branch,
@@ -268,6 +307,9 @@ class JobExecutor:
                 error=str(e),
                 refs=envelope.refs,
             )
+
+            # Clean up actor from registry
+            registry.remove_actor(actor_obj.actor_id)
 
             return JobResult(
                 command_type=envelope.command_type,
