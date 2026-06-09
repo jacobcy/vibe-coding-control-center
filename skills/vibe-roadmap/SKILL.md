@@ -191,6 +191,23 @@ gh issue list -l "roadmap/p1"
 对新进入的 issue 运行三级审查（Level 1/2/3，见 roadmap-common.md）后，选择：
 
 **场景 A: 适合自动化推进**（通过全部三级审查）
+
+先根据 issue 内容判断是否为简单任务：
+
+**简单任务路由**（同时满足以下条件）：
+- 只涉及测试文件修改（`tests/`、`test_*.py`、`*_test.py`、测试夹具、测试配置）
+- 不涉及业务代码改动（`src/`、`lib/`、核心逻辑文件）
+- 预估改动范围 ≤ 5 个文件、≤ 100 行
+
+满足时，路由到 supervisor/apply 快速通道（复用 assignee-pool Step 2.5 的判断标准）：
+```bash
+# 移除旧 state 标签（如有），添加 supervisor 路由标签
+gh issue edit <number> --add-label "supervisor,state/handoff"
+gh issue comment <number> --body "[roadmap decision] simple task → supervisor/apply: <判断依据>."
+gh issue edit <number> --add-label "roadmap-reviewed"
+```
+
+不满足时，走完整 manager intake 路径：
 ```bash
 vibe3 task intake <number>
 gh issue comment <number> --body "[roadmap decision] Intake completed (scope=<bugfix|feature|refactor>)."
