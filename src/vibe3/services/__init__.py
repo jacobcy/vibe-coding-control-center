@@ -58,6 +58,13 @@ if TYPE_CHECKING:
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
+
+    # Job monitoring
+    from vibe3.services.job_monitor_service import (
+        ActiveJob,
+        JobMonitorService,
+        JobMonitorSnapshot,
+    )
     from vibe3.services.label_service import LabelService
     from vibe3.services.orchestra_helpers import (
         get_handoff_state_label,
@@ -154,6 +161,7 @@ if TYPE_CHECKING:
     from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
+    "ActiveJob",
     "BaseResolutionUsecase",
     "BlockedStateService",
     "BootstrapAction",
@@ -184,6 +192,8 @@ __all__ = [
     "IssueFlowService",
     "IssueStatusEntry",
     "IssueTitleCacheService",
+    "JobMonitorService",
+    "JobMonitorSnapshot",
     "LabelAnomaly",
     "LabelService",
     "MissingTaskIssueError",
@@ -284,6 +294,10 @@ _SYMBOL_MODULES = {
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
     "FlowCategory": "vibe3.services.flow_classifier",
+    # Job monitoring
+    "ActiveJob": "vibe3.services.job_monitor_service",
+    "JobMonitorService": "vibe3.services.job_monitor_service",
+    "JobMonitorSnapshot": "vibe3.services.job_monitor_service",
     "FlowCleanupService": "vibe3.services.flow_cleanup_service",
     "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",
     "FlowProjection": "vibe3.services.flow_projection_service",
