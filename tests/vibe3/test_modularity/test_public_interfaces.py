@@ -13,6 +13,70 @@ if TYPE_CHECKING:
     pass
 
 
+def _is_legitimate_export(obj: object) -> tuple[bool, str]:
+    """Check if a non-callable export follows a known legitimate pattern.
+
+    Returns (is_ok, pattern_name) so the caller can include the reason
+    in diagnostic messages.
+    """
+    obj_type = type(obj)
+
+    # Dataclass singletons (domain role definitions, sync specs)
+    if hasattr(obj_type, "__dataclass_fields__"):
+        return True, "dataclass instance"
+
+    # Pydantic model instances (configuration objects)
+    try:
+        from pydantic import BaseModel
+
+        if isinstance(obj, BaseModel):
+            return True, "pydantic model instance"
+    except ImportError:
+        pass
+
+    # Module re-exports (barrel exports)
+    import types
+
+    if isinstance(obj, types.ModuleType):
+        return True, "module re-export"
+
+    # Primitive containers (set/frozenset used for config values)
+    if isinstance(obj, (set, frozenset)):
+        return True, "primitive container"
+
+    # Path instances
+    from pathlib import PurePath
+
+    if isinstance(obj, PurePath):
+        return True, "path instance"
+
+    # Regex pattern
+    import re
+
+    if isinstance(obj, re.Pattern):
+        return True, "regex pattern"
+
+    # Type annotations (UnionType, etc.)
+    if isinstance(obj, type):
+        return True, "type annotation"
+
+    # UnionType (e.g. str | None) — not a type subclass, but a type annotation
+    import types as pytypes
+
+    if isinstance(obj, pytypes.UnionType):
+        return True, "union type annotation"
+
+    return False, "unmatched"
+
+
+# Truly unique non-callable exports that don't fit any pattern above.
+# Each entry requires a justification comment — prefer refactoring to a
+# callable (factory/classmethod) over adding entries here.
+_DOCUMENTED_EXCEPTIONS: dict[str, str] = {
+    "vibe3.ui.console": "Rich Console singleton — pre-configured for the project",
+}
+
+
 class TestModuleExports:
     """Test that modules properly define and export public interfaces."""
 
@@ -102,29 +166,16 @@ class TestModuleExports:
             )
 
     def test_all_exports_are_callable_or_type(self, module_registry: list[str]) -> None:
-        """Verify that exports are callable (function/class) or simple data types.
+        """Verify that exports are callable (function/class) or follow known patterns.
 
-        Legitimate non-callable exports include:
-        - Role definitions (TriggerableRoleDefinition, RoleDefinition)
-        - Configuration values (PosixPath, Pattern, set, frozenset)
+        Legitimate non-callable patterns:
+        - Dataclass singletons (domain role definitions, sync specs)
+        - Pydantic model instances (configuration objects)
+        - Module re-exports (barrel exports within the same package)
+        - Primitive containers (set, frozenset for config values)
+        - Path / regex pattern instances
         - Type annotations (UnionType)
-        - Service instances (Console)
         """
-        # Types that are legitimate non-callable exports
-        allowed_non_callable = {
-            "TriggerableRoleDefinition",
-            "RoleDefinition",
-            "IssueRoleSyncSpec",
-            "PosixPath",
-            "Pattern",
-            "set",
-            "frozenset",
-            "UnionType",
-            "Console",
-            "TimelineCommentPolicy",
-            "module",
-        }
-
         failures = []
 
         for module_name in module_registry:
@@ -146,23 +197,24 @@ class TestModuleExports:
                     if obj is None:
                         continue
 
-                    # Check if it's callable (function/class) or simple data type
                     if callable(obj):
                         continue
 
-                    # Allow simple data types
                     if isinstance(obj, (str, int, float, bool, dict, list, tuple)):
                         continue
 
-                    # Allow known legitimate non-callable types
-                    obj_type = type(obj).__name__
-                    if obj_type in allowed_non_callable:
+                    is_ok, _reason = _is_legitimate_export(obj)
+                    if is_ok:
                         continue
 
-                    # Flag complex non-callable objects
+                    # Check documented exceptions (must have justification)
+                    if f"{full_module_name}.{name}" in _DOCUMENTED_EXCEPTIONS:
+                        continue
+
                     failures.append(
-                        f"{full_module_name}.{name} is {obj_type} "
-                        "(expected callable or simple data type)"
+                        f"{full_module_name}.{name} is {type(obj).__name__} "
+                        f"(no matching export pattern; "
+                        f"consider a factory function or adding to a service layer)"
                     )
 
             except ImportError as e:
