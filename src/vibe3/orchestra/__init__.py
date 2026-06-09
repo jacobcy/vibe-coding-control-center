@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     )
     from vibe3.orchestra.issue_loader import (
         get_flow_context,
+        get_flow_context_bulk,
         is_auto_task_branch,
         load_issue,
     )
@@ -49,6 +50,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "QueuePersistenceService": "vibe3.orchestra.queue_persistence_service",
     "DispatchHealthCheckService": "vibe3.orchestra.dispatch_health_check",
     "get_flow_context": "vibe3.orchestra.issue_loader",
+    "get_flow_context_bulk": "vibe3.orchestra.issue_loader",
     "load_issue": "vibe3.orchestra.issue_loader",
     "is_auto_task_branch": "vibe3.orchestra.issue_loader",
     # Protocols (self-module re-exports only)
@@ -85,6 +87,7 @@ __all__ = [
     "QueuePersistenceService",
     "DispatchHealthCheckService",
     "get_flow_context",
+    "get_flow_context_bulk",
     "load_issue",
     "is_auto_task_branch",
     # Protocols (self-module re-exports only)

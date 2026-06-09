@@ -51,3 +51,7 @@ class FlowManagerProtocol(Protocol):
     def create_flow_for_issue(self, issue: IssueInfo) -> dict | None:
         """Create or reuse a flow for an issue."""
         ...
+
+    def resolve_best_flow(self, issue_number: int, flows: list[dict]) -> dict | None:
+        """Resolve best flow from pre-fetched list."""
+        ...

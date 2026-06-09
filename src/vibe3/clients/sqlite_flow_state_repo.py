@@ -67,6 +67,34 @@ class SQLiteFlowStateRepo(_HasConnection):
             return dict(row)
         return None
 
+    def get_flow_state_bulk(self, branches: list[str]) -> dict[str, dict[str, Any]]:
+        """Batch retrieve flow states for multiple branches (excludes soft-deleted).
+
+        Args:
+            branches: List of branch names to query.
+
+        Returns:
+            Dict mapping branch -> flow_state dict. Missing branches omitted.
+        """
+        if not branches:
+            return {}
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in branches)
+        cursor.execute(
+            f"SELECT * FROM flow_state "
+            f"WHERE branch IN ({placeholders}) AND deleted_at IS NULL",
+            tuple(branches),
+        )
+        result: dict[str, dict[str, Any]] = {}
+        for row in cursor.fetchall():
+            entry = dict(row)
+            branch = entry.get("branch")
+            if branch:
+                result[branch] = entry
+        return result
+
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
         """Update flow state fields. Raises ValueError for invalid fields."""
         if "updated_at" not in kwargs:
@@ -432,6 +460,40 @@ class SQLiteFlowStateRepo(_HasConnection):
             count=len(flows),
         ).debug("Retrieved flows by issue")
         return flows
+
+    def get_flows_by_issues_bulk(
+        self, issue_numbers: list[int], role: str
+    ) -> dict[int, list[dict[str, Any]]]:
+        """Batch retrieve flows linked to multiple issues with specified role.
+
+        Args:
+            issue_numbers: List of issue numbers to query.
+            role: Issue role to filter by (e.g. 'task').
+
+        Returns:
+            Dict mapping issue_number -> list of flow dicts (sorted by updated_at DESC).
+        """
+        if not issue_numbers:
+            return {}
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in issue_numbers)
+        cursor.execute(
+            f"SELECT l.issue_number, f.* FROM flow_state f "
+            f"JOIN flow_issue_links l ON f.branch = l.branch "
+            f"WHERE l.issue_number IN ({placeholders}) AND l.issue_role = ? "
+            f"AND f.deleted_at IS NULL "
+            f"ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
+            (*issue_numbers, role),
+        )
+        result: dict[int, list[dict[str, Any]]] = {n: [] for n in issue_numbers}
+        for row in cursor.fetchall():
+            entry = dict(row)
+            issue_num = entry.pop("issue_number", None)
+            if issue_num is not None and issue_num in result:
+                result[issue_num].append(entry)
+        return result
 
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""

@@ -197,15 +197,36 @@ class IssueFlowService:
             This wraps SQLiteClient.get_flows_by_issue with priority logic.
         """
         flows = self.store.get_flows_by_issue(issue_number, role="task")
+        return self.resolve_best_flow(issue_number, flows)
+
+    def resolve_best_flow(self, issue_number: int, flows: list[dict]) -> dict | None:
+        """Resolve best flow from pre-fetched list with deterministic selection.
+
+        Priority order:
+        1. Active canonical flow (task/issue-N)
+        2. Active non-canonical flow
+        3. First available flow (fallback)
+
+        Args:
+            issue_number: GitHub issue number (for guard check and canonical branch)
+            flows: Pre-fetched list of flow dicts (sorted by updated_at DESC)
+
+        Returns:
+            Flow dict if valid flow found, None if flows is empty.
+            Raises InvalidBranchLinkError if flow points to protected branch.
+
+        Note:
+            This is the bulk-path counterpart to find_active_flow.
+            It applies the same priority logic and guard check without
+            hitting the database.
+        """
         if not flows:
             return None
 
         # Guard: detect corrupted branch links
         # Check both sources of protected branches:
         # - scene_base_ref: OrchestraConfig's configurable base branch for current scene
-        #   (e.g., 'main', 'develop', stripped of 'origin/' prefix to match DB storage)
         # - protected_branches: VibeConfig's hardcoded list of protected branches
-        #   (e.g., ['main', 'develop', 'release/*'])
         # This aligns with TaskService.link_issue() write guard for consistency.
         base_branch = self.config.scene_base_ref.replace("origin/", "")
         protected_branches = set(VibeConfig.get_defaults().flow.protected_branches)
