@@ -179,7 +179,7 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/status")
     async def get_status() -> dict:
         """Get current orchestra status snapshot with job monitoring data."""
-        from vibe3.services import ActiveJob, JobMonitorService
+        from vibe3.execution import ActiveJob, JobMonitorService
 
         snapshot = await run_in_threadpool(status_service.snapshot)
         job_svc = JobMonitorService()

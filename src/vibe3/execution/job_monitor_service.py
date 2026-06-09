@@ -10,10 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from vibe3.execution import ActorStatus, get_actor_registry
-
 if TYPE_CHECKING:
-    from vibe3.execution import JobActor
+    from vibe3.execution.actor import JobActor
 
 
 @dataclass(frozen=True)
@@ -51,6 +49,8 @@ class JobMonitorService:
             JobMonitorSnapshot with active jobs, recent completions,
             and summary counts.
         """
+        from vibe3.execution import ActorStatus, get_actor_registry
+
         registry = get_actor_registry()
 
         # Cleanup expired before building snapshot

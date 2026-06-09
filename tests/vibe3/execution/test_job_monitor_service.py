@@ -14,7 +14,7 @@ from vibe3.execution.actor import (
     _reset_registry,
     get_actor_registry,
 )
-from vibe3.services.job_monitor_service import (
+from vibe3.execution.job_monitor_service import (
     ActiveJob,
     JobMonitorService,
 )
