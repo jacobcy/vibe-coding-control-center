@@ -235,6 +235,34 @@ class HeartbeatServer:
                         f"(retention={error_tracking.retention_days}d)"  # type: ignore[attr-defined]
                     )
 
+            # Cleanup expired actor registry entries (maintenance)
+            try:
+                from vibe3.execution import get_actor_registry
+
+                expired_actors = get_actor_registry().cleanup_expired()
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} actor cleanup failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"Actor registry cleanup failed: {exc}"
+                )
+            else:
+                if expired_actors:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: expired "
+                            f"{len(expired_actors)} actors"
+                        ),
+                        level="DEBUG",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").debug(
+                        f"Expired {len(expired_actors)} actor(s) from registry"
+                    )
+
             # Periodic Git ref packing to prevent stale references
             if tick_number % PACK_REFS_INTERVAL_TICKS == 0:
                 try:

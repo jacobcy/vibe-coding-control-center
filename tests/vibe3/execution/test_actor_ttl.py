@@ -264,3 +264,31 @@ class TestTerminalNotification:
         actor.record_dead(detail="cancelled")
 
         assert actor.actor_id in registry._completed_at
+
+    def test_notify_terminal_logs_unexpected_exceptions(self, monkeypatch) -> None:
+        """_notify_terminal should log unexpected exceptions, not silently swallow."""
+        _reset_registry()
+        registry = get_actor_registry()
+        store = MagicMock(spec=SQLiteClient)
+
+        actor = registry.create_actor(
+            job_type=JobType.DISPATCH,
+            issue_number=100,
+            branch="test-branch",
+            store=store,
+        )
+        actor.record_launch()
+
+        # Make mark_terminal raise an unexpected exception type
+        original = registry.mark_terminal
+
+        def _broken_mark_terminal(actor_id: str) -> None:
+            raise TypeError("unexpected bug")
+
+        registry.mark_terminal = _broken_mark_terminal  # type: ignore[assignment]
+
+        # Should NOT raise — it logs instead
+        actor.record_completion()
+
+        # Restore for other tests
+        registry.mark_terminal = original  # type: ignore[assignment]

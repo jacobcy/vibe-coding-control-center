@@ -209,6 +209,46 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_tick_loop_runs_actor_registry_cleanup(monkeypatch) -> None:
+    """Actor registry cleanup should run on each heartbeat tick."""
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    mock_registry = MagicMock()
+    mock_registry.cleanup_expired.return_value = ["expired-actor-1"]
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    monkeypatch.setattr(
+        "vibe3.execution.actor.get_actor_registry",
+        lambda: mock_registry,
+    )
+    server._running = True
+
+    await server._tick_loop()
+
+    mock_registry.cleanup_expired.assert_called()
+    assert any(
+        "expired 1 actors" in item for item in events
+    ), f"Expected actor cleanup event, got: {events}"
+
+
+@pytest.mark.asyncio
 async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
     server = HeartbeatServer(
         OrchestraConfig(

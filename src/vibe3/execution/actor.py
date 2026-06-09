@@ -214,9 +214,10 @@ class JobActor:
         try:
             registry = get_actor_registry()
             registry.mark_terminal(self.actor_id)
-        except Exception:
-            # Registry not initialized or other error — non-fatal
+        except (AttributeError, RuntimeError):
             pass
+        except Exception:
+            logger.debug("Unexpected error in _notify_terminal for {}", self.actor_id)
 
 
 class ActorRegistry:
