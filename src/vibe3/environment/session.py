@@ -10,6 +10,7 @@ from typing import Optional
 from loguru import logger
 
 from vibe3.exceptions import SystemError
+from vibe3.services.shared.paths import get_vibe3_log_dir
 
 
 @dataclass
@@ -56,7 +57,7 @@ class SessionManager:
             log_dir: Directory for session logs (defaults to .git/vibe3/logs)
         """
         self.repo_path = repo_path
-        self.log_dir = log_dir or (repo_path / ".git" / "vibe3" / "logs")
+        self.log_dir = log_dir or get_vibe3_log_dir(repo_path)
 
     # --- Tmux Session Methods ---
 

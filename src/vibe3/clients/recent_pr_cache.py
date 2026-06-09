@@ -17,15 +17,15 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.services.shared.paths import get_vibe3_cache_path
+
 
 class RecentPRCache:
     """Persistent cache for recent PR status by branch."""
 
-    CACHE_FILE = ".git/vibe3/recent_prs.json"
-
     def __init__(self, repo_path: Path) -> None:
         self.repo_path = repo_path
-        self.cache_file = repo_path / self.CACHE_FILE
+        self.cache_file = get_vibe3_cache_path(repo_path, "recent_prs.json")
 
     def _ensure_dir(self) -> None:
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)

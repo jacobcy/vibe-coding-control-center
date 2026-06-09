@@ -51,12 +51,31 @@ def find_worktree_path_for_branch(
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
 
+
+def get_vibe3_cache_path(repo_path: str | Path, filename: str) -> Path:
+    """Get path to a vibe3 cache file under .git/vibe3/."""
+    return Path(repo_path) / ".git" / "vibe3" / filename
+
+
+def get_vibe3_db_path(git_dir: str | Path) -> Path:
+    """Get path to handoff.db under .git/vibe3/."""
+    return Path(git_dir) / "vibe3" / "handoff.db"
+
+
+def get_vibe3_log_dir(repo_path: str | Path) -> Path:
+    """Get path to vibe3 log directory under .git/vibe3/logs/."""
+    return Path(repo_path) / ".git" / "vibe3" / "logs"
+
+
 __all__ = [
     "GitPathProtocol",
     "GitClientProtocol",
     "get_git_common_dir",
     "get_worktree_root",
     "find_worktree_path_for_branch",
+    "get_vibe3_cache_path",
+    "get_vibe3_db_path",
+    "get_vibe3_log_dir",
     "normalize_ref_path",
     "check_ref_exists",
     "resolve_ref_path",
@@ -329,10 +348,13 @@ def _path_to_alias(path: str) -> str:
     if path.startswith("docs/specs/"):
         return "@spec"
     # Shared artifacts: add @ prefix and keep the rest
-    if path.startswith("vibe3/handoff/"):
-        return f"@{path[14:]}"  # Remove "vibe3/handoff/" prefix, add @
-    if ".git/vibe3/handoff/" in path:
-        match = re.search(r"\.git/vibe3/handoff/(.+)", path)
+    # Lazy import to avoid circular dependency with handoff_resolution
+    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+
+    if path.startswith(_SHARED_HANDOFF_PREFIX):
+        return f"@{path[len(_SHARED_HANDOFF_PREFIX):]}"
+    if f".git/{_SHARED_HANDOFF_PREFIX}" in path:
+        match = re.search(rf"\.git/{re.escape(_SHARED_HANDOFF_PREFIX)}(.+)", path)
         if match:
             return f"@{match.group(1)}"
     return path
@@ -375,7 +397,13 @@ def ref_to_handoff_cmd(
     display_target = REF_FIELD_TO_ALIAS[ref_field]
 
     # Shared artifacts: use @ prefix form without --branch
-    if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
+    # Lazy import to avoid circular dependency with handoff_resolution
+    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+
+    if (
+        path.startswith(_SHARED_HANDOFF_PREFIX)
+        or f".git/{_SHARED_HANDOFF_PREFIX}" in path
+    ):
         return f"vibe3 handoff show {display_target}"
     # Worktree refs: use --branch when available
     if branch:
