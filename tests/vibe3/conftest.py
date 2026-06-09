@@ -105,3 +105,26 @@ def isolate_database(request):
             # Cleanup: close global connection and drop service singletons after test
             _close_global_connection()
             ErrorTrackingService.clear_instance()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _silence_orchestra_log():
+    """Disable orchestra event log file I/O for all tests.
+
+    Forces VIBE3_ORCHESTRA_EVENT_LOG off so the guard in
+    append_orchestra_event() (orchestra_log.py:110) returns early.
+    Covers all 15+ consumer modules without per-module patches.
+
+    Tests that ASSERT on events still work: they monkeypatch the local
+    reference, intercepting calls before the guard is reached.
+
+    See: https://github.com/jacobcy/vibe-coding-control-center/pull/2588
+    """
+    from vibe3.observability.orchestra_log import _close_events_log
+
+    _close_events_log()
+    mp = pytest.MonkeyPatch()
+    mp.delenv("VIBE3_ORCHESTRA_EVENT_LOG", raising=False)
+    yield
+    mp.undo()
+    _close_events_log()
