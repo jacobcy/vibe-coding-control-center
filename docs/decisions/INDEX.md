@@ -12,7 +12,7 @@ document_type: index
 |----|------|------|------|------|--------|---------------|
 | [ADR-0001](0001-adopt-adr-loop.md) | 采纳 RFC→ADR→Standards 闭环 | accepted | 2026-06-04 | - | - | docs/standards/doc-organization.md |
 | [ADR-0002](0002-protocol-based-di.md) | Protocol-based Dependency Injection | accepted | 2026-06-04 | - | - | docs/standards/v3/architecture-convergence-standard.md |
-| [ADR-0003](0003-runtime-loading-contract.md) | 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界 | proposed | 2026-06-09 | - | - | docs/standards/v3/runtime-loading-contract.md（待写） |
+| [ADR-0003](0003-runtime-loading-contract.md) | 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界 | accepted | 2026-06-09 | - | - | docs/standards/v3/runtime-loading-contract.md（待写） |
 | ADR-XXXX | Domain Events 架构选型 | backlog | - | - | - | （待补写） |
 | ADR-XXXX | 3-Tier Layering 演进路径 | backlog | - | - | - | （待补写） |
 | ADR-XXXX | Orchestra 编排机制 | backlog | - | - | - | （待补写） |
