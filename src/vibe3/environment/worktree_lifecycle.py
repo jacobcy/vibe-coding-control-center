@@ -23,7 +23,7 @@ from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
     from vibe3.clients import FlowStatePort
-    from vibe3.models import OrchestraConfig
+    from vibe3.models import FlowState, OrchestraConfig
 
 
 def _is_auto_task_branch(branch: str) -> bool:
@@ -38,11 +38,13 @@ class _NullFlowService:
     cleanup paths that only call release_temporary_worktree).
     """
 
-    def get_flow_state(self, branch: str) -> None:
+    def get_flow_state(self, branch: str) -> FlowState | None:
         return None
 
     def update_flow_metadata(self, branch: str, **updates: object) -> None:
-        pass
+        logger.bind(domain="worktree").debug(
+            "FlowStatePort not injected, skipping metadata update"
+        )
 
 
 class WorktreeLifecycle:
@@ -69,7 +71,9 @@ class WorktreeLifecycle:
         """
         self.config = config
         self.repo_path = repo_path
-        self.flow_service: FlowStatePort = flow_service or _NullFlowService()
+        self.flow_service: FlowStatePort = (
+            flow_service if flow_service is not None else _NullFlowService()
+        )
 
     def create_issue_worktree(
         self,
@@ -469,7 +473,7 @@ class WorktreeLifecycle:
             if not flow_state:
                 return None
             recorded_path = flow_state.worktree_path
-            if recorded_path and isinstance(recorded_path, str):
+            if recorded_path:
                 recorded = Path(recorded_path)
                 if recorded.exists() and self.validate_branch_matches(
                     recorded, flow_branch
