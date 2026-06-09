@@ -203,8 +203,8 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/models/test_job.py"
-        limit: 460
-        reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示等紧密耦合场景；新增 TestNegativeValidation 负面验证测试（7 个 parametrized cases）覆盖无效 literal、缺失字段、无效状态等 Pydantic validation 场景，Black auto-formatting 后略微超标"
+        limit: 500
+        reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标"
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 680
         reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标"
