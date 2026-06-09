@@ -16,6 +16,7 @@ from vibe3.services import (
     normalize_assignees,
     normalize_labels,
 )
+from vibe3.services.shared.labels import has_orchestra_governed, has_roadmap_label
 
 
 def build_issue_context(
@@ -113,15 +114,14 @@ def build_broader_repo_entries(
             if (
                 "supervisor" in labels
                 or "orchestra-scanned" in labels
-                or "roadmap/rfc" in labels
-                or "roadmap/epic" in labels
+                or has_roadmap_label(labels)
                 or "orchestra" in labels
             ):
                 continue
         elif (
             "supervisor" in labels
             or "orchestra-scanned" in labels
-            or "orchestra-governed" in labels
+            or has_orchestra_governed(labels)
             or "orchestra" in labels
         ):
             continue
