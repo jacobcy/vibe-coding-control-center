@@ -17,7 +17,11 @@ if TYPE_CHECKING:
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
-    """Extract label names from GitHub issue payload labels field."""
+    """Extract label names from GitHub issue payload labels field.
+
+    Handles both GitHub API format (list of dicts with "name" key) and
+    plain string lists (used in tests or simplified payloads).
+    """
     if not isinstance(raw_labels, list):
         return []
     result: list[str] = []
@@ -26,6 +30,8 @@ def normalize_labels(raw_labels: object) -> list[str]:
             name = item.get("name")
             if isinstance(name, str):
                 result.append(name)
+        elif isinstance(item, str):
+            result.append(item)
     return result
 
 

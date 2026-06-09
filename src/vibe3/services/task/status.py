@@ -6,6 +6,11 @@ from typing import Any, cast
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.shared.labels import (
+    has_orchestra_governed,
+    has_roadmap_label,
+    normalize_labels,
+)
 from vibe3.services.status_query_service import (
     StatusQueryService,
     is_auto_task_branch,
@@ -164,7 +169,7 @@ def classify_task_issues_for_rendering(
     supervisor_items = [
         item
         for item in orchestrated_issues
-        if supervisor_label in cast(list[str], item.get("labels", []))
+        if supervisor_label in normalize_labels(item.get("labels", []))
     ]
     supervisor_numbers = {cast(int, item["number"]) for item in supervisor_items}
 
@@ -172,8 +177,8 @@ def classify_task_issues_for_rendering(
     roadmap_rfc_items = [
         item
         for item in orchestrated_issues
-        if "roadmap/rfc" in cast(list[str], item.get("labels", []))
-        and supervisor_label not in cast(list[str], item.get("labels", []))
+        if "roadmap/rfc" in normalize_labels(item.get("labels", []))
+        and supervisor_label not in normalize_labels(item.get("labels", []))
     ]
     roadmap_rfc_numbers = {cast(int, item["number"]) for item in roadmap_rfc_items}
 
@@ -181,8 +186,8 @@ def classify_task_issues_for_rendering(
     roadmap_epic_items = [
         item
         for item in orchestrated_issues
-        if "roadmap/epic" in cast(list[str], item.get("labels", []))
-        and supervisor_label not in cast(list[str], item.get("labels", []))
+        if "roadmap/epic" in normalize_labels(item.get("labels", []))
+        and supervisor_label not in normalize_labels(item.get("labels", []))
     ]
     roadmap_epic_numbers = {cast(int, item["number"]) for item in roadmap_epic_items}
 
@@ -193,10 +198,9 @@ def classify_task_issues_for_rendering(
         if item.get("state") is None
         and item.get("assignee") is not None
         and item.get("assignee") in manager_usernames
-        and supervisor_label not in cast(list[str], item.get("labels", []))
-        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
-        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
-        and "orchestra-governed" not in cast(list[str], item.get("labels", []))
+        and supervisor_label not in normalize_labels(item.get("labels", []))
+        and not has_roadmap_label(normalize_labels(item.get("labels", [])))
+        and not has_orchestra_governed(normalize_labels(item.get("labels", [])))
     ]
     governed_anomaly_items = [
         item
@@ -204,10 +208,9 @@ def classify_task_issues_for_rendering(
         if item.get("state") is None
         and item.get("assignee") is not None
         and item.get("assignee") in manager_usernames
-        and supervisor_label not in cast(list[str], item.get("labels", []))
-        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
-        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
-        and "orchestra-governed" in cast(list[str], item.get("labels", []))
+        and supervisor_label not in normalize_labels(item.get("labels", []))
+        and not has_roadmap_label(normalize_labels(item.get("labels", [])))
+        and has_orchestra_governed(normalize_labels(item.get("labels", [])))
     ]
     missing_state_numbers = {
         cast(int, item["number"])
@@ -280,8 +283,7 @@ def classify_task_issues_for_rendering(
         item
         for item in orchestrated_issues
         if cast(IssueState, item["state"]) == IssueState.BLOCKED
-        and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
-        and "roadmap/epic" not in cast(list[str], item.get("labels", []))
+        and not has_roadmap_label(normalize_labels(item.get("labels", [])))
         and cast(int, item["number"]) not in supervisor_numbers
         and cast(int, item["number"]) not in human_collab_numbers
     ]

@@ -63,9 +63,9 @@ class TestNormalizeLabels:
         assert normalize_labels(labels) == ["bug", "feature"]
 
     def test_non_dict_items(self) -> None:
-        """Should skip non-dict items."""
+        """Should preserve plain string items, skip non-string non-dict."""
         labels = [{"name": "bug"}, "not-a-dict", 123]
-        assert normalize_labels(labels) == ["bug"]
+        assert normalize_labels(labels) == ["bug", "not-a-dict"]
 
     def test_non_list_input(self) -> None:
         """Non-list input should return empty list."""
