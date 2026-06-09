@@ -27,6 +27,12 @@
 - 报告模式和渐进披露原则
 - Context First 和 Fail Fast 模式
 
+**modularity-standards.md**
+- 公开 API 导入规范（禁止深层导入）
+- `__all__` 导出规范与允许类型
+- Lazy import 模式与 barrel export
+- Singleton 导出规范
+
 ## 安全规范
 
 项目特定安全要求已整合到 `CLAUDE.md` HARD RULES 第 17 条，通用 Python 安全规范见：
