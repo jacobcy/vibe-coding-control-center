@@ -14,14 +14,25 @@ from rich.progress import (
     TextColumn,
 )
 
+from vibe3.clients import GhIssueLabelPort
+from vibe3.config import OrchestraConfig, get_manager_usernames
 from vibe3.services import CheckResult, CheckService, InitResult
+from vibe3.services.shared import (
+    collect_label_anomalies,
+    has_manager_assignee,
+    has_orchestra_governed,
+    normalize_assignees,
+    normalize_labels,
+)
 
 
 @dataclass
 class ExecuteCheckResult:
     """Result of command-level check execution."""
 
-    mode: Literal["default", "init", "all", "fix", "fix_all", "clean_branch", "branch"]
+    mode: Literal[
+        "default", "init", "all", "fix", "fix_all", "clean_branch", "branch", "remote"
+    ]
     success: bool
     summary: str
     details: dict = field(default_factory=dict)
@@ -66,7 +77,7 @@ def _run_with_progress(
 def execute_check_mode(
     service: CheckService,
     mode: Literal[
-        "default", "init", "all", "fix", "fix_all", "clean_branch", "branch"
+        "default", "init", "all", "fix", "fix_all", "clean_branch", "branch", "remote"
     ] = "default",
     *,
     branch: str | None = None,
@@ -260,4 +271,158 @@ def execute_check_mode(
             else f"Issues found for branch '{default_result.branch}'"
         ),
         details={"issues": default_result.issues},
+    )
+
+
+def _audit_single_issue(
+    issue: dict,
+    *,
+    local_issue_numbers: set[int],
+    manager_usernames: tuple[str, ...],
+) -> list[dict]:
+    """Audit one GitHub issue for label anomalies.
+
+    Returns list of anomaly dicts with keys:
+        issue_number, rule, removed, added.
+    """
+    issue_number = issue.get("number")
+    if not issue_number:
+        return []
+
+    raw_labels = issue.get("labels", [])
+    labels = normalize_labels(raw_labels)
+
+    raw_assignees = issue.get("assignees", [])
+    assignees = normalize_assignees(raw_assignees)
+
+    has_local_flow = issue_number in local_issue_numbers
+    is_manager_issue = has_orchestra_governed(labels) or has_manager_assignee(
+        assignees, manager_usernames
+    )
+
+    anomalies = collect_label_anomalies(
+        labels,
+        issue_number=issue_number,
+        has_local_flow=has_local_flow,
+        is_manager_issue=is_manager_issue,
+    )
+
+    return [
+        {
+            "issue_number": a.issue_number,
+            "rule": a.rule,
+            "removed": a.removed,
+            "added": a.added,
+        }
+        for a in anomalies
+    ]
+
+
+def execute_remote_check(
+    *,
+    dry_run: bool = True,
+    show_progress: bool = True,
+) -> ExecuteCheckResult:
+    """Audit remote issue labels for anomalies and optionally fix them.
+
+    Args:
+        dry_run: Only report, don't modify labels.
+        show_progress: Show progress bar while checking issues.
+
+    Returns:
+        ExecuteCheckResult with mode="remote" and grouped anomaly details.
+    """
+    service = CheckService()
+    store = service.store
+    gh_client = service.github_client
+    label_port = GhIssueLabelPort()
+
+    config = OrchestraConfig()
+    manager_usernames = get_manager_usernames(config)
+
+    # Fetch all open issues
+    issues = gh_client.list_issues(
+        state="open",
+        fields=["labels", "assignees", "number"],
+    )
+
+    # Build set of locally-tracked issue numbers
+    all_flows = store.get_all_flows()
+    local_issue_numbers: set[int] = set()
+    for flow in all_flows:
+        branch = flow.get("branch", "")
+        if branch:
+            issue_num = store.get_task_issue_number(branch)
+            if issue_num is not None:
+                local_issue_numbers.add(issue_num)
+
+    all_anomalies: list[dict] = []
+    errors: list[str] = []
+
+    if show_progress:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+        ) as progress:
+            task_id = progress.add_task("Checking remote issues", total=len(issues))
+            for issue in issues:
+                progress.update(
+                    task_id,
+                    advance=1,
+                    description=f"Checking issue #{issue.get('number', '?')}",
+                )
+                anomalies = _audit_single_issue(
+                    issue,
+                    local_issue_numbers=local_issue_numbers,
+                    manager_usernames=manager_usernames,
+                )
+                all_anomalies.extend(anomalies)
+    else:
+        for issue in issues:
+            anomalies = _audit_single_issue(
+                issue,
+                local_issue_numbers=local_issue_numbers,
+                manager_usernames=manager_usernames,
+            )
+            all_anomalies.extend(anomalies)
+
+    # Apply fixes if not dry-run
+    if not dry_run:
+        for anomaly in all_anomalies:
+            inum = anomaly["issue_number"]
+            for label in anomaly["removed"]:
+                try:
+                    label_port.remove_issue_label(inum, label)
+                except Exception as e:
+                    errors.append(f"#{inum}: failed to remove {label}: {e}")
+            for label in anomaly["added"]:
+                try:
+                    label_port.add_issue_label(inum, label)
+                except Exception as e:
+                    errors.append(f"#{inum}: failed to add {label}: {e}")
+
+    checked_count = len(issues)
+    anomaly_count = len(all_anomalies)
+    total_removed = sum(len(a["removed"]) for a in all_anomalies)
+    total_added = sum(len(a["added"]) for a in all_anomalies)
+
+    if anomaly_count == 0:
+        summary = f"Checked {checked_count} issues, no anomalies found"
+    else:
+        summary = f"Checked {checked_count} issues, found {anomaly_count} anomalies"
+
+    return ExecuteCheckResult(
+        mode="remote",
+        success=anomaly_count == 0,
+        summary=summary,
+        details={
+            "checked_count": checked_count,
+            "anomalies": all_anomalies,
+            "removed_count": total_removed,
+            "added_count": total_added,
+            "errors": errors,
+            "dry_run": dry_run,
+        },
     )

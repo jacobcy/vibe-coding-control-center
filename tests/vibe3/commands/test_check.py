@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.commands.check import app as check_app
+from vibe3.commands.check_support import ExecuteCheckResult
 
 runner = CliRunner()
 
@@ -162,3 +163,161 @@ class TestCheckCommand:
         assert "feature-x" in result.output
         assert "Local branches failed" in result.output
         assert "feature-y: boom" in result.output
+
+
+# ==============================================================================
+# Remote check tests
+# ==============================================================================
+
+
+def _make_remote_result(
+    *,
+    success: bool,
+    summary: str,
+    checked_count: int = 0,
+    anomalies: list | None = None,
+    removed_count: int = 0,
+    added_count: int = 0,
+    dry_run: bool = True,
+) -> ExecuteCheckResult:
+    """Helper to create an ExecuteCheckResult for remote check tests."""
+    return ExecuteCheckResult(
+        mode="remote",
+        success=success,
+        summary=summary,
+        details={
+            "checked_count": checked_count,
+            "anomalies": anomalies or [],
+            "removed_count": removed_count,
+            "added_count": added_count,
+            "errors": [],
+            "dry_run": dry_run,
+        },
+    )
+
+
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_dry_run(mock_check):
+    """--dry-run flag is passed to execute_remote_check."""
+    mock_check.return_value = _make_remote_result(
+        success=True,
+        summary="Checked 0 issues, no anomalies found",
+        checked_count=0,
+    )
+    result = runner.invoke(app, ["check", "remote", "--dry-run"])
+
+    assert result.exit_code == 0
+    mock_check.assert_called_once_with(dry_run=True, show_progress=True)
+
+
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_applies_fixes(mock_check):
+    """Without --dry-run, execute_remote_check is called with dry_run=False."""
+    mock_check.return_value = _make_remote_result(
+        success=True,
+        summary="Checked 0 issues, no anomalies found",
+        checked_count=0,
+        dry_run=False,
+    )
+    result = runner.invoke(app, ["check", "remote"])
+
+    assert result.exit_code == 0
+    mock_check.assert_called_once_with(dry_run=False, show_progress=True)
+
+
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_with_anomalies(mock_check):
+    """Output groups anomalies by rule when anomalies are found."""
+    mock_check.return_value = _make_remote_result(
+        success=False,
+        summary="Checked 342 issues, found 2 anomalies",
+        checked_count=342,
+        anomalies=[
+            {
+                "issue_number": 123,
+                "rule": "roadmap_conflict",
+                "removed": ["state/claimed"],
+                "added": [],
+            },
+            {
+                "issue_number": 456,
+                "rule": "roadmap_conflict",
+                "removed": ["state/in-progress", "state/blocked"],
+                "added": [],
+            },
+            {
+                "issue_number": 789,
+                "rule": "multi_state",
+                "removed": ["state/review"],
+                "added": [],
+            },
+        ],
+        removed_count=4,
+        added_count=0,
+        dry_run=True,
+    )
+    result = runner.invoke(app, ["check", "remote", "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "roadmap_conflict" in result.output
+    assert "multi_state" in result.output
+    assert "#123" in result.output
+    assert "#456" in result.output
+    assert "#789" in result.output
+    assert "state/claimed" in result.output
+    assert "state/in-progress" in result.output
+    assert "state/blocked" in result.output
+    assert "state/review" in result.output
+    assert "Would remove" in result.output
+    assert "4 label(s)" in result.output
+    # No literal Rich markup tags
+    assert "[green]" not in result.output
+    assert "[bold]" not in result.output
+
+
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_no_anomalies(mock_check):
+    """Clean result shows 'no anomalies' message."""
+    mock_check.return_value = _make_remote_result(
+        success=True,
+        summary="Checked 342 issues, no anomalies found",
+        checked_count=342,
+    )
+    result = runner.invoke(app, ["check", "remote", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "no anomalies" in result.output
+
+
+@patch("vibe3.commands.check.CheckService")
+def test_check_backward_compat(mock_service_class):
+    """vibe3 check (no subcommand) still routes to legacy behavior."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_service = MagicMock()
+    result_obj = ExecuteCheckResult(
+        mode="fix_all", success=True, summary="All checks passed", details={}
+    )
+    mock_service_class.return_value = mock_service
+    with patch("vibe3.commands.check.execute_check_mode", return_value=result_obj):
+        result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "All checks passed" in result.output
+
+
+@patch("vibe3.commands.check.CheckService")
+def test_check_local_subcommand(mock_service_class):
+    """vibe3 check local invokes same path as vibe3 check."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_service = MagicMock()
+    result_obj = ExecuteCheckResult(
+        mode="fix_all", success=True, summary="All checks passed", details={}
+    )
+    mock_service_class.return_value = mock_service
+    with patch("vibe3.commands.check.execute_check_mode", return_value=result_obj):
+        result = runner.invoke(app, ["check", "local"])
+
+    assert result.exit_code == 0
+    assert "All checks passed" in result.output
