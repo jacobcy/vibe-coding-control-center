@@ -131,7 +131,7 @@
 | `state/claimed` | 已认领，待进入执行 | 通常由自动化镜像，不建议手工维护 |
 | `state/in-progress` | 执行中 | 通常由自动化镜像，不建议手工维护 |
 | `state/blocked` | 阻塞中 | 通常由自动化镜像，不建议手工维护 |
-| `state/failed` | 执行失败，需要人工介入/恢复 | 通常由自动化镜像，不建议手工维护 |
+| `state/failed` | 执行失败（serve 层警告，非 flow 状态） | 通常由自动化镜像，不建议手工维护 |
 | `state/handoff` | 待交接 | 通常由自动化镜像，不建议手工维护 |
 | `state/review` | 待 review | 通常由自动化镜像，不建议手工维护 |
 | `state/merge-ready` | 已满足合并条件 | 通常由自动化镜像，不建议手工维护 |

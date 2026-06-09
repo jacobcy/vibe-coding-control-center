@@ -18,26 +18,28 @@ related_docs:
   - src/vibe3/orchestra/flow_dispatch.py
 ---
 
-# Task: Orchestra 调度器（MVP）
+# Task: Orchestra 调度器
 
 ## 概述
 
 **Orchestra** 是 Vibe Center v3 的 self-hosted webhook 调度子系统（非 GitHub Actions self-hosted runner）。
-目标是让 GitHub 事件触发本地 agent 执行，并在无人值守场景下先实现最小闭环。
-
-边界说明：
-- 本系统通过 `POST /webhook/github` 接收 GitHub 事件，再在本机执行 `vibe3` 命令。
-- 本系统不负责执行 GitHub Actions job；因此不等价于 `runs-on: self-hosted` runner。
+目标是让 GitHub 事件触发本地 agent 执行，并在无人值守场景下实现治理闭环。
 
 ## 当前状态
 
-- 层级: Implementation（已落地最小能力）
-- 状态: **active**
-- 最后更新: 2026-03-29
+- 层级: Tier 3 (Cognitive / Governance)
+- 状态: **operational**
+- 最后更新: 2026-06-10
 
-## 本版已实现（MVP）
+## 核心能力
 
-### 1) Self-hosted webhook 事件服务（非 Actions runner）
+### 1) Tier 3 治理调度 (Operational)
+
+- **Cron Supervisor**: 周期性扫描并生成治理任务。
+- **Roadmap Intake**: 自动分拣并审查 Issue，决定其规划优先级。
+- **Supervisor Apply**: 异步派发治理任务执行。
+
+### 2) Self-hosted webhook 事件服务
 
 - `vibe3 serve start` 启动 HTTP webhook + heartbeat。
 - Webhook 接口：`POST /webhook/github`（支持 HMAC 校验）。
