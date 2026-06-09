@@ -51,6 +51,7 @@ def find_worktree_path_for_branch(
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
 
+
 __all__ = [
     "GitPathProtocol",
     "GitClientProtocol",
@@ -329,10 +330,13 @@ def _path_to_alias(path: str) -> str:
     if path.startswith("docs/specs/"):
         return "@spec"
     # Shared artifacts: add @ prefix and keep the rest
-    if path.startswith("vibe3/handoff/"):
-        return f"@{path[14:]}"  # Remove "vibe3/handoff/" prefix, add @
-    if ".git/vibe3/handoff/" in path:
-        match = re.search(r"\.git/vibe3/handoff/(.+)", path)
+    # Lazy import to avoid circular dependency with handoff_resolution
+    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+
+    if path.startswith(_SHARED_HANDOFF_PREFIX):
+        return f"@{path[len(_SHARED_HANDOFF_PREFIX):]}"
+    if f".git/{_SHARED_HANDOFF_PREFIX}" in path:
+        match = re.search(rf"\.git/{re.escape(_SHARED_HANDOFF_PREFIX)}(.+)", path)
         if match:
             return f"@{match.group(1)}"
     return path
@@ -375,7 +379,13 @@ def ref_to_handoff_cmd(
     display_target = REF_FIELD_TO_ALIAS[ref_field]
 
     # Shared artifacts: use @ prefix form without --branch
-    if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
+    # Lazy import to avoid circular dependency with handoff_resolution
+    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+
+    if (
+        path.startswith(_SHARED_HANDOFF_PREFIX)
+        or f".git/{_SHARED_HANDOFF_PREFIX}" in path
+    ):
         return f"vibe3 handoff show {display_target}"
     # Worktree refs: use --branch when available
     if branch:

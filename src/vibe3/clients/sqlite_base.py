@@ -12,6 +12,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.exceptions import GitError
+from vibe3.utils import get_vibe3_db_path
 
 # Module-level singleton connection to avoid FD exhaustion
 # Shared across all SQLiteClient instances
@@ -107,9 +108,8 @@ class SQLiteClientBase:
                     "rev-parse --git-common-dir",
                     f"returned non-absolute path: {git_dir}",
                 )
-            vibe3_dir = git_dir / "vibe3"
-            vibe3_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(vibe3_dir / "handoff.db")
+            db_path = str(get_vibe3_db_path(git_dir))
+            git_dir.joinpath("vibe3").mkdir(parents=True, exist_ok=True)
 
         self.db_path = db_path
         self._init_db()

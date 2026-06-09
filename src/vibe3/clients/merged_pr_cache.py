@@ -17,6 +17,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.utils import get_vibe3_cache_path
 
 
 class MergedPRCache:
@@ -41,8 +42,6 @@ class MergedPRCache:
     This ensures cache can answer queries for any issue closed by a PR.
     """
 
-    CACHE_FILE = ".git/vibe3/merged_prs.json"
-
     def __init__(self, repo_path: Path) -> None:
         """Initialize cache with repository path.
 
@@ -50,7 +49,7 @@ class MergedPRCache:
             repo_path: Path to the repository root (where .git/ is located)
         """
         self.repo_path = repo_path
-        self.cache_file = repo_path / self.CACHE_FILE
+        self.cache_file = get_vibe3_cache_path(repo_path, "merged_prs.json")
 
     def _ensure_dir(self) -> None:
         """Ensure cache directory exists."""
