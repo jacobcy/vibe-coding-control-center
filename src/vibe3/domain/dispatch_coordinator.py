@@ -569,7 +569,8 @@ class GlobalDispatchCoordinator:
         if self._coalescer is not None:
             buffered_events = self._coalescer.flush()
             # Clear coalescer so flushed events bypass coalescing and reach handlers
-            from vibe3.domain.publisher import get_publisher, publish as publish_event
+            from vibe3.domain.publisher import get_publisher
+            from vibe3.domain.publisher import publish as publish_event
 
             get_publisher().set_coalescer(None)
             for event in buffered_events:
