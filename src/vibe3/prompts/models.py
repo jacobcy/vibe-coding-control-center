@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -96,6 +97,30 @@ class PromptMaterialSpec(BaseModel):
 
     name: str
     source: PromptVariableSource
+
+
+class MaterialEntry(BaseModel):
+    """Loaded governance material with source path and content hash."""
+
+    model_config = {"frozen": True}
+
+    path: Path  # absolute path to the file
+    name: str  # relative path from the scanned directory (e.g. "assignee-pool.md")
+    content: str  # raw text content
+    content_hash: str  # SHA-256 hex digest (first 16 chars)
+    mtime: float  # file modification time (os.stat)
+
+
+class PolicyEntry(BaseModel):
+    """Loaded policy file with source path, parsed data, and content hash."""
+
+    model_config = {"frozen": True}
+
+    path: Path
+    name: str  # relative path (e.g. "autoharness.yaml")
+    data: dict[str, Any]  # parsed YAML dict
+    content_hash: str  # SHA-256 hex digest (first 16 chars)
+    mtime: float
 
 
 class PromptRecipeVariantSpec(BaseModel):
