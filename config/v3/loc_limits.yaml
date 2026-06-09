@@ -316,6 +316,9 @@ code_limits:
       - path: "tests/vibe3/integration/test_session_reuse.py"
         limit: 420
         reason: "Session reuse 集成测试集，覆盖完整生命周期验证、NULL/empty 过滤、无效 ID 验证、live preference、branch/role 隔离、安全网、race condition、多 session 选择等 9 个紧密耦合场景，每个测试使用真实 SQLite 数据库（非 mock）需要完整 setup，拆分会破坏测试场景完整性（#2060）"
+      - path: "tests/vibe3/services/test_issue_flow_service.py"
+        limit: 500
+        reason: "IssueFlowService 测试集，覆盖 convention injection、branch naming、flow lookup、resolve_best_flow 优先级逻辑与 protected branch guard 等紧密耦合场景；PR #2581 新增 8 个 resolve_best_flow 测试（优先级逻辑 5 个 + protected branch guard 3 个）从 297 行增至 465 行"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
