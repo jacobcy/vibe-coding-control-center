@@ -135,3 +135,39 @@ def test_build_run_prompt_body_includes_pre_coding_validation(tmp_path: Path) ->
     context = build_run_prompt_body(str(plan_file), config)
     assert "REQUIRED:BEFORE_CODING" in context
     assert "Pre-Coding Plan Validation" in context
+
+
+def test_build_run_prompt_body_includes_plan_requirements_verification(
+    tmp_path: Path,
+) -> None:
+    """Run prompt must contain MANDATORY plan requirements verification section."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    # Verify mandatory section appears
+    assert "Plan Requirements Verification" in context
+    assert "MANDATORY" in context
+
+    # Verify instruction to extract requirements from plan
+    assert "Extract ALL verification requirements" in context
+    assert "handoff show <plan_ref>" in context
+
+    # Verify instruction to form checklist
+    assert "Requirements Checklist" in context or "checklist" in context.lower()
+
+
+def test_build_run_prompt_body_includes_deviation_declaration(tmp_path: Path) -> None:
+    """Run prompt must instruct executor to document deviations."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    # Verify deviation declaration enforcement
+    assert "Deviation Declaration" in context
+    assert "❌" in context
+    assert "DO NOT claim" in context or "report accuracy failure" in context
