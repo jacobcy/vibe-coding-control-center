@@ -209,6 +209,7 @@ class TestJobResult:
             "status": "launched",
             "exit_code": None,
             "adapter_path": None,
+            "adapter_hash": None,
             "context": None,
             "policy_hash": None,
             "material_hash": None,
@@ -221,6 +222,32 @@ class TestJobResult:
             "actor_id": None,
         }.items():  # noqa: E501
             assert getattr(result, field) == expected
+
+    def test_adapter_hash_defaults_to_none(self):
+        """Verify adapter_hash defaults to None for backward compatibility."""
+        result = JobResult(
+            command_type=CommandType.PLAN,
+            issue_number=1,
+            branch="main",
+        )
+        assert result.adapter_hash is None
+
+    def test_version_fields_serialization_round_trip(self):
+        """Verify version metadata fields serialize/deserialize correctly."""
+        original = JobResult(
+            command_type=CommandType.RUN,
+            issue_number=123,
+            branch="main",
+            adapter_hash="a1b2c3d4e5f6a7b8",
+            policy_hash="0123456789abcdef",
+            material_hash="fedcba9876543210",
+        )
+        data = original.model_dump()
+        restored = JobResult.model_validate(data)
+
+        assert restored.adapter_hash == "a1b2c3d4e5f6a7b8"
+        assert restored.policy_hash == "0123456789abcdef"
+        assert restored.material_hash == "fedcba9876543210"
 
     def test_mutability(self):
         """Verify result is mutable (not frozen)."""

@@ -184,6 +184,8 @@ class JobExecutor:
             # Resolve adapter
             resolved = self._registry.resolve(envelope.command_type)
             adapter_path = resolved.entry.import_path
+            # Compute adapter hash
+            adapter_hash = self._compute_adapter_hash(resolved)
         except Exception as e:
             # Pre-launch failure: actor still QUEUED, just clean up
             registry.remove_actor(actor_obj.actor_id)
@@ -202,6 +204,11 @@ class JobExecutor:
         # Build context (no premature session ID loading —
         # session metadata comes from ExecutionLaunchResult after dispatch)
         context = self._build_context(envelope)
+
+        # Compute version hashes
+        repo_root = resolve_orchestra_repo_root()
+        policy_hash = self._compute_policy_hash(repo_root)
+        material_hash = self._compute_material_hash(repo_root)
 
         # Record lifecycle started event
         role = COMMAND_TYPE_TO_EXECUTION_ROLE.get(envelope.command_type)
@@ -222,12 +229,24 @@ class JobExecutor:
 
         # Record actor launch and lifecycle started
         actor_obj.record_launch()
+
+        # Prepare version refs for lifecycle events
+        version_refs = {
+            "adapter_hash": adapter_hash or "",
+            "policy_hash": policy_hash or "",
+            "material_hash": material_hash or "",
+        }
+
         self._lifecycle.record_started(
             role=role,
             target=envelope.branch,
             actor=envelope.actor,
             session_id=context.session_id,
-            refs={**(envelope.refs or {}), "actor_id": actor_obj.actor_id},
+            refs={
+                **(envelope.refs or {}),
+                "actor_id": actor_obj.actor_id,
+                **version_refs,
+            },
         )
 
         try:
@@ -261,7 +280,7 @@ class JobExecutor:
                     target=envelope.branch,
                     actor=envelope.actor,
                     error=job_result.error_message,
-                    refs=envelope.refs,
+                    refs={**(envelope.refs or {}), **version_refs},
                 )
             elif job_result.status == "skipped":
                 actor_obj.record_completion(detail=f"{envelope.command_type} skipped")
@@ -270,7 +289,7 @@ class JobExecutor:
                     target=envelope.branch,
                     actor=envelope.actor,
                     detail="Execution skipped",
-                    refs=envelope.refs,
+                    refs={**(envelope.refs or {}), **version_refs},
                 )
             else:
                 # launched or completed
@@ -282,12 +301,15 @@ class JobExecutor:
                     target=envelope.branch,
                     actor=envelope.actor,
                     detail=f"{envelope.command_type} {job_result.status}",
-                    refs=envelope.refs,
+                    refs={**(envelope.refs or {}), **version_refs},
                 )
 
             # Fill in execution metadata
             job_result.started_at = started_at
             job_result.adapter_path = adapter_path
+            job_result.policy_hash = policy_hash
+            job_result.material_hash = material_hash
+            job_result.adapter_hash = adapter_hash
             job_result.actor_id = actor_obj.actor_id
 
             # Actor stays in registry for TTL-based monitoring;
@@ -304,7 +326,7 @@ class JobExecutor:
                 target=envelope.branch,
                 actor=envelope.actor,
                 error=str(e),
-                refs=envelope.refs,
+                refs={**(envelope.refs or {}), **version_refs},
             )
 
             # Actor stays in registry for TTL-based monitoring
@@ -626,3 +648,124 @@ class JobExecutor:
             job_result.payload_summary = {"stdout": result.stdout[:1000]}  # Truncate
 
         return job_result
+
+    def _compute_adapter_hash(self, resolved: object) -> str | None:
+        """Compute SHA-256 hash of the resolved adapter's source file.
+
+        Args:
+            resolved: The resolved adapter object from registry.resolve()
+
+        Returns:
+            First 16 hex chars of SHA-256 hash, or None if module file cannot be found
+        """
+        import hashlib
+        import importlib
+
+        try:
+            # Get the module name from the resolved adapter
+            if not hasattr(resolved, "entry") or not hasattr(
+                resolved.entry, "import_path"
+            ):
+                return None
+
+            import_path = resolved.entry.import_path
+            # Extract module path
+            # e.g., "vibe3.roles.plan.PLAN_SYNC_SPEC" → "vibe3.roles.plan"
+            module_name = import_path.rsplit(".", 1)[0]
+
+            module = importlib.import_module(module_name)
+            if not hasattr(module, "__file__") or module.__file__ is None:
+                return None
+
+            source_path = module.__file__
+            if hasattr(source_path, "read_text"):
+                content = source_path.read_text(encoding="utf-8")
+            else:
+                content = open(source_path).read()
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+            return content_hash
+        except Exception as e:
+            logger.warning(f"Failed to compute adapter hash: {e}")
+            return None
+
+    def _compute_policy_hash(self, repo_root: object) -> str | None:
+        """Compute aggregate hash of all policy files.
+
+        Args:
+            repo_root: The repository root path
+
+        Returns:
+            First 16 hex chars of aggregate SHA-256 hash, or None if no policies found
+        """
+        import hashlib
+        from pathlib import Path
+
+        try:
+            from vibe3.services import policy_loader
+
+            # Convert repo_root to Path if needed
+            if hasattr(repo_root, "repo"):
+                base_path = Path(repo_root.repo)
+            else:
+                base_path = Path(str(repo_root))
+
+            policies_dir = base_path / ".vibe" / "governance" / "policies"
+            loader = policy_loader(policies_dir)
+            entries = loader.load_all()
+
+            if not entries:
+                return None
+
+            # Aggregate all content_hash values sorted by name
+            hash_parts = sorted(
+                [f"{entry.name}|{entry.content_hash}" for entry in entries]
+            )
+            concatenated = "|".join(hash_parts)
+            aggregate_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
+                :16
+            ]
+            return aggregate_hash
+        except Exception as e:
+            logger.warning(f"Failed to compute policy hash: {e}")
+            return None
+
+    def _compute_material_hash(self, repo_root: object) -> str | None:
+        """Compute aggregate hash of all material files.
+
+        Args:
+            repo_root: The repository root path
+
+        Returns:
+            First 16 hex chars of aggregate SHA-256 hash, or None if no materials found
+        """
+        import hashlib
+        from pathlib import Path
+
+        try:
+            from vibe3.services import material_loader
+
+            # Convert repo_root to Path if needed
+            if hasattr(repo_root, "repo"):
+                base_path = Path(repo_root.repo)
+            else:
+                base_path = Path(str(repo_root))
+
+            materials_dir = base_path / ".vibe" / "governance" / "materials"
+            loader = material_loader(materials_dir)
+            entries = loader.load_all()
+
+            if not entries:
+                return None
+
+            # Aggregate all content_hash values sorted by name
+            hash_parts = sorted(
+                [f"{entry.name}|{entry.content_hash}" for entry in entries]
+            )
+            concatenated = "|".join(hash_parts)
+            aggregate_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
+                :16
+            ]
+            return aggregate_hash
+        except Exception as e:
+            logger.warning(f"Failed to compute material hash: {e}")
+            return None
