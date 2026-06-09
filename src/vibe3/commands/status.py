@@ -80,42 +80,26 @@ def _render_runtime_versions() -> None:
     Displays the current policy and material hashes computed from the
     governance directory contents.
     """
-    import hashlib
-
     from vibe3.execution import resolve_orchestra_repo_root
     from vibe3.services import material_loader, policy_loader
+    from vibe3.utils import compute_hash_from_loader
 
     console.print("[bold]Runtime Versions[/] [dim](current)[/]")
 
     try:
         repo_root = resolve_orchestra_repo_root()
-
-        # Compute policy hash
         policies_dir = repo_root / ".vibe" / "governance" / "policies"
-        policy_loader_instance = policy_loader(policies_dir)
-        policy_entries = policy_loader_instance.load_all()
-        if policy_entries:
-            hash_parts = sorted(
-                [f"{entry.name}|{entry.content_hash}" for entry in policy_entries]
-            )
-            concatenated = "|".join(hash_parts)
-            policy_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[:16]
+        materials_dir = repo_root / ".vibe" / "governance" / "materials"
+
+        policy_hash = compute_hash_from_loader(policy_loader, policies_dir)
+        material_hash = compute_hash_from_loader(material_loader, materials_dir)
+
+        if policy_hash:
             console.print(f"  Policy hash:  {policy_hash}")
         else:
             console.print("  Policy hash:  [dim](no policies found)[/]")
 
-        # Compute material hash
-        materials_dir = repo_root / ".vibe" / "governance" / "materials"
-        material_loader_instance = material_loader(materials_dir)
-        material_entries = material_loader_instance.load_all()
-        if material_entries:
-            hash_parts = sorted(
-                [f"{entry.name}|{entry.content_hash}" for entry in material_entries]
-            )
-            concatenated = "|".join(hash_parts)
-            material_hash = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()[
-                :16
-            ]
+        if material_hash:
             console.print(f"  Material hash: {material_hash}")
         else:
             console.print("  Material hash: [dim](no materials found)[/]")

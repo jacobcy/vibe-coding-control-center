@@ -415,6 +415,9 @@ class TestVersionHashComputation:
     ) -> None:
         """Adapter hash should be computed from module source file."""
         import hashlib
+        import importlib
+        import sys
+        from types import SimpleNamespace
 
         # Create a temporary module file
         module_dir = tmp_path / "test_module"
@@ -423,116 +426,85 @@ class TestVersionHashComputation:
         module_content = "# Test adapter module\nprint('hello')\n"
         module_file.write_text(module_content)
 
-        # Create a mock resolved adapter
-        import sys
-
         sys.path.insert(0, str(tmp_path))
-
         try:
-            # Import the module
-            import importlib
-
             importlib.import_module("test_module.adapter")
-
-            # Create mock resolved object
-            from types import SimpleNamespace
-
             mock_resolved = SimpleNamespace(module_name="test_module.adapter")
 
-            # Compute hash
             registry = CommandAdapterRegistry()
             executor = JobExecutor(registry, mock_store)
             adapter_hash = executor._compute_adapter_hash(mock_resolved)
 
-            # Verify hash
             expected_hash = hashlib.sha256(module_content.encode("utf-8")).hexdigest()[
                 :16
             ]
             assert adapter_hash == expected_hash
         finally:
+            sys.modules.pop("test_module.adapter", None)
+            sys.modules.pop("test_module", None)
             sys.path.remove(str(tmp_path))
 
-    def test_policy_hash_aggregates_all_policy_files(
-        self, mock_store: SQLiteClient, tmp_path
-    ) -> None:
+    def test_policy_hash_aggregates_all_policy_files(self, tmp_path) -> None:
         """Policy hash should aggregate all policy files."""
+        from vibe3.services import policy_loader
+        from vibe3.utils import compute_hash_from_loader
 
-        # Create policy directory and files
         policy_dir = tmp_path / ".vibe" / "governance" / "policies"
         policy_dir.mkdir(parents=True)
 
-        policy1 = policy_dir / "policy1.yaml"
-        policy1.write_text("name: policy1\nversion: '1.0'\n")
-        policy2 = policy_dir / "policy2.yaml"
-        policy2.write_text("name: policy2\nversion: '2.0'\n")
+        (policy_dir / "policy1.yaml").write_text("name: policy1\nversion: '1.0'\n")
+        (policy_dir / "policy2.yaml").write_text("name: policy2\nversion: '2.0'\n")
 
-        # Compute hash
-        registry = CommandAdapterRegistry()
-        executor = JobExecutor(registry, mock_store)
-        policy_hash = executor._compute_policy_hash(tmp_path)
+        policy_hash = compute_hash_from_loader(policy_loader, policy_dir)
 
-        # Verify hash is computed (not None)
         assert policy_hash is not None
         assert len(policy_hash) == 16
 
-    def test_material_hash_aggregates_all_material_files(
-        self, mock_store: SQLiteClient, tmp_path
-    ) -> None:
+    def test_material_hash_aggregates_all_material_files(self, tmp_path) -> None:
         """Material hash should aggregate all material files."""
+        from vibe3.services import material_loader
+        from vibe3.utils import compute_hash_from_loader
 
-        # Create material directory and files
         material_dir = tmp_path / ".vibe" / "governance" / "materials"
         material_dir.mkdir(parents=True)
 
-        material1 = material_dir / "material1.md"
-        material1.write_text("# Material 1\nContent 1\n")
-        material2 = material_dir / "material2.md"
-        material2.write_text("# Material 2\nContent 2\n")
+        (material_dir / "material1.md").write_text("# Material 1\nContent 1\n")
+        (material_dir / "material2.md").write_text("# Material 2\nContent 2\n")
 
-        # Compute hash
-        registry = CommandAdapterRegistry()
-        executor = JobExecutor(registry, mock_store)
-        material_hash = executor._compute_material_hash(tmp_path)
+        material_hash = compute_hash_from_loader(material_loader, material_dir)
 
-        # Verify hash is computed (not None)
         assert material_hash is not None
         assert len(material_hash) == 16
 
-    def test_hash_none_when_directory_missing(
-        self, mock_store: SQLiteClient, tmp_path
-    ) -> None:
+    def test_hash_none_when_directory_missing(self, tmp_path) -> None:
         """Hash should return None when directory is missing."""
-        registry = CommandAdapterRegistry()
-        executor = JobExecutor(registry, mock_store)
+        from vibe3.services import material_loader, policy_loader
+        from vibe3.utils import compute_hash_from_loader
 
-        # No governance directory exists
-        policy_hash = executor._compute_policy_hash(tmp_path)
-        material_hash = executor._compute_material_hash(tmp_path)
+        policy_hash = compute_hash_from_loader(policy_loader, tmp_path / "nonexistent")
+        material_hash = compute_hash_from_loader(
+            material_loader, tmp_path / "nonexistent"
+        )
 
         assert policy_hash is None
         assert material_hash is None
 
-    def test_hash_changes_when_file_changes(
-        self, mock_store: SQLiteClient, tmp_path
-    ) -> None:
+    def test_hash_changes_when_file_changes(self, tmp_path) -> None:
         """Hash should change when file content changes."""
-        # Create policy directory and file
+        from vibe3.services import policy_loader
+        from vibe3.utils import compute_hash_from_loader
+
         policy_dir = tmp_path / ".vibe" / "governance" / "policies"
         policy_dir.mkdir(parents=True)
 
         policy1 = policy_dir / "policy1.yaml"
         policy1.write_text("name: policy1\nversion: '1.0'\n")
 
-        # Compute initial hash
-        registry = CommandAdapterRegistry()
-        executor = JobExecutor(registry, mock_store)
-        hash1 = executor._compute_policy_hash(tmp_path)
+        hash1 = compute_hash_from_loader(policy_loader, policy_dir)
 
-        # Change file content
         policy1.write_text("name: policy1\nversion: '2.0'\n")
-        hash2 = executor._compute_policy_hash(tmp_path)
+        hash2 = compute_hash_from_loader(policy_loader, policy_dir)
 
-        # Verify hashes are different
         assert hash1 != hash2
 
     def test_adapter_hash_none_when_module_file_missing(
@@ -540,20 +512,15 @@ class TestVersionHashComputation:
     ) -> None:
         """Adapter hash should return None when module.__file__ is None."""
         from types import SimpleNamespace
-        from unittest.mock import Mock, patch
 
         registry = CommandAdapterRegistry()
         executor = JobExecutor(registry, mock_store)
 
-        # Create mock resolved adapter
         mock_resolved = SimpleNamespace(module_name="namespace_package")
-
-        # Mock module with __file__ = None (namespace package)
         mock_module = Mock()
         mock_module.__file__ = None
 
         with patch("importlib.import_module", return_value=mock_module):
             adapter_hash = executor._compute_adapter_hash(mock_resolved)
 
-        # Verify hash is None
         assert adapter_hash is None
