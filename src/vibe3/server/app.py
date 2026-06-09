@@ -352,7 +352,7 @@ def _display_active_jobs(console: Console) -> None:
     from rich.table import Table
 
     from vibe3.execution import JobMonitorService
-    from vibe3.utils.time_format import format_age_aware_time
+    from vibe3.utils import format_age_aware_time
 
     service = JobMonitorService()
     snapshot = service.snapshot()
