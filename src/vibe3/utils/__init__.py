@@ -11,7 +11,7 @@ if TYPE_CHECKING:
         format_branch_behind_body,
         format_branch_behind_console,
     )
-    from vibe3.utils.branch_utils import find_parent_branch
+    from vibe3.utils.branch_utils import find_parent_branch, is_branch_merged_to_main
     from vibe3.utils.codeagent_helpers import (
         diagnose_backend_error,
         diagnose_prompt_size_issue,
@@ -76,6 +76,7 @@ _LAZY_IMPORTS = {
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
     "diagnose_prompt_size_issue": "vibe3.utils.codeagent_helpers",
     "find_parent_branch": "vibe3.utils.branch_utils",
+    "is_branch_merged_to_main": "vibe3.utils.branch_utils",
     "format_age_aware_time": "vibe3.utils.time_format",
     "format_branch_behind_body": "vibe3.utils.branch_compare",
     "format_branch_behind_console": "vibe3.utils.branch_compare",
@@ -132,6 +133,7 @@ __all__ = [
     "diagnose_backend_error",
     "diagnose_prompt_size_issue",
     "find_parent_branch",
+    "is_branch_merged_to_main",
     "format_age_aware_time",
     "format_branch_behind_body",
     "format_branch_behind_console",

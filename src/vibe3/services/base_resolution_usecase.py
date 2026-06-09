@@ -6,8 +6,7 @@ from typing import Callable, Literal
 from vibe3.clients import GitClient, GitClientProtocol
 from vibe3.exceptions import UserError
 from vibe3.models import BranchSource
-from vibe3.utils import find_parent_branch
-from vibe3.utils.branch_utils import is_branch_merged_to_main
+from vibe3.utils import find_parent_branch, is_branch_merged_to_main
 
 MAIN_BRANCH_NAME = "main"
 MAIN_BRANCH_REF = "origin/main"
