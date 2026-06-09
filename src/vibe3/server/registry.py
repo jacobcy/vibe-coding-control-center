@@ -211,8 +211,8 @@ def _build_server_with_launch_cwd(
         def _job_to_dict(job: ActiveJob) -> dict:
             return {
                 "actor_id": job.actor_id,
-                "job_type": job.job_type,
-                "status": job.status,
+                "job_type": job.job_type.value,
+                "status": job.status.value,
                 "issue_number": job.issue_number,
                 "branch": job.branch,
                 "started_at": job.started_at,
