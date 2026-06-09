@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from vibe3.clients import SQLiteClient
 from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_support import (
     find_worktree_by_path,
@@ -23,12 +22,29 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.models import OrchestraConfig
+    from vibe3.clients import FlowStatePort
+    from vibe3.models import FlowState, OrchestraConfig
 
 
 def _is_auto_task_branch(branch: str) -> bool:
     """Check if branch follows auto-managed task naming convention."""
     return branch.startswith("task/issue-")
+
+
+class _NullFlowService:
+    """No-op FlowStatePort implementation for callers that don't need flow state.
+
+    Used as default when no FlowService is injected (e.g. session_registry
+    cleanup paths that only call release_temporary_worktree).
+    """
+
+    def get_flow_state(self, branch: str) -> FlowState | None:
+        return None
+
+    def update_flow_metadata(self, branch: str, **updates: object) -> None:
+        logger.bind(domain="worktree").debug(
+            "FlowStatePort not injected, skipping metadata update"
+        )
 
 
 class WorktreeLifecycle:
@@ -40,15 +56,24 @@ class WorktreeLifecycle:
     - Recording worktree paths to flow state
     """
 
-    def __init__(self, config: "OrchestraConfig", repo_path: Path):
+    def __init__(
+        self,
+        config: "OrchestraConfig",
+        repo_path: Path,
+        flow_service: "FlowStatePort | None" = None,
+    ):
         """Initialize lifecycle handler.
 
         Args:
             config: Orchestra configuration
             repo_path: Path to the main repository
+            flow_service: FlowStatePort instance (optional, uses no-op if None)
         """
         self.config = config
         self.repo_path = repo_path
+        self.flow_service: FlowStatePort = (
+            flow_service if flow_service is not None else _NullFlowService()
+        )
 
     def create_issue_worktree(
         self,
@@ -245,11 +270,7 @@ class WorktreeLifecycle:
             worktree_path: Path to the worktree
         """
         try:
-            git_common_dir = self.repo_path / ".git"
-            vibe3_dir = git_common_dir / "vibe3"
-            db_path = str(vibe3_dir / "handoff.db")
-            store = SQLiteClient(db_path=db_path)
-            store.update_flow_state(branch, worktree_path=worktree_path)
+            self.flow_service.update_flow_metadata(branch, worktree_path=worktree_path)
             logger.bind(
                 domain="worktree",
                 branch=branch,
@@ -448,13 +469,11 @@ class WorktreeLifecycle:
             WorktreeContext if valid recorded path found, None otherwise
         """
         try:
-            git_common_dir = repo_path / ".git"
-            vibe3_dir = git_common_dir / "vibe3"
-            db_path = str(vibe3_dir / "handoff.db")
-            store = SQLiteClient(db_path=db_path)
-            flow_state = store.get_flow_state(flow_branch)
-            recorded_path = flow_state.get("worktree_path") if flow_state else None
-            if recorded_path and isinstance(recorded_path, str):
+            flow_state = self.flow_service.get_flow_state(flow_branch)
+            if not flow_state:
+                return None
+            recorded_path = flow_state.worktree_path
+            if recorded_path:
                 recorded = Path(recorded_path)
                 if recorded.exists() and self.validate_branch_matches(
                     recorded, flow_branch

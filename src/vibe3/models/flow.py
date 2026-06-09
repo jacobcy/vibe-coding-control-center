@@ -106,6 +106,7 @@ class FlowState(BaseModel):
     deleted_at: str | None = (
         None  # Soft delete timestamp (None = active, ISO 8601 = deleted)
     )
+    worktree_path: str | None = None  # NEW: Worktree path for path resolution
     transition_count: int = 0  # NEW: State transition count for loop prevention
 
     model_config = {"extra": "ignore"}

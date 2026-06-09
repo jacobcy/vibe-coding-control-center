@@ -11,7 +11,7 @@ class TestWorktreePathRecording:
     """Test that worktree_path is recorded to flow_state on creation."""
 
     def test_record_worktree_path_writes_to_flow_state(self):
-        """Call store.update_flow_state with worktree_path."""
+        """Call flow_service.update_flow_metadata with worktree_path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_path = Path(tmpdir) / "repo"
             repo_path.mkdir()
@@ -19,16 +19,13 @@ class TestWorktreePathRecording:
 
             config = MagicMock()
             config.scene_base_ref = "main"
-            wm = WorktreeManager(config, repo_path)
+            mock_flow_service = MagicMock()
+            wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
 
-            with patch("vibe3.environment.worktree_lifecycle.SQLiteClient") as mock_cls:
-                mock_store = MagicMock()
-                mock_cls.return_value = mock_store
-
-                wm.lifecycle.record_worktree_path("task/issue-100", "/some/path")
-                mock_store.update_flow_state.assert_called_once_with(
-                    "task/issue-100", worktree_path="/some/path"
-                )
+            wm.lifecycle.record_worktree_path("task/issue-100", "/some/path")
+            mock_flow_service.update_flow_metadata.assert_called_once_with(
+                "task/issue-100", worktree_path="/some/path"
+            )
 
 
 class TestResolveManagerCwd:
@@ -36,6 +33,8 @@ class TestResolveManagerCwd:
 
     def test_uses_recorded_worktree_path_when_valid(self):
         """When flow_state has valid worktree_path, use it directly."""
+        from vibe3.models.flow import FlowState
+
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_path = Path(tmpdir) / "repo"
             repo_path.mkdir()
@@ -48,30 +47,28 @@ class TestResolveManagerCwd:
 
             config = MagicMock()
             config.scene_base_ref = "main"
-            wm = WorktreeManager(config, repo_path)
+            mock_flow_service = MagicMock()
+            flow_state = FlowState(
+                branch="task/issue-100",
+                flow_slug="issue-100",
+                worktree_path=str(recorded),
+            )
+            mock_flow_service.get_flow_state.return_value = flow_state
+            wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
 
             with (
                 patch.object(
                     wm.lifecycle, "validate_branch_matches", return_value=True
                 ),
                 patch.object(wm, "align_auto_scene_to_base", return_value=True),
-                patch(
-                    "vibe3.environment.worktree_lifecycle.SQLiteClient"
-                ) as mock_store_cls,
             ):
-                mock_store = MagicMock()
-                mock_store.get_flow_state.return_value = {
-                    "worktree_path": str(recorded),
-                }
-                mock_store_cls.return_value = mock_store
-
                 result, is_missing = wm.resolve_manager_cwd(100, "task/issue-100")
 
                 assert result == recorded
                 assert is_missing is False
 
-    def test_falls_back_when_recorded_path_stale(self):
-        """When recorded worktree_path doesn't exist, fall back to inference."""
+    def test_returns_none_when_flow_state_absent(self):
+        """When get_flow_state() returns None, _try_recorded_path returns None."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_path = Path(tmpdir) / "repo"
             repo_path.mkdir()
@@ -79,12 +76,36 @@ class TestResolveManagerCwd:
 
             config = MagicMock()
             config.scene_base_ref = "main"
-            wm = WorktreeManager(config, repo_path)
+            mock_flow_service = MagicMock()
+            mock_flow_service.get_flow_state.return_value = None
+            wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
+
+            # _try_recorded_path should return None when flow state is absent
+            result = wm.lifecycle._try_recorded_path(100, "task/issue-100", repo_path)
+            assert result is None
+
+    def test_falls_back_when_recorded_path_stale(self):
+        """When recorded worktree_path doesn't exist, fall back to inference."""
+        from vibe3.models.flow import FlowState
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir) / "repo"
+            repo_path.mkdir()
+            (repo_path / ".git").mkdir()
+
+            config = MagicMock()
+            config.scene_base_ref = "main"
+            mock_flow_service = MagicMock()
+            # Recorded path doesn't exist
+            flow_state = FlowState(
+                branch="task/issue-100",
+                flow_slug="issue-100",
+                worktree_path="/nonexistent/path",
+            )
+            mock_flow_service.get_flow_state.return_value = flow_state
+            wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
 
             with (
-                patch(
-                    "vibe3.environment.worktree_lifecycle.SQLiteClient"
-                ) as mock_store_cls,
                 patch(
                     "vibe3.environment.worktree_support.is_current_branch",
                     return_value=False,
@@ -94,13 +115,6 @@ class TestResolveManagerCwd:
                     return_value=None,
                 ),
             ):
-                mock_store = MagicMock()
-                # Recorded path doesn't exist
-                mock_store.get_flow_state.return_value = {
-                    "worktree_path": "/nonexistent/path",
-                }
-                mock_store_cls.return_value = mock_store
-
                 # acquire_issue_worktree will be called as fallback
                 with patch.object(wm, "acquire_issue_worktree") as mock_acquire:
                     mock_ctx = MagicMock()

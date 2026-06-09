@@ -19,6 +19,7 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
+    from vibe3.clients import FlowStatePort
     from vibe3.models import OrchestraConfig
 
 
@@ -39,16 +40,19 @@ class WorktreeManager(WorktreePRMixin):
         self,
         config: "OrchestraConfig",
         repo_path: Path,
+        flow_service: "FlowStatePort | None" = None,
     ):
         """Initialize WorktreeManager.
 
         Args:
             config: Orchestra configuration
             repo_path: Path to the main repository
+            flow_service: FlowStatePort instance (optional, uses no-op if None)
         """
         self.config = config
         self.repo_path = repo_path
-        self.lifecycle = WorktreeLifecycle(config, repo_path)
+        self.flow_service: FlowStatePort | None = flow_service
+        self.lifecycle = WorktreeLifecycle(config, repo_path, flow_service=flow_service)
 
     # --- Issue Worktree Methods (L3) ---
 
