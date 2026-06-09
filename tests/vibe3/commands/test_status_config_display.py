@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from vibe3.cli import app
 from vibe3.commands.status import _analyze_orchestra_config_sources
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -67,11 +67,9 @@ class TestAnalyzeOrchestraConfigSources:
 class TestRenderConfigurationOutput:
     """Tests for _render_configuration output format."""
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_configuration_shows_source_annotations(
         self,
         mock_fetch_live_snapshot: MagicMock,
@@ -99,11 +97,9 @@ class TestRenderConfigurationOutput:
         # Check for Configuration Sources section
         assert "Configuration Sources:" in result.output
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_configuration_shows_debug_mode(
         self,
         mock_fetch_live_snapshot: MagicMock,
@@ -130,11 +126,9 @@ class TestRenderConfigurationOutput:
         assert "Debug mode:" in result.output
         assert "OFF" in result.output
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_status_shows_orchestra_and_config_sections(
         self,
         mock_fetch_live_snapshot: MagicMock,
@@ -160,9 +154,7 @@ class TestRenderConfigurationOutput:
         assert "Orchestra Status" in result.output
         assert "Vibe3 Configuration" in result.output
 
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_status_uses_keys_env_manager_when_token_already_exists(
         self,
         mock_fetch_live_snapshot: MagicMock,
@@ -208,11 +200,9 @@ class TestRenderConfigurationOutput:
 class TestTaskStatusExcludesSystemStatus:
     """Tests that task status does not show system status sections."""
 
-    @patch("vibe3.services.orchestra_helpers.get_manager_usernames")
+    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     @patch("vibe3.services.task.status.FlowService")
     @patch("vibe3.services.task.status.StatusQueryService")
     def test_task_status_no_system_sections(

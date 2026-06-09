@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import GateResult
-from vibe3.services.orchestra_status_service import OrchestraStatusService
+from vibe3.services.orchestra.status import OrchestraStatusService
 
 
 class TestSnapshotIssuePoolBoundary:
@@ -195,7 +195,7 @@ class TestSnapshotIssuePoolBoundary:
         }
 
         with patch(
-            "vibe3.services.orchestra_status_service.PRService",
+            "vibe3.services.orchestra.status.PRService",
             return_value=mock_pr_service,
         ):
             service = OrchestraStatusService(

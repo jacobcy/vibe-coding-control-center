@@ -10,7 +10,7 @@ from vibe3.roles.governance import (
     build_governance_snapshot_context,
     render_governance_prompt,
 )
-from vibe3.services.orchestra_status_service import (
+from vibe3.services.orchestra.status import (
     OrchestraSnapshot,
 )
 

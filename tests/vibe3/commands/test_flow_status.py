@@ -113,7 +113,7 @@ def test_flow_status_format_json() -> None:
             "vibe3.commands.flow_status.FlowProjectionService"
         ) as mock_projection_class:
             with patch(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot",
+                "vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot",
                 return_value=None,
             ):
                 mock_service = MagicMock()
@@ -150,7 +150,7 @@ def test_flow_status_format_yaml() -> None:
             "vibe3.commands.flow_status.FlowProjectionService"
         ) as mock_projection_class:
             with patch(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot",
+                "vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot",
                 return_value=None,
             ):
                 mock_service = MagicMock()
@@ -248,7 +248,7 @@ def test_flow_status_default_format() -> None:
             "vibe3.commands.flow_status.FlowProjectionService"
         ) as mock_projection_class:
             with patch(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot",
+                "vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot",
                 return_value=None,
             ):
                 with patch(

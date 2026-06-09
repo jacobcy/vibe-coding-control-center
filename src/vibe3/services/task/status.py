@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.services.flow_service import FlowService
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 from vibe3.services.shared.labels import (
     has_orchestra_governed,
     has_roadmap_label,
@@ -46,8 +46,8 @@ def fetch_task_status_data(
 
     from vibe3.config import load_orchestra_config
     from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.orchestra_helpers import get_manager_usernames
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
+    from vibe3.services.orchestra.helpers import get_manager_usernames
+    from vibe3.services.orchestra.status import OrchestraStatusService
 
     config = load_orchestra_config()
     orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
@@ -160,7 +160,7 @@ def classify_task_issues_for_rendering(
         remote_items, bucketed_items, pr_ref_items, blocked_items,
         open_issue_numbers.
     """
-    from vibe3.services.orchestra_helpers import get_manager_usernames
+    from vibe3.services.orchestra.helpers import get_manager_usernames
 
     supervisor_label = config.supervisor_handoff.issue_label
     manager_usernames = get_manager_usernames(config)

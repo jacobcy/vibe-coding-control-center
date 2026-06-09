@@ -104,7 +104,7 @@ class ServeStatusService:
 
     def _display_config(self) -> None:
         """Display configuration summary."""
-        from vibe3.services.orchestra_status_service import OrchestraStatusService
+        from vibe3.services.orchestra.status import OrchestraStatusService
 
         # Try to get runtime values from live server
         polling_interval = self.config.polling_interval

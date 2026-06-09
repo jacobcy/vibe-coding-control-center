@@ -10,7 +10,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 
 
 def _pr_response(

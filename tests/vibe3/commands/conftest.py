@@ -259,7 +259,7 @@ def mock_services(mock_orchestra_config, mock_orchestra_snapshot):
             "vibe3.config.orchestra_settings.load_orchestra_config"
         ) as mock_load_config,
         patch(
-            "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+            "vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot"
         ) as mock_fetch_snapshot,
         patch("vibe3.services.task.status.FlowService") as mock_flow_service_cls,
         patch(
