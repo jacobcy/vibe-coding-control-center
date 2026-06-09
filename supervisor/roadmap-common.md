@@ -176,6 +176,7 @@ Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
 - 引用的 API 未废弃
 - 涉及的配置/架构未变更
 - 有明确的代码执行路径
+- **依赖项状态已验证**：issue body/comments 中声明的依赖项（如 "Depends on #N"）必须通过 GitHub API 验证实际状态（`state` + `labels`），不可仅凭 governance suggest 的描述或 issue body 中的自然语言声明判断"依赖已解除"。验证标准：依赖 issue 的 GitHub state 为 CLOSED，或带有 `state/done` / `state/merge-ready` 标签，或有已合并的 PR
 
 ### Level 3: 生命周期检查
 
