@@ -139,6 +139,18 @@ def _build_server_with_launch_cwd(
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
     # GlobalDispatchCoordinator is created internally by the facade.
+    from vibe3.services import CheckService, FlowService
+
+    shared_check_service = CheckService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+        github_client=shared_github,
+    )
+    shared_flow_service = FlowService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+    )
+
     facade = OrchestrationFacade(
         config=config,
         capacity=shared_capacity,
@@ -146,8 +158,8 @@ def _build_server_with_launch_cwd(
         store=shared_store,
         coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
         coordinator_class=GlobalDispatchCoordinator,
-        check_service=None,  # created by factory
-        flow_service=None,  # created by factory
+        check_service=shared_check_service,
+        flow_service=shared_flow_service,
         queue_filter=None,  # default behavior
     )
 
