@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from vibe3.prompts.models import PolicyEntry
+from vibe3.prompts import PolicyEntry
 
 logger = logging.getLogger(__name__)
 
@@ -42,19 +42,17 @@ class PolicyLoader:
             return ()
 
         entries: list[PolicyEntry] = []
-        for yaml_file in sorted(self._base_dir.glob("*.yaml")):
+        seen: set[str] = set()
+        for yaml_file in sorted(
+            set(self._base_dir.glob("*.yaml")) | set(self._base_dir.glob("*.yml"))
+        ):
+            if yaml_file.name in seen:
+                continue
+            seen.add(yaml_file.name)
             entry = self.load(yaml_file.name)
             if entry is not None:
                 entries.append(entry)
 
-        # Also check for .yml files
-        for yaml_file in sorted(self._base_dir.glob("*.yml")):
-            entry = self.load(yaml_file.name)
-            if entry is not None:
-                entries.append(entry)
-
-        # Sort by name to ensure deterministic ordering
-        entries.sort(key=lambda e: e.name)
         return tuple(entries)
 
     def load(self, name: str) -> PolicyEntry | None:

@@ -6,7 +6,7 @@ import hashlib
 import logging
 from pathlib import Path
 
-from vibe3.prompts.models import MaterialEntry
+from vibe3.prompts import MaterialEntry
 
 logger = logging.getLogger(__name__)
 

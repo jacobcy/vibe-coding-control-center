@@ -37,6 +37,8 @@ if TYPE_CHECKING:
     )
     from vibe3.prompts.models import (
         LoadedPromptRecipeDefinition,
+        MaterialEntry,
+        PolicyEntry,
         PromptMaterialSpec,
         PromptRecipe,
         PromptRecipeKind,
@@ -78,6 +80,8 @@ _LAZY_IMPORTS = {
     "PromptRecipeDefinition": "vibe3.prompts.manifest",
     "PromptRecipeVariant": "vibe3.prompts.manifest",
     "LoadedPromptRecipeDefinition": "vibe3.prompts.models",
+    "MaterialEntry": "vibe3.prompts.models",
+    "PolicyEntry": "vibe3.prompts.models",
     "PromptMaterialSpec": "vibe3.prompts.models",
     "PromptRecipe": "vibe3.prompts.models",
     "PromptRecipeKind": "vibe3.prompts.models",
@@ -122,6 +126,8 @@ __all__ = [
     "PromptRecipeVariant",
     # Models
     "LoadedPromptRecipeDefinition",
+    "MaterialEntry",
+    "PolicyEntry",
     "PromptMaterialSpec",
     "PromptRecipe",
     "PromptRecipeKind",
