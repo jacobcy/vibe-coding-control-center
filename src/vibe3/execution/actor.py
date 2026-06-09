@@ -118,8 +118,7 @@ class JobActor:
             detail: Optional detail string
             refs: Optional refs dict (will include actor_id)
         """
-        event_refs = refs or {}
-        event_refs["actor_id"] = self.actor_id
+        event_refs = {**(refs or {}), "actor_id": self.actor_id}
 
         try:
             self._store.add_event(

@@ -19,7 +19,6 @@ from vibe3.domain.events.flow_lifecycle import (
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution import JobType, get_actor_registry
 from vibe3.models import ExecutionRequest
 from vibe3.services import load_issue_info
 
@@ -44,150 +43,118 @@ def _dispatch_role_intent(
     with get_store() as store:
         issue = load_issue_info(issue_number, config=config)
 
-        # Resolve branch for actor creation
-        branch_arg = builder_kwargs.get("branch")
-        branch = str(branch_arg) if branch_arg else ""
-
-        # Create actor for supervision tracking
-        registry = get_actor_registry()
-        actor_obj = registry.create_actor(
-            job_type=JobType.DISPATCH,
-            issue_number=issue_number,
-            branch=branch,
-            store=store,
-        )
-
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
         ).debug(f"Building {role} request")
 
-        try:
-            # Build request
-            request = request_builder(config, issue, **builder_kwargs)
+        request = request_builder(config, issue, **builder_kwargs)
 
-            # Inject actor_id into request refs for tracking
-            if request.refs is None:
-                request.refs = {}
-            request.refs["actor_id"] = actor_obj.actor_id
+        coordinator = ExecutionCoordinator(config, store)
 
-            coordinator = ExecutionCoordinator(config, store)
+        # Record dispatch intent BEFORE execution (correct chronological order)
+        branch_arg = builder_kwargs.get("branch")
+        branch = str(branch_arg) if branch_arg else ""
+        if branch:
+            store.add_event(
+                branch,
+                f"{role}_dispatched",
+                actor,
+                detail=f"{role.capitalize()} dispatched",
+                refs={
+                    "issue": str(issue_number),
+                    "role": role,
+                },
+            )
 
-            # Record dispatch intent BEFORE execution (correct chronological order)
-            if branch:
-                store.add_event(
-                    branch,
-                    f"{role}_dispatched",
-                    actor,
-                    detail=f"{role.capitalize()} dispatched",
-                    refs={
-                        "issue": str(issue_number),
-                        "role": role,
-                        "actor_id": actor_obj.actor_id,
-                    },
-                )
+        result = coordinator.dispatch_execution(request)
 
-            # Record actor launch
-            actor_obj.record_launch()
+        if result.launched:
 
-            result = coordinator.dispatch_execution(request)
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                tmux_session=result.tmux_session,
+            ).success(f"{role.capitalize()} dispatch completed")
+            return
 
-            if result.launched:
-                actor_obj.record_completion(detail=f"{role} launched")
+        if result.skipped:
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+            ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
+            return
 
-                logger.bind(
-                    domain=handler_domain,
-                    issue_number=issue_number,
-                    tmux_session=result.tmux_session,
-                ).success(f"{role.capitalize()} dispatch completed")
-                return
+        # Not launched, not skipped:
+        # - capacity_full / duplicate_dispatch → normal throttling (info)
+        # - all other failures → warning (FailedGate will control)
+        # Dispatch failures do NOT trigger flow block.
+        # Flow block is determined by business logic only
+        # (noop_gate, dependencies, loops).
+        # FailedGate controls dispatch based on error severity.
+        reason_code = result.reason_code or "unknown"
 
-            if result.skipped:
-                actor_obj.record_dead(detail=f"{role} skipped: {result.reason}")
+        if reason_code in ("capacity_full", "duplicate_dispatch"):
+            # Normal throttling/dedup - log at info level
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
+        elif reason_code == "launch_failed":
+            # Check if bottom layer already recorded a specific error
+            # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
+            # If no, record E_DISPATCH_FAILURE for infrastructure visibility
+            from vibe3.services import has_recent_specific_error
 
-                logger.bind(
-                    domain=handler_domain,
-                    issue_number=issue_number,
-                ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
-                return
-
-            # Not launched, not skipped - record failure
-            actor_obj.record_failure(error=result.reason or "dispatch failed")
-
-            # - capacity_full / duplicate_dispatch → normal throttling (info)
-            # - all other failures → warning (FailedGate will control)
-            # Dispatch failures do NOT trigger flow block.
-            # Flow block is determined by business logic only
-            # (noop_gate, dependencies, loops).
-            # FailedGate controls dispatch based on error severity.
-            reason_code = result.reason_code or "unknown"
-
-            if reason_code in ("capacity_full", "duplicate_dispatch"):
-                # Normal throttling/dedup - log at info level
+            if has_recent_specific_error(
+                issue_number=issue_number,
+                branch=branch,
+                within_seconds=60,
+                store=store,
+            ):
+                # Bottom layer recorded specific error - skip duplicate
                 logger.bind(
                     domain=handler_domain,
                     issue_number=issue_number,
                     reason_code=reason_code,
-                ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
-            elif reason_code == "launch_failed":
-                # Check if bottom layer already recorded a specific error
-                # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
-                # If no, record E_DISPATCH_FAILURE for infrastructure visibility
-                from vibe3.services import has_recent_specific_error
+                ).info(
+                    f"{role.capitalize()} dispatch failed (bottom layer recorded): "
+                    f"{result.reason}"
+                )
+            else:
+                # No prior error - this is an infrastructure failure
+                # Fall through to record E_DISPATCH_FAILURE
+                pass
+        else:
+            # Dispatch-level infrastructure failure - record to error_log
+            # FailedGate will control dispatch based on threshold
+            from vibe3.services import record_error
 
-                if has_recent_specific_error(
+            error_message = f"{role} dispatch failed: {result.reason}"
+            try:
+                record_error(
+                    error_code="E_DISPATCH_FAILURE",
+                    error_message=error_message,
+                    tick_id=tick_id,
                     issue_number=issue_number,
                     branch=branch,
-                    within_seconds=60,
                     store=store,
-                ):
-                    # Bottom layer recorded specific error - skip duplicate
-                    logger.bind(
-                        domain=handler_domain,
-                        issue_number=issue_number,
-                        reason_code=reason_code,
-                    ).info(
-                        f"{role.capitalize()} dispatch failed (bottom layer recorded): "
-                        f"{result.reason}"
-                    )
-                else:
-                    # No prior error - this is an infrastructure failure
-                    # Fall through to record E_DISPATCH_FAILURE
-                    pass
-            else:
-                # Dispatch-level infrastructure failure - record to error_log
-                # FailedGate will control dispatch based on threshold
-                from vibe3.services import record_error
-
-                error_message = f"{role} dispatch failed: {result.reason}"
-                try:
-                    record_error(
-                        error_code="E_DISPATCH_FAILURE",
-                        error_message=error_message,
-                        tick_id=tick_id,
-                        issue_number=issue_number,
-                        branch=branch,
-                        store=store,
-                    )
-                except Exception as exc:
-                    logger.bind(
-                        domain=handler_domain,
-                        issue_number=issue_number,
-                    ).warning(f"Failed to record dispatch error: {exc}")
-
+                )
+            except Exception as exc:
                 logger.bind(
                     domain=handler_domain,
                     issue_number=issue_number,
-                    reason_code=reason_code,
-                ).warning(
-                    f"{role.capitalize()} dispatch failed: {result.reason} - "
-                    "FailedGate will control dispatch"
-                )
+                ).warning(f"Failed to record dispatch error: {exc}")
 
-        except Exception as exc:
-            # Record actor failure on exception
-            actor_obj.record_failure(error=str(exc))
-            raise
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).warning(
+                f"{role.capitalize()} dispatch failed: {result.reason} - "
+                "FailedGate will control dispatch"
+            )
 
 
 @register_handler("PlannerDispatchIntent")
