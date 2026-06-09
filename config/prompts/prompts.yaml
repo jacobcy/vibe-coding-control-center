@@ -360,15 +360,35 @@ run:
     - Then run module-level tests: `tests/vibe3/<module>/`
 
     ## Plan Requirements Verification
-    **REQUIRED if plan contains explicit Verification requirements**
+    **MANDATORY SECTION — must appear in every execution report**
 
-    For each "Verification:" or verification requirement found in the plan:
+    Extract ALL verification requirements from the plan (not just "Verification:" lines):
+
+    1. Scan the plan for:
+       - Lines starting with "Verification:" or "验证："
+       - Verification requirements in "Risks & Considerations" section
+       - Requirements in "Success Criteria" / "验收标准" / "验证清单" section
+       - Test file creation/modification steps in "Implementation Steps"
+       - Explicit test commands mentioned in the plan
+       - Integration test requirements (for multi-module or lifecycle changes)
+
+    2. For each requirement found:
 
     | Requirement | Status | Evidence |
     |-------------|--------|----------|
     | [requirement text or reference] | ✅/❌ | [code location, test output, or manual verification steps] |
 
-    If no explicit verification requirements in plan, write: "No explicit Verification requirements in plan."
+    **If no explicit verification requirements in plan**, write: "No explicit Verification requirements in plan."
+
+    ### Deviation Declaration (if any requirement is ❌)
+    If any requirement cannot be satisfied, explicitly document:
+
+    **Deviation**: [Which requirement is not satisfied]
+    **Reason**: [Why it cannot be satisfied]
+    **Risk Impact**: [What risk this deviation introduces]
+    **Mitigation**: [If applicable, how the risk is mitigated]
+
+    **DO NOT claim "no deviations from plan" if any requirement is ❌**
 
     ## Verification
     - [ ] All changes committed (git status clean)
@@ -514,6 +534,38 @@ run:
     # Direct test: uv run pytest tests/vibe3/agents/test_run_prompt.py -v
     # Module tests: uv run pytest tests/vibe3/agents/ -q
     ```
+
+    ### MANDATORY Plan Requirements Verification (before claiming "no deviations")
+    **CRITICAL**: You MUST complete this verification before writing your execution report.
+
+    The supervisor policy (`supervisor/policies/run.md`) already requires extracting Verification requirements from the plan. This section elevates that guidance to a **MANDATORY, non-skippable step**.
+
+    #### Step-by-Step Verification Process
+
+    1. **Re-read the plan**: Run `uv run python src/vibe3/cli.py handoff show <plan_ref>` to extract ALL verification requirements.
+
+    2. **Extract ALL verification requirements** from the plan:
+       - Find all lines starting with "Verification:" or "验证："
+       - Find verification requirements in "Risks & Considerations" section (each Risk's Verification item)
+       - Find verification requirements in "Success Criteria" / "验收标准" / "验证清单" section
+       - Find test file creation/modification steps mentioned in Implementation Steps
+       - Find explicit test commands mentioned in the plan
+       - **If plan involves multi-module changes, lifecycle management, or complex flows**: Require at least one integration test covering the integration point
+
+    3. **Form a Requirements Checklist**:
+       - Each requirement as an independent checklist item
+       - Mark source location (e.g., "Risk 4", "验收标准 #3", "Step 2")
+       - Track verification status for each item
+
+    4. **Verify against checklist**:
+       - For each requirement, verify it is satisfied
+       - Document evidence (code location, test output, manual verification)
+       - If any requirement cannot be satisfied, document reason and impact
+
+    5. **Tie "no deviations" claim to checklist completion**:
+       - Claiming "no deviations from plan" without completing this checklist is a **report accuracy failure**
+       - If any requirement is ❌, you MUST document deviation in your report
+       - Do NOT skip this verification step
 
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
