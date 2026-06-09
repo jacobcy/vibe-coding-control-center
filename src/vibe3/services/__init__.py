@@ -294,6 +294,7 @@ _SYMBOL_MODULES = {
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
     "FlowCategory": "vibe3.services.flow_classifier",
+    # Job monitoring
     "FlowCleanupService": "vibe3.services.flow_cleanup_service",
     "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",
     "FlowProjection": "vibe3.services.flow_projection_service",

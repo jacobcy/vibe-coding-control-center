@@ -290,9 +290,8 @@ class JobExecutor:
             job_result.adapter_path = adapter_path
             job_result.actor_id = actor_obj.actor_id
 
-            # Clean up actor from registry (terminal state reached)
-            registry.remove_actor(actor_obj.actor_id)
-
+            # Actor stays in registry for TTL-based monitoring;
+            # cleanup_expired() will remove it after the TTL window.
             return job_result
 
         except Exception as e:
@@ -308,9 +307,7 @@ class JobExecutor:
                 refs=envelope.refs,
             )
 
-            # Clean up actor from registry
-            registry.remove_actor(actor_obj.actor_id)
-
+            # Actor stays in registry for TTL-based monitoring
             return JobResult(
                 command_type=envelope.command_type,
                 issue_number=envelope.issue_number,

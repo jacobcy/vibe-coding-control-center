@@ -1,5 +1,12 @@
 """vibe3 server - HTTP server for orchestra status and CLI management."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rich.console import Console
+
 import asyncio
 import os
 import signal
@@ -340,6 +347,79 @@ def start(
             config.pid_file.unlink()
 
 
+def _display_active_jobs(console: Console) -> None:
+    """Display active and recent jobs from the actor registry."""
+    from rich.table import Table
+
+    from vibe3.execution import JobMonitorService
+    from vibe3.utils import format_age_aware_time
+
+    service = JobMonitorService()
+    snapshot = service.snapshot()
+
+    console.print("[bold]Active Jobs:[/bold]")
+
+    if not snapshot.active_jobs and not snapshot.recent_jobs:
+        console.print("  No active jobs")
+        console.print()
+        return
+
+    if snapshot.active_jobs:
+        table = Table(title="Running / Queued", show_lines=True)
+        table.add_column("Actor", style="cyan", width=20)
+        table.add_column("Type", style="magenta", width=12)
+        table.add_column("Status", style="green", width=8)
+        table.add_column("Issue", style="yellow", width=10)
+        table.add_column("Branch", style="white")
+        table.add_column("Started", style="dim", width=12)
+
+        for job in snapshot.active_jobs:
+            started_display = (
+                format_age_aware_time(job.started_at) if job.started_at else "-"
+            )
+            issue_display = f"#{job.issue_number}" if job.issue_number > 0 else "-"
+            table.add_row(
+                job.actor_id[:20],
+                job.job_type.upper(),
+                job.status.upper(),
+                issue_display,
+                job.branch,
+                started_display,
+            )
+        console.print(table)
+
+    if snapshot.recent_jobs:
+        table = Table(title="Recent (last 30m)", show_lines=True)
+        table.add_column("Actor", style="cyan", width=20)
+        table.add_column("Type", style="magenta", width=12)
+        table.add_column("Status", style="yellow", width=8)
+        table.add_column("Issue", style="yellow", width=10)
+        table.add_column("Branch", style="white")
+        table.add_column("Completed", style="dim", width=12)
+
+        for job in snapshot.recent_jobs:
+            completed_display = (
+                format_age_aware_time(job.completed_at) if job.completed_at else "-"
+            )
+            issue_display = f"#{job.issue_number}" if job.issue_number > 0 else "-"
+            table.add_row(
+                job.actor_id[:20],
+                job.job_type.upper(),
+                job.status.upper(),
+                issue_display,
+                job.branch,
+                completed_display,
+            )
+        console.print(table)
+
+    console.print(
+        f"  Summary: {snapshot.running_count} running, "
+        f"{snapshot.completed_count} completed, "
+        f"{snapshot.failed_count} failed (last 30m)"
+    )
+    console.print()
+
+
 @app.command()
 def status() -> None:
     """Show Orchestra server status, FailedGate state, and recent activity."""
@@ -376,6 +456,9 @@ def status() -> None:
 
     service = ServeStatusService(config)
     service.display_status(pid, is_valid, tmux_exists)
+
+    # Display active jobs from actor registry
+    _display_active_jobs(console)
 
 
 @app.command()

@@ -49,6 +49,11 @@ if TYPE_CHECKING:
         COMMAND_TYPE_TO_EXECUTION_ROLE,
         JobExecutor,
     )
+    from vibe3.execution.job_monitor_service import (
+        ActiveJob,
+        JobMonitorService,
+        JobMonitorSnapshot,
+    )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
     from vibe3.execution.prompt_meta import PromptMeta, build_prompt_meta
     from vibe3.execution.role_interfaces import GovernanceFunctions
@@ -65,6 +70,9 @@ _LAZY_IMPORTS = {
     "JobActor": "vibe3.execution.actor",
     "JobType": "vibe3.execution.actor",
     "get_actor_registry": "vibe3.execution.actor",
+    "ActiveJob": "vibe3.execution.job_monitor_service",
+    "JobMonitorService": "vibe3.execution.job_monitor_service",
+    "JobMonitorSnapshot": "vibe3.execution.job_monitor_service",
     "CapacityService": "vibe3.execution.capacity_service",
     "CodeagentExecutionService": "vibe3.execution.codeagent_runner",
     "CommandAdapterEntry": "vibe3.execution.command_adapter",
@@ -124,6 +132,10 @@ __all__ = [
     "JobActor",
     "JobType",
     "get_actor_registry",
+    # Job monitoring
+    "ActiveJob",
+    "JobMonitorService",
+    "JobMonitorSnapshot",
     # Core services
     "ExecutionCoordinator",
     "CodeagentExecutionService",
