@@ -20,6 +20,14 @@ def normalize_labels(raw_labels: object) -> list[str]:
 
     Handles both GitHub API format (list of dicts with "name" key) and
     plain string lists (used in tests or simplified payloads).
+
+    Supported input formats:
+      - ``list[dict[str, str]]`` — GitHub API (each dict has a ``"name"`` key)
+      - ``list[str]`` — plain string labels
+      - Anything else — returns ``[]``
+
+    Mixed lists (containing both dicts and strings) are accepted but not
+    recommended; callers should pass a uniform list.
     """
     if not isinstance(raw_labels, list):
         return []
@@ -31,6 +39,10 @@ def normalize_labels(raw_labels: object) -> list[str]:
                 result.append(name)
         elif isinstance(item, str):
             result.append(item)
+        else:
+            logger.bind(domain="shared/labels").debug(
+                "normalize_labels: skipping unexpected item type: {}", type(item)
+            )
     return result
 
 
@@ -147,10 +159,10 @@ def clean_old_state_labels(
 # ---------------------------------------------------------------------------
 
 _ROADMAP_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
-_EXECUTION_STATES = frozenset(
+EXECUTION_STATES = frozenset(
     {"merge-ready", "review", "in-progress", "handoff", "claimed"}
 )
-_STATE_PRIORITY_ORDER = [
+_STATE_PRIORITY_ORDER = (
     "blocked",
     "done",
     "merge-ready",
@@ -159,7 +171,7 @@ _STATE_PRIORITY_ORDER = [
     "handoff",
     "claimed",
     "ready",
-]
+)
 
 ORCHESTRA_GOVERNED_LABEL = "orchestra-governed"
 
@@ -184,7 +196,7 @@ def has_roadmap_conflict(labels: list[str]) -> bool:
 def has_execution_state(labels: list[str]) -> bool:
     """Whether labels contain an execution-phase state/* label."""
     return bool(
-        _EXECUTION_STATES
+        EXECUTION_STATES
         & {lb.removeprefix("state/") for lb in labels if lb.startswith("state/")}
     )
 
@@ -248,10 +260,15 @@ def classify_dispatch_eligibility(
             DispatchExclusion("blocked_state", "blocked issues require resume")
         )
 
-    if "roadmap/rfc" in labels:
-        reasons.append(DispatchExclusion("roadmap_rfc", "roadmap RFC"))
-    if "roadmap/epic" in labels:
-        reasons.append(DispatchExclusion("roadmap_epic", "roadmap epic"))
+    if has_roadmap_label(labels):
+        for label in _ROADMAP_LABELS:
+            if label in labels:
+                reasons.append(
+                    DispatchExclusion(
+                        f"roadmap_{label.split('/')[-1]}",
+                        f"roadmap {label.split('/')[-1]}",
+                    )
+                )
 
     if supervisor_label in labels:
         reasons.append(DispatchExclusion("supervisor_issue", "supervisor issue"))

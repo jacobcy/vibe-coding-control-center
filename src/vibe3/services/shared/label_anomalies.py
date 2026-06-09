@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from vibe3.services.shared.labels import (
-    _EXECUTION_STATES,
+    EXECUTION_STATES,
     ORCHESTRA_GOVERNED_LABEL,
     get_conflicting_states,
     get_state_labels,
@@ -31,6 +31,7 @@ class LabelAnomaly:
 def collect_label_anomalies(
     labels: list[str],
     *,
+    issue_number: int,
     has_local_flow: bool,
     is_manager_issue: bool,
 ) -> list[LabelAnomaly]:
@@ -66,7 +67,7 @@ def collect_label_anomalies(
             exec_labels = [
                 lb
                 for lb in get_state_labels(labels)
-                if lb.removeprefix("state/") in _EXECUTION_STATES
+                if lb.removeprefix("state/") in EXECUTION_STATES
             ]
             if exec_labels:
                 removed.extend(exec_labels)
@@ -90,7 +91,7 @@ def collect_label_anomalies(
 
     return [
         LabelAnomaly(
-            issue_number=0,  # caller sets this
+            issue_number=issue_number,
             rule=", ".join(rules),
             removed=removed,
             added=added,
