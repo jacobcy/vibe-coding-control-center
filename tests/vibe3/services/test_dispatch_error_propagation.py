@@ -67,6 +67,23 @@ class TestResolveManagerCwd:
                 assert result == recorded
                 assert is_missing is False
 
+    def test_returns_none_when_flow_state_absent(self):
+        """When get_flow_state() returns None, _try_recorded_path returns None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir) / "repo"
+            repo_path.mkdir()
+            (repo_path / ".git").mkdir()
+
+            config = MagicMock()
+            config.scene_base_ref = "main"
+            mock_flow_service = MagicMock()
+            mock_flow_service.get_flow_state.return_value = None
+            wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
+
+            # _try_recorded_path should return None when flow state is absent
+            result = wm.lifecycle._try_recorded_path(100, "task/issue-100", repo_path)
+            assert result is None
+
     def test_falls_back_when_recorded_path_stale(self):
         """When recorded worktree_path doesn't exist, fall back to inference."""
         from vibe3.models.flow import FlowState
