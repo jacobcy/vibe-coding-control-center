@@ -66,8 +66,8 @@ code_limits:
 
       # Commands 层 —— 允许 480-550
       - path: "src/vibe3/commands/status.py"
-        limit: 450
-        reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）后略微超标"
+        limit: 490
+        reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
       - path: "src/vibe3/commands/task.py"
         limit: 500
         reason: "Task 命令聚合，包含 show/status/intake/resume 多个子命令入口；新增 vibe3 task intake 命令（issue assignee 分配 + guard 逻辑）后超标"
@@ -189,8 +189,8 @@ code_limits:
         limit: 650
         reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
       - path: "src/vibe3/execution/job_executor.py"
-        limit: 650
-        reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录、actor 生命周期管理（实时监控层，与 ExecutionLifecycleService 持久记录层互补）等紧密耦合的统一调度入口逻辑；#2172 集成 actor supervision（+60 行），作为 aggregation layer 保持内聚性优于拆分"
+        limit: 750
+        reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录、actor 生命周期管理（实时监控层，与 ExecutionLifecycleService 持久记录层互补）等紧密耦合的统一调度入口逻辑；#2172 集成 actor supervision（+60 行），#2177 新增版本元数据追踪（adapter_hash/policy_hash/material_hash 计算与持久化，+130 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
         limit: 600
         reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）"
@@ -203,8 +203,8 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/models/test_job.py"
-        limit: 500
-        reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标"
+        limit: 510
+        reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 680
         reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标"
@@ -230,8 +230,8 @@ code_limits:
         limit: 520
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标"
       - path: "tests/vibe3/execution/test_job_executor.py"
-        limit: 550
-        reason: "JobExecutor 核心服务测试集，覆盖 10 个紧密耦合场景（映射正确性、context 构建、success/failure/skip 路径、governance dispatch、equivalence regression、lifecycle 事件、adapter resolution error），共享 mock setup（registry/store/lifecycle），拆分收益低；测试覆盖 JobEnvelope → JobResult 完整执行流程与生命周期事件记录"
+        limit: 560
+        reason: "JobExecutor 核心服务测试集，覆盖 10 个紧密耦合场景（映射正确性、context 构建、success/failure/skip 路径、governance dispatch、equivalence regression、lifecycle 事件、adapter resolution error），共享 mock setup（registry/store/lifecycle），拆分收益低；测试覆盖 JobEnvelope → JobResult 完整执行流程与生命周期事件记录；#2177 新增 TestVersionHashComputation 测试类（6 个测试方法，+152 行）验证版本元数据计算"
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
