@@ -186,6 +186,47 @@ def test_check_remote_dry_run(mock_remote):
     mock_remote.assert_called_once_with(dry_run=True)
 
 
+@patch("vibe3.commands.check.execute_remote_check")
+def test_check_remote_with_anomalies_display(mock_remote):
+    """Display formatting: anomalies grouped by rule with actions and totals."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+    from vibe3.services.shared import LabelAnomaly
+
+    anomalies = [
+        LabelAnomaly(
+            issue_number=123,
+            rule="multi_state",
+            removed=["state/in-progress"],
+            added=["state/review"],
+        ),
+        LabelAnomaly(
+            issue_number=456,
+            rule="orphan_execution, multi_state",
+            removed=["state/blocked"],
+            added=[],
+        ),
+    ]
+    mock_remote.return_value = ExecuteCheckResult(
+        mode="remote",
+        success=True,
+        summary="Checked 100 issues, found 2 anomalies",
+        details={"anomalies": anomalies, "removed": 0, "added": 0, "dry_run": True},
+    )
+    result = runner.invoke(app, ["check", "remote", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Checked 100 issues, found 2 anomalies" in result.output
+    assert "multi_state" in result.output
+    assert "orphan_execution" in result.output
+    assert "#123" in result.output
+    assert "#456" in result.output
+    assert "remove state/in-progress" in result.output
+    assert "add state/review" in result.output
+    assert "remove state/blocked" in result.output
+    assert "Total: 0 labels removed, 0 labels added" in result.output
+    assert "[DRY RUN] No labels were modified" in result.output
+
+
 @patch("vibe3.commands.check.CheckService")
 def test_check_backward_compat(mock_service_class):
     """vibe3 check (no subcommand) still routes to legacy behavior."""

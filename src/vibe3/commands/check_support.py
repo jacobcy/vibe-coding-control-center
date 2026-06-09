@@ -82,7 +82,6 @@ def execute_check_mode(
         "fix_all",
         "clean_branch",
         "branch",
-        "remote",
     ] = "default",
     *,
     branch: str | None = None,
