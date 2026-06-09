@@ -20,7 +20,6 @@ from vibe3.services import CheckResult, CheckService, InitResult
 from vibe3.services.shared import (
     collect_label_anomalies,
     has_manager_assignee,
-    has_orchestra_governed,
     normalize_assignees,
     normalize_labels,
 )
@@ -296,9 +295,7 @@ def _audit_single_issue(
     assignees = normalize_assignees(raw_assignees)
 
     has_local_flow = issue_number in local_issue_numbers
-    is_manager_issue = has_orchestra_governed(labels) or has_manager_assignee(
-        assignees, manager_usernames
-    )
+    is_manager_issue = has_manager_assignee(assignees, manager_usernames)
 
     anomalies = collect_label_anomalies(
         labels,
