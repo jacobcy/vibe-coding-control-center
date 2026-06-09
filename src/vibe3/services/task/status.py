@@ -224,6 +224,7 @@ def classify_task_issues_for_rendering(
         and cast(int, item["number"]) not in roadmap_epic_numbers
         and cast(int, item["number"]) not in missing_state_numbers
     ]
+    human_collab_numbers = {cast(int, item["number"]) for item in human_collab_items}
 
     # Filter task progress items
     task_progress_items = [
@@ -282,6 +283,7 @@ def classify_task_issues_for_rendering(
         and "roadmap/rfc" not in cast(list[str], item.get("labels", []))
         and "roadmap/epic" not in cast(list[str], item.get("labels", []))
         and cast(int, item["number"]) not in supervisor_numbers
+        and cast(int, item["number"]) not in human_collab_numbers
     ]
 
     # Build set of open issue numbers for dependency status checking

@@ -57,6 +57,7 @@ class TestBranchClassification:
         assert is_dev_collab_branch("dev/feature") is False
         assert is_dev_collab_branch("main") is False
         assert is_dev_collab_branch("task/issue-123") is False
+        assert is_dev_collab_branch(None) is False
 
     def test_is_auto_task_branch_does_not_match_dev_issue(self) -> None:
         """Should not match dev/issue-N pattern (only task/issue-N)."""

@@ -99,9 +99,9 @@ def is_auto_task_branch(branch: str) -> bool:
     return branch.startswith("task/issue-")
 
 
-def is_dev_collab_branch(branch: str) -> bool:
+def is_dev_collab_branch(branch: str | None) -> bool:
     """Check if branch follows the dev/issue-N human-collaboration pattern."""
-    return branch.startswith("dev/issue-")
+    return isinstance(branch, str) and branch.startswith("dev/issue-")
 
 
 def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
