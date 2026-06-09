@@ -1,6 +1,6 @@
 """Tests for shared base resolution usecase."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -86,3 +86,37 @@ def test_collect_branch_material_uses_git_client() -> None:
     assert material.changed_files == ["src/vibe3/commands/pr_create.py"]
     git_client.get_commit_subjects.assert_called_once_with("origin/main", "task/demo")
     git_client.get_changed_files.assert_called_once()
+
+
+def test_resolve_inspect_base_falls_back_to_main_when_parent_merged() -> None:
+    """When auto-detected parent is already merged, should use origin/main."""
+    with patch(
+        "vibe3.services.base_resolution_usecase.is_branch_merged_to_main"
+    ) as mock_merged:
+        mock_merged.return_value = True
+        usecase = BaseResolutionUsecase(
+            parent_branch_finder=lambda branch: "task/old-branch"
+        )
+
+        resolved = usecase.resolve_inspect_base(None, current_branch="task/child")
+
+        assert resolved.base_branch == "origin/main"
+        assert resolved.auto_detected is True
+        mock_merged.assert_called_once_with("task/old-branch")
+
+
+def test_resolve_inspect_base_keeps_parent_when_not_merged() -> None:
+    """When auto-detected parent is not merged, should use it as base."""
+    with patch(
+        "vibe3.services.base_resolution_usecase.is_branch_merged_to_main"
+    ) as mock_merged:
+        mock_merged.return_value = False
+        usecase = BaseResolutionUsecase(
+            parent_branch_finder=lambda branch: "task/active-branch"
+        )
+
+        resolved = usecase.resolve_inspect_base(None, current_branch="task/child")
+
+        assert resolved.base_branch == "task/active-branch"
+        assert resolved.auto_detected is True
+        mock_merged.assert_called_once_with("task/active-branch")
