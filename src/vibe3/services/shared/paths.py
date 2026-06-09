@@ -157,7 +157,7 @@ def _resolve_absolute_path(
 
     # Priority 3: Pattern-based extraction for cross-machine handoff paths
     # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+    from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
 
     path_str = str(ref_path)
     if _SHARED_HANDOFF_PREFIX in path_str:
@@ -261,7 +261,7 @@ def check_ref_exists(
         - exists: True if the file exists in the correct worktree context
     """
     # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff_resolution import resolve_handoff_target
+    from vibe3.services.handoff.resolution import resolve_handoff_target
 
     try:
         resolved_path = resolve_handoff_target(ref_value, branch, git_client)

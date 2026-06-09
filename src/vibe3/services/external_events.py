@@ -6,7 +6,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.models import FlowEvent
-from vibe3.services.handoff_storage import HandoffStorage
+from vibe3.services.handoff.storage import HandoffStorage
 
 
 class ExternalEventRecorder:

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.services.handoff_resolution import resolve_handoff_target
+from vibe3.services.handoff.resolution import resolve_handoff_target
 
 
 def _make_git_client(git_common: str, worktree_root: str) -> MagicMock:
