@@ -107,38 +107,24 @@ def isolate_database(request):
             ErrorTrackingService.clear_instance()
 
 
-@pytest.fixture(autouse=True)
-def _silence_orchestra_log(request):
-    """Prevent tests from writing to the production orchestra event log.
+@pytest.fixture(autouse=True, scope="session")
+def _silence_orchestra_log():
+    """Disable orchestra event log file I/O for all tests.
 
-    append_orchestra_event() is imported by 15+ modules. Tests that exercise
-    code paths calling it (heartbeat.register, dispatch coordinator, qualify
-    gate, etc.) leak _MockService entries into temp/logs/orchestra/events.log
-    when VIBE3_ORCHESTRA_EVENT_LOG=1 is set in the environment.
+    Forces VIBE3_ORCHESTRA_EVENT_LOG off so the guard in
+    append_orchestra_event() (orchestra_log.py:110) returns early.
+    Covers all 15+ consumer modules without per-module patches.
 
-    Patches both the source module and the heartbeat import site. Individual
-    tests can still monkeypatch the heartbeat local reference to capture
-    events for assertions (function-scoped overrides session-scoped).
-
-    Skipped for test_orchestra_log.py which directly tests the logging module.
+    Tests that ASSERT on events still work: they monkeypatch the local
+    reference, intercepting calls before the guard is reached.
 
     See: https://github.com/jacobcy/vibe-coding-control-center/pull/2588
     """
     from vibe3.observability.orchestra_log import _close_events_log
 
     _close_events_log()
-
-    # Skip patching for tests that verify the logging module itself
-    test_file = request.module.__file__
-    if "test_orchestra_log.py" in test_file:
-        yield
-        return
-
-    def _noop(*args: object, **kwargs: object) -> Path:
-        return Path()
-
-    with (
-        patch("vibe3.observability.orchestra_log.append_orchestra_event", _noop),
-        patch("vibe3.runtime.heartbeat.append_orchestra_event", _noop),
-    ):
-        yield
+    mp = pytest.MonkeyPatch()
+    mp.delenv("VIBE3_ORCHESTRA_EVENT_LOG", raising=False)
+    yield
+    mp.undo()
+    _close_events_log()
