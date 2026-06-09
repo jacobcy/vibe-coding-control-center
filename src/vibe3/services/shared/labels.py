@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -12,6 +13,7 @@ from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models import IssueInfo
+    from vibe3.services.issue_dispatch_policy import DispatchExclusion
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -207,3 +209,136 @@ def get_conflicting_states(labels: list[str]) -> list[str]:
         return []
     highest = get_highest_priority_state(labels)
     return [lb for lb in states if lb != highest]
+
+
+# ---------------------------------------------------------------------------
+# Composition layer
+# ---------------------------------------------------------------------------
+
+
+def classify_dispatch_eligibility(
+    labels: list[str],
+    assignees: list[str],
+    *,
+    supervisor_label: str,
+    manager_usernames: tuple[str, ...],
+) -> list["DispatchExclusion"]:
+    """Unified dispatch exclusion logic. Single source of truth.
+
+    Returns list of reasons why issue should not be auto-dispatched.
+    """
+    from vibe3.services.issue_dispatch_policy import DispatchExclusion
+
+    reasons: list[DispatchExclusion] = []
+
+    state_labels = get_state_labels(labels)
+    if not state_labels:
+        reasons.append(
+            DispatchExclusion("missing_state_label", "missing state/* label")
+        )
+    elif get_highest_priority_state(labels) == "state/blocked":
+        reasons.append(
+            DispatchExclusion("blocked_state", "blocked issues require resume")
+        )
+
+    if "roadmap/rfc" in labels:
+        reasons.append(DispatchExclusion("roadmap_rfc", "roadmap RFC"))
+    if "roadmap/epic" in labels:
+        reasons.append(DispatchExclusion("roadmap_epic", "roadmap epic"))
+
+    if supervisor_label in labels:
+        reasons.append(DispatchExclusion("supervisor_issue", "supervisor issue"))
+
+    if not has_manager_assignee(assignees, manager_usernames):
+        if not assignees:
+            reasons.append(
+                DispatchExclusion(
+                    "missing_manager_assignee", "missing manager assignee"
+                )
+            )
+        else:
+            reasons.append(
+                DispatchExclusion("non_manager_assignee", "assignee is not manager")
+            )
+
+    return reasons
+
+
+@dataclass(frozen=True)
+class LabelAnomaly:
+    """Audit finding for a single issue's label state."""
+
+    issue_number: int
+    rule: str  # roadmap_conflict | multi_state | orphan_execution | orphan_orchestra
+    removed: list[str]
+    added: list[str]
+
+
+def collect_label_anomalies(
+    labels: list[str],
+    *,
+    has_local_flow: bool,
+    is_manager_issue: bool,
+) -> list[LabelAnomaly]:
+    """Collect all label anomalies for one issue.
+
+    Returns list of anomalies (empty = no issues found).
+    Rules evaluated in priority order; roadmap_conflict suppresses
+    multi_state and orphan_execution rules.
+    """
+    removed: list[str] = []
+    added: list[str] = []
+    rules: list[str] = []
+
+    # Rule 1: roadmap + state conflict
+    r1 = (
+        [lb for lb in labels if lb.startswith("state/")]
+        if has_roadmap_label(labels)
+        else []
+    )
+    if r1:
+        removed.extend(r1)
+        rules.append("roadmap_conflict")
+
+    if not r1:
+        # Rule 2: multiple state labels
+        conflicts = get_conflicting_states(labels)
+        if conflicts:
+            removed.extend(conflicts)
+            rules.append("multi_state")
+
+        # Rule 3: orphan execution state (manager issues only)
+        if is_manager_issue and not has_local_flow and has_execution_state(labels):
+            exec_labels = [
+                lb
+                for lb in get_state_labels(labels)
+                if lb.removeprefix("state/") in _EXECUTION_STATES
+            ]
+            if exec_labels:
+                removed.extend(exec_labels)
+                added.append("state/ready")
+                rules.append("orphan_execution")
+
+    # Rule 4: orphan orchestra-governed (manager issues only)
+    if is_manager_issue and has_orchestra_governed(labels):
+        has_state = bool(get_state_labels(labels))
+        has_roadmap = has_roadmap_label(labels)
+        if not has_state and not has_roadmap:
+            removed.append("orchestra-governed")
+            rules.append("orphan_orchestra")
+
+    if not rules:
+        return []
+
+    # Deduplicate while preserving order
+    removed = list(dict.fromkeys(removed))
+    added = list(dict.fromkeys(added))
+
+    return [
+        LabelAnomaly(
+            issue_number=0,  # caller sets this
+            rule=", ".join(rules),
+            removed=removed,
+            added=added,
+        )
+    ]

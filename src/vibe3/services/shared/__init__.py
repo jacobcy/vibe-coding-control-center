@@ -13,7 +13,10 @@ if TYPE_CHECKING:
         record_error,
     )
     from vibe3.services.shared.labels import (
+        LabelAnomaly,
+        classify_dispatch_eligibility,
         clean_old_state_labels,
+        collect_label_anomalies,
         get_conflicting_states,
         get_highest_priority_state,
         get_state_labels,
@@ -54,7 +57,10 @@ __all__ = [
     "record_dispatch_failure_if_unexpected",
     "record_error",
     # labels
+    "LabelAnomaly",
+    "classify_dispatch_eligibility",
     "clean_old_state_labels",
+    "collect_label_anomalies",
     "get_conflicting_states",
     "get_highest_priority_state",
     "get_state_labels",
@@ -84,7 +90,10 @@ _SYMBOL_MODULES = {
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
+    "LabelAnomaly": "vibe3.services.shared.labels",
+    "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
+    "collect_label_anomalies": "vibe3.services.shared.labels",
     "get_conflicting_states": "vibe3.services.shared.labels",
     "get_highest_priority_state": "vibe3.services.shared.labels",
     "get_state_labels": "vibe3.services.shared.labels",

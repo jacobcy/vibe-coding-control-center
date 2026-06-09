@@ -1,6 +1,8 @@
 """Tests for label utility functions."""
 
 from vibe3.services.shared.labels import (
+    classify_dispatch_eligibility,
+    collect_label_anomalies,
     get_conflicting_states,
     get_highest_priority_state,
     get_state_labels,
@@ -225,3 +227,138 @@ class TestGetConflictingStates:
             ["state/done", "state/ready", "state/in-progress"]
         )
         assert set(result) == {"state/ready", "state/in-progress"}
+
+
+class TestClassifyDispatchEligibility:
+    def _call(self, labels, assignees, **kwargs):
+        defaults = dict(supervisor_label="supervisor", manager_usernames=("mgr",))
+        defaults.update(kwargs)
+        return classify_dispatch_eligibility(labels, assignees, **defaults)
+
+    def test_ready_manager_is_dispatchable(self) -> None:
+        assert self._call(["state/ready"], ["mgr"]) == []
+
+    def test_missing_state_label(self) -> None:
+        reasons = self._call([], ["mgr"])
+        codes = [r.code for r in reasons]
+        assert "missing_state_label" in codes
+
+    def test_blocked_state(self) -> None:
+        reasons = self._call(["state/blocked"], ["mgr"])
+        codes = [r.code for r in reasons]
+        assert "blocked_state" in codes
+
+    def test_roadmap_rfc(self) -> None:
+        reasons = self._call(["state/ready", "roadmap/rfc"], ["mgr"])
+        codes = [r.code for r in reasons]
+        assert "roadmap_rfc" in codes
+
+    def test_roadmap_epic(self) -> None:
+        reasons = self._call(["roadmap/epic", "state/ready"], ["mgr"])
+        codes = [r.code for r in reasons]
+        assert "roadmap_epic" in codes
+
+    def test_supervisor_issue(self) -> None:
+        reasons = self._call(["state/ready", "supervisor"], ["mgr"])
+        codes = [r.code for r in reasons]
+        assert "supervisor_issue" in codes
+
+    def test_missing_manager_assignee(self) -> None:
+        reasons = self._call(["state/ready"], [])
+        codes = [r.code for r in reasons]
+        assert "missing_manager_assignee" in codes
+
+    def test_non_manager_assignee(self) -> None:
+        reasons = self._call(["state/ready"], ["stranger"])
+        codes = [r.code for r in reasons]
+        assert "non_manager_assignee" in codes
+
+    def test_empty_manager_list_allows_all(self) -> None:
+        reasons = self._call(["state/ready"], ["anyone"], manager_usernames=())
+        codes = [r.code for r in reasons]
+        assert "non_manager_assignee" not in codes
+        assert "missing_manager_assignee" not in codes
+
+    def test_all_exclusion_reasons(self) -> None:
+        reasons = self._call(
+            labels=["roadmap/epic", "supervisor"],
+            assignees=["jacobcy"],
+        )
+        codes = [r.code for r in reasons]
+        assert "missing_state_label" in codes
+        assert "roadmap_epic" in codes
+        assert "supervisor_issue" in codes
+        assert "non_manager_assignee" in codes
+
+
+class TestCollectLabelAnomalies:
+    def test_no_anomalies(self) -> None:
+        result = collect_label_anomalies(
+            ["state/ready"], has_local_flow=True, is_manager_issue=False
+        )
+        assert result == []
+
+    def test_roadmap_conflict(self) -> None:
+        result = collect_label_anomalies(
+            ["roadmap/rfc", "state/claimed"],
+            has_local_flow=True,
+            is_manager_issue=True,
+        )
+        assert len(result) == 1
+        assert "roadmap_conflict" in result[0].rule
+        assert "state/claimed" in result[0].removed
+
+    def test_multi_state_no_roadmap(self) -> None:
+        result = collect_label_anomalies(
+            ["state/blocked", "state/review"],
+            has_local_flow=True,
+            is_manager_issue=False,
+        )
+        assert len(result) == 1
+        assert "multi_state" in result[0].rule
+        assert result[0].removed == ["state/review"]
+
+    def test_orphan_execution_state(self) -> None:
+        result = collect_label_anomalies(
+            ["state/in-progress"],
+            has_local_flow=False,
+            is_manager_issue=True,
+        )
+        assert len(result) == 1
+        assert "orphan_execution" in result[0].rule
+        assert "state/in-progress" in result[0].removed
+        assert "state/ready" in result[0].added
+
+    def test_orphan_execution_skipped_when_has_flow(self) -> None:
+        result = collect_label_anomalies(
+            ["state/in-progress"],
+            has_local_flow=True,
+            is_manager_issue=True,
+        )
+        assert result == []
+
+    def test_orphan_orchestra_governed(self) -> None:
+        result = collect_label_anomalies(
+            ["orchestra-governed"],
+            has_local_flow=True,
+            is_manager_issue=True,
+        )
+        assert len(result) == 1
+        assert "orphan_orchestra" in result[0].rule
+
+    def test_orphan_orchestra_skipped_when_has_state(self) -> None:
+        result = collect_label_anomalies(
+            ["orchestra-governed", "state/ready"],
+            has_local_flow=True,
+            is_manager_issue=True,
+        )
+        assert result == []
+
+    def test_roadmap_skips_multi_state_rule(self) -> None:
+        result = collect_label_anomalies(
+            ["roadmap/epic", "state/blocked", "state/review"],
+            has_local_flow=True,
+            is_manager_issue=True,
+        )
+        rules = [a.rule for a in result]
+        assert "multi_state" not in rules

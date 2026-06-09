@@ -103,7 +103,10 @@ if TYPE_CHECKING:
         record_error,
     )
     from vibe3.services.shared.labels import (
+        LabelAnomaly,
+        classify_dispatch_eligibility,
         clean_old_state_labels,
+        collect_label_anomalies,
         get_conflicting_states,
         get_highest_priority_state,
         get_state_labels,
@@ -178,6 +181,7 @@ __all__ = [
     "IssueFlowService",
     "IssueStatusEntry",
     "IssueTitleCacheService",
+    "LabelAnomaly",
     "LabelService",
     "MissingTaskIssueError",
     "OrchestraSnapshot",
@@ -204,6 +208,8 @@ __all__ = [
     "calculate_pr_risk_score",
     "check_ref_exists",
     "clean_old_state_labels",
+    "collect_label_anomalies",
+    "classify_dispatch_eligibility",
     "classify_flow",
     "classify_task_issues_for_rendering",
     "create_flow_manager",
@@ -291,6 +297,7 @@ _SYMBOL_MODULES = {
     "IssueFlowService": "vibe3.services.issue.flow",
     "IssueStatusEntry": "vibe3.services.orchestra_status_service",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
+    "LabelAnomaly": "vibe3.services.shared.labels",
     "LabelService": "vibe3.services.label_service",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra_status_service",
@@ -368,6 +375,8 @@ _SYMBOL_MODULES = {
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     "clean_old_state_labels": "vibe3.services.shared.labels",
+    "classify_dispatch_eligibility": "vibe3.services.shared.labels",
+    "collect_label_anomalies": "vibe3.services.shared.labels",
     "should_skip_from_queue": "vibe3.services.shared.labels",
 }
 
