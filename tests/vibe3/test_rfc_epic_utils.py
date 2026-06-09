@@ -18,6 +18,7 @@ def make_flow(issue_number: int) -> SimpleNamespace:
         latest_verdict=None,
         pr_number=None,
         pr_ref=None,
+        blocked_reason_summary=None,
     )
 
 

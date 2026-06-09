@@ -3,6 +3,7 @@
 from vibe3.utils.error_message_cleaner import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
+    compute_blocked_reason_summary,
 )
 
 
@@ -104,3 +105,63 @@ class TestCleanErrorMessageCallerDelegation:
         message = "some error | "
         expected = re.sub(r"\s*\|\s*$", "", message).strip()
         assert clean_error_message(message) == expected
+
+
+class TestComputeBlockedReasonSummary:
+    """Test cases for compute_blocked_reason_summary function."""
+
+    def test_clean_short_reason_passes_through(self):
+        """Short, clean reason is returned as-is."""
+        result = compute_blocked_reason_summary("Simple error message")
+        assert result == "Simple error message"
+
+    def test_wrapper_prefix_stripped(self):
+        """codeagent-wrapper prefix is removed."""
+        result = compute_blocked_reason_summary(
+            "codeagent-wrapper failed (code 1): Actual error"
+        )
+        assert result == "Actual error"
+
+    def test_error_code_only_falls_back_to_next_line(self):
+        """If first line only has error code, use next line."""
+        result = compute_blocked_reason_summary("E_EXEC_NO_OUTPUT:\nActual error here")
+        assert result == "Actual error here"
+
+    def test_tmpdir_noise_filtered(self):
+        """TMPDIR noise is removed."""
+        result = compute_blocked_reason_summary(
+            "Error message CLAUDE_CODE_TMPDIR: /tmp/path with more details"
+        )
+        assert result == "Error message"
+
+    def test_long_message_truncated_at_sentence_boundary(self):
+        """Long messages are truncated at sentence boundary."""
+        long_msg = (
+            "This is a very long error message that exceeds the limit. "
+            "It should be truncated at the first sentence boundary."
+        )
+        result = compute_blocked_reason_summary(long_msg)
+        assert result == "This is a very long error message that exceeds the limit."
+        assert len(result) <= 80
+
+    def test_empty_input_returns_empty_string(self):
+        """Empty input returns empty string."""
+        result = compute_blocked_reason_summary("")
+        assert result == ""
+
+    def test_trailing_colon_removed(self):
+        """Trailing colon is removed."""
+        result = compute_blocked_reason_summary("Error message:")
+        assert result == "Error message"
+
+    def test_multiline_with_code_prefix(self):
+        """Multiline messages with code prefix are handled."""
+        result = compute_blocked_reason_summary(
+            "codeagent-wrapper failed (code 1):\nLine 1\nLine 2"
+        )
+        assert result == "Line 1"
+
+    def test_short_message_without_tmpdir_unchanged(self):
+        """Short messages without TMPDIR are not cleaned."""
+        result = compute_blocked_reason_summary("Short error")
+        assert result == "Short error"
