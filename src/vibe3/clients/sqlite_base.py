@@ -111,8 +111,8 @@ class SQLiteClientBase:
                     "rev-parse --git-common-dir",
                     f"returned non-absolute path: {git_dir}",
                 )
-            git_dir.joinpath("vibe3").mkdir(parents=True, exist_ok=True)
             db_path = str(get_vibe3_db_path(git_dir))
+            git_dir.joinpath("vibe3").mkdir(parents=True, exist_ok=True)
 
         self.db_path = db_path
         self._init_db()

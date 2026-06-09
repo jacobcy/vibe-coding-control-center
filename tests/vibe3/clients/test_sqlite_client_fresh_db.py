@@ -135,3 +135,10 @@ class TestFromRepoPath:
         git_dir.mkdir(parents=True)
         store = SQLiteClient.from_repo_path(tmp_path)
         assert store.db_path == str(tmp_path / ".git" / "vibe3" / "handoff.db")
+
+    def test_returns_correct_subclass_type(self, tmp_path):
+        """from_repo_path should return SQLiteClient, not SQLiteClientBase."""
+        git_dir = tmp_path / ".git" / "vibe3"
+        git_dir.mkdir(parents=True)
+        store = SQLiteClient.from_repo_path(tmp_path)
+        assert type(store).__name__ == "SQLiteClient"
