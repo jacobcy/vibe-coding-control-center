@@ -73,14 +73,12 @@ class TestCleanErrorMessage:
 class TestDisplayConfig:
     """Test cases for _display_config method."""
 
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_display_config_uses_live_snapshot_when_server_running(
         self, mock_fetch_live_snapshot
     ):
         """When server is running, display shows runtime value from live snapshot."""
-        from vibe3.services.orchestra_status_service import OrchestraSnapshot
+        from vibe3.services.orchestra.status import OrchestraSnapshot
 
         # Setup config with static value 60
         config = MagicMock()
@@ -111,9 +109,7 @@ class TestDisplayConfig:
             "30s" in msg and "(override" in msg and "60s" in msg for msg in printed
         )
 
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_display_config_falls_back_to_static_when_server_down(
         self, mock_fetch_live_snapshot
     ):
@@ -135,14 +131,12 @@ class TestDisplayConfig:
         printed = [str(call.args[0]) for call in service.console.print.call_args_list]
         assert any("60s" in msg and "(override" not in msg for msg in printed)
 
-    @patch(
-        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
-    )
+    @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_display_config_no_override_indicator_when_values_match(
         self, mock_fetch_live_snapshot
     ):
         """When live snapshot matches config, no override indicator is shown."""
-        from vibe3.services.orchestra_status_service import OrchestraSnapshot
+        from vibe3.services.orchestra.status import OrchestraSnapshot
 
         config = MagicMock()
         config.polling_interval = 60

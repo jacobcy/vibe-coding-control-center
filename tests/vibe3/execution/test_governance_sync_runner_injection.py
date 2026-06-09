@@ -40,7 +40,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda config: MagicMock(),
             )
             m.setattr(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService",
+                "vibe3.services.orchestra.status.OrchestraStatusService",
                 lambda config, orchestrator=None: MagicMock(
                     snapshot=lambda: MagicMock(circuit_breaker_state="closed")
                 ),
@@ -89,7 +89,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda config: MagicMock(),
             )
             m.setattr(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService",
+                "vibe3.services.orchestra.status.OrchestraStatusService",
                 lambda config, orchestrator=None: MagicMock(
                     snapshot=lambda: MagicMock(circuit_breaker_state="closed")
                 ),
@@ -140,7 +140,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda config: MagicMock(),
             )
             m.setattr(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService",
+                "vibe3.services.orchestra.status.OrchestraStatusService",
                 lambda config, orchestrator=None: MagicMock(
                     snapshot=lambda: MagicMock(circuit_breaker_state="closed")
                 ),
@@ -272,7 +272,7 @@ class TestGovernanceAsyncRunnerWithInjection:
                 lambda config: MagicMock(),
             )
             m.setattr(
-                "vibe3.services.orchestra_status_service.OrchestraStatusService",
+                "vibe3.services.orchestra.status.OrchestraStatusService",
                 lambda config, orchestrator=None: mock_status_service,
             )
             m.setattr(

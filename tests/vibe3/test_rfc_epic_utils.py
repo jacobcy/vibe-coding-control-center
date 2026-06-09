@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.orchestra_status_service import OrchestraSnapshot
+from vibe3.services.orchestra.status import OrchestraSnapshot
 
 
 def make_flow(issue_number: int) -> SimpleNamespace:
