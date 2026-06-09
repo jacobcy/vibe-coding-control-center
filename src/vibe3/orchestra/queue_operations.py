@@ -78,12 +78,6 @@ def select_ready_issues_from_collected_issues(
                 if issue.state not in {IssueState.READY, IssueState.BLOCKED}:
                     _auto_resume_to_ready(issue, config, label_service=label_service)
                 continue
-            if not flow_manager.git.branch_exists(branch):
-                append_orchestra_event(
-                    "dispatcher",
-                    f"skip #{issue.number}: branch '{branch}' not found in git",
-                )
-                continue
 
         selected.append(issue)
 

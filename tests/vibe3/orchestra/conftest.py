@@ -97,7 +97,6 @@ def make_coordinator() -> callable:
 
         flow_manager = MagicMock()
         flow_manager.get_flow_for_issue = MagicMock(return_value=None)
-        flow_manager.git.branch_exists = MagicMock(return_value=True)
 
         health_check_service = MagicMock()
 
