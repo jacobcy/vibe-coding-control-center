@@ -53,6 +53,66 @@ def get_flow_context(
     return branch, store.get_flow_state(branch)
 
 
+def get_flow_context_bulk(
+    issue_numbers: list[int],
+    config: OrchestraConfig,
+    github: "GitHubClient",
+    store: "SQLiteClient",
+    flow_manager: "FlowManagerProtocol",
+) -> dict[int, tuple[str, dict[str, object] | None]]:
+    """Batch get flow context (branch and state) for multiple issues.
+
+    Reduces N+1 queries to 2 bulk queries by:
+    1. Bulk-fetching all flow mappings for the issue numbers
+    2. Bulk-fetching flow states for the resolved branches
+
+    Args:
+        issue_numbers: Issue numbers to look up
+        config: Orchestra configuration
+        github: GitHub client
+        store: SQLite client
+        flow_manager: Flow manager
+
+    Returns:
+        Dict mapping issue_number -> (branch, flow_state).
+        Issues with no flow get ("", None).
+    """
+    if not issue_numbers:
+        return {}
+
+    # Step 1: Bulk fetch flow mappings
+    flows_by_issue = store.get_flows_by_issues_bulk(issue_numbers, role="task")
+
+    # Resolve each issue to its best flow (replicates find_active_flow logic)
+    issue_to_flow: dict[int, dict[str, object] | None] = {}
+    branches_to_fetch: set[str] = set()
+    for issue_num, flows in flows_by_issue.items():
+        best = flow_manager.resolve_best_flow(issue_num, flows)
+        issue_to_flow[issue_num] = best
+        if best:
+            branch = str(best.get("branch") or "").strip()
+            if branch:
+                branches_to_fetch.add(branch)
+
+    # Step 2: Bulk fetch flow states for all resolved branches
+    flow_states = store.get_flow_state_bulk(list(branches_to_fetch))
+
+    # Step 3: Assemble result
+    result: dict[int, tuple[str, dict[str, object] | None]] = {}
+    for issue_num in issue_numbers:
+        flow = issue_to_flow.get(issue_num)
+        if flow is None:
+            result[issue_num] = ("", None)
+            continue
+        branch = str(flow.get("branch") or "").strip()
+        if not branch:
+            result[issue_num] = ("", None)
+            continue
+        result[issue_num] = (branch, flow_states.get(branch))
+
+    return result
+
+
 def load_issue(
     issue_number: int, config: OrchestraConfig, github: "GitHubClient"
 ) -> "IssueInfo | None":

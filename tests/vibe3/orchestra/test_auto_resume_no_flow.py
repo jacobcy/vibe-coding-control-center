@@ -178,13 +178,13 @@ class TestAutoResumeNoFlowScene:
             make_issue_info(300, IssueState.CLAIMED),
         ]
 
-        # Mock get_flow_context to return no branch
-        def mock_get_flow_context(*args, **kwargs):
-            return (None, None)
+        # Mock get_flow_context_bulk to return no branch for issue 300
+        def mock_get_flow_context_bulk(*args, **kwargs):
+            return {300: ("", None)}
 
         monkeypatch.setattr(
-            "vibe3.orchestra.queue_operations.get_flow_context",
-            mock_get_flow_context,
+            "vibe3.orchestra.queue_operations.get_flow_context_bulk",
+            mock_get_flow_context_bulk,
         )
 
         # Mock qualify gate to return the trigger state (allow issue through)
@@ -247,13 +247,13 @@ class TestAutoResumeNoFlowScene:
             make_issue_info(301, IssueState.BLOCKED),
         ]
 
-        # Mock get_flow_context to return no branch
-        def mock_get_flow_context(*args, **kwargs):
-            return (None, None)
+        # Mock get_flow_context_bulk to return no branch for issue 301
+        def mock_get_flow_context_bulk(*args, **kwargs):
+            return {301: ("", None)}
 
         monkeypatch.setattr(
-            "vibe3.orchestra.queue_operations.get_flow_context",
-            mock_get_flow_context,
+            "vibe3.orchestra.queue_operations.get_flow_context_bulk",
+            mock_get_flow_context_bulk,
         )
 
         # Mock qualify gate to return the trigger state (allow issue through)

@@ -177,6 +177,10 @@ class FlowManagerProtocol(Protocol):
         """Create a new flow for an issue."""
         ...
 
+    def resolve_best_flow(self, issue_number: int, flows: list[dict]) -> dict | None:
+        """Resolve best flow from pre-fetched list."""
+        ...
+
 
 class IssueCollectionServiceProtocol(Protocol):
     """Protocol for issue collection service operations."""

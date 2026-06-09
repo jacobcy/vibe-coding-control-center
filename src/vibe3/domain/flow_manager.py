@@ -59,6 +59,20 @@ class FlowManager:
         """
         return self.issue_flow_service.find_active_flow(issue_number)
 
+    def resolve_best_flow(self, issue_number: int, flows: list[dict]) -> dict | None:
+        """Resolve best flow from pre-fetched list.
+
+        Delegates to IssueFlowService.resolve_best_flow for bulk-path optimization.
+
+        Args:
+            issue_number: GitHub issue number
+            flows: Pre-fetched list of flow dicts
+
+        Returns:
+            Flow dict if valid flow found, None otherwise
+        """
+        return self.issue_flow_service.resolve_best_flow(issue_number, flows)
+
     def _is_reusable_auto_flow(
         self, flow: dict[str, object], issue_number: int
     ) -> bool:
