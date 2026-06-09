@@ -3,13 +3,6 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-# Backward-compat re-exports — moved to models.execution_request
-from vibe3.models import (  # noqa: F401
-    ExecutionLaunchResult,
-    ExecutionRequest,
-    WorktreeRequirement,  # noqa: F401
-)
-
 if TYPE_CHECKING:
     from vibe3.models import AsyncExecutionHandle
 

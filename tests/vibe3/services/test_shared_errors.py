@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.execution.contracts import ExecutionLaunchResult
+from vibe3.models import ExecutionLaunchResult
 from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
 
 

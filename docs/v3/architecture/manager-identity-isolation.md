@@ -202,7 +202,7 @@ from typing import Any
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.execution.contracts import ExecutionRequest
+from vibe3.models import ExecutionRequest
 
 def build_manager_request(
     config: OrchestraConfig,

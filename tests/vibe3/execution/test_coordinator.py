@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models import ExecutionRequest
 
 
 @pytest.fixture

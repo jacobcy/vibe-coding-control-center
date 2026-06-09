@@ -88,7 +88,7 @@ class TestIssueStateDispatchHandler:
         mock_registry_cls: MagicMock,
         mock_capacity_cls: MagicMock,
     ) -> None:
-        from vibe3.execution.contracts import ExecutionLaunchResult
+        from vibe3.models import ExecutionLaunchResult
 
         mock_config = MagicMock()
         mock_config.max_concurrent_flows = 3
@@ -133,7 +133,7 @@ class TestIssueStateDispatchHandler:
         mock_registry_cls: MagicMock,
         mock_capacity_cls: MagicMock,
     ) -> None:
-        from vibe3.execution.contracts import ExecutionLaunchResult
+        from vibe3.models import ExecutionLaunchResult
 
         mock_config = MagicMock()
         mock_config.max_concurrent_flows = 3
