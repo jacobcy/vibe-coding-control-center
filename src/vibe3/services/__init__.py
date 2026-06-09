@@ -58,8 +58,6 @@ if TYPE_CHECKING:
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
-
-    # Job monitoring
     from vibe3.services.label_service import LabelService
     from vibe3.services.orchestra_helpers import (
         get_handoff_state_label,

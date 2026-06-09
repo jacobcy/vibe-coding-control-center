@@ -241,9 +241,11 @@ function renderIssues(issues) {
   return html;
 }
 
+const JOB_STATUSES = ['queued', 'running', 'done', 'failed', 'dead'];
+
 function jobStatusBadge(status) {
   const s = (status || '').toLowerCase();
-  const cls = `job-${s}`;
+  const cls = JOB_STATUSES.includes(s) ? `job-${s}` : 'job-other';
   return `<span class="badge ${cls}">${escapeHtml(status || 'unknown')}</span>`;
 }
 

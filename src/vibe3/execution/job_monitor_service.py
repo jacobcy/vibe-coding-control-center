@@ -56,18 +56,17 @@ class JobMonitorService:
         # Cleanup expired before building snapshot
         registry.cleanup_expired()
 
-        active_jobs = tuple(_to_active_job(a) for a in registry.get_active_actors())
-        recent_jobs = tuple(_to_active_job(a) for a in registry.get_recent_actors())
+        active_actors = registry.get_active_actors()
+        recent_actors = registry.get_recent_actors()
 
-        running_count = sum(
-            1 for a in registry.get_active_actors() if a.status == ActorStatus.RUNNING
-        )
-        completed_count = sum(
-            1 for a in registry.get_recent_actors() if a.status == ActorStatus.DONE
-        )
+        active_jobs = tuple(_to_active_job(a) for a in active_actors)
+        recent_jobs = tuple(_to_active_job(a) for a in recent_actors)
+
+        running_count = sum(1 for a in active_actors if a.status == ActorStatus.RUNNING)
+        completed_count = sum(1 for a in recent_actors if a.status == ActorStatus.DONE)
         failed_count = sum(
             1
-            for a in registry.get_recent_actors()
+            for a in recent_actors
             if a.status in (ActorStatus.FAILED, ActorStatus.DEAD)
         )
 

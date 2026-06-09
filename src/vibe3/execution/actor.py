@@ -12,6 +12,7 @@ Design notes:
 
 from __future__ import annotations
 
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -242,6 +243,7 @@ class ActorRegistry:
         self._actors: dict[str, JobActor] = {}
         self._ttl_seconds = ttl_seconds
         self._completed_at: dict[str, datetime] = {}
+        self._lock = threading.Lock()
 
     def create_actor(
         self,
@@ -272,7 +274,11 @@ class ActorRegistry:
             _store=store,
         )
 
-        self._actors[actor_id] = actor
+        self._lock.acquire()
+        try:
+            self._actors[actor_id] = actor
+        finally:
+            self._lock.release()
 
         # Record creation event
         try:
@@ -297,7 +303,8 @@ class ActorRegistry:
         Returns:
             The actor if found, None otherwise
         """
-        return self._actors.get(actor_id)
+        with self._lock:
+            return self._actors.get(actor_id)
 
     def get_active_actors(self) -> list[JobActor]:
         """Get all non-terminal actors.
@@ -305,11 +312,12 @@ class ActorRegistry:
         Returns:
             List of actors in QUEUED or RUNNING status
         """
-        return [
-            actor
-            for actor in self._actors.values()
-            if actor.status in (ActorStatus.QUEUED, ActorStatus.RUNNING)
-        ]
+        with self._lock:
+            return [
+                actor
+                for actor in self._actors.values()
+                if actor.status in (ActorStatus.QUEUED, ActorStatus.RUNNING)
+            ]
 
     def get_recent_actors(self) -> list[JobActor]:
         """Get terminal actors still within the TTL window.
@@ -318,14 +326,15 @@ class ActorRegistry:
             List of actors in DONE, FAILED, or DEAD status within TTL
         """
         now = datetime.now(tz=timezone.utc)
-        result: list[JobActor] = []
-        for actor_id, completed in self._completed_at.items():
-            elapsed = (now - completed).total_seconds()
-            if elapsed < self._ttl_seconds:
-                actor = self._actors.get(actor_id)
-                if actor is not None:
-                    result.append(actor)
-        return result
+        with self._lock:
+            result: list[JobActor] = []
+            for actor_id, completed in self._completed_at.items():
+                elapsed = (now - completed).total_seconds()
+                if elapsed < self._ttl_seconds:
+                    actor = self._actors.get(actor_id)
+                    if actor is not None:
+                        result.append(actor)
+            return result
 
     def mark_terminal(self, actor_id: str) -> None:
         """Record the terminal timestamp for an actor.
@@ -335,7 +344,8 @@ class ActorRegistry:
         Args:
             actor_id: Actor ID that reached a terminal state
         """
-        self._completed_at[actor_id] = datetime.now(tz=timezone.utc)
+        with self._lock:
+            self._completed_at[actor_id] = datetime.now(tz=timezone.utc)
 
     def cleanup_expired(self) -> list[str]:
         """Remove terminal actors whose TTL has expired.
@@ -344,13 +354,14 @@ class ActorRegistry:
             List of removed actor IDs
         """
         now = datetime.now(tz=timezone.utc)
-        expired_ids: list[str] = []
-        for actor_id, completed in list(self._completed_at.items()):
-            if (now - completed).total_seconds() >= self._ttl_seconds:
-                self._actors.pop(actor_id, None)
-                self._completed_at.pop(actor_id, None)
-                expired_ids.append(actor_id)
-        return expired_ids
+        with self._lock:
+            expired_ids: list[str] = []
+            for actor_id, completed in list(self._completed_at.items()):
+                if (now - completed).total_seconds() >= self._ttl_seconds:
+                    self._actors.pop(actor_id, None)
+                    self._completed_at.pop(actor_id, None)
+                    expired_ids.append(actor_id)
+            return expired_ids
 
     def remove_actor(self, actor_id: str) -> None:
         """Remove an actor from the registry.
@@ -358,8 +369,9 @@ class ActorRegistry:
         Args:
             actor_id: Actor ID
         """
-        self._actors.pop(actor_id, None)
-        self._completed_at.pop(actor_id, None)
+        with self._lock:
+            self._actors.pop(actor_id, None)
+            self._completed_at.pop(actor_id, None)
 
 
 # Module-level singleton
