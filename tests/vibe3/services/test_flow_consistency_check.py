@@ -45,7 +45,7 @@ def test_missing_ref_needs_rebuild():
     git = _make_git_client(Path("/wt/task/issue-1"))
     state = {"worktree_path": "/wt/task/issue-1", "plan_ref": "docs/plans/missing.md"}
     # Mock check_ref_exists to return False
-    import vibe3.services.flow_consistency_check as mod
+    import vibe3.services.flow.consistency as mod
 
     orig = mod.check_ref_exists
     mod.check_ref_exists = lambda ref, branch, **kw: (ref, False)

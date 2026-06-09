@@ -41,7 +41,7 @@ class TestFlowServiceCreate:
         ]
         mock_store.get_issue_links.return_value = []
 
-        with patch("vibe3.services.flow_read_mixin.GitHubClient") as mock_gh:
+        with patch("vibe3.services.flow.read_mixin.GitHubClient") as mock_gh:
             mock_gh.return_value.get_pr.return_value = None
 
             status = service.create_flow(
@@ -87,7 +87,7 @@ class TestFlowServiceCreate:
         mock_store.get_issue_links.return_value = []
         mock_git.find_worktree_path_for_branch.return_value = None
 
-        with patch("vibe3.services.flow_read_mixin.GitHubClient") as mock_gh:
+        with patch("vibe3.services.flow.read_mixin.GitHubClient") as mock_gh:
             mock_gh.return_value.get_pr.return_value = None
 
             status = service.create_flow(

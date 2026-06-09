@@ -11,7 +11,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.config import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.models import FlowState, FlowStatusResponse, MainBranchProtectedError
-from vibe3.services.flow_read_mixin import FlowReadMixin
+from vibe3.services.flow.read_mixin import FlowReadMixin
 from vibe3.services.signature_service import SignatureService
 
 

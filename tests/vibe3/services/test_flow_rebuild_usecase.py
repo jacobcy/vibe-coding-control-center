@@ -39,8 +39,8 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
     )
 
     with (
-        patch("vibe3.services.flow_rebuild_usecase.FlowCleanupService") as cleanup_cls,
-        patch("vibe3.services.flow_rebuild_usecase.HandoffService") as handoff_cls,
+        patch("vibe3.services.flow.rebuild.FlowCleanupService") as cleanup_cls,
+        patch("vibe3.services.flow.rebuild.HandoffService") as handoff_cls,
     ):
         cleanup = cleanup_cls.return_value
         cleanup.cleanup_flow_scene.return_value = {
@@ -114,8 +114,8 @@ def test_rebuild_issue_flow_fails_when_rebuilt_worktree_is_missing() -> None:
     )
 
     with (
-        patch("vibe3.services.flow_rebuild_usecase.FlowCleanupService") as cleanup_cls,
-        patch("vibe3.services.flow_rebuild_usecase.HandoffService") as handoff_cls,
+        patch("vibe3.services.flow.rebuild.FlowCleanupService") as cleanup_cls,
+        patch("vibe3.services.flow.rebuild.HandoffService") as handoff_cls,
         pytest.raises(RuntimeError, match="Rebuild postcondition failed"),
     ):
         cleanup = cleanup_cls.return_value

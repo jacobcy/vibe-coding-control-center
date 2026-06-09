@@ -54,7 +54,7 @@ def block_gh_subprocess(request, monkeypatch):
 def stable_worktree_actor(monkeypatch):
     """Avoid real git/GitHub lookups during flow creation tests."""
     monkeypatch.setattr(
-        "vibe3.services.flow_write_mixin.SignatureService.get_worktree_actor",
+        "vibe3.services.flow.write_mixin.SignatureService.get_worktree_actor",
         lambda: "test-actor",
     )
 
@@ -65,11 +65,11 @@ def stable_worktree_actor(monkeypatch):
     mock_gh.get_pr_diff.return_value = ""
 
     monkeypatch.setattr(
-        "vibe3.services.flow_read_mixin.GitHubClient",
+        "vibe3.services.flow.read_mixin.GitHubClient",
         lambda: mock_gh,
     )
     monkeypatch.setattr(
-        "vibe3.services.flow_transition.GitHubClient",
+        "vibe3.services.flow.transition.GitHubClient",
         lambda: mock_gh,
     )
 

@@ -29,25 +29,25 @@ if TYPE_CHECKING:
         policy_loader,
         resolve_manager_usernames,
     )
-    from vibe3.services.flow_classifier import (
+    from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
         classify_flow,
         get_flow_state,
     )
-    from vibe3.services.flow_cleanup_service import FlowCleanupService
-    from vibe3.services.flow_factory import create_flow_manager
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-    from vibe3.services.flow_projection_service import (
+    from vibe3.services.flow.cleanup import FlowCleanupService
+    from vibe3.services.flow.factory import create_flow_manager
+    from vibe3.services.flow.projection import (
         FlowProjection,
         FlowProjectionService,
     )
-    from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
-    from vibe3.services.flow_recovery_service import FlowRecoveryService
-    from vibe3.services.flow_resume_resolver import infer_resume_label
-    from vibe3.services.flow_service import FlowService
-    from vibe3.services.flow_status_resolver import FlowStatusResolver
-    from vibe3.services.flow_status_service import FlowStatusService
+    from vibe3.services.flow.rebuild import FlowRebuildUsecase
+    from vibe3.services.flow.recovery import FlowRecoveryService
+    from vibe3.services.flow.resume_resolver import infer_resume_label
+    from vibe3.services.flow.service import FlowService
+    from vibe3.services.flow.status import FlowStatusService
+    from vibe3.services.flow.status_resolver import FlowStatusResolver
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.handoff_resolution import resolve_handoff_target
     from vibe3.services.handoff_service import HandoffService
     from vibe3.services.handoff_status_service import HandoffStatusService
@@ -293,17 +293,17 @@ _SYMBOL_MODULES = {
     "CoordinationResolver": "vibe3.services.coordination_resolver",
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
-    "FlowCategory": "vibe3.services.flow_classifier",
-    "FlowCleanupService": "vibe3.services.flow_cleanup_service",
+    "FlowCategory": "vibe3.services.flow.classifier",
+    "FlowCleanupService": "vibe3.services.flow.cleanup",
     "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",
-    "FlowProjection": "vibe3.services.flow_projection_service",
-    "FlowProjectionService": "vibe3.services.flow_projection_service",
-    "FlowRebuildUsecase": "vibe3.services.flow_rebuild_usecase",
-    "FlowRecoveryService": "vibe3.services.flow_recovery_service",
-    "FlowService": "vibe3.services.flow_service",
-    "FlowState": "vibe3.services.flow_classifier",
-    "FlowStatusResolver": "vibe3.services.flow_status_resolver",
-    "FlowStatusService": "vibe3.services.flow_status_service",
+    "FlowProjection": "vibe3.services.flow.projection",
+    "FlowProjectionService": "vibe3.services.flow.projection",
+    "FlowRebuildUsecase": "vibe3.services.flow.rebuild",
+    "FlowRecoveryService": "vibe3.services.flow.recovery",
+    "FlowService": "vibe3.services.flow.service",
+    "FlowState": "vibe3.services.flow.classifier",
+    "FlowStatusResolver": "vibe3.services.flow.status_resolver",
+    "FlowStatusService": "vibe3.services.flow.status",
     "HandoffService": "vibe3.services.handoff_service",
     "HandoffStatusService": "vibe3.services.handoff_status_service",
     "InitResult": "vibe3.services.check_remote",
@@ -341,9 +341,9 @@ _SYMBOL_MODULES = {
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.shared.paths",
-    "classify_flow": "vibe3.services.flow_classifier",
+    "classify_flow": "vibe3.services.flow.classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
-    "create_flow_manager": "vibe3.services.flow_factory",
+    "create_flow_manager": "vibe3.services.flow.factory",
     "emit_issue_failed": "vibe3.services.event_helpers",
     "fail_executor_issue": "vibe3.services.issue.failure",
     "fail_issue": "vibe3.services.issue.failure",
@@ -357,7 +357,7 @@ _SYMBOL_MODULES = {
     "format_issue_summary_line": "vibe3.services.orchestra_status_service",
     "generate_score_report": "vibe3.services.pr.scoring",
     "get_conflicting_states": "vibe3.services.shared.labels",
-    "get_flow_state": "vibe3.services.flow_classifier",
+    "get_flow_state": "vibe3.services.flow.classifier",
     "get_highest_priority_state": "vibe3.services.shared.labels",
     "get_handoff_state_label": "vibe3.services.orchestra_helpers",
     "get_manager_usernames": "vibe3.services.orchestra_helpers",
@@ -372,7 +372,7 @@ _SYMBOL_MODULES = {
     "has_orchestra_governed": "vibe3.services.shared.labels",
     "has_roadmap_conflict": "vibe3.services.shared.labels",
     "has_roadmap_label": "vibe3.services.shared.labels",
-    "infer_resume_label": "vibe3.services.flow_resume_resolver",
+    "infer_resume_label": "vibe3.services.flow.resume_resolver",
     "is_auto_task_branch": "vibe3.services.status_query_service",
     "is_dev_collab_branch": "vibe3.services.status_query_service",
     "is_running_issue": "vibe3.services.orchestra_status_service",
