@@ -26,3 +26,14 @@ def test_validate_transition_allows_missing_from_state() -> None:
 
 def test_validate_transition_honors_force() -> None:
     validate_transition(IssueState.READY, IssueState.DONE, force=True)
+
+
+def test_validate_transition_blocked_to_handoff_forbidden() -> None:
+    """blocked → handoff should be forbidden without force (#2561)."""
+    with pytest.raises(InvalidTransitionError):
+        validate_transition(IssueState.BLOCKED, IssueState.HANDOFF, force=False)
+
+
+def test_validate_transition_blocked_to_handoff_allowed_with_force() -> None:
+    """Manual resume commands can bypass blocked state with force=True."""
+    validate_transition(IssueState.BLOCKED, IssueState.HANDOFF, force=True)
