@@ -206,6 +206,86 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_tick_loop_runs_actor_registry_cleanup(monkeypatch) -> None:
+    """Actor registry cleanup should run on each heartbeat tick."""
+    cleanup_calls: list[int] = []
+
+    def _fake_actor_cleanup() -> list[str]:
+        cleanup_calls.append(1)
+        return ["expired-actor-1"]
+
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3),
+        actor_cleanup=_fake_actor_cleanup,
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    server._running = True
+
+    await server._tick_loop()
+
+    assert len(cleanup_calls) > 0, "actor_cleanup callback should have been called"
+    assert any(
+        "expired 1 actors" in item for item in events
+    ), f"Expected actor cleanup event, got: {events}"
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_continues_when_actor_cleanup_fails(monkeypatch) -> None:
+    """Tick loop should continue even if actor cleanup raises an exception."""
+
+    def _broken_cleanup() -> list[str]:
+        raise RuntimeError("registry connection lost")
+
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3),
+        actor_cleanup=_broken_cleanup,
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Tick loop should have run (service received ticks)
+    assert svc.ticks >= 1
+    # Error event should have been recorded
+    assert any(
+        "actor cleanup failed" in item for item in events
+    ), f"Expected actor cleanup failure event, got: {events}"
+
+
+@pytest.mark.asyncio
 async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
     server = HeartbeatServer(
         OrchestraConfig(

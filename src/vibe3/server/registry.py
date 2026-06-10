@@ -178,12 +178,18 @@ def _build_server_with_launch_cwd(
         queue_filter=None,  # default behavior
     )
 
+    def _cleanup_expired_actors() -> list[str]:
+        from vibe3.execution import get_actor_registry
+
+        return get_actor_registry().cleanup_expired()
+
     heartbeat = HeartbeatServer(
         config,
         failed_gate=cast(FailedGateProtocol | None, failed_gate),
         error_tracker=None,
         check_service=shared_check_service,
         cleanup_service=None,
+        actor_cleanup=_cleanup_expired_actors,
     )
     heartbeat.register(facade)  # type: ignore[arg-type]
 

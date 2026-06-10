@@ -58,6 +58,7 @@ class HeartbeatServer:
         error_tracker: object | None = None,
         check_service: object | None = None,
         cleanup_service: object | None = None,
+        actor_cleanup: Callable[[], list[str]] | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -69,6 +70,7 @@ class HeartbeatServer:
         self._error_tracker: object | None = error_tracker
         self._check_service: object | None = check_service
         self._cleanup_service: object | None = cleanup_service
+        self._actor_cleanup: Callable[[], list[str]] | None = actor_cleanup
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -234,6 +236,33 @@ class HeartbeatServer:
                         f"Cleaned up {deleted_old} old error records "
                         f"(retention={error_tracking.retention_days}d)"  # type: ignore[attr-defined]
                     )
+
+            # Cleanup expired actor registry entries (maintenance)
+            if self._actor_cleanup:
+                try:
+                    expired_actors = self._actor_cleanup()
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} actor cleanup failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").warning(
+                        f"Actor registry cleanup failed: {exc}"
+                    )
+                else:
+                    if expired_actors:
+                        append_orchestra_event(
+                            "server",
+                            (
+                                f"tick #{tick_number} cleanup: expired "
+                                f"{len(expired_actors)} actors"
+                            ),
+                            level="DEBUG",
+                        )
+                        logger.bind(domain="orchestra", action="cleanup").debug(
+                            f"Expired {len(expired_actors)} actor(s) from registry"
+                        )
 
             # Periodic Git ref packing to prevent stale references
             if tick_number % PACK_REFS_INTERVAL_TICKS == 0:
