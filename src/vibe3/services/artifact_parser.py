@@ -1,82 +1,9 @@
-"""Artifact parsing and detail building logic."""
+"""Re-export shim for artifact parser.
 
-import re
-from pathlib import Path
+The actual implementation has moved to
+vibe3.services.shared.artifacts.
+"""
 
+from vibe3.services.shared.artifacts import ArtifactParser
 
-class ArtifactParser:
-    """Parser for handoff artifacts."""
-
-    _RESERVED_REF_KEYS = {
-        "ref",
-        "backend",
-        "model",
-        "session_id",
-        "modified_files",
-        "modified_count",
-        "verdict",
-        "comment_count",  # Special handling in detail building
-    }
-
-    _AGENT_PROMPT_BLOCK_RE = re.compile(
-        r"<agent-prompt>.*?</agent-prompt>\s*", re.DOTALL
-    )
-
-    @classmethod
-    def sanitize_handoff_content(cls, content: str) -> str:
-        """Strip prompt-provenance blocks from persisted shared artifacts."""
-        return cls._AGENT_PROMPT_BLOCK_RE.sub("", content)
-
-    @classmethod
-    def parse_modified_files(cls, content: str) -> list[str]:
-        """Extract modified files from a run artifact body."""
-        match = re.search(
-            r"### Modified Files\s*([\s\S]*?)(?:\n###|\Z)",
-            content,
-            re.IGNORECASE,
-        )
-        if not match:
-            return []
-
-        files_section = match.group(1)
-        file_matches = re.findall(
-            r"^-\s*([^:\]\n]+)(?::|\])?",
-            files_section,
-            re.MULTILINE,
-        )
-        return [path.strip() for path in file_matches if path.strip()]
-
-    @classmethod
-    def build_artifact_detail(
-        cls,
-        kind: str,
-        content: str,
-        artifact_file: Path,
-        metadata: dict[str, str] | None = None,
-    ) -> tuple[str, dict[str, str]]:
-        """Build event detail and refs from artifact content.
-
-        Note: Only called for kind="plan" or kind="run" (record_passive_artifact).
-        Review verdict is never parsed here — agent writes via handoff commands.
-        """
-        refs: dict[str, str] = {}
-        detail_parts = [f"{kind.capitalize()} completed: {artifact_file.name}"]
-
-        metadata = metadata or {}
-
-        if kind == "run":
-            modified_files = cls.parse_modified_files(content)
-            if modified_files:
-                refs["modified_files"] = ",".join(modified_files)
-                refs["modified_count"] = str(len(modified_files))
-                detail_parts.append(f"Modified {len(modified_files)} files:")
-                for file_path in modified_files[:3]:
-                    detail_parts.append(f"  - {file_path}")
-                if len(modified_files) > 3:
-                    detail_parts.append(f"  ... and {len(modified_files) - 3} more")
-
-        for key, value in metadata.items():
-            if key != "comment_count" and key not in cls._RESERVED_REF_KEYS:
-                refs[key] = value
-
-        return "\n".join(detail_parts), refs
+__all__ = ["ArtifactParser"]
