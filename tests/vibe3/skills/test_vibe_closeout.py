@@ -8,7 +8,7 @@ from vibe3.services.flow.cleanup import FlowCleanupService
 class TestVibeCloseout:
     """Tests for closeout skill cleanup behavior."""
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_preserve_mode_for_done_flow(self, mock_cleanup):
         """Test that done flows use preserve mode (keep_flow_record=True)."""
         # Setup
@@ -44,7 +44,7 @@ class TestVibeCloseout:
             force_delete=False,
         )
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_reset_mode_for_aborted_flow(self, mock_cleanup):
         """Test that aborted flows use reset mode (keep_flow_record=False)."""
         # Setup
@@ -80,7 +80,7 @@ class TestVibeCloseout:
             force_delete=False,
         )
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_cleanup_includes_remote_branch(self, mock_cleanup):
         """Test that cleanup includes remote branch deletion."""
         # Setup
@@ -109,7 +109,7 @@ class TestVibeCloseout:
         call_args = mock_cleanup.call_args
         assert call_args[1]["include_remote"] is True
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_cleanup_handles_partial_failure(self, mock_cleanup):
         """Test that cleanup handles partial failures gracefully."""
         # Setup - simulate partial failure (worktree removal failed)
@@ -160,7 +160,7 @@ class TestVibeCloseout:
         assert cleanup_mode == "reset"
         assert keep_flow_record is False
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_handles_missing_remote_branch(self, mock_cleanup):
         """Test that cleanup handles missing remote branch gracefully."""
         # Setup - remote branch doesn't exist
@@ -187,7 +187,7 @@ class TestVibeCloseout:
         # Verify cleanup succeeds even if remote didn't exist
         assert result["remote_branch"] is True
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_closeout_terminates_task_sessions(self, mock_cleanup):
         """Test that cleanup terminates tmux sessions for task branches."""
         # Setup
@@ -219,7 +219,7 @@ class TestVibeCloseout:
 class TestCloseoutIntegration:
     """Integration tests for closeout workflow."""
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_complete_closeout_workflow_done(self, mock_cleanup):
         """Test complete closeout workflow for done flow."""
         # Setup
@@ -253,7 +253,7 @@ class TestCloseoutIntegration:
         call_args = mock_cleanup.call_args
         assert call_args[1]["keep_flow_record"] is True
 
-    @patch("vibe3.services.flow_cleanup_service.FlowCleanupService.cleanup_flow_scene")
+    @patch("vibe3.services.flow.cleanup.FlowCleanupService.cleanup_flow_scene")
     def test_complete_closeout_workflow_aborted(self, mock_cleanup):
         """Test complete closeout workflow for aborted flow."""
         # Setup
