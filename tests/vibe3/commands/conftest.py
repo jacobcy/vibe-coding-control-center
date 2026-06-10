@@ -15,7 +15,7 @@ from vibe3.commands.inspect import app as inspect_app
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.handoff_status_service import HandoffStatusResult
+from vibe3.services.handoff.status import HandoffStatusResult
 
 
 @pytest.fixture(autouse=True)

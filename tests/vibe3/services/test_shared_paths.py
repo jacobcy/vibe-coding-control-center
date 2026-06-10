@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.services.handoff_resolution import (
+from vibe3.services.handoff.resolution import (
     is_shared_handoff_ref,
     to_display_target,
 )
