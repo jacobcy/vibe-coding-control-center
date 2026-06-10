@@ -351,3 +351,68 @@ class TestQueueOperations:
         await coordinator.coordinate()
 
         assert len(emit_calls) == 0
+
+    def test_single_issue_qualify_failure_does_not_abort_batch(
+        self, make_issue, make_issue_info, monkeypatch
+    ) -> None:
+        """When one issue's qualify gate fails, other issues should still be
+        collected."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+        from vibe3.orchestra.queue_operations import (
+            select_ready_issues_from_collected_issues,
+        )
+
+        # Create two issues in READY state
+        issue1 = make_issue(1, priority=5)
+        issue2 = make_issue(2, priority=5)
+
+        config = OrchestraConfig(repo="owner/repo")
+        config.manager_usernames = ["manager-bot"]
+        config.supervisor_handoff.issue_label = "supervisor"
+
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        # Mock qualify gate to fail for issue #1, succeed for issue #2
+        qualify_gate = MagicMock()
+        call_count = [0]
+
+        def mock_run_qualify_gate(issue, branch, flow_state, labels, trigger_state):
+            call_count[0] += 1
+            if issue.number == 1:
+                raise RuntimeError("qualify gate failed for issue #1")
+            elif issue.number == 2:
+                return trigger_state  # Return trigger_state to indicate success
+            return None
+
+        qualify_gate.run_qualify_gate = mock_run_qualify_gate
+
+        # Mock get_flow_context_bulk to return empty results
+        monkeypatch.setattr(
+            "vibe3.orchestra.get_flow_context_bulk",
+            lambda numbers, config, github, store, flow_manager: {
+                1: ("task/issue-1", None),
+                2: ("task/issue-2", None),
+            },
+        )
+
+        # Call select_ready_issues_from_collected_issues directly
+        selected = select_ready_issues_from_collected_issues(
+            issues=[issue1, issue2],
+            trigger_state=IssueState.READY,
+            config=config,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            qualify_gate=qualify_gate,
+            supervisor_label="supervisor",
+        )
+
+        # Verify: issue #2 is selected, issue #1 is skipped
+        assert len(selected) == 1
+        assert selected[0].number == 2
+        assert call_count[0] == 2  # Both issues were processed

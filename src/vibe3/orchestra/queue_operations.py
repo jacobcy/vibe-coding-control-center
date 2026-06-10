@@ -6,6 +6,8 @@ import importlib
 import time
 from typing import TYPE_CHECKING, Any, Callable, cast
 
+from loguru import logger
+
 from vibe3.config import get_manager_usernames
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
@@ -88,9 +90,24 @@ def select_ready_issues_from_collected_issues(
 
         branch, flow_state = flow_contexts.get(issue.number, ("", None))
 
-        target = qualify_gate.run_qualify_gate(
-            issue, branch, flow_state, issue.labels, trigger_state
-        )
+        try:
+            target = qualify_gate.run_qualify_gate(
+                issue, branch, flow_state, issue.labels, trigger_state
+            )
+        except Exception:
+            # Broad catch intentional: qualify_gate touches GitHub API,
+            # SQLite, subprocess, filesystem — any failure should skip
+            # this issue without aborting the entire batch
+            logger.warning(
+                "Skipping issue #{} during queue selection for {}: qualify gate failed",
+                issue.number,
+                trigger_state.value,
+            )
+            append_orchestra_event(
+                "dispatcher",
+                f"queue selection skipped #{issue.number}: qualify gate failed",
+            )
+            continue
         if target is None or target != trigger_state:
             continue
 
