@@ -39,9 +39,9 @@ from vibe3.prompts import (
     PromptManifest,
     PromptProvider,
     ProviderRegistry,
+    load_prompt_templates,
     resolve_source,
 )
-from vibe3.prompts.template_loader import load_prompt_templates
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
