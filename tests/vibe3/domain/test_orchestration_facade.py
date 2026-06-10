@@ -43,7 +43,7 @@ class TestOrchestrationFacade:
         )
         # Need 5 values: 2 for first call, 2 for second call, 1 for extra safety
         mock_monotonic.side_effect = [0.0, 1.0, 2.0, 3.0, 4.0]
-        facade = OrchestrationFacade(tick_count=0)
+        facade = OrchestrationFacade(flow_manager=MagicMock(), tick_count=0)
 
         facade.on_heartbeat_tick()
 
@@ -77,7 +77,7 @@ class TestOrchestrationFacade:
         # Need 3 values: 1 for first call (skip), 2 for second call (publish)
         mock_monotonic.side_effect = [0.0, 60.0, 901.0, 901.0]
 
-        facade = OrchestrationFacade(tick_count=0)
+        facade = OrchestrationFacade(flow_manager=MagicMock(), tick_count=0)
 
         facade.on_heartbeat_tick()
         mock_publish.assert_not_called()
@@ -101,7 +101,9 @@ class TestOrchestrationFacade:
             governance=GovernanceConfig(interval_ticks=1),
         )
 
-        facade = OrchestrationFacade(tick_count=0, config=config)
+        facade = OrchestrationFacade(
+            flow_manager=MagicMock(), tick_count=0, config=config
+        )
 
         facade.on_heartbeat_tick()
 
@@ -117,7 +119,7 @@ class TestOrchestrationFacade:
         sample_issue_info: IssueInfo,
     ) -> None:
         """Test that on_governance_decision posts a GitHub comment directly."""
-        facade = OrchestrationFacade()
+        facade = OrchestrationFacade(flow_manager=MagicMock())
         facade.on_governance_decision(
             issue_info=sample_issue_info,
             reason="Manual review required",
@@ -145,6 +147,7 @@ class TestOrchestrationFacade:
         )
 
         facade = OrchestrationFacade(
+            flow_manager=MagicMock(),
             capacity=capacity,
             failed_gate=gate,
             coordinator_factory=lambda **kwargs: MagicMock(),
@@ -194,7 +197,7 @@ class TestOrchestrationFacade:
             }
         ]
 
-        facade = OrchestrationFacade()
+        facade = OrchestrationFacade(flow_manager=MagicMock())
         await facade.on_supervisor_scan()
 
         assert mock_publish.call_count == 1
@@ -237,7 +240,7 @@ class TestOrchestrationFacade:
             },
         ]
 
-        facade = OrchestrationFacade()
+        facade = OrchestrationFacade(flow_manager=MagicMock())
         await facade.on_supervisor_scan()
 
         mock_publish.assert_not_called()

@@ -128,6 +128,7 @@ def make_coordinator() -> callable:
             issue_loader=mock_issue_loader,
             flow_context_resolver=mock_flow_context_resolver,
             queue_selector=select_ready_issues_from_collected_issues,
+            check_service=MagicMock(),
             queue_filter=should_skip_from_queue,
         )
 

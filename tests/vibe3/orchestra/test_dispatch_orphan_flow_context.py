@@ -19,12 +19,14 @@ def _make_mock_coordinator_dependencies():
     issue_loader = MagicMock(return_value=None)
     flow_context_resolver = MagicMock(return_value=("", None))
     queue_selector = MagicMock(return_value=[])
+    check_service = MagicMock()
     return {
         "health_check_service": health_check_service,
         "queue_persistence": queue_persistence,
         "issue_loader": issue_loader,
         "flow_context_resolver": flow_context_resolver,
         "queue_selector": queue_selector,
+        "check_service": check_service,
     }
 
 
