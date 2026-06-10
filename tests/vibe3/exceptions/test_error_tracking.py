@@ -550,7 +550,7 @@ def test_get_all_errors_status_null_severity_defaults_to_error(
         """)
         conn.commit()
 
-    from vibe3.services.error_tracking_queries import get_all_errors_status
+    from vibe3.services.orchestra.error_tracking.queries import get_all_errors_status
 
     status = get_all_errors_status(temp_store.db_path)
 
@@ -579,7 +579,7 @@ def test_get_all_errors_status_no_unknown_severity_returns_empty_dict(
         "E_EXEC_NO_OUTPUT", "Warning", severity=ErrorSeverity.WARNING
     )
 
-    from vibe3.services.error_tracking_queries import get_all_errors_status
+    from vibe3.services.orchestra.error_tracking.queries import get_all_errors_status
 
     status = get_all_errors_status(temp_store.db_path)
 
