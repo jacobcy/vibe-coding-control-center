@@ -373,7 +373,7 @@ def test_health_check_skips_block_flow_for_aborted_flows(tmp_path) -> None:
     from vibe3.clients import SQLiteClient
     from vibe3.models.orchestration import IssueInfo, IssueState
     from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
-    from vibe3.services.check_service import CheckResult, CheckService
+    from vibe3.services.check.service import CheckResult, CheckService
 
     store = SQLiteClient(db_path=tmp_path / "test.db")
     branch = "task/issue-1629"

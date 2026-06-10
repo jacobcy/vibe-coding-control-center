@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.service import CheckService
 
 
 class TestPRStatusDetection:
@@ -410,7 +410,7 @@ class TestClosedPRIdempotency:
         """Should skip handling if already handled with same closed_at."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.check.pr_service import CheckPRService
         from vibe3.services.flow_status_service import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
@@ -472,7 +472,7 @@ class TestClosedPRIdempotency:
         """Should handle again if PR was closed again (updated_at before closed_at)."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.check.pr_service import CheckPRService
         from vibe3.services.flow_status_service import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
@@ -533,7 +533,7 @@ class TestClosedPRIdempotency:
         """Should handle if initiated_by is not 'check:pr_closed'."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
+        from vibe3.services.check.pr_service import CheckPRService
         from vibe3.services.flow_status_service import FlowStatusService
 
         # ARRANGE: Flow state with different initiated_by

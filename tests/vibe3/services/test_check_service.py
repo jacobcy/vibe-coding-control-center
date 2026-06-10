@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from vibe3.models.pr import PRState
 
 if TYPE_CHECKING:
-    from vibe3.services.check_pr_service import CheckPRService
+    from vibe3.services.check.pr_service import CheckPRService
 
 
 def _make_check_pr_service() -> "CheckPRService":
@@ -14,7 +14,7 @@ def _make_check_pr_service() -> "CheckPRService":
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.check_pr_service import CheckPRService
+    from vibe3.services.check.pr_service import CheckPRService
     from vibe3.services.flow_status_service import FlowStatusService
 
     store = MagicMock(spec=SQLiteClient)
@@ -133,7 +133,7 @@ def test_handle_pr_terminal_state_does_not_call_rebuild() -> None:
 
     with (
         patch(
-            "vibe3.services.check_pr_service.FlowRebuildUsecase", create=True
+            "vibe3.services.check.pr_service.FlowRebuildUsecase", create=True
         ) as rebuild_cls,
         patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"

@@ -12,9 +12,9 @@ if TYPE_CHECKING:
         BootstrapContextService,
         BootstrapPlan,
     )
-    from vibe3.services.check_cleanup_service import CheckCleanupService
-    from vibe3.services.check_remote import InitResult
-    from vibe3.services.check_service import CheckResult, CheckService
+    from vibe3.services.check.cleanup import CheckCleanupService
+    from vibe3.services.check.remote import InitResult
+    from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
     from vibe3.services.error_tracking_service import ErrorTrackingService
 
@@ -287,9 +287,9 @@ _SYMBOL_MODULES = {
     # Services
     "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
     "BlockedStateService": "vibe3.services.blocked_state_service",
-    "CheckCleanupService": "vibe3.services.check_cleanup_service",
-    "CheckResult": "vibe3.services.check_service",
-    "CheckService": "vibe3.services.check_service",
+    "CheckCleanupService": "vibe3.services.check.cleanup",
+    "CheckResult": "vibe3.services.check.service",
+    "CheckService": "vibe3.services.check.service",
     "CoordinationResolver": "vibe3.services.coordination_resolver",
     "ErrorTrackingService": "vibe3.services.error_tracking_service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
@@ -306,7 +306,7 @@ _SYMBOL_MODULES = {
     "FlowStatusService": "vibe3.services.flow.status",
     "HandoffService": "vibe3.services.handoff_service",
     "HandoffStatusService": "vibe3.services.handoff.status",
-    "InitResult": "vibe3.services.check_remote",
+    "InitResult": "vibe3.services.check.remote",
     "IssueCollectionService": "vibe3.services.issue.collection",
     "IssueFlowService": "vibe3.services.issue.flow",
     "IssueStatusEntry": "vibe3.services.orchestra.status",

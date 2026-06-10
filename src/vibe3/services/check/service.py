@@ -11,9 +11,9 @@ from loguru import logger
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.config import VibeConfig
 from vibe3.models import IssueState
-from vibe3.services.check_lock import check_lock
-from vibe3.services.check_pr_service import CheckPRService
-from vibe3.services.check_remote import (
+from vibe3.services.check.lock import check_lock
+from vibe3.services.check.pr_service import CheckPRService
+from vibe3.services.check.remote import (
     CheckRemote,
     is_empty_auto_scene,
     issue_state_from_payload,

@@ -115,7 +115,7 @@ def _make_flow_state(
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.services.check.service.CheckService")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_default_filters_active(
     _mock_git_client,
@@ -147,7 +147,7 @@ def test_flow_status_default_filters_active(
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.services.check.service.CheckService")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_all_includes_terminal_states(
     _mock_git_client,
