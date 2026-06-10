@@ -254,30 +254,23 @@ recipes:
 
 
 def test_no_large_file_sources_in_default_recipes() -> None:
-    """Regression test: no recipe section with kind:file should reference large files.
+    """Regression test: kind:file sources pass through --prompt-file, not stdin.
 
-    Large files (>2048 bytes) should use kind:literal with Read instruction instead
-    to avoid codeagent-wrapper stdin-mode threshold (~800 chars).
+    All kind:file sources (sections, variables, material_catalog) are assembled
+    into the prompt body and written to a temp file passed via --prompt-file.
+    The codeagent-wrapper stdin-mode threshold (~800 chars) only applies to the
+    task positional argument, not the prompt file content.
 
-    This prevents regressions where runtime centralization accidentally reverts
-    the kind:literal fix (as happened in commit 44d26faf).
+    This test verifies that kind:file sources resolve to existing files on disk,
+    preventing regressions where files are missing or paths are broken.
     """
     from vibe3.prompts.models import VariableSourceKind
 
-    # 2048 bytes is a conservative upper bound for kind:file sources.
-    # The runtime stdin-mode threshold is ~800 chars (CODEAGENT_STDIN_MODE_THRESHOLD).
-    # Files between 801-2047 chars will pass this regression test but may still
-    # trigger stdin mode at runtime; the recipe design should prefer kind:literal
-    # for files approaching either threshold.
-    max_file_size_bytes = 2048
-
     manifest = PromptManifest.load_default()
 
-    violations: list[str] = []
+    missing: list[str] = []
 
-    # Check all recipes in the manifest
     for recipe_key, recipe in manifest.recipes.items():
-
         # Check section_recipe sections
         if recipe.kind == "section_recipe" and recipe.loaded_definition:
             for variant_key, variant in recipe.loaded_definition.variants.items():
@@ -286,51 +279,36 @@ def test_no_large_file_sources_in_default_recipes() -> None:
                         section.source
                         and section.source.kind == VariableSourceKind.FILE
                     ):
-                        # Resolve the file path
                         file_path = _resolve_repo_path(Path(section.source.path))
-                        if file_path.exists():
-                            file_size = file_path.stat().st_size
-                            if file_size > max_file_size_bytes:
-                                violations.append(
-                                    f"{recipe_key}/{variant_key}/{section.key}: "
-                                    f"{section.source.path} is {file_size} bytes "
-                                    f"(limit: {max_file_size_bytes})"
-                                )
+                        if not file_path.exists():
+                            missing.append(
+                                f"{recipe_key}/{variant_key}/{section.key}: "
+                                f"{section.source.path} (file not found)"
+                            )
 
         # Check template_recipe variables
         if recipe.kind == "template_recipe" and recipe.loaded_definition:
             for var_name, var_source in recipe.loaded_definition.variables.items():
                 if var_source.kind == VariableSourceKind.FILE:
-                    # Resolve the file path
                     file_path = _resolve_repo_path(Path(var_source.path))
-                    if file_path.exists():
-                        file_size = file_path.stat().st_size
-                        if file_size > max_file_size_bytes:
-                            violations.append(
-                                f"{recipe_key}/variable/{var_name}: "
-                                f"{var_source.path} is {file_size} bytes "
-                                f"(limit: {max_file_size_bytes})"
-                            )
+                    if not file_path.exists():
+                        missing.append(
+                            f"{recipe_key}/variable/{var_name}: "
+                            f"{var_source.path} (file not found)"
+                        )
 
         # Check template_recipe material_catalog
         if recipe.kind == "template_recipe" and recipe.loaded_definition:
             if recipe.loaded_definition.material_catalog:
                 for material in recipe.loaded_definition.material_catalog:
                     if material.source.kind == VariableSourceKind.FILE:
-                        # Resolve the file path
                         file_path = _resolve_repo_path(Path(material.source.path))
-                        if file_path.exists():
-                            file_size = file_path.stat().st_size
-                            if file_size > max_file_size_bytes:
-                                violations.append(
-                                    f"{recipe_key}/material/{material.name}: "
-                                    f"{material.source.path} is {file_size} bytes "
-                                    f"(limit: {max_file_size_bytes})"
-                                )
+                        if not file_path.exists():
+                            missing.append(
+                                f"{recipe_key}/material/{material.name}: "
+                                f"{material.source.path} (file not found)"
+                            )
 
-    if violations:
-        violation_list = "\n  - ".join([""] + violations)
-        pytest.fail(
-            f"Found large file sources with kind:file (should use kind:literal):"
-            f"{violation_list}"
-        )
+    if missing:
+        missing_list = "\n  - ".join([""] + missing)
+        pytest.fail(f"kind:file sources point to non-existent files:{missing_list}")
