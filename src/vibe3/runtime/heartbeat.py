@@ -11,10 +11,10 @@ from loguru import logger
 
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
+from vibe3.orchestra.domain_types import ServiceBase
 from vibe3.utils import PACK_REFS_INTERVAL_TICKS
 
 from .periodic_check_executor import execute_periodic_check
-from .service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.domain import GateResult
