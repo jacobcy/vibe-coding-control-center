@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from vibe3.models.event_bus import (
         EventHandler,
         EventPublisher,
+        PublishHook,
         get_publisher,
         publish,
         subscribe,
@@ -218,6 +219,7 @@ _LAZY_IMPORTS = {
     "DISPLAY_PLACEHOLDER_ACTORS": "vibe3.models.actor_utils",
     "EventHandler": "vibe3.models.event_bus",
     "EventPublisher": "vibe3.models.event_bus",
+    "PublishHook": "vibe3.models.event_bus",
     "format_result_entries": "vibe3.models.trace",
     "get_publisher": "vibe3.models.event_bus",
     "GovernanceConfig": "vibe3.models.orchestra_config",
@@ -342,6 +344,7 @@ __all__: list[str] = [
     "DISPLAY_PLACEHOLDER_ACTORS",
     "EventHandler",
     "EventPublisher",
+    "PublishHook",
     "format_result_entries",
     "get_publisher",
     "GovernanceConfig",

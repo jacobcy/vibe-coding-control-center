@@ -15,6 +15,13 @@ if TYPE_CHECKING:
         MAX_INTENTS_PER_TICK,
         GlobalDispatchCoordinator,
     )
+    from vibe3.domain.event_rules import (
+        EventRule,
+        build_action_handlers,
+        evaluate_rules,
+        expand_template,
+        load_rules,
+    )
     from vibe3.domain.events.base import DomainEvent
     from vibe3.domain.events.flow_lifecycle import (
         ExecutorDispatchIntent,
@@ -91,6 +98,12 @@ _LAZY_IMPORTS: dict[str, str] = {
     "find_role_for_state": "vibe3.domain.role_resolver",
     # Publisher
     "EventPublisher": "vibe3.domain.publisher",
+    # Event rules
+    "EventRule": "vibe3.domain.event_rules",
+    "build_action_handlers": "vibe3.domain.event_rules",
+    "evaluate_rules": "vibe3.domain.event_rules",
+    "expand_template": "vibe3.domain.event_rules",
+    "load_rules": "vibe3.domain.event_rules",
 }
 
 
@@ -171,6 +184,12 @@ __all__ = [
     "get_publisher",
     "publish",
     "subscribe",
+    # Event rules
+    "EventRule",
+    "build_action_handlers",
+    "evaluate_rules",
+    "expand_template",
+    "load_rules",
     # Handlers
     "register_event_handlers",
 ]
