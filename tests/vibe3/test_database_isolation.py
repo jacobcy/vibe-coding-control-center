@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 from vibe3.services.shared.errors import record_error
 
 

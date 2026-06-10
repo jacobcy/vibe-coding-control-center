@@ -13,7 +13,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate, GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server import app
-from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
 
 @pytest.fixture(autouse=True)

@@ -220,7 +220,7 @@ class TestErrorBlockOrthogonality:
 
     def test_error_log_stores_runtime_errors(self, temp_db):
         """Runtime errors should be stored in error_log, not block flow."""
-        from vibe3.services.error_tracking_service import ErrorTrackingService
+        from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
         branch = "test-branch"
 

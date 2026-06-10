@@ -32,7 +32,7 @@ def usecase():
             return_value=mock_github,
         ) as _,
         patch(
-            "vibe3.services.blocked_state_io.GitHubClient",
+            "vibe3.services.flow.blocked_state_io.GitHubClient",
             return_value=mock_github,
         ) as _,
         patch("vibe3.services.task.resume.IssueFlowService") as mock_issue_flow,

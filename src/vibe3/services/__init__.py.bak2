@@ -3,6 +3,18 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+<<<<<<< HEAD
+    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
+    from vibe3.services.flow.blocked_state_service import BlockedStateService
+=======
+    from vibe3.services.bootstrap_context_service import (
+        BootstrapAction,
+        BootstrapActionKind,
+        BootstrapContextService,
+        BootstrapPlan,
+    )
+>>>>>>> 8380c9ed (refactor(services): migrate base_resolution_usecase to pr/base_resolution)
+    from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.flow.blocked_state_service import BlockedStateService

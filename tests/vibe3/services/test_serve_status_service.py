@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.serve_status_service import ServeStatusService
+from vibe3.services.orchestra.serve_status import ServeStatusService
 
 
 class TestCleanErrorMessage:
@@ -172,7 +172,7 @@ class TestDisplayErrorTracking:
     @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
     def test_display_historical_errors_windowed_zero(self, mock_get_instance):
         """Display should show historical errors even when windowed count is zero."""
-        from vibe3.services.serve_status_service import ServeStatusService
+        from vibe3.services.orchestra.serve_status import ServeStatusService
 
         # Mock error tracking service
         mock_service = MagicMock()
@@ -212,7 +212,7 @@ class TestDisplayErrorTracking:
     @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
     def test_display_historical_and_windowed_both_nonzero(self, mock_get_instance):
         """Display should show both historical and windowed counts when both nonzero."""
-        from vibe3.services.serve_status_service import ServeStatusService
+        from vibe3.services.orchestra.serve_status import ServeStatusService
 
         # Mock error tracking service
         mock_service = MagicMock()
@@ -250,7 +250,7 @@ class TestDisplayErrorTracking:
     @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
     def test_display_no_errors(self, mock_get_instance):
         """Display should show 'No errors recorded' when total is zero."""
-        from vibe3.services.serve_status_service import ServeStatusService
+        from vibe3.services.orchestra.serve_status import ServeStatusService
 
         # Mock error tracking service
         mock_service = MagicMock()
@@ -287,7 +287,7 @@ class TestDisplayErrorTracking:
         """Display should render table with recent errors."""
         from rich.table import Table
 
-        from vibe3.services.serve_status_service import ServeStatusService
+        from vibe3.services.orchestra.serve_status import ServeStatusService
 
         # Mock error tracking service
         mock_service = MagicMock()

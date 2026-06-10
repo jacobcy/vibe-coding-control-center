@@ -34,7 +34,7 @@ def mock_store():
 @pytest.fixture
 def mock_label_service():
     """Mock LabelService."""
-    with patch("vibe3.services.blocked_state_io.LabelService") as mock:
+    with patch("vibe3.services.flow.blocked_state_io.LabelService") as mock:
         yield mock.return_value
 
 
@@ -48,7 +48,7 @@ def mock_flow_timeline_service():
 @pytest.fixture
 def mock_github_client():
     """Mock GitHubClient."""
-    with patch("vibe3.services.blocked_state_io.GitHubClient") as mock:
+    with patch("vibe3.services.flow.blocked_state_io.GitHubClient") as mock:
         mock_instance = mock.return_value
         mock_instance.get_issue_body.return_value = "Test issue body"
         yield mock_instance

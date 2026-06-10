@@ -394,7 +394,7 @@ def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
     from unittest.mock import patch
 
     with patch(
-        "vibe3.services.blocked_state_io.LabelService"
+        "vibe3.services.flow.blocked_state_io.LabelService"
     ) as mock_label_service_cls:
         mock_label_service = MagicMock()
         mock_label_service.confirm_issue_state.return_value = "confirmed"

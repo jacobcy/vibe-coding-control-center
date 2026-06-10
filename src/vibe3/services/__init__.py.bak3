@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.flow.blocked_state_service import BlockedStateService
