@@ -9,6 +9,7 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.execution.actor import (
     ActorRegistry,
+    ActorStatus,
     JobActor,
     JobType,
     _reset_registry,
@@ -70,7 +71,7 @@ class TestJobMonitorService:
         assert len(snap.active_jobs) == 1
         job = snap.active_jobs[0]
         assert job.actor_id == actor.actor_id
-        assert job.status == "running"
+        assert job.status == ActorStatus.RUNNING
         assert job.issue_number == 200
 
     def test_queued_actor_appears_in_active_jobs(self) -> None:
@@ -88,7 +89,7 @@ class TestJobMonitorService:
         snap = svc.snapshot()
 
         assert len(snap.active_jobs) == 1
-        assert snap.active_jobs[0].status == "queued"
+        assert snap.active_jobs[0].status == ActorStatus.QUEUED
 
     def test_completed_actor_appears_in_recent_jobs(self) -> None:
         """DONE actors appear in recent_jobs."""
@@ -102,7 +103,7 @@ class TestJobMonitorService:
         assert snap.completed_count == 1
         assert snap.running_count == 0
         assert len(snap.recent_jobs) == 1
-        assert snap.recent_jobs[0].status == "done"
+        assert snap.recent_jobs[0].status == ActorStatus.DONE
 
     def test_failed_actor_appears_in_recent_jobs(self) -> None:
         """FAILED actors appear in recent_jobs with failed_count."""
@@ -116,7 +117,7 @@ class TestJobMonitorService:
         assert snap.failed_count == 1
         assert snap.completed_count == 0
         assert len(snap.recent_jobs) == 1
-        assert snap.recent_jobs[0].status == "failed"
+        assert snap.recent_jobs[0].status == ActorStatus.FAILED
 
     def test_dead_actor_counted_as_failed(self) -> None:
         """DEAD actors count toward failed_count."""
@@ -128,7 +129,7 @@ class TestJobMonitorService:
         snap = svc.snapshot()
 
         assert snap.failed_count == 1
-        assert snap.recent_jobs[0].status == "dead"
+        assert snap.recent_jobs[0].status == ActorStatus.DEAD
 
     def test_mixed_states_correct_counts(self) -> None:
         """Multiple actors with different states produce correct counts."""
@@ -171,8 +172,8 @@ class TestJobMonitorService:
         job = snap.active_jobs[0]
         assert isinstance(job, ActiveJob)
         assert job.actor_id == actor.actor_id
-        assert job.job_type == "governance"
-        assert job.status == "running"
+        assert job.job_type == JobType.GOVERNANCE
+        assert job.status == ActorStatus.RUNNING
         assert job.issue_number == 700
         assert job.branch == "task/issue-700"
         assert job.started_at is not None
