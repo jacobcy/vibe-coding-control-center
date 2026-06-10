@@ -88,8 +88,8 @@ def _render_runtime_versions() -> None:
 
     try:
         repo_root = resolve_orchestra_repo_root()
-        policies_dir = repo_root / ".vibe" / "governance" / "policies"
-        materials_dir = repo_root / ".vibe" / "governance" / "materials"
+        policies_dir = repo_root / ".agent" / "governance" / "policies"
+        materials_dir = repo_root / "supervisor" / "governance"
 
         policy_hash = compute_hash_from_loader(policy_loader, policies_dir)
         material_hash = compute_hash_from_loader(material_loader, materials_dir)

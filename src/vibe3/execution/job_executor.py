@@ -215,12 +215,11 @@ class JobExecutor:
         repo_root = resolve_orchestra_repo_root()
         from vibe3.services import material_loader, policy_loader
 
-        governance_dir = repo_root / ".vibe" / "governance"
-        policy_hash = compute_hash_from_loader(
-            policy_loader, governance_dir / "policies"
-        )
         material_hash = compute_hash_from_loader(
-            material_loader, governance_dir / "materials"
+            material_loader, repo_root / "supervisor" / "governance"
+        )
+        policy_hash = compute_hash_from_loader(
+            policy_loader, repo_root / ".agent" / "governance" / "policies"
         )
 
         # Record lifecycle started event

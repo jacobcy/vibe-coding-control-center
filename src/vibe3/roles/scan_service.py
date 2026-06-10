@@ -10,37 +10,46 @@ from typing import Any
 from loguru import logger
 
 
-def extract_material_description(material_path: str) -> str:
-    """Extract description from material markdown file.
+def extract_material_description(material_name: str) -> str:
+    """Extract description from a governance material entry.
 
-    Reads the first markdown header (# Title) as description.
-    Falls back to filename if no title found.
+    Uses the material_loader to read from disk (PolicyLoader boundary),
+    falling back to the filename if the file cannot be loaded.
 
     Args:
-        material_path: Path to material file
+        material_name: Material name (e.g. "supervisor/governance/assignee-pool.md")
 
     Returns:
-        Material description or filename as fallback
+        Material description (first markdown header) or filename as fallback.
     """
+    from vibe3.clients import GitClient
+    from vibe3.services import material_loader
+
     try:
-        path = Path(material_path)
-        if not path.exists():
-            return material_path
+        git_client = GitClient()
+        git_common_dir = git_client.get_git_common_dir()
+        if not git_common_dir:
+            return material_name
+        repo_root = Path(git_common_dir).parent
+        materials_dir = repo_root / "supervisor" / "governance"
 
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("# "):
-                    # Extract title without '# ' prefix
-                    return line[2:].strip()
-                # Stop at first non-empty, non-title line
-                if line and not line.startswith("#"):
-                    break
+        loader = material_loader(materials_dir)
+        # Strip directory prefix: "supervisor/governance/foo.md" -> "foo.md"
+        basename = Path(material_name).name
+        entry = loader.load(basename)
+        if entry is None:
+            return material_name
+
+        for line in entry.content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                return stripped[2:].strip()
+            if stripped and not stripped.startswith("#"):
+                break
     except Exception as e:
-        logger.debug(f"Could not extract description from {material_path}: {e}")
+        logger.debug(f"Could not extract description from {material_name}: {e}")
 
-    # Fallback to filename
-    return material_path
+    return material_name
 
 
 def dispatch_governance_execution(
