@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, cast
 
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
         QualifyGateServiceProtocol,
     )
 
+
+logger = logging.getLogger(__name__)
 
 # Cooldown mechanism for auto-resume circuit breaker
 AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -93,12 +96,10 @@ def select_ready_issues_from_collected_issues(
                 issue, branch, flow_state, issue.labels, trigger_state
             )
         except Exception:
-            import logging
-
-            logger = logging.getLogger(__name__)
             logger.warning(
                 f"Skipping issue #{issue.number} during queue selection for "
-                f"{trigger_state.value}: qualify gate failed"
+                f"{trigger_state.value}: qualify gate failed",
+                exc_info=True,
             )
             continue
         if target is None or target != trigger_state:
