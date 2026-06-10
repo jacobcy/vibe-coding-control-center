@@ -52,6 +52,43 @@ gh issue list --search "<标题>" --state all --json number,title,state
 - 建议 Labels（`bug`、`enhancement`、`priority/*`）
 - **禁止添加 `vibe-task` 标签**（自动镜像）
 
+### Step 4.5: Milestone Assignment
+
+**必须为每个 issue 分配 milestone**，确保版本规划可追踪。
+
+**检查现有 milestones**：
+
+```bash
+gh api repos/{owner}/{repo}/milestones --paginate -q '.[] | {number, title, open_issues, closed_issues}'
+```
+
+**询问用户**：
+
+> 建议分配到哪个 milestone？
+> 
+> 当前活跃 milestones：
+> - Phase 6: 架构清理与模块化 (5 open)
+> - Phase 7: Runtime Kernel 核心能力 (3 open)
+> - Phase 8: Runtime Kernel 高级特性 (1 open)
+>
+> 或创建新 milestone？
+
+**分配原则**：
+
+- **Bug 修复** → 当前版本 milestone（如有活跃修复阶段）或下一版本
+- **Feature/Epic** → 根据规划放入对应版本 milestone
+- **RFC/讨论** → 暂不分配 milestone，等待决策
+- **Sub-issue** → 与父 epic issue 使用相同 milestone
+
+**如果用户不确定**：
+
+提供推荐并说明理由：
+
+```text
+建议分配到: Phase 6: 架构清理与模块化
+理由: 此 issue 涉及 services/shared 模块重构，属于架构清理范围
+```
+
 ### Step 5: Scope Check
 
 扫描是否为 epic 候选：
@@ -87,8 +124,16 @@ gh issue list --search "<标题>" --state all --json number,title,state
 ### Step 6: Create
 
 ```bash
+# 如果有 milestone
+gh issue create --title "<标题>" --body "<内容>" --label "<labels>" --milestone "<milestone title>"
+
+# 如果是 RFC 或用户明确不确定 milestone
 gh issue create --title "<标题>" --body "<内容>" --label "<labels>"
 ```
+
+**重要**：
+- 创建后立即确认 milestone 是否正确设置
+- 如无 milestone，提醒用户后续需通过 `vibe-roadmap` 补充分配
 
 输出 Issue 链接，建议下一步：
 - 版本规划：`vibe-roadmap`
