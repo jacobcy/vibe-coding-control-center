@@ -276,7 +276,7 @@ class TestFailedGateIntegration:
 
     @pytest.mark.asyncio
     async def test_heartbeat_tick_blocked_by_active_gate(
-        self, temp_store: SQLiteClient
+        self, temp_store: SQLiteClient, monkeypatch
     ) -> None:
         """Heartbeat runtime should skip on_tick() when FailedGate is ACTIVE."""
         ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -292,6 +292,14 @@ class TestFailedGateIntegration:
 
             async def on_tick(self, tick_id: int = 0) -> None:
                 tick_calls.append("tick")
+
+        # Prevent _MockService registration from leaking into production log
+        events: list[str] = []
+
+        def _capture(domain: str, message: str, **kwargs) -> None:
+            events.append(f"{domain}:{message}")
+
+        monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
 
         server.register(TickService())
         server._running = True
