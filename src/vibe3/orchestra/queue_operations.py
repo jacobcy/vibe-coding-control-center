@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 from vibe3.config import get_manager_usernames
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
-from vibe3.orchestra import get_flow_context, is_auto_task_branch, load_issue
+from vibe3.orchestra import (
+    get_flow_context_bulk,
+    is_auto_task_branch,
+    load_issue,
+)
 from vibe3.utils import sort_ready_issues
 
 if TYPE_CHECKING:
@@ -52,6 +56,25 @@ def select_ready_issues_from_collected_issues(
     if role is None:
         return selected
 
+    # Collect issue numbers that pass the trigger_state and queue_filter gates
+    candidate_numbers: list[int] = []
+    for issue in issues:
+        if issue.state != trigger_state:
+            continue
+        if queue_filter is not None and queue_filter(
+            issue,
+            supervisor_label=supervisor_label,
+            manager_usernames=get_manager_usernames(config),
+            require_manager_assignee=True,
+        ):
+            continue
+        candidate_numbers.append(issue.number)
+
+    # Bulk fetch flow contexts (2 queries instead of 2N)
+    flow_contexts = get_flow_context_bulk(
+        candidate_numbers, config, github, store, flow_manager
+    )
+
     for issue in issues:
         if issue.state != trigger_state:
             continue
@@ -63,9 +86,7 @@ def select_ready_issues_from_collected_issues(
         ):
             continue
 
-        branch, flow_state = get_flow_context(
-            issue.number, config, github, store, flow_manager
-        )
+        branch, flow_state = flow_contexts.get(issue.number, ("", None))
 
         target = qualify_gate.run_qualify_gate(
             issue, branch, flow_state, issue.labels, trigger_state
@@ -77,12 +98,6 @@ def select_ready_issues_from_collected_issues(
             if not branch or not is_auto_task_branch(branch):
                 if issue.state not in {IssueState.READY, IssueState.BLOCKED}:
                     _auto_resume_to_ready(issue, config, label_service=label_service)
-                continue
-            if not flow_manager.git.branch_exists(branch):
-                append_orchestra_event(
-                    "dispatcher",
-                    f"skip #{issue.number}: branch '{branch}' not found in git",
-                )
                 continue
 
         selected.append(issue)

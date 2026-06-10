@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from vibe3.execution.actor import ActorStatus, JobType
+
 if TYPE_CHECKING:
     from vibe3.execution.actor import JobActor
 
@@ -19,8 +21,8 @@ class ActiveJob:
     """Immutable view of a single actor job for monitoring display."""
 
     actor_id: str
-    job_type: str  # "dispatch" / "governance" / "flow"
-    status: str  # "running" / "done" / "failed" / "dead"
+    job_type: JobType  # DISPATCH / GOVERNANCE / FLOW
+    status: ActorStatus  # RUNNING / DONE / FAILED / DEAD / QUEUED
     issue_number: int
     branch: str
     started_at: str | None
@@ -90,8 +92,8 @@ def _to_active_job(actor: JobActor) -> ActiveJob:
     """
     return ActiveJob(
         actor_id=actor.actor_id,
-        job_type=actor.job_type.value,
-        status=actor.status.value,
+        job_type=actor.job_type,
+        status=actor.status,
         issue_number=actor.issue_number,
         branch=actor.branch,
         started_at=actor.started_at,

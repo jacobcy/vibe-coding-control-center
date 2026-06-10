@@ -50,14 +50,11 @@ def test_run_separator_appends_instead_of_truncating(
     tmp_path: Path, monkeypatch
 ) -> None:
     """Run separator should append to existing events.log, not overwrite it."""
-    import os
-
     from vibe3.orchestra.logging import append_orchestra_run_separator
 
     # Clear any environment variables that might affect log directory
     monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)
-
-    os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+    monkeypatch.setenv("VIBE3_ORCHESTRA_EVENT_LOG", "1")
     log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("old event from previous run\n", encoding="utf-8")

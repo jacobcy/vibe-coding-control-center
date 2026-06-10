@@ -1,0 +1,40 @@
+# Event routing rules for orchestration
+#
+# Rules are evaluated for every published domain event.
+# Each rule specifies:
+#   - event: DomainEvent class name to match
+#   - action: Action identifier (e.g., "log", "enqueue_command_job")
+#   - params: Template parameters with {{ event.field }} syntax
+#   - enabled: Whether the rule is active (default: true)
+#
+# Template expansion:
+#   - {{ event.field }} is replaced with the event's attribute value
+#   - Unknown fields are replaced with empty string
+#
+# This file is loaded at server startup via EventPublisher.on_publish hook.
+
+rules:
+  # Governance scan started → log for observability
+  - event: GovernanceScanStarted
+    action: log
+    params:
+      message: "governance scan started (tick={{ event.tick_count }})"
+
+  # Manager dispatch → queue manager command
+  - event: ManagerDispatchIntent
+    action: enqueue_command_job
+    params:
+      command: "vibe3 internal manager {{ event.issue_number }}"
+      actor: "{{ event.actor }}"
+
+  # Supervisor issue identified → log for tracking
+  - event: SupervisorIssueIdentified
+    action: log
+    params:
+      message: "supervisor candidate: issue #{{ event.issue_number }}"
+
+  # Issue failed → record for error tracking
+  - event: IssueFailed
+    action: log
+    params:
+      message: "issue #{{ event.issue_number }} failed: {{ event.reason }}"

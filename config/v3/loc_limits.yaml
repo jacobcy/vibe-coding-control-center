@@ -46,7 +46,7 @@ code_limits:
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
-        limit: 480
+        limit: 540
         reason: |
           Repo 层职责内聚，包含：
           - 基础 CRUD 操作（10 个 get 方法）
@@ -56,13 +56,16 @@ code_limits:
           - get_task_issue_number 方法（从 flow_issue_links 查询 task issue）
           - UTC-aware datetime 写入（update_flow_state, add_issue_link）
           - Status 参数验证（get_flows_by_status 增加 VALID_FLOW_STATUSES 校验）
+          - Bulk retrieval optimization（get_flow_state_bulk、get_flows_by_issues_bulk，Issue #2542 N+1 查询优化）
 
           拆分会破坏：
           - 数据访问层完整性
           - 查询一致性（所有方法都需过滤 deleted_at）
           - 事务原子性保证
+          - Bulk optimization coherence（批量查询与单条查询语义一致性）
 
           PR #2409 新增 status 验证逻辑，提升类型安全和 fail-fast 行为（+18 行）
+          PR #2542 新增 bulk retrieval 方法，修复 N+1 查询模式，减少 100x 数据库查询（+62 行）
 
       # Commands 层 —— 允许 480-550
       - path: "src/vibe3/commands/status.py"
@@ -141,8 +144,8 @@ code_limits:
         limit: 620
         reason: "Orchestra CLI 入口聚合，包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查、全局单例实例管理、serve start/stop/status 增强；#2174 新增 Active Jobs 面板显示运行态 job 监控数据（+83 行）"
       - path: "src/vibe3/server/registry.py"
-        limit: 530
-        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）"
+        limit: 540
+        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）"
 
       # Shell / 脚本兼容入口
       - path: "scripts/install.sh"
@@ -317,6 +320,9 @@ code_limits:
       - path: "tests/vibe3/integration/test_session_reuse.py"
         limit: 420
         reason: "Session reuse 集成测试集，覆盖完整生命周期验证、NULL/empty 过滤、无效 ID 验证、live preference、branch/role 隔离、安全网、race condition、多 session 选择等 9 个紧密耦合场景，每个测试使用真实 SQLite 数据库（非 mock）需要完整 setup，拆分会破坏测试场景完整性（#2060）"
+      - path: "tests/vibe3/services/test_issue_flow_service.py"
+        limit: 500
+        reason: "IssueFlowService 测试集，覆盖 convention injection、branch naming、flow lookup、resolve_best_flow 优先级逻辑与 protected branch guard 等紧密耦合场景；PR #2581 新增 8 个 resolve_best_flow 测试（优先级逻辑 5 个 + protected branch guard 3 个）从 297 行增至 465 行"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"

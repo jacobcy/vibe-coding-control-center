@@ -88,16 +88,20 @@ def _build_server_with_launch_cwd(
         FlowManager,
         GlobalDispatchCoordinator,
         OrchestrationFacade,
+        build_action_handlers,
+        evaluate_rules,
+        load_rules,
     )
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
+    from vibe3.models import DomainEvent, get_publisher
     from vibe3.orchestra import create_global_dispatch_coordinator
     from vibe3.runtime import (
         CircuitBreaker,
         FailedGateProtocol,
         HeartbeatServer,
     )
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services import CheckService, FlowService, OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -135,10 +139,33 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
+    # Create shared service instances for the assembly layer.
+    shared_check_service = CheckService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+        github_client=shared_github,
+    )
+    shared_flow_service = FlowService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+    )
+
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
     # GlobalDispatchCoordinator is created internally by the facade.
+    from vibe3.services import CheckService, FlowService
+
+    shared_check_service = CheckService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+        github_client=shared_github,
+    )
+    shared_flow_service = FlowService(
+        store=shared_store,
+        git_client=shared_flow_manager.git,
+    )
+
     facade = OrchestrationFacade(
         config=config,
         capacity=shared_capacity,
@@ -146,8 +173,8 @@ def _build_server_with_launch_cwd(
         store=shared_store,
         coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
         coordinator_class=GlobalDispatchCoordinator,
-        check_service=None,  # created by factory
-        flow_service=None,  # created by factory
+        check_service=shared_check_service,
+        flow_service=shared_flow_service,
         queue_filter=None,  # default behavior
     )
 
@@ -160,11 +187,32 @@ def _build_server_with_launch_cwd(
         config,
         failed_gate=cast(FailedGateProtocol | None, failed_gate),
         error_tracker=None,
-        check_service=None,
+        check_service=shared_check_service,
         cleanup_service=None,
         actor_cleanup=_cleanup_expired_actors,
     )
     heartbeat.register(facade)  # type: ignore[arg-type]
+
+    # Wire event rules engine into EventPublisher
+    try:
+        from vibe3.utils import find_repo_root
+
+        rules_dir = find_repo_root() / "config" / "policies"
+        rules = load_rules(rules_dir)
+        action_handlers = build_action_handlers()
+        publisher = get_publisher()
+
+        def rule_engine_hook(event: DomainEvent) -> None:  # type: ignore[valid-type]
+            evaluate_rules(event, rules, action_handlers)
+
+        publisher.add_publish_hook(rule_engine_hook)
+        logger.bind(domain="orchestra").info(
+            f"Event rules engine initialized with {len(rules)} rules"
+        )
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Event rules engine initialization failed (non-fatal): {exc}"
+        )
 
     # Combined shutdown callback for all services
     def shutdown_all() -> None:
@@ -194,8 +242,8 @@ def _build_server_with_launch_cwd(
         def _job_to_dict(job: ActiveJob) -> dict:
             return {
                 "actor_id": job.actor_id,
-                "job_type": job.job_type,
-                "status": job.status,
+                "job_type": job.job_type.value,
+                "status": job.status.value,
                 "issue_number": job.issue_number,
                 "branch": job.branch,
                 "started_at": job.started_at,

@@ -40,3 +40,15 @@ class FlowManagerProtocol(Protocol):
             Flow dict if created, None otherwise
         """
         ...
+
+    def resolve_best_flow(self, issue_number: int, flows: list[dict]) -> dict | None:
+        """Resolve best flow from pre-fetched list.
+
+        Args:
+            issue_number: GitHub issue number
+            flows: Pre-fetched list of flow dicts (sorted by updated_at DESC)
+
+        Returns:
+            Flow dict if valid flow found, None otherwise
+        """
+        ...
