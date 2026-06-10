@@ -265,6 +265,25 @@ def build_manager_request(
     return request
 
 
+def _record_missing_manager_sections(sections: dict[str, Any]) -> None:
+    """Record warning if manager sections are missing from prompts.yaml."""
+    required = {"target", "retry_task"}
+    missing = required - sections.keys()
+    if not missing:
+        return
+    msg = f"Manager prompt sections missing from prompts.yaml: {missing}"
+    logger.bind(domain="manager").warning(msg)
+    try:
+        from vibe3.services import ErrorTrackingService
+
+        ErrorTrackingService.get_instance().record_error(
+            error_code="E_CONFIG_MISSING",
+            error_message=msg,
+        )
+    except Exception:
+        pass
+
+
 def build_manager_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
@@ -291,6 +310,7 @@ def build_manager_sync_request(
     # than crashing the entire orchestration flow.
     prompts_data = load_prompt_templates()
     manager_sections = prompts_data.get("manager", {})
+    _record_missing_manager_sections(manager_sections)
 
     # Build providers for static sections (no source override)
     providers: dict[str, PromptProvider] = {
