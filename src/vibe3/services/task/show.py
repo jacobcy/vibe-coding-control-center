@@ -332,7 +332,7 @@ class TaskShowService:
         local_task = self.flow_service.get_flow_status(target_branch)
 
         # Resolve task issue numbers from DB links
-        from vibe3.services.issue.flow import IssueFlowService
+        from vibe3.services.issue import IssueFlowService
 
         issue_flow_service = IssueFlowService(store=self.store)
         task_issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
