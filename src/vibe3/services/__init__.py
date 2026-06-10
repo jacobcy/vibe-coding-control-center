@@ -388,7 +388,7 @@ _SYMBOL_MODULES = {
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
-    "resolve_issue_branch_input": "vibe3.services.issue_branch_resolver",
+    "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
     "resolve_manager_usernames": "vibe3.services.file_loader",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
