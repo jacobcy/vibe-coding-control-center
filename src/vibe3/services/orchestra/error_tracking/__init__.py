@@ -3,11 +3,13 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    pass  # No public exports yet
+    from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
-__all__: list[str] = []
+__all__ = ["ErrorTrackingService"]
 
-_SYMBOL_MODULES: dict[str, str] = {}
+_SYMBOL_MODULES = {
+    "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
+}
 
 
 def __getattr__(name: str) -> Any:

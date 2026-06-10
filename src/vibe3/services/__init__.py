@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
-    from vibe3.services.error_tracking_service import ErrorTrackingService
     from vibe3.services.expired_resource_cleanup_service import (
         ExpiredResourceCleanupService,
     )
@@ -54,6 +53,7 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
@@ -277,7 +277,7 @@ _SYMBOL_MODULES = {
     "CheckResult": "vibe3.services.check.service",
     "CheckService": "vibe3.services.check.service",
     "CoordinationResolver": "vibe3.services.coordination_resolver",
-    "ErrorTrackingService": "vibe3.services.error_tracking_service",
+    "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
