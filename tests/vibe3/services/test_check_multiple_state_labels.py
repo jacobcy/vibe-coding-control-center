@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.service import CheckService
 
 
 @pytest.fixture
