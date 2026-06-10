@@ -87,6 +87,31 @@ description: Use when the user wants project-level roadmap planning, version goa
    - decision 不是 `rfc` → **打 `roadmap-reviewed`**：`gh issue edit <number> --add-label "roadmap-reviewed"`
    - decision 是 `rfc` → **不打 `roadmap-reviewed`**，打 `roadmap/rfc`，等人类决策后再处理
 
+4.5. **proceed/unblock 时必须移除 orchestra-scanned**：
+
+   当 decision 是 `proceed` 或 `unblock`（依赖已解除、可以继续推进）时，如果 issue 带有 `orchestra-scanned` 标签，**必须移除**。否则 roadmap-intake 的过滤规则会永久跳过该 issue，即使依赖已解除也无法被重新纳入。
+
+   ```bash
+   # 检查是否有 orchestra-scanned
+   LABELS=$(gh issue view <number> --json labels --jq '[.labels[].name]')
+   if echo "$LABELS" | grep -q "orchestra-scanned"; then
+     gh issue edit <number> --remove-label "orchestra-scanned"
+   fi
+   ```
+
+   **背景**：#2381 被标记为 `orchestra-scanned` 后，即使依赖已解除（#2376、#2380 CLOSED），
+   roadmap-intake 仍无法看到它。roadmap 写了 `proceed` 但没移除标签，导致 issue 被永久跳过。
+
+   **适用场景**：
+   - 依赖解除后的 proceed
+   - 错误 skip 后的 override
+   - 任何导致 issue 需要重新进入 pipeline 的 decision
+
+   **不适用场景**：
+   - decision 是 `hold`（保持 blocked）
+   - decision 是 `close`（关闭 issue）
+   - decision 是 `rfc`（等待人类决策）
+
 5. **推翻 intake skip 时的三步处理**：
 
    当被审查的 `[governance suggest][roadmap-intake]` 来自 intake 层 skip 决策（issue 带 `orchestra-scanned` 且无 assignee），如果你决定纳入该 issue，**必须显式执行三步**（标签语义见 roadmap-common.md）：
