@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import importlib
-import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, cast
+
+from loguru import logger
 
 from vibe3.config import get_manager_usernames
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
@@ -25,8 +26,6 @@ if TYPE_CHECKING:
         QualifyGateServiceProtocol,
     )
 
-
-logger = logging.getLogger(__name__)
 
 # Cooldown mechanism for auto-resume circuit breaker
 AUTO_RESUME_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -96,10 +95,17 @@ def select_ready_issues_from_collected_issues(
                 issue, branch, flow_state, issue.labels, trigger_state
             )
         except Exception:
+            # Broad catch intentional: qualify_gate touches GitHub API,
+            # SQLite, subprocess, filesystem — any failure should skip
+            # this issue without aborting the entire batch
             logger.warning(
-                f"Skipping issue #{issue.number} during queue selection for "
-                f"{trigger_state.value}: qualify gate failed",
-                exc_info=True,
+                "Skipping issue #{} during queue selection for {}: qualify gate failed",
+                issue.number,
+                trigger_state.value,
+            )
+            append_orchestra_event(
+                "dispatcher",
+                f"queue selection skipped #{issue.number}: qualify gate failed",
             )
             continue
         if target is None or target != trigger_state:
