@@ -3,6 +3,8 @@
 import concurrent.futures
 from pathlib import Path
 
+import pytest
+
 from vibe3.clients.sqlite_client import SQLiteClient
 
 
@@ -40,6 +42,7 @@ def test_concurrent_connection_creation_no_thread_error(tmp_path: Path) -> None:
             future.result()
 
 
+@pytest.mark.slow
 def test_concurrent_queries_no_corruption(tmp_path: Path) -> None:
     """Verify concurrent read queries on shared DB do not corrupt results.
 
