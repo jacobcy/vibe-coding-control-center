@@ -280,15 +280,10 @@ class TestTerminalNotification:
         actor.record_launch()
 
         # Make mark_terminal raise an unexpected exception type
-        original = registry.mark_terminal
-
         def _broken_mark_terminal(actor_id: str) -> None:
             raise TypeError("unexpected bug")
 
-        registry.mark_terminal = _broken_mark_terminal  # type: ignore[assignment]
+        monkeypatch.setattr(registry, "mark_terminal", _broken_mark_terminal)
 
         # Should NOT raise — it logs instead
         actor.record_completion()
-
-        # Restore for other tests
-        registry.mark_terminal = original  # type: ignore[assignment]

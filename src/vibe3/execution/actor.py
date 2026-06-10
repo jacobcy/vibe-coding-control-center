@@ -217,7 +217,7 @@ class JobActor:
         except (AttributeError, RuntimeError):
             pass
         except Exception:
-            logger.debug("Unexpected error in _notify_terminal for {}", self.actor_id)
+            logger.warning("Unexpected error in _notify_terminal for {}", self.actor_id)
 
 
 class ActorRegistry:
