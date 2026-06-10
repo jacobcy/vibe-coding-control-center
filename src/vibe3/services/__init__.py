@@ -3,10 +3,8 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
-    from vibe3.services.flow.blocked_state_service import BlockedStateService
-    from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
+    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.classifier import (
@@ -71,6 +69,7 @@ if TYPE_CHECKING:
         get_pr_commit_count,
         get_recent_commits,
     )
+    from vibe3.services.pr.base_resolution import BaseResolutionUsecase
     from vibe3.services.pr.create import PRCreateUsecase
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
     from vibe3.services.pr.resolver import (
@@ -271,7 +270,7 @@ __all__ = [
 # Lazy import mapping for symbols not directly imported above
 _SYMBOL_MODULES = {
     # Services
-    "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
+    "BaseResolutionUsecase": "vibe3.services.pr.base_resolution",
     "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckResult": "vibe3.services.check.service",
