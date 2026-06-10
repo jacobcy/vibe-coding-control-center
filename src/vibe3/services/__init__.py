@@ -10,9 +10,6 @@ if TYPE_CHECKING:
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.coordination_resolver import CoordinationResolver
     from vibe3.services.error_tracking_service import ErrorTrackingService
-
-    # Functions used in domain/execution/roles
-    from vibe3.services.event_helpers import emit_issue_failed
     from vibe3.services.expired_resource_cleanup_service import (
         ExpiredResourceCleanupService,
     )
@@ -102,6 +99,9 @@ if TYPE_CHECKING:
         record_dispatch_failure_if_unexpected,
         record_error,
     )
+
+    # Functions used in domain/execution/roles
+    from vibe3.services.shared.events import emit_issue_failed
     from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
         collect_label_anomalies,
@@ -137,6 +137,10 @@ if TYPE_CHECKING:
         is_auto_task_branch,
         is_dev_collab_branch,
     )
+    from vibe3.services.task.binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
+    )
     from vibe3.services.task.classifier import TaskStatusBucket
     from vibe3.services.task.resume import (
         TaskResumeOperations,
@@ -147,10 +151,6 @@ if TYPE_CHECKING:
     from vibe3.services.task.status import (
         classify_task_issues_for_rendering,
         fetch_task_status_data,
-    )
-    from vibe3.services.task_binding_guard import (
-        MissingTaskIssueError,
-        build_bind_task_hint,
     )
 
 __all__ = [
@@ -300,7 +300,7 @@ _SYMBOL_MODULES = {
     "LabelService": "vibe3.services.shared.label_service",
     "FileLoader": "vibe3.services.file_loader",
     "material_loader": "vibe3.services.file_loader",
-    "MissingTaskIssueError": "vibe3.services.task_binding_guard",
+    "MissingTaskIssueError": "vibe3.services.task.binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra.status",
     "OrchestraStatusService": "vibe3.services.orchestra.status",
     "PRCreateUsecase": "vibe3.services.pr.create",
@@ -322,14 +322,14 @@ _SYMBOL_MODULES = {
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
-    "build_bind_task_hint": "vibe3.services.task_binding_guard",
+    "build_bind_task_hint": "vibe3.services.task.binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.shared.paths",
     "classify_flow": "vibe3.services.flow.classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     "create_flow_manager": "vibe3.services.flow.factory",
-    "emit_issue_failed": "vibe3.services.event_helpers",
+    "emit_issue_failed": "vibe3.services.shared.events",
     "fail_executor_issue": "vibe3.services.issue.failure",
     "fail_issue": "vibe3.services.issue.failure",
     "fail_manager_issue": "vibe3.services.issue.failure",

@@ -3,6 +3,12 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.services.task.binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
+        ensure_task_issue_bound,
+        has_task_issue,
+    )
     from vibe3.services.task.classifier import TaskStatusBucket, classify_task_status
     from vibe3.services.task.resume import (
         TaskResumeCandidates,
@@ -26,6 +32,8 @@ if TYPE_CHECKING:
 __all__ = [
     # Classes - service
     "TaskService",
+    # Classes - binding guard
+    "MissingTaskIssueError",
     # Classes - show
     "TaskShowService",
     "TaskShowResult",
@@ -40,6 +48,10 @@ __all__ = [
     "TaskResumeOperations",
     # Classes - classifier
     "TaskStatusBucket",
+    # Functions - binding guard
+    "ensure_task_issue_bound",
+    "has_task_issue",
+    "build_bind_task_hint",
     # Functions - status
     "fetch_task_status_data",
     "classify_task_issues_for_rendering",
@@ -50,6 +62,8 @@ __all__ = [
 _SYMBOL_MODULES = {
     # Classes - service
     "TaskService": "vibe3.services.task.service",
+    # Classes - binding guard
+    "MissingTaskIssueError": "vibe3.services.task.binding_guard",
     # Classes - show
     "TaskShowService": "vibe3.services.task.show",
     "TaskShowResult": "vibe3.services.task.show",
@@ -64,6 +78,10 @@ _SYMBOL_MODULES = {
     "TaskResumeOperations": "vibe3.services.task.resume",
     # Classes - classifier
     "TaskStatusBucket": "vibe3.services.task.classifier",
+    # Functions - binding guard
+    "ensure_task_issue_bound": "vibe3.services.task.binding_guard",
+    "has_task_issue": "vibe3.services.task.binding_guard",
+    "build_bind_task_hint": "vibe3.services.task.binding_guard",
     # Functions - status
     "fetch_task_status_data": "vibe3.services.task.status",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
