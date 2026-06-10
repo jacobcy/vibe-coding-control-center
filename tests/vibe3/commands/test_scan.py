@@ -49,6 +49,7 @@ class TestScanCommand:
 
 
 class TestGovernanceScan:
+    @pytest.mark.slow
     def test_governance_dry_run(self):
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0

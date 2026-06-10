@@ -18,6 +18,9 @@ NC='\033[0m'
 
 header() { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 
+TMPFILE=$(mktemp)
+trap "rm -f '$TMPFILE'" EXIT
+
 header "Test Suite Performance Analysis"
 
 # --- Test counts by category ---
@@ -43,47 +46,45 @@ echo -e "  Slow tests (marked @slow):          ${YELLOW}$slow_count${NC}"
 # --- Duration profiling ---
 if [[ "${1:-}" != "--quick" ]]; then
     header "Slowest 20 Tests (Unit Tests Only)"
-    echo "  Running unit tests with --durations=20..."
+    echo "  Running unit tests with --durations=20 (this takes ~4 min)..."
     uv run pytest tests/vibe3 \
         -m "not integration and not slow" \
         --ignore=tests/vibe3/test_modularity \
         --ignore=tests/vibe3/integration \
         --durations=20 \
-        -q --tb=no 2>&1 | grep -E "^\s*(tests/|[0-9]+\.[0-9]+s)" | head -40
+        -q --tb=no > "$TMPFILE" 2>&1
+
+    echo ""
+    # Extract duration lines (format: "X.XXs call tests/...")
+    grep -E "^[0-9]+\.[0-9]+s" "$TMPFILE" || echo "  (no duration data found)"
+    echo ""
+    # Show summary line
+    grep -E "passed|failed|error" "$TMPFILE" | tail -1 || true
 else
     header "Duration Profiling (skipped: --quick mode)"
     echo "  Run without --quick to see slowest tests."
 fi
 
 # --- Optimization suggestions ---
-header "Optimization Suggestions"
+header "CI Structure (3 parallel jobs)"
 
 echo -e "
-  ${YELLOW}CI Structure (3 parallel jobs):${NC}
-    1. Lint & Type Check  (~2 min)
-    2. Unit Tests          (~5 min, excludes slow/integration/modularity)
-    3. Quality Tests       (~30s, modularity + integration + slow)
+  ${GREEN}1. Lint & Type Check${NC}  (~2 min)
+     ruff, black, mypy, bats, LOC checks
 
-  ${YELLOW}Current bottlenecks:${NC}
-    - Unit tests dominate CI time (~5 min)
-    - Slow tests (dry-runs, coordinator) run in Quality job
+  ${GREEN}2. Unit Tests${NC}          (~4 min)
+     3222 tests, excludes slow/integration/modularity
+     Flag: ${CYAN}-m \"not integration and not slow\"${NC}
+
+  ${GREEN}3. Quality Tests${NC}       (~30s)
+     modularity (37) + integration (76) + slow (4)
+     Flag: ${CYAN}-m slow${NC} + directory-based
 
   ${YELLOW}Optimization levers:${NC}
-    1. Mark more tests @pytest.mark.slow to move them to Quality job
-    2. Replace subprocess CLI tests with Typer CliRunner (ms vs seconds)
-    3. Use fixtures with mocks instead of real service initialization
-    4. Run pytest-xdist (-n auto) for parallel test execution
-
-  ${YELLOW}To mark a test as slow:${NC}
-    import pytest
-
-    @pytest.mark.slow
-    def test_my_slow_test(): ...
-
-  ${YELLOW}Pytest markers:${NC}
-    @pytest.mark.slow        — Moves test to Quality CI job
-    @pytest.mark.integration — For tests needing external services
-    @pytest.mark.regression  — For regression tests (e.g., specific issues)
+    1. Mark slow tests:  @pytest.mark.slow  (moves to Quality job)
+    2. Use CliRunner instead of subprocess for CLI tests
+    3. Mock heavy fixtures (coordinator, service init)
+    4. pytest-xdist (-n auto) for parallel execution
 "
 
 echo -e "${GREEN}Done.${NC}"
