@@ -262,7 +262,7 @@ def test_rebuild_stale_issue_flow_delegates_to_flow_rebuild_usecase() -> None:
     )
     issue = IssueInfo(number=320, title="Rebuild lifecycle")
 
-    with patch("vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase") as rebuild_cls:
+    with patch("vibe3.services.flow.rebuild.FlowRebuildUsecase") as rebuild_cls:
         rebuild = rebuild_cls.return_value
         rebuild.rebuild_issue_flow.return_value = {"branch": "task/issue-320"}
 

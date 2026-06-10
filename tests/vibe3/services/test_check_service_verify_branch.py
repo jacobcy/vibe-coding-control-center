@@ -455,7 +455,7 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
     with (
         patch("vibe3.services.issue.flow.IssueFlowService") as mock_issue_flow_cls,
         patch(
-            "vibe3.services.coordination_resolver.CoordinationResolver"
+            "vibe3.services.orchestra.coordination.CoordinationResolver"
         ) as mock_resolver_cls,
     ):
         mock_issue_flow = MagicMock()
