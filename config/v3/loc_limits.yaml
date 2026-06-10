@@ -141,8 +141,8 @@ code_limits:
         limit: 620
         reason: "Orchestra CLI 入口聚合，包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查、全局单例实例管理、serve start/stop/status 增强；#2174 新增 Active Jobs 面板显示运行态 job 监控数据（+83 行）"
       - path: "src/vibe3/server/registry.py"
-        limit: 510
-        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）"
+        limit: 530
+        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）"
 
       # Shell / 脚本兼容入口
       - path: "scripts/install.sh"
