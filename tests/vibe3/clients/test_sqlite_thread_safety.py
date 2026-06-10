@@ -38,3 +38,38 @@ def test_concurrent_connection_creation_no_thread_error(tmp_path: Path) -> None:
         for future in concurrent.futures.as_completed(futures):
             # Should NOT raise ProgrammingError about thread safety
             future.result()
+
+
+def test_concurrent_queries_no_corruption(tmp_path: Path) -> None:
+    """Verify concurrent read queries on shared DB do not corrupt results.
+
+    Reproduces the IndexError/InterfaceError from issue #2535 where
+    ThreadPoolExecutor threads share a single connection and corrupt
+    each other's cursor state.
+    """
+    db_path = str(tmp_path / "test.db")
+    client = SQLiteClient(db_path=db_path)
+
+    # Seed test data
+    for i in range(50):
+        client.update_flow_state(
+            f"branch-{i}", flow_slug=f"slug-{i}", flow_status="active"
+        )
+
+    errors: list[Exception] = []
+
+    def concurrent_query() -> None:
+        try:
+            repo = SQLiteClient(db_path=db_path)
+            for _ in range(100):
+                flows = repo.get_all_flows()
+                assert len(flows) == 50
+        except Exception as e:
+            errors.append(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(concurrent_query) for _ in range(20)]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+
+    assert not errors, f"Concurrent queries raised errors: {errors}"

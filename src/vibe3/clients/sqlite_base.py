@@ -14,11 +14,13 @@ from vibe3.clients.sqlite_schema import init_schema
 from vibe3.exceptions import GitError
 from vibe3.utils import get_vibe3_db_path
 
-# Module-level singleton connection to avoid FD exhaustion
-# Shared across all SQLiteClient instances
-_global_conn: sqlite3.Connection | None = None
-_global_db_path: str | None = None
-_global_lock = threading.Lock()
+# Per-thread connections to avoid concurrent query corruption
+# Each thread gets its own connection; tracked for bulk close in tests/atexit
+_thread_local = threading.local()
+_thread_conns: set[sqlite3.Connection] = set()
+_thread_conns_lock = threading.Lock()
+_init_done: set[str] = set()  # tracks db_path values already initialized
+_init_lock = threading.Lock()
 
 
 class _HasConnection(Protocol):
@@ -41,44 +43,53 @@ def _is_connection_usable(conn: sqlite3.Connection) -> bool:
 
 
 def _get_global_connection(db_path: str) -> sqlite3.Connection:
-    """Get or create the module-level singleton database connection.
+    """Get or create a thread-local database connection.
 
-    Uses a single global connection shared by all SQLiteClient instances
-    to avoid FD exhaustion from repeated open/close on every operation.
+    Uses per-thread connections to avoid concurrent query corruption.
+    Each thread gets its own connection, preventing race conditions
+    where multiple threads mutate shared connection state (cursor/row_factory).
 
-    Thread-safe: Uses threading.Lock and check_same_thread=False.
+    Thread-safe: Uses threading.local() for per-thread storage.
+    Connection count bounded by thread count, not operation count.
     """
-    global _global_conn, _global_db_path
+    conn = getattr(_thread_local, "conn", None)
+    thread_db_path = getattr(_thread_local, "db_path", None)
 
-    with _global_lock:
-        # Reopen if path changed, connection is missing, or a previous caller
-        # closed the module-level singleton directly.
-        if (
-            _global_conn is None
-            or _global_db_path != db_path
-            or not _is_connection_usable(_global_conn)
-        ):
-            if _global_conn is not None:
-                try:
-                    _global_conn.close()
-                except Exception:
-                    pass
-            _global_conn = sqlite3.connect(db_path, check_same_thread=False)
-            _global_db_path = db_path
+    if conn is None or thread_db_path != db_path or not _is_connection_usable(conn):
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")  # ensure WAL on each new connection
+        _thread_local.conn = conn
+        _thread_local.db_path = db_path
 
-    return _global_conn
+        with _thread_conns_lock:
+            _thread_conns.add(conn)
+
+    return conn
 
 
 def _close_global_connection() -> None:
-    """Close the global singleton connection."""
-    global _global_conn, _global_db_path
-    if _global_conn is not None:
+    """Close all tracked thread-local connections.
+
+    Used for test isolation and atexit cleanup.
+    Closes current thread's connection and all tracked connections.
+    """
+    # Close current thread's connection
+    conn = getattr(_thread_local, "conn", None)
+    if conn is not None:
         try:
-            _global_conn.close()
+            conn.close()
         except Exception:
             pass
-        _global_conn = None
-        _global_db_path = None
+        _thread_local.conn = None
+
+    # Close all tracked connections (for test cleanup / atexit)
+    with _thread_conns_lock:
+        for c in list(_thread_conns):
+            try:
+                c.close()
+            except Exception:
+                pass
+        _thread_conns.clear()
 
 
 def _utcnow_iso() -> str:
@@ -145,10 +156,14 @@ class SQLiteClientBase:
         in sqlite_schema.py when adding new migrations.
         """
         conn = _get_global_connection(self.db_path)
-        with _global_lock:
+        with _init_lock:
             # Lightweight guard: check migration version
             # Update required_migration_version when adding new migrations
             required_migration_version = 3  # Increment when adding
+
+            # Check if already initialized for this db_path
+            if self.db_path in _init_done:
+                return
 
             try:
                 version_row = conn.execute(
@@ -157,6 +172,7 @@ class SQLiteClientBase:
                 current_version = int(version_row[0]) if version_row else 0
                 if current_version >= required_migration_version:
                     # Migrations already applied, skip full init
+                    _init_done.add(self.db_path)
                     return
             except (sqlite3.OperationalError, ValueError):
                 # Table doesn't exist or invalid version, need to init
@@ -164,7 +180,8 @@ class SQLiteClientBase:
 
             # Run full schema initialization (includes migration_version update)
             init_schema(conn)
+            _init_done.add(self.db_path)
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Get the global singleton connection for this database."""
+        """Get the thread-local connection for this database."""
         return _get_global_connection(self.db_path)
