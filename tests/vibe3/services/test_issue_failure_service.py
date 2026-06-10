@@ -149,9 +149,7 @@ def test_block_flow_writes_body_label_and_cache():
         flow_service.create_flow(slug="issue-400", branch=branch, actor="test-user")
         store.add_issue_link(branch, 400, "task")
 
-        with patch(
-            "vibe3.services.shared.label_service.LabelService"
-        ) as mock_label_cls:
+        with patch("vibe3.services.blocked_state_io.LabelService") as mock_label_cls:
             mock_label = MagicMock()
             mock_label_cls.return_value = mock_label
 
