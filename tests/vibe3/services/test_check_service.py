@@ -627,3 +627,67 @@ def test_reset_issue_after_pr_closed_transfers_dependencies() -> None:
 
         assert handled is True
         assert len(issues) == 0
+
+
+def test_verify_branch_returns_warning_for_open_pr_with_running_worker() -> None:
+    """verify_branch returns is_valid=True with warning when open PR has
+    running worker."""
+    from pathlib import Path
+
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.models.pr import PRResponse
+    from vibe3.services.check.service import CheckService
+
+    # ARRANGE: Active flow with running planner and open PR
+    tmp_path = Path("/tmp/test-check")
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    store = SQLiteClient(db_path=tmp_path / "test.db")
+    store.update_flow_state(
+        "task/my-feature",
+        flow_slug="my_feature",
+        flow_status="active",
+        planner_status="running",
+    )
+
+    # Mock git client
+    git_client = MagicMock(spec=GitClient)
+    git_client.get_current_branch.return_value = "task/my-feature"
+    git_client.get_git_common_dir.return_value = tmp_path / ".git"
+
+    # Mock GitHub client to return open PR
+    github_client = MagicMock(spec=GitHubClient)
+    open_pr = PRResponse(
+        number=42,
+        title="Test PR",
+        state=PRState.OPEN,
+        head_branch="task/my-feature",
+        base_branch="main",
+        url="https://github.com/test/pr/42",
+        draft=False,
+        is_ready=True,
+        ci_passed=True,
+    )
+    github_client.list_prs_for_branch.return_value = [open_pr]
+    github_client.list_all_prs.return_value = [open_pr]
+
+    # Create handoff file to avoid missing file warning
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    handoff_dir = get_branch_handoff_dir(tmp_path, "task/my-feature")
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    (handoff_dir / "current.md").touch()
+
+    # ACT: Run verify_branch
+    service = CheckService(
+        store=store, git_client=git_client, github_client=github_client
+    )
+    result = service.verify_branch("task/my-feature")
+
+    # ASSERT: Should return is_valid=True with warning about transition
+    assert result.is_valid is True
+    assert len(result.warnings) >= 1
+    assert any("transitioned to review" in w for w in result.warnings)
+    flow = store.get_flow_state("task/my-feature")
+    assert flow["flow_status"] == "review"

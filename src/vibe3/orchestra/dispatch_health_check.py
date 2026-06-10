@@ -97,7 +97,7 @@ class DispatchHealthCheckService:
         # Terminal state takes priority: skip dispatch cleanly without block_flow.
         # This handles flows auto-aborted by verify_branch (closed issue, missing
         # branch, orphaned flow) as well as flows already in done/stale state.
-        if flow_status in ("done", "aborted", "stale"):
+        if flow_status in ("done", "aborted", "stale", "review"):
             append_orchestra_event(
                 "dispatcher",
                 f"DispatchHealthCheckService: skipped #{issue.number} "

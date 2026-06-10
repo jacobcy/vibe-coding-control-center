@@ -595,3 +595,279 @@ class TestClosedPRIdempotency:
             # ASSERT: Should handle
             assert handled is True
             mock_reset.assert_called_once()
+
+
+class TestOpenPRFlowTransition:
+    """Test open PR detection and flow transition to review."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_snapshot(self):
+        """Mock snapshot service to avoid real git operations in tests."""
+        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
+            yield
+
+    def test_open_pr_planner_running(self, tmp_path):
+        """Should transition to review when planner is running."""
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        # ARRANGE: Active flow with planner running
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+            planner_status="running",
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create open PR
+        open_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_pr_terminal_state
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/my-feature", open_pr
+        )
+
+        # ASSERT: Should transition to review
+        assert handled is True
+        assert len(warnings) == 1
+        assert "transitioned to review" in warnings[0]
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "review"
+
+    def test_open_pr_executor_running(self, tmp_path):
+        """Should transition to review when executor is running."""
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        # ARRANGE: Active flow with executor running
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+            executor_status="running",
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create open PR
+        open_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_pr_terminal_state
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/my-feature", open_pr
+        )
+
+        # ASSERT: Should transition to review
+        assert handled is True
+        assert len(warnings) == 1
+        assert "transitioned to review" in warnings[0]
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "review"
+
+    def test_open_pr_no_worker_running(self, tmp_path):
+        """Should NOT transition when no worker is running."""
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        # ARRANGE: Active flow with no workers running
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="active",
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create open PR
+        open_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_pr_terminal_state
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/my-feature", open_pr
+        )
+
+        # ASSERT: Should NOT transition
+        assert handled is False
+        assert len(warnings) == 0
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "active"
+
+    def test_open_pr_already_review(self, tmp_path):
+        """Should NOT transition when already in review state."""
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        # ARRANGE: Flow already in review state
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="review",
+            planner_status="running",
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create open PR
+        open_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_pr_terminal_state
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/my-feature", open_pr
+        )
+
+        # ASSERT: Should NOT transition (idempotent)
+        assert handled is False
+        assert len(warnings) == 0
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "review"
+
+    def test_open_pr_already_done(self, tmp_path):
+        """Should NOT transition when already in done state."""
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        # ARRANGE: Flow already in done state
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "task/my-feature",
+            flow_slug="my_feature",
+            flow_status="done",
+            executor_status="running",
+        )
+
+        # Mock clients
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+
+        # Create open PR
+        open_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/my-feature",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+        # ACT: Call handle_pr_terminal_state
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        handled, issues, warnings = service.handle_pr_terminal_state(
+            "task/my-feature", open_pr
+        )
+
+        # ASSERT: Should NOT transition (terminal state)
+        assert handled is False
+        assert len(warnings) == 0
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "done"
