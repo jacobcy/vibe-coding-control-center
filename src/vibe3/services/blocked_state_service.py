@@ -17,12 +17,12 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient
 from vibe3.models import IssueState
-from vibe3.services.blocked_state_io import BlockedStateIO
-from vibe3.services.blocked_state_types import (
+from vibe3.services.blocked.types import (
     BlockedState,
     ConsistencyReport,
     UnblockResult,
 )
+from vibe3.services.blocked_state_io import BlockedStateIO
 from vibe3.services.flow.timeline import FlowTimelineService
 from vibe3.services.shared.label_service import LabelService
 

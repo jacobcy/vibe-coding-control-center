@@ -16,10 +16,6 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import ErrorSeverity, get_error_handling_contract
-from vibe3.services.error_tracking_cleanup import (
-    cleanup_old_errors as _cleanup_old_errors,
-)
-from vibe3.services.error_tracking_cleanup import clear_errors as _clear_errors
 from vibe3.services.error_tracking_queries import (
     get_all_errors_status as _get_all_errors_status,
 )
@@ -48,6 +44,12 @@ from vibe3.services.error_tracking_queries import (
 )
 from vibe3.services.error_tracking_queries import (
     has_model_config_error as _has_model_config_error,
+)
+from vibe3.services.orchestra.error_tracking.cleanup import (
+    cleanup_old_errors as _cleanup_old_errors,
+)
+from vibe3.services.orchestra.error_tracking.cleanup import (
+    clear_errors as _clear_errors,
 )
 
 
