@@ -169,7 +169,7 @@ class TestDisplayConfig:
 class TestDisplayErrorTracking:
     """Test cases for _display_error_tracking method."""
 
-    @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
+    @patch("vibe3.services.orchestra.serve_status.ErrorTrackingService.get_instance")
     def test_display_historical_errors_windowed_zero(self, mock_get_instance):
         """Display should show historical errors even when windowed count is zero."""
         from vibe3.services.orchestra.serve_status import ServeStatusService
@@ -209,7 +209,7 @@ class TestDisplayErrorTracking:
         # Should NOT show windowed line (total is 0)
         assert not any("Windowed" in msg for msg in printed)
 
-    @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
+    @patch("vibe3.services.orchestra.serve_status.ErrorTrackingService.get_instance")
     def test_display_historical_and_windowed_both_nonzero(self, mock_get_instance):
         """Display should show both historical and windowed counts when both nonzero."""
         from vibe3.services.orchestra.serve_status import ServeStatusService
@@ -247,7 +247,7 @@ class TestDisplayErrorTracking:
         assert any("Windowed" in msg and "2 errors" in msg for msg in printed)
         assert any("threshold: 2" in msg for msg in printed)
 
-    @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
+    @patch("vibe3.services.orchestra.serve_status.ErrorTrackingService.get_instance")
     def test_display_no_errors(self, mock_get_instance):
         """Display should show 'No errors recorded' when total is zero."""
         from vibe3.services.orchestra.serve_status import ServeStatusService
@@ -282,7 +282,7 @@ class TestDisplayErrorTracking:
         # Should show no errors message
         assert any("No errors recorded" in msg for msg in printed)
 
-    @patch("vibe3.services.serve_status_service.ErrorTrackingService.get_instance")
+    @patch("vibe3.services.orchestra.serve_status.ErrorTrackingService.get_instance")
     def test_display_with_recent_errors_table(self, mock_get_instance):
         """Display should render table with recent errors."""
         from rich.table import Table

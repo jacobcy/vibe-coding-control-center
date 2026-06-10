@@ -41,7 +41,7 @@ def mock_label_service():
 @pytest.fixture
 def mock_flow_timeline_service():
     """Mock FlowTimelineService."""
-    with patch("vibe3.services.blocked_state_service.FlowTimelineService") as mock:
+    with patch("vibe3.services.flow.timeline.FlowTimelineService") as mock:
         yield mock.return_value
 
 
