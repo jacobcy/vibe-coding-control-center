@@ -5,12 +5,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.blocked_state_service import BlockedStateService
-    from vibe3.services.bootstrap_context_service import (
-        BootstrapAction,
-        BootstrapActionKind,
-        BootstrapContextService,
-        BootstrapPlan,
-    )
     from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
@@ -162,10 +156,6 @@ if TYPE_CHECKING:
 __all__ = [
     "BaseResolutionUsecase",
     "BlockedStateService",
-    "BootstrapAction",
-    "BootstrapActionKind",
-    "BootstrapContextService",
-    "BootstrapPlan",
     "CheckCleanupService",
     "CheckResult",
     "CheckService",
@@ -279,11 +269,6 @@ __all__ = [
 
 # Lazy import mapping for symbols not directly imported above
 _SYMBOL_MODULES = {
-    # Bootstrap symbols
-    "BootstrapAction": "vibe3.services.bootstrap_context_service",
-    "BootstrapActionKind": "vibe3.services.bootstrap_context_service",
-    "BootstrapContextService": "vibe3.services.bootstrap_context_service",
-    "BootstrapPlan": "vibe3.services.bootstrap_context_service",
     # Services
     "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
     "BlockedStateService": "vibe3.services.blocked_state_service",
