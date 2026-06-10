@@ -15,7 +15,7 @@ import yaml
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.models.domain_events import DomainEvent
+    from vibe3.models import DomainEvent
 
 
 @dataclass(frozen=True)

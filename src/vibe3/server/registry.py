@@ -88,16 +88,13 @@ def _build_server_with_launch_cwd(
         FlowManager,
         GlobalDispatchCoordinator,
         OrchestrationFacade,
-    )
-    from vibe3.domain.event_rules import (
         build_action_handlers,
         evaluate_rules,
         load_rules,
     )
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
-    from vibe3.models.domain_events import DomainEvent
-    from vibe3.models.event_bus import get_publisher
+    from vibe3.models import DomainEvent, get_publisher
     from vibe3.orchestra import create_global_dispatch_coordinator
     from vibe3.runtime import (
         CircuitBreaker,
@@ -192,9 +189,9 @@ def _build_server_with_launch_cwd(
 
     # Wire event rules engine into EventPublisher
     try:
-        from vibe3.config.settings import _vibe3_config_root
+        from vibe3.utils import find_repo_root
 
-        rules_dir = _vibe3_config_root() / "config" / "policies"
+        rules_dir = find_repo_root() / "config" / "policies"
         rules = load_rules(rules_dir)
         action_handlers = build_action_handlers()
         publisher = get_publisher()
