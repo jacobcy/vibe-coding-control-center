@@ -9,6 +9,7 @@ Reference: docs/v3/design/trace-inspect-output-format.md
 
 from __future__ import annotations
 
+import re
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -21,7 +22,14 @@ from vibe3.cli import app
 if TYPE_CHECKING:
     pass
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    return _ANSI_RE.sub("", text)
+
 
 # All inspect subcommands that should support both --json and --yaml.
 INSPECT_SUBCOMMANDS = [
@@ -57,12 +65,14 @@ class TestInspectFormatContract:
     @pytest.mark.parametrize("subcommand", INSPECT_SUBCOMMANDS)
     def test_subcommand_has_json_option(self, subcommand: str) -> None:
         result = runner.invoke(app, ["inspect", subcommand, "--help"])
-        assert "--json" in result.output, f"inspect {subcommand} missing --json"
+        output = _strip_ansi(result.output)
+        assert "--json" in output, f"inspect {subcommand} missing --json"
 
     @pytest.mark.parametrize("subcommand", INSPECT_SUBCOMMANDS)
     def test_subcommand_has_yaml_option(self, subcommand: str) -> None:
         result = runner.invoke(app, ["inspect", subcommand, "--help"])
-        assert "--yaml" in result.output, f"inspect {subcommand} missing --yaml"
+        output = _strip_ansi(result.output)
+        assert "--yaml" in output, f"inspect {subcommand} missing --yaml"
 
 
 class TestInspectYamlOutput:
