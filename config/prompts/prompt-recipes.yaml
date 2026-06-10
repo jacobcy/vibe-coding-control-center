@@ -34,26 +34,8 @@ recipes:
         sections:
           - key: manager.supervisor_content
             source:
-              kind: literal
-              value: |
-                ## Manager 执行指南
-
-                你的完整执行指令和决策规则在以下文件中：
-                `supervisor/manager.md` (约 1000 行)
-
-                **请立即使用 Read tool 阅读此文件**：
-                ```
-                Read("supervisor/manager.md")
-                ```
-
-                该文件包含：
-                - **Role 定义**：Issue Owner 职责边界
-                - **Permission Contract**：允许/禁止的操作
-                - **核心决策逻辑**：做 vs 不做，无中间地带
-                - **State 机器**：ready → claimed → in_progress → review → done/blocked
-                - **Exit 条件**：何时停止执行
-
-                阅读后，按照其中的规则执行 manager 职责。
+              kind: file
+              path: supervisor/manager.md
           - key: manager.target
           - key: manager.quick_commands
 
@@ -188,24 +170,8 @@ recipes:
         kind: literal
         value: supervisor/apply.md
       supervisor_content:
-        kind: literal
-        value: |
-          ## Supervisor Handoff 执行指南
-
-          你的完整执行指令和决策规则在以下文件中：
-          `supervisor/apply.md`
-
-          **请立即使用 Read tool 阅读此文件**：
-          ```
-          Read("supervisor/apply.md")
-          ```
-
-          该文件包含：
-          - **Role 定义**：Supervisor 应用职责边界
-          - **执行逻辑**：如何应用 handoff 指令
-          - **状态转换**：issue state 的变化规则
-
-          阅读后，按照其中的规则执行 supervisor apply 职责。
+        kind: file
+        path: supervisor/apply.md
       server_status:
         kind: provider
         provider: governance.server_status

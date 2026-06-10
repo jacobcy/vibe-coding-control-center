@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     )
     from vibe3.prompts.template_loader import (
         DEFAULT_PROMPTS_PATH,
+        load_prompt_templates,
         resolve_prompt_template,
         resolve_prompts_path,
     )
@@ -95,6 +96,7 @@ _LAZY_IMPORTS = {
     "build_tools_guide_section": "vibe3.prompts.sections",
     "resolve_common_rules_path": "vibe3.prompts.sections",
     "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
+    "load_prompt_templates": "vibe3.prompts.template_loader",
     "resolve_prompt_template": "vibe3.prompts.template_loader",
     "resolve_prompts_path": "vibe3.prompts.template_loader",
     "resolve_source": "vibe3.prompts.builtin_providers",
@@ -150,6 +152,7 @@ __all__ = [
     "ValidationIssue",
     # Template helpers
     "DEFAULT_PROMPTS_PATH",
+    "load_prompt_templates",
     "resolve_prompt_template",
     "resolve_prompts_path",
     "resolve_source",
