@@ -115,7 +115,7 @@ _update_run() {
     log_success "Pre-flight checks passed"
 
     # Sync core components
-    for dir in bin lib lib3 config scripts src skills supervisor; do
+    for dir in bin lib lib3 config scripts src skills supervisor .agent; do
         _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
             log_error "Failed to sync $dir"
             exit 1

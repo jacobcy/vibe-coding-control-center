@@ -212,7 +212,6 @@ class JobExecutor:
         except Exception:
             adapter_hash = None
 
-        repo_root = resolve_orchestra_repo_root()
         from vibe3.clients import resolve_runtime_asset
         from vibe3.services import material_loader, policy_loader
 
@@ -222,8 +221,11 @@ class JobExecutor:
             if materials_dir.exists()
             else None
         )
-        policy_hash = compute_hash_from_loader(
-            policy_loader, repo_root / ".agent" / "governance" / "policies"
+        policies_dir = resolve_runtime_asset(".agent/governance/policies")
+        policy_hash = (
+            compute_hash_from_loader(policy_loader, policies_dir)
+            if policies_dir.exists()
+            else None
         )
 
         # Record lifecycle started event

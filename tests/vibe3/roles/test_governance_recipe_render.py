@@ -162,3 +162,76 @@ class TestRenderGovernancePrompt:
         )
         # Materials load from disk via file source (issue #2167)
         assert "GLOBAL ROADMAP INTAKE MATERIAL" in result.rendered_text
+
+
+class TestCrossRepoMaterialResolution:
+    """Verify material hash and description resolve via VIBE3_RUNTIME_ASSETS_ROOT."""
+
+    def test_compute_material_hash_uses_runtime_assets_root(
+        self, tmp_path, monkeypatch
+    ):
+        """_compute_material_hash should resolve through resolve_runtime_asset."""
+        from vibe3.roles.governance import _compute_material_hash
+
+        gov_dir = tmp_path / "supervisor" / "governance"
+        gov_dir.mkdir(parents=True)
+        (gov_dir / "assignee-pool.md").write_text("# Assignee Pool", encoding="utf-8")
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
+
+        result = _compute_material_hash()
+        assert result is not None
+        assert len(result) > 0
+
+    def test_compute_material_hash_falls_back_to_bundled_root(
+        self, tmp_path, monkeypatch
+    ):
+        """When VIBE3_RUNTIME_ASSETS_ROOT has no materials, falls back to bundled."""
+        from vibe3.roles.governance import _compute_material_hash
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(empty))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
+
+        # Falls back to bundled project root which has real governance materials
+        result = _compute_material_hash()
+        assert result is not None
+
+    def test_extract_material_description_uses_runtime_assets_root(
+        self, tmp_path, monkeypatch
+    ):
+        """extract_material_description should resolve through resolve_runtime_asset."""
+        from vibe3.roles.scan_service import extract_material_description
+
+        gov_dir = tmp_path / "supervisor" / "governance"
+        gov_dir.mkdir(parents=True)
+        (gov_dir / "roadmap-intake.md").write_text(
+            "# Roadmap Intake Process", encoding="utf-8"
+        )
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
+
+        result = extract_material_description("supervisor/governance/roadmap-intake.md")
+        assert result == "Roadmap Intake Process"
+
+    def test_extract_material_description_falls_back_to_name(
+        self, tmp_path, monkeypatch
+    ):
+        from vibe3.roles.scan_service import extract_material_description
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(empty))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
+
+        result = extract_material_description("supervisor/governance/missing.md")
+        assert result == "supervisor/governance/missing.md"

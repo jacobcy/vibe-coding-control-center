@@ -31,17 +31,23 @@ def runtime_assets_root() -> Path:
 def resolve_runtime_asset(path: str | Path) -> Path:
     """Resolve a standard Vibe runtime asset path.
 
-    Relative paths under ``supervisor/``, ``config/prompts/``, and ``skills/``
-    are mechanism assets. Source-tree development uses the bundled project copy;
-    cross-project execution uses the global distribution. If the global copy
-    has not been synced yet, fall back to the bundled project root.
+    Relative paths under ``supervisor/``, ``config/prompts/``, ``skills/``,
+    and ``.agent/`` are mechanism assets. Source-tree development uses the
+    bundled project copy; cross-project execution uses the global distribution.
+    If the global copy has not been synced yet, fall back to the bundled project
+    root.
     """
     candidate = Path(path).expanduser()
     if candidate.is_absolute():
         return candidate
 
     relative = Path(candidate)
-    if relative.parts[:1] in {("supervisor",), ("config",), ("skills",)}:
+    if relative.parts[:1] in {
+        ("supervisor",),
+        ("config",),
+        ("skills",),
+        (".agent",),
+    }:
         bundled_path = bundled_project_root() / relative
         try:
             Path.cwd().resolve().relative_to(bundled_project_root())
