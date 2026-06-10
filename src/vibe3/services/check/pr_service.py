@@ -248,6 +248,21 @@ class CheckPRService:
         )
         self._update_pr_cache(branch, pr)
 
+        # Publish PRMerged event if we have a valid issue context
+        task_issue = self.store.get_task_issue_number(branch)
+        if task_issue:
+            from vibe3.models.domain_events import PRMerged
+            from vibe3.models.event_bus import publish
+
+            publish(
+                PRMerged(
+                    issue_number=task_issue,
+                    branch=branch,
+                    pr_number=pr.number,
+                    merged_by=getattr(pr, "merged_by", None),
+                )
+            )
+
         if suggestions.get("issue_to_close"):
             # Informational message, not an error
             warnings.append(

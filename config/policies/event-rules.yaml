@@ -88,3 +88,31 @@ rules:
     action: log
     params:
       message: "webhook issue closed: issue #{{ event.issue_number }}"
+
+  # Flow blocked → queue manager for re-evaluation
+  - event: FlowBlocked
+    action: enqueue_command_job
+    params:
+      command_type: "manager"
+      issue_number: "{{ event.issue_number }}"
+      actor: "{{ event.actor }}"
+
+  # Flow completed → log for downstream tracking
+  - event: FlowCompleted
+    action: log
+    params:
+      message: "flow completed for issue #{{ event.issue_number }} ({{ event.completed_state }})"
+
+  # PR merged → queue manager for state advancement
+  - event: PRMerged
+    action: enqueue_command_job
+    params:
+      command_type: "manager"
+      issue_number: "{{ event.issue_number }}"
+      actor: "{{ event.actor }}"
+
+  # Policy changed → log for observability
+  - event: PolicyChanged
+    action: log
+    params:
+      message: "policy files changed: {{ event.changed_files }}"

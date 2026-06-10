@@ -100,6 +100,20 @@ class FlowLifecycleMixin:
             event_type=event_type,
         )
 
+        # Publish FlowBlocked event if we have a valid issue context
+        if issue_number is not None:
+            from vibe3.models.domain_events import FlowBlocked
+            from vibe3.models.event_bus import publish
+
+            publish(
+                FlowBlocked(
+                    issue_number=issue_number,
+                    branch=branch,
+                    blocked_reason=reason or "unspecified",
+                    actor=effective_actor,
+                )
+            )
+
     def abort_flow(
         self: Self,
         branch: str,
