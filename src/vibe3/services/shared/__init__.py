@@ -9,10 +9,12 @@ if TYPE_CHECKING:
         resolve_actor_backend_model,
     )
     from vibe3.services.shared.artifacts import ArtifactParser
+    from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
         resolve_branch_arg,
     )
+    from vibe3.services.shared.context_cache import FlowContextCacheService
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
         record_dispatch_failure_if_unexpected,
@@ -68,6 +70,10 @@ __all__ = [
     "extract_role_from_actor",
     # artifacts
     "ArtifactParser",
+    # branch_resolver
+    "resolve_issue_branch_input",
+    # context_cache
+    "FlowContextCacheService",
     # events
     "emit_issue_failed",
     # paths
@@ -127,6 +133,10 @@ _SYMBOL_MODULES = {
     "extract_role_from_actor": "vibe3.services.shared.actors",
     # artifacts
     "ArtifactParser": "vibe3.services.shared.artifacts",
+    # branch_resolver
+    "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",
+    # context_cache
+    "FlowContextCacheService": "vibe3.services.shared.context_cache",
     # events
     "emit_issue_failed": "vibe3.services.shared.events",
     # paths
