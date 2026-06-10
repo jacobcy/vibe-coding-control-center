@@ -81,7 +81,8 @@ def run_command(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    # Register EDA event handlers for run command (may publish events)
+    # Register EDA event handlers (defensive: ensures handlers are bound even
+    # if the CLI path ever publishes domain events in the future)
     from vibe3.domain import register_event_handlers
 
     register_event_handlers()

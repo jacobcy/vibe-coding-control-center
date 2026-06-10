@@ -169,7 +169,6 @@ def _build_server_with_launch_cwd(
     facade = OrchestrationFacade(
         config=config,
         capacity=shared_capacity,
-        failed_gate=failed_gate,
         store=shared_store,
         coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
         coordinator_class=GlobalDispatchCoordinator,
