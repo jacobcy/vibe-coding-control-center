@@ -28,8 +28,8 @@ from vibe3.services.pr.utils import (
     check_upstream_conflicts,
     get_metadata_from_flow,
 )
-from vibe3.services.signature_service import SignatureService
-from vibe3.services.version_service import VersionService
+from vibe3.services.shared.signatures import SignatureService
+from vibe3.services.shared.versions import VersionService
 
 
 def _format_datetime_iso(dt: datetime | None) -> str | None:

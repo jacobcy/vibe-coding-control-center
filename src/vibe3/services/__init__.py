@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.actor_support import format_agent_actor
     from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
     from vibe3.services.blocked_state_service import BlockedStateService
     from vibe3.services.bootstrap_context_service import (
@@ -64,7 +63,6 @@ if TYPE_CHECKING:
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
-    from vibe3.services.label_service import LabelService
     from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
@@ -97,8 +95,8 @@ if TYPE_CHECKING:
         generate_score_report,
     )
     from vibe3.services.pr.service import PRService
-    from vibe3.services.role_policy_helpers import get_role_block_function
     from vibe3.services.serve_status_service import ServeStatusService
+    from vibe3.services.shared.actors import format_agent_actor
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
         resolve_branch_arg,
@@ -112,6 +110,7 @@ if TYPE_CHECKING:
         LabelAnomaly,
         collect_label_anomalies,
     )
+    from vibe3.services.shared.label_service import LabelService
     from vibe3.services.shared.labels import (
         ORCHESTRA_GOVERNED_LABEL,
         classify_dispatch_eligibility,
@@ -134,7 +133,8 @@ if TYPE_CHECKING:
         resolve_ref_path,
         sanitize_event_detail_paths,
     )
-    from vibe3.services.signature_service import SignatureService
+    from vibe3.services.shared.roles import get_role_block_function
+    from vibe3.services.shared.signatures import SignatureService
     from vibe3.services.spec_ref_service import SpecRefService
     from vibe3.services.status_query_service import (
         StatusQueryService,
@@ -312,7 +312,7 @@ _SYMBOL_MODULES = {
     "IssueStatusEntry": "vibe3.services.orchestra.status",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     "LabelAnomaly": "vibe3.services.shared.label_anomalies",
-    "LabelService": "vibe3.services.label_service",
+    "LabelService": "vibe3.services.shared.label_service",
     "FileLoader": "vibe3.services.file_loader",
     "material_loader": "vibe3.services.file_loader",
     "MissingTaskIssueError": "vibe3.services.task_binding_guard",
@@ -325,7 +325,7 @@ _SYMBOL_MODULES = {
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
     "ServeStatusService": "vibe3.services.serve_status_service",
-    "SignatureService": "vibe3.services.signature_service",
+    "SignatureService": "vibe3.services.shared.signatures",
     "SpecRefService": "vibe3.services.spec_ref_service",
     "StatusQueryService": "vibe3.services.status_query_service",
     "TaskResumeOperations": "vibe3.services.task.resume",
@@ -350,7 +350,7 @@ _SYMBOL_MODULES = {
     "fail_manager_issue": "vibe3.services.issue.failure",
     "fail_planner_issue": "vibe3.services.issue.failure",
     "fail_reviewer_issue": "vibe3.services.issue.failure",
-    "format_agent_actor": "vibe3.services.actor_support",
+    "format_agent_actor": "vibe3.services.shared.actors",
     "filter_critical_files": "vibe3.services.pr.analysis",
     "fetch_task_status_data": "vibe3.services.task.status",
     "format_issue_runtime_line": "vibe3.services.orchestra.status",

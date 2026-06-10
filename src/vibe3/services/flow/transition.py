@@ -18,7 +18,7 @@ from vibe3.models import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow.write_mixin import FlowWriteMixin
 from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.shared.paths import GitPathProtocol
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 
 
 class FlowTransitionMixin(FlowWriteMixin):

@@ -2,7 +2,7 @@
 
 from vibe3.models.orchestration import IssueState
 from vibe3.models.state_machine import VIBE_TASK_LABEL
-from vibe3.services.label_service import LabelService
+from vibe3.services.shared.label_service import LabelService
 
 
 class FakeIssuePort:
