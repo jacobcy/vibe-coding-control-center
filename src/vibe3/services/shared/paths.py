@@ -379,8 +379,8 @@ def ref_to_handoff_cmd(
     display_target = REF_FIELD_TO_ALIAS[ref_field]
 
     # Shared artifacts: use @ prefix form without --branch
-    # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
+    # Lazy import to avoid circular dependency with handoff.resolution
+    from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
 
     if (
         path.startswith(_SHARED_HANDOFF_PREFIX)
