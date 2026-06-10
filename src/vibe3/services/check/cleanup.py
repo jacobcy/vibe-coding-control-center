@@ -61,7 +61,7 @@ class CheckCleanupService:
             Dict with summary and details of cleaned branches.
         """
         from vibe3.config import VibeConfig
-        from vibe3.services.expired_resource_cleanup_service import (
+        from vibe3.services.orchestra.cleanup import (
             ExpiredResourceCleanupService,
         )
 
@@ -529,7 +529,7 @@ class CheckCleanupService:
 
             # Load protected worktree names from config
             from vibe3.config import VibeConfig
-            from vibe3.services.expired_resource_cleanup_service import (
+            from vibe3.services.orchestra.cleanup import (
                 _is_protected_worktree,
             )
 
