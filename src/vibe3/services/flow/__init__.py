@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.services.flow.abandon import AbandonFlowService
     from vibe3.services.flow.block_mixin import FlowLifecycleMixin
     from vibe3.services.flow.classifier import (
         FlowCategory,
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     # Public API (exported via services/__init__.py)
+    "AbandonFlowService",
     "FlowCategory",
     "FlowState",
     "classify_flow",
@@ -75,6 +77,7 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     # Public API
+    "AbandonFlowService": "vibe3.services.flow.abandon",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowState": "vibe3.services.flow.classifier",
     "classify_flow": "vibe3.services.flow.classifier",
