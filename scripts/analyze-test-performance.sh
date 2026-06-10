@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# analyze-test-performance.sh — Analyze test suite performance and suggest optimizations.
+# analyze-test-performance.sh — Find slowest tests and suggest optimizations.
 #
 # Usage:
-#   bash scripts/analyze-test-performance.sh           # Full analysis
-#   bash scripts/analyze-test-performance.sh --quick   # Skip duration profiling (fast)
+#   bash scripts/analyze-test-performance.sh           # Full analysis (runs tests)
+#   bash scripts/analyze-test-performance.sh --quick   # Counts only (fast)
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -21,70 +20,53 @@ header() { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 TMPFILE=$(mktemp)
 trap "rm -f '$TMPFILE'" EXIT
 
-header "Test Suite Performance Analysis"
-
-# --- Test counts by category ---
 header "Test Counts"
 
 unit_count=$(uv run pytest tests/vibe3 -m "not integration and not slow" \
     --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration \
     --co -q 2>&1 | tail -1)
 
-modularity_count=$(uv run pytest tests/vibe3/test_modularity --co -q 2>&1 | tail -1)
-
-integration_count=$(uv run pytest tests/vibe3/integration --co -q 2>&1 | tail -1)
-
 slow_count=$(uv run pytest tests/vibe3 -m "slow" \
     --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration \
     --co -q 2>&1 | tail -1)
 
-echo -e "  Unit tests (not slow/integration): ${GREEN}$unit_count${NC}"
-echo -e "  Modularity tests:                  ${GREEN}$modularity_count${NC}"
-echo -e "  Integration tests:                  ${GREEN}$integration_count${NC}"
-echo -e "  Slow tests (marked @slow):          ${YELLOW}$slow_count${NC}"
+echo -e "  Unit tests:    ${GREEN}$unit_count${NC}"
+echo -e "  Slow (marked): ${YELLOW}$slow_count${NC}"
 
-# --- Duration profiling ---
-if [[ "${1:-}" != "--quick" ]]; then
-    header "Slowest 20 Tests (Unit Tests Only)"
-    echo "  Running unit tests with --durations=20 (this takes ~4 min)..."
-    uv run pytest tests/vibe3 \
-        -m "not integration and not slow" \
-        --ignore=tests/vibe3/test_modularity \
-        --ignore=tests/vibe3/integration \
-        --durations=20 \
-        -q --tb=no > "$TMPFILE" 2>&1
-
-    echo ""
-    # Extract duration lines (format: "X.XXs call tests/...")
-    grep -E "^[0-9]+\.[0-9]+s" "$TMPFILE" || echo "  (no duration data found)"
-    echo ""
-    # Show summary line
-    grep -E "passed|failed|error" "$TMPFILE" | tail -1 || true
-else
-    header "Duration Profiling (skipped: --quick mode)"
-    echo "  Run without --quick to see slowest tests."
+if [[ "${1:-}" == "--quick" ]]; then
+    echo -e "\n  ${YELLOW}Skipped duration profiling (--quick mode)${NC}"
+    exit 0
 fi
 
-# --- Optimization suggestions ---
-header "CI Structure (3 parallel jobs)"
+# Run unit tests with durations, capture to file
+header "Running Unit Tests with --durations=20"
+echo "  (takes ~3 min)..."
 
-echo -e "
-  ${GREEN}1. Lint & Type Check${NC}  (~2 min)
-     ruff, black, mypy, bats, LOC checks
+uv run pytest tests/vibe3 \
+    -m "not integration and not slow" \
+    --ignore=tests/vibe3/test_modularity \
+    --ignore=tests/vibe3/integration \
+    --durations=20 \
+    -q --tb=no > "$TMPFILE" 2>&1
 
-  ${GREEN}2. Unit Tests${NC}          (~4 min)
-     3222 tests, excludes slow/integration/modularity
-     Flag: ${CYAN}-m \"not integration and not slow\"${NC}
+# Extract and display slowest tests
+header "Slowest 20 Unit Tests"
 
-  ${GREEN}3. Quality Tests${NC}       (~30s)
-     modularity (37) + integration (76) + slow (4)
-     Flag: ${CYAN}-m slow${NC} + directory-based
+# Print duration lines (format: "X.XXs call    tests/...")
+dur_lines=$(grep -E "^[0-9]+\.[0-9]+s" "$TMPFILE" || true)
+if [[ -n "$dur_lines" ]]; then
+    echo "$dur_lines"
+    echo ""
+    # Count how many are >2s
+    over_2s=$(echo "$dur_lines" | awk -F's' '$1+0 > 2 {count++} END {print count+0}')
+    over_3s=$(echo "$dur_lines" | awk -F's' '$1+0 > 3 {count++} END {print count+0}')
+    echo -e "  ${YELLOW}>2s: $over_2s tests | >3s: $over_3s tests${NC}"
+    echo -e "  To move a slow test to Quality CI job, add: ${CYAN}@pytest.mark.slow${NC}"
+else
+    echo "  No duration data found."
+fi
 
-  ${YELLOW}Optimization levers:${NC}
-    1. Mark slow tests:  @pytest.mark.slow  (moves to Quality job)
-    2. Use CliRunner instead of subprocess for CLI tests
-    3. Mock heavy fixtures (coordinator, service init)
-    4. pytest-xdist (-n auto) for parallel execution
-"
-
-echo -e "${GREEN}Done.${NC}"
+# Summary
+header "Summary"
+summary=$(grep -E "passed|failed" "$TMPFILE" | tail -1 || true)
+echo "  $summary"
