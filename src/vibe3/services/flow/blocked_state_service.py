@@ -17,8 +17,8 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient
 from vibe3.models import IssueState
-from vibe3.services.blocked_state_io import BlockedStateIO
-from vibe3.services.blocked_state_types import (
+from vibe3.services.flow.blocked_state_io import BlockedStateIO
+from vibe3.services.flow.blocked_state_types import (
     BlockedState,
     ConsistencyReport,
     UnblockResult,

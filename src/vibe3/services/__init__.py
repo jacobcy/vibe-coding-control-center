@@ -3,25 +3,9 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
-    from vibe3.services.blocked_state_service import BlockedStateService
-    from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
-    from vibe3.services.coordination_resolver import CoordinationResolver
-    from vibe3.services.error_tracking_service import ErrorTrackingService
-
-    # Functions used in domain/execution/roles
-    from vibe3.services.event_helpers import emit_issue_failed
-    from vibe3.services.expired_resource_cleanup_service import (
-        ExpiredResourceCleanupService,
-    )
-    from vibe3.services.file_loader import (
-        FileLoader,
-        material_loader,
-        policy_loader,
-        resolve_manager_usernames,
-    )
+    from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
@@ -41,8 +25,8 @@ if TYPE_CHECKING:
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
     from vibe3.services.handoff.resolution import resolve_handoff_target
+    from vibe3.services.handoff.service import HandoffService
     from vibe3.services.handoff.status import HandoffStatusService
-    from vibe3.services.handoff_service import HandoffService
     from vibe3.services.issue.branch_resolver import resolve_issue_branch_input
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
@@ -56,11 +40,17 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.orchestra.cleanup import (
+        ExpiredResourceCleanupService,
+    )
+    from vibe3.services.orchestra.coordination import CoordinationResolver
+    from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
+    from vibe3.services.orchestra.serve_status import ServeStatusService
     from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
@@ -78,6 +68,7 @@ if TYPE_CHECKING:
         get_pr_commit_count,
         get_recent_commits,
     )
+    from vibe3.services.pr.base_resolution import BaseResolutionUsecase
     from vibe3.services.pr.create import PRCreateUsecase
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
     from vibe3.services.pr.resolver import (
@@ -91,7 +82,6 @@ if TYPE_CHECKING:
     from vibe3.services.pr.service import PRService
     from vibe3.services.pr.verdict_policy import requires_audit_ref
     from vibe3.services.pr.verdict_service import VerdictService
-    from vibe3.services.serve_status_service import ServeStatusService
     from vibe3.services.shared.actors import format_agent_actor
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
@@ -101,6 +91,15 @@ if TYPE_CHECKING:
         has_recent_specific_error,
         record_dispatch_failure_if_unexpected,
         record_error,
+    )
+
+    # Functions used in domain/execution/roles
+    from vibe3.services.shared.events import emit_issue_failed
+    from vibe3.services.shared.file_loader import (
+        FileLoader,
+        material_loader,
+        policy_loader,
+        resolve_manager_usernames,
     )
     from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
@@ -131,11 +130,15 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.roles import get_role_block_function
     from vibe3.services.shared.signatures import SignatureService
-    from vibe3.services.spec_ref_service import SpecRefService
-    from vibe3.services.status_query_service import (
+    from vibe3.services.shared.spec_ref import SpecRefService
+    from vibe3.services.shared.status_query import (
         StatusQueryService,
         is_auto_task_branch,
         is_dev_collab_branch,
+    )
+    from vibe3.services.task.binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
     )
     from vibe3.services.task.classifier import TaskStatusBucket
     from vibe3.services.task.resume import (
@@ -147,10 +150,6 @@ if TYPE_CHECKING:
     from vibe3.services.task.status import (
         classify_task_issues_for_rendering,
         fetch_task_status_data,
-    )
-    from vibe3.services.task_binding_guard import (
-        MissingTaskIssueError,
-        build_bind_task_hint,
     )
 
 __all__ = [
@@ -270,14 +269,14 @@ __all__ = [
 # Lazy import mapping for symbols not directly imported above
 _SYMBOL_MODULES = {
     # Services
-    "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
-    "BlockedStateService": "vibe3.services.blocked_state_service",
+    "BaseResolutionUsecase": "vibe3.services.pr.base_resolution",
+    "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckResult": "vibe3.services.check.service",
     "CheckService": "vibe3.services.check.service",
-    "CoordinationResolver": "vibe3.services.coordination_resolver",
-    "ErrorTrackingService": "vibe3.services.error_tracking_service",
-    "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
+    "CoordinationResolver": "vibe3.services.orchestra.coordination",
+    "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
+    "ExpiredResourceCleanupService": "vibe3.services.orchestra.cleanup",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
     "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
@@ -289,7 +288,7 @@ _SYMBOL_MODULES = {
     "FlowState": "vibe3.services.flow.classifier",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
-    "HandoffService": "vibe3.services.handoff_service",
+    "HandoffService": "vibe3.services.handoff.service",
     "HandoffStatusService": "vibe3.services.handoff.status",
     "InitResult": "vibe3.services.check.remote",
     "IssueCollectionService": "vibe3.services.issue.collection",
@@ -298,21 +297,21 @@ _SYMBOL_MODULES = {
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "LabelService": "vibe3.services.shared.label_service",
-    "FileLoader": "vibe3.services.file_loader",
-    "material_loader": "vibe3.services.file_loader",
-    "MissingTaskIssueError": "vibe3.services.task_binding_guard",
+    "FileLoader": "vibe3.services.shared.file_loader",
+    "material_loader": "vibe3.services.shared.file_loader",
+    "MissingTaskIssueError": "vibe3.services.task.binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra.status",
     "OrchestraStatusService": "vibe3.services.orchestra.status",
     "PRCreateUsecase": "vibe3.services.pr.create",
     "PRDimensions": "vibe3.services.pr.scoring",
     "PRService": "vibe3.services.pr.service",
-    "policy_loader": "vibe3.services.file_loader",
+    "policy_loader": "vibe3.services.shared.file_loader",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
-    "ServeStatusService": "vibe3.services.serve_status_service",
+    "ServeStatusService": "vibe3.services.orchestra.serve_status",
     "SignatureService": "vibe3.services.shared.signatures",
-    "SpecRefService": "vibe3.services.spec_ref_service",
-    "StatusQueryService": "vibe3.services.status_query_service",
+    "SpecRefService": "vibe3.services.shared.spec_ref",
+    "StatusQueryService": "vibe3.services.shared.status_query",
     "TaskResumeOperations": "vibe3.services.task.resume",
     "TaskResumeUsecase": "vibe3.services.task.resume",
     "TaskService": "vibe3.services.task.service",
@@ -322,14 +321,14 @@ _SYMBOL_MODULES = {
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
-    "build_bind_task_hint": "vibe3.services.task_binding_guard",
+    "build_bind_task_hint": "vibe3.services.task.binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.shared.paths",
     "classify_flow": "vibe3.services.flow.classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     "create_flow_manager": "vibe3.services.flow.factory",
-    "emit_issue_failed": "vibe3.services.event_helpers",
+    "emit_issue_failed": "vibe3.services.shared.events",
     "fail_executor_issue": "vibe3.services.issue.failure",
     "fail_issue": "vibe3.services.issue.failure",
     "fail_manager_issue": "vibe3.services.issue.failure",
@@ -358,8 +357,8 @@ _SYMBOL_MODULES = {
     "has_roadmap_conflict": "vibe3.services.shared.labels",
     "has_roadmap_label": "vibe3.services.shared.labels",
     "infer_resume_label": "vibe3.services.flow.resume_resolver",
-    "is_auto_task_branch": "vibe3.services.status_query_service",
-    "is_dev_collab_branch": "vibe3.services.status_query_service",
+    "is_auto_task_branch": "vibe3.services.shared.status_query",
+    "is_dev_collab_branch": "vibe3.services.shared.status_query",
     "is_running_issue": "vibe3.services.orchestra.status",
     "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.shared.labels",
@@ -374,7 +373,7 @@ _SYMBOL_MODULES = {
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
     "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
-    "resolve_manager_usernames": "vibe3.services.file_loader",
+    "resolve_manager_usernames": "vibe3.services.shared.file_loader",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     "clean_old_state_labels": "vibe3.services.shared.labels",

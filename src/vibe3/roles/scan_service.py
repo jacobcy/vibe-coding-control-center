@@ -23,6 +23,7 @@ def extract_material_description(material_name: str) -> str:
         Material description (first markdown header) or filename as fallback.
     """
     from vibe3.clients import resolve_runtime_asset
+    from vibe3.prompts import MaterialEntry
     from vibe3.services import material_loader
 
     try:
@@ -33,7 +34,7 @@ def extract_material_description(material_name: str) -> str:
         loader = material_loader(materials_dir)
         # Strip directory prefix: "supervisor/governance/foo.md" -> "foo.md"
         basename = Path(material_name).name
-        entry = loader.load(basename)
+        entry: MaterialEntry | None = loader.load(basename)
         if entry is None:
             return material_name
 

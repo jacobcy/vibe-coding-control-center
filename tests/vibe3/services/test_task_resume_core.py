@@ -29,7 +29,7 @@ def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service

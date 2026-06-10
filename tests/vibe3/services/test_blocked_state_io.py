@@ -4,7 +4,7 @@
 def test_write_database_cache_stores_summary(tmp_path):
     """write_database_cache should compute and store blocked_reason_summary."""
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
 
     db = SQLiteClient(db_path=str(tmp_path / "test.db"))
     io = BlockedStateIO(store=db)
@@ -31,7 +31,7 @@ def test_write_database_cache_stores_summary(tmp_path):
 def test_clear_database_cache_resets_transition_count(tmp_path):
     """clear_database_cache should reset transition_count to 0."""
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
 
     db = SQLiteClient(db_path=str(tmp_path / "test.db"))
 
@@ -57,7 +57,7 @@ def test_clear_database_cache_resets_transition_count(tmp_path):
 
 def test_clear_database_cache_returns_early_when_store_is_none():
     """clear_database_cache should return early when store is None."""
-    from vibe3.services.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
 
     io = BlockedStateIO(store=None)
     # Should not raise any exception
@@ -69,7 +69,7 @@ def test_clear_database_cache_handles_transition_history_exception(
 ):
     """clear_database_cache should handle exception from clear_transition_history."""
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
 
     db = SQLiteClient(db_path=str(tmp_path / "test.db"))
 

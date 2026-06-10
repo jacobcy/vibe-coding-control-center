@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.config.convention_resolver import ConventionResolver
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
@@ -19,7 +20,6 @@ from vibe3.roles.supervisor import (
     get_supervisor_prompt_path,
     iter_supervisor_identified_events,
 )
-from vibe3.services.convention_resolver import ConventionResolver
 
 
 @pytest.fixture(autouse=True)

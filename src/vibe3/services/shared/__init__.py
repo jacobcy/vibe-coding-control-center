@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         record_dispatch_failure_if_unexpected,
         record_error,
     )
+    from vibe3.services.shared.events import emit_issue_failed
     from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
         collect_label_anomalies,
@@ -67,6 +68,8 @@ __all__ = [
     "extract_role_from_actor",
     # artifacts
     "ArtifactParser",
+    # events
+    "emit_issue_failed",
     # paths
     "GitClientProtocol",
     "check_ref_exists",
@@ -124,6 +127,8 @@ _SYMBOL_MODULES = {
     "extract_role_from_actor": "vibe3.services.shared.actors",
     # artifacts
     "ArtifactParser": "vibe3.services.shared.artifacts",
+    # events
+    "emit_issue_failed": "vibe3.services.shared.events",
     # paths
     "GitClientProtocol": "vibe3.services.shared.paths",
     "check_ref_exists": "vibe3.services.shared.paths",

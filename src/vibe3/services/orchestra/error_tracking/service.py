@@ -16,37 +16,41 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import ErrorSeverity, get_error_handling_contract
-from vibe3.services.error_tracking_cleanup import (
+from vibe3.services.orchestra.error_tracking.cleanup import (
     cleanup_old_errors as _cleanup_old_errors,
 )
-from vibe3.services.error_tracking_cleanup import clear_errors as _clear_errors
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.cleanup import (
+    clear_errors as _clear_errors,
+)
+from vibe3.services.orchestra.error_tracking.queries import (
     get_all_errors_status as _get_all_errors_status,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     get_api_and_exec_error_count as _get_api_and_exec_error_count,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     get_api_error_count as _get_api_error_count,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     get_critical_error_codes as _get_critical_error_codes,
 )
-from vibe3.services.error_tracking_queries import get_error_counts as _get_error_counts
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
+    get_error_counts as _get_error_counts,
+)
+from vibe3.services.orchestra.error_tracking.queries import (
     get_recent_errors as _get_recent_errors,
 )
-from vibe3.services.error_tracking_queries import get_status as _get_status
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import get_status as _get_status
+from vibe3.services.orchestra.error_tracking.queries import (
     get_threshold_error_count as _get_threshold_error_count,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     get_warning_count as _get_warning_count,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     has_critical_error as _has_critical_error,
 )
-from vibe3.services.error_tracking_queries import (
+from vibe3.services.orchestra.error_tracking.queries import (
     has_model_config_error as _has_model_config_error,
 )
 

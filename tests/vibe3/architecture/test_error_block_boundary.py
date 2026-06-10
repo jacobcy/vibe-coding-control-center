@@ -45,12 +45,14 @@ class TestErrorModulesDoNotImportBlockModules:
         # exceptions/error_*.py
         exceptions_dir = PROJECT_ROOT / "src/vibe3/exceptions"
         files.extend(exceptions_dir.glob("error_*.py"))
-        # services/error_tracking_*.py
+        # services/orchestra/error_tracking/ (migrated from services/)
         services_dir = PROJECT_ROOT / "src/vibe3/services"
-        files.extend(services_dir.glob("error_tracking_*.py"))
+        error_tracking_dir = services_dir / "orchestra" / "error_tracking"
+        if error_tracking_dir.exists():
+            files.extend(error_tracking_dir.glob("*.py"))
         assert files, (
             f"No error files found. Check paths: "
-            f"{exceptions_dir}/error_*.py, {services_dir}/error_tracking_*.py"
+            f"{exceptions_dir}/error_*.py, {error_tracking_dir}/*.py"
         )
         return files
 
@@ -105,15 +107,17 @@ class TestBlockModulesDoNotImportErrorModules:
 
     @pytest.fixture
     def block_files(self) -> list[Path]:
-        """Get all BLOCK-related files in services/."""
+        """Get all BLOCK-related files in services/flow/ (migrated from services/)."""
         services_dir = PROJECT_ROOT / "src/vibe3/services"
+        flow_dir = services_dir / "flow"
         files: list[Path] = []
-        # Glob for blocked_state files and flow_block files
-        files.extend(services_dir.glob("*blocked_state*.py"))
-        files.extend(services_dir.glob("flow_block_*.py"))
+        # Glob for blocked_state files and block files in flow/
+        if flow_dir.exists():
+            files.extend(flow_dir.glob("*blocked_state*.py"))
+            files.extend(flow_dir.glob("*block*.py"))
         assert files, (
-            f"No block files found. Check path: {services_dir}/"
-            f"*blocked_state*.py, flow_block_*.py"
+            f"No block files found. Check path: {flow_dir}/"
+            f"*blocked_state*.py, *block*.py"
         )
         return files
 

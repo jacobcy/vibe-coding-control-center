@@ -10,7 +10,7 @@ from rich.table import Table
 from vibe3.config import load_orchestra_config
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
-from vibe3.services.error_tracking_service import ErrorTrackingService
+from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,

@@ -231,7 +231,7 @@ class TestRunQualifyGate:
             return_value=mock_truth,
         ):
             with patch(
-                "vibe3.services.blocked_state_io.GitHubClient",
+                "vibe3.services.flow.blocked_state_io.GitHubClient",
                 return_value=mock_github,
             ):
                 flow_state = {"status": "active"}

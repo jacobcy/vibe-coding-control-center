@@ -78,7 +78,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                     mock_label_service_class.return_value = mock_label_service
 
                     with patch(
-                        "vibe3.services.blocked_state_io.GitHubClient"
+                        "vibe3.services.flow.blocked_state_io.GitHubClient"
                     ) as mock_github_class:
                         mock_github = MagicMock()
                         mock_github.get_issue_body.return_value = "User content"
@@ -113,7 +113,9 @@ def test_block_flow_uses_new_fields():
         flow_service.create_flow(slug="issue-300", branch=branch, actor="test-user")
         store.add_issue_link(branch, 300, "task")
 
-        with patch("vibe3.services.blocked_state_io.GitHubClient") as mock_github_class:
+        with patch(
+            "vibe3.services.flow.blocked_state_io.GitHubClient"
+        ) as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_issue_body.return_value = "User content"
             mock_github_class.return_value = mock_github
@@ -149,7 +151,9 @@ def test_block_flow_writes_body_label_and_cache():
         flow_service.create_flow(slug="issue-400", branch=branch, actor="test-user")
         store.add_issue_link(branch, 400, "task")
 
-        with patch("vibe3.services.blocked_state_io.LabelService") as mock_label_cls:
+        with patch(
+            "vibe3.services.flow.blocked_state_io.LabelService"
+        ) as mock_label_cls:
             mock_label = MagicMock()
             mock_label_cls.return_value = mock_label
 
@@ -160,7 +164,7 @@ def test_block_flow_writes_body_label_and_cache():
                 mock_timeline_cls.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.blocked_state_io.GitHubClient"
+                    "vibe3.services.flow.blocked_state_io.GitHubClient"
                 ) as mock_github_class:
                     mock_github = MagicMock()
                     mock_github.get_issue_body.return_value = "User content"

@@ -5,6 +5,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from vibe3.services.flow.abandon import AbandonFlowService
     from vibe3.services.flow.block_mixin import FlowLifecycleMixin
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_service import BlockedStateService
+    from vibe3.services.flow.blocked_state_types import (
+        BlockedState,
+        ConsistencyReport,
+        UnblockResult,
+    )
     from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
@@ -43,6 +50,11 @@ if TYPE_CHECKING:
 __all__ = [
     # Public API (exported via services/__init__.py)
     "AbandonFlowService",
+    "BlockedState",
+    "BlockedStateIO",
+    "BlockedStateService",
+    "ConsistencyReport",
+    "UnblockResult",
     "FlowCategory",
     "FlowState",
     "classify_flow",
@@ -78,6 +90,11 @@ __all__ = [
 _SYMBOL_MODULES = {
     # Public API
     "AbandonFlowService": "vibe3.services.flow.abandon",
+    "BlockedState": "vibe3.services.flow.blocked_state_types",
+    "BlockedStateIO": "vibe3.services.flow.blocked_state_io",
+    "BlockedStateService": "vibe3.services.flow.blocked_state_service",
+    "ConsistencyReport": "vibe3.services.flow.blocked_state_types",
+    "UnblockResult": "vibe3.services.flow.blocked_state_types",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowState": "vibe3.services.flow.classifier",
     "classify_flow": "vibe3.services.flow.classifier",
