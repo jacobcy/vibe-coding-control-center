@@ -310,7 +310,7 @@ _SYMBOL_MODULES = {
     "policy_loader": "vibe3.services.file_loader",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
-    "ServeStatusService": "vibe3.services.serve_status_service",
+    "ServeStatusService": "vibe3.services.orchestra.serve_status",
     "SignatureService": "vibe3.services.shared.signatures",
     "SpecRefService": "vibe3.services.spec_ref_service",
     "StatusQueryService": "vibe3.services.status_query_service",
