@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
+from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.execution.actor import (
@@ -285,5 +286,19 @@ class TestTerminalNotification:
 
         monkeypatch.setattr(registry, "mark_terminal", _broken_mark_terminal)
 
+        # Capture logger.warning calls
+        log_calls: list[str] = []
+
+        def _capture_warning(msg: str, *args: object) -> None:
+            log_calls.append(msg.format(*args) if args else msg)
+
+        monkeypatch.setattr(logger, "warning", _capture_warning)
+
         # Should NOT raise — it logs instead
         actor.record_completion()
+
+        # Verify warning was logged with actor_id
+        assert len(log_calls) == 1, f"Expected 1 warning log, got {len(log_calls)}"
+        assert (
+            actor.actor_id in log_calls[0]
+        ), f"Expected actor_id in log message, got: {log_calls[0]}"
