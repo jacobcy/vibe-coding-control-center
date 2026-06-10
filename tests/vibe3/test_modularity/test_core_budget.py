@@ -49,7 +49,6 @@ CORE_MODULES: frozenset[str] = frozenset({"runtime", "orchestra"})
 CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     "process_lifecycle": [
         "runtime.orchestra_instance",
-        "runtime.service_protocol",
     ],
     "heartbeat_timer": [
         "runtime.heartbeat",
