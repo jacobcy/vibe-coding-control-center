@@ -333,7 +333,7 @@ _SYMBOL_MODULES = {
     "TaskService": "vibe3.services.task.service",
     "TaskShowResult": "vibe3.services.task.show",
     "TaskStatusBucket": "vibe3.services.task.classifier",
-    "VerdictService": "vibe3.services.verdict_service",
+    "VerdictService": "vibe3.services.pr.verdict_service",
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
@@ -382,7 +382,7 @@ _SYMBOL_MODULES = {
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
     "ref_to_handoff_cmd": "vibe3.services.shared.paths",
-    "requires_audit_ref": "vibe3.services.verdict_policy",
+    "requires_audit_ref": "vibe3.services.pr.verdict_policy",
     "resolve_branch_and_issue": "vibe3.services.shared.branches",
     "resolve_branch_arg": "vibe3.services.shared.branches",
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",
