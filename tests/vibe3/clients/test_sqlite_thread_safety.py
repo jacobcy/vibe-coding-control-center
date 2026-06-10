@@ -46,6 +46,9 @@ def test_concurrent_queries_no_corruption(tmp_path: Path) -> None:
     Reproduces the IndexError/InterfaceError from issue #2535 where
     ThreadPoolExecutor threads share a single connection and corrupt
     each other's cursor state.
+
+    Note: A failing test reliably reproduces the bug. A passing test
+    means the bug did not trigger this run, not that it is absent.
     """
     db_path = str(tmp_path / "test.db")
     client = SQLiteClient(db_path=db_path)

@@ -15,7 +15,9 @@ from vibe3.exceptions import GitError
 from vibe3.utils import get_vibe3_db_path
 
 # Per-thread connections to avoid concurrent query corruption
-# Each thread gets its own connection; tracked for bulk close in tests/atexit
+# Each thread gets its own connection; tracked for bulk close in tests/atexit.
+# Assumes bounded thread pools (ThreadPoolExecutor). Dynamic thread creation
+# may orphan connections until process exit when atexit runs cleanup.
 _thread_local = threading.local()
 _thread_conns: set[sqlite3.Connection] = set()
 _thread_conns_lock = threading.Lock()
@@ -42,7 +44,7 @@ def _is_connection_usable(conn: sqlite3.Connection) -> bool:
     return True
 
 
-def _get_global_connection(db_path: str) -> sqlite3.Connection:
+def _get_thread_connection(db_path: str) -> sqlite3.Connection:
     """Get or create a thread-local database connection.
 
     Uses per-thread connections to avoid concurrent query corruption.
@@ -67,13 +69,13 @@ def _get_global_connection(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def _close_global_connection() -> None:
+def _close_all_connections() -> None:
     """Close all tracked thread-local connections.
 
     Used for test isolation and atexit cleanup.
     Closes current thread's connection and all tracked connections.
     """
-    # Close current thread's connection
+    # Close current thread's connection and remove from tracked set
     conn = getattr(_thread_local, "conn", None)
     if conn is not None:
         try:
@@ -82,7 +84,7 @@ def _close_global_connection() -> None:
             pass
         _thread_local.conn = None
 
-    # Close all tracked connections (for test cleanup / atexit)
+    # Close all remaining tracked connections (for test cleanup / atexit)
     with _thread_conns_lock:
         for c in list(_thread_conns):
             try:
@@ -101,7 +103,7 @@ def _utcnow_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-atexit.register(_close_global_connection)
+atexit.register(_close_all_connections)
 
 
 T = TypeVar("T", bound="SQLiteClientBase")
@@ -154,8 +156,10 @@ class SQLiteClientBase:
         Uses a migration version check to avoid re-running full DDL
         on every SQLiteClient instantiation. Increments migration_version
         in sqlite_schema.py when adding new migrations.
+
+        Note: init_schema() must remain idempotent — multiple threads may
+        race to the same code path before _init_done is populated.
         """
-        conn = _get_global_connection(self.db_path)
         with _init_lock:
             # Lightweight guard: check migration version
             # Update required_migration_version when adding new migrations
@@ -164,6 +168,8 @@ class SQLiteClientBase:
             # Check if already initialized for this db_path
             if self.db_path in _init_done:
                 return
+
+            conn = _get_thread_connection(self.db_path)
 
             try:
                 version_row = conn.execute(
@@ -184,4 +190,4 @@ class SQLiteClientBase:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get the thread-local connection for this database."""
-        return _get_global_connection(self.db_path)
+        return _get_thread_connection(self.db_path)
