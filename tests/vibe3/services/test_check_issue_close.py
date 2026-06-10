@@ -17,9 +17,14 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.services.check.service import CheckService
 
 
-@pytest.mark.slow
 class TestMarkFlowDoneIssueClose:
     """Test _mark_flow_done issue closing behavior."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_snapshot(self):
+        """Mock snapshot service to avoid real git operations in tests."""
+        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
+            yield
 
     def test_mark_flow_done_closes_task_issue(self, tmp_path):
         """Single active flow, task issue open → issue closed."""

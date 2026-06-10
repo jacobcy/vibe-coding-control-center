@@ -11,9 +11,14 @@ from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check.service import CheckService
 
 
-@pytest.mark.slow
 class TestPRStatusDetection:
     """Test PR status detection and flow auto-completion."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_snapshot(self):
+        """Mock snapshot service to avoid real git operations in tests."""
+        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
+            yield
 
     def test_check_marks_flow_done_when_merged(self, tmp_path):
         """Should mark flow as done when PR is merged."""
