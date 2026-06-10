@@ -364,7 +364,7 @@ _SYMBOL_MODULES = {
     "get_pr_changed_files": "vibe3.services.pr.analysis",
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
-    "get_role_block_function": "vibe3.services.role_policy_helpers",
+    "get_role_block_function": "vibe3.services.shared.roles",
     "get_state_labels": "vibe3.services.shared.labels",
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "has_execution_state": "vibe3.services.shared.labels",
