@@ -57,21 +57,26 @@ def _resolve_literal(src: PromptVariableSource) -> str:
     return src.value or ""
 
 
-def _resolve_file(src: PromptVariableSource) -> str:
+def _resolve_file(
+    src: PromptVariableSource,
+    warnings: list[str] | None = None,
+) -> str:
     if not src.path:
         return ""
     path = resolve_runtime_asset(src.path)
     if not path.exists():
-        logger.bind(domain="prompt_assembly").warning(
-            f"File source not found: {src.path}"
-        )
+        msg = f"File source not found: {src.path}"
+        logger.bind(domain="prompt_assembly").warning(msg)
+        if warnings is not None:
+            warnings.append(msg)
         return ""
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
-        logger.bind(domain="prompt_assembly").warning(
-            f"Cannot read file source {src.path}: {exc}"
-        )
+        msg = f"Cannot read file source {src.path}: {exc}"
+        logger.bind(domain="prompt_assembly").warning(msg)
+        if warnings is not None:
+            warnings.append(msg)
         return ""
 
 
@@ -134,12 +139,13 @@ def resolve_source(
     runtime_context: dict[str, Any],
     registry: ProviderRegistry,
     skill_path_resolver: Callable[[str], str | None] | None = None,
+    warnings: list[str] | None = None,
 ) -> str:
     """Resolve a single variable source to its string value."""
     if src.kind == VariableSourceKind.LITERAL:
         return _resolve_literal(src)
     if src.kind == VariableSourceKind.FILE:
-        return _resolve_file(src)
+        return _resolve_file(src, warnings=warnings)
     if src.kind == VariableSourceKind.SKILL:
         return _resolve_skill(src, skill_path_resolver)
     if src.kind == VariableSourceKind.COMMAND:

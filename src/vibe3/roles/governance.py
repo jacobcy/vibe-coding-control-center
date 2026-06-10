@@ -307,6 +307,19 @@ def build_governance_recipe(
     )
 
 
+def _record_assembly_warnings(warnings: tuple[str, ...]) -> None:
+    for msg in warnings:
+        try:
+            from vibe3.services import ErrorTrackingService
+
+            ErrorTrackingService.get_instance().record_error(
+                error_code="E_CONFIG_MISSING",
+                error_message=msg,
+            )
+        except Exception:
+            pass
+
+
 def render_governance_prompt(
     config: OrchestraConfig,
     snapshot_context: dict[str, Any],
@@ -325,7 +338,9 @@ def render_governance_prompt(
     )
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
-    return assembler.render(recipe, runtime_context=snapshot_context)
+    result = assembler.render(recipe, runtime_context=snapshot_context)
+    _record_assembly_warnings(result.warnings)
+    return result
 
 
 def resolve_governance_options(config: OrchestraConfig) -> Any:
