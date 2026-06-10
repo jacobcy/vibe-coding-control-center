@@ -391,3 +391,44 @@ def test_get_flows_by_status_uses_sql_where_clause() -> None:
         assert len(result) == 50
         # All returned flows should be active
         assert all(f["flow_status"] == "active" for f in result)
+
+
+def test_restore_flow_resets_aborted_status() -> None:
+    """Test that restore_flow resets flow_status from aborted to active.
+
+    This tests the deadlock scenario where:
+    - flow_status='aborted' (set by abort_flow)
+    - deleted_at is NULL (no tombstone created)
+
+    The restore_flow method should reset flow_status to 'active'.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Create a flow with active status
+        store.update_flow_state(
+            "task/issue-789",
+            flow_slug="issue_789",
+            flow_status="active",
+            spec_ref="#789",
+            plan_ref="docs/plans/test.md",
+        )
+
+        # Simulate abort_flow by setting flow_status to 'aborted' without deleted_at
+        store.update_flow_state("task/issue-789", flow_status="aborted")
+
+        # Verify the deadlock state: aborted but no tombstone
+        aborted_flow = store.get_flow_state_include_deleted("task/issue-789")
+        assert aborted_flow is not None
+        assert aborted_flow["flow_status"] == "aborted"
+        assert aborted_flow["deleted_at"] is None
+
+        # Restore the flow
+        store.restore_flow("task/issue-789")
+
+        # Verify flow_status is reset to active and deleted_at remains NULL
+        restored_flow = store.get_flow_state_include_deleted("task/issue-789")
+        assert restored_flow is not None
+        assert restored_flow["flow_status"] == "active"
+        assert restored_flow["deleted_at"] is None
