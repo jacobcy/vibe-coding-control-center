@@ -38,3 +38,33 @@ rules:
     action: log
     params:
       message: "issue #{{ event.issue_number }} failed: {{ event.reason }}"
+
+  # Webhook: label changed → log (upstream handler can refresh queue)
+  - event: WebhookLabelChanged
+    action: log
+    params:
+      message: "webhook label changed: issue #{{ event.issue_number }} label={{ event.label }} action={{ event.action }}"
+
+  # Webhook: issue updated → log
+  - event: WebhookIssueUpdated
+    action: log
+    params:
+      message: "webhook issue updated: issue #{{ event.issue_number }} action={{ event.action }}"
+
+  # Webhook: PR merged → log (upstream handler can trigger flow advancement)
+  - event: WebhookPRMerged
+    action: log
+    params:
+      message: "webhook PR merged: pr #{{ event.pr_number }}"
+
+  # Webhook: PR reviewed → log
+  - event: WebhookPRReviewed
+    action: log
+    params:
+      message: "webhook PR reviewed: pr #{{ event.pr_number }} state={{ event.state }}"
+
+  # Webhook: issue closed → log
+  - event: WebhookIssueClosed
+    action: log
+    params:
+      message: "webhook issue closed: issue #{{ event.issue_number }}"

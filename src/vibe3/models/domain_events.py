@@ -91,3 +91,54 @@ class SupervisorIssueIdentified(DomainEvent):
     supervisor_file: str
     actor: str = "system:supervisor"
     timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookLabelChanged(DomainEvent):
+    """Published when a GitHub issue label is added or removed."""
+
+    issue_number: int
+    label: str
+    action: str  # "labeled" | "unlabeled"
+    sender: str = ""
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookIssueUpdated(DomainEvent):
+    """Published when a GitHub issue is opened or edited."""
+
+    issue_number: int
+    action: str  # "opened" | "edited"
+    sender: str = ""
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookPRMerged(DomainEvent):
+    """Published when a GitHub pull request is merged."""
+
+    pr_number: int
+    branch: str = ""
+    sender: str = ""
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookPRReviewed(DomainEvent):
+    """Published when a GitHub PR review is submitted."""
+
+    pr_number: int
+    reviewer: str = ""
+    state: str = ""  # "approved" | "changes_requested" | "commented"
+    sender: str = ""
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class WebhookIssueClosed(DomainEvent):
+    """Published when a GitHub issue is closed."""
+
+    issue_number: int
+    sender: str = ""
+    timestamp: str | None = None

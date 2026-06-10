@@ -10,6 +10,11 @@ from vibe3.models import (
     ManagerDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
+    WebhookIssueClosed,
+    WebhookIssueUpdated,
+    WebhookLabelChanged,
+    WebhookPRMerged,
+    WebhookPRReviewed,
 )
 
 __all__ = [
@@ -18,4 +23,9 @@ __all__ = [
     "ManagerDispatchIntent",
     "PlannerDispatchIntent",
     "ReviewerDispatchIntent",
+    "WebhookIssueClosed",
+    "WebhookIssueUpdated",
+    "WebhookLabelChanged",
+    "WebhookPRMerged",
+    "WebhookPRReviewed",
 ]

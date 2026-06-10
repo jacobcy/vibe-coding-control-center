@@ -296,6 +296,19 @@ def _build_server_with_launch_cwd(
             f"Failed to mount MCP server, continuing without MCP: {exc}"
         )
 
+    # Mount webhook router (gracefully degrades if not available)
+    try:
+        from .webhook import router as webhook_router
+
+        fastapi_app.include_router(webhook_router)
+        logger.bind(domain="orchestra").info(
+            "Webhook router mounted at /webhook/github"
+        )
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Failed to mount webhook router, continuing without webhook: {exc}"
+        )
+
     return heartbeat, fastapi_app
 
 
