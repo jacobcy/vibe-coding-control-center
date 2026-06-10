@@ -196,6 +196,98 @@ gh issue list -l "roadmap/p0"
 gh issue list -l "roadmap/p1"
 ```
 
+### Step 1.5: Milestone 健康检查
+
+**每次版本规划必须执行**，生成统计报告并选择性处理缺失 milestone 的 issues。
+
+**Step 1.5a: 统计报告**
+
+检查无 milestone 的 issues 并生成报告：
+
+```bash
+# 统计总数
+COUNT=$(gh issue list --state open --limit 100 --json milestone --jq '[.[] | select(.milestone == null)] | length')
+echo "发现 $COUNT 个 open issues 没有 milestone"
+
+# 按优先级分组统计
+echo -e "\n按 roadmap 优先级分布："
+gh issue list --state open --limit 100 --json number,title,milestone,labels \
+  --jq '.[] | select(.milestone == null) 
+        | {number, title, priority: ([.labels[].name | select(startswith("roadmap/p"))] | first // "none")}' \
+  | jq -s 'group_by(.priority) | .[] | {priority: .[0].priority, count: length}'
+```
+
+**Step 1.5b: 分批处理**
+
+当发现大量无 milestone issues 时，**不要一次性全部处理**。采用以下策略：
+
+**策略 1: 按优先级分批**
+```bash
+# 只处理 P0/P1 高优先级 issues（每次最多 5-10 个）
+gh issue list --state open --limit 100 --json number,title,milestone,labels \
+  --jq '.[] | select(.milestone == null) 
+        | select([.labels[].name] | index("roadmap/p0") or index("roadmap/p1"))
+        | .number' \
+  | head -5 | while read NUM; do
+    echo "处理 #$NUM..."
+    # 分析并分配 milestone
+  done
+```
+
+**策略 2: 按标题关键词分批**
+```bash
+# 处理标题包含 "Phase" 字样的 issues（通常有明确的阶段标识）
+gh issue list --state open --limit 100 --json number,title,milestone \
+  --jq '.[] | select(.milestone == null) 
+        | select(.title | test("Phase [0-9]")) 
+        | {number, title}' \
+  | head -10
+```
+
+**单个 Issue 处理流程**：
+
+1. **分析 issue 内容和 scope**：
+   - 查看标题、body 和现有 labels
+   - 判断属于哪个 feature/阶段
+   - 检查是否为 epic issue 或 sub-issue
+
+2. **分配 milestone**：
+
+```bash
+# 查看现有 milestones
+gh api repos/{owner}/{repo}/milestones --paginate -q '.[] | {number, title, open_issues}'
+
+# 分配 milestone
+gh issue edit <number> --milestone "<milestone title>"
+```
+
+3. **记录决策**：
+
+```bash
+gh issue comment <number> --body "[roadmap decision] milestone assigned: <milestone> (理由: <scope/feature归属>)"
+gh issue edit <number> --add-label "roadmap-reviewed"
+```
+
+**Milestone 分配原则**：
+
+- **Epic issue** → 放入对应的版本/阶段 milestone（如 "Phase 6: 架构清理与模块化"）
+- **Sub-issue** → 与父 epic issue 使用相同 milestone
+- **独立小修复** → 根据紧急程度放入当前版本或下一版本 milestone
+- **RFC/架构讨论** → 不分配 milestone，等待决策后再归档
+
+**统计输出**：
+
+处理完一批后，输出当前 milestone 分布：
+
+```bash
+gh api repos/{owner}/{repo}/milestones --paginate -q '.[] | select(.open_issues > 0) | {title, open_issues}'
+```
+
+**重要提醒**：
+- 每次会话处理 5-10 个高优先级 issues 即可
+- 剩余 issues 留到下次 roadmap 规划时继续处理
+- 在 PR comment 或 issue comment 中记录处理进度
+
 ### Step 2: 版本规划决策
 
 **场景 A: 没有版本目标**
