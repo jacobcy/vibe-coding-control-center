@@ -57,7 +57,6 @@ def cleanup_service(mock_store, mock_git_client):
     )
 
 
-@pytest.mark.slow
 class TestMergedPRHandling:
     """Tests for merged PR handling."""
 
