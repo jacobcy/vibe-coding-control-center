@@ -390,3 +390,40 @@ class FlowOrchestratorService:
             raise RuntimeError(
                 f"Failed to create flow for issue #{issue.number}: {exc}"
             ) from exc
+
+    def create_placeholder_flow(
+        self,
+        issue: IssueInfo,
+        *,
+        branch: str,
+        slug: str,
+        blocked_by_issue: int | None = None,
+    ) -> dict:
+        """Create a placeholder flow — DB records only, no git branch / worktree.
+
+        Used by intake when an issue is blocked by a dependency.
+        Writes flow_state, flow_issue_links, and sets flow_status="blocked".
+        Does NOT create a git branch or worktree.
+        """
+        # 1. Create flow record in DB
+        flow_state = self.flow_service.create_flow(
+            slug=slug,
+            branch=branch,
+            source="intake",
+        )
+
+        # 2. Link task issue
+        self.task_service.link_issue(branch, issue.number, "task")
+
+        # 3. Link dependency issue if provided
+        if blocked_by_issue:
+            self.task_service.link_issue(branch, blocked_by_issue, "dependency")
+
+        # 4. Set flow_status to blocked and record dependency
+        self.store.update_flow_state(
+            branch,
+            flow_status="blocked",
+            blocked_by_issue=blocked_by_issue,
+        )
+
+        return self.store.get_flow_state(branch) or flow_state.model_dump()

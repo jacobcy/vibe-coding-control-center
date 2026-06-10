@@ -16,10 +16,13 @@ from vibe3.config import (
     get_manager_usernames,
 )
 from vibe3.exceptions import SystemError, UserError
-from vibe3.models import IssueState
+from vibe3.models import IssueInfo, IssueState
 from vibe3.observability import setup_logging
 from vibe3.services import (
+    FlowOrchestratorService,
     FlowService,
+    IssueFlowService,
+    LabelService,
     TaskResumeUsecase,
     TaskService,
 )
@@ -177,6 +180,10 @@ def intake(
         bool,
         typer.Option("--yes", "-y", help="Force reassignment without confirmation"),
     ] = False,
+    blocked_by: Annotated[
+        int | None,
+        typer.Option("--blocked-by", help="Issue number this is blocked by"),
+    ] = None,
 ) -> None:
     """Assign an issue to the local manager account.
 
@@ -192,7 +199,9 @@ def intake(
     local_manager = managers[0]
 
     client = GitHubClient()
-    issue = client.view_issue(issue_id, fields=["labels", "assignees", "state"])
+    issue = client.view_issue(
+        issue_id, fields=["labels", "assignees", "state", "title"]
+    )
 
     if issue is None:
         typer.echo(f"Error: Issue #{issue_id} not found.", err=True)
@@ -240,6 +249,41 @@ def intake(
         )
     else:
         typer.echo(f"#{issue_id} assigned to {local_manager}")
+
+    # Create placeholder flow if blocked-by is specified
+    if blocked_by is not None:
+        # Build IssueInfo from the GitHub response we already have
+        state_label = next(
+            (label for label in labels if label.startswith("state/")), None
+        )
+        issue_state = IssueState(state_label.split("/")[1]) if state_label else None
+        issue_info = IssueInfo(
+            number=issue_id,
+            title=issue.get("title", f"Issue #{issue_id}"),
+            state=issue_state,
+            labels=labels,
+            assignees=assignee_logins,
+        )
+
+        # Get canonical branch name for flow key
+        issue_flow_svc = IssueFlowService()
+        branch = issue_flow_svc.canonical_branch_name(issue_id)
+        slug = f"issue-{issue_id}"
+
+        # Create placeholder flow
+        orchestrator = FlowOrchestratorService(config.orchestra)
+        orchestrator.create_placeholder_flow(
+            issue=issue_info,
+            branch=branch,
+            slug=slug,
+            blocked_by_issue=blocked_by,
+        )
+
+        # Set state/blocked label on GitHub
+        label_service = LabelService(repo=config.orchestra.repo)
+        label_service.set_state(issue_id, IssueState.BLOCKED)
+
+        typer.echo(f"  Placeholder flow created (blocked by #{blocked_by})")
 
 
 @app.command()
