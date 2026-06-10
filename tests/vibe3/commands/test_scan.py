@@ -92,6 +92,7 @@ class TestSupervisorScan:
 
 
 class TestCombinedScan:
+    @pytest.mark.slow
     def test_all_dry_run(self):
         result = runner.invoke(app, ["scan", "all", "--dry-run"])
         assert result.exit_code == 0
@@ -237,6 +238,7 @@ class TestGovernanceDryRunPromptDisplay:
         assert result.exit_code == 0
         assert "assignee-pool" in result.output.lower() or "Material:" in result.output
 
+    @pytest.mark.slow
     def test_governance_dry_run_shows_prompt_preview(self):
         result = runner.invoke(
             app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
@@ -247,6 +249,7 @@ class TestGovernanceDryRunPromptDisplay:
 
 
 class TestSupervisorDryRunPromptDisplay:
+    @pytest.mark.slow
     def test_supervisor_dry_run_shows_scan_info(self):
         result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
         assert result.exit_code == 0
