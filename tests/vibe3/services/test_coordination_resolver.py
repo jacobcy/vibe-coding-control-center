@@ -21,7 +21,7 @@ def test_resolve_coordination_remote_first():
     resolver = CoordinationResolver(store=store)
 
     with patch(
-        "vibe3.services.coordination_resolver.CoordinationResolver._read_remote_collaboration"
+        "vibe3.services.orchestra.coordination.CoordinationResolver._read_remote_collaboration"
     ) as mock_remote:
         mock_remote.return_value = {
             "blocked_reason": "Remote reason",
@@ -60,7 +60,7 @@ def test_resolve_coordination_fallback_to_local():
 
     # Simulate remote read failure
     with patch(
-        "vibe3.services.coordination_resolver.CoordinationResolver._read_remote_collaboration"
+        "vibe3.services.orchestra.coordination.CoordinationResolver._read_remote_collaboration"
     ) as mock_remote:
         mock_remote.return_value = None
 

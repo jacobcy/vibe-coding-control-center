@@ -61,15 +61,15 @@ class TestIsHumanComment:
             is True
         )
 
-    @patch("vibe3.services.comment_service.load_orchestra_config")
+    @patch("vibe3.services.shared.comment.load_orchestra_config")
     def test_bot_username_from_config(self, mock_config: MagicMock) -> None:
         config = MagicMock()
         config.bot_username = "mybot"
         mock_config.return_value = config
         assert is_human_comment(_make_comment("mybot", "hi")) is False
 
-    @patch("vibe3.services.comment_service._get_manager_usernames")
-    @patch("vibe3.services.comment_service.load_orchestra_config")
+    @patch("vibe3.services.shared.comment._get_manager_usernames")
+    @patch("vibe3.services.shared.comment.load_orchestra_config")
     def test_manager_username_from_config(
         self, mock_config: MagicMock, mock_usernames: MagicMock
     ) -> None:
@@ -79,13 +79,13 @@ class TestIsHumanComment:
         mock_usernames.return_value = ("manager-user",)
         assert is_human_comment(_make_comment("manager-user", "hi")) is False
 
-    @patch("vibe3.services.comment_service.load_orchestra_config")
+    @patch("vibe3.services.shared.comment.load_orchestra_config")
     def test_config_load_failure_falls_through(self, mock_config: MagicMock) -> None:
         mock_config.side_effect = RuntimeError("config unavailable")
         assert is_human_comment(_make_comment("alice", "hello")) is True
 
-    @patch("vibe3.services.comment_service._get_manager_usernames")
-    @patch("vibe3.services.comment_service.load_orchestra_config")
+    @patch("vibe3.services.shared.comment._get_manager_usernames")
+    @patch("vibe3.services.shared.comment.load_orchestra_config")
     def test_empty_manager_usernames_list(
         self, mock_config: MagicMock, mock_usernames: MagicMock
     ) -> None:
