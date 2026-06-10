@@ -3,12 +3,15 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check.service import CheckService
 
 
+@pytest.mark.slow
 class TestPRStatusDetection:
     """Test PR status detection and flow auto-completion."""
 

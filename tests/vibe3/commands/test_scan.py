@@ -230,6 +230,7 @@ def test_governance_invalid_role_shows_friendly_error():
     assert "traceback" not in output.lower()
 
 
+@pytest.mark.slow
 class TestGovernanceDryRunPromptDisplay:
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_dry_run_shows_material_info(self, mock_run):
