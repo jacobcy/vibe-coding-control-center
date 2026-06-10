@@ -524,7 +524,7 @@ def test_get_all_errors_status_total_includes_unknown_severity(
         conn.commit()
 
     # Call get_all_errors_status via the query function
-    from vibe3.services.error_tracking_queries import get_all_errors_status
+    from vibe3.services.orchestra.error_tracking.queries import get_all_errors_status
 
     status = get_all_errors_status(temp_store.db_path)
 

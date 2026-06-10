@@ -570,7 +570,7 @@ def test_backend_passed_to_expired_resource_service():
     )
 
     with patch(
-        "vibe3.services.expired_resource_cleanup_service.ExpiredResourceCleanupService"
+        "vibe3.services.orchestra.cleanup.ExpiredResourceCleanupService"
     ) as mock_class:
         mock_instance = MagicMock()
         mock_class.return_value = mock_instance
