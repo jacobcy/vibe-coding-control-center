@@ -466,7 +466,7 @@ class OrchestraStatusService:
             gate_result = self._failed_gate.check()
             if gate_result.blocked:
                 dispatch_blocked = True
-                from vibe3.services.convention_resolver import get_convention
+                from vibe3.config import get_convention
 
                 convention = get_convention()
                 blocked_reason = convention.state_label(convention.blocked_label)

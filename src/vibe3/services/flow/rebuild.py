@@ -14,7 +14,7 @@ from vibe3.config import load_orchestra_config
 from vibe3.models import IssueInfo
 from vibe3.services.flow.cleanup import FlowCleanupService
 from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services.handoff.service import HandoffService
 from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
 
 LabelResume = Callable[..., None]

@@ -265,7 +265,7 @@ class FlowOrchestratorService:
 
         Returns None if the issue already has a merged PR (no rebuild needed).
         """
-        from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+        from vibe3.services.flow.rebuild import FlowRebuildUsecase
 
         # Use branch→PR lookup for consistency (not issue→PR)
         # Query all PR states (including merged) to detect merged PRs

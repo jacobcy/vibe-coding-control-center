@@ -3,8 +3,8 @@
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from vibe3.config import get_convention
 from vibe3.exceptions import UserError
-from vibe3.services.convention_resolver import get_convention
 
 
 def iter_issue_branch_candidates(issue_number: int) -> Iterable[str]:

@@ -246,7 +246,7 @@ class FlowCleanupService:
     def _clear_handoff(self, branch: str, results: dict[str, bool]) -> None:
         """Clear handoff files for the branch."""
         try:
-            from vibe3.services.handoff_service import HandoffService
+            from vibe3.services.handoff.service import HandoffService
 
             HandoffService(
                 store=self.store, git_client=self.git_client

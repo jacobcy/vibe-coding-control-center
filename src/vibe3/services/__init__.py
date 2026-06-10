@@ -41,8 +41,8 @@ if TYPE_CHECKING:
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
     from vibe3.services.handoff.resolution import resolve_handoff_target
+    from vibe3.services.handoff.service import HandoffService
     from vibe3.services.handoff.status import HandoffStatusService
-    from vibe3.services.handoff_service import HandoffService
     from vibe3.services.issue.branch_resolver import resolve_issue_branch_input
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
@@ -289,7 +289,7 @@ _SYMBOL_MODULES = {
     "FlowState": "vibe3.services.flow.classifier",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
-    "HandoffService": "vibe3.services.handoff_service",
+    "HandoffService": "vibe3.services.handoff.service",
     "HandoffStatusService": "vibe3.services.handoff.status",
     "InitResult": "vibe3.services.check.remote",
     "IssueCollectionService": "vibe3.services.issue.collection",
