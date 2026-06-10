@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.comment_service import is_human_comment
+from vibe3.services.shared.comment import is_human_comment
 
 
 def _make_comment(login: str = "alice", body: str = "") -> dict:

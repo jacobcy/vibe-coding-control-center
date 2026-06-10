@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.exceptions import UserError
-from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
+from vibe3.services.pr.base_resolution import BaseResolutionUsecase
 
 
 def test_resolve_pr_create_base_defaults_to_main() -> None:

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.data_source import DataSource
-from vibe3.services.coordination_resolver import CoordinationResolver
+from vibe3.services.orchestra.coordination import CoordinationResolver
 
 
 def test_resolve_coordination_remote_first():

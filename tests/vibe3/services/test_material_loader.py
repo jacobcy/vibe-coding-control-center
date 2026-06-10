@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.services.file_loader import material_loader
+from vibe3.services.shared.file_loader import material_loader
 
 
 class TestMaterialLoader:
