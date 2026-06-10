@@ -284,6 +284,11 @@ def build_manager_sync_request(
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
     # Load prompts through template loader abstraction
+    # NOTE: load_prompt_templates() provides graceful degradation if prompts.yaml
+    # is missing (returns DEFAULT_PROMPT_TEMPLATES with empty manager section),
+    # unlike the previous check_runtime_asset() which raised MissingResourceError.
+    # This is intentional: manager request continues with incomplete prompts rather
+    # than crashing the entire orchestration flow.
     prompts_data = load_prompt_templates()
     manager_sections = prompts_data.get("manager", {})
 
