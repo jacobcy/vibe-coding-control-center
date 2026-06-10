@@ -117,6 +117,7 @@ jobs:
         run: uv run pytest tests/vibe3/integration -v
 
       - name: Run slow tests
+        if: always()
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: uv run pytest tests/vibe3 -v -m "slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration
