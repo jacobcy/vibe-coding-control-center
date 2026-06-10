@@ -229,7 +229,7 @@ def test_block_manager_noop_issue_no_flow():
         # No flow found
         mock_store.get_flows_by_issue.return_value = []
 
-        with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
+        with patch("vibe3.services.FlowService") as mock_flow_service:
             block_manager_noop_issue(
                 issue_number=123, repo=None, reason="Test reason", actor="test:actor"
             )
