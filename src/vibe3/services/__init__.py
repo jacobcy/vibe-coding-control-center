@@ -276,7 +276,7 @@ _SYMBOL_MODULES = {
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckResult": "vibe3.services.check.service",
     "CheckService": "vibe3.services.check.service",
-    "CoordinationResolver": "vibe3.services.coordination_resolver",
+    "CoordinationResolver": "vibe3.services.orchestra.coordination",
     "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
     "FlowCategory": "vibe3.services.flow.classifier",

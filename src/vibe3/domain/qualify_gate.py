@@ -21,7 +21,6 @@ from vibe3.models import (
     OrchestraConfig,
 )
 from vibe3.services import (
-    CoordinationResolver,
     FlowService,
     FlowStatusService,
     IssueFlowService,
@@ -29,6 +28,7 @@ from vibe3.services import (
     TaskResumeOperations,
     infer_resume_label,
 )
+from vibe3.services.orchestra.coordination import CoordinationResolver
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

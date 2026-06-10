@@ -546,7 +546,7 @@ class CheckService(CheckRemote):
 
             # Read-only dependency check
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
-                from vibe3.services.coordination_resolver import CoordinationResolver
+                from vibe3.services.orchestra.coordination import CoordinationResolver
 
                 resolver = CoordinationResolver(store=self.store)
                 truth = resolver.resolve_coordination(branch, task_issue)
