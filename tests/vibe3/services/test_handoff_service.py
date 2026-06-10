@@ -7,7 +7,7 @@ import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.exceptions import UserError
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services.handoff import HandoffService
 
 
 class StubGitClient:

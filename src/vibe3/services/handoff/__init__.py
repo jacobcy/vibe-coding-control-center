@@ -8,6 +8,7 @@ if TYPE_CHECKING:
         resolve_handoff_target,
         to_display_target,
     )
+    from vibe3.services.handoff.service import HandoffService
     from vibe3.services.handoff.status import (
         HandoffStatusResult,
         HandoffStatusService,
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from vibe3.services.handoff.validation import validate_authoritative_ref
 
 __all__ = [
+    # Classes - service
+    "HandoffService",
     # Classes - status
     "HandoffStatusService",
     "HandoffStatusResult",
@@ -30,6 +33,8 @@ __all__ = [
 ]
 
 _SYMBOL_MODULES = {
+    # Classes - service
+    "HandoffService": "vibe3.services.handoff.service",
     # Classes - status
     "HandoffStatusService": "vibe3.services.handoff.status",
     "HandoffStatusResult": "vibe3.services.handoff.status",
