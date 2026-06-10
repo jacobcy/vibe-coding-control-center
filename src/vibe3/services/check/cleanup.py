@@ -18,7 +18,7 @@ from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-    from vibe3.services.flow_cleanup_service import FlowCleanupService
+    from vibe3.services.flow.cleanup import FlowCleanupService
 
 
 class CheckCleanupService:
@@ -114,7 +114,7 @@ class CheckCleanupService:
         Returns:
             Dict with summary and details of cleaned flows.
         """
-        from vibe3.services.flow_cleanup_service import FlowCleanupService
+        from vibe3.services.flow.cleanup import FlowCleanupService
 
         logger.bind(domain="check", action="clean_residual").info(
             "Checking for residual branches"
@@ -365,7 +365,7 @@ class CheckCleanupService:
                 return
 
             from vibe3.clients import GitHubClient
-            from vibe3.services.flow_service import FlowService
+            from vibe3.services.flow.service import FlowService
             from vibe3.services.issue.flow import IssueFlowService
             from vibe3.services.shared.label_service import LabelService
 

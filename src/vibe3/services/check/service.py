@@ -18,7 +18,7 @@ from vibe3.services.check.remote import (
     is_empty_auto_scene,
     issue_state_from_payload,
 )
-from vibe3.services.flow_status_service import FlowStatusService
+from vibe3.services.flow.status import FlowStatusService
 from vibe3.services.pr.service import PRService
 
 if TYPE_CHECKING:
@@ -286,7 +286,7 @@ class CheckService(CheckRemote):
                 output = self.git_client._run(["branch", "--list", branch])
                 if not output.strip():
                     # Not found locally. Check if it's a safe branch.
-                    from vibe3.services.flow_service import FlowService
+                    from vibe3.services.flow.service import FlowService
 
                     if not branch.startswith(FlowService.SAFE_BRANCH_PREFIX):
                         branch_missing = True
@@ -383,7 +383,7 @@ class CheckService(CheckRemote):
 
             # Instantiate FlowRecoveryService early for use in blocked state recovery
             # and flow consistency check
-            from vibe3.services.flow_recovery_service import (
+            from vibe3.services.flow.recovery import (
                 FlowRecoveryService,
                 RecoveryAction,
             )

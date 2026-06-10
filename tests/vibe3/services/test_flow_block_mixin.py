@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 def test_block_flow_calls_blocked_state_service() -> None:

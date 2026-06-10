@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.exceptions import UserError
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 def test_reactivate_flow_records_event():

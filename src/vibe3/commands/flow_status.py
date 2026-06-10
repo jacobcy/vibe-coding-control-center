@@ -34,6 +34,8 @@ from vibe3.exceptions import SystemError, UserError
 from vibe3.services import (
     FlowProjectionService,
     FlowService,
+    FlowStatusResolver,
+    IssueFlowService,
     PRService,
     build_bind_task_hint,
     resolve_command_branch,
@@ -103,14 +105,10 @@ def show(
             raise typer.Exit(1) from error
 
         # Get task issue number for remote fallback
-        from vibe3.services import IssueFlowService
-
         issue_flow_service = IssueFlowService(store=service.store)
         task_issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
 
     # Use resolver for source-aware read
-    from vibe3.services import FlowStatusResolver
-
     resolver = FlowStatusResolver(store=service.store, flow_service=service)
     flow_status = resolver.resolve(
         branch=target_branch,
@@ -121,9 +119,7 @@ def show(
     # Handle non-registered flow or special branches
     if not flow_status or flow_status.flow_status == "aborted":
         if output_format == "table":
-            from vibe3.services import FlowService as FlowService_
-
-            is_safe = target_branch.startswith(FlowService_.SAFE_BRANCH_PREFIX)
+            is_safe = target_branch.startswith(FlowService.SAFE_BRANCH_PREFIX)
             is_aborted = flow_status and flow_status.flow_status == "aborted"
 
             if is_safe:

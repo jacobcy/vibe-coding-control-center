@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
+from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
 
 
 def _issue(

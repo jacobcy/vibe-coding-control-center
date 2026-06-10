@@ -421,9 +421,7 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
         github_client=github_client,
     )
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup.cleanup_flow_scene.return_value = {
             "flow_record": True,

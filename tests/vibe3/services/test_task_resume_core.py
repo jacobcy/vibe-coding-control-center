@@ -35,7 +35,7 @@ def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
         mock_service_cls.return_value = mock_service
 
         with patch(
-            "vibe3.services.flow_cleanup_service.FlowCleanupService"
+            "vibe3.services.flow.cleanup.FlowCleanupService"
         ) as mock_cleanup_cls:
             operations.reset_issue_to_ready(
                 issue_number=303,
@@ -58,7 +58,7 @@ def test_reset_issue_to_ready_rejects_legacy_destructive_mode() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-456"
 
-    with patch("vibe3.services.flow_cleanup_service.FlowCleanupService") as cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as cleanup_cls:
         with pytest.raises(UserError, match="FlowRebuildUsecase"):
             operations.reset_issue_to_ready(
                 issue_number=456,

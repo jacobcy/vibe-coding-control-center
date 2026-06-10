@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.issue.failure import (
     block_manager_noop_issue,
     fail_manager_issue,
@@ -66,13 +66,13 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.blocked_state_service.FlowTimelineService"
+                "vibe3.services.flow.timeline.FlowTimelineService"
             ) as mock_timeline_class:
                 mock_timeline = MagicMock()
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.blocked_state_io.LabelService"
+                    "vibe3.services.shared.label_service.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
@@ -154,7 +154,7 @@ def test_block_flow_writes_body_label_and_cache():
             mock_label_cls.return_value = mock_label
 
             with patch(
-                "vibe3.services.blocked_state_service.FlowTimelineService"
+                "vibe3.services.flow.timeline.FlowTimelineService"
             ) as mock_timeline_cls:
                 mock_timeline = MagicMock()
                 mock_timeline_cls.return_value = mock_timeline
@@ -227,7 +227,7 @@ def test_block_manager_noop_issue_no_flow():
         # No flow found
         mock_store.get_flows_by_issue.return_value = []
 
-        with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
+        with patch("vibe3.services.FlowService") as mock_flow_service:
             block_manager_noop_issue(
                 issue_number=123, repo=None, reason="Test reason", actor="test:actor"
             )

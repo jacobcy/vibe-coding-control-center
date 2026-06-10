@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from vibe3.services.pr.resolver import resolve_command_branch
 
 if TYPE_CHECKING:
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services.flow.service import FlowService
 
 
 def resolve_branch_arg(

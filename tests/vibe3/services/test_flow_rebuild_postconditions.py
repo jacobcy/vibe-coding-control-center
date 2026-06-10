@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from vibe3.services.flow_rebuild_postconditions import assert_rebuild_postconditions
+from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
 
 
 class CachedGitClient:

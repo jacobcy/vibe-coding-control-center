@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from vibe3.models import TimelineEvent
-from vibe3.services.flow_timeline_service import TIMELINE_DISPLAY_MAP
+from vibe3.services.flow.timeline import TIMELINE_DISPLAY_MAP
 
 
 def parse_timeline_from_comments(

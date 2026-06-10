@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from vibe3.exceptions import UserError
-from vibe3.services.issue_branch_resolver import (
+from vibe3.services.issue.branch_resolver import (
     _format_flow_details,
     resolve_issue_branch_input,
 )

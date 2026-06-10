@@ -8,7 +8,7 @@ from loguru import logger
 
 from vibe3.models import CoordinationTruth, DataSource
 from vibe3.observability import DegradedModeReason, get_degraded_manager
-from vibe3.services.flow_status_resolver import FlowStatusResolver
+from vibe3.services.flow.status_resolver import FlowStatusResolver
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

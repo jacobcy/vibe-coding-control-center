@@ -332,7 +332,7 @@ class TestMergedPRCacheIntegration:
     def test_cache_hit_skips_api_call(self, tmp_path: Path) -> None:
         """When cache hits, get_merged_pr_for_issue should skip API call."""
         from vibe3.clients.merged_pr_cache import MergedPRCache
-        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+        from vibe3.services.pr.status_checker import get_merged_pr_for_issue
 
         cache = MergedPRCache(tmp_path)
         cache._save_cache(
@@ -368,7 +368,7 @@ class TestMergedPRCacheIntegration:
 
     def test_cache_miss_triggers_sync(self, tmp_path: Path) -> None:
         """When cache misses, get_merged_pr_for_issue should sync and return result."""
-        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+        from vibe3.services.pr.status_checker import get_merged_pr_for_issue
 
         # Mock get_git_common_dir to return tmp_path
         with patch(
@@ -411,7 +411,7 @@ class TestClosedPRIdempotency:
         from datetime import datetime, timezone
 
         from vibe3.services.check.pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
         # and updated_at after closed_at
@@ -473,7 +473,7 @@ class TestClosedPRIdempotency:
         from datetime import datetime, timezone
 
         from vibe3.services.check.pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
         # but updated_at BEFORE closed_at
@@ -534,7 +534,7 @@ class TestClosedPRIdempotency:
         from datetime import datetime, timezone
 
         from vibe3.services.check.pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with different initiated_by
         store = SQLiteClient(db_path=tmp_path / "test.db")

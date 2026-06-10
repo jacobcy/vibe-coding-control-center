@@ -46,10 +46,10 @@ if TYPE_CHECKING:
     from vibe3.services.flow.service import FlowService
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.handoff.resolution import resolve_handoff_target
     from vibe3.services.handoff.status import HandoffStatusService
     from vibe3.services.handoff_service import HandoffService
+    from vibe3.services.issue.branch_resolver import resolve_issue_branch_input
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
     from vibe3.services.issue.failure import (
@@ -62,11 +62,11 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
-    from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
     from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
+    from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
     from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
@@ -95,6 +95,8 @@ if TYPE_CHECKING:
         generate_score_report,
     )
     from vibe3.services.pr.service import PRService
+    from vibe3.services.pr.verdict_policy import requires_audit_ref
+    from vibe3.services.pr.verdict_service import VerdictService
     from vibe3.services.serve_status_service import ServeStatusService
     from vibe3.services.shared.actors import format_agent_actor
     from vibe3.services.shared.branches import (
@@ -156,8 +158,6 @@ if TYPE_CHECKING:
         MissingTaskIssueError,
         build_bind_task_hint,
     )
-    from vibe3.services.verdict_policy import requires_audit_ref
-    from vibe3.services.verdict_service import VerdictService
 
 __all__ = [
     "BaseResolutionUsecase",
@@ -295,7 +295,7 @@ _SYMBOL_MODULES = {
     "ExpiredResourceCleanupService": "vibe3.services.expired_resource_cleanup_service",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
-    "FlowOrchestratorService": "vibe3.services.flow_orchestrator_service",
+    "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
     "FlowProjection": "vibe3.services.flow.projection",
     "FlowProjectionService": "vibe3.services.flow.projection",
     "FlowRebuildUsecase": "vibe3.services.flow.rebuild",
@@ -333,7 +333,7 @@ _SYMBOL_MODULES = {
     "TaskService": "vibe3.services.task.service",
     "TaskShowResult": "vibe3.services.task.show",
     "TaskStatusBucket": "vibe3.services.task.classifier",
-    "VerdictService": "vibe3.services.verdict_service",
+    "VerdictService": "vibe3.services.pr.verdict_service",
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
@@ -382,13 +382,13 @@ _SYMBOL_MODULES = {
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
     "ref_to_handoff_cmd": "vibe3.services.shared.paths",
-    "requires_audit_ref": "vibe3.services.verdict_policy",
+    "requires_audit_ref": "vibe3.services.pr.verdict_policy",
     "resolve_branch_and_issue": "vibe3.services.shared.branches",
     "resolve_branch_arg": "vibe3.services.shared.branches",
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
-    "resolve_issue_branch_input": "vibe3.services.issue_branch_resolver",
+    "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
     "resolve_manager_usernames": "vibe3.services.file_loader",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",

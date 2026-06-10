@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 @pytest.fixture

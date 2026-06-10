@@ -12,7 +12,7 @@ from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models import IssueInfo
-    from vibe3.services.issue_dispatch_policy import DispatchExclusion
+    from vibe3.services.issue.dispatch_policy import DispatchExclusion
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -78,7 +78,7 @@ def _make_dispatch_policy(
     supervisor_label: str,
     manager_usernames: tuple[str, ...],
 ) -> "object":
-    from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
+    from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
 
     return IssueDispatchPolicy(
         supervisor_label=supervisor_label,
@@ -112,7 +112,7 @@ def should_skip_from_queue(
     Returns:
         True if issue should be skipped, False otherwise
     """
-    from vibe3.services.issue_dispatch_policy import IssueDispatchPolicy
+    from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
 
     policy: IssueDispatchPolicy = _make_dispatch_policy(  # type: ignore[assignment]
         supervisor_label, tuple(manager_usernames)
@@ -246,7 +246,7 @@ def classify_dispatch_eligibility(
 
     Returns list of reasons why issue should not be auto-dispatched.
     """
-    from vibe3.services.issue_dispatch_policy import DispatchExclusion
+    from vibe3.services.issue.dispatch_policy import DispatchExclusion
 
     reasons: list[DispatchExclusion] = []
 

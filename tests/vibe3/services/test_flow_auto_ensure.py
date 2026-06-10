@@ -1,7 +1,7 @@
 """Tests for flow auto-ensure functionality."""
 
 from vibe3.clients import SQLiteClient
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 class TestEnsureFlowForBranch:

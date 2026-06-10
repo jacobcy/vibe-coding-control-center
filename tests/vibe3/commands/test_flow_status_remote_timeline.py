@@ -42,7 +42,9 @@ def test_remote_no_local_db_uses_remote_timeline() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
+        with patch(
+            "vibe3.commands.flow_status.FlowStatusResolver"
+        ) as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -106,7 +108,9 @@ def test_remote_ignores_stale_local_events() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
+        with patch(
+            "vibe3.commands.flow_status.FlowStatusResolver"
+        ) as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -165,7 +169,9 @@ def test_non_remote_uses_local_events() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
+        with patch(
+            "vibe3.commands.flow_status.FlowStatusResolver"
+        ) as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -238,7 +244,9 @@ def test_remote_json_output_includes_timeline() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
+        with patch(
+            "vibe3.commands.flow_status.FlowStatusResolver"
+        ) as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:
@@ -292,7 +300,9 @@ def test_remote_yaml_output_includes_timeline() -> None:
     )
 
     with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
-        with patch("vibe3.services.FlowStatusResolver") as mock_resolver_class:
+        with patch(
+            "vibe3.commands.flow_status.FlowStatusResolver"
+        ) as mock_resolver_class:
             with patch(
                 "vibe3.commands.flow_status.FlowProjectionService"
             ) as mock_projection_class:

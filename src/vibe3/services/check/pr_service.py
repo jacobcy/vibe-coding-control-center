@@ -17,7 +17,7 @@ from vibe3.services.shared.labels import normalize_labels
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.models import PRResponse
-    from vibe3.services.flow_status_service import FlowStatusService
+    from vibe3.services.flow.status import FlowStatusService
 
 
 class CheckPRService:
@@ -113,7 +113,7 @@ class CheckPRService:
         self._flow_status_service.mark_flow_aborted(branch, reason)
 
         # Clean up physical resources (worktree, branches, flow record)
-        from vibe3.services.flow_cleanup_service import (
+        from vibe3.services.flow.cleanup import (
             FlowCleanupService,
             LiveSessionsDetectedError,
         )

@@ -195,7 +195,7 @@ class TestDependencyNotSatisfiedTriggersBlock:
 
     def test_flow_service_block_flow_writes_blocked_reason(self, temp_db):
         """FlowService.block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services.flow.service import FlowService
 
         branch = "test-branch"
 
@@ -239,7 +239,7 @@ class TestErrorBlockOrthogonality:
 
     def test_block_flow_writes_blocked_reason(self, temp_db):
         """block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services.flow.service import FlowService
 
         branch = "test-branch"
 

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.flow_projection_service import FlowProjectionService
+from vibe3.services.flow.projection import FlowProjectionService
 
 
 def test_flow_projection_basic():

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 def test_issue_flow_init_caches_issue_title_without_mutating_spec_ref() -> None:

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
-from vibe3.services.flow_projection_service import FlowProjectionService
+from vibe3.services.flow.projection import FlowProjectionService
 
 
 def test_flow_projection_uses_cached_issue_title() -> None:

@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from vibe3.services.flow_consistency_check import (
+from vibe3.services.flow.consistency import (
     FlowConsistencyCode,
     check_flow_consistency,
 )
