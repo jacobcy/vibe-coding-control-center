@@ -6,7 +6,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 
 
 class FlowLifecycleMixin:

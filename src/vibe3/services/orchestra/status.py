@@ -17,9 +17,9 @@ from vibe3.clients import (
 from vibe3.models import IssueState, OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
 from vibe3.services.flow_reader import FlowReader
-from vibe3.services.label_service import LabelService
 from vibe3.services.orchestra.helpers import get_manager_usernames
 from vibe3.services.pr.service import PRService
+from vibe3.services.shared.label_service import LabelService
 from vibe3.services.status_query_service import (
     extract_primary_assignee_login,
     extract_queue_metadata,

@@ -225,7 +225,7 @@ class CheckService(CheckRemote):
 
         # Auto-fix using LabelService (atomic: add new, remove old)
         try:
-            from vibe3.services.label_service import LabelService
+            from vibe3.services.shared.label_service import LabelService
 
             label_service = LabelService()
             label_service.set_state(issue_number, target_state)

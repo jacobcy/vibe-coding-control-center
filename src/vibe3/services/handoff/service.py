@@ -9,16 +9,16 @@ from loguru import logger
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.models import FlowEvent, VerdictRecord
-from vibe3.services.actor_support import (
-    extract_role_from_actor,
-)
-from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.external_events import ExternalEventRecorder
 from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
 from vibe3.services.handoff.storage import HandoffStorage
 from vibe3.services.handoff.validation import validate_authoritative_ref
+from vibe3.services.shared.actors import (
+    extract_role_from_actor,
+)
+from vibe3.services.shared.artifacts import ArtifactParser
 from vibe3.services.shared.paths import GitPathProtocol
-from vibe3.services.signature_service import SignatureService
+from vibe3.services.shared.signatures import SignatureService
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient

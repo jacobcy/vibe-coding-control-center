@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from vibe3.models.pr import VersionBumpType
-from vibe3.services.version_service import VersionService
+from vibe3.services.shared.versions import VersionService
 
 
 @pytest.fixture
