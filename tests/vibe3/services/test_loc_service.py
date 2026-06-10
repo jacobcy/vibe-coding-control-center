@@ -35,7 +35,7 @@ class TestLocService:
         config.code_limits.code_paths.v3_python = ["custom/core/"]
 
         with patch(
-            "vibe3.services.loc_service.VibeConfig.get_defaults", return_value=config
+            "vibe3.services.shared.loc.VibeConfig.get_defaults", return_value=config
         ):
             service = LocService()
 
