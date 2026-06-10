@@ -67,7 +67,20 @@ _GOVERNANCE_RUNTIME_VARS = (
     "running_issue_details",
     "suggested_issue_details",
     "truncated_note",
+    "material_hash",
 )
+
+
+def _compute_material_hash() -> str | None:
+    """Compute aggregate hash of governance material files on disk."""
+    from vibe3.clients import resolve_runtime_asset
+    from vibe3.services import material_loader
+    from vibe3.utils import compute_hash_from_loader
+
+    materials_dir = resolve_runtime_asset("supervisor/governance")
+    if not materials_dir.exists():
+        return None
+    return compute_hash_from_loader(material_loader, materials_dir)
 
 
 def _resolve_governance_material(
@@ -121,13 +134,17 @@ def build_governance_snapshot_context(
         current_material = _resolve_governance_material(config, execution_count)
     material_name = Path(current_material).name
 
+    # Compute material hash from disk so config/material changes are
+    # visible in the scan output without a server restart (issue #2167).
+    material_hash = _compute_material_hash()
+
     if material_name == "roadmap-intake.md":
         broader_entries = build_broader_repo_entries(
             config,
             current_material=current_material,
             github=github,
         )
-        return build_issue_context(
+        ctx = build_issue_context(
             broader_entries,
             server_running=snapshot.server_running,
             active_flows=snapshot.active_flows,
@@ -141,6 +158,8 @@ def build_governance_snapshot_context(
                 "目标是识别适合自动化纳入 assignee issue pool 的对象。"
             ),
         )
+        ctx["material_hash"] = material_hash
+        return ctx
 
     if material_name == "cron-supervisor.md":
         broader_entries = build_broader_repo_entries(
@@ -148,7 +167,7 @@ def build_governance_snapshot_context(
             current_material=current_material,
             github=github,
         )
-        return build_issue_context(
+        ctx = build_issue_context(
             broader_entries,
             server_running=snapshot.server_running,
             active_flows=snapshot.active_flows,
@@ -162,9 +181,13 @@ def build_governance_snapshot_context(
                 "目标是挑选最多 5 个需要语义对齐的过时文档对象。"
             ),
         )
+        ctx["material_hash"] = material_hash
+        return ctx
 
     if material_name == "code-auditor.md":
-        return build_code_auditor_context(snapshot, tick_count=tick_count)
+        ctx = build_code_auditor_context(snapshot, tick_count=tick_count)
+        ctx["material_hash"] = material_hash
+        return ctx
 
     # Default: assignee-pool path
     github = github or GitHubClient()
@@ -187,7 +210,7 @@ def build_governance_snapshot_context(
             f"Filtered {skipped_count} orchestra-governed issues from pool scan"
         )
 
-    return build_issue_context(
+    ctx = build_issue_context(
         filtered_entries,
         server_running=snapshot.server_running,
         active_flows=snapshot.active_flows,
@@ -201,6 +224,8 @@ def build_governance_snapshot_context(
             "最终仍需结合 flow / worktree / PR 现场判断。"
         ),
     )
+    ctx["material_hash"] = material_hash
+    return ctx
 
 
 def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
@@ -282,6 +307,19 @@ def build_governance_recipe(
     )
 
 
+def _record_assembly_warnings(warnings: tuple[str, ...]) -> None:
+    for msg in warnings:
+        try:
+            from vibe3.services import ErrorTrackingService
+
+            ErrorTrackingService.get_instance().record_error(
+                error_code="E_CONFIG_MISSING",
+                error_message=msg,
+            )
+        except Exception:
+            pass
+
+
 def render_governance_prompt(
     config: OrchestraConfig,
     snapshot_context: dict[str, Any],
@@ -300,7 +338,9 @@ def render_governance_prompt(
     )
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
-    return assembler.render(recipe, runtime_context=snapshot_context)
+    result = assembler.render(recipe, runtime_context=snapshot_context)
+    _record_assembly_warnings(result.warnings)
+    return result
 
 
 def resolve_governance_options(config: OrchestraConfig) -> Any:

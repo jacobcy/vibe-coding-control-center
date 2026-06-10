@@ -12,27 +12,49 @@ from vibe3.roles.scan_service import (
 class TestExtractMaterialDescription:
     """Tests for material description extraction."""
 
-    def test_extracts_title_from_markdown(self, tmp_path):
-        """Test extracting title from markdown file."""
-        # Create temp markdown file
-        md_file = tmp_path / "test-material.md"
-        md_file.write_text("# Test Material 治理材料\n\nSome content\n")
+    def test_extracts_title_from_markdown(self, tmp_path, monkeypatch):
+        """Extract title from material name via material_loader."""
+        gov_dir = tmp_path / "supervisor" / "governance"
+        gov_dir.mkdir(parents=True)
+        (gov_dir / "test-material.md").write_text(
+            "# Test Material 治理材料\n\nSome content\n"
+        )
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
 
-        description = extract_material_description(str(md_file))
+        description = extract_material_description(
+            "supervisor/governance/test-material.md"
+        )
         assert description == "Test Material 治理材料"
 
-    def test_fallback_to_filename_without_title(self, tmp_path):
-        """Test fallback to filename when no title."""
-        md_file = tmp_path / "no-title.md"
-        md_file.write_text("Some content without title\n")
+    def test_fallback_to_filename_without_title(self, tmp_path, monkeypatch):
+        """Fallback to material name when no title in file."""
+        gov_dir = tmp_path / "supervisor" / "governance"
+        gov_dir.mkdir(parents=True)
+        (gov_dir / "no-title.md").write_text("Some content without title\n")
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
 
-        description = extract_material_description(str(md_file))
+        description = extract_material_description("supervisor/governance/no-title.md")
         assert "no-title.md" in description
 
-    def test_handles_missing_file(self):
-        """Test handling of missing file."""
-        description = extract_material_description("nonexistent/file.md")
-        assert "nonexistent" in description or "file.md" in description
+    def test_handles_missing_file(self, tmp_path, monkeypatch):
+        """Handling of missing material file."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(empty))
+        external = tmp_path / "external-repo"
+        external.mkdir()
+        monkeypatch.chdir(external)
+
+        description = extract_material_description(
+            "supervisor/governance/nonexistent.md"
+        )
+        assert "nonexistent.md" in description
 
 
 class TestFetchSupervisorCandidates:

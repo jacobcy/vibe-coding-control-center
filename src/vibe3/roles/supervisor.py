@@ -28,7 +28,7 @@ from vibe3.prompts import (
     PromptRecipe,
 )
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
-from vibe3.roles.governance import _build_runtime_registry
+from vibe3.roles.governance import _build_runtime_registry, _record_assembly_warnings
 from vibe3.services import IssueFlowService, get_handoff_state_label
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
@@ -122,6 +122,7 @@ def build_supervisor_handoff_payload(
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     rendered = assembler.render(recipe, runtime_context=snapshot_context)
+    _record_assembly_warnings(rendered.warnings)
     prompt = rendered.rendered_text
 
     options = ExecutionRolePolicyService(config).resolve_effective_agent_options(
