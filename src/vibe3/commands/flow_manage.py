@@ -452,14 +452,18 @@ def restore_flow(
 
     store = SQLiteClient()
 
-    # Check if flow exists and is deleted
+    # Check if flow exists
     flow = store.get_flow_state_include_deleted(target_branch)
     if flow is None:
         console.print(f"[red]Error: Flow '{target_branch}' not found[/]")
         raise typer.Exit(1)
 
-    if flow.get("deleted_at") is None:
-        console.print(f"[yellow]Flow '{target_branch}' is not deleted[/]")
+    # Check if flow can be restored
+    is_deleted = flow.get("deleted_at") is not None
+    is_aborted = flow.get("flow_status") == "aborted"
+
+    if not is_deleted and not is_aborted:
+        console.print(f"[yellow]Flow '{target_branch}' is already active[/]")
         raise typer.Exit(0)
 
     # Restore the flow

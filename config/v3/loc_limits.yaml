@@ -322,6 +322,9 @@ code_limits:
       - path: "tests/vibe3/services/test_issue_flow_service.py"
         limit: 500
         reason: "IssueFlowService 测试集，覆盖 convention injection、branch naming、flow lookup、resolve_best_flow 优先级逻辑与 protected branch guard 等紧密耦合场景；PR #2581 新增 8 个 resolve_best_flow 测试（优先级逻辑 5 个 + protected branch guard 3 个）从 297 行增至 465 行"
+      - path: "tests/vibe3/clients/test_sqlite_flow_state_repo.py"
+        limit: 450
+        reason: "SQLite flow state repo 测试集，覆盖 flow CRUD、soft-delete、cascade delete、status validation、bulk retrieval optimization、restore flow deadlock fix 等紧密耦合场景，与 sqlite_flow_state_repo.py 源文件（limit 540）对应；Issue #2537 新增 test_restore_flow_resets_aborted_status 测试验证 aborted flow deadlock fix（+41 行）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
