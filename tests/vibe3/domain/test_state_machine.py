@@ -29,7 +29,7 @@ def test_validate_transition_honors_force() -> None:
 
 
 def test_validate_transition_blocked_to_handoff_forbidden() -> None:
-    """blocked → handoff should be forbidden without force (Issue #303)."""
+    """blocked → handoff should be forbidden without force (#2561)."""
     with pytest.raises(InvalidTransitionError):
         validate_transition(IssueState.BLOCKED, IssueState.HANDOFF, force=False)
 
