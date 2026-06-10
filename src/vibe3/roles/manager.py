@@ -116,38 +116,15 @@ MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
 
 
 def resolve_manager_token(config: OrchestraConfig) -> str | None:
-    """Resolve manager token with fallback: env var (.zshrc) → keys.env → None."""
+    """Resolve manager token from environment variable.
+
+    Relies on load_keys_env_fallback() (called during config loading)
+    to populate os.environ from keys.env if the shell wrapper didn't.
+    """
     token_env = config.assignee_dispatch.token_env
     if not token_env:
         return None
-
-    # 1. Environment variable (set via .zshrc / direnv)
-    token = os.getenv(token_env)
-    if token:
-        return token
-
-    # 2. Fallback to config/keys.env
-    try:
-        from vibe3.execution import resolve_orchestra_repo_root
-
-        keys_path = resolve_orchestra_repo_root() / "config" / "keys.env"
-        if keys_path.exists():
-            prefix = f"{token_env}="
-            for line in keys_path.read_text(encoding="utf-8").splitlines():
-                stripped = line.strip()
-                if stripped.startswith(prefix) and not stripped.startswith("#"):
-                    value = stripped[len(prefix) :].strip().strip("\"'")
-                    if value:
-                        logger.bind(domain="manager").debug(
-                            f"Manager token loaded from {keys_path}"
-                        )
-                        return value
-    except (OSError, UnicodeDecodeError) as e:
-        logger.bind(domain="manager").debug(
-            f"Failed to read keys.env for manager token: {e}"
-        )
-
-    return None
+    return os.getenv(token_env) or None
 
 
 def _make_section_provider(
@@ -286,9 +263,6 @@ def build_manager_request(
     else:
         request.env.update(env)
     return request
-
-
-_resolve_manager_token = resolve_manager_token
 
 
 def build_manager_sync_request(
