@@ -3,7 +3,7 @@
 from enum import Enum
 
 from vibe3.models import FlowStatusResponse
-from vibe3.services.status_query_service import is_auto_task_branch
+from vibe3.services.shared.status_query import is_auto_task_branch
 
 
 class FlowCategory(str, Enum):

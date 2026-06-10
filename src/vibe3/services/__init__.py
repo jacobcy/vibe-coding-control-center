@@ -8,16 +8,6 @@ if TYPE_CHECKING:
     from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
-    from vibe3.services.coordination_resolver import CoordinationResolver
-    from vibe3.services.expired_resource_cleanup_service import (
-        ExpiredResourceCleanupService,
-    )
-    from vibe3.services.file_loader import (
-        FileLoader,
-        material_loader,
-        policy_loader,
-        resolve_manager_usernames,
-    )
     from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.classifier import (
         FlowCategory,
@@ -53,12 +43,17 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.orchestra.cleanup import (
+        ExpiredResourceCleanupService,
+    )
+    from vibe3.services.orchestra.coordination import CoordinationResolver
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.helpers import (
         get_handoff_state_label,
         get_manager_usernames,
     )
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
+    from vibe3.services.orchestra.serve_status import ServeStatusService
     from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
@@ -89,7 +84,6 @@ if TYPE_CHECKING:
     from vibe3.services.pr.service import PRService
     from vibe3.services.pr.verdict_policy import requires_audit_ref
     from vibe3.services.pr.verdict_service import VerdictService
-    from vibe3.services.serve_status_service import ServeStatusService
     from vibe3.services.shared.actors import format_agent_actor
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
@@ -103,6 +97,12 @@ if TYPE_CHECKING:
 
     # Functions used in domain/execution/roles
     from vibe3.services.shared.events import emit_issue_failed
+    from vibe3.services.shared.file_loader import (
+        FileLoader,
+        material_loader,
+        policy_loader,
+        resolve_manager_usernames,
+    )
     from vibe3.services.shared.label_anomalies import (
         LabelAnomaly,
         collect_label_anomalies,
@@ -132,8 +132,8 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.roles import get_role_block_function
     from vibe3.services.shared.signatures import SignatureService
-    from vibe3.services.spec_ref_service import SpecRefService
-    from vibe3.services.status_query_service import (
+    from vibe3.services.shared.spec_ref import SpecRefService
+    from vibe3.services.shared.status_query import (
         StatusQueryService,
         is_auto_task_branch,
         is_dev_collab_branch,
@@ -313,7 +313,7 @@ _SYMBOL_MODULES = {
     "ServeStatusService": "vibe3.services.orchestra.serve_status",
     "SignatureService": "vibe3.services.shared.signatures",
     "SpecRefService": "vibe3.services.shared.spec_ref",
-    "StatusQueryService": "vibe3.services.status_query_service",
+    "StatusQueryService": "vibe3.services.shared.status_query",
     "TaskResumeOperations": "vibe3.services.task.resume",
     "TaskResumeUsecase": "vibe3.services.task.resume",
     "TaskService": "vibe3.services.task.service",
@@ -359,8 +359,8 @@ _SYMBOL_MODULES = {
     "has_roadmap_conflict": "vibe3.services.shared.labels",
     "has_roadmap_label": "vibe3.services.shared.labels",
     "infer_resume_label": "vibe3.services.flow.resume_resolver",
-    "is_auto_task_branch": "vibe3.services.status_query_service",
-    "is_dev_collab_branch": "vibe3.services.status_query_service",
+    "is_auto_task_branch": "vibe3.services.shared.status_query",
+    "is_dev_collab_branch": "vibe3.services.shared.status_query",
     "is_running_issue": "vibe3.services.orchestra.status",
     "load_issue_info": "vibe3.services.issue.context",
     "normalize_assignees": "vibe3.services.shared.labels",

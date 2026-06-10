@@ -20,7 +20,7 @@ from vibe3.services.flow.reader import FlowReader
 from vibe3.services.orchestra.helpers import get_manager_usernames
 from vibe3.services.pr.service import PRService
 from vibe3.services.shared.label_service import LabelService
-from vibe3.services.status_query_service import (
+from vibe3.services.shared.status_query import (
     extract_primary_assignee_login,
     extract_queue_metadata,
     is_orchestra_managed_flow_branch,
