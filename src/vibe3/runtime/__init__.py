@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 # Lazy imports via __getattr__ for everything to avoid circular dependencies
 if TYPE_CHECKING:
-    from vibe3.orchestra.domain_types import ServiceBase
+    from vibe3.orchestra import ServiceBase
     from vibe3.runtime.circuit_breaker import (
         CircuitBreaker,
         CircuitState,
@@ -84,7 +84,7 @@ def __getattr__(name: str) -> object:
 
         return execute_periodic_check
     if name == "ServiceBase":
-        from vibe3.orchestra.domain_types import ServiceBase
+        from vibe3.orchestra import ServiceBase
 
         return ServiceBase
 
