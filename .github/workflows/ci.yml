@@ -88,31 +88,8 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/src
         run: uv run pytest tests/vibe3 -v -m "not integration and not slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration
 
-  test-integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install Python dependencies
-        run: uv sync --dev
-
-      - name: Run integration tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-        run: uv run pytest tests/vibe3/integration -v --ignore=tests/vibe3/test_modularity
-
-  test-modularity:
-    name: Modularity Tests
+  test-quality:
+    name: Quality Tests (Modularity + Integration)
     runs-on: ubuntu-latest
 
     steps:
@@ -133,3 +110,8 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: uv run pytest tests/vibe3/test_modularity -v
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: uv run pytest tests/vibe3/integration -v

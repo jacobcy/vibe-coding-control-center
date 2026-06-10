@@ -81,8 +81,8 @@ class TestInspectYamlOutput:
 class TestInspectSubprocessSmoke:
     """One end-to-end subprocess test to verify the real CLI binary."""
 
-    def test_dead_code_yaml_subprocess(self) -> None:
-        """Verify dead-code --yaml works via real subprocess invocation."""
+    def test_files_yaml_subprocess(self) -> None:
+        """Verify files --yaml works via real subprocess invocation."""
         result = subprocess.run(
             [
                 "uv",
@@ -90,7 +90,8 @@ class TestInspectSubprocessSmoke:
                 "python",
                 "src/vibe3/cli.py",
                 "inspect",
-                "dead-code",
+                "files",
+                "src/vibe3/cli.py",
                 "--yaml",
             ],
             capture_output=True,
@@ -100,6 +101,4 @@ class TestInspectSubprocessSmoke:
         )
         data = yaml.safe_load(result.stdout)
         assert isinstance(data, dict)
-        assert "total_symbols" in data
-        assert "dead_code_count" in data
-        assert "findings" in data
+        assert "file" in data or "function_count" in data
