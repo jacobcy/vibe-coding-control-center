@@ -79,6 +79,7 @@ class PromptRenderResult(BaseModel):
     template_source: str
     rendered_text: str
     provenance: tuple[PromptVariableProvenance, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
 class PromptSectionSpec(BaseModel):

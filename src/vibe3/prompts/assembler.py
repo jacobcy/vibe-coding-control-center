@@ -72,11 +72,16 @@ class PromptAssembler:
         # Resolve each declared variable and build provenance
         resolved: dict[str, str] = {}
         provenance_list: list[PromptVariableProvenance] = []
+        assembly_warnings: list[str] = []
 
         for var in sorted(required_vars):
             source = recipe.variables[var]
             value = resolve_source(
-                source, runtime_context, self._registry, self._skill_path_resolver
+                source,
+                runtime_context,
+                self._registry,
+                self._skill_path_resolver,
+                warnings=assembly_warnings,
             )
             resolved[var] = value
             resolved_from = _describe_source(source)
@@ -101,6 +106,7 @@ class PromptAssembler:
             template_source=template_source,
             rendered_text=rendered_text,
             provenance=tuple(provenance_list),
+            warnings=tuple(assembly_warnings),
         )
 
 
