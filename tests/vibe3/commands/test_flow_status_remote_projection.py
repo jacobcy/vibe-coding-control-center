@@ -53,7 +53,7 @@ def test_projection_pr_resolves_by_branch() -> None:
 @patch("vibe3.commands.flow_status._render_snapshot_format")
 @patch("vibe3.commands.flow_status.PRService")
 @patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
-@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 def test_flow_show_snapshot_uses_pr_service_branch_status(
     mock_service_class,
     mock_resolver_class,
@@ -112,7 +112,7 @@ def _make_flow_state(
     )
 
 
-@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.services.check.service.CheckService")
@@ -144,7 +144,7 @@ def test_flow_status_default_filters_active(
     mock_service.list_flows.assert_called_once_with(status="active")
 
 
-@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.services.check.service.CheckService")
@@ -170,7 +170,7 @@ def test_flow_status_all_includes_terminal_states(
     mock_service.list_flows.assert_called_once_with(status=None)
 
 
-@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.commands.common.execute_check_mode")
@@ -204,7 +204,7 @@ def test_flow_status_check_runs_verification(
     mock_execute_check_mode.assert_called_once()
 
 
-@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
 @patch("vibe3.commands.common.execute_check_mode")
