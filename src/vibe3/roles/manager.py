@@ -6,11 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-import yaml
 from loguru import logger
 
 # public-api: pending upstream export
-from vibe3.clients import check_runtime_asset, runtime_assets_root
+from vibe3.clients import runtime_assets_root
 
 # public-api: pending upstream export
 from vibe3.config import (
@@ -42,6 +41,7 @@ from vibe3.prompts import (
     ProviderRegistry,
     resolve_source,
 )
+from vibe3.prompts.template_loader import load_prompt_templates
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -130,7 +130,7 @@ def resolve_manager_token(config: OrchestraConfig) -> str | None:
 def _make_section_provider(
     manager_sections: dict[str, Any], section_key: str
 ) -> PromptProvider:
-    """Create a provider that loads section from prompts.yaml."""
+    """Create a provider that returns a section from loaded prompts data."""
 
     def _provider() -> str | None:
         # Extract section name (e.g., "manager.target" -> "target")
@@ -283,10 +283,8 @@ def build_manager_sync_request(
     # Select variant based on session_id
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
-    # Load prompts.yaml for static sections
-    prompts_path = check_runtime_asset("config/prompts/prompts.yaml")
-    with open(prompts_path) as f:
-        prompts_data = yaml.safe_load(f)
+    # Load prompts through template loader abstraction
+    prompts_data = load_prompt_templates()
     manager_sections = prompts_data.get("manager", {})
 
     # Build providers for static sections (no source override)

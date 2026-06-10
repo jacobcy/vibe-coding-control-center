@@ -48,22 +48,17 @@ recipes:
             encoding="utf-8",
         )
 
-        # Create prompts.yaml with minimal sections
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-manager:
-  target: "target section"
-  quick_commands: "quick commands"
-  retry_task: "retry task"
-""",
-            encoding="utf-8",
-        )
-
         # Patch paths
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
-            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                    "quick_commands": "quick commands",
+                    "retry_task": "retry task",
+                }
+            },
         )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
@@ -110,19 +105,15 @@ recipes:
             encoding="utf-8",
         )
 
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-manager:
-  target: "target section"
-  retry_task: "retry task"
-""",
-            encoding="utf-8",
-        )
-
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
-            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                    "retry_task": "retry task",
+                }
+            },
         )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
@@ -164,19 +155,15 @@ recipes:
             encoding="utf-8",
         )
 
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-manager:
-  target: "target section"
-  retry_task: "retry task"
-""",
-            encoding="utf-8",
-        )
-
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
-            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                    "retry_task": "retry task",
+                }
+            },
         )
         monkeypatch.setattr(
             "vibe3.roles.manager.resolve_orchestra_repo_root",
@@ -218,17 +205,16 @@ recipes:
           - manager.retry_task
 """)
 
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text("""
-manager:
-  target: "target section"
-  quick_commands: "quick commands"
-  retry_task: "retry task"
-""")
-
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
-            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                    "quick_commands": "quick commands",
+                    "retry_task": "retry task",
+                }
+            },
         )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
@@ -274,16 +260,15 @@ recipes:
           - manager.retry_task
 """)
 
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text("""
-manager:
-  target: "target section"
-  retry_task: "retry task"
-""")
-
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
-            "vibe3.roles.manager.check_runtime_asset", lambda path: prompts_path
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                    "retry_task": "retry task",
+                }
+            },
         )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
