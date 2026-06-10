@@ -52,32 +52,8 @@ SERVICES_SUBPACKAGES = ["flow", "pr", "issue", "task"]
 # Known violations in shared/ boundary.
 # Each entry: (relative_path, import_target) — registered as technical debt.
 # These represent architectural debt that should be resolved over time.
-KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = {
-    # shared/branches.py
-    ("vibe3/services/shared/branches.py", "vibe3.services.pr.resolver"),
-    ("vibe3/services/shared/branches.py", "vibe3.services.flow.service"),
-    # shared/labels.py
-    ("vibe3/services/shared/labels.py", "vibe3.services.issue.dispatch_policy"),
-    # shared/roles.py
-    ("vibe3/services/shared/roles.py", "vibe3.services.issue.failure"),
-    # shared/timeline.py
-    ("vibe3/services/shared/timeline.py", "vibe3.services.flow.timeline"),
-    # shared/status_query.py
-    (
-        "vibe3/services/shared/status_query.py",
-        "vibe3.services.issue.collection",
-    ),
-    (
-        "vibe3/services/shared/status_query.py",
-        "vibe3.services.issue.dispatch_policy",
-    ),
-    (
-        "vibe3/services/shared/status_query.py",
-        "vibe3.services.issue.title_cache",
-    ),
-    ("vibe3/services/shared/status_query.py", "vibe3.services.pr.service"),
-    ("vibe3/services/shared/status_query.py", "vibe3.services.issue.body"),
-}
+# Phase 7b: All shared/ boundary violations resolved (2026-06-11).
+KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.

@@ -24,6 +24,7 @@ import tomllib
 from pathlib import Path
 
 from vibe3.services.shared.paths import (
+    _SHARED_HANDOFF_PREFIX,
     GitPathProtocol,
     _get_git_client,
     find_worktree_path_for_branch,
@@ -35,7 +36,6 @@ from vibe3.services.shared.paths import (
 # Note: re.fullmatch() ensures the entire string matches, preventing control
 # characters like trailing newlines from being accepted
 _BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
-_SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
 
 # Vibe path validation regex: alphanumeric, slash, underscore, hyphen, period, colon
 # Used for @vibe/<path> namespace to prevent path traversal attacks
