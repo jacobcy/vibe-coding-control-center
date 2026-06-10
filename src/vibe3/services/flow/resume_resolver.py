@@ -5,7 +5,7 @@ on its local reference states (pr_ref, audit_ref, plan_ref, report_ref).
 """
 
 from vibe3.models import FlowState, IssueState, VerdictValue
-from vibe3.services.verdict_policy import passes_review
+from vibe3.services.pr.verdict_policy import passes_review
 
 
 def infer_resume_label(flow_state: FlowState) -> IssueState:

@@ -23,7 +23,7 @@ from vibe3.services.blocked_state_types import (
     ConsistencyReport,
     UnblockResult,
 )
-from vibe3.services.flow_timeline_service import FlowTimelineService
+from vibe3.services.flow.timeline import FlowTimelineService
 from vibe3.services.shared.label_service import LabelService
 
 if TYPE_CHECKING:

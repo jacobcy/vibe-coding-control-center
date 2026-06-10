@@ -15,7 +15,7 @@ def _make_check_pr_service() -> "CheckPRService":
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.check.pr_service import CheckPRService
-    from vibe3.services.flow_status_service import FlowStatusService
+    from vibe3.services.flow.status import FlowStatusService
 
     store = MagicMock(spec=SQLiteClient)
     git_client = MagicMock(spec=GitClient)
@@ -64,9 +64,7 @@ def test_handle_pr_terminal_state_creates_bridge_issue() -> None:
     service.github_client.add_comment.return_value = True
     service.github_client.close_issue_if_open.return_value = "closed"
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {
@@ -135,9 +133,7 @@ def test_handle_pr_terminal_state_does_not_call_rebuild() -> None:
         patch(
             "vibe3.services.check.pr_service.FlowRebuildUsecase", create=True
         ) as rebuild_cls,
-        patch(
-            "vibe3.services.flow_cleanup_service.FlowCleanupService"
-        ) as mock_cleanup_cls,
+        patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls,
     ):
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
@@ -171,9 +167,7 @@ def test_handle_pr_terminal_state_with_closed_issue_marks_flow_aborted() -> None
         "state": "CLOSED",
     }
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         # Mock cleanup result
@@ -242,9 +236,7 @@ def test_handle_pr_terminal_state_bridge_idempotency() -> None:
         }
     ]
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {}
@@ -308,9 +300,7 @@ def test_handle_pr_terminal_state_existing_bridge_close_failure_does_not_cleanup
     ]
     service.github_client.close_issue_if_open.return_value = "failed"
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
@@ -365,9 +355,7 @@ def test_handle_pr_terminal_state_ignores_bridge_marker_for_prefixed_pr_number()
     service.github_client.add_comment.return_value = True
     service.github_client.close_issue_if_open.return_value = "closed"
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {}
@@ -402,9 +390,7 @@ def test_handle_pr_terminal_state_when_view_issue_fails_does_not_cleanup() -> No
     # Mock view_issue failure (returns non-dict)
     service.github_client.view_issue.return_value = "network_error"
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
@@ -450,9 +436,7 @@ def test_handle_pr_terminal_state_when_close_original_fails_does_not_cleanup() -
     # Mock marker addition failure
     service.github_client.add_comment.return_value = False
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
@@ -496,9 +480,7 @@ def test_handle_pr_terminal_state_when_add_marker_fails_does_not_cleanup() -> No
     service.github_client.create_issue.return_value = 789
     service.github_client.add_comment.return_value = False
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
 
@@ -624,9 +606,7 @@ def test_reset_issue_after_pr_closed_transfers_dependencies() -> None:
     # Mock dependents for _transfer_dependencies
     service.store.get_flow_dependents.return_value = ["task/dep-1", "task/dep-2"]
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup_cls.return_value = mock_cleanup
         mock_cleanup.cleanup_flow_scene.return_value = {

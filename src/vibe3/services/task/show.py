@@ -11,7 +11,7 @@ from typing import Any, cast
 from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import FlowStatusResponse, PRResponse
 from vibe3.services.comment_service import is_human_comment
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.service import PRService
 from vibe3.services.shared.artifacts import ArtifactParser
 from vibe3.services.shared.paths import resolve_ref_path

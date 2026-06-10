@@ -13,8 +13,8 @@ from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteC
 from vibe3.environment import WorktreeManager
 from vibe3.exceptions import GitError, is_transient_git_error
 from vibe3.models import PRState
-from vibe3.services.flow_cleanup_service import FlowCleanupService
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.cleanup import FlowCleanupService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.issue.failure import block_manager_noop_issue
 from vibe3.services.issue.flow import IssueFlowService
 from vibe3.services.orchestra.status import OrchestraStatusService

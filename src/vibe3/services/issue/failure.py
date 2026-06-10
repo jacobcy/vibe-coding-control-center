@@ -13,7 +13,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.services.flow_timeline_service import FlowTimelineService
+from vibe3.services.flow.timeline import FlowTimelineService
 from vibe3.services.issue.flow import IssueFlowService
 
 _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
@@ -94,7 +94,7 @@ def mark_issue(
             # issue_number and repo omitted: prevents GitHub comment write
         )
     else:
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services.flow.service import FlowService
 
         FlowService(store=store).block_flow(
             branch=branch,

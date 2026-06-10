@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.issue.failure import (
     block_manager_noop_issue,
     fail_manager_issue,

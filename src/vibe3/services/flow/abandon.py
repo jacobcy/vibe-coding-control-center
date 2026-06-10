@@ -16,7 +16,7 @@ from vibe3.clients import GitHubClient
 from vibe3.models import IssueState
 
 if TYPE_CHECKING:
-    from vibe3.services.flow_service import FlowService
+    from vibe3.services.flow.service import FlowService
     from vibe3.services.pr.service import PRService
 
 
@@ -58,7 +58,7 @@ class AbandonFlowService:
             pr_service = PRService()
 
         if flow_service is None:
-            from vibe3.services.flow_service import FlowService
+            from vibe3.services.flow.service import FlowService
 
             flow_service = FlowService()
 

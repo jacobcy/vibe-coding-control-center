@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 @pytest.fixture

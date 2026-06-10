@@ -5,7 +5,7 @@ from pathlib import Path
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 def test_ensure_flow_for_issue_branch_initializes_issue_context() -> None:

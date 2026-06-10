@@ -39,7 +39,7 @@ class FlowRebuildUsecase:
             self.orchestrator = orchestrator
         else:
             try:
-                from vibe3.services.flow_orchestrator_service import (
+                from vibe3.services.orchestra.orchestrator import (
                     FlowOrchestratorService,
                 )
 

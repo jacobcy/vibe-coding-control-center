@@ -11,7 +11,7 @@ from vibe3.clients import AIClient, AISuggestionClient, BaseResolver
 from vibe3.config import VibeConfig
 from vibe3.prompts import resolve_prompts_path
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.task_binding_guard import ensure_task_issue_bound
 
 

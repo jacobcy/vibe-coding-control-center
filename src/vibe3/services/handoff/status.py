@@ -7,9 +7,9 @@ from typing import Any
 from vibe3.clients import BackendProtocol, GitClient, SQLiteClient
 from vibe3.environment import SessionRegistryService
 from vibe3.models import FlowEvent, FlowState, VerdictRecord
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.verdict_service import VerdictService
+from vibe3.services.pr.verdict_service import VerdictService
 
 
 @dataclass

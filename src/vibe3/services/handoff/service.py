@@ -215,7 +215,7 @@ class HandoffService:
 
         # 3. Call FlowTimelineService to record event and optionally write comment
         if issue_number:
-            from vibe3.services.flow_timeline_service import FlowTimelineService
+            from vibe3.services.flow.timeline import FlowTimelineService
 
             timeline_service = FlowTimelineService(
                 store=self.store,

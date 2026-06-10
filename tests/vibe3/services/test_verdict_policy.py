@@ -1,6 +1,6 @@
 """Tests for review verdict policy helpers."""
 
-from vibe3.services.verdict_policy import (
+from vibe3.services.pr.verdict_policy import (
     ALL_VERDICTS,
     blocks_merge,
     passes_review,

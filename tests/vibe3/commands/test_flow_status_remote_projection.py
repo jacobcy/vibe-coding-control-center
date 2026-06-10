@@ -38,7 +38,7 @@ def test_projection_pr_resolves_by_branch() -> None:
         flow_status="active",
     )
 
-    from vibe3.services.flow_projection_service import FlowProjectionService
+    from vibe3.services.flow.projection import FlowProjectionService
 
     svc = FlowProjectionService(
         flow_service=mock_flow_service, pr_service=mock_pr_service

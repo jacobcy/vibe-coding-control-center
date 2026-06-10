@@ -8,7 +8,7 @@ import pytest
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.models.flow import FlowEvent
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 @pytest.fixture

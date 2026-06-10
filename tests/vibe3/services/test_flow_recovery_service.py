@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.flow_recovery_service import (
+from vibe3.services.flow.recovery import (
     FlowRecoveryService,
     RecoveryAction,
 )

@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from vibe3.services.flow_cleanup_service import FlowCleanupService
+from vibe3.services.flow.cleanup import FlowCleanupService
 
 
 class TestVibeCloseout:

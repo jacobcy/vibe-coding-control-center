@@ -8,8 +8,8 @@ import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.data_source import DataSource
-from vibe3.services.flow_service import FlowService
-from vibe3.services.flow_status_resolver import FlowStatusResolver
+from vibe3.services.flow.service import FlowService
+from vibe3.services.flow.status_resolver import FlowStatusResolver
 
 
 @pytest.fixture
