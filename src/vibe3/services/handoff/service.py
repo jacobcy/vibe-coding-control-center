@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.models import FlowEvent, VerdictRecord
-from vibe3.services.external_events import ExternalEventRecorder
+from vibe3.services.handoff.external_events import ExternalEventRecorder
 from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
 from vibe3.services.handoff.storage import HandoffStorage
 from vibe3.services.handoff.validation import validate_authoritative_ref
