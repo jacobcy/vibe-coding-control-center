@@ -22,16 +22,13 @@ def extract_material_description(material_name: str) -> str:
     Returns:
         Material description (first markdown header) or filename as fallback.
     """
-    from vibe3.clients import GitClient
+    from vibe3.clients import resolve_runtime_asset
     from vibe3.services import material_loader
 
     try:
-        git_client = GitClient()
-        git_common_dir = git_client.get_git_common_dir()
-        if not git_common_dir:
+        materials_dir = resolve_runtime_asset("supervisor/governance")
+        if not materials_dir.exists():
             return material_name
-        repo_root = Path(git_common_dir).parent
-        materials_dir = repo_root / "supervisor" / "governance"
 
         loader = material_loader(materials_dir)
         # Strip directory prefix: "supervisor/governance/foo.md" -> "foo.md"

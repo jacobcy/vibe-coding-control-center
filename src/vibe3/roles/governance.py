@@ -73,16 +73,13 @@ _GOVERNANCE_RUNTIME_VARS = (
 
 def _compute_material_hash() -> str | None:
     """Compute aggregate hash of governance material files on disk."""
-    from vibe3.clients import GitClient
+    from vibe3.clients import resolve_runtime_asset
     from vibe3.services import material_loader
     from vibe3.utils import compute_hash_from_loader
 
-    git_client = GitClient()
-    git_common_dir = git_client.get_git_common_dir()
-    if not git_common_dir:
+    materials_dir = resolve_runtime_asset("supervisor/governance")
+    if not materials_dir.exists():
         return None
-    repo_root = Path(git_common_dir).parent
-    materials_dir = repo_root / "supervisor" / "governance"
     return compute_hash_from_loader(material_loader, materials_dir)
 
 

@@ -80,6 +80,7 @@ def _render_runtime_versions() -> None:
     Displays the current policy and material hashes computed from the
     governance directory contents.
     """
+    from vibe3.clients import resolve_runtime_asset
     from vibe3.execution import resolve_orchestra_repo_root
     from vibe3.services import material_loader, policy_loader
     from vibe3.utils import compute_hash_from_loader
@@ -89,7 +90,7 @@ def _render_runtime_versions() -> None:
     try:
         repo_root = resolve_orchestra_repo_root()
         policies_dir = repo_root / ".agent" / "governance" / "policies"
-        materials_dir = repo_root / "supervisor" / "governance"
+        materials_dir = resolve_runtime_asset("supervisor/governance")
 
         policy_hash = compute_hash_from_loader(policy_loader, policies_dir)
         material_hash = compute_hash_from_loader(material_loader, materials_dir)
