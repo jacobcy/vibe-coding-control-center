@@ -1,21 +1,9 @@
-"""Role policy helper functions that depend on services."""
+"""Re-export shim for role policy helpers.
 
-from typing import Callable
+The actual implementation has moved to
+vibe3.services.shared.roles.
+"""
 
-from vibe3.services.issue.failure import (
-    block_executor_noop_issue,
-    block_manager_noop_issue,
-    block_planner_noop_issue,
-    block_reviewer_noop_issue,
-)
+from vibe3.services.shared.roles import get_role_block_function
 
-
-def get_role_block_function(role: str) -> Callable[..., None]:
-    """Get the block function for a given role."""
-    block_fns: dict[str, Callable[..., None]] = {
-        "manager": block_manager_noop_issue,
-        "planner": block_planner_noop_issue,
-        "executor": block_executor_noop_issue,
-        "reviewer": block_reviewer_noop_issue,
-    }
-    return block_fns[role]
+__all__ = ["get_role_block_function"]
