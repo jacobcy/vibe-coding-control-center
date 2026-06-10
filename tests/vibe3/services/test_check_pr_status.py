@@ -349,12 +349,12 @@ class TestMergedPRCacheIntegration:
         )
 
         with patch(
-            "vibe3.services.pr_status_checker.get_git_common_dir"
+            "vibe3.services.pr.status_checker.get_git_common_dir"
         ) as mock_git_dir:
             mock_git_dir.return_value = str(tmp_path / ".git")
 
             with patch(
-                "vibe3.services.pr_status_checker.GitHubClient"
+                "vibe3.services.pr.status_checker.GitHubClient"
             ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
@@ -372,13 +372,13 @@ class TestMergedPRCacheIntegration:
 
         # Mock get_git_common_dir to return tmp_path
         with patch(
-            "vibe3.services.pr_status_checker.get_git_common_dir"
+            "vibe3.services.pr.status_checker.get_git_common_dir"
         ) as mock_git_dir:
             mock_git_dir.return_value = str(tmp_path / ".git")
 
             # Mock GitHubClient
             with patch(
-                "vibe3.services.pr_status_checker.GitHubClient"
+                "vibe3.services.pr.status_checker.GitHubClient"
             ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
