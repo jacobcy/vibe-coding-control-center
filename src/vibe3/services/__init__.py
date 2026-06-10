@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
-    from vibe3.services.blocked_state_service import BlockedStateService
+    from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.check.cleanup import CheckCleanupService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         policy_loader,
         resolve_manager_usernames,
     )
+    from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
@@ -271,7 +272,7 @@ __all__ = [
 _SYMBOL_MODULES = {
     # Services
     "BaseResolutionUsecase": "vibe3.services.base_resolution_usecase",
-    "BlockedStateService": "vibe3.services.blocked_state_service",
+    "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckResult": "vibe3.services.check.service",
     "CheckService": "vibe3.services.check.service",

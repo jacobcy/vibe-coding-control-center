@@ -213,7 +213,7 @@ class FlowRecoveryService:
             RuntimeError: If label write fails (RC2: prevents silent failure)
         """
         from vibe3.models import FlowState, IssueState
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.flow.blocked_state_service import BlockedStateService
         from vibe3.services.flow.resume_resolver import infer_resume_label
 
         # Determine target state from flow progress

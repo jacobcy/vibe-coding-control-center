@@ -144,7 +144,7 @@ class FlowRebuildUsecase:
         skip the classify step and go straight to clearing blocked state.
         """
         from vibe3.models import FlowState, IssueState
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.flow.blocked_state_service import BlockedStateService
         from vibe3.services.flow.resume_resolver import infer_resume_label
 
         # Determine target state from rebuilt flow
