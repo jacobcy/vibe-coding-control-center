@@ -30,7 +30,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -60,7 +60,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -87,7 +87,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -116,7 +116,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
+                "vibe3.services.issue.failure.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -140,7 +140,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_manager_noop_issue"
+                "vibe3.services.issue.failure.block_manager_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -166,7 +166,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_reviewer_noop_issue"
+                "vibe3.services.issue.failure.block_reviewer_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -193,7 +193,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = None
@@ -227,7 +227,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("timeout")
@@ -261,7 +261,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("timeout")
@@ -297,7 +297,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = None  # Malformed
@@ -327,7 +327,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -356,7 +356,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with patch(
-            "vibe3.services.role_policy_helpers.block_executor_noop_issue"
+            "vibe3.services.issue.failure.block_executor_noop_issue"
         ) as mock_block:
             apply_unified_noop_gate(
                 store=store,
@@ -376,7 +376,7 @@ class TestApplyUnifiedNoopGate:
         store = _make_mock_store()
 
         with patch(
-            "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+            "vibe3.services.issue.failure.block_planner_noop_issue"
         ) as mock_block:
             apply_unified_noop_gate(
                 store=store,
@@ -403,7 +403,7 @@ class TestApplyUnifiedNoopGate:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_planner_noop_issue"
+                "vibe3.services.issue.failure.block_planner_noop_issue"
             ) as mock_block,
         ):
             # Single call: check issue closed state (returns closed)

@@ -5,7 +5,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients import GitHubClientProtocol
-from vibe3.services.loc_service import LocService, LOCStats
+from vibe3.services.shared.loc import LocService, LOCStats
 
 LOC_SENTINEL = "<!-- vibe3:pr-loc-summary -->"
 

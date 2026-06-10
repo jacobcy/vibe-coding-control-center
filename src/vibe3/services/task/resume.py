@@ -15,7 +15,7 @@ from vibe3.exceptions import UserError
 from vibe3.models import IssueState
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue.flow import IssueFlowService
-from vibe3.services.label_service import LabelService
+from vibe3.services.shared.label_service import LabelService
 from vibe3.services.status_query_service import StatusQueryService
 
 if TYPE_CHECKING:
