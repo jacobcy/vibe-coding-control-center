@@ -229,7 +229,6 @@ class CheckPRService:
                 return (False, [], [])
             return self._handle_closed_pr_flow(branch, pr)
 
-        # PR still open, nothing to handle
         return (False, [], [])
 
     def _handle_merged_pr(
