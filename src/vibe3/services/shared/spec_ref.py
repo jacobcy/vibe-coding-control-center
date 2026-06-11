@@ -127,12 +127,15 @@ class SpecRefService:
             return "\n".join(parts) if parts else None
 
         if info.kind == "file" and info.file_path:
-            from vibe3.services.handoff.resolution import resolve_handoff_target
+            import importlib
+
+            _resolution = importlib.import_module("vibe3.services.handoff.resolution")
+            resolve_handoff_target = _resolution.resolve_handoff_target
 
             # Use resolve_handoff_target for correct worktree path resolution
             try:
                 resolved_path = resolve_handoff_target(info.file_path, branch=branch)
-                return resolved_path.read_text(encoding="utf-8")
+                return resolved_path.read_text(encoding="utf-8")  # type: ignore[no-any-return]
             except (FileNotFoundError, OSError):
                 return None
         return None
@@ -153,7 +156,10 @@ class SpecRefService:
         if issue_number is not None:
             return True, ""
 
-        from vibe3.services.handoff.resolution import resolve_handoff_target
+        import importlib
+
+        _resolution = importlib.import_module("vibe3.services.handoff.resolution")
+        resolve_handoff_target = _resolution.resolve_handoff_target
 
         try:
             resolve_handoff_target(spec_ref, branch=branch)

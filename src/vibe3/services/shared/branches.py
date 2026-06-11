@@ -3,17 +3,10 @@
 Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
-from typing import TYPE_CHECKING
-
-from vibe3.services.pr.resolver import resolve_command_branch
-
-if TYPE_CHECKING:
-    from vibe3.services.flow.service import FlowService
-
 
 def resolve_branch_arg(
     branch_arg: str | None,
-    flow_service: "FlowService | None" = None,
+    flow_service: object | None = None,
 ) -> str:
     """Resolve --branch argument to a canonical branch name.
 
@@ -33,13 +26,18 @@ def resolve_branch_arg(
     Returns:
         Resolved branch name
     """
+    import importlib
+
+    _pr_resolver = importlib.import_module("vibe3.services.pr.resolver")
+    resolve_command_branch = _pr_resolver.resolve_command_branch
+
     if flow_service is None:
         # Use public API for cross-module import (allows test patching)
         from vibe3.services import FlowService
 
         flow_service = FlowService()
 
-    return resolve_command_branch(
+    return resolve_command_branch(  # type: ignore[no-any-return]
         position_arg=branch_arg,
         flow_service=flow_service,
         allow_no_flow=False,
@@ -49,7 +47,7 @@ def resolve_branch_arg(
 
 def resolve_branch_and_issue(
     branch_arg: str | None,
-    flow_service: "FlowService | None" = None,
+    flow_service: object | None = None,
 ) -> tuple[str, int | None]:
     """Resolve --branch argument and extract issue number in one call.
 

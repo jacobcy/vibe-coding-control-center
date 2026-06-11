@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from vibe3.models import IssueInfo
+from vibe3.models import DispatchExclusion, IssueInfo
 from vibe3.services.shared.labels import classify_dispatch_eligibility
 
-
-@dataclass(frozen=True)
-class DispatchExclusion:
-    """Structured reason why an issue should not be auto-dispatched."""
-
-    code: str
-    message: str
+# Re-export for backward compatibility
+__all__ = ["DispatchExclusion", "IssueDispatchPolicy"]
 
 
 class IssueDispatchPolicy:

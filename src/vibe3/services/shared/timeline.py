@@ -7,7 +7,18 @@ from datetime import datetime
 from typing import Any
 
 from vibe3.models import TimelineEvent
-from vibe3.services.flow.timeline import TIMELINE_DISPLAY_MAP
+
+# Event type to display text mapping (canonical source in shared/)
+# FlowTimelineService re-exports this for backward compatibility.
+TIMELINE_DISPLAY_MAP: dict[str, str] = {
+    "flow_blocked": "Flow blocked",
+    "flow_failed": "Flow failed",
+    "flow_aborted": "Flow aborted",
+    "resumed": "Flow resumed",
+    "handoff_append": "Handoff update",
+    "milestone_recorded": "Milestone recorded",
+    "user_notification": "User notification",
+}
 
 
 def parse_timeline_from_comments(

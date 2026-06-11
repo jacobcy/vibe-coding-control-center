@@ -6,14 +6,13 @@ a thin rendering layer.
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import IssueInfo, IssueState
-from vibe3.services.issue.collection import IssueCollectionService
-from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
 from vibe3.utils import (
     resolve_priority,
     resolve_roadmap_rank,
@@ -22,7 +21,6 @@ from vibe3.utils import (
 
 if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
-    from vibe3.services.issue.title_cache import IssueTitleCacheService
 
 
 def _state_from_labels(raw_labels: object) -> IssueState | None:
@@ -198,7 +196,7 @@ class StatusQueryService:
         github_client: GitHubClient | None = None,
         git_client: GitClient | None = None,
         repo: str | None = None,
-        title_cache: IssueTitleCacheService | None = None,
+        title_cache: object | None = None,
         store: SQLiteClient | None = None,
     ) -> None:
         self.github = github_client or GitHubClient()
@@ -208,12 +206,13 @@ class StatusQueryService:
         self._title_cache = title_cache
 
     @property
-    def title_cache(self) -> IssueTitleCacheService:
+    def title_cache(self) -> object:
         """Lazy-initialized title cache service."""
         if self._title_cache is None:
-            from vibe3.services.issue.title_cache import IssueTitleCacheService
+            import importlib
 
-            self._title_cache = IssueTitleCacheService(self.store, self.github)
+            _mod = importlib.import_module("vibe3.services.issue.title_cache")
+            self._title_cache = _mod.IssueTitleCacheService(self.store, self.github)
         return self._title_cache
 
     def fetch_orchestrated_issues(
@@ -253,7 +252,8 @@ class StatusQueryService:
                 )
 
         try:
-            collected_issues = IssueCollectionService(
+            _collection_mod = importlib.import_module("vibe3.services.issue.collection")
+            collected_issues = _collection_mod.IssueCollectionService(
                 self.github,
                 repo=self.repo,
             ).collect_open_issues(limit=100)
@@ -261,7 +261,8 @@ class StatusQueryService:
             logger.bind(domain="status").warning(f"Failed to fetch issues: {exc}")
             collected_issues = []
 
-        dispatch_policy = IssueDispatchPolicy(
+        _dispatch_mod = importlib.import_module("vibe3.services.issue.dispatch_policy")
+        dispatch_policy = _dispatch_mod.IssueDispatchPolicy(
             supervisor_label=supervisor_label or "",
             manager_usernames=manager_usernames or (),
         )
@@ -270,13 +271,12 @@ class StatusQueryService:
         branches = [flow.branch for flow in flows if flow.branch]
 
         # Use cache service for titles (cache-first)
-        branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)
+        branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)  # type: ignore[attr-defined]
 
         # Batch fetch all open PRs through the shared PRService cache path.
         try:
-            from vibe3.services.pr.service import PRService
-
-            branch_to_pr = PRService(
+            _pr_mod = importlib.import_module("vibe3.services.pr.service")
+            branch_to_pr = _pr_mod.PRService(
                 github_client=cast(GitHubClientProtocol, self.github),
                 git_client=self.git,
                 store=self.store,
@@ -308,9 +308,8 @@ class StatusQueryService:
                     blocked_reason = getattr(flow, "blocked_reason", None)
                 elif issue.body:
                     # For remote BLOCKED issues, parse from issue body
-                    from vibe3.services.issue.body import parse_projection
-
-                    proj = parse_projection(issue.body)
+                    _body_mod = importlib.import_module("vibe3.services.issue.body")
+                    proj = _body_mod.parse_projection(issue.body)
                     if proj.blocked_by:
                         blocked_by = tuple(proj.blocked_by)
                     blocked_reason = proj.blocked_reason

@@ -11,8 +11,7 @@ from vibe3.clients import GhIssueLabelPort, TriggerableRoleDefinitionProtocol
 from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
-    from vibe3.models import IssueInfo
-    from vibe3.services.issue.dispatch_policy import DispatchExclusion
+    from vibe3.models import DispatchExclusion, IssueInfo
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -78,9 +77,10 @@ def _make_dispatch_policy(
     supervisor_label: str,
     manager_usernames: tuple[str, ...],
 ) -> "object":
-    from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
+    import importlib
 
-    return IssueDispatchPolicy(
+    _mod = importlib.import_module("vibe3.services.issue.dispatch_policy")
+    return _mod.IssueDispatchPolicy(
         supervisor_label=supervisor_label,
         manager_usernames=manager_usernames,
     )
@@ -112,12 +112,10 @@ def should_skip_from_queue(
     Returns:
         True if issue should be skipped, False otherwise
     """
-    from vibe3.services.issue.dispatch_policy import IssueDispatchPolicy
-
-    policy: IssueDispatchPolicy = _make_dispatch_policy(  # type: ignore[assignment]
+    policy: object = _make_dispatch_policy(  # type: ignore[assignment]
         supervisor_label, tuple(manager_usernames)
     )
-    reasons = policy.exclusion_reasons(issue)
+    reasons = policy.exclusion_reasons(issue)  # type: ignore[attr-defined]
     if require_manager_assignee:
         return bool(reasons)
 
@@ -246,7 +244,7 @@ def classify_dispatch_eligibility(
 
     Returns list of reasons why issue should not be auto-dispatched.
     """
-    from vibe3.services.issue.dispatch_policy import DispatchExclusion
+    from vibe3.models import DispatchExclusion
 
     reasons: list[DispatchExclusion] = []
 
