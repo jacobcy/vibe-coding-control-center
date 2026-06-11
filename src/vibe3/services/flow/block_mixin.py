@@ -24,13 +24,9 @@ class FlowLifecycleMixin:
         """Inject task service for dependency breaking."""
         self._task_service = task_service
 
-    def _get_task_service(self) -> "TaskQueryProtocol":
-        """Lazily initialize task service if not injected."""
-        if self._task_service is None:
-            from vibe3.services.task import TaskService
-
-            self._task_service = TaskService()  # type: ignore[assignment]
-        return self._task_service  # type: ignore[return-value]
+    def _get_task_service(self) -> "TaskQueryProtocol | None":
+        """Return injected task service or None if not available."""
+        return self._task_service
 
     def block_flow(
         self: Self,
@@ -77,12 +73,21 @@ class FlowLifecycleMixin:
         )
 
         if blocked_by_issue:
-            self._get_task_service().link_issue(
-                branch,
-                blocked_by_issue,
-                role="dependency",
-                actor=effective_actor,
-            )
+            svc = self._get_task_service()
+            if svc is not None:
+                svc.link_issue(
+                    branch,
+                    blocked_by_issue,
+                    role="dependency",
+                    actor=effective_actor,
+                )
+            else:
+                logger.bind(
+                    domain="flow",
+                    action="block",
+                    branch=branch,
+                    blocked_by_issue=blocked_by_issue,
+                ).warning("TaskService not injected, skipping dependency link")
 
         issue_number: int | None = None
         from vibe3.services.issue.flow import IssueFlowService
