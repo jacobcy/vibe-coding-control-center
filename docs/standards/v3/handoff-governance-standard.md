@@ -163,7 +163,8 @@ V2 到 V3 handoff 系统的关键变化：
 
 - [ ] 更新所有 `vibe` shell 命令引用为 `vibe3` Python CLI
 - [ ] 更新路径引用 `.git/vibe/` → `.git/vibe3/`
-- [ ] 更新 handoff buffer 路径 `.agent/context/task.md` → `.git/vibe3/handoff/<branch>/current.md`
+- [ ] 更新 handoff buffer 访问方式：严禁直接读写文件，改用 `vibe3 handoff show/append`
+- [ ] 更新 handoff buffer 概念：存储于 `.git/vibe3/handoff/<branch>/` (系统内部路径)，由 CLI 抽象访问
 - [ ] 移除对 `task.md` 的依赖，改用 SQLite 作为真源
 - [ ] 更新相关文档引用到 v3 版本
 
