@@ -10,12 +10,8 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.services.check.service import CheckService
 
 
-def test_closed_issue_flow_check_returns_invalid_e2e(temp_store: SQLiteClient) -> None:
-    """CheckService reports closed issue as invalid but does not abort the flow.
-
-    Flow termination (marking as aborted) is QualifyGate's responsibility.
-    CheckService is a pure structural validator that only reports invalidity.
-    """
+def test_closed_issue_flow_check_aborts_flow_e2e(temp_store: SQLiteClient) -> None:
+    """CheckService aborts active flow when task issue is closed with no PR."""
     branch = "task/issue-789"
 
     # Setup: create flow in active state with task issue link
@@ -53,13 +49,11 @@ def test_closed_issue_flow_check_returns_invalid_e2e(temp_store: SQLiteClient) -
 
     result = service.verify_branch(branch)
 
-    # Verify: check result reports invalid (closed issue = not valid for dispatch)
-    assert result.is_valid is False
-    assert any("CLOSED" in issue for issue in result.issues)
+    # Verify: check auto-fixes the terminal stale flow instead of failing.
+    assert result.is_valid is True
+    assert result.issues == []
     assert result.branch == branch
 
-    # Verify: flow remains active — CheckService no longer aborts flows.
-    # QualifyGate.run_qualify_gate() handles flow termination via cleanup_flow_scene().
     flow_data = temp_store.get_flow_state(branch)
     assert flow_data is not None
-    assert flow_data["flow_status"] == "active"
+    assert flow_data["flow_status"] == "aborted"
