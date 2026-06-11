@@ -23,8 +23,8 @@ from vibe3.clients import GitHubClient
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
-    DispatchHealthCheckProtocol,
     FlowContextResolverProtocol,
+    FlowServiceProtocol,
     IssueCollectionServiceProtocol,
     IssueLoaderProtocol,
     LabelDispatchCallable,
@@ -65,7 +65,7 @@ class GlobalDispatchCoordinator:
     _executor: ThreadPoolExecutor
     _owns_executor: bool
     _frozen_queue: list[QueueEntry] | None
-    _health_check_service: DispatchHealthCheckProtocol
+    _flow_blocker: FlowServiceProtocol
     _queue_persistence: QueuePersistenceServiceProtocol
     _load_issue: IssueLoaderProtocol
     _flow_context: FlowContextResolverProtocol
@@ -86,7 +86,7 @@ class GlobalDispatchCoordinator:
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
         *,
-        health_check_service: DispatchHealthCheckProtocol,
+        flow_blocker: FlowServiceProtocol,
         queue_persistence: QueuePersistenceServiceProtocol,
         issue_loader: IssueLoaderProtocol,
         flow_context_resolver: FlowContextResolverProtocol,
@@ -112,7 +112,7 @@ class GlobalDispatchCoordinator:
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
 
         # Injected runtime services
-        self._health_check_service = health_check_service
+        self._flow_blocker = flow_blocker
         self._queue_persistence = queue_persistence
         self._load_issue = issue_loader
         self._flow_context = flow_context_resolver
@@ -252,6 +252,86 @@ class GlobalDispatchCoordinator:
             f"total={len(queue)} issues",
         )
         return queue
+
+    def _check_dispatch_health(self, issue: IssueInfo) -> bool:
+        """Pre-dispatch health check. Returns True if issue can be dispatched.
+
+        Delegates structural checks to CheckService, with terminal state
+        and transient error handling inlined from DispatchHealthCheckService.
+        """
+        branch, _ = self._flow_context(issue.number)
+
+        # Empty-branch guard: fail-open only for manager entry states
+        if not branch:
+            issue_state = issue.state
+            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
+                state_value = issue_state.value if issue_state else "unknown"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    f"(missing flow context for {state_value})",
+                )
+                return False
+            return True
+
+        result = self._check_service.verify_branch(branch)
+
+        flow_state = self._store.get_flow_state(branch)
+        flow_status = (
+            flow_state.get("flow_status", "active") if flow_state else "active"
+        )
+
+        # Terminal state: skip dispatch cleanly
+        if flow_status in ("done", "aborted", "stale", "review"):
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                f"(flow is {flow_status})",
+            )
+            return False
+
+        if not result.is_valid:
+            # Transient errors: fail-open
+            transient_errors = ["Cannot verify", "No flow record"]
+            is_transient = any(
+                any(err.startswith(prefix) for err in result.issues)
+                for prefix in transient_errors
+            )
+            if is_transient:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
+                    f"(transient: {', '.join(result.issues)})",
+                )
+                return True
+
+            # Genuine failure: block and skip
+            reason = f"Health check failed: {', '.join(result.issues)}"
+            block_succeeded = False
+            try:
+                self._flow_blocker.block_flow(
+                    branch=branch, reason=reason, actor="orchestra:dispatcher"
+                )
+                block_succeeded = True
+            except Exception as exc:
+                logger.bind(domain="orchestra", action="health_check").warning(
+                    f"Failed to block flow for #{issue.number}: {exc}"
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
+                    f"(error: {exc}, health check: {reason})",
+                )
+
+            if block_succeeded:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
+                    f"(health check failed: {reason})",
+                )
+            return False
+
+        return True
 
     def _merge_queue(
         self,
@@ -450,7 +530,7 @@ class GlobalDispatchCoordinator:
                     continue
 
             # === Pre-dispatch health check ===
-            if not self._health_check_service.check_issue_health(issue):
+            if not self._check_dispatch_health(issue):
                 self._frozen_queue.pop(index)
                 continue
 

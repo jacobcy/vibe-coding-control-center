@@ -13,7 +13,6 @@ import directly from their source modules.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
     from vibe3.orchestra.domain_types import (
         CapacityServiceProtocol,
         CheckServiceProtocol,
@@ -48,7 +47,6 @@ _LAZY_IMPORTS: dict[str, str] = {
     "select_ready_issues_from_collected_issues": "vibe3.orchestra.queue_operations",
     "promote_progressed_entries": "vibe3.orchestra.queue_operations",
     "QueuePersistenceService": "vibe3.orchestra.queue_persistence_service",
-    "DispatchHealthCheckService": "vibe3.orchestra.dispatch_health_check",
     "get_flow_context": "vibe3.orchestra.issue_loader",
     "get_flow_context_bulk": "vibe3.orchestra.issue_loader",
     "load_issue": "vibe3.orchestra.issue_loader",
@@ -85,7 +83,6 @@ __all__ = [
     "select_ready_issues_from_collected_issues",
     "promote_progressed_entries",
     "QueuePersistenceService",
-    "DispatchHealthCheckService",
     "get_flow_context",
     "get_flow_context_bulk",
     "load_issue",

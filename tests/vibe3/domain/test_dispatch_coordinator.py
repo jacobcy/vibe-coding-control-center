@@ -29,7 +29,7 @@ def test_dispatch_coordinator_constructor_requires_injected_services():
 
     # Verify required keyword-only parameters exist
     required_kwonly_params = {
-        "health_check_service",
+        "flow_blocker",
         "queue_persistence",
         "issue_loader",
         "flow_context_resolver",

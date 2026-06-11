@@ -47,8 +47,7 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     flow_manager = MagicMock()
     flow_manager.get_flow_for_issue = MagicMock(return_value=None)
 
-    health_check_service = MagicMock()
-    health_check_service.check_issue_health.return_value = True
+    flow_blocker = MagicMock()
     queue_persistence = MagicMock()
     queue_persistence.frozen_queue = None
     queue_persistence.restore.return_value = None
@@ -62,7 +61,7 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
         store=store,
         flow_manager=flow_manager,
         registry=None,
-        health_check_service=health_check_service,
+        flow_blocker=flow_blocker,
         queue_persistence=queue_persistence,
         issue_loader=lambda issue_number: None,
         flow_context_resolver=lambda issue_number: (f"task/issue-{issue_number}", None),
@@ -71,7 +70,7 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     )
 
     # Mock methods that would require complex setup
-    coordinator._health_check_before_dispatch = MagicMock(return_value=True)
+    coordinator._check_dispatch_health = MagicMock(return_value=True)
     coordinator._emit_dispatch_intent = MagicMock()
 
     return coordinator

@@ -6,7 +6,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from vibe3.orchestra import (
-    DispatchHealthCheckService,
     QueuePersistenceService,
     get_flow_context,
     load_issue,
@@ -48,12 +47,6 @@ def create_global_dispatch_coordinator(
     def issue_loader(issue_number: int) -> "IssueInfo | None":
         return load_issue(issue_number, config, github)
 
-    health_check_service = DispatchHealthCheckService(
-        check_service=check_service,
-        flow_blocker=flow_service,
-        store=store,
-        flow_context_resolver=flow_context_resolver,
-    )
     queue_persistence = QueuePersistenceService(
         store=store,
         config=config,
@@ -71,7 +64,7 @@ def create_global_dispatch_coordinator(
         store=store,
         flow_manager=flow_manager,
         registry=registry,
-        health_check_service=health_check_service,
+        flow_blocker=flow_service,
         queue_persistence=queue_persistence,
         issue_loader=issue_loader,
         flow_context_resolver=flow_context_resolver,
