@@ -79,6 +79,7 @@ if TYPE_CHECKING:
         resolve_review_options,
         validate_review_prerequisites,
     )
+    from vibe3.roles.review_helpers import ReviewRunResult
     from vibe3.roles.run import (
         EXECUTOR_PUBLISH_ROLE,
         EXECUTOR_ROLE,
@@ -170,6 +171,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "execute_manual_review_sync": "vibe3.roles.review",
     "resolve_review_options": "vibe3.roles.review",
     "validate_review_prerequisites": "vibe3.roles.review",
+    "ReviewRunResult": "vibe3.roles.review_helpers",
     # supervisor
     "SUPERVISOR_APPLY_ROLE": "vibe3.roles.supervisor",
     "SUPERVISOR_CLI_SYNC_SPEC": "vibe3.roles.supervisor",
@@ -275,6 +277,8 @@ __all__ = [
     "execute_manual_review_sync",
     "resolve_review_options",
     "validate_review_prerequisites",
+    # reviewer (review_helpers)
+    "ReviewRunResult",
     # supervisor (lazy)
     "SUPERVISOR_APPLY_ROLE",
     "SUPERVISOR_CLI_SYNC_SPEC",

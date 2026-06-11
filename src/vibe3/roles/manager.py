@@ -246,8 +246,6 @@ def build_manager_request(
         return request
 
     # Async mode: non-blocking tmux execution (default)
-    # Async CLI 命令必须显式传递 --show-prompt（默认 False）
-    # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
     request = build_issue_async_cli_request(
         role="manager",
         issue=issue,
@@ -257,7 +255,6 @@ def build_manager_request(
             "manager",
             str(issue.number),
             "--no-async",
-            "--show-prompt",
         ],
         actor=actor,
         execution_name=get_manager_session_name(issue.number),

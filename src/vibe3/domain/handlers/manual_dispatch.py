@@ -104,9 +104,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
             model=event.model,
             fresh_session=event.fresh_session,
         )
-        # Async CLI 命令必须显式传递 --show-prompt（默认 False）
-        # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
-        cli_args = ["plan"] + overrides.to_argv() + ["--show-prompt"]
+        cli_args = ["plan"] + overrides.to_argv()
 
         result = execute_spec_plan_async(
             request=request,  # type: ignore[arg-type]
@@ -194,6 +192,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
     )
     from vibe3.roles import (
         REVIEW_SYNC_SPEC,
+        ReviewRunResult,
         execute_manual_review_async,
         execute_manual_review_sync,
     )
@@ -210,6 +209,10 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
         config = load_config_for_role("review", event.agent, event.backend, event.model)
     except Exception as e:
         logger.error(f"Config load failed for review: {e}")
+        if event.no_async or event.dry_run:
+            _pending_results["review"] = ReviewRunResult(
+                "ERROR", None, event.issue_number
+            )
         return
 
     if event.is_base_review:
@@ -218,24 +221,32 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
         request = event.request if isinstance(event.request, ReviewRequest) else None
         if request is None:
             logger.error("ManualReviewIntent missing ReviewRequest for base review")
+            if event.no_async or event.dry_run:
+                _pending_results["review"] = ReviewRunResult(
+                    "ERROR", None, event.issue_number
+                )
             return
 
         if event.no_async or event.dry_run:
             # Sync mode (dry-run always sync)
-            result = execute_manual_review_sync(
-                request=request,
-                dry_run=event.dry_run,
-                instructions=event.instructions,
-                issue_number=event.issue_number,
-                pr_number=None,
-                branch=event.branch,
-                agent=event.agent,
-                backend=event.backend,
-                model=event.model,
-                fresh_session=event.fresh_session,
-                config=config,
-                show_prompt=event.show_prompt,
-            )
+            try:
+                result = execute_manual_review_sync(
+                    request=request,
+                    dry_run=event.dry_run,
+                    instructions=event.instructions,
+                    issue_number=event.issue_number,
+                    pr_number=None,
+                    branch=event.branch,
+                    agent=event.agent,
+                    backend=event.backend,
+                    model=event.model,
+                    fresh_session=event.fresh_session,
+                    config=config,
+                    show_prompt=event.show_prompt,
+                )
+            except Exception:
+                logger.exception("Review execution failed")
+                result = ReviewRunResult("ERROR", None, event.issue_number)
             # Store result for CLI to retrieve
             _pending_results["review"] = result
         else:
