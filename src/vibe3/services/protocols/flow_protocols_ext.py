@@ -9,6 +9,34 @@ if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
 
 
+class FlowTimelineProtocol(Protocol):
+    """Protocol for flow timeline event recording.
+
+    Breaks the circular dependency between issue and flow subpackages.
+    """
+
+    def record_timeline_event(
+        self,
+        branch: str,
+        event_type: str,
+        actor: str,
+        detail: str = "",
+        issue_number: int | None = None,
+        repo: str | None = None,
+    ) -> None:
+        """Record a timeline event for a flow branch.
+
+        Args:
+            branch: Flow branch
+            event_type: Event type identifier
+            actor: Actor performing the action
+            detail: Event detail/reason
+            issue_number: GitHub issue number (optional)
+            repo: Repository name (optional)
+        """
+        ...
+
+
 class FlowQueryProtocol(Protocol):
     """Protocol for flow query operations needed by task services.
 
@@ -52,5 +80,26 @@ class FlowQueryProtocol(Protocol):
 
         Returns:
             List of flow status responses
+        """
+        ...
+
+    def block_flow(
+        self,
+        branch: str,
+        reason: str | None = None,
+        blocked_by_issue: int | None = None,
+        actor: str | None = None,
+        repo: str | None = None,
+        event_type: str = "flow_blocked",
+    ) -> None:
+        """Mark a flow as blocked.
+
+        Args:
+            branch: Branch name
+            reason: Blocking reason
+            blocked_by_issue: Dependency issue number
+            actor: Actor performing the block
+            repo: Repository name
+            event_type: Event type for timeline
         """
         ...

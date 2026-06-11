@@ -6,18 +6,23 @@ It follows the principle of "tools, not decisions":
 - Decision logic is in agent prompts, not in code
 """
 
+from __future__ import annotations
+
 import json
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.clients import GitClient, SQLiteClient
 from vibe3.models import VerdictRecord, VerdictValue
-from vibe3.services.flow.service import FlowService
 from vibe3.services.handoff.storage import HandoffStorage
 from vibe3.services.shared.actors import extract_role_from_actor
 from vibe3.services.shared.paths import GitPathProtocol
 from vibe3.services.shared.signatures import SignatureService
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 
 class VerdictService:
@@ -41,7 +46,7 @@ class VerdictService:
         self,
         store: SQLiteClient | None = None,
         git_client: GitPathProtocol | None = None,
-        flow_service: FlowService | None = None,
+        flow_service: FlowQueryProtocol | None = None,
         handoff_storage: HandoffStorage | None = None,
     ) -> None:
         """Initialize verdict service.
@@ -49,14 +54,12 @@ class VerdictService:
         Args:
             store: SQLiteClient instance for persistence
             git_client: GitClient instance for git operations
-            flow_service: FlowService instance
+            flow_service: FlowQueryProtocol instance
             handoff_storage: HandoffStorage instance
         """
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
-        self.flow_service = flow_service or FlowService(
-            store=self.store, git_client=self.git_client
-        )
+        self.flow_service = flow_service
         self.storage = handoff_storage or HandoffStorage(self.git_client)
 
     def write_verdict(

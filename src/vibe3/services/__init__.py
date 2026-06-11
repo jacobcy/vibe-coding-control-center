@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow.service import FlowService
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
+    from vibe3.services.flow.timeline import FlowTimelineService
     from vibe3.services.handoff.resolution import resolve_handoff_target
     from vibe3.services.handoff.service import HandoffService
     from vibe3.services.handoff.status import HandoffStatusService
@@ -172,6 +173,7 @@ __all__ = [
     "FlowState",
     "FlowStatusResolver",
     "FlowStatusService",
+    "FlowTimelineService",
     "HandoffService",
     "HandoffStatusService",
     "InitResult",
@@ -226,6 +228,7 @@ __all__ = [
     "format_agent_actor",
     "format_issue_runtime_line",
     "format_issue_summary_line",
+    "has_merged_pr_for_issue",
     "generate_score_report",
     "get_conflicting_states",
     "get_flow_state",
@@ -288,6 +291,7 @@ _SYMBOL_MODULES = {
     "FlowState": "vibe3.services.flow.classifier",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
+    "FlowTimelineService": "vibe3.services.flow.timeline",
     "HandoffService": "vibe3.services.handoff.service",
     "HandoffStatusService": "vibe3.services.handoff.status",
     "InitResult": "vibe3.services.check.remote",
@@ -337,6 +341,7 @@ _SYMBOL_MODULES = {
     "format_agent_actor": "vibe3.services.shared.actors",
     "filter_critical_files": "vibe3.services.pr.analysis",
     "fetch_task_status_data": "vibe3.services.task.status",
+    "has_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "format_issue_runtime_line": "vibe3.services.orchestra.status",
     "format_issue_summary_line": "vibe3.services.orchestra.status",
     "generate_score_report": "vibe3.services.pr.scoring",

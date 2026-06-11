@@ -69,10 +69,10 @@ class TaskService:
 
     @property
     def _flow_service(self) -> FlowQueryProtocol:
-        """Lazily initialize flow service."""
+        """Return injected or fallback flow service."""
         if self._flow_service_input is not None:
             return self._flow_service_input
-        from vibe3.services.flow.service import FlowService
+        from vibe3.services import FlowService
 
         return FlowService(store=self.store)  # type: ignore[return-value]
 

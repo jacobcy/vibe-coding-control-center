@@ -85,7 +85,7 @@ def fetch_task_status_data(
     assert orch_snapshot is not None
 
     # Fetch flows
-    from vibe3.services.flow.service import FlowService
+    from vibe3.services import FlowService
 
     service = FlowService()  # type: ignore[assignment]
     flows = service.list_flows(status=None if all_flows else "active")
