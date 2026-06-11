@@ -257,27 +257,35 @@ def intake(
 
     # Create placeholder flow if blocked-by is specified
     if blocked_by is not None:
-        # Load full issue info for consistent flow creation
-        issue_info = load_issue_info(issue_id, config=config.orchestra)
+        try:
+            # Load full issue info for consistent flow creation
+            issue_info = load_issue_info(issue_id, config=config.orchestra)
 
-        # Get canonical branch name for flow key
-        issue_flow_svc = IssueFlowService()
-        branch = issue_flow_svc.canonical_branch_name(issue_id)
-        slug = f"issue-{issue_id}"
+            # Get canonical branch name for flow key
+            issue_flow_svc = IssueFlowService()
+            branch = issue_flow_svc.canonical_branch_name(issue_id)
+            slug = f"issue-{issue_id}"
 
-        # Create placeholder flow
-        orchestrator = FlowOrchestratorService(config.orchestra)
-        orchestrator.create_placeholder_flow(
-            issue=issue_info,
-            branch=branch,
-            slug=slug,
-            blocked_by_issue=blocked_by,
-            blocked_reason=blocked_reason,
-        )
+            # Create placeholder flow
+            orchestrator = FlowOrchestratorService(config.orchestra)
+            orchestrator.create_placeholder_flow(
+                issue=issue_info,
+                branch=branch,
+                slug=slug,
+                blocked_by_issue=blocked_by,
+                blocked_reason=blocked_reason,
+            )
 
-        # Set state/blocked label on GitHub
-        label_service = LabelService(repo=config.orchestra.repo)
-        label_service.set_state(issue_id, IssueState.BLOCKED)
+            # Set state/blocked label on GitHub
+            label_service = LabelService(repo=config.orchestra.repo)
+            label_service.set_state(issue_id, IssueState.BLOCKED)
+        except Exception:
+            typer.echo(
+                "  Warning: Placeholder flow creation failed — "
+                f"assignee set but blocked state incomplete for #{issue_id}",
+                err=True,
+            )
+            raise
 
         msg = f"  Placeholder flow created (blocked by #{blocked_by})"
         if blocked_reason:
