@@ -20,6 +20,10 @@ from typing import TYPE_CHECKING, Callable, cast
 from loguru import logger
 
 from vibe3.clients import GitHubClient
+from vibe3.domain.dispatch_preflight import (
+    DispatchPreflightDecision,
+    DispatchPreflightService,
+)
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
@@ -36,7 +40,7 @@ from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-from vibe3.observability import append_orchestra_event, get_degraded_manager
+from vibe3.observability import append_orchestra_event
 from vibe3.services import (
     IssueCollectionService,
     clean_old_state_labels,
@@ -78,6 +82,7 @@ class GlobalDispatchCoordinator:
     _remote_check_runner: Callable[[], None] | None
     _remote_check_interval: int
     _last_remote_check_tick: int
+    _dispatch_preflight: DispatchPreflightService
 
     def __init__(
         self,
@@ -144,6 +149,11 @@ class GlobalDispatchCoordinator:
         self._remote_check_runner = remote_check_runner
         self._remote_check_interval = remote_check_interval
         self._last_remote_check_tick: int = 0
+        self._dispatch_preflight = DispatchPreflightService(
+            qualify_gate=self._qualify_gate,
+            flow_context=lambda issue_number: self._flow_context(issue_number),
+            structural_check=lambda issue: self._check_dispatch_health(issue),
+        )
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -341,6 +351,10 @@ class GlobalDispatchCoordinator:
 
         return True
 
+    def _run_dispatch_preflight(self, issue: IssueInfo) -> DispatchPreflightDecision:
+        """Run the unified pre-dispatch gate for one issue."""
+        return self._dispatch_preflight.evaluate(issue)
+
     def _merge_queue(
         self,
         existing: list[QueueEntry],
@@ -500,47 +514,16 @@ class GlobalDispatchCoordinator:
                     index += 1
                     continue
 
-            # For BLOCKED issues: run qualify gate at intent time.
-            # If qualify_blocked_issue returns None (still blocked per body truth),
-            # the issue is popped from the current frozen queue cycle.
-            # It may be re-collected on the next queue rebuild if it still has
-            # the state/blocked label.
-            if issue.state == IssueState.BLOCKED:
-                target_state = self._qualify_gate.qualify_blocked_issue(issue)
-
-                # Check degraded mode immediately after qualification
-                degraded = get_degraded_manager()
-                if degraded.is_degraded():
-                    degraded_reason = degraded.get_reason()
-                    reason_value = degraded_reason.value if degraded_reason else None
-                    logger.bind(
-                        domain="orchestra",
-                        action="collect_blocked_intents",
-                        degraded_mode=True,
-                        reason=reason_value,
-                        issue_number=issue.number,
-                    ).warning(f"Qualification of #{issue.number} entered degraded mode")
-
-                # Then check target_state
-                if target_state is None:
-                    self._frozen_queue.pop(index)
-                    continue
-
-                role = find_role_for_state(target_state)
-                if role is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                entry.collected_state = target_state.value
-            else:
-                role = find_role_for_state(issue.state)
-                if role is None:
-                    self._frozen_queue.pop(index)
-                    continue
-
-            # === Pre-dispatch health check ===
-            if not self._check_dispatch_health(issue):
+            preflight = self._run_dispatch_preflight(issue)
+            if not preflight.allowed or preflight.target_state is None:
                 self._frozen_queue.pop(index)
                 continue
+
+            role = find_role_for_state(preflight.target_state)
+            if role is None:
+                self._frozen_queue.pop(index)
+                continue
+            entry.collected_state = preflight.target_state.value
 
             green = "\033[32m"
             reset = "\033[0m"

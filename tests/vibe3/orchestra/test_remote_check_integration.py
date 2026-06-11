@@ -249,3 +249,48 @@ class TestRemoteCheckIntegration:
         await coordinator.coordinate(tick_id=40)
         assert remote_check_runner.call_count == 2
         assert coordinator._last_remote_check_tick == 40
+
+
+class TestRemoteLabelCheck:
+    """Tests for remote label anomaly check flow detection."""
+
+    def test_remote_label_check_treats_dev_issue_flow_as_local_flow(
+        self, monkeypatch
+    ) -> None:
+        """dev/issue-N active flows must not be treated as orphan execution."""
+        from vibe3.orchestra.remote_check import run_remote_label_check
+
+        config = MagicMock()
+        config.repo = "owner/repo"
+        config.manager_usernames = ["manager-bot"]
+
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 123,
+                "labels": [{"name": "state/in-progress"}],
+                "assignees": [{"login": "manager-bot"}],
+            }
+        ]
+
+        store = MagicMock()
+        store.get_all_flows.return_value = [
+            {"branch": "dev/issue-123", "flow_status": "active"}
+        ]
+
+        label_port = MagicMock()
+
+        monkeypatch.setattr("vibe3.config.load_orchestra_config", lambda: config)
+        monkeypatch.setattr(
+            "vibe3.config.get_manager_usernames",
+            lambda loaded_config: loaded_config.manager_usernames,
+        )
+        monkeypatch.setattr("vibe3.clients.GitHubClient", lambda: github)
+        monkeypatch.setattr("vibe3.clients.SQLiteClient", lambda: store)
+        monkeypatch.setattr("vibe3.clients.GhIssueLabelPort", lambda repo: label_port)
+
+        result = run_remote_label_check(dry_run=False)
+
+        assert result.anomaly_count == 0
+        label_port.remove_issue_label.assert_not_called()
+        label_port.add_issue_label.assert_not_called()

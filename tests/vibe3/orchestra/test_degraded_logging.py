@@ -130,7 +130,7 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
         # Run coordination with log capture
         import asyncio
 
-        with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
+        with patch("vibe3.domain.dispatch_preflight.logger") as mock_logger:
             asyncio.run(coordinator.coordinate(tick_id=1))
 
             # Verify degraded mode warning was logged

@@ -237,6 +237,46 @@ class TestDispatchLoop:
             # Should only dispatch 1 (capacity limit)
             assert dispatched_count == 1
 
+    def test_dispatch_loop_rechecks_qualify_gate_for_ready_issue(
+        self, mock_coordinator
+    ):
+        """READY issue must pass qualify gate again immediately before dispatch."""
+        mock_coordinator._frozen_queue = [
+            QueueEntry(issue_number=42, collected_state="ready", waiting_state=None),
+        ]
+
+        mock_coordinator._load_issue = lambda issue_number: IssueInfo(
+            number=issue_number,
+            title=f"Issue {issue_number}",
+            state=IssueState.READY,
+            labels=["state/ready"],
+            assignees=["manager-bot"],
+        )
+        mock_coordinator._flow_context = MagicMock(
+            return_value=(
+                "task/issue-42",
+                {"branch": "task/issue-42", "flow_status": "active"},
+            )
+        )
+        mock_coordinator._store.get_flow_state.return_value = {
+            "branch": "task/issue-42",
+            "flow_status": "active",
+        }
+        mock_coordinator._qualify_gate.run_qualify_gate = MagicMock(return_value=None)
+
+        with patch(
+            "vibe3.domain.dispatch_coordinator.find_role_for_state"
+        ) as mock_find_role:
+            mock_role = MagicMock()
+            mock_role.registry_role = "manager"
+            mock_find_role.return_value = mock_role
+
+            dispatched_count = mock_coordinator._dispatch_loop(tick_id=1)
+
+        assert dispatched_count == 0
+        mock_coordinator._qualify_gate.run_qualify_gate.assert_called_once()
+        mock_coordinator._emit_dispatch_intent.assert_not_called()
+
 
 class TestActionableTriggeredCollection:
     """Test coordinate() only collects when actionable candidates exhausted."""

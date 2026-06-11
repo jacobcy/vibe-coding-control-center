@@ -45,13 +45,18 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
         normalize_assignees,
         normalize_labels,
     )
-    from vibe3.config import get_manager_usernames, load_orchestra_config
+    from vibe3.config import (
+        get_convention,
+        get_manager_usernames,
+        load_orchestra_config,
+    )
 
     logger.bind(domain="orchestra", action="remote_check").info(
         "Starting remote label check", dry_run=dry_run
     )
 
     config = load_orchestra_config()
+    convention = get_convention()
     manager_usernames = get_manager_usernames(config)
     github = GitHubClient()
     store = SQLiteClient()
@@ -60,7 +65,12 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
     all_issues = github.list_issues(
         state="open", fields=["number", "labels", "assignees"]
     )
-    flow_branches = {f["branch"] for f in store.get_all_flows() if f.get("branch")}
+    local_flow_issues = {
+        issue_number
+        for flow in store.get_all_flows()
+        if (branch := str(flow.get("branch") or "").strip())
+        if (issue_number := convention.branch.parse_issue_number(branch)) is not None
+    }
 
     anomalies: list = []
     removed_count = added_count = 0
@@ -74,7 +84,7 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
         found = collect_label_anomalies(
             labels,
             issue_number=num,
-            has_local_flow=f"task/issue-{num}" in flow_branches,
+            has_local_flow=num in local_flow_issues,
             is_manager_issue=has_manager_assignee(assignees, manager_usernames),
         )
         anomalies.extend(found)
