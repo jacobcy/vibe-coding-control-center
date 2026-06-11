@@ -9,40 +9,12 @@ No longer checks GitHub labels. All state is persisted to SQLite:
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-
-
-@dataclass(frozen=True)
-class GateResult:
-    """Result of a failed gate check."""
-
-    blocked: bool
-    reason: str | None = None
-    blocked_ticks: int = 0
-
-    @classmethod
-    def open_gate(cls) -> GateResult:
-        """Create a non-blocking gate result."""
-        return cls(blocked=False)
-
-
-@dataclass
-class GateStatus:
-    """Full status of FailedGate for display."""
-
-    is_active: bool
-    reason: str | None
-    triggered_at: str | None
-    triggered_by_error_code: str | None
-    cleared_at: str | None
-    cleared_by: str | None
-    cleared_reason: str | None
-    blocked_ticks: int
+from vibe3.orchestra import GateResult, GateStatus  # re-export from KERNEL
 
 
 class FailedGate:

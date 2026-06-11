@@ -46,9 +46,9 @@ class FailedGateProtocol(Protocol):
 class HeartbeatServer:
     """Manages the orchestra event loop.
 
-    Two event sources:
-    - Webhook events (real-time, primary): pushed via emit()
-    - Polling tick (fallback): calls service.on_tick() every polling_interval s
+    Primary event source: periodic polling tick, calling service.on_tick()
+    every polling_interval seconds. Real-time webhook events (planned, not
+    yet implemented) will be pushed via emit() when available.
     """
 
     def __init__(

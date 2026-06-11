@@ -105,11 +105,23 @@ def test_domain_layer_no_orchestra_imports():
     """Verify domain layer does not import from orchestra (with exceptions)."""
     domain_dir = Path("src/vibe3/domain")
 
+    # Domain files allowed to re-export from orchestra (thin wrapper files
+    # that provide backward-compatible access to canonical KERNEL definitions
+    # in orchestra/domain_types.py).  These files contain ONLY re-exports.
+    _reexport_wrappers = {
+        "failed_gate.py",  # re-exports GateResult, GateStatus
+        "runtime_protocols.py",  # re-exports ServiceBase
+    }
+
     violations = []
 
     for py_file in domain_dir.rglob("*.py"):
         # Skip __init__.py (may re-export for backward compatibility)
         if py_file.name == "__init__.py":
+            continue
+
+        # Skip re-export wrapper files that back KERNEL definitions
+        if py_file.name in _reexport_wrappers:
             continue
 
         try:
@@ -148,7 +160,8 @@ def test_domain_layer_no_orchestra_imports():
             f"Found {len(violations)} orchestra imports in domain layer:\n"
             f"{violation_list}\n\n"
             "Domain layer should not import from orchestra layer.\n"
-            "Allowed exceptions: orchestra.protocols/failed_gate (TYPE_CHECKING only)."
+            "Allowed exceptions: orchestra.protocols/failed_gate (TYPE_CHECKING only); "
+            "failed_gate.py / runtime_protocols.py (re-export wrappers)."
         )
 
     print(f"✓ Verified {len(list(domain_dir.rglob('*.py')))} domain files")

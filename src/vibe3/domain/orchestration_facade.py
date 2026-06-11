@@ -22,7 +22,6 @@ from vibe3.models import IssueInfo, OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
-    from vibe3.domain.failed_gate import FailedGate
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.environment import SessionRegistryService
     from vibe3.execution import CapacityService
@@ -47,7 +46,6 @@ class OrchestrationFacade(ServiceBase):
         tick_count: int = 0,
         config: OrchestraConfig | None = None,
         capacity: "CapacityService | None" = None,
-        failed_gate: "FailedGate | None" = None,
         store: "SQLiteClient | None" = None,
         github: "GitHubClient | None" = None,
         flow_manager: "FlowManagerProtocol | None" = None,
@@ -68,9 +66,6 @@ class OrchestrationFacade(ServiceBase):
                 When provided, GlobalDispatchCoordinator is used for unified
                 dispatch with capacity checks before emitting intents.
                 When None, legacy concurrent gather path is used (backward compat).
-            failed_gate: Optional FailedGate retained for compatibility with
-                existing server assembly. Runtime dispatch is no longer frozen
-                here; gating belongs on the authoritative sync execution path.
             store: Optional SQLiteClient for dependency injection. When omitted
                 with capacity provided, creates a new SQLiteClient instance.
             github: Optional GitHubClient for dependency injection. When omitted,
@@ -95,7 +90,6 @@ class OrchestrationFacade(ServiceBase):
         self._last_governance_started_at: float | None = None
         self._capacity = capacity
         self._coordinator: GlobalDispatchCoordinator | None = None
-        self._failed_gate = failed_gate
         self._github = github or GitHubClient()
         from vibe3.domain import FlowManager
 
@@ -154,25 +148,6 @@ class OrchestrationFacade(ServiceBase):
         from vibe3.observability import append_orchestra_event
 
         self.on_heartbeat_tick()
-
-        # Check failed gate before any dispatch (supervisor included)
-        if self._failed_gate is not None:
-            gate_result = self._failed_gate.check()
-            if gate_result.blocked:
-                reason_part = (
-                    f" reason={gate_result.reason}" if gate_result.reason else ""
-                )
-                append_orchestra_event(
-                    "dispatcher",
-                    f"dispatch blocked by failed gate:{reason_part}",
-                )
-                logger.bind(
-                    domain="orchestration_facade",
-                    reason=gate_result.reason,
-                    blocked_ticks=gate_result.blocked_ticks,
-                ).warning("Dispatch blocked by failed gate")
-                self._failed_gate.increment_blocked_ticks()
-                return
 
         # Scan for supervisor candidates and publish events
         try:
