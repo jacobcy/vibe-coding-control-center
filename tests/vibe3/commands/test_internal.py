@@ -203,5 +203,6 @@ def test_internal_bootstrap_dispatch() -> None:
     assert call.kwargs["ensure_worktree"] is True
     assert call.kwargs["related_issue_numbers"] == (456,)
     assert call.kwargs["dependency_issue_numbers"] == (789,)
+    assert call.kwargs["blocked_reason"] is None
     payload = json.loads(result.stdout)
     assert payload["branch"] == "dev/issue-123"

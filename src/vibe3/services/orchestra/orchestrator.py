@@ -128,6 +128,7 @@ class FlowOrchestratorService:
         reactivate_existing: bool = False,
         related_issue_numbers: tuple[int, ...] = (),
         dependency_issue_numbers: tuple[int, ...] = (),
+        blocked_reason: str | None = None,
         skip_git: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
@@ -200,6 +201,7 @@ class FlowOrchestratorService:
             for dependency_issue in dependency_issue_numbers:
                 self.flow_service.block_flow(
                     branch,
+                    reason=blocked_reason,
                     blocked_by_issue=dependency_issue,
                     actor=actor,
                 )
@@ -400,6 +402,7 @@ class FlowOrchestratorService:
         branch: str,
         slug: str,
         blocked_by_issue: int | None = None,
+        blocked_reason: str | None = None,
     ) -> dict[str, Any]:
         """Create a placeholder flow — DB records only, no git branch / worktree.
 
@@ -413,4 +416,5 @@ class FlowOrchestratorService:
             source="intake",
             skip_git=True,
             dependency_issue_numbers=((blocked_by_issue,) if blocked_by_issue else ()),
+            blocked_reason=blocked_reason,
         )

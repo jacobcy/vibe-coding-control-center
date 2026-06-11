@@ -195,6 +195,7 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     )
     service.flow_service.block_flow.assert_called_once_with(
         "dev/issue-501",
+        reason=None,
         blocked_by_issue=701,
         actor=None,
     )
@@ -583,6 +584,7 @@ def test_create_placeholder_flow_delegates_to_bootstrap() -> None:
         source="intake",
         skip_git=True,
         dependency_issue_numbers=(),
+        blocked_reason=None,
     )
     assert result is expected
 
@@ -619,6 +621,7 @@ def test_create_placeholder_flow_with_dependency() -> None:
         source="intake",
         skip_git=True,
         dependency_issue_numbers=(701,),
+        blocked_reason=None,
     )
     assert result["blocked_by_issue"] == 701
 

@@ -16,7 +16,7 @@ from vibe3.config import (
     get_manager_usernames,
 )
 from vibe3.exceptions import SystemError, UserError
-from vibe3.models import IssueInfo, IssueState
+from vibe3.models import IssueState
 from vibe3.observability import setup_logging
 from vibe3.services import (
     FlowOrchestratorService,
@@ -25,6 +25,7 @@ from vibe3.services import (
     LabelService,
     TaskResumeUsecase,
     TaskService,
+    load_issue_info,
 )
 from vibe3.ui import (
     render_task_comments,
@@ -184,6 +185,10 @@ def intake(
         int | None,
         typer.Option("--blocked-by", help="Issue number this is blocked by"),
     ] = None,
+    blocked_reason: Annotated[
+        str | None,
+        typer.Option("--blocked-reason", help="Reason this issue is blocked"),
+    ] = None,
 ) -> None:
     """Assign an issue to the local manager account.
 
@@ -252,18 +257,8 @@ def intake(
 
     # Create placeholder flow if blocked-by is specified
     if blocked_by is not None:
-        # Build IssueInfo from the GitHub response we already have
-        state_label = next(
-            (label for label in labels if label.startswith("state/")), None
-        )
-        issue_state = IssueState(state_label.split("/")[1]) if state_label else None
-        issue_info = IssueInfo(
-            number=issue_id,
-            title=issue.get("title", f"Issue #{issue_id}"),
-            state=issue_state,
-            labels=labels,
-            assignees=assignee_logins,
-        )
+        # Load full issue info for consistent flow creation
+        issue_info = load_issue_info(issue_id, config=config.orchestra)
 
         # Get canonical branch name for flow key
         issue_flow_svc = IssueFlowService()
@@ -277,13 +272,17 @@ def intake(
             branch=branch,
             slug=slug,
             blocked_by_issue=blocked_by,
+            blocked_reason=blocked_reason,
         )
 
         # Set state/blocked label on GitHub
         label_service = LabelService(repo=config.orchestra.repo)
         label_service.set_state(issue_id, IssueState.BLOCKED)
 
-        typer.echo(f"  Placeholder flow created (blocked by #{blocked_by})")
+        msg = f"  Placeholder flow created (blocked by #{blocked_by})"
+        if blocked_reason:
+            msg += f": {blocked_reason}"
+        typer.echo(msg)
 
 
 @app.command()

@@ -222,6 +222,7 @@ def test_intake_with_blocked_by_creates_placeholder_flow():
         patch("vibe3.commands.task.GitHubClient") as mock_client_cls,
         patch("vibe3.commands.task.get_manager_usernames") as mock_managers,
         patch("vibe3.commands.task.get_config_with_env_override") as mock_config,
+        patch("vibe3.commands.task.load_issue_info") as mock_load_issue,
         patch("vibe3.commands.task.FlowOrchestratorService") as mock_orch_cls,
         patch("vibe3.commands.task.LabelService") as mock_label_cls,
         patch("vibe3.commands.task.IssueFlowService") as mock_issue_flow_cls,
@@ -240,6 +241,10 @@ def test_intake_with_blocked_by_creates_placeholder_flow():
         }
         mock_client.add_assignee.return_value = True
         mock_client_cls.return_value = mock_client
+
+        from vibe3.models import IssueInfo
+
+        mock_load_issue.return_value = IssueInfo(number=123, title="Blocked issue")
 
         mock_issue_flow = MagicMock()
         mock_issue_flow.canonical_branch_name.return_value = "task/issue-123"
