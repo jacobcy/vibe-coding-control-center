@@ -20,11 +20,15 @@ from typing import TYPE_CHECKING, Callable, cast
 from loguru import logger
 
 from vibe3.clients import GitHubClient
+from vibe3.domain.dispatch_preflight import (
+    DispatchPreflightDecision,
+    DispatchPreflightService,
+)
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
-    DispatchHealthCheckProtocol,
     FlowContextResolverProtocol,
+    FlowServiceProtocol,
     IssueCollectionServiceProtocol,
     IssueLoaderProtocol,
     LabelDispatchCallable,
@@ -36,7 +40,7 @@ from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-from vibe3.observability import append_orchestra_event, get_degraded_manager
+from vibe3.observability import append_orchestra_event
 from vibe3.services import (
     IssueCollectionService,
     clean_old_state_labels,
@@ -65,7 +69,7 @@ class GlobalDispatchCoordinator:
     _executor: ThreadPoolExecutor
     _owns_executor: bool
     _frozen_queue: list[QueueEntry] | None
-    _health_check_service: DispatchHealthCheckProtocol
+    _flow_blocker: FlowServiceProtocol
     _queue_persistence: QueuePersistenceServiceProtocol
     _load_issue: IssueLoaderProtocol
     _flow_context: FlowContextResolverProtocol
@@ -75,6 +79,10 @@ class GlobalDispatchCoordinator:
     _label_dispatcher: LabelDispatchCallable
     _dispatch_paused: bool
     _supervisor_label: str
+    _remote_check_runner: Callable[[], None] | None
+    _remote_check_interval: int
+    _last_remote_check_tick: int
+    _dispatch_preflight: DispatchPreflightService
 
     def __init__(
         self,
@@ -86,7 +94,7 @@ class GlobalDispatchCoordinator:
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
         *,
-        health_check_service: DispatchHealthCheckProtocol,
+        flow_blocker: FlowServiceProtocol,
         queue_persistence: QueuePersistenceServiceProtocol,
         issue_loader: IssueLoaderProtocol,
         flow_context_resolver: FlowContextResolverProtocol,
@@ -97,6 +105,8 @@ class GlobalDispatchCoordinator:
         ) = None,
         label_dispatcher: LabelDispatchCallable | None = None,
         queue_filter: Callable[..., bool] | None = None,
+        remote_check_runner: Callable[[], None] | None = None,
+        remote_check_interval: int = 20,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -112,7 +122,7 @@ class GlobalDispatchCoordinator:
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
 
         # Injected runtime services
-        self._health_check_service = health_check_service
+        self._flow_blocker = flow_blocker
         self._queue_persistence = queue_persistence
         self._load_issue = issue_loader
         self._flow_context = flow_context_resolver
@@ -136,6 +146,14 @@ class GlobalDispatchCoordinator:
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
+        self._remote_check_runner = remote_check_runner
+        self._remote_check_interval = remote_check_interval
+        self._last_remote_check_tick: int = 0
+        self._dispatch_preflight = DispatchPreflightService(
+            qualify_gate=self._qualify_gate,
+            flow_context=lambda issue_number: self._flow_context(issue_number),
+            structural_check=lambda issue: self._check_dispatch_health(issue),
+        )
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -252,6 +270,90 @@ class GlobalDispatchCoordinator:
             f"total={len(queue)} issues",
         )
         return queue
+
+    def _check_dispatch_health(self, issue: IssueInfo) -> bool:
+        """Pre-dispatch health check. Returns True if issue can be dispatched.
+
+        Delegates structural checks to CheckService, with terminal state
+        and transient error handling inlined directly in this method.
+        """
+        branch, _ = self._flow_context(issue.number)
+
+        # Empty-branch guard: fail-open only for manager entry states
+        if not branch:
+            issue_state = issue.state
+            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
+                state_value = issue_state.value if issue_state else "unknown"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    f"(missing flow context for {state_value})",
+                )
+                return False
+            return True
+
+        result = self._check_service.verify_branch(branch)
+
+        flow_state = self._store.get_flow_state(branch)
+        flow_status = (
+            flow_state.get("flow_status", "active") if flow_state else "active"
+        )
+
+        # Terminal state: skip dispatch cleanly
+        if flow_status in ("done", "aborted", "stale", "review"):
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                f"(flow is {flow_status})",
+            )
+            return False
+
+        if not result.is_valid:
+            # Transient errors: fail-open
+            transient_errors = ["Cannot verify", "No flow record"]
+            is_transient = any(
+                any(err.startswith(prefix) for err in result.issues)
+                for prefix in transient_errors
+            )
+            if is_transient:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
+                    f"(transient: {', '.join(result.issues)})",
+                )
+                return True
+
+            # Genuine failure: block and skip
+            reason = f"Health check failed: {', '.join(result.issues)}"
+            block_succeeded = False
+            try:
+                self._flow_blocker.block_flow(
+                    branch=branch, reason=reason, actor="orchestra:dispatcher"
+                )
+                block_succeeded = True
+            except Exception as exc:
+                logger.bind(domain="orchestra", action="health_check").warning(
+                    f"Failed to block flow for #{issue.number}: {exc}"
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
+                    f"(error: {exc}, health check: {reason})",
+                )
+
+            if block_succeeded:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
+                    f"(health check failed: {reason})",
+                )
+            return False
+
+        return True
+
+    def _run_dispatch_preflight(self, issue: IssueInfo) -> DispatchPreflightDecision:
+        """Run the unified pre-dispatch gate for one issue."""
+        return self._dispatch_preflight.evaluate(issue)
 
     def _merge_queue(
         self,
@@ -412,47 +514,16 @@ class GlobalDispatchCoordinator:
                     index += 1
                     continue
 
-            # For BLOCKED issues: run qualify gate at intent time.
-            # If qualify_blocked_issue returns None (still blocked per body truth),
-            # the issue is popped from the current frozen queue cycle.
-            # It may be re-collected on the next queue rebuild if it still has
-            # the state/blocked label.
-            if issue.state == IssueState.BLOCKED:
-                target_state = self._qualify_gate.qualify_blocked_issue(issue)
-
-                # Check degraded mode immediately after qualification
-                degraded = get_degraded_manager()
-                if degraded.is_degraded():
-                    degraded_reason = degraded.get_reason()
-                    reason_value = degraded_reason.value if degraded_reason else None
-                    logger.bind(
-                        domain="orchestra",
-                        action="collect_blocked_intents",
-                        degraded_mode=True,
-                        reason=reason_value,
-                        issue_number=issue.number,
-                    ).warning(f"Qualification of #{issue.number} entered degraded mode")
-
-                # Then check target_state
-                if target_state is None:
-                    self._frozen_queue.pop(index)
-                    continue
-
-                role = find_role_for_state(target_state)
-                if role is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                entry.collected_state = target_state.value
-            else:
-                role = find_role_for_state(issue.state)
-                if role is None:
-                    self._frozen_queue.pop(index)
-                    continue
-
-            # === Pre-dispatch health check ===
-            if not self._health_check_service.check_issue_health(issue):
+            preflight = self._run_dispatch_preflight(issue)
+            if not preflight.allowed or preflight.target_state is None:
                 self._frozen_queue.pop(index)
                 continue
+
+            role = find_role_for_state(preflight.target_state)
+            if role is None:
+                self._frozen_queue.pop(index)
+                continue
+            entry.collected_state = preflight.target_state.value
 
             green = "\033[32m"
             reset = "\033[0m"
@@ -519,6 +590,21 @@ class GlobalDispatchCoordinator:
         # frozen_queue = None when all entries are removed
         if self._frozen_queue is None:
             self._frozen_queue = []
+
+        # Step 2.5: Periodic remote check (before collection)
+        if (
+            self._remote_check_runner
+            and tick_id - self._last_remote_check_tick >= self._remote_check_interval
+        ):
+            try:
+                self._remote_check_runner()
+            except Exception as exc:
+                logger.bind(domain="check", action="remote").warning(
+                    f"Remote check failed: {exc}"
+                )
+            finally:
+                # Always update tick to prevent repeated attempts on failure
+                self._last_remote_check_tick = tick_id
 
         queue_refreshed = False
         periodic_check = self._config.periodic_check

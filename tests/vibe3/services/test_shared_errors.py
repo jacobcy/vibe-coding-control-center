@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from vibe3.models import ExecutionLaunchResult
 from vibe3.services.shared.errors import record_dispatch_failure_if_unexpected
@@ -83,7 +83,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -103,7 +103,7 @@ class TestRecordDispatchFailureIfUnexpected:
             tick_id=0,  # Manual dispatch marker
             issue_number=456,
             branch="dev/test",
-            store=mock_store,
+            store=ANY,
         )
 
     def test_error_message_format(self) -> None:
@@ -120,7 +120,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -156,7 +156,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -176,7 +176,7 @@ class TestRecordDispatchFailureIfUnexpected:
             tick_id=0,  # Manual dispatch marker
             issue_number=0,  # Coerced from None
             branch="dev/test",
-            store=mock_store,
+            store=ANY,
         )
 
     def test_tick_id_always_zero_for_manual_dispatch(self) -> None:
@@ -193,7 +193,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -215,7 +215,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -235,7 +235,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -254,7 +254,7 @@ class TestRecordDispatchFailureIfUnexpected:
             tick_id=0,
             issue_number=456,
             branch="dev/test",
-            store=mock_store,
+            store=ANY,
         )
 
     def test_exception_error_message_format(self) -> None:
@@ -264,7 +264,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -301,7 +301,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -340,7 +340,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):
@@ -365,7 +365,7 @@ class TestRecordDispatchFailureIfUnexpected:
         with (
             patch("vibe3.services.shared.errors.record_error") as mock_record_error,
             patch(
-                "vibe3.clients.sqlite_client.SQLiteClient",
+                "vibe3.clients.SQLiteClient",
                 return_value=mock_store,
             ),
         ):

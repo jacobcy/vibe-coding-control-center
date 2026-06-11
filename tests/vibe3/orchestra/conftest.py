@@ -98,7 +98,7 @@ def make_coordinator() -> callable:
         flow_manager = MagicMock()
         flow_manager.get_flow_for_issue = MagicMock(return_value=None)
 
-        health_check_service = MagicMock()
+        flow_blocker = MagicMock()
 
         def mock_issue_loader(issue_number: int):
             return None
@@ -123,7 +123,7 @@ def make_coordinator() -> callable:
             store=store,
             flow_manager=flow_manager,
             registry=None,
-            health_check_service=health_check_service,
+            flow_blocker=flow_blocker,
             queue_persistence=queue_persistence,
             issue_loader=mock_issue_loader,
             flow_context_resolver=mock_flow_context_resolver,
@@ -133,9 +133,11 @@ def make_coordinator() -> callable:
         )
 
         # Mock health check to bypass CheckService for queue operation tests
+        # Note: After unification, _check_dispatch_health is the method to mock
         if mock_health_check:
-            coordinator._health_check_service.check_issue_health = MagicMock(
-                return_value=True
+            # Keep the check_service mock returning valid results
+            coordinator._check_service.verify_branch = MagicMock(
+                return_value=MagicMock(is_valid=True, issues=[], branch="task/issue-42")
             )
 
         if with_branches and role != "manager":

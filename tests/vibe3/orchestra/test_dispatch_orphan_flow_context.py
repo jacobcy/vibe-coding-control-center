@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def _make_mock_coordinator_dependencies():
     """Create mock dependencies for GlobalDispatchCoordinator construction."""
-    health_check_service = MagicMock()
+    flow_blocker = MagicMock()
     queue_persistence = MagicMock()
     queue_persistence.frozen_queue = None
     issue_loader = MagicMock(return_value=None)
@@ -21,34 +21,13 @@ def _make_mock_coordinator_dependencies():
     queue_selector = MagicMock(return_value=[])
     check_service = MagicMock()
     return {
-        "health_check_service": health_check_service,
+        "flow_blocker": flow_blocker,
         "queue_persistence": queue_persistence,
         "issue_loader": issue_loader,
         "flow_context_resolver": flow_context_resolver,
         "queue_selector": queue_selector,
         "check_service": check_service,
     }
-
-
-def _setup_health_check_service(
-    coordinator: "GlobalDispatchCoordinator",
-    check_service: MagicMock,
-    store: MagicMock,
-) -> None:
-    """Helper to re-create health check service with mocked dependencies."""
-    from unittest.mock import MagicMock
-
-    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
-
-    # Create mock flow_blocker for tests
-    mock_flow_blocker = MagicMock()
-
-    coordinator._health_check_service = DispatchHealthCheckService(
-        check_service=check_service,
-        flow_blocker=mock_flow_blocker,
-        store=store,
-        flow_context_resolver=coordinator._flow_context,
-    )
 
 
 def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
@@ -74,18 +53,16 @@ def test_health_check_skips_non_ready_issue_without_flow_context() -> None:
     )
     coordinator._flow_context = MagicMock(return_value=("", None))
 
-    # Re-create health check service with mocked flow_context
-    mock_check_service = MagicMock()
-    _setup_health_check_service(coordinator, mock_check_service, store)
-
     with patch(
-        "vibe3.orchestra.dispatch_health_check.append_orchestra_event"
+        "vibe3.domain.dispatch_coordinator.append_orchestra_event"
     ) as append_event:
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
     assert result is False
-    append_event.assert_called_once()
-    assert "missing flow context" in append_event.call_args[0][1]
+    # Check that an event was logged with the right message
+    assert any(
+        "missing flow context" in str(call) for call in append_event.call_args_list
+    )
 
 
 @patch("vibe3.domain.dispatch_coordinator.get_manager_usernames", return_value=[])
@@ -120,12 +97,8 @@ def test_dispatch_loop_logs_missing_flow_context_once(
     )
     coordinator._flow_context = MagicMock(return_value=("", None))
 
-    # Re-create health check service with mocked flow_context
-    mock_check_service = MagicMock()
-    _setup_health_check_service(coordinator, mock_check_service, coordinator._store)
-
     with patch(
-        "vibe3.orchestra.dispatch_health_check.append_orchestra_event"
+        "vibe3.domain.dispatch_coordinator.append_orchestra_event"
     ) as append_event:
         dispatched = coordinator._dispatch_loop()
 

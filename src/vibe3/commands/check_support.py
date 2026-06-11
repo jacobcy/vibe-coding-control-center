@@ -279,65 +279,25 @@ def execute_check_mode(
 
 
 def execute_remote_check(*, dry_run: bool = True) -> ExecuteCheckResult:
-    """Wire collect_label_anomalies to CLI.
+    """Wire remote label check to CLI.
 
-    No audit logic rewritten — uses #2534 infrastructure directly.
+    This is a thin command-layer wrapper around the orchestra function.
     """
-    from vibe3.clients import GhIssueLabelPort, GitHubClient, SQLiteClient
-    from vibe3.config import get_manager_usernames, load_orchestra_config
-    from vibe3.services import (
-        collect_label_anomalies,
-        has_manager_assignee,
-        normalize_assignees,
-        normalize_labels,
-    )
+    from vibe3.orchestra import run_remote_label_check
 
-    config = load_orchestra_config()
-    manager_usernames = get_manager_usernames(config)
-    github = GitHubClient()
-    store = SQLiteClient()
-    label_port = GhIssueLabelPort(repo=config.repo)
-
-    all_issues = github.list_issues(
-        state="open", fields=["number", "labels", "assignees"]
-    )
-    flow_branches = {f["branch"] for f in store.get_all_flows() if f.get("branch")}
-
-    anomalies: list = []
-    removed_count = added_count = 0
-
-    for issue in all_issues:
-        num = issue.get("number")
-        if not isinstance(num, int):
-            continue
-        labels = normalize_labels(issue.get("labels", []))
-        assignees = normalize_assignees(issue.get("assignees", []))
-        found = collect_label_anomalies(
-            labels,
-            issue_number=num,
-            has_local_flow=f"task/issue-{num}" in flow_branches,
-            is_manager_issue=has_manager_assignee(assignees, manager_usernames),
-        )
-        anomalies.extend(found)
-        if not dry_run and found:
-            for a in found:
-                for lb in a.removed:
-                    label_port.remove_issue_label(num, lb)
-                    removed_count += 1
-                for lb in a.added:
-                    label_port.add_issue_label(num, lb)
-                    added_count += 1
+    result = run_remote_label_check(dry_run=dry_run)
 
     return ExecuteCheckResult(
         mode="remote",
         success=True,
         summary=(
-            f"Checked {len(all_issues)} issues, " f"found {len(anomalies)} anomalies"
+            f"Checked {result.checked_count} issues, "
+            f"found {result.anomaly_count} anomalies"
         ),
         details={
-            "anomalies": anomalies,
-            "removed": removed_count,
-            "added": added_count,
-            "dry_run": dry_run,
+            "anomalies": result.anomalies,
+            "removed": result.removed_count,
+            "added": result.added_count,
+            "dry_run": result.dry_run,
         },
     )

@@ -1,6 +1,6 @@
 """Tests for pre-dispatch health checks.
 
-After unification, _health_check_before_dispatch delegates to
+After unification, _check_dispatch_health delegates to
 CheckService.verify_branch(). These tests verify the coordinator's
 interpretation of CheckService results (fail-open, skip dispatch,
 terminal state detection) rather than re-testing CheckService internals.
@@ -13,12 +13,12 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.check.service import CheckResult
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
+    pass
 
 
 def _make_mock_coordinator_dependencies():
     """Create mock dependencies for GlobalDispatchCoordinator construction."""
-    health_check_service = MagicMock()
+    flow_blocker = MagicMock()
     queue_persistence = MagicMock()
     queue_persistence.frozen_queue = None
     issue_loader = MagicMock(return_value=None)
@@ -26,37 +26,13 @@ def _make_mock_coordinator_dependencies():
     queue_selector = MagicMock(return_value=[])
     check_service = MagicMock()
     return {
-        "health_check_service": health_check_service,
+        "flow_blocker": flow_blocker,
         "queue_persistence": queue_persistence,
         "issue_loader": issue_loader,
         "flow_context_resolver": flow_context_resolver,
         "queue_selector": queue_selector,
         "check_service": check_service,
     }
-
-
-def _setup_health_check_service(
-    coordinator: "GlobalDispatchCoordinator",
-    check_service: MagicMock,
-    store: MagicMock,
-    flow_blocker: MagicMock | None = None,
-) -> MagicMock:
-    """Helper to re-create health check service with mocked dependencies."""
-    from unittest.mock import MagicMock
-
-    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
-
-    # Use provided flow_blocker or create default mock
-    if flow_blocker is None:
-        flow_blocker = MagicMock()
-
-    coordinator._health_check_service = DispatchHealthCheckService(
-        check_service=check_service,
-        flow_blocker=flow_blocker,
-        store=store,
-        flow_context_resolver=coordinator._flow_context,
-    )
-    return flow_blocker
 
 
 class TestPreDispatchHealthChecks:
@@ -82,6 +58,7 @@ class TestPreDispatchHealthChecks:
 
         # Create mock dependencies
         mock_deps = _make_mock_coordinator_dependencies()
+        mock_flow_blocker = mock_deps["flow_blocker"]
 
         coordinator = GlobalDispatchCoordinator(
             config=config,
@@ -118,13 +95,7 @@ class TestPreDispatchHealthChecks:
         )
         coordinator._check_service = mock_check_service
 
-        # Mock FlowService to verify block_flow call
-        mock_flow_blocker = MagicMock()
-        _setup_health_check_service(
-            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
-        )
-
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert - genuine consistency failure should skip dispatch
         assert (
@@ -193,8 +164,7 @@ class TestPreDispatchHealthChecks:
             branch="task/issue-43",
         )
         coordinator._check_service = mock_check_service
-        _setup_health_check_service(coordinator, mock_check_service, store)
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert
         assert result is True, "Health check should pass for healthy active flow"
@@ -252,8 +222,7 @@ class TestPreDispatchHealthChecks:
             branch="task/issue-44",
         )
         coordinator._check_service = mock_check_service
-        _setup_health_check_service(coordinator, mock_check_service, store)
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert - flow is done, should skip dispatch
         assert result is False, "Health check should fail for done flow"
@@ -310,8 +279,7 @@ class TestPreDispatchHealthChecks:
             branch="task/issue-45",
         )
         coordinator._check_service = mock_check_service
-        _setup_health_check_service(coordinator, mock_check_service, store)
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert
         assert result is True, "Health check should pass for active flow with open PR"
@@ -368,8 +336,7 @@ class TestPreDispatchHealthChecks:
             branch="task/issue-46",
         )
         coordinator._check_service = mock_check_service
-        _setup_health_check_service(coordinator, mock_check_service, store)
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert - should fail open on transient errors
         assert result is True, "Health check should fail open on network errors"
@@ -394,13 +361,17 @@ class TestPreDispatchHealthChecks:
         git_client = MagicMock()
         flow_manager.git = git_client
 
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_flow_blocker = mock_deps["flow_blocker"]
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
             github=github,
             store=store,
             flow_manager=flow_manager,
-            **_make_mock_coordinator_dependencies(),
+            **mock_deps,
         )
 
         issue = IssueInfo(
@@ -432,13 +403,7 @@ class TestPreDispatchHealthChecks:
         )
         coordinator._check_service = mock_check_service
 
-        # Mock FlowService to verify block_flow call
-        mock_flow_blocker = MagicMock()
-        _setup_health_check_service(
-            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
-        )
-
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert - block_flow should be called with correct parameters
         mock_flow_blocker.block_flow.assert_called_once()
@@ -468,13 +433,17 @@ class TestPreDispatchHealthChecks:
         store.db_path = ":memory:"
         flow_manager = MagicMock()
 
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_flow_blocker = mock_deps["flow_blocker"]
+
         coordinator = GlobalDispatchCoordinator(
             config=config,
             capacity=capacity,
             github=github,
             store=store,
             flow_manager=flow_manager,
-            **_make_mock_coordinator_dependencies(),
+            **mock_deps,
         )
 
         issue = IssueInfo(
@@ -503,15 +472,76 @@ class TestPreDispatchHealthChecks:
         )
         coordinator._check_service = mock_check_service
 
-        # Mock FlowService.block_flow to ensure it's NOT called
-        mock_flow_blocker = MagicMock()
-        _setup_health_check_service(
-            coordinator, mock_check_service, store, flow_blocker=mock_flow_blocker
-        )
-        result = coordinator._health_check_service.check_issue_health(issue)
+        result = coordinator._check_dispatch_health(issue)
 
         # Assert - block_flow should NOT be called for transient errors
         mock_flow_blocker.block_flow.assert_not_called()
 
         # Assert - should fail open
         assert result is True, "Health check should fail open on transient errors"
+
+    def test_health_check_skips_block_for_terminal_states(self) -> None:
+        """When flow is in terminal state (aborted/done/stale/review),
+        health check should skip dispatch without calling block_flow."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        # Setup
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_flow_blocker = mock_deps["flow_blocker"]
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            **mock_deps,
+        )
+
+        issue = IssueInfo(
+            number=1629,
+            title="Aborted issue",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            github_state="CLOSED",
+        )
+
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-1629", None))
+
+        # Mock flow state as aborted (terminal)
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-1629",
+            "flow_status": "aborted",
+        }
+
+        # Mock CheckService to return invalid (would normally block)
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=["Task issue #1629 is CLOSED (no open PR found)"],
+            branch="task/issue-1629",
+        )
+        coordinator._check_service = mock_check_service
+
+        result = coordinator._check_dispatch_health(issue)
+
+        # Assert - should skip dispatch for terminal state
+        assert result is False, "Health check should return False for terminal states"
+
+        # Assert - block_flow should NOT be called for terminal states
+        mock_flow_blocker.block_flow.assert_not_called()

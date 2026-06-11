@@ -20,8 +20,7 @@ def _make_coordinator_dependencies(
     issue: IssueInfo,
     branch: str,
 ) -> dict[str, object]:
-    health_check_service = MagicMock()
-    health_check_service.check_issue_health.return_value = True
+    flow_blocker = MagicMock()
     queue_persistence = MagicMock()
     queue_persistence.frozen_queue = None
     queue_persistence.restore.return_value = None
@@ -29,7 +28,7 @@ def _make_coordinator_dependencies(
     queue_persistence.get_queued_issue_numbers.return_value = set()
     check_service = MagicMock()
     return {
-        "health_check_service": health_check_service,
+        "flow_blocker": flow_blocker,
         "queue_persistence": queue_persistence,
         "issue_loader": lambda issue_number: issue,
         "flow_context_resolver": lambda issue_number: (branch, None),
@@ -126,12 +125,12 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
         coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
         # Mock health check to pass
-        coordinator._health_check_service.check_issue_health = lambda issue: True
+        coordinator._check_dispatch_health = lambda issue: True
 
         # Run coordination with log capture
         import asyncio
 
-        with patch("vibe3.domain.dispatch_coordinator.logger") as mock_logger:
+        with patch("vibe3.domain.dispatch_preflight.logger") as mock_logger:
             asyncio.run(coordinator.coordinate(tick_id=1))
 
             # Verify degraded mode warning was logged
@@ -233,7 +232,7 @@ def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
         coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
 
         # Mock health check to pass
-        coordinator._health_check_service.check_issue_health = lambda issue: True
+        coordinator._check_dispatch_health = lambda issue: True
 
         # Run coordination with log capture
         import asyncio
