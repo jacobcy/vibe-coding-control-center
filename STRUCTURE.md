@@ -297,6 +297,8 @@ from vibe3.services.flow_reader import FlowReader
 
 **职责**：存放各种 AI Agent 工具的配置、规则、工作流与临时上下文。
 
+**重要性**：这是 AI 的"办公室"，包含 AI 需要的工具、工作流、模板和上下文 (Rules moved to `.claude/rules/`)
+
 | 目录 | 职责 | 备注 |
 |------|------|------|
 | `.agent/` | **Agent 核心工作区**。包含模板 (`templates/`)、工作流 (`workflows/`) 和跨任务记忆 (`context/memory/`)。 | Canonical AI workspace |
@@ -319,13 +321,6 @@ from vibe3.services.flow_reader import FlowReader
 |------|------|---------|
 | `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具）。 | 仅补充关键模式 |
 
-#### `.claude/rules/` - 编码规则
-
-| 文件 | 职责 |
-|------|------|
-| `coding-standards.md` | 编码标准 |
-| `patterns.md` | 设计模式 |
-
 #### `.agent/templates/` - 文档模板
 
 **职责**：AI 用来生成文档的模板
@@ -345,6 +340,20 @@ from vibe3.services.flow_reader import FlowReader
 #### `.agent/workflows/` - 工作流定义
 
 **职责**：定义各种工作流程
+
+### `.claude/` - Claude AI 配置 (Current Truth)
+
+**职责**：Claude 环境加载入口，包含项目规则与技能运行时。
+
+#### `.claude/rules/` - 编码规则
+
+**职责**：项目的编码标准与真源 (Moved from `.agent/rules/`)
+
+| 文件 | 职责 |
+|------|------|
+| `coding-standards.md` | 编码标准 |
+| `python-standards.md` | Python 编码标准 |
+| `patterns.md` | 设计模式 |
 
 #### `.claude/skills/` - 技能运行时
 
