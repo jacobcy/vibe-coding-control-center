@@ -9,7 +9,7 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.protocols.backend import BackendProtocol
-from vibe3.services.expired_resource_cleanup_service import (
+from vibe3.services.orchestra.cleanup import (
     ExpiredResourceCleanupService,
 )
 
@@ -129,7 +129,7 @@ def test_clean_expired_local_branches_reports_worktree_removal(
     mock_git_client.is_branch_occupied_by_worktree.return_value = True
     mock_git_client.find_worktree_path_for_branch.return_value = Path("/tmp/wt")
 
-    with patch("vibe3.services.expired_resource_cleanup_service.remove_worktree") as rm:
+    with patch("vibe3.services.orchestra.cleanup.remove_worktree") as rm:
         result = service.clean_expired_local_branches(max_age_days=7)
 
     rm.assert_called_once()

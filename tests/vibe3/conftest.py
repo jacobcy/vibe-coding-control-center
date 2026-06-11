@@ -80,7 +80,7 @@ def isolate_database(request):
     """
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.sqlite_base import _close_all_connections
-    from vibe3.services.error_tracking_service import ErrorTrackingService
+    from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
     # Skip patching for tests that verify GitClient.get_git_common_dir() itself
     # to avoid interfering with their assertions

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from vibe3.services.timeline_parser import parse_timeline_from_comments
+from vibe3.services.shared.timeline import parse_timeline_from_comments
 
 
 def test_parse_timeline_from_comments_empty():

@@ -5,7 +5,7 @@ from datetime import datetime
 from vibe3.models.flow import FlowState
 from vibe3.models.orchestration import IssueState
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.flow_resume_resolver import infer_resume_label
+from vibe3.services.flow.resume_resolver import infer_resume_label
 
 
 def _create_verdict(verdict: str) -> VerdictRecord:

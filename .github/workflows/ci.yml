@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
-    name: Lint & Test
+  lint:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
 
     steps:
@@ -19,11 +19,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y bats shellcheck zsh
 
-      # Setup Python environment for v3
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
 
       - name: Check Python LOC ceiling
         run: bash scripts/hooks/check-python-loc.sh
@@ -45,20 +50,12 @@ jobs:
         env:
           ENFORCE_LOC_LIMITS: true
 
-      # Shell checks
       - name: Run dual-layer lint
         run: bash scripts/hooks/lint.sh
 
       - name: Run bats tests
         run: bats tests/vibe2/
 
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install Python dependencies
-        run: uv sync --dev
-
-      # Python checks for v3
       - name: Run Python lint (ruff)
         run: uv run ruff check src
 
@@ -68,10 +65,59 @@ jobs:
       - name: Run Python type check (mypy)
         run: uv run mypy src
 
-      - name: Run Python tests (pytest)
-        # deps-only venv (package=false): no editable install, so subprocess-based
-        # imports (e.g. module independence tests) need src on PYTHONPATH, mirroring
-        # the committed .envrc used in dev worktrees.
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
+
+      - name: Run unit tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src
-        run: uv run pytest tests/vibe3 -v
+        run: uv run pytest tests/vibe3 -v -m "not integration and not slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration
+
+  test-quality:
+    name: Quality Tests (Modularity + Integration)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
+
+      - name: Run modularity tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: uv run pytest tests/vibe3/test_modularity -v
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: uv run pytest tests/vibe3/integration -v
+
+      - name: Run slow tests
+        if: always()
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: uv run pytest tests/vibe3 -v -m "slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration

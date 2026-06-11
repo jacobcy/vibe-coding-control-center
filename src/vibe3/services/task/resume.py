@@ -13,10 +13,10 @@ from loguru import logger
 from vibe3.clients import BackendProtocol, GitClient, GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models import IssueState
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue.flow import IssueFlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.status_query_service import StatusQueryService
+from vibe3.services.flow.service import FlowService
+from vibe3.services.issue import IssueFlowService
+from vibe3.services.shared.label_service import LabelService
+from vibe3.services.shared.status_query import StatusQueryService
 
 if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
@@ -80,7 +80,7 @@ class TaskResumeOperations:
         emit_progress("checking consistency and recovering")
 
         # Delegate to unified recovery service (manual path: auto=False)
-        from vibe3.services.flow_recovery_service import FlowRecoveryService
+        from vibe3.services.flow.recovery import FlowRecoveryService
 
         recovery = FlowRecoveryService(
             store=self.flow_service.store,
@@ -120,7 +120,7 @@ class TaskResumeOperations:
     ) -> IssueState:
         if not label_state:
             from vibe3.models import FlowState
-            from vibe3.services.flow_resume_resolver import infer_resume_label
+            from vibe3.services.flow.resume_resolver import infer_resume_label
 
             fs_dict = (
                 self.flow_service.store.get_flow_state(branch)
@@ -327,7 +327,7 @@ class TaskResumeCandidates:
             True if issue can be resumed, False otherwise
         """
         # ✅ Use authoritative truth: check if issue has merged PR
-        from vibe3.services.pr_status_checker import has_merged_pr_for_issue
+        from vibe3.services.pr.status_checker import has_merged_pr_for_issue
 
         if has_merged_pr_for_issue(issue_number, repo):
             # Issue has merged PR, cannot be resumed

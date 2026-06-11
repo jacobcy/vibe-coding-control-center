@@ -37,7 +37,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
     )
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service
@@ -71,7 +71,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -105,7 +105,7 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -139,7 +139,7 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -171,7 +171,7 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -203,7 +203,7 @@ def test_reset_issue_to_ready_with_label_review() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -235,7 +235,7 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -271,7 +271,7 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
     operations.flow_service.store.get_flow_state.return_value = None
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
 
@@ -348,7 +348,7 @@ def test_label_auto_with_unrecorded_existing_worktree_fixes_and_resumes() -> Non
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.blocked_state_service.BlockedStateService"
+        "vibe3.services.flow.blocked_state_service.BlockedStateService"
     ) as mock_service_cls:
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service

@@ -223,63 +223,18 @@ class IssueTitleCacheService:
     ) -> None:
         """Update cache with PR information for a branch.
 
+        DEPRECATED: This method now delegates to FlowContextCacheService.
+        New code should import FlowContextCacheService directly from shared.
+
         Args:
             branch: The git branch name.
             pr_number: The PR number.
             pr_title: The PR title.
         """
-        existing = self.store.get_flow_context_cache(branch)
-        self.store.upsert_flow_context_cache(
-            branch=branch,
-            task_issue_number=existing.get("task_issue_number") if existing else None,
-            issue_title=existing.get("issue_title") if existing else None,
-            pr_number=pr_number,
-            pr_title=pr_title,
-        )
-        logger.bind(
-            domain="issue_title_cache",
-            branch=branch,
-            pr_number=pr_number,
-        ).debug("Updated PR cache")
+        from vibe3.services.shared.context_cache import FlowContextCacheService
 
-    def update_prs_bulk(
-        self,
-        prs: list[tuple[str, int, str]],
-    ) -> None:
-        """Bulk update cache with PR information for multiple branches.
-
-        Args:
-            prs: List of tuples (branch, pr_number, pr_title).
-        """
-        if not prs:
-            return
-
-        branches = [branch for branch, _, _ in prs]
-
-        # Batch read existing cache entries
-        existing_cache = self.store.get_flow_context_cache_bulk(branches)
-
-        # Prepare bulk entries
-        entries: list[tuple[str, int | None, str | None, int | None, str | None]] = []
-        for branch, pr_number, pr_title in prs:
-            existing = existing_cache.get(branch)
-            entries.append(
-                (
-                    branch,
-                    existing.get("task_issue_number") if existing else None,
-                    existing.get("issue_title") if existing else None,
-                    pr_number,
-                    pr_title,
-                )
-            )
-
-        # Single transaction for all updates
-        self.store.upsert_flow_context_cache_bulk(entries)
-
-        logger.bind(
-            domain="issue_title_cache",
-            count=len(prs),
-        ).debug("Bulk updated PR cache")
+        cache_service = FlowContextCacheService(self.store)
+        cache_service.update_pr(branch, pr_number, pr_title)
 
     def invalidate(self, branch: str) -> None:
         """Invalidate cache entry for a branch.

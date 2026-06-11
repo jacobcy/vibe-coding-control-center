@@ -4,7 +4,7 @@ import pytest
 
 from vibe3.exceptions import GitError
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.flow_cleanup_service import (
+from vibe3.services.flow.cleanup import (
     FlowCleanupService,
     LiveSessionsDetectedError,
 )

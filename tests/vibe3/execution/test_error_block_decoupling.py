@@ -100,7 +100,7 @@ class TestAgentNoopTriggersBlock:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
+                "vibe3.services.issue.failure.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = {
@@ -138,7 +138,7 @@ class TestGitHubAPIFailureNoBlock:
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
-                "vibe3.services.role_policy_helpers.block_executor_noop_issue"
+                "vibe3.services.issue.failure.block_executor_noop_issue"
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub timeout")
@@ -195,7 +195,7 @@ class TestDependencyNotSatisfiedTriggersBlock:
 
     def test_flow_service_block_flow_writes_blocked_reason(self, temp_db):
         """FlowService.block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services.flow.service import FlowService
 
         branch = "test-branch"
 
@@ -220,7 +220,7 @@ class TestErrorBlockOrthogonality:
 
     def test_error_log_stores_runtime_errors(self, temp_db):
         """Runtime errors should be stored in error_log, not block flow."""
-        from vibe3.services.error_tracking_service import ErrorTrackingService
+        from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
         branch = "test-branch"
 
@@ -239,7 +239,7 @@ class TestErrorBlockOrthogonality:
 
     def test_block_flow_writes_blocked_reason(self, temp_db):
         """block_flow() should write blocked_reason."""
-        from vibe3.services.flow_service import FlowService
+        from vibe3.services.flow.service import FlowService
 
         branch = "test-branch"
 

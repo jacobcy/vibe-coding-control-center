@@ -55,12 +55,12 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     }
     hook_exception = module.find_exception(
         settings.exceptions,
-        "src/vibe3/services/check_service.py",
+        "src/vibe3/services/check/service.py",
     )
 
     assert hook_exception is not None
     # Verify both configs have the same limit (sync check)
-    expected_path = "src/vibe3/services/check_service.py"
+    expected_path = "src/vibe3/services/check/service.py"
     assert hook_exception.limit == exceptions[expected_path].limit
     # Verify the limit is reasonable (updated from 620 to 680 for PR closed handling)
     assert hook_exception.limit == 680

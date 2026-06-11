@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from vibe3.services.flow_timeline_service import FlowTimelineService
+from vibe3.services.flow.timeline import FlowTimelineService
 
 
 def test_record_timeline_event_creates_event_and_comment():

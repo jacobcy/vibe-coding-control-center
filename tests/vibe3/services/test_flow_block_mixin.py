@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow.service import FlowService
 
 
 def test_block_flow_calls_blocked_state_service() -> None:
@@ -16,7 +16,7 @@ def test_block_flow_calls_blocked_state_service() -> None:
         patch.object(service.store, "add_event"),
         patch("vibe3.services.task.service.TaskService"),
         patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
+            "vibe3.services.flow.blocked_state_service.BlockedStateService"
         ) as mock_blocked_service_cls,
     ):
 

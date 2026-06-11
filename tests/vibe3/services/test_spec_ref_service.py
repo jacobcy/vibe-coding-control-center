@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vibe3.services.spec_ref_service import SpecRefInfo, SpecRefService
+from vibe3.services.shared.spec_ref import SpecRefInfo, SpecRefService
 
 
 class TestSpecRefService:

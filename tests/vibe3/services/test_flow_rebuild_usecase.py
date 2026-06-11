@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.flow_rebuild_usecase import FlowRebuildUsecase
+from vibe3.services.flow.rebuild import FlowRebuildUsecase
 
 
 def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(

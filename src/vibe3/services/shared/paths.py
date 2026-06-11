@@ -4,10 +4,14 @@ This module provides path normalization, resolution, and display utilities.
 For handoff target resolution, see handoff_resolution module.
 """
 
+import importlib
 import re
 from pathlib import Path
 
 from vibe3.clients import GitPathProtocol
+
+# Shared handoff path prefix (canonical source)
+_SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
 
 
 def _get_git_client(git_client: GitPathProtocol | None = None) -> GitPathProtocol:
@@ -156,9 +160,6 @@ def _resolve_absolute_path(
         pass
 
     # Priority 3: Pattern-based extraction for cross-machine handoff paths
-    # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
-
     path_str = str(ref_path)
     if _SHARED_HANDOFF_PREFIX in path_str:
         # Extract relative path starting from vibe3/handoff/
@@ -260,8 +261,9 @@ def check_ref_exists(
         - display_path: Relative path for display (or original if cannot relativize)
         - exists: True if the file exists in the correct worktree context
     """
-    # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff.resolution import resolve_handoff_target
+    # Dynamic import to avoid shared/ → handoff/ boundary violation
+    _mod = importlib.import_module("vibe3.services.handoff.resolution")
+    resolve_handoff_target = _mod.resolve_handoff_target
 
     try:
         resolved_path = resolve_handoff_target(ref_value, branch, git_client)
@@ -330,9 +332,6 @@ def _path_to_alias(path: str) -> str:
     if path.startswith("docs/specs/"):
         return "@spec"
     # Shared artifacts: add @ prefix and keep the rest
-    # Lazy import to avoid circular dependency with handoff_resolution
-    from vibe3.services.handoff_resolution import _SHARED_HANDOFF_PREFIX
-
     if path.startswith(_SHARED_HANDOFF_PREFIX):
         return f"@{path[len(_SHARED_HANDOFF_PREFIX):]}"
     if f".git/{_SHARED_HANDOFF_PREFIX}" in path:
@@ -379,9 +378,6 @@ def ref_to_handoff_cmd(
     display_target = REF_FIELD_TO_ALIAS[ref_field]
 
     # Shared artifacts: use @ prefix form without --branch
-    # Lazy import to avoid circular dependency with handoff.resolution
-    from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
-
     if (
         path.startswith(_SHARED_HANDOFF_PREFIX)
         or f".git/{_SHARED_HANDOFF_PREFIX}" in path

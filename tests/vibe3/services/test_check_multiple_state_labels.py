@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.service import CheckService
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def test_multiple_state_labels_auto_fix_success(check_service):
     }
 
     # Mock LabelService.set_state
-    with patch("vibe3.services.label_service.LabelService") as mock_cls:
+    with patch("vibe3.services.shared.label_service.LabelService") as mock_cls:
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 
@@ -100,7 +100,7 @@ def test_multiple_state_labels_priority_order(check_service):
     for labels, expected_state in test_cases:
         issue_payload = {"labels": [{"name": label} for label in labels]}
 
-        with patch("vibe3.services.label_service.LabelService") as mock_cls:
+        with patch("vibe3.services.shared.label_service.LabelService") as mock_cls:
             mock_label_service = MagicMock()
             mock_cls.return_value = mock_label_service
 
@@ -140,7 +140,7 @@ def test_mixed_known_unknown_state_labels_keeps_known(check_service):
         ]
     }
 
-    with patch("vibe3.services.label_service.LabelService") as mock_cls:
+    with patch("vibe3.services.shared.label_service.LabelService") as mock_cls:
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 
@@ -166,7 +166,7 @@ def test_auto_fix_failure_returns_manual_fix_issue(check_service):
     }
 
     # Mock LabelService.set_state to raise exception
-    with patch("vibe3.services.label_service.LabelService") as mock_cls:
+    with patch("vibe3.services.shared.label_service.LabelService") as mock_cls:
         mock_label_service = MagicMock()
         mock_label_service.set_state.side_effect = Exception("GitHub API error")
         mock_cls.return_value = mock_label_service
@@ -191,7 +191,7 @@ def test_merge_ready_included_in_priority_list(check_service):
         ]
     }
 
-    with patch("vibe3.services.label_service.LabelService") as mock_cls:
+    with patch("vibe3.services.shared.label_service.LabelService") as mock_cls:
         mock_label_service = MagicMock()
         mock_cls.return_value = mock_label_service
 

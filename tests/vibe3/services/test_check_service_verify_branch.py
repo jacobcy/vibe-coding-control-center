@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 from vibe3.clients import SQLiteClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.service import CheckService
 
 
 def test_verify_branch_returns_check_result(tmp_path: Path) -> None:
@@ -394,7 +394,7 @@ def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
     from unittest.mock import patch
 
     with patch(
-        "vibe3.services.blocked_state_io.LabelService"
+        "vibe3.services.flow.blocked_state_io.LabelService"
     ) as mock_label_service_cls:
         mock_label_service = MagicMock()
         mock_label_service.confirm_issue_state.return_value = "confirmed"
@@ -455,7 +455,7 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
     with (
         patch("vibe3.services.issue.flow.IssueFlowService") as mock_issue_flow_cls,
         patch(
-            "vibe3.services.coordination_resolver.CoordinationResolver"
+            "vibe3.services.orchestra.coordination.CoordinationResolver"
         ) as mock_resolver_cls,
     ):
         mock_issue_flow = MagicMock()

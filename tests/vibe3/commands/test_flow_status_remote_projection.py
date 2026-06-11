@@ -38,7 +38,7 @@ def test_projection_pr_resolves_by_branch() -> None:
         flow_status="active",
     )
 
-    from vibe3.services.flow_projection_service import FlowProjectionService
+    from vibe3.services.flow.projection import FlowProjectionService
 
     svc = FlowProjectionService(
         flow_service=mock_flow_service, pr_service=mock_pr_service
@@ -52,7 +52,7 @@ def test_projection_pr_resolves_by_branch() -> None:
 
 @patch("vibe3.commands.flow_status._render_snapshot_format")
 @patch("vibe3.commands.flow_status.PRService")
-@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
+@patch("vibe3.commands.flow_status.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_snapshot_uses_pr_service_branch_status(
     mock_service_class,
@@ -115,7 +115,7 @@ def _make_flow_state(
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.services.check.service.CheckService")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_default_filters_active(
     _mock_git_client,
@@ -147,7 +147,7 @@ def test_flow_status_default_filters_active(
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.services.check.service.CheckService")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_all_includes_terminal_states(
     _mock_git_client,

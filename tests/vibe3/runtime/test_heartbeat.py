@@ -6,9 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.domain_types import ServiceBase
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.runtime.service_protocol import ServiceBase
 
 
 def _config() -> OrchestraConfig:
@@ -192,7 +192,7 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
     # Mock ErrorTrackingService at its actual module location
     monkeypatch.setattr(
-        "vibe3.services.error_tracking_service.ErrorTrackingService.get_instance",
+        "vibe3.services.orchestra.error_tracking.service.ErrorTrackingService.get_instance",
         staticmethod(lambda: cleanup_service),
     )
     server._running = True

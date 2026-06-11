@@ -7,8 +7,8 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.services.check_cleanup_service import CheckCleanupService
-from vibe3.services.expired_resource_cleanup_service import (
+from vibe3.services.check.cleanup import CheckCleanupService
+from vibe3.services.orchestra.cleanup import (
     ExpiredResourceCleanupService,
 )
 
@@ -421,9 +421,7 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
         github_client=github_client,
     )
 
-    with patch(
-        "vibe3.services.flow_cleanup_service.FlowCleanupService"
-    ) as mock_cleanup_cls:
+    with patch("vibe3.services.flow.cleanup.FlowCleanupService") as mock_cleanup_cls:
         mock_cleanup = MagicMock()
         mock_cleanup.cleanup_flow_scene.return_value = {
             "flow_record": True,
@@ -433,7 +431,7 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
         mock_cleanup_cls.return_value = mock_cleanup
 
         with patch(
-            "vibe3.services.check_cleanup_service.TaskResumeOperations"
+            "vibe3.services.check.cleanup.TaskResumeOperations"
         ) as mock_operations_cls:
             mock_operations = MagicMock()
             mock_operations_cls.return_value = mock_operations
@@ -469,7 +467,7 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
         "state": "open",
     }
 
-    with patch("vibe3.services.check_cleanup_service.TaskResumeOperations"):
+    with patch("vibe3.services.check.cleanup.TaskResumeOperations"):
         service._resume_blocked_issue("task/issue-300")
 
     # Verify comment added
@@ -487,7 +485,7 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
     """check --clean-branch restores labels through the same resume operation."""
     from unittest.mock import MagicMock, patch
 
-    from vibe3.services.check_cleanup_service import CheckCleanupService
+    from vibe3.services.check.cleanup import CheckCleanupService
 
     store = MagicMock()
     git = MagicMock()
@@ -497,9 +495,7 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
     store.get_task_issue_number.return_value = None
     service = CheckCleanupService(store=store, git_client=git, github_client=github)
 
-    with patch(
-        "vibe3.services.check_cleanup_service.TaskResumeOperations"
-    ) as operations_cls:
+    with patch("vibe3.services.check.cleanup.TaskResumeOperations") as operations_cls:
         operations = MagicMock()
         operations_cls.return_value = operations
 
@@ -574,7 +570,7 @@ def test_backend_passed_to_expired_resource_service():
     )
 
     with patch(
-        "vibe3.services.expired_resource_cleanup_service.ExpiredResourceCleanupService"
+        "vibe3.services.orchestra.cleanup.ExpiredResourceCleanupService"
     ) as mock_class:
         mock_instance = MagicMock()
         mock_class.return_value = mock_instance

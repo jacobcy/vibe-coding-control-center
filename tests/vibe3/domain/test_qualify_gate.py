@@ -202,6 +202,7 @@ class TestRunQualifyGate:
                 assert result is None
                 mock_label_port.confirm_issue_state.assert_not_called()
 
+    @pytest.mark.slow
     def test_dependency_block(
         self, qualify_gate_service, sample_issue, mock_store, mock_github
     ):
@@ -231,7 +232,7 @@ class TestRunQualifyGate:
             return_value=mock_truth,
         ):
             with patch(
-                "vibe3.services.blocked_state_io.GitHubClient",
+                "vibe3.services.flow.blocked_state_io.GitHubClient",
                 return_value=mock_github,
             ):
                 flow_state = {"status": "active"}

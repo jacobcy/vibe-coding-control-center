@@ -11,18 +11,7 @@ if TYPE_CHECKING:
     from vibe3.config import TimelineCommentPolicy
 
 
-# Event type to display text mapping
-# Only includes events that may write comments (per policy)
-# NOTE: Must be reversible by timeline_parser.py reverse_map
-TIMELINE_DISPLAY_MAP: dict[str, str] = {
-    "flow_blocked": "Flow blocked",
-    "flow_failed": "Flow failed",
-    "flow_aborted": "Flow aborted",
-    "resumed": "Flow resumed",
-    "handoff_append": "Handoff update",
-    "milestone_recorded": "Milestone recorded",
-    "user_notification": "User notification",
-}
+from vibe3.services.shared.timeline import TIMELINE_DISPLAY_MAP
 
 
 class FlowTimelineService:

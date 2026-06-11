@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.actor_support import extract_role_from_actor
-from vibe3.services.verdict_service import VerdictService
+from vibe3.services.pr.verdict_service import VerdictService
+from vibe3.services.shared.actors import extract_role_from_actor
 
 
 class TestVerdictService:
@@ -65,7 +65,7 @@ class TestVerdictService:
 
         # Mock signature service
         with patch(
-            "vibe3.services.verdict_service.SignatureService.resolve_for_branch"
+            "vibe3.services.pr.verdict_service.SignatureService.resolve_for_branch"
         ) as mock_resolve:
             mock_resolve.return_value = "claude/claude-sonnet-4-6"
 
@@ -105,7 +105,7 @@ class TestVerdictService:
         mock_store.get_flow_state.return_value = {}
 
         with patch(
-            "vibe3.services.verdict_service.SignatureService.resolve_for_branch"
+            "vibe3.services.pr.verdict_service.SignatureService.resolve_for_branch"
         ) as mock_resolve:
             mock_resolve.return_value = "manager"
 
@@ -129,7 +129,7 @@ class TestVerdictService:
         mock_store.get_flow_state.return_value = {}
 
         with patch(
-            "vibe3.services.verdict_service.SignatureService.resolve_for_branch"
+            "vibe3.services.pr.verdict_service.SignatureService.resolve_for_branch"
         ) as mock_resolve:
             mock_resolve.return_value = "reviewer"
 

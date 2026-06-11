@@ -4,17 +4,17 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
-from vibe3.services.flow_service import FlowService
+from vibe3.services import (
+    StatusQueryService,
+    is_auto_task_branch,
+    is_dev_collab_branch,
+)
+from vibe3.services.flow.service import FlowService
 from vibe3.services.orchestra.status import OrchestraSnapshot
 from vibe3.services.shared.labels import (
     has_orchestra_governed,
     has_roadmap_label,
     normalize_labels,
-)
-from vibe3.services.status_query_service import (
-    StatusQueryService,
-    is_auto_task_branch,
-    is_dev_collab_branch,
 )
 from vibe3.services.task.classifier import TaskStatusBucket, classify_task_status
 
@@ -45,8 +45,8 @@ def fetch_task_status_data(
     import time
 
     from vibe3.config import load_orchestra_config
-    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
     from vibe3.services.orchestra.helpers import get_manager_usernames
+    from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
     from vibe3.services.orchestra.status import OrchestraStatusService
 
     config = load_orchestra_config()

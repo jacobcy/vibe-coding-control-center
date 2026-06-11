@@ -5,10 +5,10 @@ import shutil
 import typer
 
 from vibe3.clients import GitHubClient
+from vibe3.config import get_convention
 from vibe3.exceptions import UserError
-from vibe3.services.convention_resolver import get_convention
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.services.flow.service import FlowService
+from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
 
 
 def resolve_branch_from_pr(

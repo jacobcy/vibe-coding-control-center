@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibe3.services.file_loader import policy_loader, resolve_manager_usernames
+from vibe3.services.shared.file_loader import policy_loader, resolve_manager_usernames
 
 
 class TestPolicyLoader:

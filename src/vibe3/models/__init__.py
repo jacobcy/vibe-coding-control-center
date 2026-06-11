@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
     from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+    from vibe3.models.dispatch import DispatchExclusion
     from vibe3.models.domain_events import (
         DomainEvent,
         ExecutorDispatchIntent,
@@ -147,6 +148,7 @@ _LAZY_IMPORTS = {
     "CreatePRRequest": "vibe3.models.pr",
     "CriticalFileInfo": "vibe3.models.pr_analysis",
     "DataSource": "vibe3.models.data_source",
+    "DispatchExclusion": "vibe3.models.dispatch",
     "ChangeSource": "vibe3.models.change_source",
     "ChangeSourceType": "vibe3.models.change_source",
     "CICheck": "vibe3.models.pr",
@@ -271,6 +273,7 @@ __all__: list[str] = [
     "DeadCodeFinding",
     "DeadCodeReport",
     "DependencyChange",
+    "DispatchExclusion",
     "DomainEvent",
     "DependencyEdge",
     "DiffSummary",

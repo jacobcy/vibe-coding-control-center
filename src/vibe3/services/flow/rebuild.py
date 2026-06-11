@@ -14,7 +14,7 @@ from vibe3.config import load_orchestra_config
 from vibe3.models import IssueInfo
 from vibe3.services.flow.cleanup import FlowCleanupService
 from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services.handoff.service import HandoffService
 from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
 
 LabelResume = Callable[..., None]
@@ -39,7 +39,7 @@ class FlowRebuildUsecase:
             self.orchestrator = orchestrator
         else:
             try:
-                from vibe3.services.flow_orchestrator_service import (
+                from vibe3.services.orchestra.orchestrator import (
                     FlowOrchestratorService,
                 )
 
@@ -144,7 +144,7 @@ class FlowRebuildUsecase:
         skip the classify step and go straight to clearing blocked state.
         """
         from vibe3.models import FlowState, IssueState
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.flow.blocked_state_service import BlockedStateService
         from vibe3.services.flow.resume_resolver import infer_resume_label
 
         # Determine target state from rebuilt flow

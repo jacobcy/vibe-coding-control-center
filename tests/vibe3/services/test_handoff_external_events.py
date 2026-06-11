@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services.handoff import HandoffService
 
 
 @pytest.fixture

@@ -39,97 +39,39 @@ vibe-center/
 ├── SOUL.md                      # 项目宪法和核心原则
 ├── DEVELOPER.md                 # 开发者指南
 ├── README.md                    # 项目介绍（面向用户）
+├── CHANGELOG.md                 # 变更日志
+├── VERSION                      # 当前版本号
 │
-├── bin/                         # CLI 入口
-│   ├── vibe                     # [Legacy / V2] Shell 入口
-│   └── vibe3                    # [Active Core] Python 入口
+├── .agent/                      # [Group: AI Workspace] Agent 核心配置与工作流
+├── .claude/                     # [Group: AI Workspace] Claude 专用配置与规则
+├── .gemini/                     # [Group: AI Workspace] Gemini 专用配置
+├── .codex/                      # [Group: AI Workspace] Codex 专用配置与环境
+├── .copilot/                    # [Group: AI Workspace] GitHub Copilot 专用配置
+├── .trae/                       # [Group: AI Workspace] Trae 专用配置
+├── .kiro/                       # [Group: AI Workspace] Kiro Spec 工作区
+├── .serena/                     # [Group: AI Workspace] Serena 治理配置
+├── .qoder/                      # [Group: AI Workspace] Qoder 专用配置
+├── .codebuddy/                  # [Group: AI Workspace] CodeBuddy 专用配置
+├── .opencode/                   # [Group: AI Workspace] OpenCode 专用配置
+├── .vibe/                       # [Group: AI Workspace] Vibe 内部运行时缓存 (Legacy)
+├── .github/                     # GitHub 配置、工作流与 Issue 模板
 │
-├── src/vibe3/                   # [Active Core] V3 Python 实现（主要）
-│   ├── cli.py                   # CLI 主入口
-│   ├── __main__.py              # 进程入口（vibe3 serve）
-│   ├── adapters/                # 逻辑适配器与集成桥接
-│   ├── agents/                  # AI Agent 调用层
-│   ├── analysis/                # 代码智能与影响分析
-│   ├── clients/                 # 外部客户端
-│   ├── commands/                # 命令实现
-│   ├── config/                  # 配置加载与 schema
-│   ├── domain/                  # 领域事件与 handlers
-│   ├── environment/             # 环境资源管理
-│   ├── exceptions/              # 统一异常层级
-│   ├── execution/               # 执行控制平面
-│   ├── models/                  # 数据模型
-│   ├── observability/           # 可观测性
-│   ├── orchestra/               # 编排中枢
-│   ├── prompts/                 # Prompt 组装与变量解析
-│   ├── resources/               # 运行时资产与静态资源
-│   ├── roles/                   # 角色定义与执行模块
-│   ├── runtime/                 # 事件驱动运行时
-│   ├── server/                  # HTTP / MCP / health 服务
-│   ├── services/                # 业务逻辑
-│   ├── ui/                      # CLI 输出格式化
-│   └── utils/                   # 工具函数
-│
+├── bin/                         # CLI 入口 (vibe, vibe3)
+├── src/vibe3/                   # [Active Core] V3 Python 实现核心
 ├── lib/                         # [Legacy / V2] Shell 核心逻辑
-│   ├── *.sh                     # 各功能模块
-│   └── ...
+├── lib3/                        # V3 Python 核心包装器与仓库重定向
+├── scripts/                     # 自动化脚本、安装脚本与工具
+├── supervisor/                  # 治理与监督逻辑 (Apply, Governance, Policies)
 │
-├── lib3/                        # V3 Python 核心包装器与仓库重定向 (hub)
-│   └── vibe.sh                  # 负责仓库重定向和加载密钥
+├── config/                      # 配置文件与策略 (Policies, Prompts)
+├── tests/                       # 测试 (vibe2, vibe3, 覆盖率报告)
+├── skills/                      # 技能定义 (Canonical Source)
+├── docs/                        # 人类文档区 (Standards, PRDs, Specs, Reports)
 │
-├── config/                      # V2 配置文件
-│   ├── keys/                    # API 密钥配置
-│   └── aliases/                 # 命令别名
-│
-├── tests/                       # 测试
-│   ├── vibe3/                   # [Active Core] V3 测试
-│   └── vibe2/                   # [Legacy / V2] 测试
-│
-├── skills/                      # 技能定义（canonical source）
-│   └── */                       # 各技能目录
-│
-├── .agent/                      # AI 工作区
-│   ├── README.md                # AI 工作区说明
-│   ├── context/                 # AI 上下文
-│   │   ├── memory/              # [TRACKED] AI 上下文记忆（详见 docs/standards/v3/v3-memory-standard.md）
-│   │   └── ...                  # 动态上下文（如 handoff）由 vibe3 管理，见 .git/vibe3/
-│   ├── templates/               # 文档模板（AI 工具）
-│   │   ├── prd.md               # PRD 模板
-│   │   ├── tech-spec.md         # Spec 模板
-│   │   ├── plan.md              # Plan 模板
-│   │   ├── test.md              # Test 模板
-│   │   ├── code.md              # Code 模板
-│   │   ├── audit.md             # Audit 模板
-│   │   └── task-readme.md       # Task README 模板
-│   ├── workflows/               # 工作流定义
-│   └── skills/                  # 技能运行时（旧路径，symlinks）
-│
-├── .claude/                     # Claude AI 配置（当前真源）
-│   ├── rules/                   # 编码规则 (Moved from .agent/rules/)
-│   │   ├── coding-standards.md
-│   │   ├── python-standards.md
-│   │   └── patterns.md
-│   └── skills/                  # 技能运行时 (Moved from .agent/skills/)
-│
-├── docs/                        # 人类文档区
-│   ├── README.md                # 文档总览
-│   ├── standards/               # 标准和规范
-│   │   ├── doc-organization.md  # 文档组织标准
-│   │   ├── cognition-spec-dominion.md  # 宪法大纲
-│   │   └── ...                         # 其他现行标准
-│   ├── specs/                   # 规范文档
-│   ├── prds/                    # 全局 PRD
-│   │   ├── vibe-workflow-paradigm.md   # 总 PRD
-│   │   └── ...
-│   ├── plans/                   # 执行计划
-│   ├── reports/                 # 报告和总结
-│   ├── references/              # 外部参考资料
-│   │   └── ...                  # 收集的外部文档、论文、资料等
-│   ├── archive/                 # 历史文档归档
-│   │   └── ...                  # 已退役设计与历史任务文档
-│
-└── .kiro/                       # Kiro Spec 工作区
-    └── specs/                   # Spec 定义
-        └── */                   # 各 spec 目录
+├── debug/                       # 调试信息与临时分析报告
+├── openspec/                    # 开放规范集成区
+├── temp/                        # [Local Only] 运行时产生的临时目录 (Ignored)
+└── .worktrees/                  # [Local Only] Git worktrees 存储目录 (Ignored)
 ```
 
 ## 📄 根目录文件职责
@@ -201,6 +143,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `execution/` - 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
 - `exceptions/` - 统一异常层级
 - `domain/` - 领域事件与 handlers（events, handlers, orchestration_facade）
+  - `domain/protocols/` - 领域协议与抽象接口
 - `models/` - 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
@@ -210,6 +153,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（issue, pr, task, handoff, check）
+  - `services/flow/` - Flow 状态转换、注册、重建与清理
   - `services/issue/` - Issue 生命流程、标题缓存与失败处理
   - `services/pr/` - PR 创建、评审、质量评分与分析
   - `services/task/` - Task 绑定、状态分类与恢复逻辑
@@ -295,6 +239,28 @@ from vibe3.services.flow_reader import FlowReader
 **主要模块**：
 - `vibe.sh` - 核心包装器逻辑。
 
+### `scripts/` - 自动化与辅助脚本
+
+**职责**：存放项目生命周期管理、环境初始化、集成桥接等辅助脚本。
+
+**内容**：
+- `init.sh` / `install.sh` - 项目初始化与依赖安装脚本。
+- `serena_gate.sh` / `serena_gate.py` - Serena 治理网关。
+- `trace_manager.py` - 链路追踪管理工具。
+- `openspec_bridge.sh` - OpenSpec 桥接工具。
+- `github/` - GitHub 特定集成脚本（如标签同步）。
+
+### `supervisor/` - 治理与监督逻辑
+
+**职责**：定义 AI Agent 的治理策略、监督逻辑与自动治理任务。
+
+**内容**：
+- `manager.md` - Vibe Manager 的核心执行指令。
+- `apply.md` - 治理 Issue 的自动应用指令。
+- `governance/` - 周期性治理扫描策略。
+- `policies/` - 细粒度治理策略定义。
+- `vibe-*/` - 各种专项治理器（audit, drift, test-runner 等）。
+
 ### `config/` - V2 配置文件
 
 **职责**：V2 Shell 实现的配置文件
@@ -305,15 +271,18 @@ from vibe3.services.flow_reader import FlowReader
 
 ### `tests/` - 测试
 
-**职责**：所有测试代码
+**职责**：存放项目的所有测试代码、测试夹具 (fixtures) 与覆盖率配置。
 
 **子目录**：
-- `vibe3/` - V3 Python 测试
-- `vibe2/` - V2 Shell 测试
+- `vibe3/` - **[Active Core]** V3 Python 实现的测试，其子目录结构与 `src/vibe3/` 保持 1:1 镜像对齐。
+- `vibe2/` - **[Legacy / V2]** Shell 实现的测试 (Zsh)。
+- `conftest.py` - pytest 全局配置与通用 fixtures。
+- `test_error_classification.py` - 专项：错误分类逻辑测试。
 
 **规则**：
-- V3 测试使用 pytest
-- 测试覆盖率目标 80%+
+- V3 测试统一使用 `pytest`。
+- 新功能必须包含对应的测试文件。
+- 测试覆盖率目标保持在 80% 以上。
 
 ### `skills/` - 技能定义
 
@@ -324,13 +293,29 @@ from vibe3.services.flow_reader import FlowReader
 - 包含 `SKILL.md` 定义文件
 - 运行时通过 symlink 链接到 `.claude/skills/` (Legacy: `.agent/skills/`)
 
-### `.agent/` - AI 工作区
+### 🤖 AI Workspace Directories (AI 工作区)
 
-**职责**：AI Agent 的工作环境
+**职责**：存放各种 AI Agent 工具的配置、规则、工作流与临时上下文。
 
 **重要性**：这是 AI 的"办公室"，包含 AI 需要的工具、工作流、模板和上下文 (Rules moved to `.claude/rules/`)
 
+| 目录 | 职责 | 备注 |
+|------|------|------|
+| `.agent/` | **Agent 核心工作区**。包含模板 (`templates/`)、工作流 (`workflows/`) 和跨任务记忆 (`context/memory/`)。 | Canonical AI workspace |
+| `.claude/` | **Claude 专用配置**。存放规则 (`rules/`)、团队模板 (`team-templates/`) 和本地技能运行时。 | 当前主用真源 |
+| `.gemini/` | **Gemini 专用配置**。存放 Gemini CLI 的相关指令与钩子。 | Active |
+| `.codex/` | **Codex 专用配置**。环境定义与技能映射。 | Active |
+| `.kiro/` | **Kiro Spec 工作区**。Spec 定义与设计文档。 | Active |
+| `.copilot/` | **GitHub Copilot 专用配置**。 | Supplemental |
+| `.trae/` | **Trae 专用配置**。 | Supplemental |
+| `.serena/` | **Serena 治理配置**。治理网关与项目元数据。 | Governance |
+| `.qoder/` | **Qoder 专用配置**。 | Supplemental |
+| `.codebuddy/` | **CodeBuddy 专用配置**。 | Supplemental |
+| `.opencode/` | **OpenCode 专用配置**。 | Supplemental |
+| `.vibe/` | **Vibe 内部运行时缓存 (Legacy)**。 | 逐步迁移至 .git/vibe3/ |
+
 #### `.agent/context/` - AI 上下文
+
 
 | 路径 | 职责 | 更新频率 |
 |------|------|---------|
@@ -503,6 +488,25 @@ ls ~/.vibe/
 **用途**：
 - 记录结论、验证结果、审计摘要和阶段总结
 - 供后续会话和人类读者稳定引用
+
+### `debug/` - 调试与分析区
+
+**职责**：存放调试信息、执行追踪快照、临时分析报告。
+
+**内容**：
+- `external-project-integration-debug.md` - 外部集成调试记录。
+- 自动化生成的 `debug_*.py`/`debug_*.sh` 临时脚本。
+
+### 📁 临时与本地目录 (Temporary Directories)
+
+**职责**：存放运行时产生的、不应进入版本控制的本地临时数据。
+
+| 路径 | 职责 | 备注 |
+|------|------|------|
+| `temp/` | 通用临时目录 | 被 `.gitignore` 排除 |
+| `wt-*/` | 任务级 Git worktrees | 被 `.gitignore` 排除 |
+| `.worktrees/` | 集中式 worktrees 存储 | 被 `.gitignore` 排除 |
+| `tmpvibe-*` | 运行时临时前缀目录 | 被 `.gitignore` 排除 |
 
 ### `.kiro/` - Kiro Spec 工作区
 

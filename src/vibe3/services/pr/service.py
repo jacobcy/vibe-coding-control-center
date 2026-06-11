@@ -28,8 +28,8 @@ from vibe3.services.pr.utils import (
     check_upstream_conflicts,
     get_metadata_from_flow,
 )
-from vibe3.services.signature_service import SignatureService
-from vibe3.services.version_service import VersionService
+from vibe3.services.shared.signatures import SignatureService
+from vibe3.services.shared.versions import VersionService
 
 
 def _format_datetime_iso(dt: datetime | None) -> str | None:
@@ -130,11 +130,11 @@ class PRService:
 
     def _sync_branch_context_cache(self, prs: dict[str, PRResponse]) -> None:
         """Project recent PR facts into flow_context_cache."""
-        from vibe3.services.issue.title_cache import IssueTitleCacheService
+        from vibe3.services.shared.context_cache import FlowContextCacheService
 
-        title_cache = IssueTitleCacheService(self.store)
+        cache_service = FlowContextCacheService(self.store)
         pr_entries = [(pr.head_branch, pr.number, pr.title) for pr in prs.values()]
-        title_cache.update_prs_bulk(pr_entries)
+        cache_service.update_prs_bulk(pr_entries)
 
     def refresh_recent_pr_cache(
         self,
@@ -589,11 +589,11 @@ class PRService:
             pr_ref=pr.url,  # Write PR URL as proof of PR creation
         )
 
-        # Update PR context cache with latest PR info using IssueTitleCacheService
-        from vibe3.services.issue.title_cache import IssueTitleCacheService
+        # Update PR context cache with latest PR info
+        from vibe3.services.shared.context_cache import FlowContextCacheService
 
-        title_cache = IssueTitleCacheService(self.store)
-        title_cache.update_pr(
+        cache_service = FlowContextCacheService(self.store)
+        cache_service.update_pr(
             branch=pr.head_branch,
             pr_number=pr.number,
             pr_title=pr.title,

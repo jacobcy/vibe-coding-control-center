@@ -20,6 +20,8 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
     mock_store = MagicMock()
     mock_store.get_task_issue_number.return_value = None
     mock_service.store = mock_store
+    # Add SAFE_BRANCH_PREFIX attribute to mock class
+    mock_service_cls.SAFE_BRANCH_PREFIX = "vibe/main-safe/"
     mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show"])
@@ -30,7 +32,7 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
-@patch("vibe3.services.FlowStatusResolver")
+@patch("vibe3.commands.flow_status.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_timeline_when_registered(
@@ -78,7 +80,7 @@ def test_flow_show_timeline_when_registered(
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
-@patch("vibe3.services.FlowStatusResolver")
+@patch("vibe3.commands.flow_status.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_numeric_issue_resolves_branch(

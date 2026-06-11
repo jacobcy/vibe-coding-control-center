@@ -70,12 +70,13 @@ MY_ROLE = TriggerableRoleDefinition(
 `FlowService` 和 `TaskService` 是管理流程状态、Issue 链接和 PR 关联的核心服务。
 
 ```python
-from vibe3.services.flow_service import FlowService
-from vibe3.services.task_service import TaskService
+from vibe3.services.flow import FlowService
+from vibe3.services.task import TaskService
 
 # 初始化
 flow_service = FlowService()
 task_service = TaskService()
+```
 
 # 示例：绑定 Spec 到当前 Flow
 # spec_ref 可以是 issue 编号或文件路径

@@ -32,7 +32,7 @@ def usecase():
             return_value=mock_github,
         ) as _,
         patch(
-            "vibe3.services.blocked_state_io.GitHubClient",
+            "vibe3.services.flow.blocked_state_io.GitHubClient",
             return_value=mock_github,
         ) as _,
         patch("vibe3.services.task.resume.IssueFlowService") as mock_issue_flow,
@@ -64,7 +64,7 @@ class TestAutoResumePreservesWorktree:
         }
 
         with patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
+            "vibe3.services.flow.blocked_state_service.BlockedStateService"
         ) as mock_service_cls:
             mock_service = MagicMock()
             mock_service_cls.return_value = mock_service
@@ -88,7 +88,7 @@ class TestAutoResumeRestoresInferredState:
     def test_infer_resume_label_no_actor_restores_ready(self, usecase):
         """Unclaimed flow (no actor) should restore to READY."""
         from vibe3.models.flow import FlowState
-        from vibe3.services.flow_resume_resolver import infer_resume_label
+        from vibe3.services.flow.resume_resolver import infer_resume_label
 
         fs = FlowState(
             branch="task/issue-123",
@@ -102,7 +102,7 @@ class TestAutoResumeRestoresInferredState:
     def test_infer_resume_label_with_actor_restores_in_progress(self, usecase):
         """Active flow with actor should restore to IN_PROGRESS or CLAIMED."""
         from vibe3.models.flow import FlowState
-        from vibe3.services.flow_resume_resolver import infer_resume_label
+        from vibe3.services.flow.resume_resolver import infer_resume_label
 
         fs = FlowState(
             branch="task/issue-456",

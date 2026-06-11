@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.status_query_service import (
+from vibe3.services.shared.status_query import (
     StatusQueryService,
     is_auto_task_branch,
     is_canonical_task_branch,

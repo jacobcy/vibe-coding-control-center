@@ -9,7 +9,7 @@ import pytest
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
 from vibe3.services.orchestra.status import OrchestraSnapshot
 
 
@@ -54,7 +54,7 @@ def test_flow_orchestrator_can_snapshot() -> None:
     )
 
     with patch(
-        "vibe3.services.flow_orchestrator_service.OrchestraStatusService.fetch_live_snapshot",
+        "vibe3.services.orchestra.orchestrator.OrchestraStatusService.fetch_live_snapshot",
         return_value=mock_snapshot,
     ):
         snapshot = service.snapshot()
@@ -69,7 +69,7 @@ def test_flow_orchestrator_snapshot_returns_none_when_unreachable() -> None:
     service = FlowOrchestratorService(config)
 
     with patch(
-        "vibe3.services.flow_orchestrator_service.OrchestraStatusService.fetch_live_snapshot",
+        "vibe3.services.orchestra.orchestrator.OrchestraStatusService.fetch_live_snapshot",
         return_value=None,
     ):
         snapshot = service.snapshot()
@@ -133,9 +133,7 @@ def test_bootstrap_issue_flow_skips_checkout_in_worktree_mode() -> None:
     )
 
     # Mock worktree resolution
-    with patch(
-        "vibe3.services.flow_orchestrator_service.WorktreeManager"
-    ) as worktree_cls:
+    with patch("vibe3.services.orchestra.orchestrator.WorktreeManager") as worktree_cls:
         worktree = worktree_cls.return_value
         worktree.resolve_bootstrap_worktree_context.return_value = MagicMock(
             path="/tmp/repo/.worktrees/dev-issue-888"
@@ -239,7 +237,7 @@ def test_bootstrap_persists_worktree_path() -> None:
     )
 
     # Mock worktree resolution
-    with patch("vibe3.services.flow_orchestrator_service.WorktreeManager") as mock_wm:
+    with patch("vibe3.services.orchestra.orchestrator.WorktreeManager") as mock_wm:
         mock_ctx = MagicMock()
         mock_ctx.path = Path("/tmp/worktrees/task/issue-999")
         mock_wm.return_value.resolve_bootstrap_worktree_context.return_value = mock_ctx
@@ -264,7 +262,7 @@ def test_rebuild_stale_issue_flow_delegates_to_flow_rebuild_usecase() -> None:
     )
     issue = IssueInfo(number=320, title="Rebuild lifecycle")
 
-    with patch("vibe3.services.flow_rebuild_usecase.FlowRebuildUsecase") as rebuild_cls:
+    with patch("vibe3.services.flow.rebuild.FlowRebuildUsecase") as rebuild_cls:
         rebuild = rebuild_cls.return_value
         rebuild.rebuild_issue_flow.return_value = {"branch": "task/issue-320"}
 
@@ -469,7 +467,7 @@ def test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict() -> None:
         None,  # Success on retry
     ]
 
-    with patch("vibe3.services.flow_orchestrator_service.time.sleep") as mock_sleep:
+    with patch("vibe3.services.orchestra.orchestrator.time.sleep") as mock_sleep:
         result = service.bootstrap_issue_flow(
             IssueInfo(number=999, title="Retry test"),
             branch="dev/issue-999",
@@ -511,7 +509,7 @@ def test_bootstrap_issue_flow_packs_refs_on_lock_conflict() -> None:
         None,  # Success after pack-refs
     ]
 
-    with patch("vibe3.services.flow_orchestrator_service.time.sleep"):
+    with patch("vibe3.services.orchestra.orchestrator.time.sleep"):
         result = service.bootstrap_issue_flow(
             IssueInfo(number=777, title="Pack refs test"),
             branch="dev/issue-777",
@@ -541,7 +539,7 @@ def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
         "fetch", "cannot lock ref 'refs/remotes/origin/main': ..."
     )
 
-    with patch("vibe3.services.flow_orchestrator_service.time.sleep"):
+    with patch("vibe3.services.orchestra.orchestrator.time.sleep"):
         with pytest.raises(GitError, match="cannot lock ref"):
             service.bootstrap_issue_flow(
                 IssueInfo(number=888, title="Exhausted retry test"),

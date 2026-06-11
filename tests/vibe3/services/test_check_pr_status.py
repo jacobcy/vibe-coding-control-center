@@ -3,14 +3,22 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.service import CheckService
 
 
 class TestPRStatusDetection:
     """Test PR status detection and flow auto-completion."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_snapshot(self):
+        """Mock snapshot service to avoid real git operations in tests."""
+        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
+            yield
 
     def test_check_marks_flow_done_when_merged(self, tmp_path):
         """Should mark flow as done when PR is merged."""
@@ -332,7 +340,7 @@ class TestMergedPRCacheIntegration:
     def test_cache_hit_skips_api_call(self, tmp_path: Path) -> None:
         """When cache hits, get_merged_pr_for_issue should skip API call."""
         from vibe3.clients.merged_pr_cache import MergedPRCache
-        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+        from vibe3.services.pr.status_checker import get_merged_pr_for_issue
 
         cache = MergedPRCache(tmp_path)
         cache._save_cache(
@@ -349,12 +357,12 @@ class TestMergedPRCacheIntegration:
         )
 
         with patch(
-            "vibe3.services.pr_status_checker.get_git_common_dir"
+            "vibe3.services.pr.status_checker.get_git_common_dir"
         ) as mock_git_dir:
             mock_git_dir.return_value = str(tmp_path / ".git")
 
             with patch(
-                "vibe3.services.pr_status_checker.GitHubClient"
+                "vibe3.services.pr.status_checker.GitHubClient"
             ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
@@ -368,17 +376,17 @@ class TestMergedPRCacheIntegration:
 
     def test_cache_miss_triggers_sync(self, tmp_path: Path) -> None:
         """When cache misses, get_merged_pr_for_issue should sync and return result."""
-        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+        from vibe3.services.pr.status_checker import get_merged_pr_for_issue
 
         # Mock get_git_common_dir to return tmp_path
         with patch(
-            "vibe3.services.pr_status_checker.get_git_common_dir"
+            "vibe3.services.pr.status_checker.get_git_common_dir"
         ) as mock_git_dir:
             mock_git_dir.return_value = str(tmp_path / ".git")
 
             # Mock GitHubClient
             with patch(
-                "vibe3.services.pr_status_checker.GitHubClient"
+                "vibe3.services.pr.status_checker.GitHubClient"
             ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
@@ -410,8 +418,8 @@ class TestClosedPRIdempotency:
         """Should skip handling if already handled with same closed_at."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
         # and updated_at after closed_at
@@ -472,8 +480,8 @@ class TestClosedPRIdempotency:
         """Should handle again if PR was closed again (updated_at before closed_at)."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with initiated_by="check:pr_closed"
         # but updated_at BEFORE closed_at
@@ -533,8 +541,8 @@ class TestClosedPRIdempotency:
         """Should handle if initiated_by is not 'check:pr_closed'."""
         from datetime import datetime, timezone
 
-        from vibe3.services.check_pr_service import CheckPRService
-        from vibe3.services.flow_status_service import FlowStatusService
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
 
         # ARRANGE: Flow state with different initiated_by
         store = SQLiteClient(db_path=tmp_path / "test.db")

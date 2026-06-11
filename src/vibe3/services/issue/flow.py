@@ -8,8 +8,8 @@ from vibe3.config import VibeConfig, load_orchestra_config
 from vibe3.exceptions import InvalidBranchLinkError
 
 if TYPE_CHECKING:
+    from vibe3.config import ConventionResolver
     from vibe3.models import OrchestraConfig
-    from vibe3.services.convention_resolver import ConventionResolver
 
 
 def _default_store() -> SQLiteClient:

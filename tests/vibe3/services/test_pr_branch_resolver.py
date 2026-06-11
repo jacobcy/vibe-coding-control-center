@@ -277,7 +277,7 @@ class TestCommandIntegration:
             mock_github_class.return_value = mock_client
 
             # Mock FlowService
-            with patch("vibe3.services.flow_service.FlowService") as mock_service_class:
+            with patch("vibe3.services.FlowService") as mock_service_class:
                 mock_service = Mock()
                 mock_service.get_current_branch.return_value = "main"
                 mock_service_class.return_value = mock_service

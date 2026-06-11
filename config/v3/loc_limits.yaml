@@ -23,17 +23,17 @@ code_limits:
       - path: "src/vibe3/services/pr/service.py"
         limit: 600
         reason: "PR 生命周期聚合"
-      - path: "src/vibe3/services/check_service.py"
+      - path: "src/vibe3/services/check/service.py"
         limit: 680
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑"
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑；迁移至 check/ 子包（Issue #2584）"
 
       # Exceptions 聚合 —— 允许 480-600
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 620
         reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）"
-      - path: "src/vibe3/services/handoff_service.py"
+      - path: "src/vibe3/services/handoff/service.py"
         limit: 650
-        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）"
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
 
       # Clients 聚合 —— 允许 450-540
       - path: "src/vibe3/clients/sqlite_schema.py"
@@ -100,7 +100,7 @@ code_limits:
       - path: "src/vibe3/analysis/snapshot_service.py"
         limit: 480
         reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑"
-      - path: "src/vibe3/services/status_query_service.py"
+      - path: "src/vibe3/services/shared/status_query.py"
         limit: 480
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"
       - path: "src/vibe3/services/task_service.py"
@@ -112,15 +112,15 @@ code_limits:
       - path: "src/vibe3/services/task/show.py"
         limit: 420
         reason: "Task show service (refactored from task_show_service.py), 包含 TaskShowService、TaskRefSummary、TaskCommentSummary、TaskPRSummary、TaskShowResult 等紧密耦合类；新增 fields parameter 支持（view_issue fields 参数）后略微超标（+13 行，multi-line formatting by black）"
-      - path: "src/vibe3/services/expired_resource_cleanup_service.py"
+      - path: "src/vibe3/services/orchestra/cleanup.py"
         limit: 650
         reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑；新增 quiet 模式、颜色高亮输出，以及 flow-record 安全闸（active/blocked 分支保护 + _get_active_flow_branches，替代 merge 状态作为删除依据，issue #2033）后略微超标"
       - path: "src/vibe3/services/flow/cleanup.py"
         limit: 420
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤（migrated from flow_cleanup_service.py to flow/ subpackage, Issue #2107）"
-      - path: "src/vibe3/services/check_cleanup_service.py"
+      - path: "src/vibe3/services/check/cleanup.py"
         limit: 610
-        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）"
+        reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）；迁移至 check/ 子包（Issue #2584）"
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
@@ -200,9 +200,9 @@ code_limits:
       - path: "src/vibe3/services/orchestra/status.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多；Issue #2106 Phase 3-2 迁移至 orchestra/status.py"
-      - path: "src/vibe3/services/check_pr_service.py"
+      - path: "src/vibe3/services/check/pr_service.py"
         limit: 720
-        reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数 + idempotency 检查）、label 继承、GitHub API 失败保护（network/auth/timeout）、retry-safe cleanup 逻辑、dependency transfer（PR closed 时将依赖从旧 issue 转移到 bridge issue）等紧密耦合功能，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）；Issue #2380 新增 _transfer_dependencies 方法支持依赖转移（+35 行）"
+        reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数 + idempotency 检查）、label 继承、GitHub API 失败保护（network/auth/timeout）、retry-safe cleanup 逻辑、dependency transfer（PR closed 时将依赖从旧 issue 转移到 bridge issue）等紧密耦合功能，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）；Issue #2380 新增 _transfer_dependencies 方法支持依赖转移（+35 行）；迁移至 check/ 子包（Issue #2584）"
 
       # 强耦合测试例外
       - path: "tests/vibe3/models/test_job.py"

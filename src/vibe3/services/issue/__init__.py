@@ -8,8 +8,16 @@ if TYPE_CHECKING:
         parse_projection,
         render_projection,
     )
+    from vibe3.services.issue.branch_resolver import (
+        iter_issue_branch_candidates,
+        resolve_issue_branch_input,
+    )
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
+    from vibe3.services.issue.dispatch_policy import (
+        DispatchExclusion,
+        IssueDispatchPolicy,
+    )
     from vibe3.services.issue.failure import (
         block_executor_noop_issue,
         block_issue,
@@ -28,13 +36,18 @@ if TYPE_CHECKING:
 
 __all__ = [
     # Classes
+    "DispatchExclusion",
     "IssueCollectionService",
+    "IssueDispatchPolicy",
     "IssueFlowService",
     "IssueTitleCacheService",
     # Functions - body
     "merge_projection",
     "parse_projection",
     "render_projection",
+    # Functions - branch_resolver
+    "iter_issue_branch_candidates",
+    "resolve_issue_branch_input",
     # Functions - context
     "load_issue_info",
     # Functions - failure
@@ -53,13 +66,18 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     # Classes
+    "DispatchExclusion": "vibe3.services.issue.dispatch_policy",
     "IssueCollectionService": "vibe3.services.issue.collection",
+    "IssueDispatchPolicy": "vibe3.services.issue.dispatch_policy",
     "IssueFlowService": "vibe3.services.issue.flow",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
     # Functions - body
     "merge_projection": "vibe3.services.issue.body",
     "parse_projection": "vibe3.services.issue.body",
     "render_projection": "vibe3.services.issue.body",
+    # Functions - branch_resolver
+    "iter_issue_branch_candidates": "vibe3.services.issue.branch_resolver",
+    "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
     # Functions - context
     "load_issue_info": "vibe3.services.issue.context",
     # Functions - failure

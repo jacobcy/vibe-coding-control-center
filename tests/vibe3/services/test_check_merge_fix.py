@@ -11,8 +11,8 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.check_cleanup_service import CheckCleanupService
-from vibe3.services.check_service import CheckService
+from vibe3.services.check.cleanup import CheckCleanupService
+from vibe3.services.check.service import CheckService
 
 
 @pytest.fixture
