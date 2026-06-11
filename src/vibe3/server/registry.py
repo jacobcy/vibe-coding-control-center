@@ -36,30 +36,6 @@ def _resolve_dispatcher_models_root(
     return resolve_orchestra_repo_root().resolve()
 
 
-def _resolve_async_cli_override_root(
-    config: "OrchestraConfig",
-    launch_cwd: Path | None = None,
-) -> Path | None:
-    """Resolve optional async child code-root override.
-
-    DEPRECATED: Always returns None.
-
-    Cross-project dispatch must always use the installed/source vibe3 project
-    root, never the caller repository. This ensures correct cli.py resolution
-    when running `vibe3 scan` from external projects.
-
-    Debug mode only affects logging verbosity and debug output, not code paths.
-    See VIBE3_REPO_MODELS_ROOT for project-specific models root override
-    (which IS debug-mode sensitive).
-
-    Historical context (PR #1662):
-    - Pre-fix: debug mode returned launch_cwd, breaking cross-project dispatch
-    - Post-fix: always returns None, forcing module-based resolution
-    - Rationale: cli.py must always point to vibe3 installation, not caller repo
-    """
-    return None
-
-
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
     """Resolve the shared orchestra log root anchored to the launch cwd."""
     return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
@@ -139,22 +115,10 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
-    # Create shared service instances for the assembly layer.
-    shared_check_service = CheckService(
-        store=shared_store,
-        git_client=shared_flow_manager.git,
-        github_client=shared_github,
-    )
-    shared_flow_service = FlowService(
-        store=shared_store,
-        git_client=shared_flow_manager.git,
-    )
-
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
     # GlobalDispatchCoordinator is created internally by the facade.
-    from vibe3.services import CheckService, FlowService
 
     shared_check_service = CheckService(
         store=shared_store,
@@ -419,7 +383,6 @@ def _build_async_serve_command(
 
     models_root = _resolve_dispatcher_models_root(config, launch_cwd)
     log_dir = _resolve_orchestra_log_dir(launch_cwd)
-    async_cli_root = _resolve_async_cli_override_root(config, launch_cwd)
 
     # Resolve the absolute path to vibe3 project root via module location.
     # This works correctly in both:
@@ -432,11 +395,7 @@ def _build_async_serve_command(
 
     # Always explicitly set VIBE3_ASYNC_CLI_PROJECT_ROOT to prevent
     # parent environment hijacking the async child's code-root resolution
-    async_cli_root_env = (
-        f"VIBE3_ASYNC_CLI_PROJECT_ROOT={async_cli_root}"
-        if async_cli_root is not None
-        else "VIBE3_ASYNC_CLI_PROJECT_ROOT="
-    )
+    async_cli_root_env = "VIBE3_ASYNC_CLI_PROJECT_ROOT="
     cmd = [
         "env",
         "VIBE3_ORCHESTRA_EVENT_LOG=1",
