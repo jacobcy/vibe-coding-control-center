@@ -6,6 +6,7 @@ on every published domain event via EventPublisher.on_publish hook.
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -354,12 +355,12 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
 
         _dispatch_command_job(command_type, issue_number, actor, refs)
 
-    def enqueue_plan_action(params: dict[str, str]) -> None:
-        """Enqueue plan action handler (syntactic sugar for enqueue_command_job)."""
+    def _enqueue_by_role(role: str, params: dict[str, str]) -> None:
+        """Validate params and dispatch via _dispatch_command_job."""
         issue_number_str = params.get("issue_number")
         if not issue_number_str:
             logger.bind(domain="event_rules").warning(
-                "enqueue_plan missing 'issue_number' param, skipping"
+                f"enqueue_{role} missing 'issue_number' param, skipping"
             )
             return
 
@@ -367,58 +368,14 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
             issue_number = int(issue_number_str)
         except ValueError:
             logger.bind(domain="event_rules").warning(
-                f"enqueue_plan invalid issue_number '{issue_number_str}', skipping"
+                f"enqueue_{role} invalid issue_number '{issue_number_str}', skipping"
             )
             return
 
-        actor = params.get("actor", "event:enqueue_plan")
+        actor = params.get("actor", f"event:enqueue_{role}")
         refs = {k: v for k, v in params.items() if k not in ("issue_number", "actor")}
 
-        _dispatch_command_job("plan", issue_number, actor, refs)
-
-    def enqueue_run_action(params: dict[str, str]) -> None:
-        """Enqueue run action handler (syntactic sugar for enqueue_command_job)."""
-        issue_number_str = params.get("issue_number")
-        if not issue_number_str:
-            logger.bind(domain="event_rules").warning(
-                "enqueue_run missing 'issue_number' param, skipping"
-            )
-            return
-
-        try:
-            issue_number = int(issue_number_str)
-        except ValueError:
-            logger.bind(domain="event_rules").warning(
-                f"enqueue_run invalid issue_number '{issue_number_str}', skipping"
-            )
-            return
-
-        actor = params.get("actor", "event:enqueue_run")
-        refs = {k: v for k, v in params.items() if k not in ("issue_number", "actor")}
-
-        _dispatch_command_job("run", issue_number, actor, refs)
-
-    def enqueue_review_action(params: dict[str, str]) -> None:
-        """Enqueue review action handler (syntactic sugar for enqueue_command_job)."""
-        issue_number_str = params.get("issue_number")
-        if not issue_number_str:
-            logger.bind(domain="event_rules").warning(
-                "enqueue_review missing 'issue_number' param, skipping"
-            )
-            return
-
-        try:
-            issue_number = int(issue_number_str)
-        except ValueError:
-            logger.bind(domain="event_rules").warning(
-                f"enqueue_review invalid issue_number '{issue_number_str}', skipping"
-            )
-            return
-
-        actor = params.get("actor", "event:enqueue_review")
-        refs = {k: v for k, v in params.items() if k not in ("issue_number", "actor")}
-
-        _dispatch_command_job("review", issue_number, actor, refs)
+        _dispatch_command_job(role, issue_number, actor, refs)
 
     def refresh_queue_priority_action(params: dict[str, str]) -> None:
         """Refresh queue priority action handler.
@@ -478,14 +435,18 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
             issue_number=issue_number,
         ).info("Published ManagerDispatchIntent for queue refresh")
 
+    def _publish_governance_scan(actor: str, tick_count: int) -> None:
+        """Publish GovernanceScanStarted with the given actor and tick."""
+        from vibe3.domain import publish
+        from vibe3.domain.events.governance import GovernanceScanStarted
+
+        publish(GovernanceScanStarted(tick_count=tick_count, actor=actor))
+
     def reload_material_action(params: dict[str, str]) -> None:
         """Reload material action handler.
 
         Publishes GovernanceScanStarted to trigger governance material re-read.
         """
-        from vibe3.domain import publish
-        from vibe3.domain.events.governance import GovernanceScanStarted
-
         tick_count = 0
         tick_str = params.get("tick_count")
         if tick_str:
@@ -494,12 +455,7 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
             except ValueError:
                 pass
 
-        event = GovernanceScanStarted(
-            tick_count=tick_count,
-            actor="event:reload_material",
-        )
-        publish(event)
-
+        _publish_governance_scan("event:reload_material", tick_count)
         logger.bind(domain="event_rules").info(
             f"Published GovernanceScanStarted for material reload (tick={tick_count})"
         )
@@ -509,9 +465,6 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
 
         Publishes GovernanceScanStarted directly (bypasses heartbeat interval gating).
         """
-        from vibe3.domain import publish
-        from vibe3.domain.events.governance import GovernanceScanStarted
-
         tick_count = 0
         tick_str = params.get("tick_count")
         if tick_str:
@@ -521,13 +474,7 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
                 pass
 
         actor = params.get("actor", "event:trigger_governance_scan")
-
-        event = GovernanceScanStarted(
-            tick_count=tick_count,
-            actor=actor,
-        )
-        publish(event)
-
+        _publish_governance_scan(actor, tick_count)
         logger.bind(domain="event_rules").info(
             f"Published GovernanceScanStarted (tick={tick_count})"
         )
@@ -548,9 +495,9 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
         "log": log_action,
         "refresh_queue_priority": refresh_queue_priority_action,
         "enqueue_command_job": enqueue_command_job_action,
-        "enqueue_plan": enqueue_plan_action,
-        "enqueue_run": enqueue_run_action,
-        "enqueue_review": enqueue_review_action,
+        "enqueue_plan": functools.partial(_enqueue_by_role, "plan"),
+        "enqueue_run": functools.partial(_enqueue_by_role, "run"),
+        "enqueue_review": functools.partial(_enqueue_by_role, "review"),
         "reload_material": reload_material_action,
         "trigger_governance_scan": trigger_governance_scan_action,
         "notify": notify_action,
