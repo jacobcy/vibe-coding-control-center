@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models import PRState
-from vibe3.observability import append_orchestra_event
 from vibe3.services.shared.labels import normalize_labels
 
 if TYPE_CHECKING:
@@ -230,9 +229,6 @@ class CheckPRService:
                 return (False, [], [])
             return self._handle_closed_pr_flow(branch, pr)
 
-        if pr.state == PRState.OPEN:
-            return self._handle_open_pr_flow(branch, pr)
-
         return (False, [], [])
 
     def _handle_merged_pr(
@@ -291,58 +287,6 @@ class CheckPRService:
             return (True, [reset_error], [])
 
         return (True, [], reset_warnings)
-
-    def _handle_open_pr_flow(
-        self, branch: str, pr: "PRResponse"
-    ) -> tuple[bool, list[str], list[str]]:
-        """Handle open PR with active worker running.
-
-        When a flow has planner_status or executor_status as "running" but a PR
-        already exists and is open, transition the flow to "review" to prevent
-        duplicated work and re-dispatch.
-
-        Returns:
-            Tuple of (handled=True, issues, warnings).
-        """
-        flow_state = self.store.get_flow_state(branch)
-        if not flow_state:
-            return (False, [], [])
-
-        flow_status = flow_state.get("flow_status", "active")
-        if flow_status != "active":
-            # Flow already in non-active state (review/done/aborted/etc.)
-            return (False, [], [])
-
-        # Check if any worker is actually running
-        planner_status = flow_state.get("planner_status")
-        executor_status = flow_state.get("executor_status")
-        has_running_worker = planner_status == "running" or executor_status == "running"
-
-        if not has_running_worker:
-            # Flow is active but idle - no duplicated work to prevent
-            return (False, [], [])
-
-        # Transition flow to review
-        reason = f"PR #{pr.number} is open, but worker is running"
-        self._flow_status_service.mark_flow_status(
-            branch, "review", reason, "flow_auto_review", "auto_review_flow"
-        )
-
-        # Log event
-        append_orchestra_event(
-            "check",
-            f"Auto-transitioned flow {branch} to review: "
-            f"PR #{pr.number} open with running worker",
-        )
-
-        # Update PR cache
-        self._update_pr_cache(branch, pr)
-
-        warning_msg = (
-            f"Flow '{branch}' transitioned to review: "
-            f"PR #{pr.number} is open but worker is running"
-        )
-        return (True, [], [warning_msg])
 
     def _find_existing_bridge_marker(
         self, issue_number: int, closed_pr_number: int

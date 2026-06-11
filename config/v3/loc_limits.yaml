@@ -31,7 +31,7 @@ code_limits:
       # Domain 层
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 620
-        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）"
+        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）；PR #2667 新增 open PR 检测与自动转换到 review 状态（+78 行）"
       - path: "src/vibe3/domain/event_rules.py"
         limit: 550
         reason: "Event rules 引擎核心聚合，包含规则加载、模板展开、规则评估、action handler 构建（9 个 handler，含 enqueue_command_job、refresh_queue_priority、reload_material、governance_scan 等业务动作）等紧密耦合逻辑；handler 函数与 build_action_handlers 工厂内聚性强，拆分会破坏注册一致性"

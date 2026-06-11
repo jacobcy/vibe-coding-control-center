@@ -33,6 +33,7 @@ from vibe3.services import (
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
+    from vibe3.models import PRResponse
 
 
 class QualifyGateService:
@@ -137,6 +138,10 @@ class QualifyGateService:
         # Step 0: GitHub closed check (ALL states)
         if issue.github_state and issue.github_state.upper() == "CLOSED":
             self._terminalize_closed_issue(issue, branch)
+            return None
+
+        # Step 0b: Open PR check (transition to review if worker running)
+        if branch and self._should_transition_to_review(branch, flow_state):
             return None
 
         # Step 1: Resolve body/local truth (remote-first)
@@ -448,6 +453,83 @@ class QualifyGateService:
         )
 
         return target_label
+
+    def _should_transition_to_review(
+        self, branch: str, flow_state: dict[str, object] | None
+    ) -> bool:
+        """Check if flow should be transitioned to review due to open PR.
+
+        Args:
+            branch: Git branch name
+            flow_state: Current flow state from store
+
+        Returns:
+            True if flow was transitioned to review, False otherwise.
+        """
+        if not flow_state or flow_state.get("flow_status") != "active":
+            return False
+
+        # Check for running worker
+        has_running = any(
+            flow_state.get(status) == "running"
+            for status in ("planner_status", "executor_status")
+        )
+        if not has_running:
+            return False
+
+        # Check for open PR
+        pr = self._get_open_pr_for_branch(branch)
+        if not pr:
+            return False
+
+        # Transition to review
+        self._transition_flow_to_review(branch, pr)
+        return True
+
+    def _get_open_pr_for_branch(self, branch: str) -> "PRResponse | None":
+        """Get open PR for branch.
+
+        Args:
+            branch: Git branch name
+
+        Returns:
+            PRResponse if open PR exists, None otherwise.
+        """
+        from vibe3.models import PRState
+
+        try:
+            prs = self._github.list_prs_for_branch(branch)
+            return next((pr for pr in prs if pr.state == PRState.OPEN), None)
+        except Exception:
+            return None
+
+    def _transition_flow_to_review(self, branch: str, pr: "PRResponse") -> None:
+        """Transition flow to review state.
+
+        Args:
+            branch: Git branch name
+            pr: Open PR response
+        """
+        from vibe3.observability import append_orchestra_event
+        from vibe3.services import FlowStatusService
+
+        FlowStatusService(
+            store=self._store,
+            git_client=self._flow_manager.git,
+            github_client=self._github,
+        ).mark_flow_status(
+            branch,
+            "review",
+            f"PR #{pr.number} is open with running worker",
+            "flow_auto_review",
+            "auto_review_flow",
+        )
+
+        append_orchestra_event(
+            "qualify_gate",
+            f"Auto-transitioned flow {branch} to review: "
+            f"PR #{pr.number} open with running worker",
+        )
 
     def _check_worktree_health(
         self,
