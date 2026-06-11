@@ -8,18 +8,30 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request
 
+from vibe3.models import (
+    WebhookIssueClosed,
+    WebhookIssueUpdated,
+    WebhookLabelChanged,
+    WebhookPRMerged,
+    WebhookPRReviewed,
+)
+
 if TYPE_CHECKING:
-    from vibe3.models.domain_events import DomainEvent
+    from vibe3.models import DomainEvent
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
+
+# 5 MB max — well above typical GitHub webhook payloads (~1 MB for large PRs)
+MAX_PAYLOAD_BYTES = 5 * 1024 * 1024
 
 
 def _verify_signature(payload: bytes, signature: str, secret: str) -> bool:
@@ -70,8 +82,6 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
                     logger.warning("Webhook label event missing label name")
                     return None
 
-                from vibe3.models.domain_events import WebhookLabelChanged
-
                 return WebhookLabelChanged(
                     issue_number=issue_number,
                     label=label,
@@ -81,8 +91,6 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
                 )
 
             elif action in ("opened", "edited"):
-                from vibe3.models.domain_events import WebhookIssueUpdated
-
                 return WebhookIssueUpdated(
                     issue_number=issue_number,
                     action=action,
@@ -91,8 +99,6 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
                 )
 
             elif action == "closed":
-                from vibe3.models.domain_events import WebhookIssueClosed
-
                 return WebhookIssueClosed(
                     issue_number=issue_number,
                     sender=sender,
@@ -112,8 +118,6 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
                 sender = payload.get("sender", {}).get("login", "")
                 timestamp = payload.get("pull_request", {}).get("merged_at")
 
-                from vibe3.models.domain_events import WebhookPRMerged
-
                 return WebhookPRMerged(
                     pr_number=pr_number,
                     branch=branch,
@@ -132,8 +136,6 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
                 state = payload.get("review", {}).get("state", "")
                 sender = payload.get("sender", {}).get("login", "")
                 timestamp = payload.get("review", {}).get("submitted_at")
-
-                from vibe3.models.domain_events import WebhookPRReviewed
 
                 return WebhookPRReviewed(
                     pr_number=pr_number,
@@ -157,11 +159,16 @@ async def handle_github_webhook(request: Request) -> dict:
     Verifies HMAC signature, converts payload to DomainEvent, and publishes
     to event bus. Always returns 200 for valid requests to prevent GitHub retries.
     """
-    # Read event type header
     event_type = request.headers.get("X-GitHub-Event", "")
 
-    # Read raw body for signature verification
     payload_bytes = await request.body()
+
+    if len(payload_bytes) > MAX_PAYLOAD_BYTES:
+        logger.warning(
+            f"Webhook payload too large: {len(payload_bytes)} bytes "
+            f"(max {MAX_PAYLOAD_BYTES})"
+        )
+        return {"status": "error", "message": "Payload too large"}
 
     # Verify signature if secret is configured
     secret = os.getenv("GITHUB_WEBHOOK_SECRET")
@@ -180,8 +187,6 @@ async def handle_github_webhook(request: Request) -> dict:
 
     # Parse JSON payload
     try:
-        import json
-
         payload = json.loads(payload_bytes)
     except json.JSONDecodeError as exc:
         logger.warning(f"Failed to parse webhook payload: {exc}")
@@ -191,7 +196,6 @@ async def handle_github_webhook(request: Request) -> dict:
     event = _convert_to_event(event_type, payload)
 
     if event is None:
-        # Unrecognized event type - GitHub requires 2xx response
         logger.debug(f"Unhandled webhook event type: {event_type}")
         return {"status": "ok", "event": event_type}
 
@@ -202,7 +206,6 @@ async def handle_github_webhook(request: Request) -> dict:
         publish(event)
         logger.info(f"Published webhook event: {event.__class__.__name__}")
     except Exception as exc:
-        # Log error but still return 200 to prevent GitHub retries
         logger.exception(f"Failed to publish webhook event: {exc}")
 
     return {"status": "ok", "event": event_type}

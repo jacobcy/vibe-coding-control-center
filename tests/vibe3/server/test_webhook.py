@@ -305,6 +305,45 @@ class TestWebhookEndpoint:
 
         assert response.status_code == 200
 
+    def test_publish_failure_returns_200(self, client):
+        """Publish failure should still return 200 (GitHub requires 2xx)."""
+        payload = {
+            "action": "labeled",
+            "issue": {"number": 123},
+            "label": {"name": "state/ready"},
+            "sender": {"login": "testuser"},
+        }
+
+        with patch("vibe3.models.publish", side_effect=RuntimeError("publish failed")):
+            response = client.post(
+                "/webhook/github",
+                content=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "X-GitHub-Event": "issues",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        assert response.status_code == 200
+
+    def test_payload_too_large_returns_200(self, client):
+        """Oversized payload should return 200 with error message."""
+        # Generate a payload larger than MAX_PAYLOAD_BYTES (5 MB)
+        large_string = "x" * (6 * 1024 * 1024)
+        payload = {"data": large_string}
+
+        response = client.post(
+            "/webhook/github",
+            content=json.dumps(payload).encode("utf-8"),
+            headers={
+                "X-GitHub-Event": "issues",
+                "Content-Type": "application/json",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "error"
+
 
 class TestConvertToEventFieldExtraction:
     """Tests for nested field extraction in payload conversion."""
