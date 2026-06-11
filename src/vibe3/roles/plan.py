@@ -195,11 +195,19 @@ def build_plan_request(
     """Build the planner async execution request for dispatch."""
     convention = get_convention()
     target_branch = branch or convention.branch.canonical_branch(issue.number)
+    # Async CLI 命令必须显式传递 --show-prompt（默认 False）
+    # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
     return build_role_async_request(
         role="planner",
         config=config,
         issue=issue,
-        command_args=["plan", "--branch", target_branch, "--no-async"],
+        command_args=[
+            "plan",
+            "--branch",
+            target_branch,
+            "--no-async",
+            "--show-prompt",
+        ],
         worktree_requirement=PLANNER_ROLE.worktree,
         branch=branch,
         repo_path=repo_path,

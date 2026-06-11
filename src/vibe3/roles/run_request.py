@@ -58,6 +58,8 @@ def build_run_request(
         ]
         refs["commit_mode"] = "true"
     elif plan_ref:
+        # Async CLI 命令必须显式传递 --show-prompt（默认 False）
+        # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
         command_args = [
             "run",
             "--branch",
@@ -65,9 +67,18 @@ def build_run_request(
             "--plan",
             plan_ref,
             "--no-async",
+            "--show-prompt",
         ]
     else:
-        command_args = ["run", "--branch", target_branch, "--no-async"]
+        # Async CLI 命令必须显式传递 --show-prompt（默认 False）
+        # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
+        command_args = [
+            "run",
+            "--branch",
+            target_branch,
+            "--no-async",
+            "--show-prompt",
+        ]
 
     return build_role_async_request(
         role="executor",
