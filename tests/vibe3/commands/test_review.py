@@ -134,12 +134,15 @@ class TestReviewBaseExitCodes:
 
     def test_minor_verdict_does_not_exit_nonzero(self) -> None:
         from vibe3.models import ReviewRequest, ReviewScope
+        from vibe3.roles.review_helpers import ReviewRunResult
 
         with (
             patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
             patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
             patch("vibe3.commands.review.build_base_review_request") as mock_request,
+            patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
+            patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
         ):
             mock_flow.return_value = (object(), "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
@@ -150,24 +153,29 @@ class TestReviewBaseExitCodes:
             # Create proper ReviewRequest instance
             review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
             mock_request.return_value = (review_request, 123, None)
-            mock_execute.return_value = type(
-                "Result",
-                (),
-                {"verdict": "MINOR", "handoff_file": None},
-            )()
+            mock_execute.return_value = ReviewRunResult(
+                verdict="MINOR",
+                handoff_file=None,
+                issue_number=None,
+            )
+            mock_execute_cache.return_value = mock_execute.return_value
 
             result = runner.invoke(app, ["base", "main", "--no-async"])
 
         assert result.exit_code == 0
 
     def test_refuse_verdict_exits_nonzero(self) -> None:
+
         from vibe3.models import ReviewRequest, ReviewScope
+        from vibe3.roles.review_helpers import ReviewRunResult
 
         with (
             patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
             patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
             patch("vibe3.commands.review.build_base_review_request") as mock_request,
+            patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
+            patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
         ):
             mock_flow.return_value = (object(), "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
@@ -178,11 +186,12 @@ class TestReviewBaseExitCodes:
             # Create proper ReviewRequest instance
             review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
             mock_request.return_value = (review_request, 123, None)
-            mock_execute.return_value = type(
-                "Result",
-                (),
-                {"verdict": "REFUSE", "handoff_file": None},
-            )()
+            mock_execute.return_value = ReviewRunResult(
+                verdict="REFUSE",
+                handoff_file=None,
+                issue_number=None,
+            )
+            mock_execute_cache.return_value = mock_execute.return_value
 
             result = runner.invoke(app, ["base", "main", "--no-async"])
 
@@ -202,12 +211,15 @@ def test_review_base_show_prompt_forwarded_to_sync():
     """review base --show-prompt should forward the flag to
     execute_manual_review_sync (requires --dry-run)."""
     from vibe3.models import ReviewRequest, ReviewScope
+    from vibe3.roles.review_helpers import ReviewRunResult
 
     with (
         patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
         patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
         patch("vibe3.commands.review.build_base_review_request") as mock_request,
+        patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
         patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
+        patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
     ):
         mock_flow.return_value = (object(), "feature/test")
         mock_base.return_value.resolve_review_base.return_value = type(
@@ -218,18 +230,20 @@ def test_review_base_show_prompt_forwarded_to_sync():
         # Create proper ReviewRequest instance
         review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
         mock_request.return_value = (review_request, 123, None)
-        mock_execute.return_value = type(
-            "Result",
-            (),
-            {"verdict": "MINOR", "handoff_file": None},
-        )()
+        mock_execute.return_value = ReviewRunResult(
+            verdict="MINOR",
+            handoff_file=None,
+            issue_number=None,
+        )
+        mock_execute_cache.return_value = mock_execute.return_value
 
         result = runner.invoke(
             app, ["base", "main", "--no-async", "--dry-run", "--show-prompt"]
         )
 
     assert result.exit_code == 0
-    assert mock_execute.call_args.kwargs["show_prompt"] is True
+    # Handler resolves via vibe3.roles (cache), not vibe3.roles.review
+    assert mock_execute_cache.call_args.kwargs["show_prompt"] is True
 
 
 def test_review_help_shows_new_options():
@@ -278,67 +292,100 @@ def test_review_fresh_session_propagates():
 
 def test_review_agent_option_propagates():
     """review --agent foo should propagate to run_issue_role_sync."""
+    mock_config = MagicMock()
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
         patch(
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-        ) as mock_sync,
+        ) as _mock_sync,
+        patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
-        mock_flow = MagicMock()
-        mock_flow.task_issue_number = 42
-        mock_validate.return_value = (mock_flow, 42)
-        mock_resolve.return_value = "task/issue-42"
+        # Inject mock into vibe3.config namespace for handler
+        import vibe3.config
 
-        result = runner.invoke(app, ["--no-async", "--agent", "foo"])
+        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
+        try:
+            mock_flow = MagicMock()
+            mock_flow.task_issue_number = 42
+            mock_validate.return_value = (mock_flow, 42)
+            mock_resolve.return_value = "task/issue-42"
+
+            result = runner.invoke(app, ["--no-async", "--agent", "foo"])
+        finally:
+            # Cleanup injected attribute
+            del vibe3.config.load_config_for_role
 
     assert result.exit_code == 0
-    mock_sync.assert_called_once()
-    call_kwargs = mock_sync.call_args.kwargs
+    mock_sync_cache.assert_called_once()
+    call_kwargs = mock_sync_cache.call_args.kwargs
     assert call_kwargs["agent"] == "foo"
 
 
 def test_review_backend_option_propagates():
     """review --backend claude should propagate to run_issue_role_sync."""
+    mock_config = MagicMock()
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
         patch(
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-        ) as mock_sync,
+        ) as _mock_sync,
+        patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
-        mock_flow = MagicMock()
-        mock_flow.task_issue_number = 42
-        mock_validate.return_value = (mock_flow, 42)
-        mock_resolve.return_value = "task/issue-42"
+        import vibe3.config
 
-        result = runner.invoke(app, ["--no-async", "--backend", "claude"])
+        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
+        try:
+            mock_flow = MagicMock()
+            mock_flow.task_issue_number = 42
+            mock_validate.return_value = (mock_flow, 42)
+            mock_resolve.return_value = "task/issue-42"
+
+            result = runner.invoke(app, ["--no-async", "--backend", "claude"])
+        finally:
+            del vibe3.config.load_config_for_role
 
     assert result.exit_code == 0
-    mock_sync.assert_called_once()
-    call_kwargs = mock_sync.call_args.kwargs
+    mock_sync_cache.assert_called_once()
+    call_kwargs = mock_sync_cache.call_args.kwargs
     assert call_kwargs["backend"] == "claude"
 
 
 def test_review_model_option_propagates():
     """review --model claude-opus-4-8 should propagate to run_issue_role_sync."""
+    mock_config = MagicMock()
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
         patch(
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-        ) as mock_sync,
+        ) as _mock_sync,
+        patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
-        mock_flow = MagicMock()
-        mock_flow.task_issue_number = 42
-        mock_validate.return_value = (mock_flow, 42)
-        mock_resolve.return_value = "task/issue-42"
+        import vibe3.config
 
-        result = runner.invoke(
-            app, ["--no-async", "--backend", "claude", "--model", "claude-opus-4-8"]
-        )
+        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
+        try:
+            mock_flow = MagicMock()
+            mock_flow.task_issue_number = 42
+            mock_validate.return_value = (mock_flow, 42)
+            mock_resolve.return_value = "task/issue-42"
+
+            result = runner.invoke(
+                app,
+                [
+                    "--no-async",
+                    "--backend",
+                    "claude",
+                    "--model",
+                    "claude-opus-4-8",
+                ],
+            )
+        finally:
+            del vibe3.config.load_config_for_role
 
     assert result.exit_code == 0
-    mock_sync.assert_called_once()
-    call_kwargs = mock_sync.call_args.kwargs
+    mock_sync_cache.assert_called_once()
+    call_kwargs = mock_sync_cache.call_args.kwargs
     assert call_kwargs["model"] == "claude-opus-4-8"

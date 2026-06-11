@@ -72,7 +72,11 @@ class TestPlanCommandValidation:
 
     def test_plan_rejects_show_prompt_without_dry_run(self):
         """plan command should reject --show-prompt without --dry-run."""
-        with patch("vibe3.commands.plan._plan_for_branch") as mock_plan:
+        with (
+            patch("vibe3.commands.plan.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.commands.plan._plan_for_branch") as mock_plan,
+        ):
+            mock_resolve.return_value = "task/issue-42"
             result = runner.invoke(cli_app, ["plan", "--branch", "42", "--show-prompt"])
 
         assert result.exit_code == 1
@@ -100,7 +104,11 @@ class TestReviewCommandValidation:
 
     def test_review_rejects_show_prompt_without_dry_run(self):
         """review command should reject --show-prompt without --dry-run."""
-        with patch("vibe3.commands.review._review_branch_impl") as mock_review:
+        with (
+            patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.commands.review._review_branch_impl") as mock_review,
+        ):
+            mock_resolve.return_value = "task/issue-42"
             result = runner.invoke(
                 cli_app, ["review", "--branch", "42", "--show-prompt"]
             )

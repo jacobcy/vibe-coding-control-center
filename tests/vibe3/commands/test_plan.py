@@ -10,6 +10,22 @@ from vibe3.commands.plan import app as plan_app
 runner = CliRunner(env={"NO_COLOR": "1"})
 
 
+def _ensure_lazy_imports_populated() -> None:
+    """Force vibe3.roles lazy import cache to populate with real values.
+
+    Must be called BEFORE patching vibe3.roles.plan source module.
+    Without this, monkeypatch.setattr on the cache triggers __getattr__
+    which reads from the (already-mocked) source, caching the mock.
+    monkeypatch.undo then restores the mock instead of the real function.
+    """
+    import vibe3.roles
+
+    # Access each symbol to trigger __getattr__ and cache the real value
+    _ = vibe3.roles.resolve_spec_plan_input
+    _ = vibe3.roles.execute_spec_plan_async
+    _ = vibe3.roles.execute_spec_plan_sync
+
+
 def _make_mock_flow(
     branch: str = "task/issue-42",
     spec_ref: str | None = "#42",
@@ -30,6 +46,8 @@ def _patch_plan_deps(
     Returns:
         Tuple of (mock_async, mock_sync) for verification in tests.
     """
+    _ensure_lazy_imports_populated()
+
     if mock_flow is None:
         mock_flow = _make_mock_flow()
 
@@ -51,21 +69,47 @@ def _patch_plan_deps(
     mock_config.plan.agent_config.agent = None
     mock_config.plan.agent_config.timeout_seconds = 3600
 
+    # Mock at roles lazy import cache BEFORE source to
+    # ensure monkeypatch saves real function as old value.
+    monkeypatch.setattr(
+        "vibe3.roles.resolve_spec_plan_input",
+        mock_resolve,
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.execute_spec_plan_async",
+        mock_async,
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.execute_spec_plan_sync",
+        mock_sync,
+    )
+    # Mock at roles.plan source module
+    monkeypatch.setattr(
+        "vibe3.roles.plan.resolve_spec_plan_input",
+        mock_resolve,
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.plan.execute_spec_plan_async",
+        mock_async,
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.plan.execute_spec_plan_sync",
+        mock_sync,
+    )
     # Mock at command layer (where functions are imported)
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
-    # Mock at roles.plan layer (where domain handler imports from)
-    monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        mock_resolve,
+    )
     # Mock config loader for domain handler
     monkeypatch.setattr(
         "vibe3.config.config_loader.load_config_for_role",
         lambda *a, **kw: mock_config,
     )
-    # Mock execute functions
-    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", mock_async)
-    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", mock_sync)
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
     )
     return mock_async, mock_sync
 
@@ -165,6 +209,8 @@ def test_plan_branch_no_spec_error(monkeypatch) -> None:
 
 def test_plan_spec_file_basic_flow(monkeypatch) -> None:
     """Test plan --spec <file> flow."""
+    _ensure_lazy_imports_populated()
+
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -175,14 +221,24 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
     mock_spec_input.request = MagicMock()
     mock_resolve.return_value = mock_spec_input
 
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
-    monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
-    )
+    # Cache before source
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_async", mock_execute)
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_sync", mock_execute)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
+    # Source
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", mock_execute)
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", mock_execute)
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    # Command layer
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.FlowService",
+        lambda: mock_flow_service,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
+    )
     # Mock load_config_and_validate_model since we refactored config loading
     mock_config = MagicMock()
     monkeypatch.setattr(
@@ -199,7 +255,8 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
         with patch.object(Path, "is_file", return_value=True):
             with patch.object(Path, "resolve", return_value=Path("/abs/docs/spec.md")):
                 result = runner.invoke(
-                    plan_app, ["--spec", "docs/spec.md", "--branch", "42"]
+                    plan_app,
+                    ["--spec", "docs/spec.md", "--branch", "42"],
                 )
     assert result.exit_code == 0
 
@@ -215,6 +272,8 @@ def test_plan_issue_subcommand_works(monkeypatch) -> None:
 
 def test_plan_dry_run_branch(monkeypatch) -> None:
     """Test plan --branch --dry-run returns exit_code=0 without async dispatch."""
+    _ensure_lazy_imports_populated()
+
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -234,16 +293,27 @@ def test_plan_dry_run_branch(monkeypatch) -> None:
     mock_config = MagicMock()
 
     # Don't mock execute_spec_plan_sync - let it call create_codeagent_command
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    # Cache before source for resolve_spec_plan_input
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.FlowService",
+        lambda: mock_flow_service,
     )
-    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.plan.create_codeagent_command",
+        mock_command,
+    )
     monkeypatch.setattr(
         "vibe3.roles.plan.CodeagentExecutionService",
-        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+        lambda cfg: MagicMock(
+            execute_sync=lambda cmd: mock_result,
+        ),
     )
     # Mock config loader for domain handler
     monkeypatch.setattr(
@@ -261,6 +331,8 @@ def test_plan_dry_run_branch(monkeypatch) -> None:
 
 def test_plan_show_prompt_propagates(monkeypatch) -> None:
     """Test plan --branch --dry-run --show-prompt passes show_prompt=True."""
+    _ensure_lazy_imports_populated()
+
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -279,16 +351,27 @@ def test_plan_show_prompt_propagates(monkeypatch) -> None:
     # Mock config
     mock_config = MagicMock()
 
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    # Cache before source for resolve_spec_plan_input
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.FlowService",
+        lambda: mock_flow_service,
     )
-    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", mock_command)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
+    )
+    monkeypatch.setattr(
+        "vibe3.roles.plan.create_codeagent_command",
+        mock_command,
+    )
     monkeypatch.setattr(
         "vibe3.roles.plan.CodeagentExecutionService",
-        lambda cfg: MagicMock(execute_sync=lambda cmd: mock_result),
+        lambda cfg: MagicMock(
+            execute_sync=lambda cmd: mock_result,
+        ),
     )
     # Mock config loader for domain handler
     monkeypatch.setattr(
@@ -306,6 +389,8 @@ def test_plan_show_prompt_propagates(monkeypatch) -> None:
 
 def test_plan_async_shows_tmux_info(monkeypatch) -> None:
     """Test plan --branch (async) shows tmux session and log path."""
+    _ensure_lazy_imports_populated()
+
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -324,12 +409,24 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
     # Mock config
     mock_config = MagicMock()
 
+    # Cache before source
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
+    # Source
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", mock_async)
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    # Command layer
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        mock_resolve,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.FlowService",
+        lambda: mock_flow_service,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
     )
     # Mock config loader for domain handler
     monkeypatch.setattr(
@@ -408,8 +505,10 @@ def test_plan_model_with_config_backend_succeeds(monkeypatch) -> None:
 
     When user has backend: "claude" in settings.yaml and runs:
       vibe3 plan --model opus
-    This should succeed — config provides backend, CLI provides model.
+    This should succeed -- config provides backend, CLI provides model.
     """
+    _ensure_lazy_imports_populated()
+
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -421,12 +520,24 @@ def test_plan_model_with_config_backend_succeeds(monkeypatch) -> None:
     mock_spec_input.request = MagicMock()
     mock_resolve.return_value = mock_spec_input
 
+    # Cache before source
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
+    # Source
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", mock_sync)
-    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    # Command layer
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        mock_resolve,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.FlowService",
+        lambda: mock_flow_service,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda _: "task/issue-42",
     )
 
     # Mock config with backend set (simulating settings.yaml)

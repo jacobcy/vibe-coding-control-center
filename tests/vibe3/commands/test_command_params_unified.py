@@ -96,6 +96,8 @@ def mock_run_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
     )
     # Mock execute_manual_run at roles layer
     monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", MagicMock())
+    # Mock at lazy import cache (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", MagicMock())
     # Mock config loader for domain handler
     monkeypatch.setattr(
         "vibe3.config.config_loader.load_config_for_role",
@@ -126,6 +128,10 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
         "vibe3.execution.issue_role_sync_runner.run_issue_role_async",
         MagicMock(),
     )
+    # Mock at lazy import cache for roles layer
+    # (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_review_sync", MagicMock())
+    monkeypatch.setattr("vibe3.roles.execute_manual_review_async", MagicMock())
     # Mock config loader for domain handler
     monkeypatch.setattr(
         "vibe3.config.config_loader.load_config_for_role",
@@ -265,6 +271,8 @@ def test_run_dry_run_forwards_to_execution(
     """vibe3 run --dry-run forwards dry_run=True to execute_manual_run."""
     mock_execute = MagicMock()
     monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    # Mock at lazy import cache (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
 
     runner.invoke(run_app, ["--dry-run", "--no-async", "test instructions"])
 
@@ -301,6 +309,8 @@ def test_review_base_dry_run_returns_dry_run_verdict(
     mock_result = MagicMock(verdict="DRY_RUN", handoff_file=None)
     mock_execute = MagicMock(return_value=mock_result)
     monkeypatch.setattr("vibe3.roles.review.execute_manual_review_sync", mock_execute)
+    # Mock at lazy import cache (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_review_sync", mock_execute)
 
     result = runner.invoke(review_app, ["base", "main", "--dry-run", "--no-async"])
 
@@ -381,6 +391,8 @@ def test_run_show_prompt_forwarded(
     """vibe3 run --dry-run --show-prompt forwards both flags to execute_manual_run."""
     mock_execute = MagicMock()
     monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    # Mock at lazy import cache (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
 
     runner.invoke(
         run_app, ["--dry-run", "--show-prompt", "--no-async", "test instructions"]
@@ -434,6 +446,8 @@ def test_run_cli_agent_overrides_config(
     """--agent CLI option forwards agent to execute_manual_run."""
     mock_execute = MagicMock()
     monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    # Mock at lazy import cache (handler does from vibe3.roles import ...)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
 
     runner.invoke(
         run_app, ["--agent", "override-agent", "--no-async", "test instructions"]
