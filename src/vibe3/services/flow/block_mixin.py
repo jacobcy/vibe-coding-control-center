@@ -1,6 +1,8 @@
 """Flow block/abort operations mixin."""
 
-from typing import Self
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Self
 
 from loguru import logger
 
@@ -8,11 +10,27 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.services.shared.signatures import SignatureService
 
+if TYPE_CHECKING:
+    from vibe3.services.protocols import TaskQueryProtocol
+
 
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: SQLiteClient
+    _task_service: "TaskQueryProtocol | None" = None
+
+    def set_task_service(self, task_service: TaskQueryProtocol) -> None:
+        """Inject task service for dependency breaking."""
+        self._task_service = task_service
+
+    def _get_task_service(self) -> "TaskQueryProtocol":
+        """Lazily initialize task service if not injected."""
+        if self._task_service is None:
+            from vibe3.services.task import TaskService
+
+            self._task_service = TaskService()  # type: ignore[assignment]
+        return self._task_service  # type: ignore[return-value]
 
     def block_flow(
         self: Self,
@@ -59,9 +77,7 @@ class FlowLifecycleMixin:
         )
 
         if blocked_by_issue:
-            from vibe3.services.task import TaskService
-
-            TaskService().link_issue(
+            self._get_task_service().link_issue(
                 branch,
                 blocked_by_issue,
                 role="dependency",

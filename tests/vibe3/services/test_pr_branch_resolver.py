@@ -150,13 +150,18 @@ class TestResolveCommandBranch:
 
     def test_fallback_current_branch(self):
         """测试回退：当前分支"""
-        mock_flow_service = Mock()
-        mock_flow_service.get_current_branch.return_value = "main"
+        from unittest.mock import MagicMock
 
-        result = resolve_command_branch(flow_service=mock_flow_service)
+        mock_flow_service = Mock()
+        mock_git_client = MagicMock()
+        mock_git_client.get_current_branch.return_value = "main"
+
+        result = resolve_command_branch(
+            flow_service=mock_flow_service, git_client=mock_git_client
+        )
 
         assert result == "main"
-        mock_flow_service.get_current_branch.assert_called_once()
+        mock_git_client.get_current_branch.assert_called_once()
 
     def test_conflict_detection(self):
         """测试参数冲突检测"""

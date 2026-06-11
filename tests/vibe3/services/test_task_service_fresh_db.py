@@ -272,7 +272,7 @@ def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> No
         worktree_root=str(tmp_path),
     )
 
-    summary = service._show_service._select_latest_ref("task/issue-501", flow)
+    summary = service.show_service._select_latest_ref("task/issue-501", flow)
 
     assert summary is not None
     assert summary.kind == "report"
@@ -414,7 +414,7 @@ def test_select_latest_ref_with_state_transitions(
         worktree_root=str(tmp_path),
     )
 
-    summary = service._show_service._select_latest_ref("task/issue-501", flow)
+    summary = service.show_service._select_latest_ref("task/issue-501", flow)
 
     if expected_kind is None:
         assert summary is None

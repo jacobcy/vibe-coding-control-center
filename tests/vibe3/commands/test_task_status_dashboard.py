@@ -42,7 +42,7 @@ def _make_config_mock() -> MagicMock:
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_splits_assignee_ready_and_anomaly(
     mock_status_service_cls,
@@ -136,7 +136,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_flows_with_prs(
     mock_status_service_cls,
@@ -189,7 +189,7 @@ def test_task_status_shows_flows_with_prs(
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_excludes_system_status_sections(
     mock_status_service_cls,
@@ -232,7 +232,7 @@ def test_task_status_excludes_system_status_sections(
 
 @patch("vibe3.config.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_missing_state_label_section(
     mock_status_service_cls,
@@ -309,7 +309,7 @@ def test_task_status_shows_missing_state_label_section(
 
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_active_exception_for_missing_assignee(
     mock_status_service_cls: MagicMock,

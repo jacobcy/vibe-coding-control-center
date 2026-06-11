@@ -1,14 +1,19 @@
 """PR to Branch resolution with conflict detection."""
 
+from __future__ import annotations
+
 import shutil
+from typing import TYPE_CHECKING
 
 import typer
 
-from vibe3.clients import GitHubClient
+from vibe3.clients import GitClient, GitHubClient
 from vibe3.config import get_convention
 from vibe3.exceptions import UserError
-from vibe3.services.flow.service import FlowService
 from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 
 def resolve_branch_from_pr(
@@ -67,8 +72,9 @@ def resolve_command_branch(
     branch_opt: str | None = None,
     pr_opt: int | None = None,
     position_arg: str | None = None,
-    flow_service: FlowService,
+    flow_service: "FlowQueryProtocol",
     github_client: GitHubClient | None = None,
+    git_client: GitClient | None = None,
     allow_no_flow: bool = False,
     canonical_fallback: bool = False,
 ) -> str:
@@ -84,8 +90,9 @@ def resolve_command_branch(
         branch_opt: Value from --branch option
         pr_opt: Value from --pr option
         position_arg: Positional argument (issue/branch)
-        flow_service: FlowService for issue resolution
+        flow_service: FlowQueryProtocol for issue resolution
         github_client: Optional GitHub client (for testing)
+        git_client: Optional Git client (for testing)
         allow_no_flow: If True, return raw numeric string instead of raising
             UserError when no flows exist for an issue number. Only affects
             --branch and <position-arg> paths.
@@ -159,4 +166,5 @@ def resolve_command_branch(
         return position_arg
 
     # Step 5: Priority 4 - Current branch (fallback)
-    return flow_service.get_current_branch()
+    git = git_client or GitClient()
+    return git.get_current_branch()

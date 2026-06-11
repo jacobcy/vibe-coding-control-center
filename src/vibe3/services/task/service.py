@@ -1,11 +1,14 @@
 """Task service implementation."""
 
-from typing import Any, Literal, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from loguru import logger
 
 from vibe3.clients import (
     GhIssueLabelPort,
+    GitClient,
     GitHubClient,
     GitHubClientProtocol,
     IssueLabelPort,
@@ -20,7 +23,6 @@ from vibe3.models import (
     OrchestraConfig,
     PRResponse,
 )
-from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.service import PRService
 from vibe3.services.shared.label_service import LabelService
 from vibe3.services.shared.signatures import SignatureService
@@ -31,6 +33,9 @@ from vibe3.services.task.show import (
     TaskShowResult,
     TaskShowService,
 )
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 __all__ = [
     "TaskService",
@@ -49,24 +54,51 @@ class TaskService:
         self,
         store: SQLiteClient | None = None,
         github_client: GitHubClient | None = None,
+        git_client: GitClient | None = None,
         issue_label_port: IssueLabelPort | None = None,
         orchestra_config: OrchestraConfig | None = None,
+        flow_service: FlowQueryProtocol | None = None,
     ) -> None:
         self.store = SQLiteClient() if store is None else store
-        self._flow_service = FlowService(store=self.store)
+        self._flow_service_input = flow_service
         self.github_client = GitHubClient() if github_client is None else github_client
-        self._show_service = TaskShowService(
-            store=self.store,
-            flow_service=self._flow_service,
-            github_client=self.github_client,
-        )
+        self._git_client = git_client
+        self._show_service: TaskShowService | None = None
         self._issue_label_port = issue_label_port
         self._orchestra_config = orchestra_config
 
     @property
-    def flow_service(self) -> FlowService:
+    def _flow_service(self) -> FlowQueryProtocol:
+        """Lazily initialize flow service."""
+        if self._flow_service_input is not None:
+            return self._flow_service_input
+        from vibe3.services.flow.service import FlowService
+
+        return FlowService(store=self.store)  # type: ignore[return-value]
+
+    @property
+    def git_client(self) -> GitClient:
+        """Lazily initialize git client."""
+        if self._git_client is None:
+            return GitClient()
+        return self._git_client
+
+    @property
+    def flow_service(self) -> FlowQueryProtocol:
         """Expose the internal FlowService instance for branch resolution."""
         return self._flow_service
+
+    @property
+    def show_service(self) -> TaskShowService:
+        """Lazily initialize show service."""
+        if self._show_service is None:
+            self._show_service = TaskShowService(
+                store=self.store,
+                flow_service=self._flow_service,
+                github_client=self.github_client,
+                git_client=self.git_client,
+            )
+        return self._show_service
 
     # ------------------------------------------------------------------
     # Core task operations
@@ -430,7 +462,7 @@ class TaskService:
         Returns:
             Issue dict, "network_error" string, or None if not found
         """
-        return self._show_service.fetch_issue_with_comments(issue_number)
+        return self.show_service.fetch_issue_with_comments(issue_number)
 
     def resolve_branch(
         self,
@@ -452,7 +484,7 @@ class TaskService:
         Returns:
             Resolved branch name
         """
-        return self._show_service.resolve_branch(
+        return self.show_service.resolve_branch(
             branch,
             pr_number=pr_number,
             position_arg=position_arg,
@@ -461,4 +493,4 @@ class TaskService:
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state."""
-        return self._show_service.show_task(branch)
+        return self.show_service.show_task(branch)

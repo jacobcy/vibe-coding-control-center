@@ -9,10 +9,10 @@ from vibe3.clients import GitHubClient, SQLiteClient
 from vibe3.models import FlowStatusResponse
 from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.service import PRService
-from vibe3.services.task import TaskService
 
 if TYPE_CHECKING:
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.protocols import TaskQueryProtocol
 
 
 @dataclass
@@ -65,18 +65,27 @@ class FlowProjectionService:
     def __init__(
         self,
         flow_service: FlowService | None = None,
-        task_service: TaskService | None = None,
+        task_service: "TaskQueryProtocol | None" = None,
         pr_service: PRService | None = None,
         github_client: GitHubClient | None = None,
         store: SQLiteClient | None = None,
         title_cache: IssueTitleCacheService | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
-        self.task_service = task_service or TaskService()
+        self._task_service = task_service
         self.pr_service = pr_service or PRService()
         self.github_client = github_client or GitHubClient()
         self.store = store or SQLiteClient()
         self._title_cache = title_cache
+
+    @property
+    def task_service(self) -> "TaskQueryProtocol":
+        """Lazily initialize task service."""
+        if self._task_service is None:
+            from vibe3.services.task import TaskService
+
+            self._task_service = TaskService()  # type: ignore[assignment]
+        return self._task_service  # type: ignore[return-value]
 
     @property
     def title_cache(self) -> IssueTitleCacheService:

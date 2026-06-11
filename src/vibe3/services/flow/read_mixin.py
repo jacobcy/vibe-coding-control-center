@@ -1,6 +1,6 @@
 """Flow read operations mixin."""
 
-from typing import Literal, Self, cast
+from typing import Any, Literal, Self, cast
 
 from loguru import logger
 from pydantic import ValidationError
@@ -111,6 +111,24 @@ class FlowReadMixin:
                 f"Flow status has invalid data: {exc}"
             )
             return None
+
+    def get_flow_for_issue(self: Self, issue_number: int) -> dict[str, Any] | None:
+        """Get flow data for an issue number.
+
+        Args:
+            issue_number: Issue number to search for
+
+        Returns:
+            Flow data dict or None if not found
+        """
+        # Query all flows and find one with matching task_issue_number
+        flows = self.list_flows(status=None)
+        for flow in flows:
+            if flow.task_issue_number == issue_number:
+                flow_data = self.store.get_flow_state(flow.branch)
+                if flow_data:
+                    return flow_data
+        return None
 
     def list_flows(
         self: Self,
