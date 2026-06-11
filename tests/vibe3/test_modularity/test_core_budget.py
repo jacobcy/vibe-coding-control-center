@@ -74,6 +74,7 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
         "orchestra.flow_dispatch",
         "orchestra.failed_gate",
         "orchestra.issue_loader",
+        "orchestra.remote_check",
     ],
     "protocols": [
         "orchestra.protocols",

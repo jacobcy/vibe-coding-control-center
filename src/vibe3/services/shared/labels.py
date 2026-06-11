@@ -7,69 +7,26 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients import GhIssueLabelPort, TriggerableRoleDefinitionProtocol
+from vibe3.clients import (
+    GhIssueLabelPort,
+    TriggerableRoleDefinitionProtocol,
+    has_manager_assignee,
+    normalize_assignees,
+    normalize_labels,
+)
 from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models import DispatchExclusion, IssueInfo
 
 
-def normalize_labels(raw_labels: object) -> list[str]:
-    """Extract label names from GitHub issue payload labels field.
-
-    Handles both GitHub API format (list of dicts with "name" key) and
-    plain string lists (used in tests or simplified payloads).
-
-    Supported input formats:
-      - ``list[dict[str, str]]`` — GitHub API (each dict has a ``"name"`` key)
-      - ``list[str]`` — plain string labels
-      - Anything else — returns ``[]``
-
-    Mixed lists (containing both dicts and strings) are accepted but not
-    recommended; callers should pass a uniform list.
-    """
-    if not isinstance(raw_labels, list):
-        return []
-    result: list[str] = []
-    for item in raw_labels:
-        if isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str):
-                result.append(name)
-        elif isinstance(item, str):
-            result.append(item)
-        else:
-            logger.bind(domain="shared/labels").debug(
-                "normalize_labels: skipping unexpected item type: {}", type(item)
-            )
-    return result
-
-
-def normalize_assignees(raw_assignees: object) -> list[str]:
-    """Extract assignee logins from GitHub issue payload assignees field."""
-    if not isinstance(raw_assignees, list):
-        return []
-    assignees: list[str] = []
-    for item in raw_assignees:
-        if isinstance(item, dict):
-            login = item.get("login")
-            if isinstance(login, str) and login:
-                assignees.append(login)
-    return assignees
-
-
-def has_manager_assignee(
-    assignees: list[str],
-    manager_usernames: list[str] | tuple[str, ...],
-) -> bool:
-    """Whether issue assignees still include a configured manager username.
-
-    Returns True if manager_usernames is empty (no restriction configured).
-    This prevents all issues from being filtered out when no managers are configured.
-    """
-    if not manager_usernames:
-        return True  # No restriction: all issues allowed
-    return any(assignee in manager_usernames for assignee in assignees)
+# Re-export for backward compatibility
+__all__ = [
+    "normalize_labels",
+    "normalize_assignees",
+    "has_manager_assignee",
+    "should_skip_from_queue",
+]
 
 
 @functools.lru_cache(maxsize=8)

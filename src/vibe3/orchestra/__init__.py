@@ -38,6 +38,7 @@ if TYPE_CHECKING:
         select_ready_issues_from_collected_issues,
     )
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
+    from vibe3.orchestra.remote_check import RemoteCheckResult, run_remote_label_check
 
 _LAZY_IMPORTS: dict[str, str] = {
     # Orchestra submodules (self-module re-exports only)
@@ -51,6 +52,8 @@ _LAZY_IMPORTS: dict[str, str] = {
     "get_flow_context_bulk": "vibe3.orchestra.issue_loader",
     "load_issue": "vibe3.orchestra.issue_loader",
     "is_auto_task_branch": "vibe3.orchestra.issue_loader",
+    "run_remote_label_check": "vibe3.orchestra.remote_check",
+    "RemoteCheckResult": "vibe3.orchestra.remote_check",
     # Protocols (self-module re-exports only)
     "CheckServiceProtocol": "vibe3.orchestra.protocols",
     "FlowServiceProtocol": "vibe3.orchestra.protocols",
@@ -87,6 +90,8 @@ __all__ = [
     "get_flow_context_bulk",
     "load_issue",
     "is_auto_task_branch",
+    "run_remote_label_check",
+    "RemoteCheckResult",
     # Protocols (self-module re-exports only)
     "CheckServiceProtocol",
     "FlowServiceProtocol",

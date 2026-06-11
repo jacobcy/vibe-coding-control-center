@@ -49,9 +49,9 @@ def create_global_dispatch_coordinator(
 
     def run_remote_check() -> None:
         """Wrapper for remote check execution."""
-        from vibe3.commands.check_support import execute_remote_check
+        from vibe3.orchestra.remote_check import run_remote_label_check
 
-        execute_remote_check(dry_run=False)
+        run_remote_label_check(dry_run=False)
 
     queue_persistence = QueuePersistenceService(
         store=store,
