@@ -41,7 +41,7 @@ class TestRetryCounterPersistence:
         # Execute with mock
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch("vibe3.services.shared.roles.block_executor_noop_issue"),
+            patch("vibe3.services.issue.failure.block_executor_noop_issue"),
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
@@ -75,7 +75,7 @@ class TestRetryCounterPersistence:
         # Execute with mock
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch("vibe3.services.shared.roles.block_executor_noop_issue"),
+            patch("vibe3.services.issue.failure.block_executor_noop_issue"),
         ):
             mock_gh.return_value.view_issue.return_value = None  # Malformed response
 
