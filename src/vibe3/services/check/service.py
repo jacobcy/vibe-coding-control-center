@@ -10,7 +10,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.config import VibeConfig
-from vibe3.models import IssueState
+from vibe3.models import IssueState, PRState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
 from vibe3.services.check.remote import (
@@ -18,6 +18,7 @@ from vibe3.services.check.remote import (
     is_empty_auto_scene,
     issue_state_from_payload,
 )
+from vibe3.services.check.state_label_recovery import should_recover_missing_state_label
 from vibe3.services.flow.status import FlowStatusService
 from vibe3.services.pr.service import PRService
 
@@ -306,8 +307,11 @@ class CheckService(CheckRemote):
             task_issue_closed = False
             orchestration_state: IssueState | None = None
             issue_payload: dict | None = None
+            issue_labels: list[str] = []
+            issue_labels_loaded = False
             if task_issue:
                 from vibe3.clients import GITHUB_DEFAULT_VIEW_FIELDS
+                from vibe3.services.shared.labels import normalize_labels
 
                 # Need state, labels, and body for state validation
                 issue = self.github_client.view_issue(
@@ -321,6 +325,10 @@ class CheckService(CheckRemote):
                     issues.append(f"Task issue #{task_issue} not found on GitHub")
                 elif isinstance(issue, dict):
                     issue_payload = issue
+                    raw_labels = issue_payload.get("labels")
+                    if isinstance(raw_labels, list):
+                        issue_labels = normalize_labels(raw_labels)
+                        issue_labels_loaded = True
                     orchestration_state = issue_state_from_payload(issue)
                     if str(issue.get("state", "")).upper() == "CLOSED":
                         task_issue_closed = True
@@ -333,6 +341,7 @@ class CheckService(CheckRemote):
                     issues.extend(label_issues)
                     if fixed_state is not None:
                         orchestration_state = fixed_state
+                        issue_labels = [fixed_state.to_label()]
 
             # only one task issue per branch
             if len(task_issues) > 1:
@@ -340,10 +349,10 @@ class CheckService(CheckRemote):
 
             # ==== PR State Handling ====
             # Priority 1: Handle PR state changes (merged/closed)
-            pr = self._branch_to_pr.get(branch)
-            if pr:
+            branch_pr = self._branch_to_pr.get(branch)
+            if branch_pr:
                 handled, pr_issues, pr_warnings = (
-                    self._check_pr_service.handle_pr_terminal_state(branch, pr)
+                    self._check_pr_service.handle_pr_terminal_state(branch, branch_pr)
                 )
                 if handled:
                     return CheckResult(
@@ -357,6 +366,7 @@ class CheckService(CheckRemote):
                 try:
                     cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
                     if cached_or_remote_pr:
+                        branch_pr = cached_or_remote_pr
                         handled, pr_issues, pr_warnings = (
                             self._check_pr_service.handle_pr_terminal_state(
                                 branch, cached_or_remote_pr
@@ -396,13 +406,18 @@ class CheckService(CheckRemote):
 
             if task_issue_closed:
                 if is_active_flow:
-                    # Active flow with closed issue and no open PR = anomaly
+                    if branch_pr and branch_pr.state == PRState.OPEN:
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    pr_detail = (
+                        f"PR #{branch_pr.number} closed" if branch_pr else "no PR found"
+                    )
+                    reason = f"Task issue #{task_issue} is CLOSED ({pr_detail})"
+                    self._flow_status_service.mark_flow_aborted(branch, reason)
                     return CheckResult(
-                        is_valid=False,
+                        is_valid=True,
                         branch=branch,
-                        issues=[
-                            f"Task issue #{task_issue} is CLOSED (no open PR found)"
-                        ],
+                        issues=[],
+                        warnings=[reason],
                     )
                 # Inactive flow with closed issue = expected terminal state, continue
 
@@ -543,6 +558,35 @@ class CheckService(CheckRemote):
                             f"Auto-recovery failed: {e}. "
                             f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
                         )
+
+            if task_issue and should_recover_missing_state_label(
+                labels=issue_labels,
+                flow_status=str(flow_status),
+                issue_loaded=issue_payload is not None and issue_labels_loaded,
+                task_issue_closed=task_issue_closed,
+            ):
+                try:
+                    result = recovery_svc.recover(
+                        branch=branch,
+                        issue_number=task_issue,
+                        reason="Remote state label missing",
+                        auto=False,
+                        ensure_worktree=True,
+                    )
+                    logger.info(
+                        "Recovered missing remote state label",
+                        branch=branch,
+                        action=result.action.value,
+                        detail=result.detail,
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+                except Exception as e:
+                    logger.error(
+                        "Failed to recover missing remote state label",
+                        branch=branch,
+                        error=str(e),
+                    )
+                    issues.append(f"Missing state label auto-recovery failed: {e}")
 
             # Read-only dependency check
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:

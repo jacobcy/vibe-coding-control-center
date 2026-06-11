@@ -281,14 +281,18 @@ class TestRemoteLabelCheck:
 
         label_port = MagicMock()
 
-        monkeypatch.setattr("vibe3.config.load_orchestra_config", lambda: config)
         monkeypatch.setattr(
-            "vibe3.config.get_manager_usernames",
+            "vibe3.orchestra.remote_check.load_orchestra_config", lambda: config
+        )
+        monkeypatch.setattr(
+            "vibe3.orchestra.remote_check.get_manager_usernames",
             lambda loaded_config: loaded_config.manager_usernames,
         )
-        monkeypatch.setattr("vibe3.clients.GitHubClient", lambda: github)
-        monkeypatch.setattr("vibe3.clients.SQLiteClient", lambda: store)
-        monkeypatch.setattr("vibe3.clients.GhIssueLabelPort", lambda repo: label_port)
+        monkeypatch.setattr("vibe3.orchestra.remote_check.GitHubClient", lambda: github)
+        monkeypatch.setattr("vibe3.orchestra.remote_check.SQLiteClient", lambda: store)
+        monkeypatch.setattr(
+            "vibe3.orchestra.remote_check.GhIssueLabelPort", lambda repo: label_port
+        )
 
         result = run_remote_label_check(dry_run=False)
 
