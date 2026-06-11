@@ -13,13 +13,13 @@ from loguru import logger
 from vibe3.clients import BackendProtocol, GitClient, GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models import IssueState
-from vibe3.services.flow.service import FlowService
 from vibe3.services.issue import IssueFlowService
 from vibe3.services.shared.label_service import LabelService
 from vibe3.services.shared.status_query import StatusQueryService
 
 if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
+    from vibe3.services.protocols import FlowQueryProtocol
 
 
 ProgressCallback = Callable[[int, str | None, str, str], None]
@@ -32,14 +32,14 @@ class TaskResumeOperations:
         self,
         git_client: GitClient,
         github_client: GitHubClient,
-        flow_service: FlowService,
+        flow_service: "FlowQueryProtocol",
         label_service: LabelService,
         issue_flow_service: IssueFlowService,
         backend: BackendProtocol | None = None,
     ) -> None:
         self.git_client = git_client
         self.github_client = github_client
-        self.flow_service = flow_service
+        self._flow_service = flow_service
         self.label_service = label_service
         self.issue_flow_service = issue_flow_service
         self._backend = backend
@@ -64,7 +64,7 @@ class TaskResumeOperations:
             )
 
         if isinstance(branch, str):
-            flow_status = self.flow_service.get_flow_status(branch)
+            flow_status = self._flow_service.get_flow_status(branch)
             if flow_status and flow_status.flow_status == "done":
                 raise UserError(
                     f"Flow '{branch}' is done - cannot reset. "
@@ -83,7 +83,7 @@ class TaskResumeOperations:
         from vibe3.services.flow.recovery import FlowRecoveryService
 
         recovery = FlowRecoveryService(
-            store=self.flow_service.store,
+            store=self._flow_service.store,
             git_client=self.git_client,
             github_client=self.github_client,
         )
@@ -103,7 +103,7 @@ class TaskResumeOperations:
         from vibe3.environment import SessionRegistryService
 
         registry = SessionRegistryService(
-            store=self.flow_service.store,
+            store=self._flow_service.store,
             backend=self._backend,
         )
         live_sessions = registry.get_truly_live_sessions_for_branch(branch)
@@ -123,7 +123,7 @@ class TaskResumeOperations:
             from vibe3.services.flow.resume_resolver import infer_resume_label
 
             fs_dict = (
-                self.flow_service.store.get_flow_state(branch)
+                self._flow_service.store.get_flow_state(branch)
                 if isinstance(branch, str)
                 else None
             )
@@ -151,12 +151,12 @@ class TaskResumeCandidates:
         self,
         status_service: StatusQueryService,
         label_service: LabelService,
-        flow_service: FlowService,
+        flow_service: "FlowQueryProtocol",
         issue_flow_service: IssueFlowService,
     ) -> None:
         self.status_service = status_service
         self.label_service = label_service
-        self.flow_service = flow_service
+        self._flow_service = flow_service
         self.issue_flow_service = issue_flow_service
 
     def merge_explicit_issue_candidates(
@@ -251,7 +251,7 @@ class TaskResumeCandidates:
                 continue
             preferred = self.select_resume_flow(preferred, flow)
 
-        for flow in self.flow_service.list_flows(status=None):
+        for flow in self._flow_service.list_flows(status=None):
             if (
                 flow.task_issue_number != issue_number
                 or flow.flow_status not in statuses
@@ -277,7 +277,7 @@ class TaskResumeCandidates:
         if preferred is not None:
             return preferred
 
-        for flow in self.flow_service.list_flows(status=None):
+        for flow in self._flow_service.list_flows(status=None):
             if flow.task_issue_number != issue_number:
                 continue
             preferred = self.select_resume_flow(preferred, flow)
@@ -369,32 +369,55 @@ class TaskResumeUsecase:
         self,
         status_service: StatusQueryService | None = None,
         label_service: LabelService | None = None,
-        flow_service: FlowService | None = None,
+        flow_service: "FlowQueryProtocol | None" = None,
         git_client: GitClient | None = None,
         github_client: GitHubClient | None = None,
         issue_flow_service: IssueFlowService | None = None,
     ) -> None:
         self.status_service = status_service or StatusQueryService()
         self.label_service = label_service or LabelService()
-        self.flow_service = flow_service or FlowService()
+        self._flow_service_input = flow_service
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
         self.issue_flow_service = issue_flow_service or IssueFlowService()
 
-        # Initialize delegate modules
-        self.candidates = TaskResumeCandidates(
-            status_service=self.status_service,
-            label_service=self.label_service,
-            flow_service=self.flow_service,
-            issue_flow_service=self.issue_flow_service,
-        )
-        self.operations = TaskResumeOperations(
-            git_client=self.git_client,
-            github_client=self.github_client,
-            flow_service=self.flow_service,
-            label_service=self.label_service,
-            issue_flow_service=self.issue_flow_service,
-        )
+        # Initialize delegate modules lazily
+        self._candidates: TaskResumeCandidates | None = None
+        self._operations: TaskResumeOperations | None = None
+
+    @property
+    def _flow_service(self) -> "FlowQueryProtocol":
+        """Lazily initialize flow service."""
+        if self._flow_service_input is not None:
+            return self._flow_service_input
+        from vibe3.services.flow.service import FlowService
+
+        return FlowService()  # type: ignore[return-value]
+
+    @property
+    def candidates(self) -> TaskResumeCandidates:
+        """Lazily initialize candidates module."""
+        if self._candidates is None:
+            self._candidates = TaskResumeCandidates(
+                status_service=self.status_service,
+                label_service=self.label_service,
+                flow_service=self._flow_service,
+                issue_flow_service=self.issue_flow_service,
+            )
+        return self._candidates
+
+    @property
+    def operations(self) -> TaskResumeOperations:
+        """Lazily initialize operations module."""
+        if self._operations is None:
+            self._operations = TaskResumeOperations(
+                git_client=self.git_client,
+                github_client=self.github_client,
+                flow_service=self._flow_service,
+                label_service=self.label_service,
+                issue_flow_service=self.issue_flow_service,
+            )
+        return self._operations
 
     def resume_issues(
         self,

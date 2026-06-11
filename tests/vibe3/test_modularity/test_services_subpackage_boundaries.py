@@ -58,10 +58,18 @@ KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
 # Phase 7b continuation: pr <-> task cycle resolved (2026-06-11).
+# Phase 7b continuation: flow <-> task cycle partially resolved via
+#   Protocol/DI (2026-06-11).
+#   - flow → task: Now uses TaskQueryProtocol injection
+#     (runtime import only in lazy fallback)
+#   - task → flow: Now uses FlowQueryProtocol injection
+#     (runtime import only in lazy fallback)
+#   - Status: Protocol-based DI implemented, but runtime fallback
+#     imports still detected by test
 KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = {
     frozenset({"flow", "pr"}),
     frozenset({"flow", "issue"}),
-    frozenset({"flow", "task"}),
+    frozenset({"flow", "task"}),  # Protocol/DI implemented, runtime fallback remains
 }
 
 

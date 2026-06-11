@@ -24,7 +24,7 @@ class FlowLifecycleMixin:
         """Inject task service for dependency breaking."""
         self._task_service = task_service
 
-    def _get_task_service(self) -> TaskQueryProtocol:
+    def _get_task_service(self) -> "TaskQueryProtocol":
         """Lazily initialize task service if not injected."""
         if self._task_service is None:
             from vibe3.services.task import TaskService

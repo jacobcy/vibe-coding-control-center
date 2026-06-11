@@ -79,7 +79,7 @@ class FlowProjectionService:
         self._title_cache = title_cache
 
     @property
-    def task_service(self) -> TaskQueryProtocol:
+    def task_service(self) -> "TaskQueryProtocol":
         """Lazily initialize task service."""
         if self._task_service is None:
             from vibe3.services.task import TaskService
