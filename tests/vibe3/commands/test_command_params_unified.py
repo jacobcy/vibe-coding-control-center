@@ -69,6 +69,10 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
         "vibe3.config.config_loader.load_config_for_role",
         lambda *a, **kw: mock_config,
     )
+    monkeypatch.setattr(
+        "vibe3.config.load_config_for_role",
+        lambda *a, **kw: mock_config,
+    )
     return {"flow": mock_flow}
 
 
@@ -103,6 +107,10 @@ def mock_run_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
         "vibe3.config.config_loader.load_config_for_role",
         lambda *a, **kw: mock_config,
     )
+    monkeypatch.setattr(
+        "vibe3.config.load_config_for_role",
+        lambda *a, **kw: mock_config,
+    )
     return {"flow": mock_flow}
 
 
@@ -135,6 +143,10 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     # Mock config loader for domain handler
     monkeypatch.setattr(
         "vibe3.config.config_loader.load_config_for_role",
+        lambda *a, **kw: mock_config,
+    )
+    monkeypatch.setattr(
+        "vibe3.config.load_config_for_role",
         lambda *a, **kw: mock_config,
     )
 
@@ -278,6 +290,20 @@ def test_run_dry_run_forwards_to_execution(
 
     mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
+
+
+def test_run_sync_handler_failure_exits_nonzero(
+    monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
+) -> None:
+    """Handler execution failures must make the CLI fail."""
+    mock_execute = MagicMock(side_effect=RuntimeError("run boom"))
+    monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
+
+    result = runner.invoke(run_app, ["--no-async", "test instructions"])
+
+    assert result.exit_code == 1
+    assert "Error: run boom" in result.output
 
 
 def test_review_base_dry_run_returns_dry_run_verdict(

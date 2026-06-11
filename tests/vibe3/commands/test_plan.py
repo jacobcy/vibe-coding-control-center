@@ -38,6 +38,18 @@ def _make_mock_flow(
     return mock_flow
 
 
+def _patch_config_for_role(monkeypatch, mock_config: MagicMock) -> None:
+    """Patch config loader at both public and source-module paths."""
+    monkeypatch.setattr(
+        "vibe3.config.config_loader.load_config_for_role",
+        lambda *a, **kw: mock_config,
+    )
+    monkeypatch.setattr(
+        "vibe3.config.load_config_for_role",
+        lambda *a, **kw: mock_config,
+    )
+
+
 def _patch_plan_deps(
     monkeypatch, mock_flow: MagicMock | None = None
 ) -> tuple[MagicMock, MagicMock]:
@@ -102,10 +114,7 @@ def _patch_plan_deps(
         mock_resolve,
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
@@ -246,10 +255,7 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
         lambda *a, **kw: mock_config,
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
 
     with patch.object(Path, "exists", return_value=True):
         with patch.object(Path, "is_file", return_value=True):
@@ -316,10 +322,7 @@ def test_plan_dry_run_branch(monkeypatch) -> None:
         ),
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
 
     result = runner.invoke(plan_app, ["--branch", "42", "--dry-run"])
     assert result.exit_code == 0
@@ -327,6 +330,17 @@ def test_plan_dry_run_branch(monkeypatch) -> None:
     mock_command.assert_called_once()
     call_kwargs = mock_command.call_args[1]
     assert call_kwargs["dry_run"] is True
+
+
+def test_plan_sync_handler_failure_exits_nonzero(monkeypatch) -> None:
+    """Handler execution failures must make the CLI fail."""
+    _, mock_sync = _patch_plan_deps(monkeypatch)
+    mock_sync.side_effect = RuntimeError("plan boom")
+
+    result = runner.invoke(plan_app, ["--branch", "42", "--no-async"])
+
+    assert result.exit_code == 1
+    assert "Error: plan boom" in result.output
 
 
 def test_plan_show_prompt_propagates(monkeypatch) -> None:
@@ -374,10 +388,7 @@ def test_plan_show_prompt_propagates(monkeypatch) -> None:
         ),
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
 
     result = runner.invoke(plan_app, ["--branch", "42", "--dry-run", "--show-prompt"])
     assert result.exit_code == 0
@@ -429,10 +440,7 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
         lambda _: "task/issue-42",
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
 
     result = runner.invoke(plan_app, ["--branch", "42"])
     assert result.exit_code == 0
@@ -551,10 +559,7 @@ def test_plan_model_with_config_backend_succeeds(monkeypatch) -> None:
         lambda *a, **kw: mock_config,
     )
     # Mock config loader for domain handler
-    monkeypatch.setattr(
-        "vibe3.config.config_loader.load_config_for_role",
-        lambda *a, **kw: mock_config,
-    )
+    _patch_config_for_role(monkeypatch, mock_config)
 
     result = runner.invoke(
         plan_app, ["--branch", "42", "--no-async", "--model", "opus"]

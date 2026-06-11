@@ -36,6 +36,16 @@ BranchOption = Annotated[
 ]
 
 
+def _raise_pending_plan_error() -> None:
+    """Convert handler-side plan errors into CLI failures."""
+    from vibe3.domain import get_pending_result
+
+    result = get_pending_result("plan")
+    if isinstance(result, Exception):
+        typer.echo(f"Error: {result}", err=True)
+        raise typer.Exit(1)
+
+
 def _plan_for_branch(
     branch: str,
     trace: bool,
@@ -52,11 +62,12 @@ def _plan_for_branch(
         enable_method_trace()
 
     # Register EDA event handlers for plan command
+    from vibe3.domain import get_pending_result, register_event_handlers
     from vibe3.domain import publish as domain_publish
-    from vibe3.domain import register_event_handlers
     from vibe3.models import ManualPlanIntent
 
     register_event_handlers()
+    get_pending_result("plan")
 
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("plan", agent, backend, model)
@@ -109,6 +120,7 @@ def _plan_for_branch(
             fresh_session=fresh_session,
         )
     )
+    _raise_pending_plan_error()
 
 
 def _plan_spec_impl(
@@ -128,11 +140,12 @@ def _plan_spec_impl(
         enable_method_trace()
 
     # Register EDA event handlers for plan command
+    from vibe3.domain import get_pending_result, register_event_handlers
     from vibe3.domain import publish as domain_publish
-    from vibe3.domain import register_event_handlers
     from vibe3.models import ManualPlanIntent
 
     register_event_handlers()
+    get_pending_result("plan")
 
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("plan", agent, backend, model)
@@ -239,6 +252,7 @@ def _plan_spec_impl(
             fresh_session=fresh_session,
         )
     )
+    _raise_pending_plan_error()
 
 
 @app.callback(invoke_without_command=True)

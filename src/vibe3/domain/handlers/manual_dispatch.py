@@ -33,6 +33,11 @@ def get_pending_result(key: str) -> Any | None:
     return _pending_results.pop(key, None)
 
 
+def _store_pending_error(key: str, exc: Exception) -> None:
+    """Store a handler error for the originating CLI command to report."""
+    _pending_results[key] = exc
+
+
 @register_handler("ManualPlanIntent")
 def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     """Handle ManualPlanIntent event by delegating to execute_spec_plan functions.
@@ -57,71 +62,78 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
         config = load_config_for_role("plan", event.agent, event.backend, event.model)
     except Exception as e:
         logger.error(f"Config load failed for plan: {e}")
+        _store_pending_error("plan", e)
         return
 
     # Use request already resolved by CLI (avoids duplicate spec resolution)
     request = event.request
     if request is None:
-        logger.error("ManualPlanIntent missing request")
+        error = ValueError("ManualPlanIntent missing request")
+        logger.error(str(error))
+        _store_pending_error("plan", error)
         return
 
-    # Dispatch to sync or async execution
-    if event.dry_run:
-        # Dry-run mode: always sync, with dry_run=True
-        execute_spec_plan_sync(
-            request=request,  # type: ignore[arg-type]
-            issue_number=event.issue_number,
-            branch=event.branch,
-            agent=event.agent,
-            backend=event.backend,
-            model=event.model,
-            fresh_session=event.fresh_session,
-            config=config,
-            dry_run=True,
-            show_prompt=event.show_prompt,
-        )
-    elif event.no_async:
-        # Sync mode
-        execute_spec_plan_sync(
-            request=request,  # type: ignore[arg-type]
-            issue_number=event.issue_number,
-            branch=event.branch,
-            agent=event.agent,
-            backend=event.backend,
-            model=event.model,
-            fresh_session=event.fresh_session,
-            config=config,
-            dry_run=False,
-            show_prompt=event.show_prompt,
-        )
-    else:
-        # Async mode: construct cli_args from individual fields
-        from vibe3.config import RoleCliOverrides
+    try:
+        # Dispatch to sync or async execution
+        if event.dry_run:
+            # Dry-run mode: always sync, with dry_run=True
+            execute_spec_plan_sync(
+                request=request,  # type: ignore[arg-type]
+                issue_number=event.issue_number,
+                branch=event.branch,
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+                fresh_session=event.fresh_session,
+                config=config,
+                dry_run=True,
+                show_prompt=event.show_prompt,
+            )
+        elif event.no_async:
+            # Sync mode
+            execute_spec_plan_sync(
+                request=request,  # type: ignore[arg-type]
+                issue_number=event.issue_number,
+                branch=event.branch,
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+                fresh_session=event.fresh_session,
+                config=config,
+                dry_run=False,
+                show_prompt=event.show_prompt,
+            )
+        else:
+            # Async mode: construct cli_args from individual fields
+            from vibe3.config import RoleCliOverrides
 
-        overrides = RoleCliOverrides(
-            agent=event.agent,
-            backend=event.backend,
-            model=event.model,
-            fresh_session=event.fresh_session,
-        )
-        cli_args = ["plan"] + overrides.to_argv()
+            overrides = RoleCliOverrides(
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+                fresh_session=event.fresh_session,
+            )
+            cli_args = ["plan"] + overrides.to_argv()
 
-        result = execute_spec_plan_async(
-            request=request,  # type: ignore[arg-type]
-            issue_number=event.issue_number,
-            branch=event.branch,
-            cli_args=cli_args,
-            agent=event.agent,
-            backend=event.backend,
-            model=event.model,
-            fresh_session=event.fresh_session,
-            config=config,
-        )
-        # Echo tmux info (same as CLI did)
-        import typer
+            result = execute_spec_plan_async(
+                request=request,  # type: ignore[arg-type]
+                issue_number=event.issue_number,
+                branch=event.branch,
+                cli_args=cli_args,
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+                fresh_session=event.fresh_session,
+                config=config,
+            )
+            # Echo tmux info (same as CLI did)
+            import typer
 
-        typer.echo(f"tmux session: {result.tmux_session}")
-        typer.echo(f"log: {result.log_path}")
+            typer.echo(f"tmux session: {result.tmux_session}")
+            typer.echo(f"log: {result.log_path}")
+    except Exception as e:
+        logger.exception(f"Manual plan execution failed: {e}")
+        _store_pending_error("plan", e)
 
 
 @register_handler("ManualRunIntent")
@@ -145,6 +157,7 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
         config = load_config_for_role("run", event.agent, event.backend, event.model)
     except Exception as e:
         logger.error(f"Config load failed for run: {e}")
+        _store_pending_error("run", e)
         return
 
     # Reconstruct SimpleNamespace from flattened fields
@@ -156,24 +169,28 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
         worktree_root=None,  # Always None in CLI path
     )
 
-    # Delegate to execute_manual_run
-    execute_manual_run(
-        config=config,
-        branch=event.branch,
-        issue_number=event.issue_number,
-        instructions=event.instructions,
-        plan_file=event.plan_file,
-        skill=event.skill,
-        summary=summary,
-        dry_run=event.dry_run,
-        no_async=event.no_async,
-        show_prompt=event.show_prompt,
-        agent=event.agent,
-        backend=event.backend,
-        model=event.model,
-        fresh_session=event.fresh_session,
-        publish=event.publish,
-    )
+    try:
+        # Delegate to execute_manual_run
+        execute_manual_run(
+            config=config,
+            branch=event.branch,
+            issue_number=event.issue_number,
+            instructions=event.instructions,
+            plan_file=event.plan_file,
+            skill=event.skill,
+            summary=summary,
+            dry_run=event.dry_run,
+            no_async=event.no_async,
+            show_prompt=event.show_prompt,
+            agent=event.agent,
+            backend=event.backend,
+            model=event.model,
+            fresh_session=event.fresh_session,
+            publish=event.publish,
+        )
+    except Exception as e:
+        logger.exception(f"Manual run execution failed: {e}")
+        _store_pending_error("run", e)
 
 
 @register_handler("ManualReviewIntent")

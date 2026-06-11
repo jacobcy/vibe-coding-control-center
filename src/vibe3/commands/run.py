@@ -42,6 +42,16 @@ BranchOption = Annotated[
 ]
 
 
+def _raise_pending_run_error() -> None:
+    """Convert handler-side run errors into CLI failures."""
+    from vibe3.domain import get_pending_result
+
+    result = get_pending_result("run")
+    if isinstance(result, Exception):
+        typer.echo(f"Error: {result}", err=True)
+        raise typer.Exit(1)
+
+
 def run_command(
     branch: BranchOption = None,
     instructions: Annotated[
@@ -81,10 +91,11 @@ def run_command(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for run command (may publish events)
+    from vibe3.domain import get_pending_result, register_event_handlers
     from vibe3.domain import publish as domain_publish
-    from vibe3.domain import register_event_handlers
 
     register_event_handlers()
+    get_pending_result("run")
 
     # Import new event type
     from vibe3.models import ManualRunIntent
@@ -144,6 +155,7 @@ def run_command(
                 publish=publish,
             )
         )
+        _raise_pending_run_error()
         return
 
     # Resolve plan parameter using shared @-resolution channel
@@ -217,6 +229,7 @@ def run_command(
             publish=publish,
         )
     )
+    _raise_pending_run_error()
 
 
 @app.callback(invoke_without_command=True)
