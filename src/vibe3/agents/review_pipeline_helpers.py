@@ -1,35 +1,36 @@
 """Service-layer helpers for review pipeline dependencies."""
 
-import json
-import subprocess
-from typing import Any
-
-import typer
 from loguru import logger
 
 from vibe3.analysis import (
     SnapshotError,
+    build_change_analysis,
     build_snapshot,
     compute_diff,
     find_snapshot_by_branch,
 )
+from vibe3.exceptions import SystemError
 from vibe3.models import StructureDiff
 
 
 def run_inspect_json(args: list[str]) -> dict[str, object]:
     """Call inspect subcommand and return parsed JSON result."""
-    result = subprocess.run(
-        ["uv", "run", "python", "-m", "vibe3", "inspect", *args, "--json"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        logger.error(f"inspect failed: {result.stderr}")
-        raise typer.Exit(1)
-    payload: Any = json.loads(result.stdout)
-    if not isinstance(payload, dict):
-        raise typer.Exit(1)
-    return {str(key): value for key, value in payload.items()}
+    if not args:
+        raise SystemError("Missing inspect subcommand")
+
+    subcommand = args[0]
+    if subcommand not in ("pr", "base"):
+        raise SystemError(f"Unknown inspect subcommand: {subcommand}")
+
+    if len(args) < 2:
+        raise SystemError(f"Missing identifier for inspect {subcommand}")
+
+    identifier = args[1]
+
+    if subcommand == "pr":
+        return build_change_analysis("pr", identifier)
+    else:  # subcommand == "base"
+        return build_change_analysis("branch", identifier)
 
 
 def build_snapshot_diff(
