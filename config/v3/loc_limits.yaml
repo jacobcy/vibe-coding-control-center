@@ -300,6 +300,9 @@ code_limits:
       - path: "tests/vibe3/domain/handlers/test_dispatch.py"
         limit: 420
         reason: "Dispatch handler 测试集（已拆分 test_dispatch_not_launched.py），覆盖 planner/executor/reviewer 三个角色的 dispatch 逻辑，共享 mock setup，继续拆分收益低；rebase 后新增 launch_failed 测试略微超标"
+      - path: "tests/vibe3/domain/test_event_rules.py"
+        limit: 480
+        reason: "Event rules 引擎完整测试集，覆盖规则加载（5 个）、模板展开（4 个）、规则评估（5 个）、action handler 构建（3 个）、9 个 action handler 单元测试（9 个）、config↔code 一致性验证（1 个）等 30 个测试，按测试类组织内聚度高，拆分降低可读性"
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
