@@ -58,7 +58,7 @@ def _build_server_with_launch_cwd(
     from starlette.concurrency import run_in_threadpool
 
     from vibe3.agents import CodeagentBackend
-    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.domain import (
         FailedGate,
         FlowManager,
@@ -77,7 +77,7 @@ def _build_server_with_launch_cwd(
         FailedGateProtocol,
         HeartbeatServer,
     )
-    from vibe3.services import CheckService, FlowService, OrchestraStatusService
+    from vibe3.services import CheckService, OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -93,7 +93,13 @@ def _build_server_with_launch_cwd(
 
     failed_gate = FailedGate(store=shared_store)
 
-    shared_flow_manager = FlowManager(config, registry=shared_registry)
+    shared_flow_manager = FlowManager(
+        config,
+        store=shared_store,
+        git=GitClient(),
+        github=shared_github,
+        registry=shared_registry,
+    )
     shared_circuit_breaker = None
 
     # Create shared CapacityService for capacity-aware dispatch
@@ -120,20 +126,21 @@ def _build_server_with_launch_cwd(
     # supervisor scan, and issue-label dispatch polling.
     # GlobalDispatchCoordinator is created internally by the facade.
 
+    # Create shared CheckService for HeartbeatServer and Coordinator
     shared_check_service = CheckService(
         store=shared_store,
         git_client=shared_flow_manager.git,
         github_client=shared_github,
     )
-    shared_flow_service = FlowService(
-        store=shared_store,
-        git_client=shared_flow_manager.git,
-    )
+
+    # Use FlowManager's internal flow_service instance
+    shared_flow_service = shared_flow_manager.flow_service
 
     facade = OrchestrationFacade(
         config=config,
         capacity=shared_capacity,
         store=shared_store,
+        flow_manager=shared_flow_manager,
         coordinator_factory=create_global_dispatch_coordinator,  # type: ignore[arg-type]
         coordinator_class=GlobalDispatchCoordinator,
         check_service=shared_check_service,

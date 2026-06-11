@@ -43,12 +43,12 @@ class OrchestrationFacade(ServiceBase):
 
     def __init__(
         self,
+        flow_manager: "FlowManagerProtocol",
         tick_count: int = 0,
         config: OrchestraConfig | None = None,
         capacity: "CapacityService | None" = None,
         store: "SQLiteClient | None" = None,
         github: "GitHubClient | None" = None,
-        flow_manager: "FlowManagerProtocol | None" = None,
         registry: "SessionRegistryService | None" = None,
         coordinator_factory: CoordinatorFactory | None = None,
         coordinator_class: type | None = None,
@@ -91,9 +91,7 @@ class OrchestrationFacade(ServiceBase):
         self._capacity = capacity
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._github = github or GitHubClient()
-        from vibe3.domain import FlowManager
-
-        self._flow_manager = flow_manager or FlowManager(self._config)
+        self._flow_manager = flow_manager
         self._registry: SessionRegistryService | None = registry
 
         if self._capacity is not None:

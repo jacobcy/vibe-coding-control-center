@@ -352,15 +352,7 @@ class HeartbeatServer:
 
     async def _run_periodic_check(self, tick_number: int) -> None:
         """Run periodic consistency check (every N ticks)."""
-        if self._check_service is not None:
-            check_service = self._check_service
-        else:
-            import importlib
-
-            _clients = importlib.import_module("vibe3.clients")
-            _services = importlib.import_module("vibe3.services")
-            store = _clients.SQLiteClient()
-            check_service = _services.CheckService(store=store)
+        check_service = self._check_service
 
         await execute_periodic_check(
             self.config.periodic_check,

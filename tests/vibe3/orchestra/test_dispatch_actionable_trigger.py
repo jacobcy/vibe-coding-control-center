@@ -67,6 +67,7 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
         issue_loader=lambda issue_number: None,
         flow_context_resolver=lambda issue_number: (f"task/issue-{issue_number}", None),
         queue_selector=lambda *args, **kwargs: [],
+        check_service=MagicMock(),
     )
 
     # Mock methods that would require complex setup

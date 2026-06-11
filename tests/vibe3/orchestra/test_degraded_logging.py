@@ -27,12 +27,14 @@ def _make_coordinator_dependencies(
     queue_persistence.restore.return_value = None
     queue_persistence.promote.return_value = False
     queue_persistence.get_queued_issue_numbers.return_value = set()
+    check_service = MagicMock()
     return {
         "health_check_service": health_check_service,
         "queue_persistence": queue_persistence,
         "issue_loader": lambda issue_number: issue,
         "flow_context_resolver": lambda issue_number: (branch, None),
         "queue_selector": lambda *args, **kwargs: [],
+        "check_service": check_service,
     }
 
 
