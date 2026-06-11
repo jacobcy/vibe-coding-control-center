@@ -75,6 +75,9 @@ class GlobalDispatchCoordinator:
     _label_dispatcher: LabelDispatchCallable
     _dispatch_paused: bool
     _supervisor_label: str
+    _remote_check_runner: Callable[[], None] | None
+    _remote_check_interval: int
+    _last_remote_check_tick: int
 
     def __init__(
         self,
@@ -97,6 +100,8 @@ class GlobalDispatchCoordinator:
         ) = None,
         label_dispatcher: LabelDispatchCallable | None = None,
         queue_filter: Callable[..., bool] | None = None,
+        remote_check_runner: Callable[[], None] | None = None,
+        remote_check_interval: int = 20,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -136,6 +141,9 @@ class GlobalDispatchCoordinator:
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
+        self._remote_check_runner = remote_check_runner
+        self._remote_check_interval = remote_check_interval
+        self._last_remote_check_tick: int = 0
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -599,6 +607,21 @@ class GlobalDispatchCoordinator:
         # frozen_queue = None when all entries are removed
         if self._frozen_queue is None:
             self._frozen_queue = []
+
+        # Step 2.5: Periodic remote check (before collection)
+        if (
+            self._remote_check_runner
+            and tick_id - self._last_remote_check_tick >= self._remote_check_interval
+        ):
+            try:
+                self._remote_check_runner()
+            except Exception as exc:
+                logger.bind(domain="check", action="remote").warning(
+                    f"Remote check failed: {exc}"
+                )
+            finally:
+                # Always update tick to prevent repeated attempts on failure
+                self._last_remote_check_tick = tick_id
 
         queue_refreshed = False
         periodic_check = self._config.periodic_check

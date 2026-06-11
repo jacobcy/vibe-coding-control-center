@@ -47,6 +47,12 @@ def create_global_dispatch_coordinator(
     def issue_loader(issue_number: int) -> "IssueInfo | None":
         return load_issue(issue_number, config, github)
 
+    def run_remote_check() -> None:
+        """Wrapper for remote check execution."""
+        from vibe3.commands.check_support import execute_remote_check
+
+        execute_remote_check(dry_run=False)
+
     queue_persistence = QueuePersistenceService(
         store=store,
         config=config,
@@ -70,4 +76,5 @@ def create_global_dispatch_coordinator(
         flow_context_resolver=flow_context_resolver,
         queue_selector=select_ready_issues_from_collected_issues,
         check_service=check_service,
+        remote_check_runner=run_remote_check,
     )
