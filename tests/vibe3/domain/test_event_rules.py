@@ -275,3 +275,177 @@ class TestBuildActionHandlers:
 
         # Should not raise (placeholder implementation)
         enqueue_handler({"command": "test command", "actor": "test"})
+
+
+class TestActionHandlers:
+    """Test new action handlers."""
+
+    def test_build_action_handlers_all_keys(self) -> None:
+        """Dict contains all 9 expected keys."""
+        handlers = build_action_handlers()
+
+        expected_keys = {
+            "log",
+            "refresh_queue_priority",
+            "enqueue_command_job",
+            "enqueue_plan",
+            "enqueue_run",
+            "enqueue_review",
+            "reload_material",
+            "trigger_governance_scan",
+            "notify",
+        }
+        assert set(handlers.keys()) == expected_keys
+
+    def test_refresh_queue_priority_publishes_intent(self) -> None:
+        """ManagerDispatchIntent is published with correct issue_number."""
+        from unittest.mock import MagicMock, patch
+
+        handlers = build_action_handlers()
+        handler = handlers["refresh_queue_priority"]
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            handler({"issue": "123", "actor": "test_actor"})
+
+        assert mock_publish.called
+        event = mock_publish.call_args[0][0]
+        assert event.issue_number == 123
+        assert event.trigger_state == "ready"
+        assert event.actor == "test_actor"
+
+    def test_refresh_queue_priority_loop_guard(self) -> None:
+        """Re-entrant call with actor='event:refresh_queue_priority' is skipped."""
+        from unittest.mock import MagicMock, patch
+
+        handlers = build_action_handlers()
+        handler = handlers["refresh_queue_priority"]
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            # This should be skipped due to loop guard
+            handler({"issue": "123", "actor": "event:refresh_queue_priority"})
+
+        assert not mock_publish.called
+
+    def test_enqueue_command_job_missing_command_type(self) -> None:
+        """Graceful handling of missing command_type."""
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_command_job"]
+
+        # Should not raise, just log warning
+        handler({"issue_number": "123", "actor": "test"})
+
+    def test_enqueue_command_job_missing_issue_number(self) -> None:
+        """Graceful handling of missing issue_number."""
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_command_job"]
+
+        # Should not raise, just log warning
+        handler({"command_type": "plan", "actor": "test"})
+
+    def test_enqueue_command_job_invalid_issue_number(self) -> None:
+        """Graceful handling of invalid issue_number."""
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_command_job"]
+
+        # Should not raise, just log warning
+        handler({"command_type": "plan", "issue_number": "not_a_number"})
+
+    def test_enqueue_plan_callable(self) -> None:
+        """enqueue_plan action handler is callable."""
+        from unittest.mock import patch
+
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_plan"]
+
+        # Mock the internal dispatch helper
+        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
+            handler({"issue_number": "123", "actor": "test"})
+            mock_dispatch.assert_called_once_with("plan", 123, "test", {})
+
+    def test_enqueue_run_callable(self) -> None:
+        """enqueue_run action handler is callable."""
+        from unittest.mock import patch
+
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_run"]
+
+        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
+            handler({"issue_number": "456", "actor": "test"})
+            mock_dispatch.assert_called_once_with("run", 456, "test", {})
+
+    def test_enqueue_review_callable(self) -> None:
+        """enqueue_review action handler is callable."""
+        from unittest.mock import patch
+
+        handlers = build_action_handlers()
+        handler = handlers["enqueue_review"]
+
+        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
+            handler({"issue_number": "789", "actor": "test"})
+            mock_dispatch.assert_called_once_with("review", 789, "test", {})
+
+    def test_reload_material_publishes_event(self) -> None:
+        """GovernanceScanStarted is published."""
+        from unittest.mock import MagicMock, patch
+
+        handlers = build_action_handlers()
+        handler = handlers["reload_material"]
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            handler({"tick_count": "5"})
+
+        assert mock_publish.called
+        event = mock_publish.call_args[0][0]
+        assert event.tick_count == 5
+        assert event.actor == "event:reload_material"
+
+    def test_trigger_governance_scan_publishes_event(self) -> None:
+        """GovernanceScanStarted is published."""
+        from unittest.mock import MagicMock, patch
+
+        handlers = build_action_handlers()
+        handler = handlers["trigger_governance_scan"]
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            handler({"tick_count": "10", "actor": "custom_actor"})
+
+        assert mock_publish.called
+        event = mock_publish.call_args[0][0]
+        assert event.tick_count == 10
+        assert event.actor == "custom_actor"
+
+    def test_notify_logs_message(self) -> None:
+        """Handler is callable and logs with [NOTIFY] prefix."""
+        from unittest.mock import patch
+
+        handlers = build_action_handlers()
+        handler = handlers["notify"]
+
+        # Should not raise
+        with patch("vibe3.domain.event_rules.logger") as mock_logger:
+            handler({"message": "test notification", "target": "manager"})
+            # Verify the bind was called
+            assert mock_logger.bind.called
+
+
+class TestRulesHaveMatchingHandlers:
+    """Test that rules in config have matching handlers."""
+
+    def test_rules_have_matching_handlers(self, tmp_path: Path) -> None:
+        """All rules in config have matching action handlers."""
+        from vibe3.utils import find_repo_root
+
+        rules_dir = find_repo_root() / "config" / "policies"
+        rules = load_rules(rules_dir)
+        handlers = build_action_handlers()
+
+        missing_actions: list[str] = []
+        for rule in rules:
+            if rule.action not in handlers:
+                missing_actions.append(rule.action)
+
+        assert not missing_actions, f"Missing handlers for actions: {missing_actions}"

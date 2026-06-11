@@ -3,7 +3,7 @@
 # Rules are evaluated for every published domain event.
 # Each rule specifies:
 #   - event: DomainEvent class name to match
-#   - action: Action identifier (e.g., "log", "enqueue_command_job")
+#   - action: Action identifier (e.g., "log", "enqueue_command_job", "refresh_queue_priority")
 #   - params: Template parameters with {{ event.field }} syntax
 #   - enabled: Whether the rule is active (default: true)
 #
@@ -14,27 +14,77 @@
 # This file is loaded at server startup via EventPublisher.on_publish hook.
 
 rules:
-  # Governance scan started → log for observability
+  # P0: Issue failed → auto-dispatch manager for recovery
+  - event: IssueFailed
+    action: enqueue_command_job
+    params:
+      command_type: "manager"
+      issue_number: "{{ event.issue_number }}"
+      actor: "{{ event.actor }}"
+
+  # P0: Issue failed → refresh queue priority
+  - event: IssueFailed
+    action: refresh_queue_priority
+    params:
+      issue: "{{ event.issue_number }}"
+      actor: "event:issue_failed"
+
+  # P1: Governance scan started → log for observability
   - event: GovernanceScanStarted
     action: log
     params:
       message: "governance scan started (tick={{ event.tick_count }})"
 
-  # Manager dispatch → queue manager command
-  - event: ManagerDispatchIntent
-    action: enqueue_command_job
-    params:
-      command: "vibe3 internal manager {{ event.issue_number }}"
-      actor: "{{ event.actor }}"
+  # P1: Governance scan completed → reload materials
+  - event: GovernanceScanCompleted
+    action: reload_material
+    scope: [governance, prompts]
 
-  # Supervisor issue identified → log for tracking
+  # P1: Supervisor issue identified → trigger governance scan
+  - event: SupervisorIssueIdentified
+    action: trigger_governance_scan
+    params:
+      issue_number: "{{ event.issue_number }}"
+
+  # P1: Supervisor issue identified → log for tracking
   - event: SupervisorIssueIdentified
     action: log
     params:
       message: "supervisor candidate: issue #{{ event.issue_number }}"
 
-  # Issue failed → record for error tracking
+  # P2: Issue failed → notify (stub)
   - event: IssueFailed
-    action: log
+    action: notify
     params:
       message: "issue #{{ event.issue_number }} failed: {{ event.reason }}"
+      target: "manager"
+
+  # Webhook: label changed → log (upstream handler can refresh queue)
+  - event: WebhookLabelChanged
+    action: log
+    params:
+      message: "webhook label changed: issue #{{ event.issue_number }} label={{ event.label }} action={{ event.action }}"
+
+  # Webhook: issue updated → log
+  - event: WebhookIssueUpdated
+    action: log
+    params:
+      message: "webhook issue updated: issue #{{ event.issue_number }} action={{ event.action }}"
+
+  # Webhook: PR merged → log (upstream handler can trigger flow advancement)
+  - event: WebhookPRMerged
+    action: log
+    params:
+      message: "webhook PR merged: pr #{{ event.pr_number }}"
+
+  # Webhook: PR reviewed → log
+  - event: WebhookPRReviewed
+    action: log
+    params:
+      message: "webhook PR reviewed: pr #{{ event.pr_number }} state={{ event.state }}"
+
+  # Webhook: issue closed → log
+  - event: WebhookIssueClosed
+    action: log
+    params:
+      message: "webhook issue closed: issue #{{ event.issue_number }}"
