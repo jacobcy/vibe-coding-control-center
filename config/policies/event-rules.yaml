@@ -88,3 +88,27 @@ rules:
     action: log
     params:
       message: "webhook issue closed: issue #{{ event.issue_number }}"
+
+  # Flow blocked → log for downstream tracking
+  - event: FlowBlocked
+    action: log
+    params:
+      message: "flow blocked for issue #{{ event.issue_number }}: {{ event.blocked_reason }}"
+
+  # Flow completed → log for downstream tracking
+  - event: FlowCompleted
+    action: log
+    params:
+      message: "flow completed for issue #{{ event.issue_number }} ({{ event.completed_state }})"
+
+  # PR merged → log for downstream tracking
+  - event: PRMerged
+    action: log
+    params:
+      message: "PR merged for issue #{{ event.issue_number }} (pr #{{ event.pr_number }})"
+
+  # Policy changed → log for observability
+  - event: PolicyChanged
+    action: log
+    params:
+      message: "policy files changed: {{ event.changed_files }}"

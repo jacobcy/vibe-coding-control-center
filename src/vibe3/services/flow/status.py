@@ -127,11 +127,25 @@ class FlowStatusService:
             branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
         )
 
+        # Fetch task issue once for both event publish and close logic
+        task_issue = self.store.get_task_issue_number(branch)
+
+        # Publish FlowCompleted event if we have a valid issue context
+        if task_issue:
+            from vibe3.models import FlowCompleted, publish
+
+            publish(
+                FlowCompleted(
+                    issue_number=task_issue,
+                    branch=branch,
+                    completed_state="done",
+                )
+            )
+
         suggestions: dict[str, int | None] = {"issue_to_close": None}
         # Only close issue if there's an explicit task-role binding.
         # Do NOT fallback to branch name parsing - that would incorrectly close
         # issues that are only linked as related/dependency.
-        task_issue = self.store.get_task_issue_number(branch)
         if not task_issue:
             return suggestions
 
