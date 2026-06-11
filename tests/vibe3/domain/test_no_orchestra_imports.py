@@ -44,7 +44,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     Disallowed:
     - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
-    - orchestra.dispatch_health_check
     - orchestra.issue_loader
     - orchestra.queue_operations
     - orchestra.queue_persistence_service

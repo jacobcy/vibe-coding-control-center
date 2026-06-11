@@ -13,7 +13,6 @@ import directly from their source modules.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.dispatch_health_check import DispatchHealthCheckService
     from vibe3.orchestra.domain_types import (
         CapacityServiceProtocol,
         CheckServiceProtocol,
@@ -39,6 +38,7 @@ if TYPE_CHECKING:
         select_ready_issues_from_collected_issues,
     )
     from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
+    from vibe3.orchestra.remote_check import RemoteCheckResult, run_remote_label_check
 
 _LAZY_IMPORTS: dict[str, str] = {
     # Orchestra submodules (self-module re-exports only)
@@ -48,11 +48,12 @@ _LAZY_IMPORTS: dict[str, str] = {
     "select_ready_issues_from_collected_issues": "vibe3.orchestra.queue_operations",
     "promote_progressed_entries": "vibe3.orchestra.queue_operations",
     "QueuePersistenceService": "vibe3.orchestra.queue_persistence_service",
-    "DispatchHealthCheckService": "vibe3.orchestra.dispatch_health_check",
     "get_flow_context": "vibe3.orchestra.issue_loader",
     "get_flow_context_bulk": "vibe3.orchestra.issue_loader",
     "load_issue": "vibe3.orchestra.issue_loader",
     "is_auto_task_branch": "vibe3.orchestra.issue_loader",
+    "run_remote_label_check": "vibe3.orchestra.remote_check",
+    "RemoteCheckResult": "vibe3.orchestra.remote_check",
     # Protocols (self-module re-exports only)
     "CheckServiceProtocol": "vibe3.orchestra.protocols",
     "FlowServiceProtocol": "vibe3.orchestra.protocols",
@@ -85,11 +86,12 @@ __all__ = [
     "select_ready_issues_from_collected_issues",
     "promote_progressed_entries",
     "QueuePersistenceService",
-    "DispatchHealthCheckService",
     "get_flow_context",
     "get_flow_context_bulk",
     "load_issue",
     "is_auto_task_branch",
+    "run_remote_label_check",
+    "RemoteCheckResult",
     # Protocols (self-module re-exports only)
     "CheckServiceProtocol",
     "FlowServiceProtocol",

@@ -258,14 +258,14 @@ code_limits:
         limit: 440
         reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
-        limit: 520
-        reason: "Health check failure 测试集，7 个独立测试用例验证 coordinator 对 CheckService 结果的处理逻辑，每个测试需要完整 mock setup，拆分会降低可读性；新增 mock_flow_blocker 注入对齐测试模式（#1723）；新增 _make_mock_coordinator_dependencies helper function 后略微超标（#1887）"
+        limit: 550
+        reason: "Health check failure 测试集，验证 coordinator 对 CheckService 结果的处理逻辑（terminal/fail-open/genuine failure），包含 TestPreDispatchHealthChecks（8 个测试）和 TestEmptyBranchGuard（7 个测试）两个测试类，每个测试需要完整 mock setup，拆分会降低可读性；新增 mock_flow_blocker 注入对齐测试模式（#1723）；新增 _make_mock_coordinator_dependencies helper function（#1887）；Issue #2381 Task 1 新增 TestPreDispatchHealthChecks 测试类验证 inlined health check logic（+67 行），test file migration from DispatchHealthCheckService to coordinator"
       - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
       - path: "tests/vibe3/orchestra/test_dispatch_actionable_trigger.py"
-        limit: 460
-        reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低"
+        limit: 500
+        reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低；#2381 新增 test_dispatch_loop_rechecks_qualify_gate_for_ready_issue 测试验证 dispatch-time qualify gate recheck（+29 行）"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
         limit: 450
         reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2536 新增 test_single_issue_qualify_failure_does_not_abort_batch 回归测试验证单个 issue 失败不阻塞整个批次（+66 行）"

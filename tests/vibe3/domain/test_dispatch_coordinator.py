@@ -29,7 +29,7 @@ def test_dispatch_coordinator_constructor_requires_injected_services():
 
     # Verify required keyword-only parameters exist
     required_kwonly_params = {
-        "health_check_service",
+        "flow_blocker",
         "queue_persistence",
         "issue_loader",
         "flow_context_resolver",
@@ -53,7 +53,6 @@ def test_dispatch_coordinator_uses_domain_protocols():
     from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
         CheckServiceProtocol,
-        DispatchHealthCheckProtocol,
         FlowContextResolverProtocol,
         FlowServiceProtocol,
         IssueLoaderProtocol,
@@ -63,7 +62,6 @@ def test_dispatch_coordinator_uses_domain_protocols():
     )
 
     # Verify protocols are importable
-    assert DispatchHealthCheckProtocol is not None
     assert QueuePersistenceServiceProtocol is not None
     assert IssueLoaderProtocol is not None
     assert FlowContextResolverProtocol is not None

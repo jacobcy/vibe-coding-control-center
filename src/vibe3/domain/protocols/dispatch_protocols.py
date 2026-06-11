@@ -60,22 +60,6 @@ class QueuePersistenceServiceProtocol(Protocol):
         ...
 
 
-class DispatchHealthCheckProtocol(Protocol):
-    """Protocol for dispatch health checks."""
-
-    def check_issue_health(self, issue: "IssueInfo") -> bool:
-        """Check if issue is healthy for dispatch.
-
-        Args:
-            issue: Issue to check
-
-        Returns:
-            True if issue can be dispatched (healthy or transient error)
-            False if issue should be skipped (genuine failure or terminal state)
-        """
-        ...
-
-
 class IssueLoaderProtocol(Protocol):
     """Protocol for loading issue snapshots."""
 

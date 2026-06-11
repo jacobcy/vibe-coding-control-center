@@ -67,7 +67,6 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     ],
     "status_metadata": [
         "orchestra.logging",
-        "orchestra.dispatch_health_check",
     ],
     "dispatch_coordination": [
         "orchestra.global_dispatch_coordinator",
@@ -75,6 +74,7 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
         "orchestra.flow_dispatch",
         "orchestra.failed_gate",
         "orchestra.issue_loader",
+        "orchestra.remote_check",
     ],
     "protocols": [
         "orchestra.protocols",

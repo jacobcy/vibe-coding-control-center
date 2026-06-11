@@ -157,15 +157,14 @@ class TestExecutorNoOpGate:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
+                return_value=("state/in-progress", False),
+            ),
             patch(
                 "vibe3.services.issue.failure.block_executor_noop_issue"
             ) as mock_block,
         ):
-            mock_gh.return_value.view_issue.return_value = {
-                "labels": [{"name": "state/in-progress"}],
-                "state": "open",
-            }
             apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=200,
@@ -188,15 +187,14 @@ class TestExecutorNoOpGate:
         mock_store = MagicMock()
 
         with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
+                return_value=("state/handoff", False),
+            ),
             patch(
                 "vibe3.services.issue.failure.block_executor_noop_issue"
             ) as mock_block,
         ):
-            mock_gh.return_value.view_issue.return_value = {
-                "labels": [{"name": "state/handoff"}],
-                "state": "open",
-            }
             apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=200,
