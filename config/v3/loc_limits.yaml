@@ -212,6 +212,9 @@ code_limits:
         reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数 + idempotency 检查）、label 继承、GitHub API 失败保护（network/auth/timeout）、retry-safe cleanup 逻辑、dependency transfer（PR closed 时将依赖从旧 issue 转移到 bridge issue）、PRMerged event publishing（flow lifecycle tracking）等紧密耦合功能，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）；Issue #2380 新增 _transfer_dependencies 方法支持依赖转移（+35 行）；Issue #2598 新增 PRMerged domain event publish 支持 flow lifecycle tracking（+15 行）；迁移至 check/ 子包（Issue #2584）；PR #2667 移除 _handle_open_pr_flow 方法（-51 行），迁移至 qualify_gate 层实现统一检查入口"
 
       # 强耦合测试例外
+      - path: "tests/vibe3/services/test_shared_errors.py"
+        limit: 383
+        reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file"
       - path: "tests/vibe3/models/test_job.py"
         limit: 510
         reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"
@@ -258,8 +261,8 @@ code_limits:
         limit: 440
         reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
-        limit: 550
-        reason: "Health check failure 测试集，验证 coordinator 对 CheckService 结果的处理逻辑（terminal/fail-open/genuine failure），包含 TestPreDispatchHealthChecks（8 个测试）和 TestEmptyBranchGuard（7 个测试）两个测试类，每个测试需要完整 mock setup，拆分会降低可读性；新增 mock_flow_blocker 注入对齐测试模式（#1723）；新增 _make_mock_coordinator_dependencies helper function（#1887）；Issue #2381 Task 1 新增 TestPreDispatchHealthChecks 测试类验证 inlined health check logic（+67 行），test file migration from DispatchHealthCheckService to coordinator"
+        limit: 686
+        reason: "Health check failure tests (TestPreDispatchHealthChecks + TestEmptyBranchGuard). Code review follow-up: added 3 tests for block_flow failure, missing flow context, and empty-branch entry state paths."
       - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
