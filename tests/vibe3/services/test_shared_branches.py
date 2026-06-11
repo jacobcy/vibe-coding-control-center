@@ -18,7 +18,7 @@ class TestResolveBranchArg:
 
         with (
             patch("vibe3.services.FlowService") as mock_fs_cls,
-            patch("vibe3.clients.GitClient") as mock_git_cls,
+            patch("vibe3.services.pr.resolver.GitClient") as mock_git_cls,
         ):
             mock_fs_cls.return_value = mock_flow_service
             mock_git_cls.return_value = mock_git_client
