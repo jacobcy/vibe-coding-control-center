@@ -144,8 +144,8 @@ code_limits:
         limit: 620
         reason: "Orchestra CLI 入口聚合，包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查、全局单例实例管理、serve start/stop/status 增强；#2174 新增 Active Jobs 面板显示运行态 job 监控数据（+83 行）"
       - path: "src/vibe3/server/registry.py"
-        limit: 540
-        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）"
+        limit: 560
+        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）；#2596 新增 webhook router mounting（+13 行）"
 
       # Shell / 脚本兼容入口
       - path: "scripts/install.sh"
@@ -302,6 +302,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_task_status_human_collab.py"
         limit: 420
         reason: "Task status dashboard special sections 测试集，覆盖 governed anomaly、server label resolution、compute effective server running、remote tasks、human collaboration flows (dev/issue-N) 等场景，共享 mock setup，拆分收益低"
+      - path: "tests/vibe3/server/test_webhook.py"
+        limit: 450
+        reason: "Webhook 端点完整测试集，覆盖 HMAC 签名验证（3 个）、事件转换（8 个跨 5 种事件类型）、端点行为（5 个含签名/401/publish 失败/payload 超限）、嵌套字段提取（4 个）共 20+ 测试，按测试类组织内聚度高，拆分降低可读性"
       - path: "tests/vibe3/services/test_check_pr_status.py"
         limit: 600
         reason: "Check PR 状态测试集，覆盖 PR closed 检测、terminal 状态判断、duplicate handling、check priority fix (PR merged before issue-closed) 等紧密耦合场景，新增 PR merged with closed issue 回归测试后略微超标（#2284）"
