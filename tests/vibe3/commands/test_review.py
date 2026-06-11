@@ -133,11 +133,13 @@ class TestReviewBaseExitCodes:
     """Verify review base exit codes follow verdict semantics."""
 
     def test_minor_verdict_does_not_exit_nonzero(self) -> None:
+        from vibe3.models import ReviewRequest, ReviewScope
+
         with (
             patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
             patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
             patch("vibe3.commands.review.build_base_review_request") as mock_request,
-            patch("vibe3.commands.review.execute_manual_review_sync") as mock_execute,
+            patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
         ):
             mock_flow.return_value = (object(), "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
@@ -145,7 +147,9 @@ class TestReviewBaseExitCodes:
                 (),
                 {"base_branch": "main", "auto_detected": False},
             )()
-            mock_request.return_value = (object(), 123, None)
+            # Create proper ReviewRequest instance
+            review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
+            mock_request.return_value = (review_request, 123, None)
             mock_execute.return_value = type(
                 "Result",
                 (),
@@ -157,11 +161,13 @@ class TestReviewBaseExitCodes:
         assert result.exit_code == 0
 
     def test_refuse_verdict_exits_nonzero(self) -> None:
+        from vibe3.models import ReviewRequest, ReviewScope
+
         with (
             patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
             patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
             patch("vibe3.commands.review.build_base_review_request") as mock_request,
-            patch("vibe3.commands.review.execute_manual_review_sync") as mock_execute,
+            patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
         ):
             mock_flow.return_value = (object(), "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
@@ -169,7 +175,9 @@ class TestReviewBaseExitCodes:
                 (),
                 {"base_branch": "main", "auto_detected": False},
             )()
-            mock_request.return_value = (object(), 123, None)
+            # Create proper ReviewRequest instance
+            review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
+            mock_request.return_value = (review_request, 123, None)
             mock_execute.return_value = type(
                 "Result",
                 (),
@@ -193,11 +201,13 @@ def test_review_base_help_mentions_show_prompt_option():
 def test_review_base_show_prompt_forwarded_to_sync():
     """review base --show-prompt should forward the flag to
     execute_manual_review_sync (requires --dry-run)."""
+    from vibe3.models import ReviewRequest, ReviewScope
+
     with (
         patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
         patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
         patch("vibe3.commands.review.build_base_review_request") as mock_request,
-        patch("vibe3.commands.review.execute_manual_review_sync") as mock_execute,
+        patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
     ):
         mock_flow.return_value = (object(), "feature/test")
         mock_base.return_value.resolve_review_base.return_value = type(
@@ -205,7 +215,9 @@ def test_review_base_show_prompt_forwarded_to_sync():
             (),
             {"base_branch": "main", "auto_detected": False},
         )()
-        mock_request.return_value = (object(), 123, None)
+        # Create proper ReviewRequest instance
+        review_request = ReviewRequest(scope=ReviewScope.for_base("main"))
+        mock_request.return_value = (review_request, 123, None)
         mock_execute.return_value = type(
             "Result",
             (),
