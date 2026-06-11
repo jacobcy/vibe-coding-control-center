@@ -50,6 +50,27 @@ class CoverageService:
             "commands": tc.commands,
         }
 
+    @staticmethod
+    def _categorize_by_layer(
+        coverage_data: dict[str, Any],
+        layer_names: tuple[str, ...],
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Pre-categorize coverage files by architectural layer in one pass.
+
+        Returns:
+            Dict mapping layer_name -> {file_path: file_data} for files
+            whose path starts with f"src/vibe3/{layer_name}".
+        """
+        categorized: dict[str, dict[str, dict[str, Any]]] = {
+            name: {} for name in layer_names
+        }
+        for file_path, file_data in coverage_data.get("files", {}).items():
+            for layer_name in layer_names:
+                if file_path.startswith(f"src/vibe3/{layer_name}"):
+                    categorized[layer_name][file_path] = file_data
+                    break  # each file belongs to at most one layer
+        return categorized
+
     def run_coverage_check(self) -> CoverageReport:
         """Run pytest with coverage and generate layer-based report.
 
@@ -64,12 +85,22 @@ class CoverageService:
         # 1. Run pytest with coverage
         coverage_data = self._run_pytest_cov()
 
-        # 2. Analyze by layer
-        services_cov = self._analyze_layer(coverage_data, "services")
-        clients_cov = self._analyze_layer(coverage_data, "clients")
-        commands_cov = self._analyze_layer(coverage_data, "commands")
+        # 2. Pre-categorize files by layer (single pass)
+        layers = ("services", "clients", "commands")
+        categorized = self._categorize_by_layer(coverage_data, layers)
 
-        # 3. Build report
+        # 3. Analyze by layer (using pre-categorized files)
+        services_cov = self._analyze_layer(
+            coverage_data, "services", categorized["services"]
+        )
+        clients_cov = self._analyze_layer(
+            coverage_data, "clients", categorized["clients"]
+        )
+        commands_cov = self._analyze_layer(
+            coverage_data, "commands", categorized["commands"]
+        )
+
+        # 4. Build report
         report = CoverageReport(
             services=services_cov,
             clients=clients_cov,
@@ -165,27 +196,36 @@ class CoverageService:
             raise RuntimeError(f"Coverage run failed: {e}") from e
 
     def _analyze_layer(
-        self, coverage_data: dict[str, Any], layer_name: str
+        self,
+        coverage_data: dict[str, Any],
+        layer_name: str,
+        _layer_files: dict[str, dict[str, Any]] | None = None,
     ) -> LayerCoverage:
         """Analyze coverage for a specific architectural layer.
 
         Args:
             coverage_data: Parsed coverage.json data
             layer_name: Layer name (services, clients, commands)
+            _layer_files: Pre-categorized files for this layer (optional optimization)
 
         Returns:
             LayerCoverage for the specified layer
         """
-        layer_path = f"src/vibe3/{layer_name}"
+        if _layer_files is not None:
+            files = _layer_files
+        else:
+            layer_path = f"src/vibe3/{layer_name}"
+            files = {
+                fp: fd
+                for fp, fd in coverage_data.get("files", {}).items()
+                if fp.startswith(layer_path)
+            }
+
         covered_lines = 0
         total_lines = 0
 
-        # Iterate through files in coverage data
-        files = coverage_data.get("files", {})
-        for file_path, file_data in files.items():
-            if not file_path.startswith(layer_path):
-                continue
-
+        # Iterate through files
+        for file_data in files.values():
             summary = file_data.get("summary", {})
             covered_lines += summary.get("covered_lines", 0)
             total_lines += summary.get("num_statements", 0)
