@@ -145,6 +145,24 @@ class WebhookIssueClosed(DomainEvent):
 
 
 @dataclass(frozen=True)
+class ManualPlanIntent(DomainEvent):
+    """Published when CLI plan command is invoked."""
+
+    issue_number: int | None
+    branch: str
+    request: object = None  # PlanRequest (frozen dataclass)
+    dry_run: bool = False
+    no_async: bool = False
+    show_prompt: bool = False
+    agent: str | None = None
+    backend: str | None = None
+    model: str | None = None
+    fresh_session: bool = False
+    actor: str = "cli:plan"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class FlowBlocked(DomainEvent):
     """Published when a flow enters blocked state."""
 
@@ -156,6 +174,30 @@ class FlowBlocked(DomainEvent):
 
 
 @dataclass(frozen=True)
+class ManualRunIntent(DomainEvent):
+    """Published when CLI run command is invoked."""
+
+    issue_number: int | None
+    branch: str
+    instructions: str | None = None
+    plan_file: str | None = None
+    skill: str | None = None
+    summary_mode: str = "plan"
+    summary_message: str | None = None
+    summary_branch: str | None = None
+    dry_run: bool = False
+    no_async: bool = False
+    show_prompt: bool = False
+    agent: str | None = None
+    backend: str | None = None
+    model: str | None = None
+    fresh_session: bool = False
+    publish: bool = False
+    actor: str = "cli:run"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class FlowCompleted(DomainEvent):
     """Published when a flow is marked done."""
 
@@ -163,6 +205,26 @@ class FlowCompleted(DomainEvent):
     branch: str
     completed_state: str  # "done" | "merged"
     actor: str = "system:flow"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ManualReviewIntent(DomainEvent):
+    """Published when CLI review command is invoked."""
+
+    issue_number: int | None
+    branch: str
+    is_base_review: bool = False
+    request: object = None  # ReviewRequest (frozen dataclass)
+    instructions: str | None = None
+    dry_run: bool = False
+    no_async: bool = False
+    show_prompt: bool = False
+    agent: str | None = None
+    backend: str | None = None
+    model: str | None = None
+    fresh_session: bool = False
+    actor: str = "cli:review"
     timestamp: str | None = None
 
 

@@ -67,7 +67,12 @@ def build_run_request(
             "--no-async",
         ]
     else:
-        command_args = ["run", "--branch", target_branch, "--no-async"]
+        command_args = [
+            "run",
+            "--branch",
+            target_branch,
+            "--no-async",
+        ]
 
     return build_role_async_request(
         role="executor",

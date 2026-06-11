@@ -38,6 +38,42 @@ def mock_git_client_base() -> Generator[None, None, None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _populate_lazy_imports() -> None:
+    """Force vibe3.roles and vibe3.execution lazy import caches to populate.
+
+    Must run before any test that mocks lazy-imported symbols.
+    Without this, monkeypatch.setattr on a cache triggers __getattr__
+    which reads from the (already-mocked) source, caching the mock.
+    monkeypatch.undo then restores the mock instead of the real function.
+    """
+    import vibe3.execution
+    import vibe3.roles
+
+    # Roles: plan
+    for sym in [
+        "resolve_spec_plan_input",
+        "execute_spec_plan_async",
+        "execute_spec_plan_sync",
+    ]:
+        _ = getattr(vibe3.roles, sym)
+
+    # Roles: run
+    for sym in ["execute_manual_run"]:
+        _ = getattr(vibe3.roles, sym)
+
+    # Roles: review
+    for sym in [
+        "execute_manual_review_sync",
+        "execute_manual_review_async",
+    ]:
+        _ = getattr(vibe3.roles, sym)
+
+    # Execution
+    for sym in ["run_issue_role_sync", "run_issue_role_async"]:
+        _ = getattr(vibe3.execution, sym)
+
+
 @pytest.fixture
 def mock_pr_response() -> PRResponse:
     """Create mock PR response."""

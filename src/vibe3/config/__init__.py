@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     )
     from vibe3.config.branch_convention import BranchConvention
     from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
+    from vibe3.config.config_loader import load_config_for_role
     from vibe3.config.convention_resolver import diagnose_profile
     from vibe3.config.loader import (
         get_config,
@@ -118,6 +119,7 @@ __all__ = [
     "get_role_section",
     "has_agent_env_override",
     "load_config",
+    "load_config_for_role",
     "load_keys_env_fallback",
     "load_orchestra_config",
     "load_runtime_config",
@@ -179,6 +181,7 @@ _SYMBOL_MODULES = {
     "get_role_section": "vibe3.config.role_policy",
     "has_agent_env_override": "vibe3.config.agent_preset",
     "load_config": "vibe3.config.loader",
+    "load_config_for_role": "vibe3.config.config_loader",
     "load_keys_env_fallback": "vibe3.config.loader",
     "load_orchestra_config": "vibe3.config.orchestra_settings",
     "load_runtime_config": "vibe3.config.loader",

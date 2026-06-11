@@ -22,7 +22,6 @@ from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import UserError
 from vibe3.roles import (
     ensure_plan_file_exists,
-    execute_manual_run,
     resolve_run_mode,
     resolve_skill_path,
     validate_run_prerequisites,
@@ -41,6 +40,16 @@ BranchOption = Annotated[
     str | None,
     typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
 ]
+
+
+def _raise_pending_run_error() -> None:
+    """Convert handler-side run errors into CLI failures."""
+    from vibe3.domain import get_pending_result
+
+    result = get_pending_result("run")
+    if isinstance(result, Exception):
+        typer.echo(f"Error: {result}", err=True)
+        raise typer.Exit(1)
 
 
 def run_command(
@@ -81,14 +90,18 @@ def run_command(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    # Register EDA event handlers (defensive: ensures handlers are bound even
-    # if the CLI path ever publishes domain events in the future)
-    from vibe3.domain import register_event_handlers
+    # Register EDA event handlers for run command (may publish events)
+    from vibe3.domain import get_pending_result, register_event_handlers
+    from vibe3.domain import publish as domain_publish
 
     register_event_handlers()
+    get_pending_result("run")
+
+    # Import new event type
+    from vibe3.models import ManualRunIntent
 
     # Load config and validate --model requires backend (CLI or config)
-    config = load_config_and_validate_model("run", agent, backend, model)
+    _config = load_config_and_validate_model("run", agent, backend, model)
 
     target_branch = resolve_branch_arg(branch)
 
@@ -118,25 +131,31 @@ def run_command(
             raise typer.Exit(1)
 
         typer.echo(f"-> Skill: {skill_path}")
-        execute_manual_run(
-            config=config,
-            branch=target_branch,
-            issue_number=issue_number,
-            instructions=instructions,
-            plan_file=None,
-            skill=skill,
-            summary=resolve_run_mode(
-                flow_service, target_branch, instructions, None, skill
-            ),
-            dry_run=dry_run,
-            no_async=no_async,
-            show_prompt=show_prompt,
-            agent=agent,
-            backend=backend,
-            model=model,
-            fresh_session=fresh_session,
-            publish=publish,
+        summary = resolve_run_mode(
+            flow_service, target_branch, instructions, None, skill
         )
+        # Publish ManualRunIntent event (handler will execute)
+        domain_publish(
+            ManualRunIntent(
+                issue_number=issue_number,
+                branch=target_branch,
+                instructions=instructions,
+                plan_file=None,
+                skill=skill,
+                summary_mode=summary.mode,
+                summary_message=summary.message,
+                summary_branch=summary.branch,
+                dry_run=dry_run,
+                no_async=no_async,
+                show_prompt=show_prompt,
+                agent=agent,
+                backend=backend,
+                model=model,
+                fresh_session=fresh_session,
+                publish=publish,
+            )
+        )
+        _raise_pending_run_error()
         return
 
     # Resolve plan parameter using shared @-resolution channel
@@ -189,22 +208,28 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    execute_manual_run(
-        config=config,
-        branch=target_branch,
-        issue_number=issue_number,
-        instructions=instructions,
-        plan_file=plan_file,
-        skill=None,
-        summary=summary,
-        dry_run=dry_run,
-        no_async=no_async,
-        show_prompt=show_prompt,
-        agent=agent,
-        backend=backend,
-        model=model,
-        fresh_session=fresh_session,
+    # Publish ManualRunIntent event (handler will execute)
+    domain_publish(
+        ManualRunIntent(
+            issue_number=issue_number,
+            branch=target_branch,
+            instructions=instructions,
+            plan_file=plan_file,
+            skill=None,
+            summary_mode=summary.mode,
+            summary_message=summary.message,
+            summary_branch=summary.branch,
+            dry_run=dry_run,
+            no_async=no_async,
+            show_prompt=show_prompt,
+            agent=agent,
+            backend=backend,
+            model=model,
+            fresh_session=fresh_session,
+            publish=publish,
+        )
     )
+    _raise_pending_run_error()
 
 
 @app.callback(invoke_without_command=True)

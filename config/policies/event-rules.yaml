@@ -59,6 +59,24 @@ rules:
       message: "issue #{{ event.issue_number }} failed: {{ event.reason }}"
       target: "manager"
 
+  # Manual plan triggered via CLI
+  - event: ManualPlanIntent
+    action: log
+    params:
+      message: "CLI plan triggered for issue #{{ event.issue_number }} (branch={{ event.branch }})"
+
+  # Manual run triggered via CLI
+  - event: ManualRunIntent
+    action: log
+    params:
+      message: "CLI run triggered for issue #{{ event.issue_number }} (mode={{ event.summary_mode }})"
+
+  # Manual review triggered via CLI
+  - event: ManualReviewIntent
+    action: log
+    params:
+      message: "CLI review triggered for issue #{{ event.issue_number }} (base={{ event.is_base_review }})"
+
   # Webhook: label changed → log (upstream handler can refresh queue)
   - event: WebhookLabelChanged
     action: log

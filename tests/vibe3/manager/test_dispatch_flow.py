@@ -63,7 +63,11 @@ class TestManagerRoleServicePreparation:
         assert request.mode == "async"
         assert request.worktree_requirement == WorktreeRequirement.PERMANENT
         assert request.cmd is not None
-        assert request.cmd[-2:] == ["102", "--no-async"]
+        assert request.cmd[-3:] == [
+            "manager",
+            "102",
+            "--no-async",
+        ]
         assert "VIBE3_ASYNC_CHILD" in request.env
         assert request.refs["issue_title"] == "Manager real dispatch"
 
