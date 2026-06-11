@@ -69,16 +69,29 @@ def has_manager_assignee(
     return any(assignee in manager_usernames for assignee in assignees)
 
 
-# Label constants (duplicated from services/shared/labels.py
-# to avoid cross-category imports)
-EXECUTION_STATES = frozenset({"in-progress", "review", "handoff", "blocked"})
+# Label constants duplicated from services/shared/labels.py to avoid
+# cross-category imports. Keep these semantics in sync.
+ROADMAP_LIFECYCLE_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
+EXECUTION_STATES = frozenset(
+    {"merge-ready", "review", "in-progress", "handoff", "claimed"}
+)
+STATE_PRIORITY_ORDER = (
+    "blocked",
+    "done",
+    "merge-ready",
+    "review",
+    "in-progress",
+    "handoff",
+    "claimed",
+    "ready",
+)
 
 ORCHESTRA_GOVERNED_LABEL = "orchestra-governed"
 
 
 def has_roadmap_label(labels: list[str]) -> bool:
-    """Check if issue has a roadmap label."""
-    return any(lb.startswith("roadmap/") for lb in labels)
+    """Check if issue has an RFC or epic roadmap lifecycle label."""
+    return bool(ROADMAP_LIFECYCLE_LABELS & set(labels))
 
 
 def has_execution_state(labels: list[str]) -> bool:
@@ -94,6 +107,16 @@ def get_state_labels(labels: list[str]) -> list[str]:
     return [lb for lb in labels if lb.startswith("state/")]
 
 
+def get_highest_priority_state(labels: list[str]) -> str | None:
+    """Return highest-priority state/* label from labels, or None."""
+    state_set = set(get_state_labels(labels))
+    for priority_state in STATE_PRIORITY_ORDER:
+        candidate = f"state/{priority_state}"
+        if candidate in state_set:
+            return candidate
+    return None
+
+
 def has_orchestra_governed(labels: list[str]) -> bool:
     """Check if issue has orchestra-governed label."""
     return ORCHESTRA_GOVERNED_LABEL in labels
@@ -102,10 +125,10 @@ def has_orchestra_governed(labels: list[str]) -> bool:
 def get_conflicting_states(labels: list[str]) -> list[str]:
     """Get conflicting state labels (multiple state labels on same issue)."""
     state_labels = get_state_labels(labels)
-    if len(state_labels) > 1:
-        # Return all but the first one (keep the first, remove the rest)
-        return state_labels[1:]
-    return []
+    if len(state_labels) <= 1:
+        return []
+    highest = get_highest_priority_state(labels)
+    return [lb for lb in state_labels if lb != highest]
 
 
 @dataclass(frozen=True)
@@ -113,7 +136,8 @@ class LabelAnomaly:
     """Audit finding for a single issue's label state."""
 
     issue_number: int
-    rule: str  # roadmap_conflict | multi_state | orphan_execution | orphan_orchestra
+    # roadmap_conflict | multi_state | orphan_execution | governed_missing_state
+    rule: str
     removed: list[str]
     added: list[str]
 
@@ -164,13 +188,13 @@ def collect_label_anomalies(
                 added.append("state/ready")
                 rules.append("orphan_execution")
 
-    # Rule 4: orphan orchestra-governed (manager issues only)
+    # Rule 4: governed issue missing its terminal state (manager issues only)
     if is_manager_issue and has_orchestra_governed(labels):
         has_state = bool(get_state_labels(labels))
         has_roadmap = has_roadmap_label(labels)
         if not has_state and not has_roadmap:
-            removed.append(ORCHESTRA_GOVERNED_LABEL)
-            rules.append("orphan_orchestra")
+            added.append("state/ready")
+            rules.append("governed_missing_state")
 
     if not rules:
         return []

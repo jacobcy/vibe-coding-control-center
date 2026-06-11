@@ -311,7 +311,7 @@ class TestCollectLabelAnomalies:
 
     def test_multi_state_no_roadmap(self) -> None:
         result = collect_label_anomalies(
-            ["state/blocked", "state/review"],
+            ["state/review", "state/blocked"],
             issue_number=1,
             has_local_flow=True,
             is_manager_issue=False,
@@ -341,7 +341,7 @@ class TestCollectLabelAnomalies:
         )
         assert result == []
 
-    def test_orphan_orchestra_governed(self) -> None:
+    def test_governed_without_terminal_label_backfills_ready(self) -> None:
         result = collect_label_anomalies(
             ["orchestra-governed"],
             issue_number=1,
@@ -349,9 +349,11 @@ class TestCollectLabelAnomalies:
             is_manager_issue=True,
         )
         assert len(result) == 1
-        assert "orphan_orchestra" in result[0].rule
+        assert "governed_missing_state" in result[0].rule
+        assert result[0].removed == []
+        assert result[0].added == ["state/ready"]
 
-    def test_orphan_orchestra_skipped_when_has_state(self) -> None:
+    def test_governed_missing_state_skipped_when_has_state(self) -> None:
         result = collect_label_anomalies(
             ["orchestra-governed", "state/ready"],
             issue_number=1,
@@ -359,6 +361,16 @@ class TestCollectLabelAnomalies:
             is_manager_issue=True,
         )
         assert result == []
+
+    def test_governed_missing_state_skipped_when_rfc_or_epic(self) -> None:
+        for roadmap_label in ("roadmap/rfc", "roadmap/epic"):
+            result = collect_label_anomalies(
+                ["orchestra-governed", roadmap_label],
+                issue_number=1,
+                has_local_flow=True,
+                is_manager_issue=True,
+            )
+            assert result == []
 
     def test_roadmap_skips_multi_state_rule(self) -> None:
         result = collect_label_anomalies(

@@ -18,6 +18,7 @@ from vibe3.services.check.remote import (
     is_empty_auto_scene,
     issue_state_from_payload,
 )
+from vibe3.services.check.state_label_recovery import should_recover_missing_state_label
 from vibe3.services.flow.status import FlowStatusService
 from vibe3.services.pr.service import PRService
 
@@ -306,8 +307,11 @@ class CheckService(CheckRemote):
             task_issue_closed = False
             orchestration_state: IssueState | None = None
             issue_payload: dict | None = None
+            issue_labels: list[str] = []
+            issue_labels_loaded = False
             if task_issue:
                 from vibe3.clients import GITHUB_DEFAULT_VIEW_FIELDS
+                from vibe3.services.shared.labels import normalize_labels
 
                 # Need state, labels, and body for state validation
                 issue = self.github_client.view_issue(
@@ -321,6 +325,10 @@ class CheckService(CheckRemote):
                     issues.append(f"Task issue #{task_issue} not found on GitHub")
                 elif isinstance(issue, dict):
                     issue_payload = issue
+                    raw_labels = issue_payload.get("labels")
+                    if isinstance(raw_labels, list):
+                        issue_labels = normalize_labels(raw_labels)
+                        issue_labels_loaded = True
                     orchestration_state = issue_state_from_payload(issue)
                     if str(issue.get("state", "")).upper() == "CLOSED":
                         task_issue_closed = True
@@ -333,6 +341,7 @@ class CheckService(CheckRemote):
                     issues.extend(label_issues)
                     if fixed_state is not None:
                         orchestration_state = fixed_state
+                        issue_labels = [fixed_state.to_label()]
 
             # only one task issue per branch
             if len(task_issues) > 1:
@@ -543,6 +552,35 @@ class CheckService(CheckRemote):
                             f"Auto-recovery failed: {e}. "
                             f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
                         )
+
+            if task_issue and should_recover_missing_state_label(
+                labels=issue_labels,
+                flow_status=str(flow_status),
+                issue_loaded=issue_payload is not None and issue_labels_loaded,
+                task_issue_closed=task_issue_closed,
+            ):
+                try:
+                    result = recovery_svc.recover(
+                        branch=branch,
+                        issue_number=task_issue,
+                        reason="Remote state label missing",
+                        auto=False,
+                        ensure_worktree=True,
+                    )
+                    logger.info(
+                        "Recovered missing remote state label",
+                        branch=branch,
+                        action=result.action.value,
+                        detail=result.detail,
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+                except Exception as e:
+                    logger.error(
+                        "Failed to recover missing remote state label",
+                        branch=branch,
+                        error=str(e),
+                    )
+                    issues.append(f"Missing state label auto-recovery failed: {e}")
 
             # Read-only dependency check
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
