@@ -57,11 +57,11 @@ KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
+# Phase 7b continuation: pr <-> task cycle resolved (2026-06-11).
 KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = {
     frozenset({"flow", "pr"}),
     frozenset({"flow", "issue"}),
     frozenset({"flow", "task"}),
-    frozenset({"pr", "task"}),
 }
 
 

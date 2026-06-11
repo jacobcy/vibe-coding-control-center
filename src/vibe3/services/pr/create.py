@@ -12,7 +12,7 @@ from vibe3.config import VibeConfig
 from vibe3.prompts import resolve_prompts_path
 from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.base_resolution import BaseResolutionUsecase
-from vibe3.services.task.binding_guard import ensure_task_issue_bound
+from vibe3.services.shared.binding_guard import ensure_task_issue_bound
 
 
 @dataclass(frozen=True)
