@@ -9,11 +9,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import logging
 import os
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request
+from loguru import logger
 
 from vibe3.models import (
     WebhookIssueClosed,
@@ -25,8 +25,6 @@ from vibe3.models import (
 
 if TYPE_CHECKING:
     from vibe3.models import DomainEvent
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
@@ -152,6 +150,67 @@ def _convert_to_event(event_type: str, payload: dict) -> DomainEvent | None:
     return None
 
 
+def _format_event_details(event: DomainEvent) -> str:
+    """Format webhook event with key fields for observability.
+
+    Uses loguru color markup to highlight key fields:
+    - issue_number/PR number: yellow
+    - label/reviewer/state: blue
+    - action: red
+    - sender: green
+    - timestamp: dim
+
+    Args:
+        event: Domain event to format
+
+    Returns:
+        Formatted string with color markup
+    """
+    if isinstance(event, WebhookLabelChanged):
+        return (
+            f"WebhookLabelChanged("
+            f"issue=<yellow>#{event.issue_number}</yellow>, "
+            f"label=<blue>{event.label}</blue>, "
+            f"action=<red>{event.action}</red>, "
+            f"sender=<green>{event.sender}</green>, "
+            f"timestamp=<dim>{event.timestamp or 'N/A'}</dim>)"
+        )
+    elif isinstance(event, WebhookIssueUpdated):
+        return (
+            f"WebhookIssueUpdated("
+            f"issue=<yellow>#{event.issue_number}</yellow>, "
+            f"action=<red>{event.action}</red>, "
+            f"sender=<green>{event.sender}</green>, "
+            f"timestamp=<dim>{event.timestamp or 'N/A'}</dim>)"
+        )
+    elif isinstance(event, WebhookPRMerged):
+        return (
+            f"WebhookPRMerged("
+            f"pr=<yellow>#{event.pr_number}</yellow>, "
+            f"branch={event.branch}, "
+            f"sender=<green>{event.sender}</green>, "
+            f"timestamp=<dim>{event.timestamp or 'N/A'}</dim>)"
+        )
+    elif isinstance(event, WebhookPRReviewed):
+        return (
+            f"WebhookPRReviewed("
+            f"pr=<yellow>#{event.pr_number}</yellow>, "
+            f"reviewer=<green>{event.reviewer}</green>, "
+            f"state=<blue>{event.state}</blue>, "
+            f"sender=<green>{event.sender}</green>, "
+            f"timestamp=<dim>{event.timestamp or 'N/A'}</dim>)"
+        )
+    elif isinstance(event, WebhookIssueClosed):
+        return (
+            f"WebhookIssueClosed("
+            f"issue=<yellow>#{event.issue_number}</yellow>, "
+            f"sender=<green>{event.sender}</green>, "
+            f"timestamp=<dim>{event.timestamp or 'N/A'}</dim>)"
+        )
+    else:
+        return event.__class__.__name__
+
+
 @router.post("/github")
 async def handle_github_webhook(request: Request) -> dict:
     """Handle GitHub webhook POST request.
@@ -182,8 +241,7 @@ async def handle_github_webhook(request: Request) -> dict:
         if not _verify_signature(payload_bytes, signature, secret):
             logger.warning("Webhook signature verification failed")
             raise HTTPException(status_code=401, detail="Invalid signature")
-    else:
-        logger.warning("GITHUB_WEBHOOK_SECRET not set, skipping signature verification")
+    # else: secret not set, verification already warned at startup
 
     # Parse JSON payload
     try:
@@ -204,8 +262,11 @@ async def handle_github_webhook(request: Request) -> dict:
         from vibe3.models import publish
 
         publish(event)
-        logger.info(f"Published webhook event: {event.__class__.__name__}")
+        event_details = _format_event_details(event)
+        logger.bind(domain="webhook").info(f"Published webhook event: {event_details}")
     except Exception as exc:
-        logger.exception(f"Failed to publish webhook event: {exc}")
+        logger.bind(domain="webhook").exception(
+            f"Failed to publish webhook event: {exc}"
+        )
 
     return {"status": "ok", "event": event_type}

@@ -266,9 +266,17 @@ def _build_server_with_launch_cwd(
             f"Failed to mount MCP server, continuing without MCP: {exc}"
         )
 
-    # Mount webhook router (gracefully degrades if not available)
+    # Mount webhook router (optional, controlled by config)
     try:
+        # Warn at startup if webhook secret not configured
+        import os
+
         from .webhook import router as webhook_router
+
+        if not os.getenv("GITHUB_WEBHOOK_SECRET"):
+            logger.bind(domain="orchestra").warning(
+                "GITHUB_WEBHOOK_SECRET not set, webhook signature verification disabled"
+            )
 
         fastapi_app.include_router(webhook_router)
         logger.bind(domain="orchestra").info(
