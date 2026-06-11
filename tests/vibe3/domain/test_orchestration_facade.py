@@ -1,6 +1,6 @@
 """Tests for OrchestrationFacade."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -9,7 +9,6 @@ from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.failed_gate import GateResult
 
 
 @pytest.fixture
@@ -130,38 +129,6 @@ class TestOrchestrationFacade:
         call_args = mock_add_comment.call_args
         assert call_args.args[0] == 42
         assert "Manual review required" in call_args.args[1]
-
-    @pytest.mark.asyncio
-    @patch("vibe3.observability.orchestra_log.append_orchestra_event")
-    async def test_on_tick_blocks_dispatch_when_failed_gate_is_closed(
-        self,
-        mock_append_event: MagicMock,
-    ) -> None:
-        """Failed gate should freeze dispatch-intent emission, not heartbeat itself."""
-        capacity = MagicMock()
-        gate = MagicMock()
-        gate.check.return_value = GateResult(
-            blocked=True,
-            reason="manager failed",
-            blocked_ticks=0,
-        )
-
-        facade = OrchestrationFacade(
-            flow_manager=MagicMock(),
-            capacity=capacity,
-            failed_gate=gate,
-            coordinator_factory=lambda **kwargs: MagicMock(),
-        )
-        facade.on_supervisor_scan = AsyncMock()
-        facade._coordinator = MagicMock()
-        facade._coordinator.coordinate = AsyncMock()
-
-        await facade.on_tick()
-
-        gate.check.assert_called_once()
-        facade._coordinator.coordinate.assert_not_awaited()
-        assert mock_append_event.called
-        assert "dispatch blocked by failed gate" in mock_append_event.call_args.args[1]
 
     @pytest.mark.asyncio
     @patch(

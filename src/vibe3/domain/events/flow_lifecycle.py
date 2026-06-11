@@ -6,9 +6,12 @@ See vibe3.models.domain_events for the canonical definitions.
 
 from vibe3.models import (
     ExecutorDispatchIntent,
+    FlowBlocked,
+    FlowCompleted,
     IssueFailed,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
+    PRMerged,
     ReviewerDispatchIntent,
     WebhookIssueClosed,
     WebhookIssueUpdated,
@@ -19,9 +22,12 @@ from vibe3.models import (
 
 __all__ = [
     "ExecutorDispatchIntent",
+    "FlowBlocked",
+    "FlowCompleted",
     "IssueFailed",
     "ManagerDispatchIntent",
     "PlannerDispatchIntent",
+    "PRMerged",
     "ReviewerDispatchIntent",
     "WebhookIssueClosed",
     "WebhookIssueUpdated",
