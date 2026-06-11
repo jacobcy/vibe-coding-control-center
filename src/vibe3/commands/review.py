@@ -21,15 +21,8 @@ from vibe3.commands.command_options import (
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
-from vibe3.execution import (
-    run_issue_role_async,
-    run_issue_role_sync,
-)
 from vibe3.roles import (
-    REVIEW_SYNC_SPEC,
     build_base_review_request,
-    execute_manual_review_async,
-    execute_manual_review_sync,
     validate_review_prerequisites,
 )
 from vibe3.services import FlowService, resolve_branch_arg
@@ -72,6 +65,13 @@ def _review_branch_impl(
     if trace:
         enable_method_trace()
 
+    # Register EDA event handlers for review command
+    from vibe3.domain import publish as domain_publish
+    from vibe3.domain import register_event_handlers
+    from vibe3.models import ManualReviewIntent
+
+    register_event_handlers()
+
     # Load config and validate --model requires backend (CLI or config)
     # config is unused here but returned for potential future use
     _config = load_config_and_validate_model("review", agent, backend, model)
@@ -83,43 +83,21 @@ def _review_branch_impl(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    # Handle dry_run early return (align with plan command pattern)
-    # dry_run early-return: bypasses async/sync execution
-    # to display command/prompt for verification
-    if dry_run:
-        run_issue_role_sync(
+    # Publish ManualReviewIntent event (handler will execute)
+    domain_publish(
+        ManualReviewIntent(
             issue_number=issue_number,
-            dry_run=True,
-            fresh_session=fresh_session,
+            branch=branch,
+            is_base_review=False,
+            dry_run=dry_run,
+            no_async=no_async,
             show_prompt=show_prompt,
-            spec=REVIEW_SYNC_SPEC,
-            agent=agent,
-            backend=backend,
-            model=model,
-        )
-        return
-
-    if no_async:
-        run_issue_role_sync(
-            issue_number=issue_number,
-            dry_run=False,
-            fresh_session=fresh_session,
-            show_prompt=show_prompt,
-            spec=REVIEW_SYNC_SPEC,
-            agent=agent,
-            backend=backend,
-            model=model,
-        )
-    else:
-        run_issue_role_async(
-            issue_number=issue_number,
-            dry_run=False,
-            spec=REVIEW_SYNC_SPEC,
             agent=agent,
             backend=backend,
             model=model,
             fresh_session=fresh_session,
         )
+    )
 
 
 @app.callback(invoke_without_command=True)
@@ -228,6 +206,14 @@ def base(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
+    # Register EDA event handlers for review command
+    from vibe3.domain import publish as domain_publish
+    from vibe3.domain import register_event_handlers
+    from vibe3.domain.handlers.manual_dispatch import get_pending_result
+    from vibe3.models import ManualReviewIntent
+
+    register_event_handlers()
+
     # Load config and validate --model requires backend (CLI or config)
     # config is unused here but returned for potential future use
     _config = load_config_and_validate_model("review", agent, backend, model)
@@ -259,34 +245,32 @@ def base(
         resolved_base.base_branch,
         flow_service=flow_service,
     )
-    if no_async or dry_run:
-        result = execute_manual_review_sync(
-            request=request,
-            dry_run=dry_run,
-            instructions=instructions,
+
+    # Publish ManualReviewIntent event (handler will execute)
+    domain_publish(
+        ManualReviewIntent(
             issue_number=issue_number,
             branch=current_branch,
+            is_base_review=True,
+            request=request,
+            instructions=instructions,
+            dry_run=dry_run,
+            no_async=no_async,
             show_prompt=show_prompt,
             agent=agent,
             backend=backend,
             model=model,
             fresh_session=fresh_session,
         )
+    )
+
+    # Retrieve result from handler (sync execution)
+    result = get_pending_result("review")
+    if result is None:
+        # Async mode: result is None, tmux session info already echoed by handler
+        pass
     else:
-        result = execute_manual_review_async(
-            request=request,
-            instructions=instructions,
-            issue_number=issue_number,
-            branch=current_branch,
-            agent=agent,
-            backend=backend,
-            model=model,
-            fresh_session=fresh_session,
-        )
-        if result.tmux_session:
-            typer.echo(f"tmux session: {result.tmux_session}")
-        if result.log_path:
-            typer.echo(f"log: {result.log_path}")
-    _emit_review_result(result.verdict, result.handoff_file)
-    if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
-        raise typer.Exit(1)
+        # Sync mode: display result
+        _emit_review_result(result.verdict, result.handoff_file)
+        if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
+            raise typer.Exit(1)

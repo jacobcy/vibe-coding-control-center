@@ -25,6 +25,7 @@ from vibe3.domain.handlers import dispatch as _dispatch
 from vibe3.domain.handlers import flow_lifecycle as _flow_lifecycle
 from vibe3.domain.handlers import governance_scan as _governance_scan
 from vibe3.domain.handlers import issue_state_dispatch as _issue_state_dispatch
+from vibe3.domain.handlers import manual_dispatch as _manual_dispatch
 from vibe3.domain.handlers import supervisor_scan as _supervisor_scan
 
 # Store modules in private tuple to prevent Ruff from flagging as unused
@@ -34,5 +35,6 @@ _HANDLER_MODULES = (
     _flow_lifecycle,
     _governance_scan,
     _issue_state_dispatch,
+    _manual_dispatch,
     _supervisor_scan,
 )

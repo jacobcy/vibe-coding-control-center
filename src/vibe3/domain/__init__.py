@@ -27,6 +27,9 @@ if TYPE_CHECKING:
         ExecutorDispatchIntent,
         IssueFailed,
         ManagerDispatchIntent,
+        ManualPlanIntent,
+        ManualReviewIntent,
+        ManualRunIntent,
         PlannerDispatchIntent,
         ReviewerDispatchIntent,
     )
@@ -64,6 +67,9 @@ _LAZY_IMPORTS: dict[str, str] = {
     # Events - flow lifecycle
     "IssueFailed": "vibe3.domain.events.flow_lifecycle",
     "ManagerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
+    "ManualPlanIntent": "vibe3.domain.events.flow_lifecycle",
+    "ManualRunIntent": "vibe3.domain.events.flow_lifecycle",
+    "ManualReviewIntent": "vibe3.domain.events.flow_lifecycle",
     "PlannerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
     "ExecutorDispatchIntent": "vibe3.domain.events.flow_lifecycle",
     "ReviewerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
@@ -148,6 +154,9 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueFailed",
     "ManagerDispatchIntent",
+    "ManualPlanIntent",
+    "ManualRunIntent",
+    "ManualReviewIntent",
     "PlannerDispatchIntent",
     "ExecutorDispatchIntent",
     "ReviewerDispatchIntent",
