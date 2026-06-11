@@ -222,8 +222,8 @@ code_limits:
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
       - path: "tests/vibe3/commands/test_plan.py"
-        limit: 450
-        reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；Issue #2435 新增 test_plan_model_with_config_backend_succeeds 验证 MAJOR fix 后略微超标（423 行）"
+        limit: 460
+        reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；Issue #2435 新增 test_plan_model_with_config_backend_succeeds 验证 MAJOR fix 后略微超标（423 行）；rebase 后新增 EDA 架构 mock 路径修复测试（+31 行）"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
