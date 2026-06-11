@@ -257,7 +257,7 @@ class GlobalDispatchCoordinator:
         """Pre-dispatch health check. Returns True if issue can be dispatched.
 
         Delegates structural checks to CheckService, with terminal state
-        and transient error handling inlined from DispatchHealthCheckService.
+        and transient error handling inlined directly in this method.
         """
         branch, _ = self._flow_context(issue.number)
 
