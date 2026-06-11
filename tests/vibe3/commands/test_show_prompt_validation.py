@@ -45,7 +45,7 @@ class TestRunCommandValidation:
     def test_run_rejects_show_prompt_without_dry_run(self):
         """run command should reject --show-prompt without --dry-run."""
         # Patch execute_manual_run to avoid real execution
-        with patch("vibe3.commands.run.execute_manual_run") as mock_execute:
+        with patch("vibe3.roles.run_command.execute_manual_run") as mock_execute:
             result = runner.invoke(cli_app, ["run", "test", "--show-prompt"])
 
         assert result.exit_code == 1
@@ -56,7 +56,7 @@ class TestRunCommandValidation:
     def test_run_show_prompt_with_dry_run_still_works(self):
         """run command should accept --show-prompt with --dry-run."""
         # Patch execute_manual_run to avoid real execution
-        with patch("vibe3.commands.run.execute_manual_run"):
+        with patch("vibe3.roles.run_command.execute_manual_run"):
             result = runner.invoke(
                 cli_app, ["run", "test", "--dry-run", "--show-prompt", "--no-async"]
             )
@@ -174,7 +174,7 @@ class TestReviewBaseCommandValidation:
                     mock_build.return_value = (None, None, None)
 
                     with patch(
-                        "vibe3.commands.review.execute_manual_review_sync"
+                        "vibe3.roles.review.execute_manual_review_sync"
                     ) as mock_execute:
                         mock_execute.return_value.verdict = "PASS"
                         mock_execute.return_value.handoff_file = None
