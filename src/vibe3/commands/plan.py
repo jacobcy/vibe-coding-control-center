@@ -5,7 +5,6 @@ from typing import Annotated
 
 import typer
 
-from vibe3.agents import create_codeagent_command, make_plan_context_builder
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -19,11 +18,7 @@ from vibe3.commands.command_options import (
     validate_show_prompt_dependency,
 )
 from vibe3.commands.common import enable_method_trace
-from vibe3.config import RoleCliOverrides
-from vibe3.execution import CodeagentExecutionService
 from vibe3.roles import (
-    execute_spec_plan_async,
-    execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
 from vibe3.services import FlowService, resolve_branch_arg, resolve_handoff_target
@@ -41,6 +36,16 @@ BranchOption = Annotated[
 ]
 
 
+def _raise_pending_plan_error() -> None:
+    """Convert handler-side plan errors into CLI failures."""
+    from vibe3.domain import get_pending_result
+
+    result = get_pending_result("plan")
+    if isinstance(result, Exception):
+        typer.echo(f"Error: {result}", err=True)
+        raise typer.Exit(1)
+
+
 def _plan_for_branch(
     branch: str,
     trace: bool,
@@ -56,8 +61,16 @@ def _plan_for_branch(
     if trace:
         enable_method_trace()
 
+    # Register EDA event handlers for plan command
+    from vibe3.domain import get_pending_result, register_event_handlers
+    from vibe3.domain import publish as domain_publish
+    from vibe3.models import ManualPlanIntent
+
+    register_event_handlers()
+    get_pending_result("plan")
+
     # Load config and validate --model requires backend (CLI or config)
-    config = load_config_and_validate_model("plan", agent, backend, model)
+    _config = load_config_and_validate_model("plan", agent, backend, model)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -92,56 +105,22 @@ def _plan_for_branch(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # Handle dry_run early return
-    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
-    # (aligned with run command's proven dry_run handling)
-    if dry_run:
-        command = create_codeagent_command(
-            role="planner",
-            context_builder=make_plan_context_builder(spec_input.request, config),
-            task=spec_input.request.task_guidance,
-            dry_run=True,
+    # Publish ManualPlanIntent event (handler will execute)
+    domain_publish(
+        ManualPlanIntent(
+            issue_number=issue_number,
+            branch=branch,
+            request=spec_input.request,
+            dry_run=dry_run,
+            no_async=no_async,
             show_prompt=show_prompt,
-            handoff_kind="plan",
-            branch=branch,
-            issue_number=issue_number,
-            config=config,
-            agent=agent,
-            backend=backend,
-            model=model,
-        )
-        CodeagentExecutionService(config).execute_sync(command)
-        return
-
-    if no_async:
-        execute_spec_plan_sync(
-            request=spec_input.request,
-            issue_number=issue_number,
-            branch=branch,
-            agent=agent,
-            backend=backend,
-            model=model,
-            fresh_session=fresh_session,
-            config=config,
-        )
-    else:
-        overrides = RoleCliOverrides(
-            agent=agent, backend=backend, model=model, fresh_session=fresh_session
-        )
-        cli_args = ["plan"] + overrides.to_argv()
-
-        result = execute_spec_plan_async(
-            request=spec_input.request,
-            issue_number=issue_number,
-            branch=branch,
-            cli_args=cli_args,
             agent=agent,
             backend=backend,
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux session: {result.tmux_session}")
-        typer.echo(f"log: {result.log_path}")
+    )
+    _raise_pending_plan_error()
 
 
 def _plan_spec_impl(
@@ -160,8 +139,16 @@ def _plan_spec_impl(
     if trace:
         enable_method_trace()
 
+    # Register EDA event handlers for plan command
+    from vibe3.domain import get_pending_result, register_event_handlers
+    from vibe3.domain import publish as domain_publish
+    from vibe3.models import ManualPlanIntent
+
+    register_event_handlers()
+    get_pending_result("plan")
+
     # Load config and validate --model requires backend (CLI or config)
-    config = load_config_and_validate_model("plan", agent, backend, model)
+    _config = load_config_and_validate_model("plan", agent, backend, model)
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -250,59 +237,22 @@ def _plan_spec_impl(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # Handle dry_run early return
-    # Pattern: create_codeagent_command + CodeagentExecutionService.execute_sync
-    # (aligned with run command's proven dry_run handling)
-    if dry_run:
-        command = create_codeagent_command(
-            role="planner",
-            context_builder=make_plan_context_builder(spec_input.request, config),
-            task=spec_input.request.task_guidance,
-            dry_run=True,
+    # Publish ManualPlanIntent event (handler will execute)
+    domain_publish(
+        ManualPlanIntent(
+            issue_number=issue_number,
+            branch=branch,
+            request=spec_input.request,
+            dry_run=dry_run,
+            no_async=no_async,
             show_prompt=show_prompt,
-            handoff_kind="plan",
-            branch=branch,
-            issue_number=issue_number,
-            config=config,
-            agent=agent,
-            backend=backend,
-            model=model,
-        )
-        CodeagentExecutionService(config).execute_sync(command)
-        return
-
-    if no_async:
-        execute_spec_plan_sync(
-            request=spec_input.request,
-            issue_number=issue_number,
-            branch=branch,
-            agent=agent,
-            backend=backend,
-            model=model,
-            fresh_session=fresh_session,
-            config=config,
-        )
-    else:
-        overrides = RoleCliOverrides(
-            agent=agent, backend=backend, model=model, fresh_session=fresh_session
-        )
-        cli_args = ["plan"]
-        if spec_path:
-            cli_args += ["--spec", spec_path]
-        cli_args += overrides.to_argv()
-
-        result = execute_spec_plan_async(
-            request=spec_input.request,
-            issue_number=issue_number,
-            branch=branch,
-            cli_args=cli_args,
             agent=agent,
             backend=backend,
             model=model,
             fresh_session=fresh_session,
         )
-        typer.echo(f"tmux session: {result.tmux_session}")
-        typer.echo(f"log: {result.log_path}")
+    )
+    _raise_pending_plan_error()
 
 
 @app.callback(invoke_without_command=True)

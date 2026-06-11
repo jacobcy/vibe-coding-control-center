@@ -250,7 +250,12 @@ def build_manager_request(
         role="manager",
         issue=issue,
         target_branch=flow_branch,
-        command_args=["internal", "manager", str(issue.number), "--no-async"],
+        command_args=[
+            "internal",
+            "manager",
+            str(issue.number),
+            "--no-async",
+        ],
         actor=actor,
         execution_name=get_manager_session_name(issue.number),
         refs=refs,

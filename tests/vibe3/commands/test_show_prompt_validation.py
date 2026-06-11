@@ -1,6 +1,6 @@
 """Tests for --show-prompt requires --dry-run validation."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.exceptions import Exit
@@ -44,19 +44,34 @@ class TestRunCommandValidation:
 
     def test_run_rejects_show_prompt_without_dry_run(self):
         """run command should reject --show-prompt without --dry-run."""
-        # Patch execute_manual_run to avoid real execution
-        with patch("vibe3.commands.run.execute_manual_run") as mock_execute:
+        # Patch dependencies to avoid real execution
+        with (
+            patch(
+                "vibe3.commands.run.resolve_branch_arg", return_value="task/issue-42"
+            ),
+            patch(
+                "vibe3.commands.run.validate_run_prerequisites",
+                return_value=(MagicMock(), 42),
+            ),
+        ):
             result = runner.invoke(cli_app, ["run", "test", "--show-prompt"])
 
         assert result.exit_code == 1
         assert "Error: --show-prompt requires --dry-run" in result.output
-        # Mock should NOT be called since validation happens first
-        mock_execute.assert_not_called()
 
     def test_run_show_prompt_with_dry_run_still_works(self):
         """run command should accept --show-prompt with --dry-run."""
-        # Patch execute_manual_run to avoid real execution
-        with patch("vibe3.commands.run.execute_manual_run"):
+        # Patch dependencies to avoid real execution
+        with (
+            patch(
+                "vibe3.commands.run.resolve_branch_arg", return_value="task/issue-42"
+            ),
+            patch(
+                "vibe3.commands.run.validate_run_prerequisites",
+                return_value=(MagicMock(), 42),
+            ),
+            patch("vibe3.domain.publish"),
+        ):
             result = runner.invoke(
                 cli_app, ["run", "test", "--dry-run", "--show-prompt", "--no-async"]
             )
@@ -72,7 +87,12 @@ class TestPlanCommandValidation:
 
     def test_plan_rejects_show_prompt_without_dry_run(self):
         """plan command should reject --show-prompt without --dry-run."""
-        with patch("vibe3.commands.plan._plan_for_branch") as mock_plan:
+        with (
+            patch("vibe3.commands.plan._plan_for_branch") as mock_plan,
+            patch(
+                "vibe3.commands.plan.resolve_branch_arg", return_value="task/issue-42"
+            ),
+        ):
             result = runner.invoke(cli_app, ["plan", "--branch", "42", "--show-prompt"])
 
         assert result.exit_code == 1
@@ -100,7 +120,12 @@ class TestReviewCommandValidation:
 
     def test_review_rejects_show_prompt_without_dry_run(self):
         """review command should reject --show-prompt without --dry-run."""
-        with patch("vibe3.commands.review._review_branch_impl") as mock_review:
+        with (
+            patch("vibe3.commands.review._review_branch_impl") as mock_review,
+            patch(
+                "vibe3.commands.review.resolve_branch_arg", return_value="task/issue-42"
+            ),
+        ):
             result = runner.invoke(
                 cli_app, ["review", "--branch", "42", "--show-prompt"]
             )
@@ -153,9 +178,12 @@ class TestReviewBaseCommandValidation:
 
     def test_review_base_show_prompt_with_dry_run_still_works(self):
         """review base command should accept --show-prompt with --dry-run."""
-        with patch(
-            "vibe3.commands.review.ensure_flow_for_current_branch"
-        ) as mock_ensure:
+        with (
+            patch(
+                "vibe3.commands.review.ensure_flow_for_current_branch"
+            ) as mock_ensure,
+            patch("vibe3.domain.publish"),
+        ):
             # Setup mock to avoid needing real flow
             mock_ensure.return_value = (None, "test-branch")
 
@@ -173,22 +201,16 @@ class TestReviewBaseCommandValidation:
                 ) as mock_build:
                     mock_build.return_value = (None, None, None)
 
-                    with patch(
-                        "vibe3.commands.review.execute_manual_review_sync"
-                    ) as mock_execute:
-                        mock_execute.return_value.verdict = "PASS"
-                        mock_execute.return_value.handoff_file = None
-
-                        result = runner.invoke(
-                            cli_app,
-                            [
-                                "review",
-                                "base",
-                                "main",
-                                "--dry-run",
-                                "--show-prompt",
-                            ],
-                        )
+                    result = runner.invoke(
+                        cli_app,
+                        [
+                            "review",
+                            "base",
+                            "main",
+                            "--dry-run",
+                            "--show-prompt",
+                        ],
+                    )
 
         # Should exit 0, not with validation error
         assert "Error: --show-prompt requires --dry-run" not in result.output

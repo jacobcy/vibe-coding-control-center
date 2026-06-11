@@ -199,7 +199,12 @@ def build_plan_request(
         role="planner",
         config=config,
         issue=issue,
-        command_args=["plan", "--branch", target_branch, "--no-async"],
+        command_args=[
+            "plan",
+            "--branch",
+            target_branch,
+            "--no-async",
+        ],
         worktree_requirement=PLANNER_ROLE.worktree,
         branch=branch,
         repo_path=repo_path,

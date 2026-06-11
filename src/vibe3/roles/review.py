@@ -229,7 +229,12 @@ def build_issue_review_request(
     async_refs: dict[str, str] = {"issue_number": str(issue.number)}
     if report_ref:
         async_refs["report_ref"] = report_ref
-    command_args = ["review", "--branch", target_branch, "--no-async"]
+    command_args = [
+        "review",
+        "--branch",
+        target_branch,
+        "--no-async",
+    ]
 
     return build_issue_async_cli_request(
         role="reviewer",
