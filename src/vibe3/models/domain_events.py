@@ -142,3 +142,47 @@ class WebhookIssueClosed(DomainEvent):
     issue_number: int
     sender: str = ""
     timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class FlowBlocked(DomainEvent):
+    """Published when a flow enters blocked state."""
+
+    issue_number: int
+    branch: str
+    blocked_reason: str
+    actor: str = "system:flow"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class FlowCompleted(DomainEvent):
+    """Published when a flow is marked done."""
+
+    issue_number: int
+    branch: str
+    completed_state: str  # "done" | "merged"
+    actor: str = "system:flow"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class PRMerged(DomainEvent):
+    """Published when a PR merge is detected."""
+
+    issue_number: int
+    branch: str
+    pr_number: int
+    merged_by: str | None = None
+    actor: str = "system:check"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class PolicyChanged(DomainEvent):
+    """Published when policy configuration files change."""
+
+    changed_files: tuple[str, ...]
+    scope: tuple[str, ...] = ()
+    actor: str = "system:policy"
+    timestamp: str | None = None
