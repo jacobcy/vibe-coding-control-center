@@ -38,7 +38,6 @@ from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event, get_degraded_manager
 from vibe3.services import (
-    CheckService,
     IssueCollectionService,
     clean_old_state_labels,
     get_manager_usernames,
@@ -92,7 +91,7 @@ class GlobalDispatchCoordinator:
         issue_loader: IssueLoaderProtocol,
         flow_context_resolver: FlowContextResolverProtocol,
         queue_selector: QueueSelectorProtocol,
-        check_service: CheckServiceProtocol | None = None,
+        check_service: CheckServiceProtocol,
         issue_collector_factory: (
             Callable[[], IssueCollectionServiceProtocol] | None
         ) = None,
@@ -118,11 +117,7 @@ class GlobalDispatchCoordinator:
         self._load_issue = issue_loader
         self._flow_context = flow_context_resolver
         self._queue_selector = queue_selector
-
-        # Optional dependency injection with backward-compatible fallback
-        self._check_service = check_service or CheckService(
-            store=store, git_client=flow_manager.git, github_client=github
-        )
+        self._check_service = check_service
 
         # Fallback: create default factory or use default dispatcher
         self._issue_collector_factory: Callable[[], IssueCollectionServiceProtocol] = (
