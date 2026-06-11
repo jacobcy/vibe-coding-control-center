@@ -40,12 +40,19 @@ _SYMBOL_MODULES = {
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import for Orchestra services symbols to avoid circular dependencies."""
+    """Lazy import for Orchestra services symbols to avoid circular dependencies.
+
+    This allows external modules to use:
+        from vibe3.services.orchestra import OrchestraStatusService
+
+    While avoiding circular imports at module load time.
+    """
     if name in _SYMBOL_MODULES:
         import importlib
 
         module = importlib.import_module(_SYMBOL_MODULES[name])
         symbol = getattr(module, name)
+        # Cache in module globals for faster subsequent access
         globals()[name] = symbol
         return symbol
 
