@@ -10,10 +10,18 @@ class TestResolveBranchArg:
 
     def test_none_returns_current_branch(self):
         """测试：None 输入返回当前分支"""
-        with patch("vibe3.services.FlowService") as mock_fs_cls:
-            mock_flow_service = Mock()
+        from unittest.mock import MagicMock
+
+        mock_flow_service = Mock()
+        mock_git_client = MagicMock()
+        mock_git_client.get_current_branch.return_value = "dev/issue-123"
+
+        with (
+            patch("vibe3.services.FlowService") as mock_fs_cls,
+            patch("vibe3.clients.GitClient") as mock_git_cls,
+        ):
             mock_fs_cls.return_value = mock_flow_service
-            mock_flow_service.get_current_branch.return_value = "dev/issue-123"
+            mock_git_cls.return_value = mock_git_client
 
             result = resolve_branch_arg(None)
             assert result == "dev/issue-123"

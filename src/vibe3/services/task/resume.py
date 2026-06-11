@@ -44,6 +44,11 @@ class TaskResumeOperations:
         self.issue_flow_service = issue_flow_service
         self._backend = backend
 
+    @property
+    def flow_service(self) -> "FlowQueryProtocol":
+        """Expose the internal FlowService instance for testing access."""
+        return self._flow_service
+
     def reset_issue_to_ready(
         self,
         *,
@@ -393,6 +398,11 @@ class TaskResumeUsecase:
         from vibe3.services.flow.service import FlowService
 
         return FlowService()  # type: ignore[return-value]
+
+    @property
+    def flow_service(self) -> "FlowQueryProtocol":
+        """Expose the internal FlowService instance for testing access."""
+        return self._flow_service
 
     @property
     def candidates(self) -> TaskResumeCandidates:

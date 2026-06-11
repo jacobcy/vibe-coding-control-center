@@ -54,7 +54,9 @@ def test_projection_pr_resolves_by_branch() -> None:
 @patch("vibe3.commands.flow_status.PRService")
 @patch("vibe3.commands.flow_status.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.pr.resolver.GitClient")
 def test_flow_show_snapshot_uses_pr_service_branch_status(
+    mock_git_client_cls,
     mock_service_class,
     mock_resolver_class,
     mock_pr_service_class,
@@ -68,6 +70,11 @@ def test_flow_show_snapshot_uses_pr_service_branch_status(
         flow_status="active",
         task_issue_number=123,
     )
+
+    # Mock GitClient to return expected branch
+    mock_git_client = MagicMock()
+    mock_git_client.get_current_branch.return_value = branch
+    mock_git_client_cls.return_value = mock_git_client
 
     mock_service = MagicMock()
     mock_service.get_current_branch.return_value = branch

@@ -35,12 +35,23 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
 @patch("vibe3.commands.flow_status.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.services.pr.resolver.GitClient")
 def test_flow_show_timeline_when_registered(
-    mock_service_cls, _find_parent_branch, mock_resolver_cls, _render_timeline
+    mock_git_client_cls,
+    mock_service_cls,
+    _find_parent_branch,
+    mock_resolver_cls,
+    _render_timeline,
 ) -> None:
     """flow show should show timeline if flow is already registered."""
     mock_service = MagicMock()
     branch = "feature/registered"
+
+    # Mock GitClient to return expected branch
+    mock_git_client = MagicMock()
+    mock_git_client.get_current_branch.return_value = branch
+    mock_git_client_cls.return_value = mock_git_client
+
     mock_service.get_current_branch.return_value = branch
 
     flow_status = FlowStatusResponse(
