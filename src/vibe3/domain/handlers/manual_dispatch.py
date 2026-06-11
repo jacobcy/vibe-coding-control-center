@@ -44,7 +44,6 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     from vibe3.roles import (
         execute_spec_plan_async,
         execute_spec_plan_sync,
-        resolve_spec_plan_input,
     )
 
     logger.bind(
@@ -53,21 +52,24 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
         branch=event.branch,
     ).info("Manual plan intent received")
 
-    # Load config (same as CLI does)
+    # Load config (handler needs its own config instance)
     try:
         config = load_config_for_role("plan", event.agent, event.backend, event.model)
     except Exception as e:
         logger.error(f"Config load failed for plan: {e}")
         return
 
-    # Resolve plan input (same as CLI does)
-    spec_input = resolve_spec_plan_input(event.branch)
+    # Use request already resolved by CLI (avoids duplicate spec resolution)
+    request = event.request
+    if request is None:
+        logger.error("ManualPlanIntent missing request")
+        return
 
     # Dispatch to sync or async execution
     if event.dry_run:
         # Dry-run mode: always sync, with dry_run=True
         execute_spec_plan_sync(
-            request=spec_input.request,
+            request=request,  # type: ignore[arg-type]
             issue_number=event.issue_number,
             branch=event.branch,
             agent=event.agent,
@@ -81,7 +83,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     elif event.no_async:
         # Sync mode
         execute_spec_plan_sync(
-            request=spec_input.request,
+            request=request,  # type: ignore[arg-type]
             issue_number=event.issue_number,
             branch=event.branch,
             agent=event.agent,
@@ -107,7 +109,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
         cli_args = ["plan"] + overrides.to_argv() + ["--show-prompt"]
 
         result = execute_spec_plan_async(
-            request=spec_input.request,
+            request=request,  # type: ignore[arg-type]
             issue_number=event.issue_number,
             branch=event.branch,
             cli_args=cli_args,
