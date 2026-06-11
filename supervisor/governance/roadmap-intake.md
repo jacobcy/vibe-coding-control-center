@@ -437,10 +437,12 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 roadmap-intake 在扫描和决策阶段的依赖操作约束：
 
-- ✅ 在 suggest comment 中用自然语言说明依赖关系（"建议先等 #N 完成"、"依赖 #N 的 API 设计"）
-- ✅ 添加 `roadmap/*`、`priority/*` 规划类 labels
-- ❌ 禁止直接添加 `state/blocked` 标签 — intake 层无法保证三源（label/body/cache）原子写入
+- ✅ 当 intake 候选有明确依赖（body/title 中的 `Blocked by #N`）时，使用 `vibe3 task intake <M> --blocked-by <N>`
+- ✅ 这将创建 placeholder flow（仅 DB 记录）并设置 `state/blocked` 标签 — issue 进入执行池并记录依赖
+- ✅ `state/blocked` 标签由 intake 命令原子设置 — intake 不再需要避免 `state/blocked`
+- ✅ 在 suggest comment 中用自然语言说明依赖关系（"已通过 --blocked-by #N 入池"）
+- ❌ 禁止直接添加 `state/blocked` 标签 — 必须通过 `vibe3 task intake --blocked-by` 命令
 - ❌ 禁止写 managed section（`<!-- vibe3-flow-state-start -->` 块中的结构化字段）
-- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — issue 尚未进入执行池，无 flow context
+- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — intake 阶段应使用 `--blocked-by` 参数
 
-**记录方式**：依赖关系写在 `[governance suggest][roadmap-intake]` 评论中，由 manager 入场后通过 `vibe3 flow blocked --task <N>` 正式建立。
+**记录方式**：依赖关系通过 `vibe3 task intake --blocked-by` 命令建立，自动写入 flow_state 和 flow_issue_links。
