@@ -10,8 +10,6 @@ import ast
 from pathlib import Path
 from typing import Dict, List
 
-import pytest
-
 # Define submodule public APIs (Phase 4 completed)
 PUBLIC_APIS = {
     "services.pr": {
@@ -131,7 +129,6 @@ def find_internal_imports(module_a: str, module_b: str) -> List[Dict]:
     return violations
 
 
-@pytest.mark.xfail(reason="Phase 5: 跨模块内部引用 - 待消除", strict=False)
 def test_no_cross_module_internal_imports():
     """Verify no cross-module internal imports.
 
@@ -162,7 +159,6 @@ def test_no_cross_module_internal_imports():
     assert len(violations) == 0, f"发现 {len(violations)} 处内部引用违规"
 
 
-@pytest.mark.xfail(reason="Phase 5: 公开 API 导入验证 - 待修复", strict=False)
 def test_imports_via_public_api():
     """Verify cross-module imports use only public APIs.
 
@@ -170,7 +166,7 @@ def test_imports_via_public_api():
     """
     violations = []
 
-    for module, public_symbols in PUBLIC_APIS.items():
+    for module in PUBLIC_APIS:
         module_path = Path("src/vibe3") / module.replace(".", "/")
 
         if not module_path.exists():
@@ -187,9 +183,9 @@ def test_imports_via_public_api():
                         imported_module = node.module or ""
                         # Check if importing from other modules
                         for other_module, symbols in PUBLIC_APIS.items():
-                            if (
-                                other_module != module
-                                and other_module in imported_module
+                            if other_module != module and (
+                                imported_module == other_module
+                                or imported_module.startswith(other_module + ".")
                             ):
                                 # Verify imported symbols are in public list
                                 for alias in node.names:
