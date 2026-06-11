@@ -76,7 +76,9 @@ def test_review_no_arg_defaults_to_current_branch():
     """vibe review (no subcommand) -> executes review on current branch."""
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch("vibe3.commands.review.run_issue_role_async") as mock_async,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+        ) as mock_async,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
@@ -244,7 +246,9 @@ def test_review_fresh_session_propagates():
     """review --fresh-session should propagate to run_issue_role_sync."""
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_sync,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
@@ -264,7 +268,9 @@ def test_review_agent_option_propagates():
     """review --agent foo should propagate to run_issue_role_sync."""
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_sync,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
@@ -284,7 +290,9 @@ def test_review_backend_option_propagates():
     """review --backend claude should propagate to run_issue_role_sync."""
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_sync,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
@@ -304,7 +312,9 @@ def test_review_model_option_propagates():
     """review --model claude-opus-4-8 should propagate to run_issue_role_sync."""
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch("vibe3.commands.review.run_issue_role_sync") as mock_sync,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_sync,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
     ):
         mock_flow = MagicMock()
