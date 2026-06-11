@@ -100,7 +100,9 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
             model=event.model,
             fresh_session=event.fresh_session,
         )
-        cli_args = ["plan"] + overrides.to_argv()
+        # Async CLI 命令必须显式传递 --show-prompt（默认 False）
+        # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
+        cli_args = ["plan"] + overrides.to_argv() + ["--show-prompt"]
 
         result = execute_spec_plan_async(
             request=spec_input.request,

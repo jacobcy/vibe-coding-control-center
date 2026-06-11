@@ -229,7 +229,15 @@ def build_issue_review_request(
     async_refs: dict[str, str] = {"issue_number": str(issue.number)}
     if report_ref:
         async_refs["report_ref"] = report_ref
-    command_args = ["review", "--branch", target_branch, "--no-async"]
+    # Async CLI 命令必须显式传递 --show-prompt（默认 False）
+    # 因为子进程会重新调用 run_issue_role_sync，需要必选参数
+    command_args = [
+        "review",
+        "--branch",
+        target_branch,
+        "--no-async",
+        "--show-prompt",
+    ]
 
     return build_issue_async_cli_request(
         role="reviewer",
