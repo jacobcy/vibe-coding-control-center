@@ -16,12 +16,12 @@ from typing import Any
 from loguru import logger
 
 from vibe3.domain.handler_registry import register_handler
-from vibe3.models.domain_events import (
+from vibe3.models import (
     ManualPlanIntent,
     ManualReviewIntent,
     ManualRunIntent,
+    ReviewRequest,
 )
-from vibe3.models.review import ReviewRequest
 
 # Result sink for CLI commands that need return values (review verdict).
 # Handler stores result after execution; CLI reads via get_pending_result().
@@ -41,7 +41,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     ensuring that on_publish hooks and the rule engine observe all executions.
     """
     from vibe3.config import load_config_for_role
-    from vibe3.roles.plan import (
+    from vibe3.roles import (
         execute_spec_plan_async,
         execute_spec_plan_sync,
         resolve_spec_plan_input,
@@ -132,7 +132,7 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
     to match execute_manual_run's expected signature.
     """
     from vibe3.config import load_config_for_role
-    from vibe3.roles.run_command import execute_manual_run
+    from vibe3.roles import execute_manual_run
 
     logger.bind(
         domain="manual_run_handler",
@@ -186,12 +186,12 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
     Stores result in _pending_results for CLI to retrieve verdict.
     """
     from vibe3.config import load_config_for_role
-    from vibe3.execution.issue_role_sync_runner import (
+    from vibe3.execution import (
         run_issue_role_async,
         run_issue_role_sync,
     )
-    from vibe3.roles import REVIEW_SYNC_SPEC
-    from vibe3.roles.review import (
+    from vibe3.roles import (
+        REVIEW_SYNC_SPEC,
         execute_manual_review_async,
         execute_manual_review_sync,
     )

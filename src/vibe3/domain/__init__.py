@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     )
     from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.flow_manager import FlowManager
+    from vibe3.domain.handlers.manual_dispatch import get_pending_result
     from vibe3.domain.orchestration_facade import OrchestrationFacade
     from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
@@ -110,6 +111,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "evaluate_rules": "vibe3.domain.event_rules",
     "expand_template": "vibe3.domain.event_rules",
     "load_rules": "vibe3.domain.event_rules",
+    "get_pending_result": "vibe3.domain.handlers.manual_dispatch",
 }
 
 
@@ -201,4 +203,5 @@ __all__ = [
     "load_rules",
     # Handlers
     "register_event_handlers",
+    "get_pending_result",
 ]

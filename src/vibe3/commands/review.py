@@ -207,9 +207,8 @@ def base(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for review command
+    from vibe3.domain import get_pending_result, register_event_handlers
     from vibe3.domain import publish as domain_publish
-    from vibe3.domain import register_event_handlers
-    from vibe3.domain.handlers.manual_dispatch import get_pending_result
     from vibe3.models import ManualReviewIntent
 
     register_event_handlers()
