@@ -33,7 +33,6 @@ from .registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
     _orchestra_tmux_session_exists,
-    _resolve_async_cli_override_root,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
@@ -323,11 +322,7 @@ def start(
         os.environ["VIBE3_REPO_MODELS_ROOT"] = str(
             _resolve_dispatcher_models_root(config, Path.cwd())
         )
-        async_cli_root = _resolve_async_cli_override_root(config, Path.cwd())
-        if async_cli_root is None:
-            os.environ.pop("VIBE3_ASYNC_CLI_PROJECT_ROOT", None)
-        else:
-            os.environ["VIBE3_ASYNC_CLI_PROJECT_ROOT"] = str(async_cli_root)
+        os.environ.pop("VIBE3_ASYNC_CLI_PROJECT_ROOT", None)
         os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
         # --no-async flag: propagate to all dispatched role agents
         # Only set when user explicitly requested --no-async (not in async wrapper)
