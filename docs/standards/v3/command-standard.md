@@ -295,23 +295,21 @@ vibe3 flow rebuild [<issue>] [--branch <branch>] [--keep-remote] [--no-worktree]
 - 操作顺序：hard cleanup -> bootstrap flow/worktree -> append rebuild handoff -> label-auto resume。
 - 不能作为普通 blocked 恢复入口使用；blocked 恢复优先使用 `task resume`。
 
-### 7.5 `flow show` / `flow status`
-
+### 7.6 `flow show` / `flow status`
 
 ```bash
+# Show single flow
 vibe3 flow show [--branch <branch>] [--snapshot] [--format json]
-```
 
-### 7.5 `flow status`
-
-```bash
+# List all flows
 vibe3 flow status [--all] [--format json]
 ```
 
-### 7.6 `status`
+### 7.7 `status` [Legacy Alias]
 
 ```bash
-vibe3 task status [--all] [--format json]
+# Alias for 'vibe3 task status'
+vibe3 status [--all] [--format json]
 ```
 
 ## 8. 禁止语义

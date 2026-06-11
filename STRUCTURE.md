@@ -143,6 +143,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `execution/` - 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
 - `exceptions/` - 统一异常层级
 - `domain/` - 领域事件与 handlers（events, handlers, orchestration_facade）
+  - `domain/protocols/` - 领域协议与抽象接口
 - `models/` - 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
@@ -152,6 +153,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（issue, pr, task, handoff, check）
+  - `services/flow/` - Flow 状态转换、注册、重建与清理
   - `services/issue/` - Issue 生命流程、标题缓存与失败处理
   - `services/pr/` - PR 创建、评审、质量评分与分析
   - `services/task/` - Task 绑定、状态分类与恢复逻辑
@@ -295,6 +297,8 @@ from vibe3.services.flow_reader import FlowReader
 
 **职责**：存放各种 AI Agent 工具的配置、规则、工作流与临时上下文。
 
+**重要性**：这是 AI 的"办公室"，包含 AI 需要的工具、工作流、模板和上下文 (Rules moved to `.claude/rules/`)
+
 | 目录 | 职责 | 备注 |
 |------|------|------|
 | `.agent/` | **Agent 核心工作区**。包含模板 (`templates/`)、工作流 (`workflows/`) 和跨任务记忆 (`context/memory/`)。 | Canonical AI workspace |
@@ -317,13 +321,6 @@ from vibe3.services.flow_reader import FlowReader
 |------|------|---------|
 | `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具）。 | 仅补充关键模式 |
 
-#### `.claude/rules/` - 编码规则
-
-| 文件 | 职责 |
-|------|------|
-| `coding-standards.md` | 编码标准 |
-| `patterns.md` | 设计模式 |
-
 #### `.agent/templates/` - 文档模板
 
 **职责**：AI 用来生成文档的模板
@@ -343,6 +340,20 @@ from vibe3.services.flow_reader import FlowReader
 #### `.agent/workflows/` - 工作流定义
 
 **职责**：定义各种工作流程
+
+### `.claude/` - Claude AI 配置 (Current Truth)
+
+**职责**：Claude 环境加载入口，包含项目规则与技能运行时。
+
+#### `.claude/rules/` - 编码规则
+
+**职责**：项目的编码标准与真源 (Moved from `.agent/rules/`)
+
+| 文件 | 职责 |
+|------|------|
+| `coding-standards.md` | 编码标准 |
+| `python-standards.md` | Python 编码标准 |
+| `patterns.md` | 设计模式 |
 
 #### `.claude/skills/` - 技能运行时
 

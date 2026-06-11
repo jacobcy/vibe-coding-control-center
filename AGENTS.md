@@ -44,7 +44,7 @@ Follow this reading order. Each document is the authority for its domain:
 5. **[docs/standards/glossary.md](docs/standards/glossary.md)** — Project terminology
 6. **[docs/decisions/INDEX.md](docs/decisions/INDEX.md)** — Architecture Decision Records
 7. **[docs/standards/action-verbs.md](docs/standards/action-verbs.md)** — Action verb definitions
-8. **[.agent/README.md](.agent/README.md)** — AI workflows and rules
+8. **[.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)** — AI rules (Legacy: .agent/rules/)
 9. **[docs/README.md](docs/README.md)** — Documentation structure
 
 ## 🔄 Key Workflows (工作流)
@@ -72,7 +72,7 @@ For backward compatibility with V2 workflows, the following aliases are supporte
 
 ## 📍 Project Identity
 
-V3 是默认执行链：flow、handoff、orchestra 和 role dispatch 的语义真源都在 V3 Python + `docs/standards/v3/`。V2 仍然存在，但只作为兼容入口和环境工具。
+V3 是默认执行链：flow、handoff、orchestra 和 role dispatch 的语义真源都在 V3 Python + `docs/standards/v3/`。V2 仍然存在，但只作为兼容入口 and 环境工具。
 
 This project has **two parallel implementations**:
 
@@ -88,7 +88,8 @@ This project has **two parallel implementations**:
   - **Shared Module**: `src/vibe3/services/shared/` (Cross-domain public capability layer)
 - **V3 Hub**: `lib3/` (V3 Python 核心包装器与仓库重定向)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
-- **Workflows, rules, context**: `.agent/`
+- **Workflows, context**: `.agent/`
+- **Rules**: `.claude/rules/` (Moved from `.agent/rules/`)
 - **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
 
 ## 🚀 Quick Start
@@ -104,14 +105,14 @@ This project has **two parallel implementations**:
 - `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
 - `vibe3 handoff append "内容"`：追加 handoff 记录，提供后续上下文
 - `vibe3 handoff verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
-- `vibe3 handoff plan/report/audit/next`：记录特定阶段的责任链上下文
+- `vibe3 handoff plan/report/indicate/audit/next`：记录特定阶段的责任链上下文
 - `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
 
 ## 架构层级 (Three-Tier Architecture)
 
-- **Tier 3 (Cognitive/Governance)**: Policies, rules, supervisor. (Rules and Principles)
-- **Tier 2 (Skill Layer)**: Orchestration and context management. (Workflow and Logic)
-- **Tier 1 (Shell Layer)**: Atomic capabilities and state access. (Tools and Execution)
+- **Tier 3 (Cognitive/Governance)**: 认知与治理层。负责全局策略、规则、Supervisor 治理。核心命令：`serve`, `scan`, `check`, `mcp`。
+- **Tier 2 (Skill Layer)**: 技能/编排层。负责 Flow 状态机、任务编排、Agent 执行。核心命令：`flow`, `task`, `run`, `plan`, `review`。
+- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`。
 
 ## 🤖 Protocol
 
