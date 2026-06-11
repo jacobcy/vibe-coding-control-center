@@ -30,8 +30,8 @@ code_limits:
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层
       - path: "src/vibe3/domain/qualify_gate.py"
-        limit: 620
-        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）；PR #2667 新增 open PR 检测与自动转换到 review 状态（+78 行）"
+        limit: 750
+        reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）；PR #2667 新增 open PR 检测与自动转换到 review 状态（+78 行）；#2381 将进一步整合 check 逻辑预估增加 +50 行"
       - path: "src/vibe3/domain/event_rules.py"
         limit: 550
         reason: "Event rules 引擎核心聚合，包含规则加载、模板展开、规则评估、action handler 构建（9 个 handler，含 enqueue_command_job、refresh_queue_priority、reload_material、governance_scan 等业务动作）等紧密耦合逻辑；handler 函数与 build_action_handlers 工厂内聚性强，拆分会破坏注册一致性"
@@ -280,7 +280,10 @@ code_limits:
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 600
-        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py；Issue #2242 新增 test_auto_resume_blocked_with_none_flow_state_returns_ready 测试验证 flow_state=None 路径返回 READY；Issue #2353 新增 test_qualify_blocked_issue_reuses_truth 测试验证 truth 参数传递优化（消除双重 resolve_coordination 调用）"
+        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py；Issue #2242 新增 test_auto_resume_blocked_with_none_flow_state_returns_ready 测试验证 flow_state=None 路径返回 READY；Issue #2353 新增 test_qualify_blocked_issue_reuses_truth 测试验证 truth 参数传递优化（消除双重 resolve_coordination 调用）；PR #2667 将 open PR 检测测试拆分至 test_qualify_gate_open_pr.py（-294 行）"
+      - path: "tests/vibe3/domain/test_qualify_gate_open_pr.py"
+        limit: 400
+        reason: "Qualify gate open PR 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0b: open PR + running planner/executor → review、no worker → skip、already review/done → skip、no PR → skip 等 6 个紧密耦合场景，共享 fixture"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 700
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试等紧密耦合场景，共享 fixture，拆分收益低；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）"
