@@ -56,8 +56,9 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
     )
     # Mock at both layers for EDA
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
-    # Don't mock execute_spec_plan_sync - let tests control it
+    # Mock in command's namespace (imported at module level)
     monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    # Mock at source (for lazy imports in handler)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
     # Mock config loader for domain handler
     monkeypatch.setattr(
@@ -229,9 +230,9 @@ def test_plan_dry_run_outputs_summary(
         captured_kwargs.update(kwargs)
         return MagicMock()
 
-    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", capture_command)
+    monkeypatch.setattr("vibe3.agents.create_codeagent_command", capture_command)
     monkeypatch.setattr(
-        "vibe3.roles.plan.CodeagentExecutionService",
+        "vibe3.execution.codeagent_runner.CodeagentExecutionService",
         lambda cfg: MagicMock(execute_sync=lambda cmd: MagicMock()),
     )
 
