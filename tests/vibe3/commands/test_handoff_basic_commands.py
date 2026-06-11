@@ -71,9 +71,9 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code == 0
         assert "Handoff" in result.output
-        # get_current_branch is called twice: once in resolve_command_branch fallback,
-        # and once for conditional --branch hint logic
-        assert mock_flow_service.get_current_branch.call_count == 2
+        # get_current_branch is called once for conditional --branch hint logic
+        # Note: resolve_command_branch now uses GitClient directly, not FlowService
+        assert mock_flow_service.get_current_branch.call_count == 1
         mock_status_service.get_handoff_status.assert_called_once()
 
     @patch("vibe3.commands.handoff_read.HandoffStatusService")
