@@ -28,9 +28,13 @@ code_limits:
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑；迁移至 check/ 子包（Issue #2584）"
 
       # Exceptions 聚合 —— 允许 480-600
+      # Domain 层
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 620
         reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查、github_state CLOSED guard、dep-closure detection 等紧密耦合逻辑；PR #1983 重构后新增统一 closed issue 检测（_terminalize_closed_issue 方法），将 HealthCheck 的业务逻辑迁移到 QualifyGate，实现单一职责（business qualification）；PR #2349 新增 dep-closure detection（_notify_dep_resolved 方法）并统一架构（使用 FlowRecoveryService）；Issue #2369 新增 mark_flow_aborted 调用与 terminal-state guard 逻辑（+13 行）"
+      - path: "src/vibe3/domain/event_rules.py"
+        limit: 550
+        reason: "Event rules 引擎核心聚合，包含规则加载、模板展开、规则评估、action handler 构建（9 个 handler，含 enqueue_command_job、refresh_queue_priority、reload_material、governance_scan 等业务动作）等紧密耦合逻辑；handler 函数与 build_action_handlers 工厂内聚性强，拆分会破坏注册一致性"
       - path: "src/vibe3/services/handoff/service.py"
         limit: 650
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
@@ -296,6 +300,9 @@ code_limits:
       - path: "tests/vibe3/domain/handlers/test_dispatch.py"
         limit: 420
         reason: "Dispatch handler 测试集（已拆分 test_dispatch_not_launched.py），覆盖 planner/executor/reviewer 三个角色的 dispatch 逻辑，共享 mock setup，继续拆分收益低；rebase 后新增 launch_failed 测试略微超标"
+      - path: "tests/vibe3/domain/test_event_rules.py"
+        limit: 480
+        reason: "Event rules 引擎完整测试集，覆盖规则加载（5 个）、模板展开（4 个）、规则评估（5 个）、action handler 构建（3 个）、9 个 action handler 单元测试（9 个）、config↔code 一致性验证（1 个）等 30 个测试，按测试类组织内聚度高，拆分降低可读性"
       - path: "tests/vibe3/services/test_pr_service.py"
         limit: 450
         reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
