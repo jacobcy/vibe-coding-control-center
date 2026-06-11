@@ -40,7 +40,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     The handler calls the same execution functions the CLI currently calls,
     ensuring that on_publish hooks and the rule engine observe all executions.
     """
-    from vibe3.commands.command_options import load_config_and_validate_model
+    from vibe3.config import load_config_for_role
     from vibe3.roles.plan import (
         execute_spec_plan_async,
         execute_spec_plan_sync,
@@ -54,9 +54,11 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
     ).info("Manual plan intent received")
 
     # Load config (same as CLI does)
-    config = load_config_and_validate_model(
-        "plan", event.agent, event.backend, event.model
-    )
+    try:
+        config = load_config_for_role("plan", event.agent, event.backend, event.model)
+    except Exception as e:
+        logger.error(f"Config load failed for plan: {e}")
+        return
 
     # Resolve plan input (same as CLI does)
     spec_input = resolve_spec_plan_input(event.branch)
@@ -129,7 +131,7 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
     Reconstructs SimpleNamespace from flattened summary_* fields
     to match execute_manual_run's expected signature.
     """
-    from vibe3.commands.command_options import load_config_and_validate_model
+    from vibe3.config import load_config_for_role
     from vibe3.roles.run_command import execute_manual_run
 
     logger.bind(
@@ -139,9 +141,11 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
     ).info("Manual run intent received")
 
     # Load config (same as CLI does)
-    config = load_config_and_validate_model(
-        "run", event.agent, event.backend, event.model
-    )
+    try:
+        config = load_config_for_role("run", event.agent, event.backend, event.model)
+    except Exception as e:
+        logger.error(f"Config load failed for run: {e}")
+        return
 
     # Reconstruct SimpleNamespace from flattened fields
     summary = SimpleNamespace(
@@ -181,7 +185,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
 
     Stores result in _pending_results for CLI to retrieve verdict.
     """
-    from vibe3.commands.command_options import load_config_and_validate_model
+    from vibe3.config import load_config_for_role
     from vibe3.execution.issue_role_sync_runner import (
         run_issue_role_async,
         run_issue_role_sync,
@@ -200,9 +204,11 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
     ).info("Manual review intent received")
 
     # Load config (same as CLI does)
-    config = load_config_and_validate_model(
-        "review", event.agent, event.backend, event.model
-    )
+    try:
+        config = load_config_for_role("review", event.agent, event.backend, event.model)
+    except Exception as e:
+        logger.error(f"Config load failed for review: {e}")
+        return
 
     if event.is_base_review:
         # Base review path
