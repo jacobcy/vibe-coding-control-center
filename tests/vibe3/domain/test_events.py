@@ -2,19 +2,18 @@
 
 import pytest
 
-from vibe3.domain.events.flow_lifecycle import (
+from vibe3.domain import (
     FlowBlocked,
     FlowCompleted,
-    IssueFailed,
-    ManagerDispatchIntent,
-    PRMerged,
-)
-from vibe3.domain.events.governance import (
     GovernanceScanCompleted,
     GovernanceScanStarted,
+    IssueFailed,
+    ManagerDispatchIntent,
+    PolicyChanged,
+    PRMerged,
+    get_publisher,
+    subscribe,
 )
-from vibe3.domain.events.policy import PolicyChanged
-from vibe3.domain.publisher import get_publisher, subscribe
 
 
 def test_governance_scan_started():

@@ -8,7 +8,7 @@ This module provides domain events for all execution layers:
 Reference: docs/standards/v3/worktree-lifecycle-standard.md
 """
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from vibe3.domain.dispatch_coordinator import (
@@ -25,12 +25,15 @@ if TYPE_CHECKING:
     from vibe3.domain.events.base import DomainEvent
     from vibe3.domain.events.flow_lifecycle import (
         ExecutorDispatchIntent,
+        FlowBlocked,
+        FlowCompleted,
         IssueFailed,
         ManagerDispatchIntent,
         ManualPlanIntent,
         ManualReviewIntent,
         ManualRunIntent,
         PlannerDispatchIntent,
+        PRMerged,
         ReviewerDispatchIntent,
     )
     from vibe3.domain.events.governance import (
@@ -38,6 +41,7 @@ if TYPE_CHECKING:
         GovernanceScanCompleted,
         GovernanceScanStarted,
     )
+    from vibe3.domain.events.policy import PolicyChanged
     from vibe3.domain.events.supervisor_apply import (
         SupervisorApplyCompleted,
         SupervisorApplyDelegated,
@@ -58,7 +62,13 @@ if TYPE_CHECKING:
     )
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.domain.protocols.runtime_protocols import ServiceBase
-    from vibe3.domain.publisher import EventPublisher
+    from vibe3.domain.publisher import (
+        EventHandler,
+        EventPublisher,
+        get_publisher,
+        publish,
+        subscribe,
+    )
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
 
@@ -67,6 +77,9 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DomainEvent": "vibe3.domain.events.base",
     # Events - flow lifecycle
     "IssueFailed": "vibe3.domain.events.flow_lifecycle",
+    "FlowBlocked": "vibe3.domain.events.flow_lifecycle",
+    "FlowCompleted": "vibe3.domain.events.flow_lifecycle",
+    "PRMerged": "vibe3.domain.events.flow_lifecycle",
     "ManagerDispatchIntent": "vibe3.domain.events.flow_lifecycle",
     "ManualPlanIntent": "vibe3.domain.events.flow_lifecycle",
     "ManualRunIntent": "vibe3.domain.events.flow_lifecycle",
@@ -78,6 +91,8 @@ _LAZY_IMPORTS: dict[str, str] = {
     "GovernanceScanStarted": "vibe3.domain.events.governance",
     "GovernanceScanCompleted": "vibe3.domain.events.governance",
     "GovernanceDecisionRequired": "vibe3.domain.events.governance",
+    # Events - policy
+    "PolicyChanged": "vibe3.domain.events.policy",
     # Events - supervisor apply
     "SupervisorApplyCompleted": "vibe3.domain.events.supervisor_apply",
     "SupervisorApplyDelegated": "vibe3.domain.events.supervisor_apply",
@@ -105,6 +120,10 @@ _LAZY_IMPORTS: dict[str, str] = {
     "find_role_for_state": "vibe3.domain.role_resolver",
     # Publisher
     "EventPublisher": "vibe3.domain.publisher",
+    "EventHandler": "vibe3.domain.publisher",
+    "publish": "vibe3.domain.publisher",
+    "subscribe": "vibe3.domain.publisher",
+    "get_publisher": "vibe3.domain.publisher",
     # Event rules
     "EventRule": "vibe3.domain.event_rules",
     "build_action_handlers": "vibe3.domain.event_rules",
@@ -118,27 +137,6 @@ _LAZY_IMPORTS: dict[str, str] = {
 def register_event_handlers() -> None:
     """Register domain event handlers lazily to avoid import cycles."""
     import vibe3.domain.handlers  # noqa: F401 triggers @register_handler at import time
-
-
-def get_publisher() -> "EventPublisher":
-    """Return the global domain event publisher lazily."""
-    from vibe3.domain.publisher import get_publisher as _get_publisher
-
-    return _get_publisher()
-
-
-def publish(event: "DomainEvent") -> None:
-    """Publish a domain event lazily."""
-    from vibe3.domain.publisher import publish as _publish
-
-    return _publish(event)
-
-
-def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None:
-    """Subscribe a handler lazily."""
-    from vibe3.domain.publisher import subscribe as _subscribe
-
-    return _subscribe(event_type, handler)
 
 
 def __getattr__(name: str) -> object:
@@ -155,6 +153,9 @@ __all__ = [
     "DomainEvent",
     # L3 Flow Lifecycle Events
     "IssueFailed",
+    "FlowBlocked",
+    "FlowCompleted",
+    "PRMerged",
     "ManagerDispatchIntent",
     "ManualPlanIntent",
     "ManualRunIntent",
@@ -166,6 +167,8 @@ __all__ = [
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
     "GovernanceDecisionRequired",
+    # Policy Events
+    "PolicyChanged",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
     "SupervisorPromptRendered",
@@ -192,6 +195,7 @@ __all__ = [
     "ServiceBase",
     # Publisher
     "EventPublisher",
+    "EventHandler",
     "get_publisher",
     "publish",
     "subscribe",
