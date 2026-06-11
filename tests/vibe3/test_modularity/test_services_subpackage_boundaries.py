@@ -57,20 +57,8 @@ KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
-# Phase 7b continuation: pr <-> task cycle resolved (2026-06-11).
-# Phase 7b continuation: flow <-> task cycle partially resolved via
-#   Protocol/DI (2026-06-11).
-#   - flow → task: Now uses TaskQueryProtocol injection
-#     (runtime import only in lazy fallback)
-#   - task → flow: Now uses FlowQueryProtocol injection
-#     (runtime import only in lazy fallback)
-#   - Status: Protocol-based DI implemented, but runtime fallback
-#     imports still detected by test
-KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = {
-    frozenset({"flow", "pr"}),
-    frozenset({"flow", "issue"}),
-    frozenset({"flow", "task"}),  # Protocol/DI implemented, runtime fallback remains
-}
+# All cycles resolved as of 2026-06-11 (PR for #2575).
+KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = set()
 
 
 def _extract_imports_from_dir(
@@ -319,29 +307,32 @@ class TestSubpackageCoupling:
             )
 
     def test_known_subpackage_cycles_still_exist(self) -> None:
-        """Verify known sub-package cycles are still present.
+        """Verify no known sub-package cycles remain (all resolved).
 
-        When a cycle is resolved, remove it from KNOWN_SUBPACKAGE_CYCLES.
+        All known cycles have been resolved as part of #2575.
+        This test validates that no new cycles have been introduced.
+        If cycles are found, add them to KNOWN_SUBPACKAGE_CYCLES for tracking.
         """
         graph = _build_subpackage_dependency_graph()
 
-        stale: list[str] = []
-        for pair in KNOWN_SUBPACKAGE_CYCLES:
-            sub_a, sub_b = pair
-            if sub_b not in graph.get(sub_a, set()) or sub_a not in graph.get(
-                sub_b, set()
-            ):
-                stale.append(
-                    f"{sub_a} <-> {sub_b} "
-                    f"(actual: {sorted(graph.get(sub_a, set()))} / "
-                    f"{sorted(graph.get(sub_b, set()))})"
-                )
+        unexpected: list[str] = []
+        for sub_a in SERVICES_SUBPACKAGES:
+            for sub_b in SERVICES_SUBPACKAGES:
+                if sub_a >= sub_b:
+                    continue
+                if sub_b in graph.get(sub_a, set()) and sub_a in graph.get(
+                    sub_b, set()
+                ):
+                    unexpected.append(
+                        f"{sub_a} <-> {sub_b} "
+                        f"({sub_a} imports {sub_b}, {sub_b} imports {sub_a})"
+                    )
 
-        if stale:
+        if unexpected:
             pytest.fail(
-                "Known sub-package cycles resolved. "
-                "Remove from KNOWN_SUBPACKAGE_CYCLES:\n"
-                + "\n".join(f"  - {s}" for s in stale)
+                "Unexpected subpackage cycles detected — "
+                "add to KNOWN_SUBPACKAGE_CYCLES or fix:\n"
+                + "\n".join(f"  - {s}" for s in unexpected)
             )
 
     def test_subpackage_dependency_report(self) -> None:

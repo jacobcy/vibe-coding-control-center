@@ -1,7 +1,10 @@
 """Usecase layer for pr create command orchestration."""
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from rich.console import Console
@@ -10,9 +13,11 @@ from rich.prompt import Prompt
 from vibe3.clients import AIClient, AISuggestionClient, BaseResolver
 from vibe3.config import VibeConfig
 from vibe3.prompts import resolve_prompts_path
-from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.base_resolution import BaseResolutionUsecase
 from vibe3.services.shared.binding_guard import ensure_task_issue_bound
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 
 @dataclass(frozen=True)
@@ -30,13 +35,22 @@ class PRCreateUsecase:
 
     def __init__(
         self,
-        flow_service: FlowService | None = None,
+        flow_service: FlowQueryProtocol | None = None,
         base_resolver: BaseResolver | None = None,
     ) -> None:
-        self._flow_service = FlowService() if flow_service is None else flow_service
+        self._service_input = flow_service
         self._base_resolver = (
             BaseResolutionUsecase() if base_resolver is None else base_resolver
         )
+
+    @property
+    def _flow_service(self) -> FlowQueryProtocol:
+        """Return injected or fallback flow service."""
+        if self._service_input is not None:
+            return self._service_input
+        from vibe3.services import FlowService
+
+        return FlowService()  # type: ignore[return-value]
 
     def check_flow_task(self, branch: str, *, yes: bool = False) -> None:
         """Require current flow to have task bound unless bypassed by --yes."""
