@@ -143,6 +143,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `execution/` - 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
 - `exceptions/` - 统一异常层级
 - `domain/` - 领域事件与 handlers（events, handlers, orchestration_facade）
+  - `domain/protocols/` - 领域协议与抽象接口
 - `models/` - 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
@@ -152,6 +153,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（issue, pr, task, handoff, check）
+  - `services/flow/` - Flow 状态转换、注册、重建与清理
   - `services/issue/` - Issue 生命流程、标题缓存与失败处理
   - `services/pr/` - PR 创建、评审、质量评分与分析
   - `services/task/` - Task 绑定、状态分类与恢复逻辑

@@ -104,14 +104,14 @@ This project has **two parallel implementations**:
 - `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
 - `vibe3 handoff append "内容"`：追加 handoff 记录，提供后续上下文
 - `vibe3 handoff verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
-- `vibe3 handoff plan/report/audit/next`：记录特定阶段的责任链上下文
+- `vibe3 handoff plan/report/indicate/audit/next`：记录特定阶段的责任链上下文
 - `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
 
 ## 架构层级 (Three-Tier Architecture)
 
-- **Tier 3 (Cognitive/Governance)**: Policies, rules, supervisor. (Rules and Principles)
-- **Tier 2 (Skill Layer)**: Orchestration and context management. (Workflow and Logic)
-- **Tier 1 (Shell Layer)**: Atomic capabilities and state access. (Tools and Execution)
+- **Tier 3 (Cognitive/Governance)**: 认知与治理层。负责全局策略、规则、Supervisor 治理。核心命令：`serve`, `scan`, `check`, `mcp`。
+- **Tier 2 (Skill Layer)**: 技能/编排层。负责 Flow 状态机、任务编排、Agent 执行。核心命令：`flow`, `task`, `run`, `plan`, `review`。
+- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`。
 
 ## 🤖 Protocol
 

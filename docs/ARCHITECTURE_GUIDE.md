@@ -125,12 +125,12 @@ def register_dispatch_handlers() -> None:
 
 ### 4. Audit 事件
 
-**事件**：`audit_recorded`
+**事件**：`handoff_audit`
 
 **语义**：
-- 系统解析 review output，提取 verdict，写入 audit_ref
-- 不是 agent 的 handoff 行为，是系统的解析行为
-- 区别于 `handoff_plan` / `handoff_report` / `handoff_indicate`（agent 主动提交）
+- Reviewer 主动发起的权威审计行为，记录审计结果（verdict）与审计引用（audit_ref）。
+- 区别于 `audit_recorded`（系统被动解析 review output 的 legacy 事件）。
+- 与 `handoff_plan` / `handoff_report` / `handoff_indicate` 属于同一级别的 Agent 主动提交行为。
 
 **详细文档**: [event-driven-standard.md](standards/v3/event-driven-standard.md) §1.2
 
