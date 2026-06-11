@@ -10,7 +10,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.config import VibeConfig
-from vibe3.models import IssueState
+from vibe3.models import IssueState, PRState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
 from vibe3.services.check.remote import (
@@ -349,10 +349,10 @@ class CheckService(CheckRemote):
 
             # ==== PR State Handling ====
             # Priority 1: Handle PR state changes (merged/closed)
-            pr = self._branch_to_pr.get(branch)
-            if pr:
+            branch_pr = self._branch_to_pr.get(branch)
+            if branch_pr:
                 handled, pr_issues, pr_warnings = (
-                    self._check_pr_service.handle_pr_terminal_state(branch, pr)
+                    self._check_pr_service.handle_pr_terminal_state(branch, branch_pr)
                 )
                 if handled:
                     return CheckResult(
@@ -366,6 +366,7 @@ class CheckService(CheckRemote):
                 try:
                     cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
                     if cached_or_remote_pr:
+                        branch_pr = cached_or_remote_pr
                         handled, pr_issues, pr_warnings = (
                             self._check_pr_service.handle_pr_terminal_state(
                                 branch, cached_or_remote_pr
@@ -405,13 +406,18 @@ class CheckService(CheckRemote):
 
             if task_issue_closed:
                 if is_active_flow:
-                    # Active flow with closed issue and no open PR = anomaly
+                    if branch_pr and branch_pr.state == PRState.OPEN:
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    pr_detail = (
+                        f"PR #{branch_pr.number} closed" if branch_pr else "no PR found"
+                    )
+                    reason = f"Task issue #{task_issue} is CLOSED ({pr_detail})"
+                    self._flow_status_service.mark_flow_aborted(branch, reason)
                     return CheckResult(
-                        is_valid=False,
+                        is_valid=True,
                         branch=branch,
-                        issues=[
-                            f"Task issue #{task_issue} is CLOSED (no open PR found)"
-                        ],
+                        issues=[],
+                        warnings=[reason],
                     )
                 # Inactive flow with closed issue = expected terminal state, continue
 

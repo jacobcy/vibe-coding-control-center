@@ -323,8 +323,8 @@ def test_verify_branch_no_longer_reports_runtime_ownership_warnings(
     assert all("owner session" not in warning for warning in result.warnings)
 
 
-def test_verify_branch_closed_issue_returns_invalid(tmp_path: Path) -> None:
-    """Closed issue without open PR must return is_valid=False."""
+def test_verify_branch_closed_issue_without_pr_aborts_flow(tmp_path: Path) -> None:
+    """Closed issue without PR should abort active flow and return valid."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
 
@@ -352,8 +352,11 @@ def test_verify_branch_closed_issue_returns_invalid(tmp_path: Path) -> None:
 
     result = service.verify_branch(branch)
 
-    # Closed issue = NOT valid for dispatch
-    assert result.is_valid is False
+    assert result.is_valid is True
+    assert result.issues == []
+    flow = store.get_flow_state(branch)
+    assert flow is not None
+    assert flow["flow_status"] == "aborted"
 
 
 def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
