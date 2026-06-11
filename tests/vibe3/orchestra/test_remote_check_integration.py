@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,11 +17,11 @@ from vibe3.services import should_skip_from_queue
 
 
 @pytest.fixture
-def make_coordinator_with_remote_check() -> callable:
+def make_coordinator_with_remote_check() -> Callable[..., GlobalDispatchCoordinator]:
     """Factory for creating GlobalDispatchCoordinator with remote check support."""
 
     def _make_coordinator(
-        remote_check_runner: callable | None = None,
+        remote_check_runner: Callable[[], None] | None = None,
         remote_check_interval: int = 20,
         last_remote_check_tick: int = 0,
     ) -> GlobalDispatchCoordinator:

@@ -545,3 +545,142 @@ class TestPreDispatchHealthChecks:
 
         # Assert - block_flow should NOT be called for terminal states
         mock_flow_blocker.block_flow.assert_not_called()
+
+    def test_health_check_handles_block_flow_failure(self) -> None:
+        """When block_flow raises, health check should log and return False."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_flow_blocker = mock_deps["flow_blocker"]
+        mock_flow_blocker.block_flow.side_effect = RuntimeError("DB connection lost")
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            **mock_deps,
+        )
+
+        issue = IssueInfo(
+            number=994,
+            title="Block failure test",
+            state=IssueState.IN_PROGRESS,
+            labels=["state/in-progress"],
+            github_state="OPEN",
+        )
+
+        coordinator._flow_context = MagicMock(return_value=("task/issue-994", None))
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-994",
+            "flow_status": "active",
+        }
+
+        mock_check_service = MagicMock()
+        mock_check_service.verify_branch.return_value = CheckResult(
+            is_valid=False,
+            issues=["Branch no longer exists locally"],
+            branch="task/issue-994",
+        )
+        coordinator._check_service = mock_check_service
+
+        result = coordinator._check_dispatch_health(issue)
+
+        mock_flow_blocker.block_flow.assert_called_once()
+        assert result is False, "Should return False when block_flow fails"
+
+    def test_health_check_rejects_missing_flow_context(self) -> None:
+        """Empty branch + non-entry state should skip dispatch."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_deps["flow_context_resolver"] = MagicMock(return_value=("", None))
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            **mock_deps,
+        )
+
+        issue = IssueInfo(
+            number=995,
+            title="Missing context test",
+            state=IssueState.IN_PROGRESS,
+            labels=["state/in-progress"],
+            github_state="OPEN",
+        )
+
+        result = coordinator._check_dispatch_health(issue)
+
+        assert result is False, "Should return False for missing flow context"
+
+    def test_health_check_passes_with_empty_branch_and_entry_state(self) -> None:
+        """Empty branch + entry state (READY) should pass."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        mock_deps = _make_mock_coordinator_dependencies()
+        mock_deps["flow_context_resolver"] = MagicMock(return_value=("", None))
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            **mock_deps,
+        )
+
+        issue = IssueInfo(
+            number=996,
+            title="Entry state test",
+            state=IssueState.READY,
+            labels=["state/ready"],
+            github_state="OPEN",
+        )
+
+        result = coordinator._check_dispatch_health(issue)
+
+        assert result is True, "Should pass for READY state even without branch"

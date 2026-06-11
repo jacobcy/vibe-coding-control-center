@@ -56,6 +56,9 @@ if TYPE_CHECKING:
 # Hard limit to prevent extreme tick duration in edge cases
 MAX_INTENTS_PER_TICK = 10
 
+# Transient error prefixes: fail-open instead of blocking the flow
+_TRANSIENT_ERROR_PREFIXES = ("Cannot verify", "No flow record")
+
 
 class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
@@ -310,10 +313,9 @@ class GlobalDispatchCoordinator:
 
         if not result.is_valid:
             # Transient errors: fail-open
-            transient_errors = ["Cannot verify", "No flow record"]
             is_transient = any(
                 any(err.startswith(prefix) for err in result.issues)
-                for prefix in transient_errors
+                for prefix in _TRANSIENT_ERROR_PREFIXES
             )
             if is_transient:
                 append_orchestra_event(

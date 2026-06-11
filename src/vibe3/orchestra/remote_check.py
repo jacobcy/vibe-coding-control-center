@@ -10,6 +10,18 @@ from dataclasses import dataclass, field
 
 from loguru import logger
 
+from vibe3.clients import (
+    GhIssueLabelPort,
+    GitHubClient,
+    LabelAnomaly,
+    SQLiteClient,
+    collect_label_anomalies,
+    has_manager_assignee,
+    normalize_assignees,
+    normalize_labels,
+)
+from vibe3.config import get_convention, get_manager_usernames, load_orchestra_config
+
 
 @dataclass
 class RemoteCheckResult:
@@ -20,7 +32,7 @@ class RemoteCheckResult:
     removed_count: int
     added_count: int
     dry_run: bool
-    anomalies: list = field(default_factory=list)
+    anomalies: list[LabelAnomaly] = field(default_factory=list)
 
 
 def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
@@ -36,21 +48,6 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
     Returns:
         RemoteCheckResult with check statistics and anomalies.
     """
-    from vibe3.clients import (
-        GhIssueLabelPort,
-        GitHubClient,
-        SQLiteClient,
-        collect_label_anomalies,
-        has_manager_assignee,
-        normalize_assignees,
-        normalize_labels,
-    )
-    from vibe3.config import (
-        get_convention,
-        get_manager_usernames,
-        load_orchestra_config,
-    )
-
     logger.bind(domain="orchestra", action="remote_check").info(
         "Starting remote label check", dry_run=dry_run
     )
@@ -72,7 +69,7 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
         if (issue_number := convention.branch.parse_issue_number(branch)) is not None
     }
 
-    anomalies: list = []
+    anomalies: list[LabelAnomaly] = []
     removed_count = added_count = 0
 
     for issue in all_issues:
@@ -91,11 +88,21 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
         if not dry_run and found:
             for a in found:
                 for lb in a.removed:
-                    label_port.remove_issue_label(num, lb)
-                    removed_count += 1
+                    try:
+                        label_port.remove_issue_label(num, lb)
+                        removed_count += 1
+                    except Exception as exc:
+                        logger.bind(domain="orchestra", action="remote_check").warning(
+                            f"Failed to remove label {lb} from #{num}: {exc}"
+                        )
                 for lb in a.added:
-                    label_port.add_issue_label(num, lb)
-                    added_count += 1
+                    try:
+                        label_port.add_issue_label(num, lb)
+                        added_count += 1
+                    except Exception as exc:
+                        logger.bind(domain="orchestra", action="remote_check").warning(
+                            f"Failed to add label {lb} to #{num}: {exc}"
+                        )
 
     logger.bind(domain="orchestra", action="remote_check").info(
         "Remote label check completed",

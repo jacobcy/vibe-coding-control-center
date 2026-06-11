@@ -259,7 +259,7 @@ code_limits:
         reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
         limit: 550
-        reason: "Health check failure 测试集，验证 coordinator 对 CheckService 结果的处理逻辑（terminal/fail-open/genuine failure），包含 TestPreDispatchHealthChecks（8 个测试）和 TestEmptyBranchGuard（7 个测试）两个测试类，每个测试需要完整 mock setup，拆分会降低可读性；新增 mock_flow_blocker 注入对齐测试模式（#1723）；新增 _make_mock_coordinator_dependencies helper function（#1887）；Issue #2381 Task 1 新增 TestPreDispatchHealthChecks 测试类验证 inlined health check logic（+67 行），test file migration from DispatchHealthCheckService to coordinator"
+        reason: "Health check failure tests (TestPreDispatchHealthChecks + TestEmptyBranchGuard). Each test needs full mock setup; splitting reduces readability (#1723, #1887, #2381)"
       - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"

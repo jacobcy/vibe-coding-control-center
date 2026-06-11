@@ -268,10 +268,9 @@ def _build_server_with_launch_cwd(
 
     # Mount webhook router (optional, controlled by config)
     try:
-        # Warn at startup if webhook secret not configured
-        import os
-
         from .webhook import router as webhook_router
+
+        # Warn at startup if webhook secret not configured
 
         if not os.getenv("GITHUB_WEBHOOK_SECRET"):
             logger.bind(domain="orchestra").warning(

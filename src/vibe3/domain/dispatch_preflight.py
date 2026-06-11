@@ -75,7 +75,9 @@ class DispatchPreflightService:
     def _qualify_blocked(self, issue: IssueInfo) -> IssueState | None:
         try:
             target_state = self._qualify_gate.qualify_blocked_issue(issue)
-        except Exception as exc:
+        except BaseException as exc:
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: preflight skipped #{issue.number} "
@@ -118,7 +120,9 @@ class DispatchPreflightService:
                 issue.labels,
                 trigger_state,
             )
-        except Exception as exc:
+        except BaseException as exc:
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: preflight skipped #{issue.number} "
