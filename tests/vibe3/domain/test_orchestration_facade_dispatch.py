@@ -46,6 +46,7 @@ class TestOrchestrationFacadeDispatchServices:
         }
 
         facade = OrchestrationFacade(
+            flow_manager=MagicMock(),
             tick_count=0,
             capacity=mock_capacity,
             coordinator_factory=_mock_coordinator_factory,
@@ -84,7 +85,7 @@ class TestOrchestrationFacadeDispatchServices:
         )
         mock_monotonic.side_effect = [float(i) for i in range(20)]
 
-        facade = OrchestrationFacade(tick_count=0)
+        facade = OrchestrationFacade(flow_manager=MagicMock(), tick_count=0)
 
         with patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock):
             await facade.on_tick()
@@ -120,6 +121,7 @@ class TestOrchestrationFacadeDispatchServices:
         }
 
         facade = OrchestrationFacade(
+            flow_manager=MagicMock(),
             tick_count=0,
             capacity=mock_capacity,
             coordinator_factory=_mock_coordinator_factory,
@@ -178,6 +180,7 @@ class TestOrchestrationFacadeDispatchServices:
         mock_registry = MagicMock(spec=SessionRegistryService)
 
         facade = OrchestrationFacade(
+            flow_manager=MagicMock(),
             tick_count=0,
             config=mock_config,
             capacity=mock_capacity,

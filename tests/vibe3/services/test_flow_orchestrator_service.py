@@ -195,6 +195,7 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     )
     service.flow_service.block_flow.assert_called_once_with(
         "dev/issue-501",
+        reason=None,
         blocked_by_issue=701,
         actor=None,
     )
@@ -553,3 +554,105 @@ def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
     # Verify pack_refs_all called 2 times (first two retry attempts,
     # not final attempt)
     assert git.pack_refs_all.call_count == 2
+
+
+def test_create_placeholder_flow_delegates_to_bootstrap() -> None:
+    """create_placeholder_flow should delegate to bootstrap_issue_flow."""
+    from unittest.mock import patch
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    issue = IssueInfo(number=999, title="Test issue")
+    expected = {"branch": "task/issue-999", "flow_status": "blocked"}
+
+    with patch.object(
+        service, "bootstrap_issue_flow", return_value=expected
+    ) as mock_bootstrap:
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999"
+        )
+
+    mock_bootstrap.assert_called_once_with(
+        issue,
+        branch="task/issue-999",
+        slug="issue-999",
+        source="intake",
+        skip_git=True,
+        dependency_issue_numbers=(),
+        blocked_reason=None,
+    )
+    assert result is expected
+
+
+def test_create_placeholder_flow_with_dependency() -> None:
+    """create_placeholder_flow should pass dependency_issue_numbers to bootstrap."""
+    from unittest.mock import patch
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    issue = IssueInfo(number=999, title="Blocked issue")
+    expected = {
+        "branch": "task/issue-999",
+        "flow_status": "blocked",
+        "blocked_by_issue": 701,
+    }
+
+    with patch.object(
+        service, "bootstrap_issue_flow", return_value=expected
+    ) as mock_bootstrap:
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999", blocked_by_issue=701
+        )
+
+    mock_bootstrap.assert_called_once_with(
+        issue,
+        branch="task/issue-999",
+        slug="issue-999",
+        source="intake",
+        skip_git=True,
+        dependency_issue_numbers=(701,),
+        blocked_reason=None,
+    )
+    assert result["blocked_by_issue"] == 701
+
+
+def test_create_placeholder_flow_returns_flow_dict() -> None:
+    """create_placeholder_flow should return the dict from bootstrap_issue_flow."""
+    from unittest.mock import patch
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    issue = IssueInfo(number=999, title="Test issue")
+    expected = {
+        "branch": "task/issue-999",
+        "flow_slug": "issue-999",
+        "flow_status": "blocked",
+        "source": "intake",
+    }
+
+    with patch.object(service, "bootstrap_issue_flow", return_value=expected):
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999"
+        )
+
+    assert isinstance(result, dict)
+    assert "branch" in result
+    assert "flow_slug" in result
+    assert "flow_status" in result
+    assert result["branch"] == "task/issue-999"
+    assert result["flow_status"] == "blocked"

@@ -76,8 +76,8 @@ code_limits:
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
       - path: "src/vibe3/commands/task.py"
-        limit: 500
-        reason: "Task 命令聚合，包含 show/status/intake/resume 多个子命令入口；新增 vibe3 task intake 命令（issue assignee 分配 + guard 逻辑）后超标"
+        limit: 550
+        reason: "Task 命令聚合，包含 show/status/intake/resume 多个子命令入口；新增 vibe3 task intake 命令（issue assignee 分配 + guard 逻辑）后超标；Issue #2621 新增 --blocked-by 参数支持 placeholder flow 创建（+46 行）"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 560
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
@@ -89,6 +89,9 @@ code_limits:
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
 
       # Services 层 —— 允许 410-540
+      - path: "src/vibe3/services/orchestra/orchestrator.py"
+        limit: 450
+        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）"
       - path: "src/vibe3/services/shared/paths.py"
         limit: 450
         reason: "Shared utilities 聚合，由 path_helpers.py + git_path_client.py 合理合并而成（解决 tight coupling），包含路径规范化、Git path 解析、handoff target resolution、ref normalization 等紧密耦合的路径处理逻辑；职责单一（path utilities）且架构质量已通过 code-reviewer 评估；PR #2406 Phase 1-2a modularity refactoring 创建；Issue #2514 新增三个 centralized path helpers（get_vibe3_cache_path/get_vibe3_db_path/get_vibe3_log_dir）以消除 8 个文件中的重复路径构造，提升代码一致性"
@@ -279,8 +282,8 @@ code_limits:
         limit: 600
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py；Issue #2242 新增 test_auto_resume_blocked_with_none_flow_state_returns_ready 测试验证 flow_state=None 路径返回 READY；Issue #2353 新增 test_qualify_blocked_issue_reuses_truth 测试验证 truth 参数传递优化（消除双重 resolve_coordination 调用）"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
-        limit: 560
-        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试等紧密耦合场景，共享 fixture，拆分收益低；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标"
+        limit: 700
+        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试等紧密耦合场景，共享 fixture，拆分收益低；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）"
       - path: "tests/vibe3/runtime/test_heartbeat.py"
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"

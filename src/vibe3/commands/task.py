@@ -19,9 +19,13 @@ from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
 from vibe3.observability import setup_logging
 from vibe3.services import (
+    FlowOrchestratorService,
     FlowService,
+    IssueFlowService,
+    LabelService,
     TaskResumeUsecase,
     TaskService,
+    load_issue_info,
 )
 from vibe3.ui import (
     render_task_comments,
@@ -177,6 +181,14 @@ def intake(
         bool,
         typer.Option("--yes", "-y", help="Force reassignment without confirmation"),
     ] = False,
+    blocked_by: Annotated[
+        int | None,
+        typer.Option("--blocked-by", help="Issue number this is blocked by"),
+    ] = None,
+    blocked_reason: Annotated[
+        str | None,
+        typer.Option("--blocked-reason", help="Reason this issue is blocked"),
+    ] = None,
 ) -> None:
     """Assign an issue to the local manager account.
 
@@ -192,7 +204,9 @@ def intake(
     local_manager = managers[0]
 
     client = GitHubClient()
-    issue = client.view_issue(issue_id, fields=["labels", "assignees", "state"])
+    issue = client.view_issue(
+        issue_id, fields=["labels", "assignees", "state", "title"]
+    )
 
     if issue is None:
         typer.echo(f"Error: Issue #{issue_id} not found.", err=True)
@@ -240,6 +254,43 @@ def intake(
         )
     else:
         typer.echo(f"#{issue_id} assigned to {local_manager}")
+
+    # Create placeholder flow if blocked-by is specified
+    if blocked_by is not None:
+        try:
+            # Load full issue info for consistent flow creation
+            issue_info = load_issue_info(issue_id, config=config.orchestra)
+
+            # Get canonical branch name for flow key
+            issue_flow_svc = IssueFlowService()
+            branch = issue_flow_svc.canonical_branch_name(issue_id)
+            slug = f"issue-{issue_id}"
+
+            # Create placeholder flow
+            orchestrator = FlowOrchestratorService(config.orchestra)
+            orchestrator.create_placeholder_flow(
+                issue=issue_info,
+                branch=branch,
+                slug=slug,
+                blocked_by_issue=blocked_by,
+                blocked_reason=blocked_reason,
+            )
+
+            # Set state/blocked label on GitHub
+            label_service = LabelService(repo=config.orchestra.repo)
+            label_service.set_state(issue_id, IssueState.BLOCKED)
+        except Exception:
+            typer.echo(
+                "  Warning: Placeholder flow creation failed — "
+                f"assignee set but blocked state incomplete for #{issue_id}",
+                err=True,
+            )
+            raise
+
+        msg = f"  Placeholder flow created (blocked by #{blocked_by})"
+        if blocked_reason:
+            msg += f": {blocked_reason}"
+        typer.echo(msg)
 
 
 @app.command()

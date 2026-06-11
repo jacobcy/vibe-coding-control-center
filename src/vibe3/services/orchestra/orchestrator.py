@@ -128,12 +128,15 @@ class FlowOrchestratorService:
         reactivate_existing: bool = False,
         related_issue_numbers: tuple[int, ...] = (),
         dependency_issue_numbers: tuple[int, ...] = (),
+        blocked_reason: str | None = None,
+        skip_git: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
 
         This is the shared bootstrap interface for both:
         - orchestra automatic flow creation
         - human-collaboration skill bootstrap planning
+        - intake placeholder flow creation (skip_git=True)
 
         It centralizes branch preparation, flow creation/reactivation, issue binding,
         optional worktree resolution, and compatible related/dependency linkage.
@@ -142,7 +145,7 @@ class FlowOrchestratorService:
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
 
         try:
-            if not self.git.branch_exists(branch):
+            if not skip_git and not self.git.branch_exists(branch):
                 # Ensure scene_base_ref remote is up-to-date before creating branch
                 remote, ref = self.config.scene_base_ref.split("/", 1)
                 for attempt in range(MAX_FETCH_RETRIES):
@@ -198,6 +201,7 @@ class FlowOrchestratorService:
             for dependency_issue in dependency_issue_numbers:
                 self.flow_service.block_flow(
                     branch,
+                    reason=blocked_reason,
                     blocked_by_issue=dependency_issue,
                     actor=actor,
                 )
@@ -390,3 +394,27 @@ class FlowOrchestratorService:
             raise RuntimeError(
                 f"Failed to create flow for issue #{issue.number}: {exc}"
             ) from exc
+
+    def create_placeholder_flow(
+        self,
+        issue: IssueInfo,
+        *,
+        branch: str,
+        slug: str,
+        blocked_by_issue: int | None = None,
+        blocked_reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a placeholder flow — DB records only, no git branch / worktree.
+
+        Used by intake when an issue is blocked by a dependency.
+        Delegates to bootstrap_issue_flow with skip_git=True.
+        """
+        return self.bootstrap_issue_flow(
+            issue,
+            branch=branch,
+            slug=slug,
+            source="intake",
+            skip_git=True,
+            dependency_issue_numbers=((blocked_by_issue,) if blocked_by_issue else ()),
+            blocked_reason=blocked_reason,
+        )

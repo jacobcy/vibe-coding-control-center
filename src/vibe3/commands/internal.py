@@ -131,7 +131,15 @@ def internal_bootstrap(
     ] = None,
     dependency_issue_numbers: Annotated[
         list[int] | None,
-        typer.Option("--dependency", help="Bind blocking dependency issue number"),
+        typer.Option(
+            "--blocked-by",
+            "--dependency",
+            help="Bind blocking dependency issue number",
+        ),
+    ] = None,
+    blocked_reason: Annotated[
+        str | None,
+        typer.Option("--blocked-reason", help="Reason this flow is blocked"),
     ] = None,
     source: Annotated[
         str,
@@ -165,5 +173,6 @@ def internal_bootstrap(
         reactivate_existing=reactivate_existing,
         related_issue_numbers=tuple(related_issue_numbers or ()),
         dependency_issue_numbers=tuple(dependency_issue_numbers or ()),
+        blocked_reason=blocked_reason,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))
