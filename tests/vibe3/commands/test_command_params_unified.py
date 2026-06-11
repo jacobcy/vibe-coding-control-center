@@ -238,6 +238,8 @@ def test_plan_dry_run_outputs_summary(
         return MagicMock()
 
     monkeypatch.setattr("vibe3.agents.create_codeagent_command", capture_command)
+    # Also mock in roles.plan namespace (where it's imported)
+    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", capture_command)
 
     def mock_execution_service(cfg):  # noqa: ARG001
         return MagicMock(execute_sync=lambda cmd: MagicMock())  # noqa: ARG005
@@ -351,6 +353,8 @@ def test_plan_show_prompt_forwarded(
         return MagicMock()
 
     monkeypatch.setattr("vibe3.agents.create_codeagent_command", capture_command)
+    # Also mock in roles.plan namespace (where it's imported)
+    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", capture_command)
 
     def mock_execution_service(cfg):  # noqa: ARG001
         return MagicMock()
