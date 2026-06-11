@@ -33,11 +33,13 @@
 
 ```bash
 vibe3 internal bootstrap  # 现代 V3 推荐方式
-# 或使用 legacy 脚本
+# 或使用 legacy 脚本 (不再推荐)
 ./scripts/init.sh
 ```
 
-当你执行 `vibe flow start <feature>`（Legacy）、`wtnew <branch>`，或由 V3 runtime 自动创建 worktree 时，`scripts/init.sh` 或 `vibe3 internal bootstrap` 会自动运行，完成以下工作：
+当你使用 `wtnew <branch>` (V3 推荐) 或由 V3 runtime 自动创建 worktree 时，`vibe3 internal bootstrap` 会自动运行。`bin/vibe flow start` 已被标记为 Legacy，V3 开发应优先使用 `wtnew` 或原生 `git worktree`。
+
+`vibe3 internal bootstrap` 完成以下工作：
 1. 安装并配置 `openSpec` 和 `Superpowers`
 2. 在 `.claude/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
@@ -224,7 +226,9 @@ bash scripts/tools/metrics.sh  # V2 Legacy 仪表盘
 ### Step 1：创建工作区
 
 ```bash
-# 在项目根目录，使用 git worktree 创建隔离工作空间
+# V3 推荐方式：使用 wtnew 或 git worktree 创建隔离工作空间
+wtnew task/issue-1839
+# 或手动创建
 git worktree add ../wt-task-1839 task/issue-1839
 cd ../wt-task-1839
 
@@ -232,7 +236,7 @@ cd ../wt-task-1839
 vibe3 flow update
 ```
 
-> V3 优先使用 `vibe3 flow update` 注册当前分支为活跃 flow；worktree 建议使用原生 `git worktree` 管理或由 orchestra 自动调度。开发前通过 `vibe3 flow show` 查看当前 flow 上下文。
+> **Legacy 注意**: `bin/vibe flow start <feature>` 已弃用。V3 优先使用 `vibe3 flow update` 注册当前分支为活跃 flow；worktree 建议使用 `wtnew` 管理。开发前通过 `vibe3 flow show` 查看当前 flow 上下文。
 
 这会：
 - 创建独立的物理工作目录

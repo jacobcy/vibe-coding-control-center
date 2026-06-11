@@ -78,11 +78,12 @@ vibe3 flow show -h
 
 ### `vibe3 handoff init`
 
-Ensure shared handoff file exists for current branch.
+Ensure shared handoff storage is scaffolded for current branch.
 
 **Behavior**:
-- Creates `.git/vibe3/handoff/<branch-safe>/current.md` if missing
+- Scaffolds internal storage for handoff (internal path: `.git/vibe3/handoff/`)
 - Scaffolds fixed Markdown template
+- **Security**: Direct file system access to this storage is prohibited for agents; use `vibe3 handoff show` instead.
 
 ```bash
 vibe3 handoff init
@@ -90,7 +91,7 @@ vibe3 handoff init
 
 ### `vibe3 handoff show`
 
-Show a handoff artifact.
+Show a handoff artifact via the authorized CLI channel.
 
 ```bash
 vibe3 handoff show
@@ -100,7 +101,7 @@ vibe3 handoff show @task-476/run-1.md
 
 ### `vibe3 handoff append <message>`
 
-Append a lightweight update block to handoff file.
+Append a lightweight update block to handoff via the authorized CLI channel.
 
 ```bash
 vibe3 handoff append "Need to align event taxonomy" --actor "codex/gpt-5.4" --kind finding

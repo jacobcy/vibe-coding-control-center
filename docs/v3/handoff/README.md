@@ -78,13 +78,13 @@ related_docs:
 
 **Success Criteria**:
 - [x] SQLite handoff store is defined as the minimal shared index, not a content truth.
-- [x] `.git/vibe3/handoff/<branch-safe>/current.md` is defined as the shared structured handoff buffer.
+- [x] Handoff buffer is defined as a structured content truth, accessed ONLY via CLI commands.
 - [x] `.agent/context/task.md` is reduced to local draft / compatibility notes.
 - [x] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
 
 **Implementation Status** (2026-03-21):
-- ✅ `vibe3 handoff init` - Create shared handoff file
-- ✅ `vibe3 handoff show` - Display handoff content
+- ✅ `vibe3 handoff init` - Scaffold shared handoff (Internal storage: `.git/vibe3/handoff/`)
+- ✅ `vibe3 handoff show` - Display handoff content (Authorized CLI channel)
 - ✅ `vibe3 handoff append` - Append lightweight update block to shared handoff
 - ✅ `vibe3 handoff plan <ref>` - Record plan handoff
 - ✅ `vibe3 handoff report <ref>` - Record report handoff
