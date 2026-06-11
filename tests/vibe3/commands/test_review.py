@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
@@ -321,40 +322,22 @@ def test_review_fresh_session_propagates():
     assert call_kwargs["fresh_session"] is True
 
 
-def test_review_agent_option_propagates():
-    """review --agent foo should propagate to run_issue_role_sync."""
-    mock_config = MagicMock()
-    with (
-        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch(
-            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-        ) as _mock_sync,
-        patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
-        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
-    ):
-        # Inject mock into vibe3.config namespace for handler
-        import vibe3.config
-
-        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
-        try:
-            mock_flow = MagicMock()
-            mock_flow.task_issue_number = 42
-            mock_validate.return_value = (mock_flow, 42)
-            mock_resolve.return_value = "task/issue-42"
-
-            result = runner.invoke(app, ["--no-async", "--agent", "foo"])
-        finally:
-            # Cleanup injected attribute
-            del vibe3.config.load_config_for_role
-
-    assert result.exit_code == 0
-    mock_sync_cache.assert_called_once()
-    call_kwargs = mock_sync_cache.call_args.kwargs
-    assert call_kwargs["agent"] == "foo"
-
-
-def test_review_backend_option_propagates():
-    """review --backend claude should propagate to run_issue_role_sync."""
+@pytest.mark.parametrize(
+    ("cli_args", "kwarg_name", "expected_value"),
+    [
+        (["--agent", "foo"], "agent", "foo"),
+        (["--backend", "claude"], "backend", "claude"),
+        (
+            ["--backend", "claude", "--model", "claude-opus-4-8"],
+            "model",
+            "claude-opus-4-8",
+        ),
+    ],
+)
+def test_review_cli_option_propagates(
+    cli_args: list[str], kwarg_name: str, expected_value: str
+) -> None:
+    """review --agent/--backend/--model should propagate to run_issue_role_sync."""
     mock_config = MagicMock()
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
@@ -373,50 +356,11 @@ def test_review_backend_option_propagates():
             mock_validate.return_value = (mock_flow, 42)
             mock_resolve.return_value = "task/issue-42"
 
-            result = runner.invoke(app, ["--no-async", "--backend", "claude"])
+            result = runner.invoke(app, ["--no-async", *cli_args])
         finally:
             del vibe3.config.load_config_for_role
 
     assert result.exit_code == 0
     mock_sync_cache.assert_called_once()
     call_kwargs = mock_sync_cache.call_args.kwargs
-    assert call_kwargs["backend"] == "claude"
-
-
-def test_review_model_option_propagates():
-    """review --model claude-opus-4-8 should propagate to run_issue_role_sync."""
-    mock_config = MagicMock()
-    with (
-        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch(
-            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-        ) as _mock_sync,
-        patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
-        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
-    ):
-        import vibe3.config
-
-        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
-        try:
-            mock_flow = MagicMock()
-            mock_flow.task_issue_number = 42
-            mock_validate.return_value = (mock_flow, 42)
-            mock_resolve.return_value = "task/issue-42"
-
-            result = runner.invoke(
-                app,
-                [
-                    "--no-async",
-                    "--backend",
-                    "claude",
-                    "--model",
-                    "claude-opus-4-8",
-                ],
-            )
-        finally:
-            del vibe3.config.load_config_for_role
-
-    assert result.exit_code == 0
-    mock_sync_cache.assert_called_once()
-    call_kwargs = mock_sync_cache.call_args.kwargs
-    assert call_kwargs["model"] == "claude-opus-4-8"
+    assert call_kwargs[kwarg_name] == expected_value
