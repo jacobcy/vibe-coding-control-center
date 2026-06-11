@@ -348,6 +348,9 @@ code_limits:
       - path: "tests/vibe3/clients/test_sqlite_flow_state_repo.py"
         limit: 450
         reason: "SQLite flow state repo 测试集，覆盖 flow CRUD、soft-delete、cascade delete、status validation、bulk retrieval optimization、restore flow deadlock fix 等紧密耦合场景，与 sqlite_flow_state_repo.py 源文件（limit 540）对应；Issue #2537 新增 test_restore_flow_resets_aborted_status 测试验证 aborted flow deadlock fix（+41 行）"
+      - path: "tests/vibe3/analysis/test_snapshot_service.py"
+        limit: 480
+        reason: "Snapshot service 测试集，覆盖 find_snapshot_by_branch（7 个测试含 branch 查找、origin/ 前缀归一化、glob 预过滤验证）、build_snapshot（1 个测试）、baseline 操作（5 个测试含 save/load/not found/no baseline dir/list excludes/save for diff）等 13 个紧密耦合场景，共享 snapshot_dir fixture 和 mock setup，拆分收益低；Issue #2616 新增 test_find_snapshot_by_branch_glob_filters_candidates 验证 glob 预过滤行为（+65 行）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
