@@ -39,7 +39,7 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     # Mock config
     mock_config = MagicMock()
-    mock_config.plan.agent_config.backend = None
+    mock_config.plan.agent_config.backend = "test-backend"
     mock_config.plan.agent_config.model = None
     mock_config.plan.agent_config.agent = None
     mock_config.plan.agent_config.timeout_seconds = 3600
@@ -60,6 +60,8 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
     monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     # Mock at source (for lazy imports in handler)
     monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    # Mock at lazy import cache location (critical for lazy imports!)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
     # Mock config loader for domain handler
     monkeypatch.setattr(
         "vibe3.config.config_loader.load_config_for_role",
@@ -219,10 +221,13 @@ def test_plan_dry_run_outputs_summary(
 
     mock_spec_input = MagicMock()
     mock_spec_input.request.task_guidance = "Test task"
-    monkeypatch.setattr(
-        "vibe3.roles.plan.resolve_spec_plan_input",
-        lambda branch, file=None: mock_spec_input,
-    )
+
+    def mock_resolve(branch, file=None):  # noqa: ARG001
+        return mock_spec_input
+
+    monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
 
     captured_kwargs = {}
 
@@ -231,9 +236,13 @@ def test_plan_dry_run_outputs_summary(
         return MagicMock()
 
     monkeypatch.setattr("vibe3.agents.create_codeagent_command", capture_command)
+
+    def mock_execution_service(cfg):  # noqa: ARG001
+        return MagicMock(execute_sync=lambda cmd: MagicMock())  # noqa: ARG005
+
     monkeypatch.setattr(
         "vibe3.execution.codeagent_runner.CodeagentExecutionService",
-        lambda cfg: MagicMock(execute_sync=lambda cmd: MagicMock()),
+        mock_execution_service,
     )
 
     spec_file = tmp_path / "spec.md"
@@ -322,10 +331,13 @@ def test_plan_show_prompt_forwarded(
     """--show-prompt passes show_prompt=True to create_codeagent_command."""
     mock_spec_input = MagicMock()
     mock_spec_input.request.task_guidance = "Test task"
-    monkeypatch.setattr(
-        "vibe3.roles.plan.resolve_spec_plan_input",
-        lambda branch, file=None: mock_spec_input,
-    )
+
+    def mock_resolve(branch, file=None):  # noqa: ARG001
+        return mock_spec_input
+
+    monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr(
         "vibe3.config.loader.VibeConfig.get_defaults", lambda: MagicMock()
     )
@@ -336,9 +348,14 @@ def test_plan_show_prompt_forwarded(
         captured_kwargs.update(kwargs)
         return MagicMock()
 
-    monkeypatch.setattr("vibe3.roles.plan.create_codeagent_command", capture_command)
+    monkeypatch.setattr("vibe3.agents.create_codeagent_command", capture_command)
+
+    def mock_execution_service(cfg):  # noqa: ARG001
+        return MagicMock()
+
     monkeypatch.setattr(
-        "vibe3.roles.plan.CodeagentExecutionService", lambda cfg: MagicMock()
+        "vibe3.execution.codeagent_runner.CodeagentExecutionService",
+        mock_execution_service,
     )
 
     spec_file = tmp_path / "spec.md"
