@@ -251,8 +251,7 @@ class CheckPRService:
         # Publish PRMerged event if we have a valid issue context
         task_issue = self.store.get_task_issue_number(branch)
         if task_issue:
-            from vibe3.models.domain_events import PRMerged
-            from vibe3.models.event_bus import publish
+            from vibe3.models import PRMerged, publish
 
             publish(
                 PRMerged(

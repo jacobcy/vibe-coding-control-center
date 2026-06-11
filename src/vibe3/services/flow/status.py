@@ -132,8 +132,7 @@ class FlowStatusService:
 
         # Publish FlowCompleted event if we have a valid issue context
         if task_issue:
-            from vibe3.models.domain_events import FlowCompleted
-            from vibe3.models.event_bus import publish
+            from vibe3.models import FlowCompleted, publish
 
             publish(
                 FlowCompleted(

@@ -102,8 +102,7 @@ class FlowLifecycleMixin:
 
         # Publish FlowBlocked event if we have a valid issue context
         if issue_number is not None:
-            from vibe3.models.domain_events import FlowBlocked
-            from vibe3.models.event_bus import publish
+            from vibe3.models import FlowBlocked, publish
 
             publish(
                 FlowBlocked(
