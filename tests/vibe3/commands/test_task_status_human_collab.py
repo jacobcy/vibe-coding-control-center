@@ -38,7 +38,7 @@ def _make_config_mock() -> MagicMock:
 
 @patch("vibe3.config.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_governed_anomaly_section(
     mock_status_service_cls: MagicMock,
@@ -156,7 +156,7 @@ class TestComputeEffectiveServerRunning:
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_shows_remote_tasks_section(
     mock_status_service_cls,
@@ -236,7 +236,7 @@ def test_task_status_shows_remote_tasks_section(
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_human_collab_section_appears_for_dev_issue_flow(
     mock_status_service_cls,
@@ -338,7 +338,7 @@ def test_human_collab_section_appears_for_dev_issue_flow(
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_blocked_dev_issue_not_in_blocked_section(
     mock_status_service_cls,
