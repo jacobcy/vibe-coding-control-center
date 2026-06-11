@@ -128,12 +128,14 @@ class FlowOrchestratorService:
         reactivate_existing: bool = False,
         related_issue_numbers: tuple[int, ...] = (),
         dependency_issue_numbers: tuple[int, ...] = (),
+        skip_git: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
 
         This is the shared bootstrap interface for both:
         - orchestra automatic flow creation
         - human-collaboration skill bootstrap planning
+        - intake placeholder flow creation (skip_git=True)
 
         It centralizes branch preparation, flow creation/reactivation, issue binding,
         optional worktree resolution, and compatible related/dependency linkage.
@@ -142,7 +144,7 @@ class FlowOrchestratorService:
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
 
         try:
-            if not self.git.branch_exists(branch):
+            if not skip_git and not self.git.branch_exists(branch):
                 # Ensure scene_base_ref remote is up-to-date before creating branch
                 remote, ref = self.config.scene_base_ref.split("/", 1)
                 for attempt in range(MAX_FETCH_RETRIES):
@@ -398,32 +400,17 @@ class FlowOrchestratorService:
         branch: str,
         slug: str,
         blocked_by_issue: int | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create a placeholder flow — DB records only, no git branch / worktree.
 
         Used by intake when an issue is blocked by a dependency.
-        Writes flow_state, flow_issue_links, and sets flow_status="blocked".
-        Does NOT create a git branch or worktree.
+        Delegates to bootstrap_issue_flow with skip_git=True.
         """
-        # 1. Create flow record in DB
-        flow_state = self.flow_service.create_flow(
-            slug=slug,
+        return self.bootstrap_issue_flow(
+            issue,
             branch=branch,
+            slug=slug,
             source="intake",
+            skip_git=True,
+            dependency_issue_numbers=((blocked_by_issue,) if blocked_by_issue else ()),
         )
-
-        # 2. Link task issue
-        self.task_service.link_issue(branch, issue.number, "task")
-
-        # 3. Link dependency issue if provided
-        if blocked_by_issue:
-            self.task_service.link_issue(branch, blocked_by_issue, "dependency")
-
-        # 4. Set flow_status to blocked and record dependency
-        self.store.update_flow_state(
-            branch,
-            flow_status="blocked",
-            blocked_by_issue=blocked_by_issue,
-        )
-
-        return self.store.get_flow_state(branch) or flow_state.model_dump()

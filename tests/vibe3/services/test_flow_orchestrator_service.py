@@ -555,124 +555,98 @@ def test_bootstrap_issue_flow_raises_after_exhausted_retries() -> None:
     assert git.pack_refs_all.call_count == 2
 
 
-def test_create_placeholder_flow_creates_db_only_flow() -> None:
-    """create_placeholder_flow should create DB records without git branch."""
+def test_create_placeholder_flow_delegates_to_bootstrap() -> None:
+    """create_placeholder_flow should delegate to bootstrap_issue_flow."""
+    from unittest.mock import patch
+
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
     github = MagicMock()
-    flow_service = MagicMock()
-    task_service = MagicMock()
 
     service = FlowOrchestratorService(config, store=store, git=git, github=github)
-    service.flow_service = flow_service
-    service.task_service = task_service
-
-    flow_service.create_flow.return_value = MagicMock(
-        model_dump=lambda: {"branch": "task/issue-999", "flow_slug": "issue-999"}
-    )
-    store.get_flow_state.return_value = {
-        "branch": "task/issue-999",
-        "flow_slug": "issue-999",
-        "flow_status": "blocked",
-    }
 
     issue = IssueInfo(number=999, title="Test issue")
-    result = service.create_placeholder_flow(
-        issue, branch="task/issue-999", slug="issue-999"
+    expected = {"branch": "task/issue-999", "flow_status": "blocked"}
+
+    with patch.object(
+        service, "bootstrap_issue_flow", return_value=expected
+    ) as mock_bootstrap:
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999"
+        )
+
+    mock_bootstrap.assert_called_once_with(
+        issue,
+        branch="task/issue-999",
+        slug="issue-999",
+        source="intake",
+        skip_git=True,
+        dependency_issue_numbers=(),
     )
-
-    # Verify flow created with source="intake"
-    flow_service.create_flow.assert_called_once_with(
-        slug="issue-999", branch="task/issue-999", source="intake"
-    )
-
-    # Verify task issue linked
-    task_service.link_issue.assert_called_once_with("task/issue-999", 999, "task")
-
-    # Verify flow_status set to blocked
-    store.update_flow_state.assert_called_once_with(
-        "task/issue-999", flow_status="blocked", blocked_by_issue=None
-    )
-
-    # Verify NO git operations
-    git.create_branch_ref.assert_not_called()
-    git.switch_branch.assert_not_called()
-
-    assert result["branch"] == "task/issue-999"
-    assert result["flow_status"] == "blocked"
+    assert result is expected
 
 
 def test_create_placeholder_flow_with_dependency() -> None:
-    """create_placeholder_flow should link dependency issue when provided."""
+    """create_placeholder_flow should pass dependency_issue_numbers to bootstrap."""
+    from unittest.mock import patch
+
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
     github = MagicMock()
-    flow_service = MagicMock()
-    task_service = MagicMock()
 
     service = FlowOrchestratorService(config, store=store, git=git, github=github)
-    service.flow_service = flow_service
-    service.task_service = task_service
 
-    flow_service.create_flow.return_value = MagicMock(
-        model_dump=lambda: {"branch": "task/issue-999", "flow_slug": "issue-999"}
-    )
-    store.get_flow_state.return_value = {
+    issue = IssueInfo(number=999, title="Blocked issue")
+    expected = {
         "branch": "task/issue-999",
-        "flow_slug": "issue-999",
         "flow_status": "blocked",
         "blocked_by_issue": 701,
     }
 
-    issue = IssueInfo(number=999, title="Blocked issue")
-    result = service.create_placeholder_flow(
-        issue, branch="task/issue-999", slug="issue-999", blocked_by_issue=701
+    with patch.object(
+        service, "bootstrap_issue_flow", return_value=expected
+    ) as mock_bootstrap:
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999", blocked_by_issue=701
+        )
+
+    mock_bootstrap.assert_called_once_with(
+        issue,
+        branch="task/issue-999",
+        slug="issue-999",
+        source="intake",
+        skip_git=True,
+        dependency_issue_numbers=(701,),
     )
-
-    # Verify both task and dependency issues linked
-    assert task_service.link_issue.call_count == 2
-    task_service.link_issue.assert_any_call("task/issue-999", 999, "task")
-    task_service.link_issue.assert_any_call("task/issue-999", 701, "dependency")
-
-    # Verify dependency recorded in flow_state
-    store.update_flow_state.assert_called_once_with(
-        "task/issue-999", flow_status="blocked", blocked_by_issue=701
-    )
-
     assert result["blocked_by_issue"] == 701
 
 
 def test_create_placeholder_flow_returns_flow_dict() -> None:
-    """create_placeholder_flow should return dict with expected keys."""
+    """create_placeholder_flow should return the dict from bootstrap_issue_flow."""
+    from unittest.mock import patch
+
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
     github = MagicMock()
-    flow_service = MagicMock()
-    task_service = MagicMock()
 
     service = FlowOrchestratorService(config, store=store, git=git, github=github)
-    service.flow_service = flow_service
-    service.task_service = task_service
 
-    flow_service.create_flow.return_value = MagicMock(
-        model_dump=lambda: {"branch": "task/issue-999", "flow_slug": "issue-999"}
-    )
-    store.get_flow_state.return_value = {
+    issue = IssueInfo(number=999, title="Test issue")
+    expected = {
         "branch": "task/issue-999",
         "flow_slug": "issue-999",
         "flow_status": "blocked",
         "source": "intake",
     }
 
-    issue = IssueInfo(number=999, title="Test issue")
-    result = service.create_placeholder_flow(
-        issue, branch="task/issue-999", slug="issue-999"
-    )
+    with patch.object(service, "bootstrap_issue_flow", return_value=expected):
+        result = service.create_placeholder_flow(
+            issue, branch="task/issue-999", slug="issue-999"
+        )
 
-    # Verify return type and expected keys
     assert isinstance(result, dict)
     assert "branch" in result
     assert "flow_slug" in result
