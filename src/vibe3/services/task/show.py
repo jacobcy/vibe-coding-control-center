@@ -6,15 +6,17 @@ import re
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import FlowStatusResponse, PRResponse
-from vibe3.services.flow.service import FlowService
 from vibe3.services.pr.service import PRService
 from vibe3.services.shared.artifacts import ArtifactParser
 from vibe3.services.shared.comment import is_human_comment
 from vibe3.services.shared.paths import resolve_ref_path
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 
 @dataclass
@@ -94,12 +96,14 @@ class TaskShowService:
     def __init__(
         self,
         store: SQLiteClient,
-        flow_service: FlowService,
+        flow_service: "FlowQueryProtocol",
         github_client: GitHubClient,
+        git_client: GitClient | None = None,
     ) -> None:
         self.store = store
-        self.flow_service = flow_service
+        self._flow_service = flow_service
         self.github_client = github_client
+        self._git_client = git_client
 
     def fetch_issue_with_comments(
         self, issue_number: int
@@ -143,8 +147,9 @@ class TaskShowService:
             branch_opt=branch,
             pr_opt=pr_number,
             position_arg=position_arg,
-            flow_service=self.flow_service,
+            flow_service=self._flow_service,
             github_client=self.github_client,
+            git_client=self._git_client,
             allow_no_flow=allow_no_flow,
         )
 
@@ -329,7 +334,7 @@ class TaskShowService:
             target_branch = self.resolve_branch()
         else:
             target_branch = branch
-        local_task = self.flow_service.get_flow_status(target_branch)
+        local_task = self._flow_service.get_flow_status(target_branch)
 
         # Resolve task issue numbers from DB links
         from vibe3.services.issue import IssueFlowService

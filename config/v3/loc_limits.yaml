@@ -89,11 +89,11 @@ code_limits:
         limit: 450
         reason: "Shared utilities 聚合，由 path_helpers.py + git_path_client.py 合理合并而成（解决 tight coupling），包含路径规范化、Git path 解析、handoff target resolution、ref normalization 等紧密耦合的路径处理逻辑；职责单一（path utilities）且架构质量已通过 code-reviewer 评估；PR #2406 Phase 1-2a modularity refactoring 创建；Issue #2514 新增三个 centralized path helpers（get_vibe3_cache_path/get_vibe3_db_path/get_vibe3_log_dir）以消除 8 个文件中的重复路径构造，提升代码一致性"
       - path: "src/vibe3/services/task/resume.py"
-        limit: 540
-        reason: "Task resume operations 聚合，包含 TaskResumeOperations（非破坏性 blocked issue resume）、ResumeCandidateFinder（候选查找与验证）、ResumeCoordinator（多 issue 协调恢复）等三个紧密耦合类；职责内聚（label 清除、状态恢复、一致性校验、live session 检测）且已按职责拆分为独立类，进一步拆分文件会破坏 resume domain 完整性"
+        limit: 570
+        reason: "Task resume operations 聚合，包含 TaskResumeOperations（非破坏性 blocked issue resume）、ResumeCandidateFinder（候选查找与验证）、ResumeCoordinator（多 issue 协调恢复）等三个紧密耦合类；职责内聚（label 清除、状态恢复、一致性校验、live session 检测）且已按职责拆分为独立类，进一步拆分文件会破坏 resume domain 完整性；Issue #2575 Protocol/DI 重构后新增公共 flow_service 属性（+5 行）供测试访问"
       - path: "src/vibe3/services/task/service.py"
-        limit: 480
-        reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低"
+        limit: 500
+        reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低；Issue #2575 Protocol/DI 重构后新增公共 flow_service 属性（+5 行）供测试访问"
       - path: "src/vibe3/services/handoff/resolution.py"
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"

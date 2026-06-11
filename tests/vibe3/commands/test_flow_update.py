@@ -23,12 +23,19 @@ runner = CliRunner()
 @patch("vibe3.commands.flow_manage.render_flow_created")
 @patch("vibe3.commands.flow_manage.FlowService")
 @patch("vibe3.services.FlowService")
+@patch("vibe3.services.pr.resolver.GitClient")
 def test_flow_update_idempotent(
+    mock_git_client_cls,
     flow_service_cls_branch_arg,
     flow_service_cls,
     _render_flow_created,
 ) -> None:
     """flow update should ensure flow exists."""
+    # Mock GitClient to return expected branch
+    mock_git_client = MagicMock()
+    mock_git_client.get_current_branch.return_value = "task/set-default-flow"
+    mock_git_client_cls.return_value = mock_git_client
+
     flow_service_branch_arg = MagicMock()
     flow_service_branch_arg.get_current_branch.return_value = "task/set-default-flow"
     flow_service_cls_branch_arg.return_value = flow_service_branch_arg
@@ -188,10 +195,16 @@ class TestFlowAddStatusCheck:
 
     @patch("vibe3.commands.flow_manage.FlowService")
     @patch("vibe3.services.FlowService")
+    @patch("vibe3.services.pr.resolver.GitClient")
     def test_unregistered_branch_creates_flow(
-        self, mock_flow_service_class, mock_service_class
+        self, mock_git_client_cls, mock_flow_service_class, mock_service_class
     ):
         """A branch without any flow record should create a new flow."""
+        # Mock GitClient to return expected branch
+        mock_git_client = MagicMock()
+        mock_git_client.get_current_branch.return_value = "feature/test"
+        mock_git_client_cls.return_value = mock_git_client
+
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "feature/test"
         mock_flow_service_class.return_value = mock_flow_service

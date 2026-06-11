@@ -83,6 +83,10 @@ if TYPE_CHECKING:
     from vibe3.services.pr.verdict_policy import requires_audit_ref
     from vibe3.services.pr.verdict_service import VerdictService
     from vibe3.services.shared.actors import format_agent_actor
+    from vibe3.services.shared.binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
+    )
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
         resolve_branch_arg,
@@ -135,10 +139,6 @@ if TYPE_CHECKING:
         StatusQueryService,
         is_auto_task_branch,
         is_dev_collab_branch,
-    )
-    from vibe3.services.task.binding_guard import (
-        MissingTaskIssueError,
-        build_bind_task_hint,
     )
     from vibe3.services.task.classifier import TaskStatusBucket
     from vibe3.services.task.resume import (
@@ -299,7 +299,7 @@ _SYMBOL_MODULES = {
     "LabelService": "vibe3.services.shared.label_service",
     "FileLoader": "vibe3.services.shared.file_loader",
     "material_loader": "vibe3.services.shared.file_loader",
-    "MissingTaskIssueError": "vibe3.services.task.binding_guard",
+    "MissingTaskIssueError": "vibe3.services.shared.binding_guard",
     "OrchestraSnapshot": "vibe3.services.orchestra.status",
     "OrchestraStatusService": "vibe3.services.orchestra.status",
     "PRCreateUsecase": "vibe3.services.pr.create",
@@ -321,7 +321,7 @@ _SYMBOL_MODULES = {
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
-    "build_bind_task_hint": "vibe3.services.task.binding_guard",
+    "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.shared.paths",

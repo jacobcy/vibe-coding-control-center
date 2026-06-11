@@ -25,7 +25,7 @@ def usecase():
     with (
         patch("vibe3.services.task.resume.StatusQueryService") as mock_status,
         patch("vibe3.services.task.resume.LabelService") as mock_label,
-        patch("vibe3.services.task.resume.FlowService") as mock_flow,
+        patch("vibe3.services.flow.service.FlowService") as mock_flow,
         patch("vibe3.services.task.resume.GitClient") as mock_git,
         patch(
             "vibe3.services.task.resume.GitHubClient",

@@ -29,7 +29,7 @@ def _make_config_mock() -> MagicMock:
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")
 @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
-@patch("vibe3.services.task.status.FlowService")
+@patch("vibe3.services.flow.service.FlowService")
 @patch("vibe3.services.task.status.StatusQueryService")
 def test_task_status_json_format(
     mock_status_service_cls,

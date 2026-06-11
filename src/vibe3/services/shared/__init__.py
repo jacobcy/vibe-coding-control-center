@@ -9,6 +9,12 @@ if TYPE_CHECKING:
         resolve_actor_backend_model,
     )
     from vibe3.services.shared.artifacts import ArtifactParser
+    from vibe3.services.shared.binding_guard import (
+        MissingTaskIssueError,
+        build_bind_task_hint,
+        ensure_task_issue_bound,
+        has_task_issue,
+    )
     from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
@@ -70,6 +76,11 @@ __all__ = [
     "extract_role_from_actor",
     # artifacts
     "ArtifactParser",
+    # binding_guard
+    "MissingTaskIssueError",
+    "ensure_task_issue_bound",
+    "has_task_issue",
+    "build_bind_task_hint",
     # branch_resolver
     "resolve_issue_branch_input",
     # context_cache
@@ -133,6 +144,11 @@ _SYMBOL_MODULES = {
     "extract_role_from_actor": "vibe3.services.shared.actors",
     # artifacts
     "ArtifactParser": "vibe3.services.shared.artifacts",
+    # binding_guard
+    "MissingTaskIssueError": "vibe3.services.shared.binding_guard",
+    "ensure_task_issue_bound": "vibe3.services.shared.binding_guard",
+    "has_task_issue": "vibe3.services.shared.binding_guard",
+    "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     # branch_resolver
     "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",
     # context_cache

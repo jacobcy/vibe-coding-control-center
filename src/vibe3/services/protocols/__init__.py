@@ -1,5 +1,14 @@
 """Services protocols namespace."""
 
-from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
+from typing import TYPE_CHECKING
 
-__all__: list[str] = ["FlowBootstrapProtocol"]
+if TYPE_CHECKING:
+    from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
+    from vibe3.services.protocols.flow_protocols_ext import FlowQueryProtocol
+    from vibe3.services.protocols.task_protocols import TaskQueryProtocol
+
+__all__: list[str] = [
+    "FlowBootstrapProtocol",
+    "FlowQueryProtocol",
+    "TaskQueryProtocol",
+]
