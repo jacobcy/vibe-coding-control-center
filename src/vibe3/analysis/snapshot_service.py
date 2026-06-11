@@ -1,5 +1,6 @@
 """Snapshot service - Build, load, and manage structure snapshots."""
 
+import glob as glob_mod
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -292,9 +293,23 @@ def find_snapshot_by_branch(
 
     # Normalize branch name for comparison
     normalized_branch = branch.replace("origin/", "")
+    sanitized_branch = normalized_branch.replace("/", "-")
 
+    # Stage 1: Glob pre-filter using branch name in filename
+    pattern = str(snapshot_dir / f"*_{sanitized_branch}_*.json")
+    candidate_paths = set(glob_mod.glob(pattern))
+
+    # Also check the unsanitized form if different
+    # (e.g., "origin/main" -> "*_origin-main_*.json")
+    unsanitized = branch.replace("/", "-")
+    if sanitized_branch != unsanitized:
+        alt_pattern = str(snapshot_dir / f"*_{unsanitized}_*.json")
+        candidate_paths.update(glob_mod.glob(alt_pattern))
+
+    # Stage 2: Load and verify branch field for narrowed candidates
     snapshots = []
-    for fp in snapshot_dir.glob("*.json"):
+    for fp_str in candidate_paths:
+        fp = Path(fp_str)
         try:
             data = json.loads(fp.read_text(encoding="utf-8"))
             snapshot_branch = data.get("branch", "")
