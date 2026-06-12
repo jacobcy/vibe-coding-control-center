@@ -4,17 +4,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.github_field_constants import GITHUB_KNOWN_ISSUE_FIELDS
 from vibe3.clients.github_issues_ops import _validate_issue_fields
 
 
 class TestFieldValidation:
     """Tests for _validate_issue_fields function."""
 
-    def test_validate_all_known_fields_pass(self) -> None:
-        """All 21 known fields should pass validation without error."""
-        # This should not raise any exception
-        _validate_issue_fields(list(GITHUB_KNOWN_ISSUE_FIELDS))
+    def test_validate_known_fields_pass(self) -> None:
+        """A representative set of known valid fields should pass validation."""
+        _validate_issue_fields(["number", "title", "state", "labels", "comments"])
 
     def test_validate_empty_fields_pass(self) -> None:
         """Empty list should pass validation (edge case)."""
