@@ -153,18 +153,37 @@ def list_snapshots(
         bool,
         typer.Option("--include-baselines", help="Include auto-saved baselines"),
     ] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Maximum snapshots to show (default: 50)"),
+    ] = 50,
+    all: Annotated[
+        bool,
+        typer.Option("--all", help="Show all snapshots (no limit)"),
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
-    """List all available snapshots.
+    """List available snapshots.
+
+    By default, shows the 50 most recent snapshots.
+    Use --limit to change the count, or --all to show all snapshots.
 
     Examples:
-        vibe3 snapshot list
+        vibe3 snapshot list                    # Show recent 50 snapshots
+        vibe3 snapshot list --limit 100        # Show recent 100 snapshots
+        vibe3 snapshot list --all              # Show all snapshots
         vibe3 snapshot list --include-baselines
     """
     if trace:
         enable_method_trace()
 
-    ids = snapshot_service.list_snapshots(include_baselines=include_baselines)
+    # Resolve limit (None if --all is specified)
+    effective_limit = None if all else limit
+
+    ids = snapshot_service.list_snapshots(
+        include_baselines=include_baselines,
+        limit=effective_limit,
+    )
 
     if json_out:
         typer.echo(json.dumps({"snapshots": ids}, indent=2))
@@ -175,6 +194,19 @@ def list_snapshots(
         else:
             for i, sid in enumerate(ids, 1):
                 typer.echo(f"  {i}. {sid}")
+
+            # Show truncation hint if limit was applied
+            if effective_limit is not None:
+                total_available = len(
+                    snapshot_service.list_snapshots(
+                        include_baselines=include_baselines, limit=None
+                    )
+                )
+                if total_available > effective_limit:
+                    typer.echo(
+                        f"\n  [yellow]Showing {effective_limit} of {total_available} "
+                        f"snapshots. Use --all or --limit to see more.[/yellow]"
+                    )
 
 
 @app.command()

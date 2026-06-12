@@ -1,5 +1,6 @@
-"""Shared fixtures for coverage service tests."""
+"""Shared fixtures for analysis service tests."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -64,3 +65,56 @@ def sample_coverage_data() -> dict:
             },
         }
     }
+
+
+@pytest.fixture
+def snapshot_dir(tmp_path: Path) -> Path:
+    """Create a temporary snapshot directory with test data."""
+    snapshot_dir = tmp_path / "vibe3" / "structure" / "snapshots"
+    snapshot_dir.mkdir(parents=True)
+
+    # Create test snapshots for different branches
+    snapshots = [
+        {
+            "snapshot_id": "2026-03-20T10-00-00_main_abc1234",
+            "branch": "main",
+            "commit": "abc1234",
+            "commit_short": "abc1234",
+            "created_at": "2026-03-20T10:00:00",
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        },
+        {
+            "snapshot_id": "2026-03-22T15-00-00_main_def5678",
+            "branch": "main",
+            "commit": "def5678",
+            "commit_short": "def5678",
+            "created_at": "2026-03-22T15:00:00",
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        },
+        {
+            "snapshot_id": "2026-03-23T12-00-00_feature-xyz_ghi9012",
+            "branch": "feature-xyz",
+            "commit": "ghi9012",
+            "commit_short": "ghi9012",
+            "created_at": "2026-03-23T12:00:00",
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        },
+    ]
+
+    for snapshot in snapshots:
+        filepath = snapshot_dir / f"{snapshot['snapshot_id']}.json"
+        filepath.write_text(json.dumps(snapshot, indent=2))
+
+    return snapshot_dir

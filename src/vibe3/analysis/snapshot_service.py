@@ -2,6 +2,7 @@
 
 import glob as glob_mod
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -222,11 +223,19 @@ def load_snapshot(snapshot_id: str | None = None) -> StructureSnapshot:
         raise SnapshotError(f"Failed to load snapshot: {e}") from e
 
 
-def list_snapshots(include_baselines: bool = False) -> list[str]:
-    """List all available snapshot IDs (newest first).
+def list_snapshots(
+    include_baselines: bool = False, limit: int | None = 50
+) -> list[str]:
+    """List available snapshot IDs (newest first).
 
     Args:
         include_baselines: If True, include auto-saved baselines in the list
+        limit: Maximum number of snapshots to return (default: 50).
+               Set to None to return all snapshots.
+
+    Returns:
+        List of snapshot IDs, sorted by creation time (newest first).
+        Limited to `limit` entries if specified.
     """
     snapshots = []
 
@@ -234,36 +243,40 @@ def list_snapshots(include_baselines: bool = False) -> list[str]:
     snapshot_dir = _get_snapshot_dir()
     if snapshot_dir.exists():
         for fp in snapshot_dir.glob("*.json"):
-            try:
-                data = json.loads(fp.read_text(encoding="utf-8"))
-                if not include_baselines and data.get("baseline_for"):
-                    continue
-                snapshots.append(
-                    {
-                        "id": data.get("snapshot_id", fp.stem),
-                        "created_at": data.get("created_at", ""),
-                    }
-                )
-            except (json.JSONDecodeError, KeyError):
+            meta = _read_snapshot_metadata(fp)
+            if meta is None:
                 continue
+            if not include_baselines and meta.get("baseline_for"):
+                continue
+            snapshots.append(
+                {
+                    "id": meta.get("snapshot_id") or fp.stem,
+                    "created_at": meta.get("created_at") or "",
+                }
+            )
 
     # Scan baselines directory if requested
     if include_baselines:
         baseline_dir = _get_baseline_dir()
         if baseline_dir.exists():
             for fp in baseline_dir.glob("*.json"):
-                try:
-                    data = json.loads(fp.read_text(encoding="utf-8"))
-                    snapshots.append(
-                        {
-                            "id": data.get("snapshot_id", fp.stem),
-                            "created_at": data.get("created_at", ""),
-                        }
-                    )
-                except (json.JSONDecodeError, KeyError):
+                meta = _read_snapshot_metadata(fp)
+                if meta is None:
                     continue
+                snapshots.append(
+                    {
+                        "id": meta.get("snapshot_id") or fp.stem,
+                        "created_at": meta.get("created_at") or "",
+                    }
+                )
 
+    # Sort by creation time (newest first)
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
+
+    # Apply limit if specified
+    if limit is not None:
+        snapshots = snapshots[:limit]
+
     return [s["id"] for s in snapshots]
 
 
@@ -339,6 +352,34 @@ def find_snapshot_by_branch(
     return load_snapshot(snapshots[0]["id"])
 
 
+_METADATA_FIELDS = ("snapshot_id", "created_at", "branch", "commit", "baseline_for")
+
+
+def _read_snapshot_metadata(filepath: Path) -> dict[str, str | None] | None:
+    """Extract top-level string fields from a snapshot JSON file.
+
+    Uses regex to extract only scalar fields without deserializing the
+    heavy nested structures (files, modules, dependencies, metrics).
+    Returns None if the file cannot be read or has no recognizable metadata.
+    """
+    try:
+        text = filepath.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    try:
+        metadata: dict[str, str | None] = {}
+        for field in _METADATA_FIELDS:
+            m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', text)
+            if m:
+                metadata[field] = m.group(1)
+            elif re.search(rf'"{field}"\s*:\s*null', text):
+                metadata[field] = None
+        return metadata if metadata else None
+    except Exception:
+        return None
+
+
 def _load_snapshots_for_branch(
     paths: set[str], normalized_branch: str, branch: str
 ) -> list[dict[str, str]]:
@@ -346,20 +387,19 @@ def _load_snapshots_for_branch(
     snapshots: list[dict[str, str]] = []
     for fp_str in paths:
         fp = Path(fp_str)
-        try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
-            snapshot_branch = data.get("branch", "")
-            if snapshot_branch == normalized_branch or snapshot_branch == branch:
-                snapshots.append(
-                    {
-                        "id": data.get("snapshot_id", fp.stem),
-                        "created_at": data.get("created_at", ""),
-                        "branch": snapshot_branch,
-                        "commit": data.get("commit", ""),
-                    }
-                )
-        except (json.JSONDecodeError, KeyError):
+        meta = _read_snapshot_metadata(fp)
+        if meta is None:
             continue
+        snapshot_branch = meta.get("branch") or ""
+        if snapshot_branch == normalized_branch or snapshot_branch == branch:
+            snapshots.append(
+                {
+                    "id": meta.get("snapshot_id") or fp.stem,
+                    "created_at": meta.get("created_at") or "",
+                    "branch": snapshot_branch,
+                    "commit": meta.get("commit") or "",
+                }
+            )
     return snapshots
 
 
