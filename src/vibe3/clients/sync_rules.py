@@ -20,7 +20,7 @@ Rule Categories:
   - orphan_execution: Reset execution state to state/ready when no local flow
   - governed_missing_state: Add state/ready to orchestra-governed issues missing state
 
-- Local rules (11): Handle local flow consistency during vibe3 check
+- Local rules (12): Handle local flow consistency during vibe3 check
   - multi_state_label_fix: Auto-correct multiple state labels to highest priority
   - pr_terminal_state: Handle PR merged/closed → mark flow aborted
   - closed_issue_sync: Handle closed task issue → mark flow aborted
@@ -32,6 +32,7 @@ Rule Categories:
   - flow_consistency_recovery: Auto-recover inconsistent flow state
   - missing_state_label_recovery: Recover missing remote state label from local flow
   - orchestra_scanned_assignee_cleanup: Remove orchestra-scanned from assigned issues
+  - blocked_label_sync: Sync remote state/blocked label to local flow status
 """
 
 from pathlib import Path
@@ -117,6 +118,10 @@ class LocalSyncRules(BaseModel):
     orchestra_scanned_assignee_cleanup: SyncRule = Field(
         default_factory=SyncRule,
         description="Remove orchestra-scanned label from issues with manager assignee",
+    )
+    blocked_label_sync: SyncRule = Field(
+        default_factory=SyncRule,
+        description="Sync remote state/blocked label to local flow status",
     )
 
 

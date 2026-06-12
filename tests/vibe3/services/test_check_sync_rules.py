@@ -72,6 +72,7 @@ class TestCheckServiceSyncRules:
         assert (
             service._sync_rules.local.orchestra_scanned_assignee_cleanup.enabled is True
         )
+        assert service._sync_rules.local.blocked_label_sync.enabled is True
 
     def test_closed_issue_sync_disabled(self):
         """Disabling closed_issue_sync skips closed issue handling."""
@@ -94,6 +95,17 @@ class TestCheckServiceSyncRules:
         service._sync_rules = config
 
         assert service._sync_rules.local.stale_blocked_sync.enabled is False
+
+    def test_blocked_label_sync_disabled(self):
+        """Disabling blocked_label_sync skips the sync check."""
+        config = SyncRulesConfig(
+            local=LocalSyncRules(blocked_label_sync=SyncRule(enabled=False))
+        )
+
+        service = CheckService()
+        service._sync_rules = config
+
+        assert service._sync_rules.local.blocked_label_sync.enabled is False
 
     def test_orchestra_scanned_assignee_cleanup_disabled(self):
         """Disabling orchestra_scanned_assignee_cleanup skips the cleanup."""

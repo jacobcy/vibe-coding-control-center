@@ -471,6 +471,38 @@ class CheckService(CheckRemote):
                         )
                         issues.append(f"Blocked flow auto-resume failed: {e}")
 
+            # Sync remote state/blocked label to local flow
+            # If remote has state/blocked but local flow is not blocked, sync it.
+            if self._sync_rules.local.blocked_label_sync.enabled:
+                if (
+                    is_active_flow
+                    and task_issue
+                    and orchestration_state == IssueState.BLOCKED
+                    and flow_status != "blocked"
+                ):
+                    try:
+                        result = recovery_svc.recover(
+                            branch=branch,
+                            issue_number=task_issue,
+                            reason="Remote state/blocked label detected",
+                            auto=True,
+                            ensure_worktree=True,
+                        )
+                        logger.info(
+                            "Synced blocked label to local flow",
+                            branch=branch,
+                            action=result.action.value,
+                            detail=result.detail,
+                        )
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    except Exception as e:
+                        logger.error(
+                            "Failed to sync blocked label to flow",
+                            branch=branch,
+                            error=str(e),
+                        )
+                        issues.append(f"Blocked label sync failed: {e}")
+
             # Handle stale ready flow rebuild
             if self._sync_rules.local.stale_ready_rebuild.enabled:
                 if (
