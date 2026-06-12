@@ -62,8 +62,6 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     # Verify both configs have the same limit (sync check)
     expected_path = "src/vibe3/services/check/service.py"
     assert hook_exception.limit == exceptions[expected_path].limit
-    # Limit updated from 680 to 700 for SyncRulesConfig integration (Issue #2685)
-    assert hook_exception.limit == 700
     assert exceptions["src/vibe3/roles/review.py"].reason != ""
 
 

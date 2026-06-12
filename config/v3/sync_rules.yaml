@@ -60,3 +60,11 @@ local:
   missing_state_label_recovery:
     enabled: true
     description: "Recover missing remote state label from local flow"
+
+  orchestra_scanned_assignee_cleanup:
+    enabled: true
+    description: "Remove orchestra-scanned label from issues with manager assignee"
+
+  blocked_label_sync:
+    enabled: true
+    description: "Sync remote state/blocked label to local flow status"

@@ -171,6 +171,14 @@ class CheckServiceProtocol(Protocol):
         """Invalidate PR cache to force refresh on next check."""
         ...
 
+    def clean_orchestra_scanned_with_assignee(self) -> int:
+        """Remove orchestra-scanned label from issues with assignee.
+
+        Returns:
+            Number of issues cleaned.
+        """
+        ...
+
 
 class FlowServiceProtocol(Protocol):
     """Protocol for flow service lifecycle operations."""

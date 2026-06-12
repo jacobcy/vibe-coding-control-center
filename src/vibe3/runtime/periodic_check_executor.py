@@ -83,7 +83,21 @@ async def execute_periodic_check(
             f"Periodic check failed: {exc}"
         )
 
-    # Phase 2: Expired resource cleanup (if enabled)
+    # Phase 2: Clean orchestra-scanned conflicts
+    try:
+        cleaned = await asyncio.to_thread(
+            check_service.clean_orchestra_scanned_with_assignee
+        )
+        if cleaned > 0:
+            logger.bind(domain="orchestra", action="periodic_check").info(
+                f"Cleaned orchestra-scanned from {cleaned} issues with assignee"
+            )
+    except Exception as exc:
+        logger.bind(domain="orchestra", action="periodic_check").warning(
+            f"Orchestra-scanned cleanup failed: {exc}"
+        )
+
+    # Phase 3: Expired resource cleanup (if enabled)
     await execute_expired_resource_cleanup(
         config, tick_number, cleanup_service=cleanup_service
     )
