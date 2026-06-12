@@ -21,6 +21,7 @@ from vibe3.models import (
     OrchestraConfig,
 )
 from vibe3.services import (
+    BlockedStateService,
     CoordinationResolver,
     FlowService,
     FlowStatusService,
@@ -224,8 +225,9 @@ class QualifyGateService:
         if truth.is_blocked and truth.blocked_by_issue:
             dep_closed = self._is_dependency_satisfied(truth.blocked_by_issue)
             if dep_closed:
-                self._notify_dep_resolved(branch, issue.number, truth.blocked_by_issue)
-                return IssueState.HANDOFF
+                return self._resume_dep_resolved(
+                    branch, issue.number, truth.blocked_by_issue
+                )
 
         flow_state = self._store.get_flow_state(branch)
         result = self.run_qualify_gate(
@@ -242,40 +244,61 @@ class QualifyGateService:
 
         return result
 
-    def _notify_dep_resolved(
+    def _resume_dep_resolved(
         self, branch: str, issue_number: int, dep_issue_number: int
-    ) -> None:
-        """Notify that dependency has been resolved.
+    ) -> IssueState:
+        """Clear blocked state after a dependency has been resolved.
 
-        Uses unified FlowRecoveryService to ensure consistency checks
-        and proper rebuild if needed.
+        Placeholder flows intentionally have no git branch or worktree yet, so
+        this path only clears the blocked sources. The dispatcher later upgrades
+        the placeholder into a real flow scene through FlowManager.
 
         Args:
             branch: Flow branch
             issue_number: Issue number that was blocked
             dep_issue_number: Dependency issue number that closed
-        """
-        from vibe3.observability import append_orchestra_event
-        from vibe3.services import FlowRecoveryService
 
-        # Use unified recovery path (includes consistency checks)
-        recovery = FlowRecoveryService(
-            store=self._store,
-            git_client=GitClient(),
+        Returns:
+            Target issue state after blocked markers are cleared.
+        """
+        from vibe3.models import FlowState
+        from vibe3.observability import append_orchestra_event
+
+        flow_state = self._store.get_flow_state(branch)
+        if flow_state:
+            try:
+                target_state = infer_resume_label(FlowState.model_validate(flow_state))
+            except Exception:
+                target_state = IssueState.READY
+        else:
+            target_state = IssueState.READY
+
+        service = BlockedStateService(
             github_client=self._github,
+            label_service=LabelService(repo=self.config.repo),
+            store=self._store,
         )
-        recovery.recover(
+        result = service.unblock(
             branch=branch,
+            target_state=target_state,
             issue_number=issue_number,
-            reason=f"Dependency #{dep_issue_number} closed",
-            auto=True,  # Auto-rebuild if needed
+            actor="orchestra:qualify",
+            detail=f"Dependency #{dep_issue_number} closed",
         )
+        if not result.label_cleared:
+            raise RuntimeError(
+                f"Failed to clear state/blocked label on issue #{issue_number}. "
+                f"Manual fix: gh issue edit {issue_number} "
+                "--remove-label state/blocked"
+            )
 
         append_orchestra_event(
             "dispatcher",
             f"qualify_gate dep_resolved #{issue_number}: "
-            f"dependency #{dep_issue_number} closed, transitioned to HANDOFF",
+            f"dependency #{dep_issue_number} closed, cleared blocked state "
+            f"to {target_state.to_label()}",
         )
+        return target_state
 
     def _align_blocked_state(
         self,
@@ -542,9 +565,14 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
-        # Placeholder flow has no worktree — skip health check
+        # Placeholder flow has no worktree yet — skip structural path checks only
+        # for that narrow shape.
         flow_state = self._store.get_flow_state(branch)
-        if flow_state and flow_state.get("flow_status") == "blocked":
+        if (
+            flow_state
+            and flow_state.get("flow_status") == "blocked"
+            and not truth.worktree_path
+        ):
             return True
 
         from vibe3.observability import append_orchestra_event

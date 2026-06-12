@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from vibe3.services.flow.block_mixin import FlowLifecycleMixin
     from vibe3.services.flow.blocked_state_io import (
         BlockedStateIO,
-        write_dependency_to_body,
     )
     from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.blocked_state_types import (
@@ -58,7 +57,6 @@ __all__ = [
     "BlockedStateService",
     "ConsistencyReport",
     "UnblockResult",
-    "write_dependency_to_body",
     "FlowCategory",
     "FlowState",
     "classify_flow",
@@ -99,7 +97,6 @@ _SYMBOL_MODULES = {
     "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "ConsistencyReport": "vibe3.services.flow.blocked_state_types",
     "UnblockResult": "vibe3.services.flow.blocked_state_types",
-    "write_dependency_to_body": "vibe3.services.flow.blocked_state_io",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowState": "vibe3.services.flow.classifier",
     "classify_flow": "vibe3.services.flow.classifier",
