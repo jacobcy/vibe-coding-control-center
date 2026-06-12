@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.clients import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.data_source import DataSource
 from vibe3.services.flow.service import FlowService
@@ -264,6 +265,40 @@ class TestFlowList:
         assert len(result) == 1
         assert result[0].branch == "branch-ok"
         assert result[0].worktree_root == "/wt/branch-ok"
+
+    def test_list_flows_computes_scene_completeness(self, mock_store) -> None:
+        """Test list_flows computes has_branch/has_worktree/is_placeholder."""
+        mock_git = MagicMock(spec=GitClient)
+        mock_store.get_all_flows.return_value = [
+            {
+                "branch": "branch-real",
+                "flow_slug": "flow-real",
+                "flow_status": "active",
+                "updated_at": "2026-03-16T00:00:00",
+            },
+            {
+                "branch": "branch-placeholder",
+                "flow_slug": "flow-placeholder",
+                "flow_status": "blocked",
+                "updated_at": "2026-03-16T00:00:00",
+            },
+        ]
+        mock_store.get_issue_links.return_value = []
+        mock_git.find_worktree_path_for_branch.return_value = None
+        mock_git.branch_exists.side_effect = lambda branch: branch == "branch-real"
+
+        service = FlowService(store=mock_store, git_client=mock_git)
+        result = service.list_flows()
+
+        assert len(result) == 2
+        real, placeholder = result
+        assert real.branch == "branch-real"
+        assert real.has_branch is True
+        assert real.is_placeholder is False
+
+        assert placeholder.branch == "branch-placeholder"
+        assert placeholder.has_branch is False
+        assert placeholder.is_placeholder is True
 
 
 class TestFlowStatusResolver:
