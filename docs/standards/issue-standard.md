@@ -14,6 +14,7 @@
    - **对象**：已分配、待执行的需求、缺陷或功能任务。
    - **处理链**：Manager -> Plan -> Run -> Review -> PR。
    - **治理关注**：Orchestra 的实时观察与排序对象。
+   - **治理状态**：经过决策进入此池的 issue 会被标记为 `orchestra-governed`。
 
 2. **Supervisor Issue Pool**（本地治理链）
    - **对象**：带 `supervisor` 标签的治理任务（如文档修正、过期测试清理）。
@@ -22,7 +23,8 @@
 
 3. **Broader Repo Issue Pool**（全量池 / 规划池）
    - **对象**：Repo 中所有 Open issues。
-   - **处理链**：Future Governance / Cron 扫描。
+   - **处理链**：Roadmap Intake / Cron 扫描。
+   - **治理状态**：Intake 审查后未进入开发链的 issue 会被标记为 `orchestra-scanned`。
    - **状态**：非当前执行真源，仅作为积压需求参考。
 
 ---
@@ -45,9 +47,10 @@ task issue 是 vibe3 视角下的角色映射，不是 GitHub 的新实体分类
 2. 对应的 issue 属于 assignee issue pool
 3. flow bind / flow_issue_links 是执行绑定的唯一事实真源
 
-副作用（Mirror）：
-- vibe-task 标签由 flow bind 自动镜像，用于 GitHub 视角过滤
-- 它不是治理判定的依据，也不是 execution record 本体
+副作用（Mirror / Side Effect）：
+- vibe-task 标签由 flow bind 自动镜像，用于 GitHub 视角可视化过滤。
+- **非真源**：它不是治理判定的依据，也不是 execution record 本体。
+- **瞬态性**：它仅表示一种“当前正在/曾被 flow 绑定管理”的逻辑视图，不代表 issue 的永久属性。
 ```
 
 **重要**：

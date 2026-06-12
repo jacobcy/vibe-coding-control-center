@@ -59,12 +59,19 @@ new → active ↔ blocked
 **区分 Flow Status 和 Issue State**：
 
 - **Flow Status**：`active/blocked/done/stale/aborted`（SQLite flow_state）
-  - 描述 flow 的执行状态
-  - `failed` 已废弃，通过 `active` 状态配合 `blocked_reason` 表达
+  - 描述 flow 的执行状态。
+  - **Deprecated Status**: `failed` 状态已从 `flow_status` 中彻底移除。
+  - **Recommended Pattern**: 使用 **`active` 状态配合 `blocked_reason`** (BLOCK 系统) 来表达需要人工关注的逻辑失败。
 
 - **Issue State**：`ready/claimed/in-progress/blocked/handoff/review/merge-ready/done`（GitHub label）
   - 描述 issue 的编排状态。详细语义见 [label-semantics.md](./label-semantics.md)。
-  - IssueState.FAILED 已废弃，统一到 BLOCKED
+  - **Deprecated Label**: `state/failed` 已废弃，系统自动将其映射为 `state/blocked`。
+
+**FailedGate (ERROR) vs flow_status (BLOCK)**：
+
+本项目严格区分基础设施错误与业务流阻塞：
+- **FailedGate (ERROR System)**: 指执行引擎、物理环境或 API 基础设施发生的错误。它通过 `error_log` 统计并触发 `FailedGate` 门禁，影响的是“是否继续派发任务”，但**不改变**具体 Flow 的业务状态位。
+- **flow_status (BLOCK System)**: 指业务逻辑上的流程暂停。它是 Flow 本身的生命周期状态，用于表示“工作流因何停止”，其解除通常需要业务层面的 unblock 动作。
 
 **关系**：
 - Flow Status `blocked` → Issue State `blocked`

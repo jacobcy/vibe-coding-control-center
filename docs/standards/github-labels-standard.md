@@ -136,14 +136,37 @@
 **规则**:
 - **决策触发**：由 `assignee-pool` 扫描并做出实质性决策（如设置 `state/ready`、`roadmap/rfc` 等）后添加。
 - **过滤依据**：governance 扫描时会过滤掉已持有此标签的 issue，避免重复评估。
-- **三层治理联动**：
-  - `orchestra-scanned`: Level 1 intake 审查标记。
-  - `orchestra-governed`: Level 2 assignee-pool 决策标记。
-  - `roadmap-reviewed`: Level 3 roadmap 终审标记。
 - **与 vibe-task 区别**：
   - `vibe-task` 是 **自动化副作用**，表示 issue "正在/曾被" flow 绑定。
   - `orchestra-governed` 是 **治理状态**，表示 issue "已通过" 治理审查。
   - 严禁混用。
+
+#### `orchestra-scanned`
+
+**语义**: Intake 审查镜像标签 (Intake Review Mark)
+
+**职责**: 辅助 governance (roadmap-intake) 识别已完成 Level 1 审查但未进入执行池（通常是跳过或拒绝）的 issue。
+
+**规则**:
+- **触发**：由 `roadmap-intake` 审查后决定跳过或拒绝时添加。
+- **过滤依据**：intake 扫描时会过滤掉已持有此标签的 issue。
+
+#### `roadmap-reviewed`
+
+**语义**: Roadmap 终审镜像标签 (Roadmap Review Mark)
+
+**职责**: 辅助 governance (vibe-roadmap) 识别已完成 Level 3 终审决策的 issue。
+
+**规则**:
+- **触发**：由 `vibe-roadmap` 在发布 `[roadmap decision]` 评论后同步添加。
+- **角色**：治理体系的终态标记，表示决策已固化并写入 memory，Step 0 自动跳过。
+
+#### 三层治理联动
+
+- `orchestra-scanned`: Level 1 intake 审查标记。
+- `orchestra-governed`: Level 2 assignee-pool 决策标记。
+- `roadmap-reviewed`: Level 3 roadmap 终审标记。
+
 
 ### 3.4 编排状态标签语义 (state/*)
 
