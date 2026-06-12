@@ -93,24 +93,28 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 ### 4.1 Level 1 (L1 - Inspection Level)
 
 - 定义：**无 Worktree 观察层**。在主仓库或内存中运行，仅负责只读观察、Metadata 扫描或轻量 Label 路由。
+- 对应架构层：**Tier 3**
 - 典型场景：`governance/roadmap` 扫描、`assignee-pool` 巡检、心跳状态监测。
 - 隔离：无隔离，直接访问共享真源。
 
 ### 4.2 Level 2 (L2 - Governance Execution Level)
 
 - 定义：**临时隔离治理层**。使用临时创建且自动销毁的 Git Worktree 进行文档治理、测试修补或环境清理。
+- 对应架构层：**Tier 3**
 - 典型场景：`supervisor/apply` 任务执行。
 - 隔离：文件系统级临时隔离。
 
 ### 4.3 Level 3 (L3 - Main Development Level)
 
 - 定义：**持久隔离开发层**。为每个 GitHub Issue 分配持久化的独立 Worktree，承载完整的 Plan/Run/Review 生命周期。
+- 对应架构层：**Tier 2**
 - 典型场景：核心业务开发、架构调整、大型特性实现。
 - 隔离：文件系统级持久隔离 + 独立的 Flow 状态机。
 
 ### 4.4 Level 4 (L4 - Atomic Collaboration Level)
 
 - 定义：**原子协作层**。由人类或外部系统通过单一指令/工具进行的细粒度干预或原子级交付。
+- 对应架构层：**Tier 1**
 - 典型场景：手动 PR 合并、密钥注入、配置热更新。
 - 隔离：通常在 L3 环境内执行或通过 API 远程执行。
 
@@ -660,7 +664,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - **不再复写通用执行框架，其执行动作应交由 Execution 层**。
 - 落点：
   - Python 模块：`src/vibe3/roles/manager.py`（Manager 角色定义）
-  - Skill: `skills/vibe-manager/SKILL.md`
+  - Skill: `skills/vibe-task/SKILL.md` (或其它活跃技能目录；`vibe-manager` 技能已废弃)
 
 ### 7.15 `Shell 能力层`
 
