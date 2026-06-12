@@ -294,7 +294,7 @@ class TestRemoteDependencies:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=456,
+            blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
             dependencies=[],
             dependencies_source=None,
@@ -567,7 +567,7 @@ class TestE2EBlockedReconciliation:
             projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=456,
+            blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
             dependencies=[456],
             dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
