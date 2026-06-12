@@ -21,6 +21,7 @@ from vibe3.clients import (
     normalize_labels,
 )
 from vibe3.config import get_convention, get_manager_usernames, load_orchestra_config
+from vibe3.config.settings_sync_rules import load_sync_rules
 
 
 @dataclass
@@ -55,6 +56,7 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
     config = load_orchestra_config()
     convention = get_convention()
     manager_usernames = get_manager_usernames(config)
+    sync_rules = load_sync_rules()
     github = GitHubClient()
     store = SQLiteClient()
     label_port = GhIssueLabelPort(repo=config.repo)
@@ -83,6 +85,7 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
             issue_number=num,
             has_local_flow=num in local_flow_issues,
             is_manager_issue=has_manager_assignee(assignees, manager_usernames),
+            rules=sync_rules,
         )
         anomalies.extend(found)
         if not dry_run and found:

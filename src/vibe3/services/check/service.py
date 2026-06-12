@@ -10,6 +10,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.config import VibeConfig
+from vibe3.config.settings_sync_rules import load_sync_rules
 from vibe3.models import IssueState, PRState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
@@ -82,6 +83,8 @@ class CheckService(CheckRemote):
         self._branch_to_pr: dict[str, PRResponse] = {}
         # Load config for protected branches
         self._vibe_config = VibeConfig()
+        # Load sync rules for local domain checks
+        self._sync_rules = load_sync_rules()
 
     @property
     def protected_branches(self) -> set[str]:
@@ -334,14 +337,15 @@ class CheckService(CheckRemote):
                         task_issue_closed = True
 
                     # Check for multiple state/* labels (anomaly)
-                    label_warnings, label_issues, fixed_state = (
-                        self._check_multiple_state_labels(task_issue, issue_payload)
-                    )
-                    warnings.extend(label_warnings)
-                    issues.extend(label_issues)
-                    if fixed_state is not None:
-                        orchestration_state = fixed_state
-                        issue_labels = [fixed_state.to_label()]
+                    if self._sync_rules.local.multi_state_label_fix.enabled:
+                        label_warnings, label_issues, fixed_state = (
+                            self._check_multiple_state_labels(task_issue, issue_payload)
+                        )
+                        warnings.extend(label_warnings)
+                        issues.extend(label_issues)
+                        if fixed_state is not None:
+                            orchestration_state = fixed_state
+                            issue_labels = [fixed_state.to_label()]
 
             # only one task issue per branch
             if len(task_issues) > 1:
@@ -349,42 +353,49 @@ class CheckService(CheckRemote):
 
             # ==== PR State Handling ====
             # Priority 1: Handle PR state changes (merged/closed)
-            branch_pr = self._branch_to_pr.get(branch)
-            if branch_pr:
-                handled, pr_issues, pr_warnings = (
-                    self._check_pr_service.handle_pr_terminal_state(branch, branch_pr)
-                )
-                if handled:
-                    return CheckResult(
-                        is_valid=len(pr_issues) == 0,
-                        issues=pr_issues,
-                        warnings=pr_warnings,
-                        branch=branch,
-                    )
-            else:
-                # No PR found in recent cache; ask PRService for branch status
-                try:
-                    cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
-                    if cached_or_remote_pr:
-                        branch_pr = cached_or_remote_pr
-                        handled, pr_issues, pr_warnings = (
-                            self._check_pr_service.handle_pr_terminal_state(
-                                branch, cached_or_remote_pr
-                            )
+            if self._sync_rules.local.pr_terminal_state.enabled:
+                branch_pr = self._branch_to_pr.get(branch)
+                if branch_pr:
+                    handled, pr_issues, pr_warnings = (
+                        self._check_pr_service.handle_pr_terminal_state(
+                            branch, branch_pr
                         )
-                        if handled:
-                            return CheckResult(
-                                is_valid=len(pr_issues) == 0,
-                                issues=pr_issues,
-                                warnings=pr_warnings,
-                                branch=branch,
-                            )
-                        self._branch_to_pr[branch] = cached_or_remote_pr
-                except Exception as e:
-                    logger.bind(domain="check", branch=branch).warning(
-                        f"Failed to verify PR status from GitHub: {e}"
                     )
-                    issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
+                    if handled:
+                        return CheckResult(
+                            is_valid=len(pr_issues) == 0,
+                            issues=pr_issues,
+                            warnings=pr_warnings,
+                            branch=branch,
+                        )
+                else:
+                    # No PR found in recent cache; ask PRService for branch status
+                    try:
+                        cached_or_remote_pr = self._pr_service.get_branch_pr_status(
+                            branch
+                        )
+                        if cached_or_remote_pr:
+                            branch_pr = cached_or_remote_pr
+                            handled, pr_issues, pr_warnings = (
+                                self._check_pr_service.handle_pr_terminal_state(
+                                    branch, cached_or_remote_pr
+                                )
+                            )
+                            if handled:
+                                return CheckResult(
+                                    is_valid=len(pr_issues) == 0,
+                                    issues=pr_issues,
+                                    warnings=pr_warnings,
+                                    branch=branch,
+                                )
+                            self._branch_to_pr[branch] = cached_or_remote_pr
+                    except Exception as e:
+                        logger.bind(domain="check", branch=branch).warning(
+                            f"Failed to verify PR status from GitHub: {e}"
+                        )
+                        issues.append(
+                            f"Cannot verify PR status for branch '{branch}': {e}"
+                        )
 
             # ==== Issue & Flow State Validation ====
             # Priority 2: Check issue state against flow state
@@ -405,7 +416,7 @@ class CheckService(CheckRemote):
             )
 
             if task_issue_closed:
-                if is_active_flow:
+                if self._sync_rules.local.closed_issue_sync.enabled and is_active_flow:
                     if branch_pr and branch_pr.state == PRState.OPEN:
                         return CheckResult(is_valid=True, branch=branch, issues=[])
                     pr_detail = (
@@ -424,48 +435,50 @@ class CheckService(CheckRemote):
             # Priority 3: Sync stale blocked state from remote
             # If flow is locally blocked but remote state/blocked was removed,
             # clear the stale local state so the flow is not permanently stuck.
-            if (
-                flow_status == "blocked"
-                and task_issue
-                and orchestration_state is not None
-                and orchestration_state != IssueState.BLOCKED
-            ):
-                try:
-                    result = recovery_svc.recover(
-                        branch=branch,
-                        issue_number=task_issue,
-                        reason="Remote state/blocked label removed",
-                        auto=True,
-                        ensure_worktree=True,
-                    )
-                    logger.info(
-                        "Auto-resumed stale blocked flow",
-                        branch=branch,
-                        action=result.action.value,
-                        detail=result.detail,
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-                except Exception as e:
-                    logger.error(
-                        "Failed to auto-resume blocked flow",
-                        branch=branch,
-                        error=str(e),
-                    )
-                    issues.append(f"Blocked flow auto-resume failed: {e}")
+            if self._sync_rules.local.stale_blocked_sync.enabled:
+                if (
+                    flow_status == "blocked"
+                    and task_issue
+                    and orchestration_state is not None
+                    and orchestration_state != IssueState.BLOCKED
+                ):
+                    try:
+                        result = recovery_svc.recover(
+                            branch=branch,
+                            issue_number=task_issue,
+                            reason="Remote state/blocked label removed",
+                            auto=True,
+                            ensure_worktree=True,
+                        )
+                        logger.info(
+                            "Auto-resumed stale blocked flow",
+                            branch=branch,
+                            action=result.action.value,
+                            detail=result.detail,
+                        )
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                    except Exception as e:
+                        logger.error(
+                            "Failed to auto-resume blocked flow",
+                            branch=branch,
+                            error=str(e),
+                        )
+                        issues.append(f"Blocked flow auto-resume failed: {e}")
 
             # Handle stale ready flow rebuild
-            if (
-                flow_status == "stale"
-                and branch.startswith("task/issue-")
-                and orchestration_state == IssueState.READY
-                and self._flow_status_service.rebuild_stale_ready_flow(
-                    branch, task_issue=task_issue, issue_payload=issue_payload
-                )
-            ):
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+            if self._sync_rules.local.stale_ready_rebuild.enabled:
+                if (
+                    flow_status == "stale"
+                    and branch.startswith("task/issue-")
+                    and orchestration_state == IssueState.READY
+                    and self._flow_status_service.rebuild_stale_ready_flow(
+                        branch, task_issue=task_issue, issue_payload=issue_payload
+                    )
+                ):
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
 
             # Handle missing local branch
-            if branch_missing:
+            if self._sync_rules.local.missing_branch_cleanup.enabled and branch_missing:
                 self._flow_status_service.mark_flow_aborted(
                     branch, f"Branch '{branch}' no longer exists locally"
                 )
@@ -478,69 +491,107 @@ class CheckService(CheckRemote):
                 # Handle orphaned active flow: no task issue + no worktree + stale
             # Only clean up flows that have no issue binding and are
             # significantly behind
-            if (
-                flow_status == "active"
-                and not task_issue
-                and not self._has_worktree(branch)
-            ):
-                try:
-                    behind_count = self._count_commits_behind_main(branch)
-                    if (
-                        behind_count
-                        and behind_count > self.ORPHAN_FLOW_BEHIND_THRESHOLD
-                    ):
-                        self._flow_status_service.mark_flow_aborted(
-                            branch,
-                            f"Orphaned flow '{branch}' is {behind_count} "
-                            "commits behind main",
-                        )
-                        return CheckResult(
-                            is_valid=False,
-                            branch=branch,
-                            issues=[
+            if self._sync_rules.local.orphaned_flow_cleanup.enabled:
+                if (
+                    flow_status == "active"
+                    and not task_issue
+                    and not self._has_worktree(branch)
+                ):
+                    try:
+                        behind_count = self._count_commits_behind_main(branch)
+                        if (
+                            behind_count
+                            and behind_count > self.ORPHAN_FLOW_BEHIND_THRESHOLD
+                        ):
+                            self._flow_status_service.mark_flow_aborted(
+                                branch,
                                 f"Orphaned flow '{branch}' is {behind_count} "
-                                "commits behind main"
-                            ],
+                                "commits behind main",
+                            )
+                            return CheckResult(
+                                is_valid=False,
+                                branch=branch,
+                                issues=[
+                                    f"Orphaned flow '{branch}' is {behind_count} "
+                                    "commits behind main"
+                                ],
+                            )
+                    except Exception as exc:
+                        logger.bind(domain="check", branch=branch).debug(
+                            f"Could not count commits behind main: {exc}"
                         )
-                except Exception as exc:
-                    logger.bind(domain="check", branch=branch).debug(
-                        f"Could not count commits behind main: {exc}"
-                    )
 
             # Handle empty active ready flow
-            if (
-                flow_status == "active"
-                and branch.startswith("task/issue-")
-                and orchestration_state == IssueState.READY
-                and is_empty_auto_scene(flow_data)
-                and not self._has_worktree(branch)
-            ):
-                self._flow_status_service.mark_flow_stale(
-                    branch,
-                    f"Issue #{task_issue} remains state/ready with no active scene",
-                )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+            if self._sync_rules.local.empty_ready_cleanup.enabled:
+                if (
+                    flow_status == "active"
+                    and branch.startswith("task/issue-")
+                    and orchestration_state == IssueState.READY
+                    and is_empty_auto_scene(flow_data)
+                    and not self._has_worktree(branch)
+                ):
+                    self._flow_status_service.mark_flow_stale(
+                        branch,
+                        f"Issue #{task_issue} remains state/ready with no active scene",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
 
             # Flow consistency check and auto-recovery
-            if flow_status not in self.INACTIVE_FLOW_STATUSES:
-                action, consistency = recovery_svc.classify(branch)
+            if self._sync_rules.local.flow_consistency_recovery.enabled:
+                if flow_status not in self.INACTIVE_FLOW_STATUSES:
+                    action, consistency = recovery_svc.classify(branch)
 
-                if action != RecoveryAction.RESUME_ONLY:
-                    # Use precomputed consistency result for error message
-                    consistency_error = (
-                        consistency.reason if consistency else "No flow record"
-                    )
+                    if action != RecoveryAction.RESUME_ONLY:
+                        # Use precomputed consistency result for error message
+                        consistency_error = (
+                            consistency.reason if consistency else "No flow record"
+                        )
 
+                        try:
+                            result = recovery_svc.recover(
+                                branch=branch,
+                                issue_number=task_issue or 0,
+                                reason="Health check auto-recover",
+                                auto=True,
+                                ensure_worktree=True,
+                            )
+                            logger.info(
+                                "Auto-recovered inconsistent flow",
+                                branch=branch,
+                                action=result.action.value,
+                                detail=result.detail,
+                            )
+                            return CheckResult(is_valid=True, branch=branch, issues=[])
+                        except Exception as e:
+                            logger.error(
+                                "Auto-recovery failed",
+                                branch=branch,
+                                error=str(e),
+                            )
+                            # Preserve original consistency error in message
+                            issues.append(
+                                f"{consistency_error}. "
+                                f"Auto-recovery failed: {e}. "
+                                f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
+                            )
+
+            if self._sync_rules.local.missing_state_label_recovery.enabled:
+                if task_issue and should_recover_missing_state_label(
+                    labels=issue_labels,
+                    flow_status=str(flow_status),
+                    issue_loaded=issue_payload is not None and issue_labels_loaded,
+                    task_issue_closed=task_issue_closed,
+                ):
                     try:
                         result = recovery_svc.recover(
                             branch=branch,
-                            issue_number=task_issue or 0,
-                            reason="Health check auto-recover",
-                            auto=True,
+                            issue_number=task_issue,
+                            reason="Remote state label missing",
+                            auto=False,
                             ensure_worktree=True,
                         )
                         logger.info(
-                            "Auto-recovered inconsistent flow",
+                            "Recovered missing remote state label",
                             branch=branch,
                             action=result.action.value,
                             detail=result.detail,
@@ -548,45 +599,11 @@ class CheckService(CheckRemote):
                         return CheckResult(is_valid=True, branch=branch, issues=[])
                     except Exception as e:
                         logger.error(
-                            "Auto-recovery failed",
+                            "Failed to recover missing remote state label",
                             branch=branch,
                             error=str(e),
                         )
-                        # Preserve original consistency error in message
-                        issues.append(
-                            f"{consistency_error}. "
-                            f"Auto-recovery failed: {e}. "
-                            f"Manual fix: vibe3 flow rebuild {task_issue} --yes"
-                        )
-
-            if task_issue and should_recover_missing_state_label(
-                labels=issue_labels,
-                flow_status=str(flow_status),
-                issue_loaded=issue_payload is not None and issue_labels_loaded,
-                task_issue_closed=task_issue_closed,
-            ):
-                try:
-                    result = recovery_svc.recover(
-                        branch=branch,
-                        issue_number=task_issue,
-                        reason="Remote state label missing",
-                        auto=False,
-                        ensure_worktree=True,
-                    )
-                    logger.info(
-                        "Recovered missing remote state label",
-                        branch=branch,
-                        action=result.action.value,
-                        detail=result.detail,
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-                except Exception as e:
-                    logger.error(
-                        "Failed to recover missing remote state label",
-                        branch=branch,
-                        error=str(e),
-                    )
-                    issues.append(f"Missing state label auto-recovery failed: {e}")
+                        issues.append(f"Missing state label auto-recovery failed: {e}")
 
             # Read-only dependency check
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
