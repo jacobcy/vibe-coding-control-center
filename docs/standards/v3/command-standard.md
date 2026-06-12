@@ -192,6 +192,24 @@ related_docs:
 - 需要时按需 hydrate GitHub issue / PR 信息
 - 不把远端展示字段持久化成长期本地真源
 
+### 4.5 命令观察层级
+
+不同命令观察不同的事件层和数据源：
+
+| 命令 | 观察层级 | 主要数据源 | 用途 |
+|------|---------|-----------|------|
+| `vibe3 serve status` | Runtime DomainEvent 层 | Event bus、handler health、FailedGate、recent orchestration activity | 运行时健康状态、错误诊断 |
+| `vibe3 flow show` | FlowEvent 层 | Flow timeline (audit projection events) | Flow 生命周期审计、人类可读时间线 |
+| `vibe3 task status` | Task Pool 聚合 | Flow/issue/orchestra/worktree summary (not event log) | 项目级总览、容量管理 |
+
+**使用原则**：
+
+- `serve status` 用于观察运行时 DomainEvent（因果信号），**不应用于**检查 flow 时间线
+- `flow show` 用于观察 FlowEvent（审计投影），**不应用于**检查运行时编排过程
+- `task status` 用于项目级聚合视图，不提供事件级细节
+
+详细的事件层定义和投影规则见 [event-driven-standard.md](event-driven-standard.md) §十二。
+
 ## 5. `status` 与 `gh` 的分工
 
 `vibe3 task status` 保留的原因是它提供了 `gh` 没有的项目内聚合视图。

@@ -12,6 +12,7 @@ last_updated: 2026-05-25
 related_docs:
   - docs/standards/v3/data-model-standard.md
   - docs/standards/glossary.md
+  - docs/standards/v3/event-driven-standard.md
 ---
 
 # 数据库 Schema 标准 (v3)
@@ -77,6 +78,8 @@ WHERE issue_role = 'task';
 ### 1.3 `flow_events`
 
 记录 Flow 生命周期内的关键事件。
+
+**重要**：此表存储 **FlowEvent** 记录（flow-local 审计投影），不是 **DomainEvent** 记录（运行时因果事件）。DomainEvent 到 FlowEvent 的投影规则见 [event-driven-standard.md](event-driven-standard.md) §十二。
 
 ```sql
 CREATE TABLE flow_events (

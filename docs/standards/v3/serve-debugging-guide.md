@@ -14,6 +14,7 @@ related_docs:
   - docs/standards/vibe3-orchestra-runtime-standard.md
   - docs/standards/v3/noop-gate-boundary-standard.md
   - docs/standards/v3/command-standard.md
+  - docs/standards/v3/event-driven-standard.md
 ---
 
 # Vibe3 Serve 调试指南
@@ -105,16 +106,19 @@ uv run python src/vibe3/cli.py serve start -vv   # DEBUG
 
 **不要只看日志，必须交叉验证真源**：
 
-| 真源 | 命令 | 用途 |
-|-----|------|------|
-| Flow 状态 | `vibe3 flow show` | 当前 flow 的状态机、事件时间线 |
-| Task 状态 | `vibe3 task status` | issue 归属、执行阶段、最新 actor |
-| GitHub Issue | `gh issue view <number>` | 外部可见状态、labels、comments |
+| 真源 | 命令 | 观察层级 | 用途 |
+|-----|------|---------|------|
+| Runtime 状态 | `vibe3 serve status` | DomainEvent 层（运行时因果信号） | Event bus、handler health、FailedGate、编排活动 |
+| Flow 时间线 | `vibe3 flow show` | FlowEvent 层（审计投影） | Flow 生命周期事件、人类可读时间线 |
+| Task 状态 | `vibe3 task status` | Task Pool 聚合 | Issue 归属、执行阶段、最新 actor |
+| GitHub Issue | `gh issue view <number>` | 外部事实 | 外部可见状态、labels、comments |
 
 **调试原则**：
 - 日志告诉你"发生了什么"
 - 真源告诉你"结果是什么"
 - 两者必须一致，否则有状态同步 bug
+
+**重要**：`serve status` 观察运行时 DomainEvents（因果信号）。对于 flow 特定的时间线记录，使用 `flow show` 观察 FlowEvents（审计投影）。详见 [event-driven-standard.md](event-driven-standard.md) §十二 了解 DomainEvent → FlowEvent 投影规则。
 
 ---
 
