@@ -106,23 +106,25 @@ class TestAnalyzeChanges:
         source = UncommittedSource()
         result = service.analyze_changes(source)
         assert "changed_files" in result
-        assert len(result["changed_files"]) == 2  # type: ignore[index]
+        assert result["changed_files"] == ["src/vibe3/config/loader.py", "bin/vibe"]
 
     def test_only_python_files_analyzed(
         self, mock_client: MagicMock, mock_git: MagicMock
     ) -> None:
         service = SerenaService(client=mock_client, git_client=mock_git)
         source = UncommittedSource()
-        service.analyze_changes(source)
-        # Verify get_changed_files was called twice:
-        # 1. Once without pathspec (for all changed files)
-        # 2. Once with pathspec="*.py" (for Python files)
-        assert mock_git.get_changed_files.call_count == 2
-        # Verify the second call had pathspec="*.py"
-        calls = mock_git.get_changed_files.call_args_list
-        assert calls[1][1].get("pathspec") == "*.py"
+        result = service.analyze_changes(source)
+
         # get_symbols_overview 只应被调用一次（只有 loader.py 是 Python）
         assert mock_client.get_symbols_overview.call_count == 1
+
+        # 验证结果中只包含 Python 文件
+        analyzed_files = [f["file"] for f in result["files"]]  # type: ignore[index]
+        assert analyzed_files == ["src/vibe3/config/loader.py"]
+        assert "bin/vibe" not in analyzed_files
+
+        # 验证 changed_files 包含原始所有文件
+        assert result["changed_files"] == ["src/vibe3/config/loader.py", "bin/vibe"]
 
     def test_source_type_in_report(
         self, mock_client: MagicMock, mock_git: MagicMock
