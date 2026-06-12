@@ -17,45 +17,72 @@ app = typer.Typer(
 )
 
 
-def _execute_governance_internal(material_override: str | None = None) -> None:
-    """Execute governance scan via service layer (no facade).
-
-    Direct path for manual governance scan, calling execution layer
-    without going through OrchestrationFacade heartbeat chain
-    or internal command layer.
+def _publish_governance_event(
+    material_override: str | None = None, tick_count: int = 0
+) -> None:
+    """Publish GovernanceScanStarted event to the event bus.
 
     Args:
-        material_override: Optional governance role to override material rotation
+        material_override: Optional governance role (not used in event,
+            preserved for future tick-based material rotation support)
+        tick_count: Tick count for the scan (default 0 for manual scans)
     """
-    from vibe3.roles import dispatch_governance_execution
+    from vibe3.domain import GovernanceScanStarted, publish
 
-    dispatch_governance_execution(material_override=material_override)
+    event = GovernanceScanStarted(
+        tick_count=tick_count,
+        execution_count=0,
+        actor="cli:scan-governance",
+    )
+    publish(event)
 
 
 def _run_governance_scan(
     material_override: str | None = None, no_async: bool = False
 ) -> None:
-    """Execute governance scan once.
+    """Execute governance scan once via event bus.
 
-    Async default (no_async=False): dispatches via tmux background session.
-    Sync (no_async=True): calls internal dispatch directly.
+    Publishes GovernanceScanStarted event, which triggers the domain handler
+    to dispatch via ExecutionCoordinator (async tmux).
 
     Args:
-        material_override: Optional governance role to override material rotation
-        no_async: Run synchronously (blocking) instead of async tmux session
+        material_override: Optional governance role (not used in event,
+            preserved for future tick-based material rotation support)
+        no_async: Deprecated flag (logs warning, always uses async dispatch
+            via event bus)
     """
     if no_async:
-        _execute_governance_internal(material_override=material_override)
-        logger.bind(domain="orchestra").info("Governance scan completed")
-    else:
-        from vibe3.execution import run_governance_async
-        from vibe3.roles import build_governance_execution_name
-
-        run_governance_async(
-            tick_count=0,
-            material_override=material_override,
-            build_execution_name=build_governance_execution_name,
+        logger.warning(
+            "--no-async is deprecated and ignored. Event bus now triggers handler "
+            "with async tmux dispatch. For synchronous execution, use "
+            "'vibe3 internal governance' directly."
         )
+    _publish_governance_event(material_override=material_override)
+    logger.bind(domain="orchestra").info("Governance scan event published")
+
+
+def _publish_supervisor_events(
+    candidates: list[dict],
+) -> None:
+    """Publish SupervisorIssueIdentified events for each candidate.
+
+    Args:
+        candidates: List of issue candidate dicts with 'number' and 'title' fields
+
+    Note:
+        supervisor_file is left empty and resolved by the domain handler,
+        which allows manual scans to use the same resolution logic as heartbeat scans.
+    """
+    from vibe3.domain import SupervisorIssueIdentified, publish
+
+    for candidate in candidates:
+        event = SupervisorIssueIdentified(
+            issue_number=candidate["number"],
+            issue_title=candidate.get("title", ""),
+            supervisor_file="",  # Resolved by handler
+            actor="cli:scan-supervisor",
+        )
+        publish(event)
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
@@ -85,18 +112,15 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
 
 
 def _run_supervisor_scan() -> tuple[int, int]:
-    """Execute supervisor scan once via execution layer (no facade).
+    """Execute supervisor scan once via event bus.
 
-    Fetches supervisor candidates and calls execution layer directly
-    without going through OrchestrationFacade or internal command layer.
+    Fetches supervisor candidates and publishes SupervisorIssueIdentified events
+    for each candidate, which triggers the domain handler to dispatch.
 
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
-    from vibe3.roles import (
-        dispatch_supervisor_execution,
-        fetch_supervisor_candidates,
-    )
+    from vibe3.roles import fetch_supervisor_candidates
 
     config = load_orchestra_config()
     github = GitHubClient()
@@ -105,10 +129,9 @@ def _run_supervisor_scan() -> tuple[int, int]:
     total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     matched_count = len(candidates)
 
-    # Dispatch each candidate via execution layer
-    for candidate in candidates:
-        issue_number = candidate["number"]
-        dispatch_supervisor_execution(issue_number=issue_number, no_async=False)
+    # Publish events for each candidate
+    if candidates:
+        _publish_supervisor_events(candidates)
 
     return total_scanned, matched_count
 
@@ -270,16 +293,15 @@ def supervisor(
 
 
 async def _run_combined_scan_async() -> None:
-    """Execute both governance and supervisor scans in sequence.
+    """Execute both governance and supervisor scans in sequence via event bus.
 
-    Governance scan uses internal dispatch directly (no facade).
-    Supervisor scan uses internal apply dispatch directly (no facade).
+    Publishes events which trigger domain handlers to dispatch via ExecutionCoordinator.
     """
-    # Governance: call internal dispatch directly (no facade, no FailedGate)
-    _execute_governance_internal(material_override=None)
-    logger.bind(domain="orchestra").info("Governance scan completed")
+    # Governance: publish event
+    _publish_governance_event(material_override=None)
+    logger.bind(domain="orchestra").info("Governance scan event published")
 
-    # Supervisor: call internal dispatch directly (no facade)
+    # Supervisor: publish events
     total_scanned, matched_count = _run_supervisor_scan()
 
     # Display scan results
