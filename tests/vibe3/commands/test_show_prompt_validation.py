@@ -219,8 +219,9 @@ class TestReviewBaseCommandValidation:
 class TestInternalManagerCommandValidation:
     """Integration tests for internal manager command validation."""
 
-    def test_internal_manager_rejects_show_prompt_without_dry_run(self):
+    def test_internal_manager_rejects_show_prompt_without_dry_run(self, monkeypatch):
         """internal manager command should reject --show-prompt without --dry-run."""
+        monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
         with patch(
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
         ) as mock_run:
@@ -233,8 +234,9 @@ class TestInternalManagerCommandValidation:
         # Mock should NOT be called since validation happens first
         mock_run.assert_not_called()
 
-    def test_internal_manager_show_prompt_with_dry_run_still_works(self):
+    def test_internal_manager_show_prompt_with_dry_run_still_works(self, monkeypatch):
         """internal manager command should accept --show-prompt with --dry-run."""
+        monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
         with patch(
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
         ) as mock_run:

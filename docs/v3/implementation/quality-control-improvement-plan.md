@@ -83,7 +83,7 @@
 **集成状态**：
 - ✅ 已集成到 `vibe pr ready` 命令
 - ✅ 支持 `--skip-coverage` 跳过
-- ✅ 支持 `--force` 强制跳过质量门禁
+- ✅ 支持 `--yes` 强制跳过质量门禁
 
 **结论**：
 - ✅ **PR Ready阶段质量门禁已基本完善**
@@ -200,7 +200,7 @@ bash scripts/hooks/check-shell-loc.sh
 - CI未通过 → 阻断
 
 **跳过机制**：
-- `--force` 强制跳过（不推荐）
+- `--yes` 强制跳过（不推荐）
 
 ---
 
@@ -442,7 +442,7 @@ pre-commit install --hook-type pre-push
 **现有实现**（已正确）：
 - ✅ `run_coverage_gate()` - 分层覆盖率检查
 - ✅ `run_risk_gate()` - 风险评分检查
-- ✅ 支持 `--skip-coverage` 和 `--force`
+- ✅ 支持 `--skip-coverage` 和 `--yes`
 
 **保持不变**：PR Ready继续执行覆盖率和风险评分检查。
 

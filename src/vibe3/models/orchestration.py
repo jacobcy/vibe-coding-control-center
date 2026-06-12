@@ -100,16 +100,16 @@ class StateTransition(BaseModel):
 #
 #   BLOCKED ◄──── any state (via [C] no-op gate, execution error, or [M] decision)
 #     │
-#     │ [H] vibe3 task resume --blocked / --label (force=True)
+#     │ [H] vibe3 task resume --blocked / --label (yes=True)
 #     └──→ READY or HANDOFF (human decides)
 #
 #   Note: FAILED state removed (2026-04-28).
 #   All execution failures now go to BLOCKED with blocked_reason.
-#   Recovery: human resume via force=True (same as BLOCKED).
+#   Recovery: human resume via yes=True (same as BLOCKED).
 #
 # Key invariants (Issue #303):
 #   1. Code layer NEVER auto-transitions to HANDOFF (no-op gate)
-#   2. BLOCKED has NO automatic exit (requires human resume with force=True)
+#   2. BLOCKED has NO automatic exit (requires human resume with yes=True)
 #   3. State decisions belong to: manager AI (normal) or human (override)
 # ============================================================================
 
@@ -137,7 +137,7 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.MERGE_READY, IssueState.BLOCKED),
     # NOTE: blocked → other states removed (修复 Issue #303)
     # blocked 状态不允许自动转换，必须等人类核查
-    # 手动 resume 命令可以用 force=True 绕过
+    # 手动 resume 命令可以用 yes=True 绕过
     # FAILED removed — execution failures now go to BLOCKED with blocked_reason
 }
 
@@ -161,7 +161,7 @@ STATE_FALLBACK_MATRIX: dict[IssueState, IssueState] = {
     IssueState.REVIEW: IssueState.HANDOFF,
 }
 
-# Forbidden transitions (require force=True)
+# Forbidden transitions (require yes=True)
 FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.READY, IssueState.DONE),
     (IssueState.CLAIMED, IssueState.DONE),
