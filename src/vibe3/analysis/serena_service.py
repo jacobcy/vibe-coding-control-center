@@ -315,9 +315,14 @@ class SerenaService:
 
                         if is_dead:
                             # Get line number and LOC
-                            # For now, use placeholder values
-                            line = 0  # TODO: extract from Serena
-                            loc = 0  # TODO: extract from Serena
+                            start = sym.get("start_line", 0)
+                            end = sym.get("end_line", 0)
+                            line = start
+                            loc = (
+                                max(end - start + 1, 0)
+                                if start > 0 and end >= start
+                                else 0
+                            )
 
                             confidence = classify_confidence(
                                 sym_name, ref_count, is_cli_command
