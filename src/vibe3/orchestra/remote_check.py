@@ -17,11 +17,11 @@ from vibe3.clients import (
     SQLiteClient,
     collect_label_anomalies,
     has_manager_assignee,
+    load_sync_rules,
     normalize_assignees,
     normalize_labels,
 )
 from vibe3.config import get_convention, get_manager_usernames, load_orchestra_config
-from vibe3.config.settings_sync_rules import load_sync_rules
 
 
 @dataclass

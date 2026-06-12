@@ -2,11 +2,7 @@
 
 from unittest.mock import patch
 
-from vibe3.config.settings_sync_rules import (
-    LocalSyncRules,
-    SyncRule,
-    SyncRulesConfig,
-)
+from vibe3.clients import LocalSyncRules, SyncRule, SyncRulesConfig
 from vibe3.services.check.service import CheckService
 
 

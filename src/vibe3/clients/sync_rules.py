@@ -1,4 +1,37 @@
-"""Sync rules configuration models."""
+"""Sync rules configuration for remote/local label alignment.
+
+This module provides fine-grained control over which sync/alignment rules
+are active during remote label checks (orchestra dispatch) and local flow
+consistency checks (vibe3 check).
+
+Architecture:
+- Remote rules: Applied by orchestra during periodic GitHub issue label scans
+- Local rules: Applied by CheckService during flow consistency verification
+
+Default behavior: All rules enabled (backward compatible with pre-config behavior).
+
+Configuration path: config/v3/sync_rules.yaml
+Registry entry: config/v3/registry.yaml (sync_rules governance)
+
+Rule Categories:
+- Remote rules (4): Handle remote label anomalies detected by orchestra
+  - roadmap_conflict: Remove state labels when roadmap/rfc or roadmap/epic present
+  - multi_state: Keep only highest-priority state label
+  - orphan_execution: Reset execution state to state/ready when no local flow
+  - governed_missing_state: Add state/ready to orchestra-governed issues missing state
+
+- Local rules (10): Handle local flow consistency during vibe3 check
+  - multi_state_label_fix: Auto-correct multiple state labels to highest priority
+  - pr_terminal_state: Handle PR merged/closed → mark flow aborted
+  - closed_issue_sync: Handle closed task issue → mark flow aborted
+  - stale_blocked_sync: Auto-resume flow when remote state/blocked label removed
+  - stale_ready_rebuild: Rebuild stale ready flow from remote issue state
+  - missing_branch_cleanup: Mark flow aborted when local branch deleted
+  - orphaned_flow_cleanup: Mark orphaned active flows (>100 commits behind) as aborted
+  - empty_ready_cleanup: Mark empty ready flows as stale
+  - flow_consistency_recovery: Auto-recover inconsistent flow state
+  - missing_state_label_recovery: Recover missing remote state label from local flow
+"""
 
 from pydantic import BaseModel, Field
 

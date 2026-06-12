@@ -1,10 +1,10 @@
 """Tests for label_utils with sync rules."""
 
-from vibe3.clients.label_utils import collect_label_anomalies
-from vibe3.config.settings_sync_rules import (
+from vibe3.clients import (
     RemoteSyncRules,
     SyncRule,
     SyncRulesConfig,
+    collect_label_anomalies,
 )
 
 

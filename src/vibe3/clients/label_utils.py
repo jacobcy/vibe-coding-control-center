@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.config.settings_sync_rules import SyncRulesConfig
+    from vibe3.clients.sync_rules import SyncRulesConfig
 
 
 def normalize_labels(raw_labels: object) -> list[str]:

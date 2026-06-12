@@ -1,11 +1,9 @@
 """Tests for sync rules configuration."""
 
-from vibe3.config.settings_sync_rules import (
-    RemoteSyncRules,
-    SyncRule,
-    SyncRulesConfig,
-    load_sync_rules,
-)
+import tempfile
+from pathlib import Path
+
+from vibe3.clients import RemoteSyncRules, SyncRule, SyncRulesConfig, load_sync_rules
 
 
 class TestSyncRulesModel:
@@ -81,3 +79,20 @@ class TestSyncRulesModel:
         )
 
         assert len(anomalies) == 0
+
+    def test_malformed_yaml_returns_defaults(self):
+        """Malformed YAML content returns default config."""
+        # Create a temp file with malformed YAML
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("invalid yaml content:\n  - [unclosed\n  brackets")
+            temp_path = f.name
+
+        try:
+            config = load_sync_rules(temp_path)
+
+            # Should return default config (all enabled)
+            assert isinstance(config, SyncRulesConfig)
+            assert config.remote.roadmap_conflict.enabled is True
+            assert config.local.multi_state_label_fix.enabled is True
+        finally:
+            Path(temp_path).unlink()

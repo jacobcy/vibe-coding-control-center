@@ -8,9 +8,14 @@ from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
-from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.clients import (
+    GitClient,
+    GitHubClient,
+    GitHubClientProtocol,
+    SQLiteClient,
+    load_sync_rules,
+)
 from vibe3.config import VibeConfig
-from vibe3.config.settings_sync_rules import load_sync_rules
 from vibe3.models import IssueState, PRState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
