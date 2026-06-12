@@ -82,16 +82,45 @@ def test_flow_blocked_resolves_numeric_branch_to_canonical_task_branch() -> None
     )
 
 
-def test_flow_blocked_rejects_reason_and_task_together() -> None:
-    """--reason and --task are mutually exclusive for blocked."""
-    result = runner.invoke(
-        app,
-        ["flow", "blocked", "--branch", "235", "--task", "246", "--reason", "wait"],
+def test_flow_blocked_allows_reason_and_task_together() -> None:
+    """--reason and --task can be used together."""
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/issue-235",
+        flow_slug="issue-235",
+        flow_status="active",
+        task_issue_number=235,
+        issues=[],
     )
 
-    assert result.exit_code == 1
-    assert "--reason" in result.output
-    assert "--task" in result.output
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
+        {"branch": "task/issue-235", "flow_status": "active"}
+    ]
+    flow_service.store = mock_store
+
+    with (
+        patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
+        patch("vibe3.services.FlowService", return_value=flow_service),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "flow",
+                "blocked",
+                "--branch",
+                "235",
+                "--task",
+                "246",
+                "--reason",
+                "wait",
+            ],
+        )
+
+    assert result.exit_code == 0
+    flow_service.block_flow.assert_called_once_with(
+        "task/issue-235", reason="wait", blocked_by_issue=246
+    )
 
 
 def test_flow_blocked_no_longer_supports_pr_option() -> None:
