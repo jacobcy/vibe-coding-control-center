@@ -185,6 +185,7 @@ _SYMBOL_MODULES = {
     "get_role_output_contract": "vibe3.config.role_policy",
     "get_role_section": "vibe3.config.role_policy",
     "get_source_root": "vibe3.config.settings",
+    "has_agent_env_override": "vibe3.config.agent_preset",
     "load_config": "vibe3.config.loader",
     "load_config_for_role": "vibe3.config.config_loader",
     "load_keys_env_fallback": "vibe3.config.loader",
