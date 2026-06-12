@@ -32,6 +32,19 @@ code_limits:
     - "tests/vibe3/hooks/test_loc_settings.py"
   status: "active"
 
+sync_rules:
+  source_file: "config/v3/sync_rules.yaml"
+  schema: "src/vibe3/clients/sync_rules.py:SyncRulesConfig"
+  consumers:
+    - "src/vibe3/clients/label_utils.py"
+    - "src/vibe3/orchestra/remote_check.py"
+    - "src/vibe3/services/check/service.py"
+  tests:
+    - "tests/vibe3/clients/test_sync_rules.py"
+    - "tests/vibe3/clients/test_label_utils_sync_rules.py"
+    - "tests/vibe3/services/test_check_sync_rules.py"
+  status: "active"
+
 doc_limits:
   source_file: "config/v3/loc_limits.yaml"
   schema: "src/vibe3/config/settings.py:DocLimitsConfig"

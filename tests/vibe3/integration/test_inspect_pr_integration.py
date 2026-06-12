@@ -203,7 +203,8 @@ def test_build_pr_analysis_commit_count_error():
             "vibe3.services.pr.analysis._calculate_risk_score",
             return_value={"score": 1},
         ),
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitHubClient") as mock_github_client_class,
         # Mock _fetch_pr_commit_shas to raise (called inside real _get_pr_commit_count)
         patch(
             "vibe3.services.pr.analysis._fetch_pr_commit_shas",
@@ -217,6 +218,9 @@ def test_build_pr_analysis_commit_count_error():
         mock_git_client = MagicMock()
         mock_git_client.get_diff.return_value = "+line1\n-line2"
         mock_git_client_class.return_value = mock_git_client
+
+        mock_github_client = MagicMock()
+        mock_github_client_class.return_value = mock_github_client
 
         # _get_pr_commit_count is NOT mocked -- real function runs,
         # catches the _fetch_pr_commit_shas exception, returns 0
@@ -246,7 +250,8 @@ def test_build_pr_analysis_dataclass_fields():
             return_value={"score": 1},
         ),
         patch("vibe3.services.pr.analysis._get_pr_commit_count", return_value=1),
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitHubClient") as mock_github_client_class,
     ):
         mock_dag_result = MagicMock()
         mock_dag_result.impacted_modules = []
@@ -256,6 +261,9 @@ def test_build_pr_analysis_dataclass_fields():
         mock_git_client = MagicMock()
         mock_git_client.get_diff.return_value = "+line1\n-line2"
         mock_git_client_class.return_value = mock_git_client
+
+        mock_github_client = MagicMock()
+        mock_github_client_class.return_value = mock_github_client
 
         result = build_pr_analysis(42)
 

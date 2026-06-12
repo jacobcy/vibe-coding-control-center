@@ -50,6 +50,13 @@ if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.clients.sqlite_schema import init_schema
     from vibe3.clients.store_context import get_store
+    from vibe3.clients.sync_rules import (
+        LocalSyncRules,
+        RemoteSyncRules,
+        SyncRule,
+        SyncRulesConfig,
+        load_sync_rules,
+    )
 
 # Lazy imports (for complex dependencies and GitHub field constants)
 _LAZY_IMPORTS = {
@@ -74,10 +81,14 @@ _LAZY_IMPORTS = {
     "GitPathProtocol": "vibe3.clients.protocols.git",
     "IssueLabelPort": "vibe3.clients.github_labels",
     "LabelAnomaly": "vibe3.clients.label_utils",
+    "LocalSyncRules": "vibe3.clients.sync_rules",
     "MergedPRCache": "vibe3.clients.merged_pr_cache",
     "RecentPRCache": "vibe3.clients.recent_pr_cache",
+    "RemoteSyncRules": "vibe3.clients.sync_rules",
     "SerenaClient": "vibe3.clients.serena_client",
     "SQLiteClient": "vibe3.clients.sqlite_client",
+    "SyncRule": "vibe3.clients.sync_rules",
+    "SyncRulesConfig": "vibe3.clients.sync_rules",
     "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols.role",
     "check_runtime_asset": "vibe3.clients.runtime_assets",
     "collect_label_anomalies": "vibe3.clients.label_utils",
@@ -87,6 +98,7 @@ _LAZY_IMPORTS = {
     "get_store": "vibe3.clients.store_context",
     "has_manager_assignee": "vibe3.clients.label_utils",
     "init_schema": "vibe3.clients.sqlite_schema",
+    "load_sync_rules": "vibe3.clients.sync_rules",
     "normalize_assignees": "vibe3.clients.label_utils",
     "normalize_labels": "vibe3.clients.label_utils",
     "parse_blocked_by": "vibe3.clients.github_issues_ops",
@@ -100,12 +112,20 @@ _LAZY_IMPORTS = {
 
 
 def __getattr__(name: str) -> object:
-    """Lazy import for clients symbols to avoid circular dependencies."""
+    """Lazy import for clients symbols to avoid circular dependencies.
+
+    This allows external modules to use:
+        from vibe3.clients import GitClient
+
+    While avoiding circular imports at module load time.
+    """
     if name in _LAZY_IMPORTS:
         import importlib
 
         module = importlib.import_module(_LAZY_IMPORTS[name])
-        return getattr(module, name)
+        symbol = getattr(module, name)
+        return symbol
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -131,10 +151,14 @@ __all__ = [
     "GitPathProtocol",
     "IssueLabelPort",
     "LabelAnomaly",
+    "LocalSyncRules",
     "MergedPRCache",
     "RecentPRCache",
+    "RemoteSyncRules",
     "SerenaClient",
     "SQLiteClient",
+    "SyncRule",
+    "SyncRulesConfig",
     "TriggerableRoleDefinitionProtocol",
     "check_runtime_asset",
     "collect_label_anomalies",
@@ -144,6 +168,7 @@ __all__ = [
     "get_store",
     "has_manager_assignee",
     "init_schema",
+    "load_sync_rules",
     "normalize_assignees",
     "normalize_labels",
     "parse_blocked_by",

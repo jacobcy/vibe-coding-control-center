@@ -7,8 +7,12 @@ so they're placed in clients (not in taxonomy) to avoid category dependency viol
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from vibe3.clients.sync_rules import SyncRulesConfig
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -148,55 +152,67 @@ def collect_label_anomalies(
     issue_number: int,
     has_local_flow: bool,
     is_manager_issue: bool,
+    rules: SyncRulesConfig | None = None,
 ) -> list[LabelAnomaly]:
     """Collect all label anomalies for one issue.
 
     Returns list of anomalies (empty = no issues found).
     Rules evaluated in priority order; roadmap_conflict suppresses
     multi_state and orphan_execution rules.
+
+    Args:
+        labels: List of label strings
+        issue_number: GitHub issue number
+        has_local_flow: Whether issue has local flow
+        is_manager_issue: Whether this is a manager issue
+        rules: Sync rules config (None = all rules enabled for backward compatibility)
     """
     removed: list[str] = []
     added: list[str] = []
-    rules: list[str] = []
+    rules_found: list[str] = []
 
     # Rule 1: roadmap + state conflict
-    r1 = (
-        [lb for lb in labels if lb.startswith("state/")]
-        if has_roadmap_label(labels)
-        else []
-    )
-    if r1:
-        removed.extend(r1)
-        rules.append("roadmap_conflict")
+    if rules is None or rules.remote.roadmap_conflict.enabled:
+        r1 = (
+            [lb for lb in labels if lb.startswith("state/")]
+            if has_roadmap_label(labels)
+            else []
+        )
+        if r1:
+            removed.extend(r1)
+            rules_found.append("roadmap_conflict")
 
-    if not r1:
+    if "roadmap_conflict" not in rules_found:
         # Rule 2: multiple state labels
-        conflicts = get_conflicting_states(labels)
-        if conflicts:
-            removed.extend(conflicts)
-            rules.append("multi_state")
+        if rules is None or rules.remote.multi_state.enabled:
+            conflicts = get_conflicting_states(labels)
+            if conflicts:
+                removed.extend(conflicts)
+                rules_found.append("multi_state")
 
         # Rule 3: orphan execution state (manager issues only)
-        if is_manager_issue and not has_local_flow and has_execution_state(labels):
-            exec_labels = [
-                lb
-                for lb in get_state_labels(labels)
-                if lb.removeprefix("state/") in EXECUTION_STATES
-            ]
-            if exec_labels:
-                removed.extend(exec_labels)
-                added.append("state/ready")
-                rules.append("orphan_execution")
+        if rules is None or rules.remote.orphan_execution.enabled:
+            if is_manager_issue and not has_local_flow and has_execution_state(labels):
+                exec_labels = [
+                    lb
+                    for lb in get_state_labels(labels)
+                    if lb.removeprefix("state/") in EXECUTION_STATES
+                ]
+                if exec_labels:
+                    removed.extend(exec_labels)
+                    added.append("state/ready")
+                    rules_found.append("orphan_execution")
 
     # Rule 4: governed issue missing its terminal state (manager issues only)
-    if is_manager_issue and has_orchestra_governed(labels):
-        has_state = bool(get_state_labels(labels))
-        has_roadmap = has_roadmap_label(labels)
-        if not has_state and not has_roadmap:
-            added.append("state/ready")
-            rules.append("governed_missing_state")
+    if rules is None or rules.remote.governed_missing_state.enabled:
+        if is_manager_issue and has_orchestra_governed(labels):
+            has_state = bool(get_state_labels(labels))
+            has_roadmap = has_roadmap_label(labels)
+            if not has_state and not has_roadmap:
+                added.append("state/ready")
+                rules_found.append("governed_missing_state")
 
-    if not rules:
+    if not rules_found:
         return []
 
     # Deduplicate while preserving order
@@ -206,7 +222,7 @@ def collect_label_anomalies(
     return [
         LabelAnomaly(
             issue_number=issue_number,
-            rule=", ".join(rules),
+            rule=", ".join(rules_found),
             removed=removed,
             added=added,
         )
