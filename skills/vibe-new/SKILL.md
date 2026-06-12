@@ -14,6 +14,7 @@ description: Use when starting or switching to a new human-collaboration task. C
 - `/vibe-new 2540` → issue=2540, branch=dev/issue-2540
 - `/vibe-new 2540 create worktree` → issue=2540, worktree=true
 - `/vibe-new 2540 superpowers` → issue=2540, workflow=superpowers
+- `/vibe-new 2540 worktree superpowers` → issue=2540, worktree=true, workflow=superpowers
 - `/vibe-new`（无参数）→ 询问 issue 号
 
 **推断规则**：
@@ -43,11 +44,9 @@ gh issue view <issue-number> --json labels,body,state
 
 在 bootstrap 前，**必须**检查 origin/main 是否有更新：
 
-```bash
-# 1. Fetch latest main
-git fetch origin main
+检查本地 main 是否落后（fetch 已在 Step 1 完成）：
 
-# 2. 检查本地 main 是否落后
+```bash
 git log main..origin/main --oneline | wc -l
 ```
 
@@ -67,9 +66,7 @@ git log main..origin/main --oneline | wc -l
 
 在确认目标 issue 后，检查是否为 Epic 主 issue：
 
-```bash
-gh issue view <issue-number> --json labels,body
-```
+使用 Step 1 获取的 issue 数据。
 
 检查逻辑：
 - 如果 issue 有 `roadmap/epic` 标签 **且** body 包含 `## Sub-issues` 或 `## 子任务` section：
@@ -102,14 +99,9 @@ gh issue view <issue-number> --json labels,body
 
 在 bootstrap 前，确认依赖关系：
 
-1. 读取目标 issue body（已在 Epic 检查时获取，或重新获取）：
-   ```bash
-   gh issue view <issue-number> --json body
-   ```
+1. 使用 Step 1 获取的 issue body，检查是否有 `## Dependencies` 或 `## 依赖` section
 
-2. 检查是否有 `## Dependencies` 或 `## 依赖` section
-
-3. 如果存在依赖：
+2. 如果存在依赖：
    - 提取依赖 issue 编号（格式：`Depends on #<id>`、`依赖 #<id>`、`blocked by #<id>`）
    - **验证依赖状态**：
      ```bash
@@ -123,7 +115,7 @@ gh issue view <issue-number> --json labels,body
      - 提示用户："依赖 #<id> 已关闭，无需阻塞"
      - **不添加** `--dependency` 参数
 
-4. 如果无依赖：继续
+3. 如果无依赖：继续
 
 ## 6. Bootstrap flow scene
 

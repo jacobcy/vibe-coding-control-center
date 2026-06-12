@@ -65,6 +65,8 @@ PR 未创建      → vibe3 run --publish
 4. **直接在当前 session 继续实现**：按 plan 的剩余步骤执行
 5. 完成后手动记录 `vibe3 handoff append`
 
+**Fallback**：如果接管后实现遇到困难（上下文不足、能力限制），建议重新执行 `vibe3 run`（可能需要先 `vibe3 snapshot save` 保存当前状态），而不是继续在当前 session 硬撑。
+
 **原则**：vibe3 run 是便利工具，不是必须依赖。主 agent 有能力直接实现。
 
 ### Monitor 生命周期管理
@@ -87,6 +89,13 @@ Monitor 触发（命令完成/失败/超时）
 3. 然后启动新命令的 Monitor
 
 **ScheduleWakeup 同理**：每次循环只保留一个 ScheduleWakeup。新循环开始时，上一个 ScheduleWakeup 应已被唤醒（或超时），不需要手动清理。
+
+**ScheduleWakeup 与 Monitor 的关系**：
+- ScheduleWakeup 是 **fallback**，不是并行 companion
+- 正常流程：Monitor 完成正常 → ScheduleWakeup 不再需要（下次循环创建新的）
+- 异常流程：Monitor 失败/超时 → ScheduleWakeup 触发作为 backup 唤醒 agent
+
+**启动序列**：启动命令 → 创建 Monitor → 设置 ScheduleWakeup 作为 fallback
 
 **禁止**：
 - ❌ 同时运行多个 Monitor 监听同一命令
@@ -150,6 +159,8 @@ Plan 审查：
 3. **代码质量**：明显 bug、类型错误 → **直接修复**
 4. **Plan 一致性**：偏离 plan 且无合理理由 → **修正为 plan 描述的方式**
 
+**重复修复限制**：同一问题修正 2 次仍未解决 → 暂停，向用户报告（见 Step 4 和限制章节）
+
 修正代码后报告：
 ```
 Run 审查：
@@ -168,6 +179,8 @@ Run 审查：
 2. **建议项**（MEDIUM/LOW）→ 评估后决定是否修复
 3. **误报** → 记录但不修改
 4. **修复后** → 重新跑 `vibe3 review` 确认通过
+
+**重复修复限制**：同一问题修正 2 次仍未解决 → 暂停，向用户报告（见 Step 4 和限制章节）
 
 修正后报告：
 ```
