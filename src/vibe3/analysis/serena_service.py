@@ -271,7 +271,7 @@ class SerenaService:
         from vibe3.models import DeadCodeFinding, DeadCodeReport
 
         log = logger.bind(domain="serena", action="scan_dead_code", root=root)
-        log.info("Scanning for dead code")
+        log.debug("Scanning for dead code")
 
         try:
             # Find all Python files
@@ -368,7 +368,7 @@ class SerenaService:
                 total_symbols=total_symbols,
                 dead_code_count=total_dead,
                 excluded_count=total_excluded,
-            ).success("Dead code scan complete")
+            ).debug("Dead code scan complete")
 
             return report
 

@@ -36,7 +36,7 @@ def analyze_file(
         domain="serena",
         action="analyze_file",
         file=relative_file,
-    ).info("Analyzing file")
+    ).debug("Analyzing file")
 
     try:
         overview = client.get_symbols_overview(relative_file)
@@ -70,7 +70,7 @@ def analyze_file(
         logger.bind(
             file=relative_file,
             symbol_count=len(symbols),
-        ).success("File analyzed")
+        ).debug("File analyzed")
 
         return {
             "file": relative_file,
