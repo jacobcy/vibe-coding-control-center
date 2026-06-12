@@ -178,6 +178,39 @@ def test_analyze_layer_missing_files(coverage_service: CoverageService) -> None:
     assert layer_cov.coverage_percent == 0.0
 
 
+def test_categorize_by_layer(
+    coverage_service: CoverageService,
+    sample_coverage_data: dict,
+) -> None:
+    """Test _categorize_by_layer static method."""
+    layers = ("services", "clients", "commands")
+    categorized = CoverageService._categorize_by_layer(sample_coverage_data, layers)
+
+    # Check correct file assignment per layer
+    assert set(categorized["services"].keys()) == {
+        "src/vibe3/services/pr_service.py",
+        "src/vibe3/services/flow_service.py",
+    }
+    assert set(categorized["clients"].keys()) == {
+        "src/vibe3/clients/github_client.py",
+        "src/vibe3/clients/sqlite_client.py",
+    }
+    assert set(categorized["commands"].keys()) == {
+        "src/vibe3/commands/pr_lifecycle.py",
+        "src/vibe3/commands/flow_commands.py",
+    }
+
+    # Check no files lost
+    total_files = sum(len(categorized[layer]) for layer in layers)
+    assert total_files == len(sample_coverage_data["files"])
+
+    # Check empty dict when no files match a layer
+    empty_data = {"files": {}}
+    categorized_empty = CoverageService._categorize_by_layer(empty_data, layers)
+    for layer in layers:
+        assert categorized_empty[layer] == {}
+
+
 class TestRunCoverageCheck:
     """run_coverage_check integration tests."""
 
