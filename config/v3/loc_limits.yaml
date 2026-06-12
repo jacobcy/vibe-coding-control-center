@@ -24,8 +24,8 @@ code_limits:
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check/service.py"
-        limit: 700
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑；迁移至 check/ 子包（Issue #2584）；新增 SyncRulesConfig 支持以解决架构冲突（Issue #2685，+16 行）"
+        limit: 780
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分；新增 orchestra_scanned_assignee_cleanup 规则（PR #2719，+78 行）"
 
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层

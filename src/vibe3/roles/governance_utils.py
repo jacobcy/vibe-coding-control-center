@@ -112,6 +112,16 @@ def build_broader_repo_entries(
         # Three-layer governance filter + legacy compat. Roadmap intake must not
         # trust stale orchestra-governed labels on unassigned issues; it owns the
         # broader unassigned pool and should re-evaluate those candidates.
+        #
+        # Note: orchestra-scanned is roadmap-intake's mechanism to mark
+        # "not for intake". Assignee-pool should NOT filter by
+        # orchestra-scanned because:
+        # 1. orchestra-scanned is only meaningful for roadmap-intake
+        # 2. Issues can have both assignee and orchestra-scanned (when
+        #    roadmap-intake skipped but later got assignee via vibe-roadmap
+        #    dependency resolution)
+        # 3. Assignee-pool's job is to process assigned issues, only checking
+        #    orchestra-governed to avoid re-scanning already decided issues.
         if material_name == "roadmap-intake.md":
             if (
                 "supervisor" in labels
@@ -122,7 +132,6 @@ def build_broader_repo_entries(
                 continue
         elif (
             "supervisor" in labels
-            or "orchestra-scanned" in labels
             or has_orchestra_governed(labels)
             or "orchestra" in labels
         ):

@@ -20,7 +20,7 @@ Rule Categories:
   - orphan_execution: Reset execution state to state/ready when no local flow
   - governed_missing_state: Add state/ready to orchestra-governed issues missing state
 
-- Local rules (10): Handle local flow consistency during vibe3 check
+- Local rules (11): Handle local flow consistency during vibe3 check
   - multi_state_label_fix: Auto-correct multiple state labels to highest priority
   - pr_terminal_state: Handle PR merged/closed → mark flow aborted
   - closed_issue_sync: Handle closed task issue → mark flow aborted
@@ -31,9 +31,14 @@ Rule Categories:
   - empty_ready_cleanup: Mark empty ready flows as stale
   - flow_consistency_recovery: Auto-recover inconsistent flow state
   - missing_state_label_recovery: Recover missing remote state label from local flow
+  - orchestra_scanned_assignee_cleanup: Remove orchestra-scanned from assigned issues
 """
 
-from pydantic import BaseModel, Field
+from pathlib import Path
+
+import yaml
+from loguru import logger
+from pydantic import BaseModel, Field, ValidationError
 
 
 class SyncRule(BaseModel):
@@ -109,6 +114,10 @@ class LocalSyncRules(BaseModel):
         default_factory=SyncRule,
         description="Recover missing remote state label from local flow",
     )
+    orchestra_scanned_assignee_cleanup: SyncRule = Field(
+        default_factory=SyncRule,
+        description="Remove orchestra-scanned label from issues with manager assignee",
+    )
 
 
 class SyncRulesConfig(BaseModel):
@@ -131,14 +140,6 @@ def load_sync_rules(config_path: str = "config/v3/sync_rules.yaml") -> SyncRules
     Returns:
         SyncRulesConfig instance (defaults to all enabled if file not found)
     """
-    import logging
-    from pathlib import Path
-
-    import yaml
-    from pydantic import ValidationError
-
-    logger = logging.getLogger(__name__)
-
     path = Path(config_path)
     if not path.exists():
         logger.info(f"Sync rules config not found at {config_path}, using defaults")
