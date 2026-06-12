@@ -45,7 +45,7 @@ def terminalize_closed_issue(
 
     _append_orchestra_event(
         "dispatcher",
-        "qualify_gate skip (#{issue.number}): issue closed on GitHub — "
+        f"qualify_gate skip (#{issue.number}): issue closed on GitHub — "
         "terminalizing local flow",
     )
 
