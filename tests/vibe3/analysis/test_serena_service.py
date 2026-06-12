@@ -6,9 +6,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.analysis.serena_service import SerenaService
+from vibe3.analysis.serena_service import SerenaService, _is_cli_file
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import BranchSource, CommitSource, UncommittedSource
+
+
+@pytest.fixture(autouse=True)
+def _clear_cli_file_cache() -> None:
+    """Clear _is_cli_file cache before and after each test."""
+    _is_cli_file.cache_clear()
+    yield
+    _is_cli_file.cache_clear()
 
 
 class TestAnalyzeFile:
@@ -233,3 +241,37 @@ class TestAnalyzeFilesSkipped:
         )
 
         assert result == ["alpha", "beta"]
+
+
+class TestIsCliFile:
+    """_is_cli_file caching tests."""
+
+    def test_caches_result(self, tmp_path: Path) -> None:
+        """Repeated calls with same path should use cache."""
+        cli_file = tmp_path / "cli.py"
+        cli_file.write_text("import typer\napp = typer.Typer()\n")
+
+        result1 = _is_cli_file(str(cli_file))
+        result2 = _is_cli_file(str(cli_file))
+
+        assert result1 is True
+        assert result2 is True
+        assert _is_cli_file.cache_info().hits == 1
+        assert _is_cli_file.cache_info().misses == 1
+
+    def test_non_cli_file_cached(self, tmp_path: Path) -> None:
+        """Non-CLI files should also be cached."""
+        normal_file = tmp_path / "normal.py"
+        normal_file.write_text("def foo(): pass\n")
+
+        result1 = _is_cli_file(str(normal_file))
+        result2 = _is_cli_file(str(normal_file))
+
+        assert result1 is False
+        assert result2 is False
+        assert _is_cli_file.cache_info().hits == 1
+
+    def test_nonexistent_file_returns_false(self) -> None:
+        """Missing files should return False (not cached on error)."""
+        result = _is_cli_file("/nonexistent/path.py")
+        assert result is False
