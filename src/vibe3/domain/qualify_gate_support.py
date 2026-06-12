@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from vibe3.clients import GitClient
-from vibe3.models import FlowStatusResponse
-from vibe3.models.orchestration import IssueState
+from vibe3.models import FlowStatusResponse, IssueState, PRResponse
 from vibe3.services import (
     BlockedStateService,
     FlowCleanupService,
@@ -23,11 +22,10 @@ if TYPE_CHECKING:
     from vibe3.config import OrchestraConfig
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.models import CoordinationTruth, IssueInfo
-    from vibe3.models.pr import PRResponse
 
 
 def _append_orchestra_event(channel: str, message: str) -> None:
-    from vibe3.observability.orchestra_log import append_orchestra_event
+    from vibe3.observability import append_orchestra_event
 
     append_orchestra_event(channel, message)
 
