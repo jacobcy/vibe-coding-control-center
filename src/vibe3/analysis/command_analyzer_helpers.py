@@ -68,7 +68,6 @@ def should_show_in_tree(callee: str) -> bool:
         "create_trace_output",
         "add_execution_step",
         "output_result",
-        "noop_context",
         "info",
         "debug",
         "warning",

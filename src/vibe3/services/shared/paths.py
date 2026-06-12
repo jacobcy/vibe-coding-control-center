@@ -5,7 +5,6 @@ For handoff target resolution, see handoff_resolution module.
 """
 
 import importlib
-import re
 from pathlib import Path
 
 from vibe3.clients import GitPathProtocol
@@ -312,33 +311,6 @@ REF_FIELD_TO_ALIAS: dict[str, str] = {
     "indicate_ref": "@indicate",
     "spec_ref": "@spec",
 }
-
-
-def _path_to_alias(path: str) -> str:
-    """Convert a ref path to shortcut alias if applicable.
-
-    Args:
-        path: Relative path (e.g., "docs/plans/xxx.md" or
-            ".git/vibe3/handoff/task-xxx/run-yyy.md")
-
-    Returns:
-        Shortcut alias (@plan, @report, @spec, @task-xxx/run-yyy.md) or
-        original path
-    """
-    if path.startswith("docs/plans/"):
-        return "@plan"
-    if path.startswith("docs/reports/"):
-        return "@report"
-    if path.startswith("docs/specs/"):
-        return "@spec"
-    # Shared artifacts: add @ prefix and keep the rest
-    if path.startswith(_SHARED_HANDOFF_PREFIX):
-        return f"@{path[len(_SHARED_HANDOFF_PREFIX):]}"
-    if f".git/{_SHARED_HANDOFF_PREFIX}" in path:
-        match = re.search(rf"\.git/{re.escape(_SHARED_HANDOFF_PREFIX)}(.+)", path)
-        if match:
-            return f"@{match.group(1)}"
-    return path
 
 
 def ref_to_handoff_cmd(

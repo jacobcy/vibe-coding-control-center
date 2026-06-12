@@ -310,7 +310,7 @@ class SerenaService:
 
                         # Apply dead code rules
                         is_dead, reason = is_dead_code(
-                            sym_name, ref_count, is_cli_command
+                            sym_name, ref_count, is_cli_command, relative_file
                         )
 
                         if is_dead:
@@ -325,7 +325,7 @@ class SerenaService:
                             )
 
                             confidence = classify_confidence(
-                                sym_name, ref_count, is_cli_command
+                                sym_name, ref_count, is_cli_command, relative_file
                             )
                             # Type narrowing
                             if confidence == "excluded":
@@ -344,7 +344,9 @@ class SerenaService:
                             )
                             total_dead += 1
                         elif (
-                            classify_confidence(sym_name, ref_count, is_cli_command)
+                            classify_confidence(
+                                sym_name, ref_count, is_cli_command, relative_file
+                            )
                             == "excluded"
                         ):
                             excluded.append(f"{relative_file}:{sym_name}")

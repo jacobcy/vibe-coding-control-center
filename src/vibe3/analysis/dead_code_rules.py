@@ -3,7 +3,9 @@
 This module defines the rules for classifying code as dead (unused).
 """
 
+import ast
 import re
+from pathlib import Path
 from typing import Literal
 
 from loguru import logger
@@ -28,6 +30,8 @@ EXCLUDE_PATTERNS = [
     r"^main$",
     # Type annotations (may be used by type checkers)
     r"^__all__$",
+    # Webhook handlers (invoked by external systems, not code)
+    r"^handle_\w+_webhook$",
 ]
 
 # Private function pattern (lower confidence)
@@ -67,10 +71,63 @@ def is_private(symbol_name: str) -> bool:
     return bool(re.match(PRIVATE_PATTERN, symbol_name))
 
 
+def has_router_decorator(file_path: str, func_name: str) -> bool:
+    """Check if function has FastAPI router decorator.
+
+    Args:
+        file_path: Relative file path
+        func_name: Function name
+
+    Returns:
+        True if function has @router.post/get/put/delete decorator
+    """
+    try:
+        source = Path(file_path).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name == func_name:
+                    for decorator in node.decorator_list:
+                        # Check decorator patterns:
+                        # @router.post(...)
+                        # @router.get(...)
+                        # @app.post(...)
+                        # etc.
+                        if isinstance(decorator, ast.Call):
+                            if isinstance(decorator.func, ast.Attribute):
+                                attr_name = decorator.func.attr
+                                if attr_name in (
+                                    "post",
+                                    "get",
+                                    "put",
+                                    "delete",
+                                    "patch",
+                                ):
+                                    if isinstance(decorator.func.value, ast.Name):
+                                        # router.post, app.post, etc.
+                                        return True
+                        # Also check @router.post without call
+                        elif isinstance(decorator, ast.Attribute):
+                            if decorator.attr in (
+                                "post",
+                                "get",
+                                "put",
+                                "delete",
+                                "patch",
+                            ):
+                                return True
+        return False
+    except Exception:
+        # If parsing fails, assume no router decorator
+        return False
+
+
 def classify_confidence(
     symbol_name: str,
     ref_count: int,
     is_cli_command: bool = False,
+    file_path: str | None = None,
 ) -> Literal["high", "medium", "low", "excluded"]:
     """Classify the confidence level of a dead code finding.
 
@@ -78,12 +135,23 @@ def classify_confidence(
         symbol_name: Name of the symbol
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
+        file_path: File path for decorator detection
 
     Returns:
         Confidence level: "high", "medium", "low", or "excluded"
     """
     # Exclude CLI commands and special patterns
     if is_cli_command or should_exclude(symbol_name):
+        return "excluded"
+
+    # Exclude functions with router decorators (FastAPI endpoints)
+    if file_path and has_router_decorator(file_path, symbol_name):
+        logger.bind(
+            domain="dead_code_rules",
+            action="classify_confidence",
+            symbol=symbol_name,
+            file=file_path,
+        ).debug("Symbol has router decorator, excluded")
         return "excluded"
 
     # Only classify as dead if ref_count == 0
@@ -109,6 +177,7 @@ def is_dead_code(
     symbol_name: str,
     ref_count: int,
     is_cli_command: bool = False,
+    file_path: str | None = None,
 ) -> tuple[bool, str]:
     """Determine if a symbol is dead code.
 
@@ -116,15 +185,18 @@ def is_dead_code(
         symbol_name: Name of the symbol
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
+        file_path: File path for decorator detection
 
     Returns:
         Tuple of (is_dead: bool, reason: str)
     """
-    confidence = classify_confidence(symbol_name, ref_count, is_cli_command)
+    confidence = classify_confidence(symbol_name, ref_count, is_cli_command, file_path)
 
     if confidence == "excluded":
         if is_cli_command:
             return False, "CLI command (invoked via CLI, not code)"
+        if file_path and has_router_decorator(file_path, symbol_name):
+            return False, "FastAPI endpoint (invoked via HTTP router)"
         if should_exclude(symbol_name):
             return False, "Excluded pattern (test/special method)"
         return False, f"Has {ref_count} references"

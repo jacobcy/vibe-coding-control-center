@@ -24,7 +24,6 @@ from vibe3.models import (
     JobContext,
     JobEnvelope,
     JobResult,
-    JobSource,
 )
 from vibe3.utils import compute_hash_from_loader
 
@@ -43,55 +42,6 @@ COMMAND_TYPE_TO_EXECUTION_ROLE: dict[CommandType, ExecutionRole] = {
     CommandType.GOVERNANCE_SCAN: "governance",
     CommandType.SUPERVISOR_APPLY: "supervisor",
 }
-
-
-def build_envelope_from_dispatch_params(
-    command_type: CommandType,
-    issue_number: int,
-    branch: str,
-    source: JobSource,
-    actor: str,
-    refs: dict[str, str] | None = None,
-    mode: Literal["sync", "async"] = "async",
-    cli_overrides: dict[str, str] | None = None,
-    governance_tick_count: int = 0,
-    governance_execution_count: int = 0,
-    governance_material_override: str | None = None,
-) -> JobEnvelope:
-    """Build a JobEnvelope from common dispatch parameters.
-
-    This helper reduces boilerplate when migrating call sites that previously
-    created ExecutionRequest directly.
-
-    Args:
-        command_type: Type of command to dispatch
-        issue_number: Issue number (0 for governance)
-        branch: Target branch
-        source: Dispatch source (e.g., "cli-manual", "heartbeat-tick")
-        actor: Actor string (e.g., "agent:plan", "orchestra:governance")
-        refs: Optional refs dict (plan_ref, session_id, etc.)
-        mode: Dispatch mode ("sync" or "async")
-        cli_overrides: Optional CLI overrides for sync mode
-        governance_tick_count: Tick count for governance dispatch
-        governance_execution_count: Execution count for governance dispatch
-        governance_material_override: Material override for governance
-
-    Returns:
-        Populated JobEnvelope ready for dispatch
-    """
-    return JobEnvelope(
-        command_type=command_type,
-        issue_number=issue_number,
-        branch=branch,
-        source=source,
-        actor=actor,
-        refs=refs or {},
-        mode=mode,
-        cli_overrides=cli_overrides,
-        governance_tick_count=governance_tick_count,
-        governance_execution_count=governance_execution_count,
-        governance_material_override=governance_material_override,
-    )
 
 
 class JobExecutor:
