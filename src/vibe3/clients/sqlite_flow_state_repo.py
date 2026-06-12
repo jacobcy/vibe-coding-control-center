@@ -233,6 +233,39 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved task issue number")
         return result
 
+    def get_branch_for_task_issue(self, issue_number: int) -> str | None:
+        """Get branch name for a task issue number from flow_issue_links.
+
+        This is the inverse of get_task_issue_number(branch).
+
+        Note: When multiple branches link to the same issue as task,
+        this returns an arbitrary one (LIMIT 1). For priority-based
+        selection (active canonical → active non-canonical), use
+        IssueFlowService.find_active_flow instead.
+
+        Args:
+            issue_number: Issue number to query
+
+        Returns:
+            Branch name if found, None otherwise
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT branch FROM flow_issue_links "
+            "WHERE issue_number = ? AND issue_role = 'task' LIMIT 1",
+            (issue_number,),
+        )
+        row = cursor.fetchone()
+        result = row[0] if row and row[0] is not None else None
+        logger.bind(
+            external="sqlite",
+            operation="get_branch_for_task_issue",
+            branch=result,
+            issue_number=issue_number,
+        ).debug("Retrieved branch for task issue")
+        return result
+
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
         conn = self._get_connection()

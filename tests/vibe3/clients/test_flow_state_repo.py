@@ -146,3 +146,68 @@ def test_get_flows_by_issues_bulk_missing_issue() -> None:
         assert len(result) == 2
         assert len(result[100]) == 1
         assert result[999] == []
+
+
+def test_get_branch_for_task_issue_returns_branch() -> None:
+    """Get branch for task issue should return correct branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Create flow and issue link
+        store.update_flow_state(
+            "task/issue-100", flow_slug="issue-100", flow_status="active"
+        )
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("task/issue-100", 100, "task"),
+        )
+        conn.commit()
+
+        # Query for branch
+        result = store.get_branch_for_task_issue(100)
+
+        assert result == "task/issue-100"
+
+
+def test_get_branch_for_task_issue_returns_none_for_missing() -> None:
+    """Get branch for non-existent issue should return None."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Query for non-existent issue
+        result = store.get_branch_for_task_issue(999)
+
+        assert result is None
+
+
+def test_get_branch_for_task_issue_returns_none_for_non_task_role() -> None:
+    """Get branch should not return dependency role links."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        # Create flow and issue link with dependency role
+        store.update_flow_state(
+            "task/issue-100", flow_slug="issue-100", flow_status="active"
+        )
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("task/issue-100", 100, "dependency"),
+        )
+        conn.commit()
+
+        # Query for branch with task role
+        result = store.get_branch_for_task_issue(100)
+
+        # Should return None because link is 'dependency' not 'task'
+        assert result is None
