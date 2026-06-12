@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     )
     from vibe3.domain.events.base import DomainEvent
     from vibe3.domain.events.flow_lifecycle import (
+        ControlPlaneEventPublished,
         ExecutorDispatchIntent,
         FlowBlocked,
         FlowCompleted,
@@ -76,6 +77,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     # Events - base
     "DomainEvent": "vibe3.domain.events.base",
     # Events - flow lifecycle
+    "ControlPlaneEventPublished": "vibe3.domain.events.flow_lifecycle",
     "IssueFailed": "vibe3.domain.events.flow_lifecycle",
     "FlowBlocked": "vibe3.domain.events.flow_lifecycle",
     "FlowCompleted": "vibe3.domain.events.flow_lifecycle",
@@ -152,6 +154,7 @@ __all__ = [
     # Base
     "DomainEvent",
     # L3 Flow Lifecycle Events
+    "ControlPlaneEventPublished",
     "IssueFailed",
     "FlowBlocked",
     "FlowCompleted",

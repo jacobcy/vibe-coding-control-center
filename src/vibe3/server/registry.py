@@ -286,6 +286,24 @@ def _build_server_with_launch_cwd(
             f"Failed to mount webhook router, continuing without webhook: {exc}"
         )
 
+    # Mount control-plane API router (optional, controlled by config or graceful)
+    try:
+        from .control_plane import router as control_plane_router
+
+        # Warn at startup if control-plane token not configured
+        if not os.getenv("VIBE_CONTROL_PLANE_TOKEN"):
+            logger.bind(domain="orchestra").warning(
+                "VIBE_CONTROL_PLANE_TOKEN not set, control-plane API will accept "
+                "requests without authentication"
+            )
+
+        fastapi_app.include_router(control_plane_router)
+        logger.bind(domain="orchestra").info("Control-plane API mounted at /api")
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Failed to mount control-plane API, continuing without it: {exc}"
+        )
+
     return heartbeat, fastapi_app
 
 

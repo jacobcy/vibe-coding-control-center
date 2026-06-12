@@ -248,3 +248,16 @@ class PolicyChanged(DomainEvent):
     scope: tuple[str, ...] = ()
     actor: str = "system:policy"
     timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ControlPlaneEventPublished(DomainEvent):
+    """Published as audit record when the control-plane API mutates state."""
+
+    event_type: str  # Name of the DomainEvent that was published
+    issue_number: int | None = None
+    actor: str = "control-plane"
+    source: str = "unknown"  # e.g. "web-dashboard", "api-client"
+    idempotency_key: str = ""
+    detail: str = ""
+    timestamp: str | None = None
