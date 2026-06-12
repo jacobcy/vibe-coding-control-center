@@ -56,7 +56,7 @@ _TRACE_OPT = Annotated[
 
 
 def _list_analyzable_top_level_commands(
-    commands_root: str = "src/vibe3/commands",
+    commands_root: str | None = None,
 ) -> list[str]:
     """Return root CLI commands that have analyzable command files.
 
@@ -71,6 +71,10 @@ def _list_analyzable_top_level_commands(
     Future improvement: Consider adding validation against registered Typer commands
     without creating layer violation.
     """
+    if commands_root is None:
+        from vibe3.config import get_commands_root
+
+        commands_root = get_commands_root()
     root = Path(commands_root)
     if not root.is_dir():
         return []
@@ -260,8 +264,8 @@ def commands(
 @app.command(name="dead-code")
 def dead_code(
     root: Annotated[
-        str, typer.Argument(help="Root directory to scan (default: src/vibe3)")
-    ] = "src/vibe3",
+        str, typer.Argument(help="Root directory to scan (default: from config)")
+    ] = "",
     json_out: _JSON_OPT = False,
     yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     min_confidence: Annotated[
@@ -307,6 +311,11 @@ def dead_code(
             err=True,
         )
         raise typer.Exit(1)
+
+    if not root:
+        from vibe3.config import get_source_root
+
+        root = get_source_root()
 
     try:
         service = SerenaService()

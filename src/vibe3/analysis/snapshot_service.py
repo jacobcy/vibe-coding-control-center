@@ -63,10 +63,10 @@ def _ensure_baseline_dir() -> None:
     _get_baseline_dir().mkdir(parents=True, exist_ok=True)
 
 
-def _get_module_from_path(file_path: str) -> str:
+def _get_module_from_path(file_path: str, root: str = "src/vibe3") -> str:
     p = Path(file_path)
-    if "src/vibe3" in str(p):
-        parts = str(p).split("src/vibe3/")
+    if root in str(p):
+        parts = str(p).split(root + "/")
         if len(parts) > 1:
             module_parts = parts[1].split("/")
             if len(module_parts) > 1:
@@ -75,8 +75,12 @@ def _get_module_from_path(file_path: str) -> str:
     return "vibe3"
 
 
-def build_snapshot(root: str = "src/vibe3") -> StructureSnapshot:
+def build_snapshot(root: str | None = None) -> StructureSnapshot:
     """Build a structure snapshot from the current codebase."""
+    if root is None:
+        from vibe3.config import get_source_root
+
+        root = get_source_root()
     log = logger.bind(domain="snapshot", action="build", root=root)
     log.info("Building structure snapshot")
 
@@ -109,7 +113,7 @@ def build_snapshot(root: str = "src/vibe3") -> StructureSnapshot:
             )
             files.append(file_snapshot)
 
-            module = _get_module_from_path(rel_path)
+            module = _get_module_from_path(rel_path, root)
             if module not in module_map:
                 module_map[module] = ModuleSnapshot(
                     module=module,
