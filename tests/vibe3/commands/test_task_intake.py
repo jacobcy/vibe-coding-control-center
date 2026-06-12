@@ -275,6 +275,42 @@ def test_intake_with_blocked_by_creates_placeholder_flow():
         mock_label_service.set_state.assert_called_once_with(123, IssueState.BLOCKED)
 
 
+def test_intake_rejects_blocked_by_and_reason_together():
+    """--blocked-by and --blocked-reason should remain mutually exclusive."""
+    with (
+        patch("vibe3.commands.task.GitHubClient") as mock_client_cls,
+        patch("vibe3.commands.task.get_manager_usernames") as mock_managers,
+        patch("vibe3.commands.task.get_config_with_env_override") as mock_config,
+    ):
+        mock_config.return_value = MagicMock(orchestra=MagicMock())
+        mock_managers.return_value = ["manager1"]
+
+        mock_client = MagicMock()
+        mock_client.view_issue.return_value = {
+            "labels": [{"name": "state/ready"}],
+            "assignees": [],
+            "title": "Blocked issue",
+            "state": "open",
+        }
+        mock_client_cls.return_value = mock_client
+
+        result = runner.invoke(
+            app,
+            [
+                "task",
+                "intake",
+                "123",
+                "--blocked-by",
+                "99",
+                "--blocked-reason",
+                "manual block",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "不能同时指定" in result.output
+
+
 def test_intake_without_blocked_by_no_placeholder():
     """Without --blocked-by, placeholder flow creation should not be called."""
     with (

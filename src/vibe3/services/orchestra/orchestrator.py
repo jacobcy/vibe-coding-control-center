@@ -144,6 +144,11 @@ class FlowOrchestratorService:
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
 
+        if dependency_issue_numbers and blocked_reason is not None:
+            raise ValueError(
+                "blocked_reason cannot be combined with dependency_issue_numbers"
+            )
+
         try:
             if not skip_git and not self.git.branch_exists(branch):
                 # Ensure scene_base_ref remote is up-to-date before creating branch
