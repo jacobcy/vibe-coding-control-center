@@ -12,6 +12,11 @@ from vibe3.analysis import (
 from vibe3.exceptions import SystemError
 from vibe3.models import StructureDiff
 
+_SUBCOMMAND_TO_SOURCE_TYPE: dict[str, str] = {
+    "pr": "pr",
+    "base": "branch",
+}
+
 
 def run_inspect_json(args: list[str]) -> dict[str, object]:
     """Call inspect subcommand and return parsed JSON result."""
@@ -19,7 +24,7 @@ def run_inspect_json(args: list[str]) -> dict[str, object]:
         raise SystemError("Missing inspect subcommand")
 
     subcommand = args[0]
-    if subcommand not in ("pr", "base"):
+    if subcommand not in _SUBCOMMAND_TO_SOURCE_TYPE:
         raise SystemError(f"Unknown inspect subcommand: {subcommand}")
 
     if len(args) < 2:
@@ -27,10 +32,8 @@ def run_inspect_json(args: list[str]) -> dict[str, object]:
 
     identifier = args[1]
 
-    if subcommand == "pr":
-        return build_change_analysis("pr", identifier)
-    else:  # subcommand == "base"
-        return build_change_analysis("branch", identifier)
+    source_type = _SUBCOMMAND_TO_SOURCE_TYPE[subcommand]
+    return build_change_analysis(source_type, identifier)
 
 
 def build_snapshot_diff(
