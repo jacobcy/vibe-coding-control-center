@@ -277,8 +277,6 @@ class SerenaService:
                 raise SerenaError("scan_dead_code", f"Root directory not found: {root}")
 
             python_files = sorted(root_path.glob("**/*.py"))
-            # Filter out __pycache__
-            python_files = [f for f in python_files if "__pycache__" not in str(f)]
 
             log.bind(file_count=len(python_files)).debug("Found Python files")
 
