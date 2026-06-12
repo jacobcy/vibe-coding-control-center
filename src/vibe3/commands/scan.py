@@ -24,7 +24,7 @@ def _publish_governance_event(
 
     Args:
         material_override: Optional governance role (not used in event,
-            preserved for future)
+            preserved for future tick-based material rotation support)
         tick_count: Tick count for the scan (default 0 for manual scans)
     """
     from vibe3.domain import publish
@@ -48,14 +48,15 @@ def _run_governance_scan(
 
     Args:
         material_override: Optional governance role (not used in event,
-            preserved for future)
+            preserved for future tick-based material rotation support)
         no_async: Deprecated flag (logs warning, always uses async dispatch
             via event bus)
     """
     if no_async:
         logger.warning(
-            "--no-async is deprecated; event bus triggers handler "
-            "with async tmux dispatch"
+            "--no-async is deprecated and ignored. Event bus now triggers handler "
+            "with async tmux dispatch. For synchronous execution, use "
+            "'vibe3 internal governance' directly."
         )
     _publish_governance_event(material_override=material_override)
     logger.bind(domain="orchestra").info("Governance scan event published")
@@ -68,6 +69,10 @@ def _publish_supervisor_events(
 
     Args:
         candidates: List of issue candidate dicts with 'number' and 'title' fields
+
+    Note:
+        supervisor_file is left empty and resolved by the domain handler,
+        which allows manual scans to use the same resolution logic as heartbeat scans.
     """
     from vibe3.domain import publish
     from vibe3.models.domain_events import SupervisorIssueIdentified
