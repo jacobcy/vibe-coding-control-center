@@ -63,16 +63,18 @@ class TestGovernanceScan:
         assert "Governance scan completed" in result.output
         mock_run.assert_called_once_with(material_override=None, no_async=True)
 
-    def test_governance_scan_does_not_call_on_heartbeat_tick(self):
-        """Sync path (--no-async) calls service layer directly, not through facade."""
-        with patch("vibe3.roles.dispatch_governance_execution") as mock_service_run:
-            with patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade:
-                runner.invoke(app, ["scan", "governance", "--no-async"])
-                mock_facade.assert_not_called()
-                assert mock_service_run.called
-                mock_service_run.assert_called_once_with(material_override=None)
+    def test_governance_scan_publishes_event(self):
+        """Governance scan publishes GovernanceScanStarted event."""
+        with patch("vibe3.domain.publish") as mock_publish:
+            from vibe3.commands.scan import _run_governance_scan
+            from vibe3.domain.events.governance import GovernanceScanStarted
+
+            _run_governance_scan(no_async=True)
+            mock_publish.assert_called_once()
+            event = mock_publish.call_args.args[0]
+            assert isinstance(event, GovernanceScanStarted)
+            assert event.actor == "cli:scan-governance"
+            assert event.tick_count == 0
 
 
 class TestSupervisorScan:
@@ -111,18 +113,21 @@ class TestCombinedScan:
 
 class TestScanIntegration:
     def test_governance_scan_registers_handlers(self):
-        """Sync governance scan calls service layer directly, not facade."""
-        with patch("vibe3.roles.dispatch_governance_execution") as mock_service:
+        """Governance scan publishes event, not direct dispatch."""
+        with patch("vibe3.domain.publish") as mock_publish:
             from vibe3.commands.scan import _run_governance_scan
+            from vibe3.domain.events.governance import GovernanceScanStarted
 
             _run_governance_scan(no_async=True)
-            mock_service.assert_called_once_with(material_override=None)
+            mock_publish.assert_called_once()
+            event = mock_publish.call_args.args[0]
+            assert isinstance(event, GovernanceScanStarted)
 
-    def test_supervisor_scan_registers_handlers(self):
-        """Supervisor scan calls service layer directly, not facade."""
+    def test_supervisor_scan_publishes_events(self):
+        """Supervisor scan publishes SupervisorIssueIdentified events."""
         with (
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.roles.dispatch_supervisor_execution") as mock_apply,
+            patch("vibe3.domain.publish") as mock_publish,
         ):
             mock_fetch.return_value = (
                 1,
@@ -136,53 +141,69 @@ class TestScanIntegration:
             )
 
             from vibe3.commands.scan import _run_supervisor_scan
+            from vibe3.models.domain_events import SupervisorIssueIdentified
 
             _run_supervisor_scan()
             mock_fetch.assert_called_once()
-            mock_apply.assert_called_once()
+            mock_publish.assert_called_once()
+            event = mock_publish.call_args.args[0]
+            assert isinstance(event, SupervisorIssueIdentified)
+            assert event.issue_number == 123
+            assert event.actor == "cli:scan-supervisor"
 
 
 class TestFailedGateBlocking:
-    def test_governance_scan_blocked_by_failed_gate(self):
-        """Sync governance scan ignores FailedGate (only for heartbeat)."""
-        with patch("vibe3.roles.dispatch_governance_execution") as mock_service:
+    def test_governance_scan_ignores_failed_gate(self):
+        """Manual governance scan ignores FailedGate (publishes event directly)."""
+        with patch("vibe3.domain.publish") as mock_publish:
             from vibe3.commands.scan import _run_governance_scan
+            from vibe3.domain.events.governance import GovernanceScanStarted
 
             _run_governance_scan(no_async=True)
-            mock_service.assert_called_once_with(material_override=None)
+            mock_publish.assert_called_once()
+            event = mock_publish.call_args.args[0]
+            assert isinstance(event, GovernanceScanStarted)
 
-    def test_supervisor_scan_blocked_by_failed_gate(self):
-        """Manual supervisor scan ignores FailedGate (only for heartbeat)."""
-        with patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch:
+    def test_supervisor_scan_ignores_failed_gate(self):
+        """Manual supervisor scan ignores FailedGate (publishes events directly)."""
+        with (
+            patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+            patch("vibe3.domain.publish") as mock_publish,
+        ):
             mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_supervisor_scan
 
             _run_supervisor_scan()
             mock_fetch.assert_called_once()
+            # No events published for empty candidates
+            mock_publish.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_combined_scan_blocked_by_failed_gate(self):
-        """Combined scan bypasses FailedGate for both governance and supervisor."""
+    async def test_combined_scan_ignores_failed_gate(self):
+        """Combined scan bypasses FailedGate (publishes events directly)."""
         with (
-            patch("vibe3.roles.dispatch_governance_execution") as mock_governance,
+            patch("vibe3.domain.publish") as mock_publish,
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.roles.dispatch_supervisor_execution"),
         ):
             mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_combined_scan_async
+            from vibe3.domain.events.governance import GovernanceScanStarted
 
             await _run_combined_scan_async()
-            mock_governance.assert_called_once()
+            # Governance event published
+            assert mock_publish.call_count >= 1
+            governance_event = mock_publish.call_args_list[0].args[0]
+            assert isinstance(governance_event, GovernanceScanStarted)
             mock_fetch.assert_called_once()
 
 
-def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
-    """Manual supervisor scan fetches candidates and dispatches each."""
+def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
+    """Manual supervisor scan fetches candidates and publishes events."""
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.roles.dispatch_supervisor_execution") as mock_apply,
+        patch("vibe3.domain.publish") as mock_publish,
     ):
         mock_fetch.return_value = (
             2,
@@ -203,7 +224,7 @@ def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
         mock_fetch.assert_called_once()
-        assert mock_apply.call_count == 2
+        assert mock_publish.call_count == 2
 
 
 def test_governance_list_shows_materials():
@@ -274,3 +295,39 @@ class TestCombinedScanDryRun:
         assert result.exit_code == 0
         mock_governance.assert_called_once()
         mock_supervisor.assert_called_once()
+
+
+def test_scan_governance_does_not_call_roles_dispatch():
+    """Verify governance scan does not call dispatch_governance_execution."""
+    with (
+        patch("vibe3.domain.publish") as mock_publish,
+        patch("vibe3.roles.dispatch_governance_execution") as mock_dispatch,
+    ):
+        from vibe3.commands.scan import _run_governance_scan
+
+        _run_governance_scan()
+        # Event published
+        mock_publish.assert_called_once()
+        # Direct dispatch NOT called
+        mock_dispatch.assert_not_called()
+
+
+def test_scan_supervisor_does_not_call_roles_dispatch():
+    """Verify supervisor scan does not call dispatch_supervisor_execution."""
+    with (
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.domain.publish") as mock_publish,
+        patch("vibe3.roles.dispatch_supervisor_execution") as mock_dispatch,
+    ):
+        mock_fetch.return_value = (
+            1,
+            [{"number": 123, "title": "Issue A", "labels": ["supervisor"]}],
+        )
+
+        from vibe3.commands.scan import _run_supervisor_scan
+
+        _run_supervisor_scan()
+        # Event published
+        mock_publish.assert_called_once()
+        # Direct dispatch NOT called
+        mock_dispatch.assert_not_called()
