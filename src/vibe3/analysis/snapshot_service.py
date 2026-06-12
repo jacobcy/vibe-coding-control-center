@@ -78,7 +78,7 @@ def _get_module_from_path(file_path: str, root: str = "src/vibe3") -> str:
 def build_snapshot(root: str | None = None) -> StructureSnapshot:
     """Build a structure snapshot from the current codebase."""
     if root is None:
-        from vibe3.config.settings import get_source_root
+        from vibe3.config import get_source_root
 
         root = get_source_root()
     log = logger.bind(domain="snapshot", action="build", root=root)

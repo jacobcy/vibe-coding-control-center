@@ -158,7 +158,7 @@ def analyze_file(file_path: str) -> FileStructure:
 def collect_python_file_structures(root: str | None = None) -> list[FileStructure]:
     """Collect structure data for all Python files under a root directory."""
     if root is None:
-        from vibe3.config.settings import get_source_root
+        from vibe3.config import get_source_root
 
         root = get_source_root()
     log = logger.bind(domain="structure", action="collect_python_files", root=root)

@@ -72,7 +72,7 @@ def _list_analyzable_top_level_commands(
     without creating layer violation.
     """
     if commands_root is None:
-        from vibe3.config.settings import get_commands_root
+        from vibe3.config import get_commands_root
 
         commands_root = get_commands_root()
     root = Path(commands_root)
@@ -313,7 +313,7 @@ def dead_code(
         raise typer.Exit(1)
 
     if not root:
-        from vibe3.config.settings import get_source_root
+        from vibe3.config import get_source_root
 
         root = get_source_root()
 
