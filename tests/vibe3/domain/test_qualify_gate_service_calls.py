@@ -22,8 +22,9 @@ class TestAlignBlockedState:
 
         truth = MagicMock(
             blocked_reason="dependency issue",
-            blocked_by_issue=200,
+            blocked_by_issues=[200],
         )
+        truth.blocked_by_issue = 200  # computed property returns first element
 
         mock_label_service = MagicMock()
         with patch("vibe3.services.LabelService", return_value=mock_label_service):

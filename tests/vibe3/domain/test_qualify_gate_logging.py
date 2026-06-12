@@ -29,7 +29,7 @@ def test_blocked_skip_log_includes_truth_details() -> None:
         projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
         blocked_reason="needs human approval",
         blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_by_issue=456,
+        blocked_by_issues=[456],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
 
