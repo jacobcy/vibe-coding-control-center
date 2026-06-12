@@ -14,7 +14,7 @@ runner = CliRunner()
 
 
 def test_internal_manager_guard_blocks_direct_call(monkeypatch):
-    """Invoke internal manager without env var and without --force → exit 1."""
+    """Invoke internal manager without env var and without --yes → exit 1."""
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
@@ -24,21 +24,21 @@ def test_internal_manager_guard_blocks_direct_call(monkeypatch):
         mock_run.assert_not_called()
 
 
-def test_internal_manager_guard_allows_force(monkeypatch):
-    """Invoke internal manager --force without VIBE3_ASYNC_CHILD → exit 0."""
+def test_internal_manager_guard_allows_yes(monkeypatch):
+    """Invoke internal manager --yes without VIBE3_ASYNC_CHILD → exit 0."""
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
         result = runner.invoke(
-            cli_app, ["internal", "manager", "123", "--no-async", "--force"]
+            cli_app, ["internal", "manager", "123", "--no-async", "--yes"]
         )
         assert result.exit_code == 0
         assert mock_run.call_args.kwargs["issue_number"] == 123
 
 
 def test_internal_manager_guard_passes_with_env(monkeypatch):
-    """Set VIBE3_ASYNC_CHILD=1 → exit 0 without --force."""
+    """Set VIBE3_ASYNC_CHILD=1 → exit 0 without --yes."""
     monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
@@ -49,7 +49,7 @@ def test_internal_manager_guard_passes_with_env(monkeypatch):
 
 
 def test_internal_apply_guard_blocks_direct_call(monkeypatch):
-    """Invoke internal apply without VIBE3_ASYNC_CHILD and without --force → exit 1."""
+    """Invoke internal apply without VIBE3_ASYNC_CHILD and without --yes → exit 1."""
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
@@ -60,7 +60,7 @@ def test_internal_apply_guard_blocks_direct_call(monkeypatch):
 
 
 def test_internal_governance_guard_blocks_direct_call(monkeypatch):
-    """Invoke internal governance without env var and without --force → exit 1."""
+    """Invoke internal governance without env var and without --yes → exit 1."""
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
     with patch(
         "vibe3.roles.scan_service.dispatch_governance_execution"
