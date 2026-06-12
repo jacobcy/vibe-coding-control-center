@@ -260,3 +260,21 @@ class BlockedStateIO:
                 issue_number=issue_number,
             ).warning(f"Failed to read label state: {exc}")
             return BlockedState.not_blocked()
+
+
+def write_dependency_to_body(
+    issue_number: int,
+    blocked_by_issue: int,
+    reason: str | None = None,
+) -> None:
+    """Write standard managed section with dependency info to issue body.
+
+    Standalone function (no flow context needed) for use during
+    roadmap/discussion phase before flow exists.
+    """
+    io = BlockedStateIO()
+    io.write_body_projection(
+        issue_number=issue_number,
+        reason=reason,
+        blocked_by_issue=blocked_by_issue,
+    )

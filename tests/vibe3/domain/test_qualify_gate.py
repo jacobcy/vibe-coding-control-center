@@ -592,3 +592,89 @@ def test_auto_resume_blocked_with_none_flow_state_returns_ready() -> None:
         )
 
         assert result == IssueState.READY
+
+
+class TestPlaceholderWorktreeSkip:
+    """Tests for placeholder flow worktree health check skip."""
+
+    def test_check_worktree_health_skips_placeholder(
+        self, mock_config, mock_github, mock_store, sample_issue
+    ):
+        """Placeholder flow (blocked + no worktree) skips worktree health check."""
+        from vibe3.models.coordination_truth import CoordinationTruth
+        from vibe3.models.data_source import DataSource
+
+        # Mock blocked flow state (placeholder flow)
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-123",
+            "flow_status": "blocked",
+            "blocked_reason": "Waiting for dependency",
+        }
+
+        service = QualifyGateService(
+            config=mock_config,
+            github=mock_github,
+            store=mock_store,
+            flow_manager=MagicMock(),
+        )
+
+        # Mock truth with no worktree path
+        truth = CoordinationTruth(
+            blocked_reason="Waiting for dependency",
+            blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_by_issue=None,
+            dependencies=[],
+            worktree_path=None,  # No worktree for placeholder
+        )
+
+        # Should return True without checking path existence
+        result = service._check_worktree_health(
+            issue=sample_issue,
+            branch="task/issue-123",
+            truth=truth,
+        )
+
+        assert result is True
+
+    def test_check_worktree_health_normal_flow_check_path(
+        self, mock_config, mock_github, mock_store, sample_issue
+    ):
+        """Normal flow should still check worktree path health."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.coordination_truth import CoordinationTruth
+
+        # Mock active flow state (normal flow)
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-456",
+            "flow_status": "active",
+        }
+
+        # Mock GitHub client to return empty body (to avoid parse error)
+        mock_github.get_issue_body = MagicMock(return_value="")
+
+        service = QualifyGateService(
+            config=mock_config,
+            github=mock_github,
+            store=mock_store,
+            flow_manager=MagicMock(),
+        )
+
+        # Mock truth with valid worktree path
+        truth = CoordinationTruth(
+            worktree_path="/tmp/worktree/task-issue-456",
+        )
+
+        # Mock Path.exists to return False (worktree missing)
+        with patch("vibe3.domain.qualify_gate.Path") as mock_path:
+            mock_path.return_value.exists.return_value = False
+
+            result = service._check_worktree_health(
+                issue=sample_issue,
+                branch="task/issue-456",
+                truth=truth,
+            )
+
+            # Should check path existence and fail
+            assert result is False
+            mock_path.assert_called_once_with("/tmp/worktree/task-issue-456")

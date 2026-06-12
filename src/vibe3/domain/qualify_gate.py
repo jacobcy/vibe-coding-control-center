@@ -542,6 +542,11 @@ class QualifyGateService:
         Returns True if worktree is healthy (dispatch can continue),
         False if blocked due to structural failure.
         """
+        # Placeholder flow has no worktree — skip health check
+        flow_state = self._store.get_flow_state(branch)
+        if flow_state and flow_state.get("flow_status") == "blocked":
+            return True
+
         from vibe3.observability import append_orchestra_event
 
         worktree_path = truth.worktree_path
