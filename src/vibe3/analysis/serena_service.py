@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,17 @@ from vibe3.models import ChangeSource
 
 if TYPE_CHECKING:
     from vibe3.models import DeadCodeReport
+
+
+@functools.lru_cache(maxsize=None)
+def _is_cli_file(file_path: str) -> bool:
+    """Check if file is a CLI module with Typer commands."""
+    try:
+        with open(file_path, "r") as f:
+            content = f.read()
+            return "import typer" in content or "from typer" in content
+    except Exception:
+        return False
 
 
 class SerenaService:
@@ -71,7 +83,7 @@ class SerenaService:
                         )
             ref_count = len(ref_list)
             # Determine symbol type
-            is_cli_command = ref_count == 0 and self._is_cli_file(relative_file)
+            is_cli_command = ref_count == 0 and _is_cli_file(relative_file)
             symbol_type = "cli_command" if is_cli_command else "function"
             logger.bind(
                 symbol=name_path, ref_count=ref_count, symbol_type=symbol_type
@@ -87,15 +99,6 @@ class SerenaService:
             raise
         except Exception as e:
             raise SerenaError(f"analyze_symbol({name_path})", str(e)) from e
-
-    def _is_cli_file(self, file_path: str) -> bool:
-        """Check if file is a CLI module with Typer commands."""
-        try:
-            with open(file_path, "r") as f:
-                content = f.read()
-                return "import typer" in content or "from typer" in content
-        except Exception:
-            return False
 
     def get_changed_functions(
         self, file_path: str, source: ChangeSource | None = None
@@ -179,7 +182,7 @@ class SerenaService:
             # If mtime check fails, continue with analysis
             pass
 
-        result = _analyze_file(relative_file, self.client, self._is_cli_file)
+        result = _analyze_file(relative_file, self.client, _is_cli_file)
 
         # Cache the result
         try:
@@ -205,7 +208,7 @@ class SerenaService:
         Raises:
             SerenaError: If any file analysis fails
         """
-        return analyze_files(files, self.client, self._is_cli_file)
+        return analyze_files(files, self.client, _is_cli_file)
 
     def analyze_changes(self, source: ChangeSource) -> dict[str, object]:
         """统一改动分析入口 - 支持 PR/Commit/Branch/Uncommitted.
