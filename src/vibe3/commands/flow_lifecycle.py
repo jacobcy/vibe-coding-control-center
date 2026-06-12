@@ -21,12 +21,11 @@ def blocked(
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
     reason: Annotated[
-        str | None,
-        typer.Option("--reason", "--blocked-reason", help="Blocking reason"),
+        str | None, typer.Option("--reason", help="Blocking reason")
     ] = None,
     task: Annotated[
         list[int] | None,
-        typer.Option("--task", "--blocked-by", help="Dependency issue number(s)"),
+        typer.Option("--task", help="Dependency issue number(s)"),
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
@@ -34,26 +33,27 @@ def blocked(
 ) -> None:
     """Mark flow as blocked.
 
-    --blocked-by (--task) marks the blocking dependency issue(s).
+    --task marks the blocking dependency issue(s).
     Can be specified multiple times for multi-dependency blocking.
-    --blocked-reason (--reason) provides a human-readable blocking reason.
-    Both options can be used together.
-
-    If --blocked-by is provided, automatically adds dependency issue link.
+    --reason provides a human-readable blocking reason.
+    Both options are mutually exclusive.
 
     If no flow exists for the branch and the branch name follows task/dev convention,
     automatically calls flow update to create branch + flow (no worktree).
 
     Examples:
         vibe3 flow blocked --reason "等待外部反馈"
-        vibe3 flow blocked --blocked-by 218
-        vibe3 flow blocked --blocked-by 218 --blocked-by 219
-        vibe3 flow blocked --reason "Blocked by #218" --blocked-by 218
+        vibe3 flow blocked --task 218
+        vibe3 flow blocked --task 218 --task 219
         vibe3 flow blocked --branch task/issue-1212 \
-            --blocked-by 467 --reason "依赖未完成"
+            --task 467
     """
     if trace:
         enable_method_trace()
+
+    if reason is not None and task is not None:
+        typer.echo("Error: 不能同时指定 --reason 与 --task", err=True)
+        raise typer.Exit(1)
 
     service = FlowService()
 
@@ -116,9 +116,11 @@ def blocked(
             raise typer.Exit(1)
 
     # Now block the flow
-    # Handle multiple dependencies: use first for DB cache (single-value degradation)
-    first_dep = task[0] if task else None
-    service.block_flow(target_branch, reason=reason, blocked_by_issue=first_dep)
+    if task:
+        for dep in task:
+            service.block_flow(target_branch, reason=None, blocked_by_issue=dep)
+    else:
+        service.block_flow(target_branch, reason=reason, blocked_by_issue=None)
 
     msg = f"Flow blocked on branch '{target_branch}'"
     if reason:

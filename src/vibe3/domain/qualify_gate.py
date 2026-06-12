@@ -222,6 +222,17 @@ class QualifyGateService:
             return None
 
         truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+        if truth.blocked_reason:
+            if truth.is_blocked:
+                self._align_blocked_state(
+                    issue.number,
+                    branch,
+                    truth,
+                    list(issue.labels),
+                    self._store.get_flow_state(branch),
+                )
+            return None
+
         if truth.is_blocked and truth.blocked_by_issues:
             # Check if ALL dependencies are satisfied
             all_satisfied = all(

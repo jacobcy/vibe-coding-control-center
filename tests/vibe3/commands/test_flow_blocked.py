@@ -1,6 +1,6 @@
 """Tests for flow blocked command guards."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
 
@@ -82,8 +82,8 @@ def test_flow_blocked_resolves_numeric_branch_to_canonical_task_branch() -> None
     )
 
 
-def test_flow_blocked_allows_reason_and_task_together() -> None:
-    """--reason and --task can be used together."""
+def test_flow_blocked_rejects_reason_and_task_together() -> None:
+    """--reason and --task should remain mutually exclusive."""
     flow_service = MagicMock()
     flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/issue-235",
@@ -117,10 +117,8 @@ def test_flow_blocked_allows_reason_and_task_together() -> None:
             ],
         )
 
-    assert result.exit_code == 0
-    flow_service.block_flow.assert_called_once_with(
-        "task/issue-235", reason="wait", blocked_by_issue=246
-    )
+    assert result.exit_code != 0
+    flow_service.block_flow.assert_not_called()
 
 
 def test_flow_blocked_no_longer_supports_pr_option() -> None:
@@ -130,11 +128,46 @@ def test_flow_blocked_no_longer_supports_pr_option() -> None:
     assert result.exit_code != 0
 
 
-def test_flow_blocked_no_longer_supports_by_alias() -> None:
-    """CLI should reject removed --by alias."""
-    result = runner.invoke(app, ["flow", "blocked", "--by", "246"])
+def test_flow_blocked_no_longer_supports_blocked_by_alias() -> None:
+    """CLI should reject removed --blocked-by alias."""
+    result = runner.invoke(app, ["flow", "blocked", "--blocked-by", "246"])
 
     assert result.exit_code != 0
+
+
+def test_flow_blocked_appends_multiple_tasks_idempotently() -> None:
+    """Repeated --task options should append dependency links, not overwrite."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/issue-235"
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/issue-235",
+        flow_slug="issue-235",
+        flow_status="active",
+        task_issue_number=235,
+        issues=[],
+    )
+
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+        result = runner.invoke(
+            app,
+            [
+                "flow",
+                "blocked",
+                "--branch",
+                "235",
+                "--task",
+                "246",
+                "--task",
+                "247",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert flow_service.block_flow.call_count == 2
+    assert flow_service.block_flow.call_args_list == [
+        call("task/issue-235", reason=None, blocked_by_issue=246),
+        call("task/issue-235", reason=None, blocked_by_issue=247),
+    ]
 
 
 def test_flow_blocked_auto_creates_flow_for_issue_branch() -> None:
