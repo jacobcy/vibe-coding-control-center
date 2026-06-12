@@ -17,6 +17,7 @@ class TestAlignBlockedState:
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
+        service._blocked_label = "state/blocked"
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
@@ -54,6 +55,7 @@ class TestAlignBlockedState:
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
+        service._blocked_label = "state/blocked"
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
@@ -104,7 +106,6 @@ class TestAutoResumeBlocked:
                     result = service._auto_resume_blocked(
                         issue_number=100,
                         branch="test-branch",
-                        labels=["state/blocked"],
                         flow_state={
                             "flow_status": "blocked",
                             "branch": "test-branch",
@@ -126,6 +127,7 @@ class TestAutoResumeBlocked:
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
+        service._blocked_label = "state/blocked"
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
@@ -143,7 +145,6 @@ class TestAutoResumeBlocked:
                     result = service._auto_resume_blocked(
                         issue_number=100,
                         branch="test-branch",
-                        labels=["state/in-progress"],
                         flow_state={
                             "flow_status": "blocked",
                             "branch": "test-branch",

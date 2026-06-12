@@ -114,7 +114,6 @@ class QualifyGateService:
             target_label = self._auto_resume_blocked(
                 issue_number=issue.number,
                 branch=branch,
-                labels=labels,
                 flow_state=flow_state,
             )
             flow_state = self._store.get_flow_state(branch)
@@ -237,8 +236,7 @@ class QualifyGateService:
             truth=truth,
             labels=labels,
             flow_state=flow_state,
-            blocked_label=getattr(self, "_blocked_label", None)
-            or self._convention.state_label(self._convention.blocked_label),
+            blocked_label=self._blocked_label,
             store=self._store,
             github=self._github,
             config=self.config,
@@ -257,8 +255,7 @@ class QualifyGateService:
         return has_stale_blocked_state(
             labels=labels,
             flow_state=flow_state,
-            blocked_label=getattr(self, "_blocked_label", None)
-            or self._convention.state_label(self._convention.blocked_label),
+            blocked_label=self._blocked_label,
         )
 
     def _source_value(self, source: object | None) -> str:
@@ -285,13 +282,11 @@ class QualifyGateService:
         self,
         issue_number: int,
         branch: str,
-        labels: list[str],
         flow_state: dict[str, object] | None,
     ) -> IssueState:
         return auto_resume_blocked(
             issue_number=issue_number,
             branch=branch,
-            labels=labels,
             flow_state=flow_state,
             store=self._store,
             github=self._github,

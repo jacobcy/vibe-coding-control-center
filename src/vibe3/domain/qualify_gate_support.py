@@ -224,7 +224,6 @@ def auto_resume_blocked(
     *,
     issue_number: int,
     branch: str,
-    labels: list[str],
     flow_state: dict[str, object] | None,
     store: "SQLiteClient",
     github: "GitHubClient",
