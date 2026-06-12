@@ -38,21 +38,6 @@ def _publish_governance_event(
     publish(event)
 
 
-def _execute_governance_internal(material_override: str | None = None) -> None:
-    """Execute governance scan via service layer (no facade).
-
-    Direct path for manual governance scan, calling execution layer
-    without going through OrchestrationFacade heartbeat chain
-    or internal command layer.
-
-    Args:
-        material_override: Optional governance role to override material rotation
-    """
-    from vibe3.roles import dispatch_governance_execution
-
-    dispatch_governance_execution(material_override=material_override)
-
-
 def _run_governance_scan(
     material_override: str | None = None, no_async: bool = False
 ) -> None:
@@ -69,8 +54,8 @@ def _run_governance_scan(
     """
     if no_async:
         logger.warning(
-            "--no-async is deprecated for event-driven scans; "
-            "dispatching via event bus (async)"
+            "--no-async is deprecated; event bus triggers handler "
+            "with async tmux dispatch"
         )
     _publish_governance_event(material_override=material_override)
     logger.bind(domain="orchestra").info("Governance scan event published")
