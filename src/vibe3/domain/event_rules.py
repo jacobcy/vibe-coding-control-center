@@ -16,15 +16,7 @@ import yaml
 from loguru import logger
 
 if TYPE_CHECKING:
-    from vibe3.models import (
-        CommandType as CommandTypeType,
-    )
-    from vibe3.models import (
-        DomainEvent,
-        ExecutionRequest,
-        IssueInfo,
-        OrchestraConfig,
-    )
+    from vibe3.models import DomainEvent
 
 
 @dataclass(frozen=True)
@@ -185,117 +177,25 @@ def evaluate_rules(
             )
 
 
-def _dispatch_command_job(
-    command_type: str,
-    issue_number: int,
-    actor: str,
-    refs: dict[str, str] | None = None,
-) -> None:
-    """Internal helper to dispatch a command job via ExecutionCoordinator.
+def _resolve_branch_from_issue(params: dict[str, str], issue_number: int) -> str:
+    """Resolve branch name from params or use convention.
 
     Args:
-        command_type: CommandType value (plan, run, review, manager)
-        issue_number: Issue number to dispatch for
-        actor: Actor identifier for the dispatch
-        refs: Optional refs dict for the execution request
+        params: Action parameters dict
+        issue_number: Issue number to resolve branch for
+
+    Returns:
+        Branch name from params or convention-based canonical branch
     """
-    from vibe3.clients import get_store
-    from vibe3.config import load_orchestra_config
-    from vibe3.execution import ExecutionCoordinator
-    from vibe3.models import CommandType
-    from vibe3.services import load_issue_info
-
-    config = load_orchestra_config()
-    effective_refs = {"issue_number": str(issue_number)}
-    if refs:
-        effective_refs.update(refs)
-
-    try:
-        cmd_type = CommandType(command_type)
-    except ValueError:
-        logger.bind(domain="event_rules").warning(
-            f"Unknown command_type '{command_type}', skipping dispatch"
-        )
-        return
-
-    with get_store() as store:
-        issue = load_issue_info(issue_number, config=config)
-        if issue is None:
-            logger.bind(domain="event_rules").warning(
-                f"Failed to load issue #{issue_number}, skipping dispatch"
-            )
-            return
-
-        # Build ExecutionRequest based on command type
-        request = _build_execution_request(
-            cmd_type, config, issue, actor, effective_refs
-        )
-        if request is None:
-            logger.bind(domain="event_rules").warning(
-                f"Failed to build execution request for {cmd_type.value} "
-                f"on #{issue_number}"
-            )
-            return
-
-        coordinator = ExecutionCoordinator(config, store)
-        result = coordinator.dispatch_execution(request)
-
-        if result.launched:
-            logger.bind(
-                domain="event_rules",
-                command_type=command_type,
-                issue_number=issue_number,
-            ).info(f"Command job dispatched: {command_type}")
-        elif result.skipped:
-            logger.bind(
-                domain="event_rules",
-                command_type=command_type,
-                issue_number=issue_number,
-            ).info(f"Command job skipped: {result.reason}")
-        else:
-            logger.bind(
-                domain="event_rules",
-                command_type=command_type,
-                issue_number=issue_number,
-            ).warning(f"Command job dispatch failed: {result.reason}")
-
-
-def _build_execution_request(
-    command_type: "CommandTypeType",
-    config: "OrchestraConfig",
-    issue: "IssueInfo",
-    actor: str,
-    refs: dict[str, str],
-) -> "ExecutionRequest | None":
-    """Build ExecutionRequest for a given command type."""
+    branch = params.get("branch")
+    if branch:
+        return branch
     from vibe3.config import get_convention
-    from vibe3.models import ExecutionRequest, WorktreeRequirement
 
     convention = get_convention()
-    target_branch = convention.branch.canonical_branch(issue.number)
-
-    # Map command type to role and worktree requirement
-    role_map = {
-        "plan": ("planner", WorktreeRequirement.PERMANENT),
-        "run": ("executor", WorktreeRequirement.PERMANENT),
-        "review": ("reviewer", WorktreeRequirement.PERMANENT),
-        "manager": ("manager", WorktreeRequirement.PERMANENT),
-    }
-
-    role, wt_req = role_map.get(
-        command_type.value, ("unknown", WorktreeRequirement.NONE)
-    )
-
-    return ExecutionRequest(
-        role=role,
-        target_branch=target_branch,
-        target_id=issue.number,
-        execution_name=f"vibe3-{role}-issue-{issue.number}",
-        actor=actor,
-        refs=refs,
-        worktree_requirement=wt_req,
-        mode="async",
-    )
+    # canonical_branch returns str, but typing says Any
+    # We cast to str for type safety
+    return str(convention.branch.canonical_branch(issue_number))
 
 
 def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
@@ -316,13 +216,16 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
     def enqueue_command_job_action(params: dict[str, str]) -> None:
         """Enqueue command job action handler.
 
-        Dispatches a command job via ExecutionCoordinator.
+        Publishes DispatchIntent events for the corresponding command type.
         Params:
             - command_type: CommandType value (plan, run, review, manager)
             - issue_number: Issue number to dispatch for
             - actor: Actor identifier (optional, defaults to
               "event:enqueue_command_job")
+            - branch: Branch name (optional, defaults to convention)
         """
+        from vibe3.domain import publish
+
         command_type = params.get("command_type")
         if not command_type:
             logger.bind(domain="event_rules").warning(
@@ -347,16 +250,72 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
             return
 
         actor = params.get("actor", "event:enqueue_command_job")
-        refs = {
-            k: v
-            for k, v in params.items()
-            if k not in ("command_type", "issue_number", "actor")
-        }
+        branch = _resolve_branch_from_issue(params, issue_number)
 
-        _dispatch_command_job(command_type, issue_number, actor, refs)
+        # Map command_type to DispatchIntent class and trigger_state
+        command_type_lower = command_type.lower()
+        intent_type_name: str
+        if command_type_lower == "manager":
+            from vibe3.models import ManagerDispatchIntent
+
+            manager_event = ManagerDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="ready",
+                actor=actor,
+            )
+            publish(manager_event)
+            intent_type_name = "ManagerDispatchIntent"
+        elif command_type_lower == "plan":
+            from vibe3.models import PlannerDispatchIntent
+
+            planner_event = PlannerDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="claimed",
+                actor=actor,
+            )
+            publish(planner_event)
+            intent_type_name = "PlannerDispatchIntent"
+        elif command_type_lower == "run":
+            from vibe3.models import ExecutorDispatchIntent
+
+            executor_event = ExecutorDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="in-progress",
+                actor=actor,
+            )
+            publish(executor_event)
+            intent_type_name = "ExecutorDispatchIntent"
+        elif command_type_lower == "review":
+            from vibe3.models import ReviewerDispatchIntent
+
+            reviewer_event = ReviewerDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="review",
+                actor=actor,
+            )
+            publish(reviewer_event)
+            intent_type_name = "ReviewerDispatchIntent"
+        else:
+            logger.bind(domain="event_rules").warning(
+                f"enqueue_command_job unknown command_type '{command_type}', "
+                "skipping"
+            )
+            return
+
+        logger.bind(
+            domain="event_rules",
+            command_type=command_type,
+            issue_number=issue_number,
+        ).info(f"Published {intent_type_name} for command dispatch")
 
     def _enqueue_by_role(role: str, params: dict[str, str]) -> None:
-        """Validate params and dispatch via _dispatch_command_job."""
+        """Validate params and publish role-specific DispatchIntent."""
+        from vibe3.domain import publish
+
         issue_number_str = params.get("issue_number")
         if not issue_number_str:
             logger.bind(domain="event_rules").warning(
@@ -373,9 +332,54 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
             return
 
         actor = params.get("actor", f"event:enqueue_{role}")
-        refs = {k: v for k, v in params.items() if k not in ("issue_number", "actor")}
+        branch = _resolve_branch_from_issue(params, issue_number)
 
-        _dispatch_command_job(role, issue_number, actor, refs)
+        # Map role to DispatchIntent class and trigger_state
+        intent_type_name: str
+        if role == "plan":
+            from vibe3.models import PlannerDispatchIntent
+
+            planner_event = PlannerDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="claimed",
+                actor=actor,
+            )
+            publish(planner_event)
+            intent_type_name = "PlannerDispatchIntent"
+        elif role == "run":
+            from vibe3.models import ExecutorDispatchIntent
+
+            executor_event = ExecutorDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="in-progress",
+                actor=actor,
+            )
+            publish(executor_event)
+            intent_type_name = "ExecutorDispatchIntent"
+        elif role == "review":
+            from vibe3.models import ReviewerDispatchIntent
+
+            reviewer_event = ReviewerDispatchIntent(
+                issue_number=issue_number,
+                branch=branch,
+                trigger_state="review",
+                actor=actor,
+            )
+            publish(reviewer_event)
+            intent_type_name = "ReviewerDispatchIntent"
+        else:
+            logger.bind(domain="event_rules").warning(
+                f"Unknown role '{role}' for enqueue_by_role, skipping"
+            )
+            return
+
+        logger.bind(
+            domain="event_rules",
+            role=role,
+            issue_number=issue_number,
+        ).info(f"Published {intent_type_name} for role dispatch")
 
     def refresh_queue_priority_action(params: dict[str, str]) -> None:
         """Refresh queue priority action handler.
