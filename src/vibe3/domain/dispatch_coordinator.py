@@ -267,11 +267,18 @@ class GlobalDispatchCoordinator:
                     "select_ready_issues_from_collected_issues failed for "
                     f"{state.value}: {exc}"
                 )
-        append_orchestra_event(
-            "dispatcher",
-            f"GlobalDispatchCoordinator: queue collection complete, "
-            f"total={len(queue)} issues",
-        )
+        if queue:
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: queue collection complete, "
+                f"total={len(queue)} issues",
+            )
+        else:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue collection complete, "
+                "no actionable issues found",
+            )
         return queue
 
     def _check_dispatch_health(self, issue: IssueInfo) -> bool:
@@ -474,6 +481,11 @@ class GlobalDispatchCoordinator:
             entry = self._frozen_queue[index]
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (issue not found or state missing)",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
@@ -492,6 +504,11 @@ class GlobalDispatchCoordinator:
                 continue
 
             if issue.state == IssueState.DONE:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (state terminal: done)",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
@@ -518,11 +535,21 @@ class GlobalDispatchCoordinator:
 
             preflight = self._run_dispatch_preflight(issue)
             if not preflight.allowed or preflight.target_state is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    f"from queue (preflight failed: {preflight.reason})",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
             role = find_role_for_state(preflight.target_state)
             if role is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    f"from queue (no role for state {preflight.target_state})",
+                )
                 self._frozen_queue.pop(index)
                 continue
             entry.collected_state = preflight.target_state.value
@@ -668,6 +695,11 @@ class GlobalDispatchCoordinator:
             dispatched_count
         )
         if need_collect:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue exhausted after dispatch, "
+                "rebuilding for next tick",
+            )
             fresh = await self._collect_frozen_queue()
             # Invalidate PR cache after fresh collection
             self._check_service.invalidate_pr_cache()
