@@ -171,8 +171,6 @@ def _find_tests_via_dag(src_files: list[str], root: Path) -> set[str]:
 
         hits: set[str] = set()
         for test_file in sorted(test_root.glob("**/test_*.py")):
-            if "__pycache__" in str(test_file):
-                continue
             file_imports = _extract_imports(str(test_file))
             if any(imp in affected for imp in file_imports):
                 try:

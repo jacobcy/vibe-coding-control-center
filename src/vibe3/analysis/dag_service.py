@@ -129,8 +129,6 @@ def build_module_graph(src_root: str = "src/vibe3") -> dict[str, ModuleNode]:
 
     graph: dict[str, ModuleNode] = {}
     for py_file in sorted(root.glob("**/*.py")):
-        if "__pycache__" in str(py_file):
-            continue
         module = _file_to_module(str(py_file))
         imports = _extract_imports(str(py_file))
         graph[module] = ModuleNode(
@@ -176,11 +174,7 @@ def expand_impacted_modules(
             graph = build_module_graph()
 
         # seed 模块（只取 Python 文件）
-        seeds = [
-            _file_to_module(f)
-            for f in seed_files
-            if f.endswith(".py") and "__pycache__" not in f
-        ]
+        seeds = [_file_to_module(f) for f in seed_files if f.endswith(".py")]
 
         # 构建反向依赖图（谁依赖了我）
         reverse: dict[str, list[str]] = {m: [] for m in graph}

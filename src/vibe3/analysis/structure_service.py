@@ -166,8 +166,6 @@ def collect_python_file_structures(root: str = "src/vibe3") -> list[FileStructur
 
     results: list[FileStructure] = []
     for py_file in sorted(root_path.glob("**/*.py")):
-        if "__pycache__" in str(py_file):
-            continue
         results.append(analyze_python_file(str(py_file)))
 
     log.bind(files=len(results)).success("Python file structures collected")
