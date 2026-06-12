@@ -19,6 +19,7 @@ from vibe3.clients import (
 )
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check.service import CheckService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -85,7 +86,7 @@ class TestCheckSyncRulesBehavioral:
             result = service.verify_current_flow()
 
             # Guard must skip the multi-state label fix
-            assert mock_check.called is False
+            assert not mock_check.called
 
         assert result is not None
         assert result.is_valid is True
@@ -116,8 +117,6 @@ class TestCheckSyncRulesBehavioral:
             "labels": [],
         }
         # Mock a closed PR that would normally trigger terminal state
-        from vibe3.models.pr import PRResponse, PRState
-
         closed_pr = PRResponse(
             number=123,
             title="Test PR",
@@ -155,7 +154,7 @@ class TestCheckSyncRulesBehavioral:
             result = service.verify_current_flow()
 
             # Guard must skip PR terminal state handling
-            assert mock_handle.called is False
+            assert not mock_handle.called
 
         assert result is not None
         # Flow should remain active, not aborted
