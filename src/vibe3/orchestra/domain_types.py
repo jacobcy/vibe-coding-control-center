@@ -124,6 +124,14 @@ class CheckServiceProtocol(Protocol):
         """Run consistency checks for flows in the store."""
         ...
 
+    def clean_orchestra_scanned_with_assignee(self) -> int:
+        """Remove orchestra-scanned label from issues with assignee.
+
+        Returns:
+            Number of issues cleaned.
+        """
+        ...
+
     def invalidate_pr_cache(self) -> None:
         """Invalidate PR cache to force refresh on next check."""
         ...

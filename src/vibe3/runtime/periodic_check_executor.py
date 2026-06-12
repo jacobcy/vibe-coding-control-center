@@ -73,6 +73,15 @@ async def execute_periodic_check(
                 f"Periodic check completed: all {total} flows are healthy"
             )
 
+        # Clean orchestra-scanned labels from issues with assignee
+        cleaned = await asyncio.to_thread(
+            check_service.clean_orchestra_scanned_with_assignee
+        )
+        if cleaned > 0:
+            logger.bind(domain="orchestra", action="periodic_check").info(
+                f"Cleaned orchestra-scanned from {cleaned} issues with assignee"
+            )
+
     except Exception as exc:
         append_orchestra_event(
             "server",

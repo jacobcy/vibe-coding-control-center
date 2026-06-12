@@ -672,3 +672,95 @@ class CheckService(CheckRemote):
             )
             return FixResult(success=False, error=error)
         return FixResult(success=True, applied=fixed)
+
+    def clean_orchestra_scanned_with_assignee(self) -> int:
+        """Remove orchestra-scanned label from issues with assignee.
+
+        orchestra-scanned is a roadmap-intake mechanism to mark "not for intake".
+        When an issue gets an assignee (e.g., via vibe-roadmap dependency resolution),
+        it should have orchestra-scanned removed to avoid confusing assignee-pool.
+
+        Returns:
+            Number of issues cleaned.
+        """
+        import subprocess
+        import time
+
+        from vibe3.config import load_orchestra_config
+
+        config = load_orchestra_config()
+        cleaned_count = 0
+
+        try:
+            # Fetch all open issues with orchestra-scanned label
+            raw_issues = self.github_client.list_issues(
+                limit=100,
+                state="open",
+                assignee=None,
+                repo=config.repo,
+            )
+
+            manager_usernames = set(config.manager_usernames)
+
+            for issue in raw_issues:
+                number = issue.get("number")
+                if not isinstance(number, int):
+                    continue
+
+                # Check if issue has orchestra-scanned label
+                labels = issue.get("labels", [])
+                if not isinstance(labels, list):
+                    continue
+
+                has_orchestra_scanned = any(
+                    isinstance(label, dict) and label.get("name") == "orchestra-scanned"
+                    for label in labels
+                )
+
+                if not has_orchestra_scanned:
+                    continue
+
+                # Check if issue has assignee from manager pool
+                assignees = issue.get("assignees", [])
+                if not isinstance(assignees, list):
+                    continue
+
+                has_manager_assignee = any(
+                    isinstance(a, dict) and a.get("login") in manager_usernames
+                    for a in assignees
+                )
+
+                if has_manager_assignee:
+                    # Remove orchestra-scanned label using gh CLI
+                    try:
+                        cmd = [
+                            "gh",
+                            "issue",
+                            "edit",
+                            str(number),
+                            "--remove-label",
+                            "orchestra-scanned",
+                        ]
+                        if config.repo:
+                            cmd.extend(["--repo", config.repo])
+
+                        subprocess.run(cmd, capture_output=True, text=True, check=True)
+                        logger.bind(domain="check").info(
+                            f"Removed orchestra-scanned from issue #{number} "
+                            f"(has manager assignee)"
+                        )
+                        cleaned_count += 1
+                        # Rate limiting
+                        time.sleep(0.5)
+                    except subprocess.CalledProcessError as exc:
+                        logger.bind(domain="check").warning(
+                            f"Failed to remove orchestra-scanned from issue #{number}: "
+                            f"{exc.stderr}"
+                        )
+
+        except Exception as exc:
+            logger.bind(domain="check").error(
+                f"Failed to clean orchestra-scanned issues: {exc}"
+            )
+
+        return cleaned_count
