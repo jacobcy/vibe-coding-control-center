@@ -153,3 +153,75 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 - 整体架构愿景：见 [architecture-convergence-standard.md](v3/architecture-convergence-standard.md)
 - 详细 LOC 限制：见 [loc-governance.md](loc-governance.md)
 - 术语定义：见 [glossary.md](glossary.md)
+
+## 8. services/ 子包边界约束 (Sub-Package Boundaries)
+
+`services/` 包含 9 个子包，每个子包有明确的职责边界和依赖规则。这些约束由 `tests/vibe3/test_modularity/test_services_subpackage_boundaries.py` 自动强制执行。
+
+### 8.1 子包职责与依赖规则
+
+| 子包 | 职责 | 可导入自 | 禁止导入自 |
+| :--- | :--- | :--- | :--- |
+| `shared/` | 跨领域公共能力（branches, labels, paths, roles, timeline, status_query） | `services/protocols`, L4-L6 模块 | `services/flow`, `services/pr`, `services/issue`, `services/task`, `services/orchestra`（9 个已知违规作为技术债务追踪） |
+| `protocols/` | 协议/接口定义（依赖倒置） | 仅 L4-L6 模块 | 所有 `services/` 实现子包 |
+| `flow/` | Flow 状态机、生命周期、重建、恢复、投影 | `issue`, `pr`, `task`, `shared`, `protocols` | 不得形成新的双向耦合（超出 4 个已知循环） |
+| `pr/` | PR 操作、解析器 | `flow`, `issue`, `task`, `shared`, `protocols` | 不得引入新的耦合 |
+| `issue/` | Issue 处理、分支解析、分发策略、标题缓存 | `flow`, `shared`, `protocols` | 不得引入新的耦合 |
+| `task/` | Task 管理 | `flow`, `issue`, `pr`, `shared`, `protocols` | 不得引入新的耦合 |
+| `orchestra/` | 编排辅助工具 | `shared`, `protocols` | 不得导入业务子包 |
+| `handoff/` | Handoff 解析、状态、存储、验证 | `shared`, `protocols` | 不得导入业务子包 |
+| `check/` | 代码质量检查（cleanup, lock, PR service, remote） | `shared`, `protocols` | 不得导入业务子包 |
+
+### 8.2 业务子包依赖图
+
+业务子包（`flow`, `pr`, `issue`, `task`）之间的依赖关系如下：
+
+```
+flow   → issue, pr, task
+pr     → flow, issue, task
+issue  → flow
+task   → flow, issue, pr
+```
+
+### 8.3 已知双向耦合
+
+以下 4 对子包存在双向导入（均为已知技术债务，需逐步消除）：
+
+- `flow` ↔ `pr`
+- `flow` ↔ `issue`
+- `flow` ↔ `task`
+- `pr` ↔ `task`
+
+这些循环在 `KNOWN_SUBPACKAGE_CYCLES` 中注册，由 `test_no_subpackage_bidirectional_coupling` 追踪。新增的双向耦合将触发测试失败。
+
+### 8.4 已知 shared/ 边界违规
+
+`shared/` 当前存在 9 个违规导入业务子包的实例，作为技术债务在 `KNOWN_SHARED_VIOLATIONS` 中注册：
+
+| 文件 | 违规导入 |
+| :--- | :--- |
+| `shared/branches.py` | `vibe3.services.pr.resolver`, `vibe3.services.flow.service` |
+| `shared/labels.py` | `vibe3.services.issue.dispatch_policy` |
+| `shared/roles.py` | `vibe3.services.issue.failure` |
+| `shared/timeline.py` | `vibe3.services.flow.timeline` |
+| `shared/status_query.py` | `vibe3.services.issue.collection`, `vibe3.services.issue.dispatch_policy`, `vibe3.services.issue.title_cache`, `vibe3.services.pr.service`, `vibe3.services.issue.body` |
+
+这些违规由 `test_shared_no_business_imports` 追踪。新增违规将触发测试失败。
+
+### 8.5 CI 强制执行
+
+本节所有约束由以下机制强制执行：
+
+- **CI 工作流**：`.github/workflows/architecture-check.yml` 在每个 PR 上运行 `tests/vibe3/test_modularity/`，零容忍策略（任何违规阻断 PR 合并）。
+- **测试套件**：`tests/vibe3/test_modularity/test_services_subpackage_boundaries.py` 提供具体的边界检查。
+- **依赖方向测试**：`tests/vibe3/test_modularity/test_dependency_direction.py` 确保无向上导入（跨 6 层模型）。
+
+### 8.6 未覆盖子包说明
+
+`orchestra/`, `handoff/`, `check/` 三个子包的边界规则未在 `test_services_subpackage_boundaries.py` 的依赖图构建器中覆盖，但其约束由以下测试强制：
+
+- `test_shared_no_business_imports`：确保 `shared/` 不导入这些子包
+- `test_protocols_no_implementation_imports`：确保 `protocols/` 不导入这些子包
+- `test_no_upward_imports`：确保这些子包不违反分层规则
+
+本节文档准确描述其边界，CI 强制执行由上述测试间接保证。

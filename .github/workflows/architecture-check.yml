@@ -1,0 +1,29 @@
+name: Architecture Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  modularity:
+    name: Architecture Tests / modularity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
+
+      - name: Run modularity tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: uv run pytest tests/vibe3/test_modularity -v
