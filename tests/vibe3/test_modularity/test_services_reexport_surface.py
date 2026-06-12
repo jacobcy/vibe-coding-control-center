@@ -6,8 +6,8 @@ These tests discover and baseline-track four categories of compatibility debt:
 3. Pure compatibility bridge modules
 4. Layer-crossing bridge modules
 
-Each category uses @pytest.mark.xfail(strict=False) to keep the test suite green
-while making the residual surface visible and preventing regressions.
+Each category enforces the current baseline as a hard regression gate, then uses
+pytest.xfail for the known residual debt until the count reaches zero.
 """
 
 import ast
@@ -204,11 +204,12 @@ KNOWN_LAYER_CROSSING_BRIDGES = {
     # Note: pr/scoring.py has local PRScoringError class, so classifier may exclude it
 }
 
+ROOT_BARREL_IMPORT_BASELINE = 126
+SHARED_BARREL_IMPORT_BASELINE = 1
+PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
+LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="Baseline: 126 root barrel imports across 76 files (issue #2698)",
-)
+
 def test_root_barrel_import_count() -> None:
     """Verify root barrel imports (from vibe3.services import ...).
 
@@ -231,14 +232,18 @@ def test_root_barrel_import_count() -> None:
         for file, count in sorted_files[:10]:
             print(f"     {file}: {count} imports")
 
-    # xfail: expected to fail with current baseline
+    assert len(imports) <= ROOT_BARREL_IMPORT_BASELINE, (
+        "Root barrel imports increased beyond the issue #2698 baseline: "
+        f"expected <= {ROOT_BARREL_IMPORT_BASELINE}, found {len(imports)}"
+    )
+    if imports:
+        pytest.xfail(
+            f"Baseline: {len(imports)} root barrel imports remain (issue #2698)"
+        )
+
     assert len(imports) == 0, f"Found {len(imports)} root barrel imports"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="Baseline: ~1 shared barrel import (issue #2698)",
-)
 def test_shared_barrel_import_count() -> None:
     """Verify shared barrel imports (from vibe3.services.shared import ...).
 
@@ -252,14 +257,18 @@ def test_shared_barrel_import_count() -> None:
         for imp in imports[:10]:
             print(f"   {imp['file']}:{imp['line']} - {imp['import']}")
 
-    # xfail: expected to fail with current baseline
+    assert len(imports) <= SHARED_BARREL_IMPORT_BASELINE, (
+        "Shared barrel imports increased beyond the issue #2698 baseline: "
+        f"expected <= {SHARED_BARREL_IMPORT_BASELINE}, found {len(imports)}"
+    )
+    if imports:
+        pytest.xfail(
+            f"Baseline: {len(imports)} shared barrel imports remain (issue #2698)"
+        )
+
     assert len(imports) == 0, f"Found {len(imports)} shared barrel imports"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="Baseline: 1 pure bridge module (issue #2698)",
-)
 def test_pure_bridge_module_count() -> None:
     """Verify pure compatibility bridge modules.
 
@@ -299,14 +308,22 @@ def test_pure_bridge_module_count() -> None:
         for file in missing_known:
             print(f"     {file}")
 
-    # xfail: expected to fail with current baseline
+    assert not unknown_bridges, (
+        "Unknown pure bridge module(s) discovered: "
+        f"{', '.join(sorted(unknown_bridges))}"
+    )
+    assert len(pure_bridges) <= PURE_BRIDGE_MODULE_BASELINE, (
+        "Pure bridge modules increased beyond the issue #2698 baseline: "
+        f"expected <= {PURE_BRIDGE_MODULE_BASELINE}, found {len(pure_bridges)}"
+    )
+    if pure_bridges:
+        pytest.xfail(
+            f"Baseline: {len(pure_bridges)} pure bridge modules remain (issue #2698)"
+        )
+
     assert len(pure_bridges) == 0, f"Found {len(pure_bridges)} pure bridge modules"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="Baseline: 3 layer-crossing bridge modules (issue #2698)",
-)
 def test_layer_crossing_bridge_count() -> None:
     """Verify layer-crossing bridge modules.
 
@@ -347,7 +364,22 @@ def test_layer_crossing_bridge_count() -> None:
             print(f"     {file}")
         print("   (May be due to classifier excluding files with local definitions)")
 
-    # xfail: expected to fail with current baseline
+    assert not unknown_bridges, (
+        "Unknown layer-crossing bridge module(s) discovered: "
+        f"{', '.join(sorted(unknown_bridges))}"
+    )
+    assert len(layer_crossing_bridges) <= LAYER_CROSSING_BRIDGE_BASELINE, (
+        "Layer-crossing bridge modules increased beyond the issue #2698 baseline: "
+        f"expected <= {LAYER_CROSSING_BRIDGE_BASELINE}, "
+        f"found {len(layer_crossing_bridges)}"
+    )
+    if layer_crossing_bridges:
+        pytest.xfail(
+            "Baseline: "
+            f"{len(layer_crossing_bridges)} layer-crossing bridge modules remain "
+            "(issue #2698)"
+        )
+
     assert (
         len(layer_crossing_bridges) == 0
     ), f"Found {len(layer_crossing_bridges)} layer-crossing bridge modules"
