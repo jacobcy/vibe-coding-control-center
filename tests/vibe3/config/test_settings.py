@@ -17,6 +17,12 @@ from vibe3.config.settings import (
 class TestPathsConfig:
     """Tests for PathsConfig model and helper functions."""
 
+    def test_paths_config_is_public_config_api(self) -> None:
+        """PathsConfig is exported through vibe3.config public API."""
+        from vibe3.config import PathsConfig as PublicPathsConfig
+
+        assert PublicPathsConfig is PathsConfig
+
     def test_paths_config_defaults(self) -> None:
         """PathsConfig() produces correct defaults."""
         pc = PathsConfig()
@@ -26,18 +32,18 @@ class TestPathsConfig:
 
     def test_paths_config_custom_vibe3_root(self) -> None:
         """VibeConfig with custom paths works."""
-        vc = VibeConfig(paths={"vibe3_root": "custom/src"})
+        vc = VibeConfig(paths=PathsConfig(vibe3_root="custom/src"))
         assert vc.paths.vibe3_root == "custom/src"
         assert vc.paths.commands_root == "src/vibe3/commands"  # unchanged default
 
     def test_paths_config_custom_all(self) -> None:
         """VibeConfig with all custom paths works."""
         vc = VibeConfig(
-            paths={
-                "vibe3_root": "custom/src",
-                "commands_root": "custom/src/commands",
-                "policies_root": "custom/policies",
-            }
+            paths=PathsConfig(
+                vibe3_root="custom/src",
+                commands_root="custom/src/commands",
+                policies_root="custom/policies",
+            )
         )
         assert vc.paths.vibe3_root == "custom/src"
         assert vc.paths.commands_root == "custom/src/commands"
