@@ -97,6 +97,167 @@ gh api repos/{owner}/{repo}/milestones --paginate -q '.[] | {number, title, open
 
 建议拆分为主 issue + sub-issues，或记录 `## Scope estimate`。
 
+### Step 5A: Epic Creation
+
+当 Step 5 识别到 epic 候选时，引导用户创建父 epic issue：
+
+**标签配置**：
+- `roadmap/epic` + 用户选择的 `roadmap/p*` + milestone
+
+**Body 必需结构**：
+
+```markdown
+## Scope
+<整体意图和范围描述>
+
+## Sub-issues
+- [ ] #N — <sub-issue 1 title>
+- [ ] #M — <sub-issue 2 title>
+```
+
+**创建流程**：
+
+```bash
+# 创建 epic issue
+gh issue create --title "<标题>" --body "$(cat <<'EOF'
+## Scope
+<整体意图>
+
+## Sub-issues
+- [ ] #<placeholder-1> — <sub-issue 1 title>
+- [ ] #<placeholder-2> — <sub-issue 2 title>
+EOF
+)" --label "roadmap/epic,roadmap/p1" --milestone "<milestone title>"
+```
+
+**注意**：
+- 如果 sub-issues 尚未创建，先使用占位符标题创建 epic
+- 创建 sub-issues 后，更新 epic 的 `## Sub-issues` 部分为真实 issue 编号
+- 复选框格式 `- [ ] #N` 是 `assignee-pool` 解析所需
+
+### Step 5B: Sub-Issue Creation
+
+为 epic 的每个子任务创建 sub-issue：
+
+**标签配置**：
+- `roadmap/p*` + milestone（与父 epic 相同）
+- **不要**添加 `state/blocked` 标签（这是 pre-flow 阶段，依赖声明只在 body 中）
+
+**Body 必需结构**：
+
+```markdown
+## Parent issue
+- Parent: #<epic-id>
+
+## Dependencies
+- Depends on #<id> — <简短描述>
+- Blocked by #<id> — <简短描述>
+
+## <Task description>
+<具体任务内容>
+```
+
+**创建命令**：
+
+```bash
+gh issue create --title "<标题>" --body "$(cat <<'EOF'
+## Parent issue
+- Parent: #<epic-id>
+
+## Dependencies
+- Depends on #<dependency-id> — <描述>
+
+## <Task section>
+<内容>
+EOF
+)" --label "roadmap/p1" --milestone "<milestone title>"
+```
+
+**关键约束**（Pre-flow Dependency Rules）：
+- **禁止**写入 `state/blocked` 标签
+- **禁止**写入 managed section（`<!-- vibe3-flow-state-start -->`）
+- **禁止**调用 `vibe3 flow blocked` / `vibe3 flow bind`（需要 branch context）
+
+创建所有 sub-issues 后，更新 epic 的 `## Sub-issues` 部分为真实 issue 编号。
+
+### Step 5C: Dependency Order Encoding
+
+当 sub-issues 之间存在依赖关系时，使用规范的依赖声明格式：
+
+**依赖声明格式**：
+
+```markdown
+## Dependencies
+- Depends on #<id> — <简短描述（提供了什么）>
+- Blocked by #<id> — <简短描述（为什么阻塞）>
+```
+
+**格式规范**：
+- 每行一个依赖
+- 使用 `- Depends on #N` 或 `- Blocked by #N` 前缀
+- 简短描述依赖内容或阻塞原因
+- 此格式可被以下工具解析：
+  - `vibe-new` Step 5（bootstrap 时提取依赖）
+  - `roadmap-intake`（检测 `Blocked by #N` 用于 `--blocked-by` 参数）
+  - `assignee-pool`（在 issue body/comments 中查找依赖引用）
+
+**示例**：
+
+```markdown
+## Dependencies
+- Depends on #123 — 提供认证中间件基础能力
+- Blocked by #124 — 等待数据库 schema 设计决策
+```
+
+### Step 5D: RFC Routing for Unresolved Design Choices
+
+当 epic 或 sub-issue 存在未解决的架构/设计决策时：
+
+**处理流程**：
+
+1. **添加 RFC 标签**：
+   ```bash
+   gh issue edit <issue-number> --add-label "roadmap/rfc"
+   ```
+
+2. **创建决策请求评论**：
+   ```bash
+   gh issue comment <issue-number> --body "[decision needed] <具体设计问题>"
+   ```
+
+3. **等待决策**：
+   - RFC issue 不会进入 dispatch
+   - 等待人类通过 `/vibe-task` 决策
+
+4. **决策完成后**：
+   - 决策写入 issue comment
+   - 移除 `roadmap/rfc` 标签
+   - 然后可以创建依赖此决策的 sub-issues
+
+**约束**：
+- 不要创建依赖未解决 RFC 决策的 sub-issues
+- RFC 问题解决前，相关 issue 保持 blocked 状态
+
+### Boundary: Pre-Flow vs Flow Context
+
+**此 skill 的职责边界**：
+
+**负责**：
+- 创建 issue 并在 body 中声明依赖（自然语言，pre-flow）
+- 引导用户填写规范的 `## Dependencies` 和 `## Sub-issues` 部分
+- 设置正确的标签和 milestone
+
+**不负责**（Pre-flow Dependency Rules）：
+- 不写入 `state/blocked` 标签（需要 flow context）
+- 不写入 managed section（需要 branch context）
+- 不调用 `vibe3 flow blocked` / `vibe3 flow bind` 命令
+
+**依赖声明到执行的转换**：
+
+- **roadmap-intake**：检测 body 中的 `Blocked by #N` → 使用 `vibe3 task intake <M> --blocked-by <N>` 创建 placeholder flow 并设置 `state/blocked`
+- **vibe-new Step 5**：在 bootstrap 时读取 `## Dependencies` → 验证并标记未满足的依赖
+- **manager**：进入 flow 后读取 body 中的依赖 → 通过 `vibe3 flow blocked --task <N>` 注册到 `flow_issue_links`
+
 ### Step 5.5: Anti-Pattern Risk Check
 
 对照以下 5 条反模式特征，检查 issue 是否存在反模式风险（定义详见 [roadmap-common.md](../../supervisor/roadmap-common.md#反模式-issue-识别标准)）：
