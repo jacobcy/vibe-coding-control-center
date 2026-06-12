@@ -119,4 +119,4 @@ class TestClearAllSessions:
         cleared = registry.clear_all_sessions()
         assert cleared == 1
         # _has_tmux_session should NOT be called
-        registry._backend.is_session_running.assert_not_called()
+        registry._backend.has_tmux_session.assert_not_called()

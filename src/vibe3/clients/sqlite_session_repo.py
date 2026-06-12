@@ -124,10 +124,12 @@ class SQLiteSessionRepo(_HasConnection):
         conn = self._get_connection()
         with conn:
             cursor = conn.cursor()
+            now = _utcnow_iso()
             cursor.execute(
-                "UPDATE runtime_session SET status = 'stopped', updated_at = ? "
+                "UPDATE runtime_session SET status = 'stopped', "
+                "updated_at = ?, ended_at = ? "
                 "WHERE status IN ('starting', 'running')",
-                (_utcnow_iso(),),
+                (now, now),
             )
             count = cursor.rowcount
         logger.bind(
