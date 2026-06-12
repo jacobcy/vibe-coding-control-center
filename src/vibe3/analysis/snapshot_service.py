@@ -299,31 +299,18 @@ def find_snapshot_by_branch(
     pattern = str(snapshot_dir / f"*_{sanitized_branch}_*.json")
     candidate_paths = set(glob_mod.glob(pattern))
 
-    # Also check the unsanitized form if different
-    # (e.g., "origin/main" -> "*_origin-main_*.json")
-    unsanitized = branch.replace("/", "-")
-    if sanitized_branch != unsanitized:
-        alt_pattern = str(snapshot_dir / f"*_{unsanitized}_*.json")
-        candidate_paths.update(glob_mod.glob(alt_pattern))
-
     # Stage 2: Load and verify branch field for narrowed candidates
-    snapshots = []
-    for fp_str in candidate_paths:
-        fp = Path(fp_str)
-        try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
-            snapshot_branch = data.get("branch", "")
-            if snapshot_branch == normalized_branch or snapshot_branch == branch:
-                snapshots.append(
-                    {
-                        "id": data.get("snapshot_id", fp.stem),
-                        "created_at": data.get("created_at", ""),
-                        "branch": snapshot_branch,
-                        "commit": data.get("commit", ""),
-                    }
-                )
-        except (json.JSONDecodeError, KeyError):
-            continue
+    snapshots = _load_snapshots_for_branch(candidate_paths, normalized_branch, branch)
+
+    # Fallback: the glob pre-filter assumes snapshot filenames embed the
+    # branch name (see StructureSnapshot.generate_id). If no candidate
+    # matched, scan remaining files to catch snapshots saved under other
+    # naming conventions rather than silently returning None.
+    if not snapshots:
+        all_paths = {str(p) for p in snapshot_dir.glob("*.json")}
+        snapshots = _load_snapshots_for_branch(
+            all_paths - candidate_paths, normalized_branch, branch
+        )
 
     if not snapshots:
         return None
@@ -350,6 +337,30 @@ def find_snapshot_by_branch(
     # Sort by created_at descending and return the most recent
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
     return load_snapshot(snapshots[0]["id"])
+
+
+def _load_snapshots_for_branch(
+    paths: set[str], normalized_branch: str, branch: str
+) -> list[dict[str, str]]:
+    """Load snapshot metadata for files whose `branch` field matches."""
+    snapshots: list[dict[str, str]] = []
+    for fp_str in paths:
+        fp = Path(fp_str)
+        try:
+            data = json.loads(fp.read_text(encoding="utf-8"))
+            snapshot_branch = data.get("branch", "")
+            if snapshot_branch == normalized_branch or snapshot_branch == branch:
+                snapshots.append(
+                    {
+                        "id": data.get("snapshot_id", fp.stem),
+                        "created_at": data.get("created_at", ""),
+                        "branch": snapshot_branch,
+                        "commit": data.get("commit", ""),
+                    }
+                )
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return snapshots
 
 
 def save_branch_baseline(branch: str) -> Path | None:

@@ -215,6 +215,35 @@ def test_find_snapshot_by_branch_glob_filters_candidates(
     assert result.snapshot_id == "2026-03-22T12-00-00_main_def5678"  # Most recent
 
 
+def test_find_snapshot_by_branch_fallback_for_nonconforming_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Fallback scan finds snapshots whose filenames don't embed `_{branch}_`."""
+    from vibe3.analysis import snapshot_service
+
+    snapshot_dir = tmp_path / "vibe3" / "structure" / "snapshots"
+    snapshot_dir.mkdir(parents=True)
+    snapshot = {
+        "snapshot_id": "flow-1-main-abc1234-2026-03-19T09-00-00",
+        "branch": "main",
+        "commit": "abc1234",
+        "commit_short": "abc1234",
+        "created_at": "2026-03-19T09:00:00",
+        "root": "src/vibe3",
+        "files": [],
+        "modules": [],
+        "dependencies": [],
+        "metrics": {},
+    }
+    (snapshot_dir / f"{snapshot['snapshot_id']}.json").write_text(json.dumps(snapshot))
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    result = find_snapshot_by_branch("main")
+
+    assert result is not None
+    assert result.snapshot_id == "flow-1-main-abc1234-2026-03-19T09-00-00"
+
+
 def test_build_snapshot_uses_shared_python_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
