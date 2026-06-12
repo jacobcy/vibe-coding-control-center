@@ -271,7 +271,7 @@ class SerenaService:
         from vibe3.models import DeadCodeFinding, DeadCodeReport
 
         log = logger.bind(domain="serena", action="scan_dead_code", root=root)
-        log.info("Scanning for dead code")
+        log.debug("Scanning for dead code")
 
         try:
             # Find all Python files
@@ -310,17 +310,22 @@ class SerenaService:
 
                         # Apply dead code rules
                         is_dead, reason = is_dead_code(
-                            sym_name, ref_count, is_cli_command
+                            sym_name, ref_count, is_cli_command, relative_file
                         )
 
                         if is_dead:
                             # Get line number and LOC
-                            # For now, use placeholder values
-                            line = 0  # TODO: extract from Serena
-                            loc = 0  # TODO: extract from Serena
+                            start = sym.get("start_line", 0)
+                            end = sym.get("end_line", 0)
+                            line = start
+                            loc = (
+                                max(end - start + 1, 0)
+                                if start > 0 and end >= start
+                                else 0
+                            )
 
                             confidence = classify_confidence(
-                                sym_name, ref_count, is_cli_command
+                                sym_name, ref_count, is_cli_command, relative_file
                             )
                             # Type narrowing
                             if confidence == "excluded":
@@ -339,7 +344,9 @@ class SerenaService:
                             )
                             total_dead += 1
                         elif (
-                            classify_confidence(sym_name, ref_count, is_cli_command)
+                            classify_confidence(
+                                sym_name, ref_count, is_cli_command, relative_file
+                            )
                             == "excluded"
                         ):
                             excluded.append(f"{relative_file}:{sym_name}")
@@ -363,7 +370,7 @@ class SerenaService:
                 total_symbols=total_symbols,
                 dead_code_count=total_dead,
                 excluded_count=total_excluded,
-            ).success("Dead code scan complete")
+            ).debug("Dead code scan complete")
 
             return report
 

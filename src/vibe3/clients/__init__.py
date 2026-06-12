@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from vibe3.clients.serena_client import (
         SerenaClient,
         count_references,
+        extract_function_locations,
         extract_function_names,
     )
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -87,6 +88,7 @@ _LAZY_IMPORTS = {
     "check_runtime_asset": "vibe3.clients.runtime_assets",
     "collect_label_anomalies": "vibe3.clients.label_utils",
     "count_references": "vibe3.clients.serena_client",
+    "extract_function_locations": "vibe3.clients.serena_client",
     "extract_function_names": "vibe3.clients.serena_client",
     "find_repo_root": "vibe3.clients.git_client",
     "get_store": "vibe3.clients.store_context",
@@ -154,6 +156,7 @@ __all__ = [
     "check_runtime_asset",
     "collect_label_anomalies",
     "count_references",
+    "extract_function_locations",
     "extract_function_names",
     "find_repo_root",
     "get_store",

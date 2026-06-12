@@ -23,22 +23,6 @@ if TYPE_CHECKING:
     from vibe3.models import FlowStatusResponse
 
 
-def _state_from_labels(raw_labels: object) -> IssueState | None:
-    """Extract orchestration state from GitHub label payload."""
-    if not isinstance(raw_labels, list):
-        return None
-    for item in raw_labels:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        if not isinstance(name, str):
-            continue
-        parsed = IssueState.from_label(name)
-        if parsed is not None:
-            return parsed
-    return None
-
-
 def extract_issue_labels(raw_labels: object) -> list[str]:
     """Extract plain label names from GitHub issue payload."""
     if not isinstance(raw_labels, list):

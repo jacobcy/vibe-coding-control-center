@@ -1,9 +1,13 @@
 """Tests for dead code detection rules."""
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from vibe3.analysis.dead_code_rules import (
     classify_confidence,
+    has_router_decorator,
     is_dead_code,
     is_private,
     should_exclude,
@@ -142,3 +146,93 @@ class TestIsDeadCode:
         is_dead, reason = is_dead_code(func_name, ref_count)
         assert is_dead is True
         assert expected_confidence in reason
+
+
+class TestHasRouterDecorator:
+    """Test FastAPI router decorator detection."""
+
+    def test_detects_router_post(self):
+        """Test @router.post decorator detection."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.post("/events")
+async def publish_event(request: dict) -> dict:
+    return {"status": "ok"}
+""")
+            f.flush()
+            file_path = f.name
+
+        assert has_router_decorator(file_path, "publish_event") is True
+        Path(file_path).unlink()
+
+    def test_detects_router_get(self):
+        """Test @router.get decorator detection."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/events")
+async def list_events() -> list:
+    return []
+""")
+            f.flush()
+            file_path = f.name
+
+        assert has_router_decorator(file_path, "list_events") is True
+        Path(file_path).unlink()
+
+    def test_detects_app_post(self):
+        """Test @app.post decorator detection."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.post("/webhook")
+async def handle_webhook(request: dict) -> dict:
+    return {"status": "ok"}
+""")
+            f.flush()
+            file_path = f.name
+
+        assert has_router_decorator(file_path, "handle_webhook") is True
+        Path(file_path).unlink()
+
+    def test_no_decorator(self):
+        """Test function without router decorator."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
+async def regular_function() -> str:
+    return "hello"
+""")
+            f.flush()
+            file_path = f.name
+
+        assert has_router_decorator(file_path, "regular_function") is False
+        Path(file_path).unlink()
+
+    def test_classify_excludes_router_endpoint(self):
+        """Test that classify_confidence excludes router endpoints."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.post("/events")
+async def publish_event(request: dict) -> dict:
+    return {"status": "ok"}
+""")
+            f.flush()
+            file_path = f.name
+
+        confidence = classify_confidence("publish_event", 0, False, file_path)
+        assert confidence == "excluded"
+        Path(file_path).unlink()

@@ -8,6 +8,7 @@ from loguru import logger
 
 from vibe3.clients import (
     count_references,
+    extract_function_locations,
     extract_function_names,
 )
 from vibe3.exceptions import SerenaError
@@ -35,13 +36,15 @@ def analyze_file(
         domain="serena",
         action="analyze_file",
         file=relative_file,
-    ).info("Analyzing file")
+    ).debug("Analyzing file")
 
     try:
         overview = client.get_symbols_overview(relative_file)
         symbols = []
         # Check if this is a CLI file
         is_cli_file = is_cli_file_func(relative_file)
+
+        locations = extract_function_locations(overview)
 
         for func_name in extract_function_names(overview):
             # Fail-fast: 立即抛出异常，不允许部分失败
@@ -53,18 +56,21 @@ def analyze_file(
                 "cli_command" if is_cli_file and ref_count == 0 else "function"
             )
 
+            loc_info = locations.get(func_name, {})
             symbols.append(
                 {
                     "name": func_name,
                     "type": symbol_type,
                     "references": ref_count,
+                    "start_line": loc_info.get("start_line", 0),
+                    "end_line": loc_info.get("end_line", 0),
                 }
             )
 
         logger.bind(
             file=relative_file,
             symbol_count=len(symbols),
-        ).success("File analyzed")
+        ).debug("File analyzed")
 
         return {
             "file": relative_file,

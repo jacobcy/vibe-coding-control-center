@@ -290,3 +290,131 @@ class TestIsCliFile:
         """Missing files should return False (not cached on error)."""
         result = _is_cli_file("/nonexistent/path.py")
         assert result is False
+
+
+class TestScanDeadCode:
+    """scan_dead_code tests."""
+
+    @pytest.fixture
+    def mock_client(self) -> MagicMock:
+        client = MagicMock()
+        # Return overview with body_location
+        client.get_symbols_overview.return_value = {
+            "kind": 12,
+            "name_path": "unused_func",
+            "body_location": {"start_line": 10, "end_line": 25},
+        }
+        # Return empty references (dead code)
+        client.find_references.return_value = []
+        return client
+
+    def test_line_and_loc_populated_from_body_location(
+        self, mock_client: MagicMock
+    ) -> None:
+        """Test that line and loc are populated from body_location."""
+        # Mock Path.glob to return only one test file
+        with patch("vibe3.analysis.serena_service.Path") as mock_path:
+            mock_root = MagicMock()
+            mock_root.exists.return_value = True
+            mock_file = MagicMock()
+            mock_file.__str__ = lambda self: "src/vibe3/test.py"
+            mock_root.glob.return_value = [mock_file]
+            mock_path.return_value = mock_root
+
+            service = SerenaService(client=mock_client)
+            report = service.scan_dead_code()
+
+            # Should have one finding
+            assert len(report.findings) == 1
+            finding = report.findings[0]
+
+            # line should be start_line
+            assert finding.line == 10
+            # loc should be end_line - start_line + 1 = 25 - 10 + 1 = 16
+            assert finding.loc == 16
+
+    def test_line_and_loc_fallback_to_zero(self) -> None:
+        """Test that line and loc fallback to 0 when body_location is missing."""
+        client = MagicMock()
+        # Return overview without body_location (simple string list)
+        client.get_symbols_overview.return_value = {"Function": ["unused_func"]}
+        # Return empty references (dead code)
+        client.find_references.return_value = []
+
+        # Mock Path.glob to return only one test file
+        with patch("vibe3.analysis.serena_service.Path") as mock_path:
+            mock_root = MagicMock()
+            mock_root.exists.return_value = True
+            mock_file = MagicMock()
+            mock_file.__str__ = lambda self: "src/vibe3/test.py"
+            mock_root.glob.return_value = [mock_file]
+            mock_path.return_value = mock_root
+
+            service = SerenaService(client=client)
+            report = service.scan_dead_code()
+
+            # Should have one finding
+            assert len(report.findings) == 1
+            finding = report.findings[0]
+
+            # line and loc should be 0 (fallback)
+            assert finding.line == 0
+            assert finding.loc == 0
+
+    def test_loc_calculation_edge_cases(self) -> None:
+        """Test LOC calculation with edge cases."""
+        client = MagicMock()
+        # Test case: start_line = 5, end_line = 5 (single line function)
+        client.get_symbols_overview.return_value = {
+            "kind": 12,
+            "name_path": "single_line_func",
+            "body_location": {"start_line": 5, "end_line": 5},
+        }
+        client.find_references.return_value = []
+
+        # Mock Path.glob to return only one test file
+        with patch("vibe3.analysis.serena_service.Path") as mock_path:
+            mock_root = MagicMock()
+            mock_root.exists.return_value = True
+            mock_file = MagicMock()
+            mock_file.__str__ = lambda self: "src/vibe3/test.py"
+            mock_root.glob.return_value = [mock_file]
+            mock_path.return_value = mock_root
+
+            service = SerenaService(client=client)
+            report = service.scan_dead_code()
+
+            assert len(report.findings) == 1
+            finding = report.findings[0]
+            assert finding.line == 5
+            # loc should be 5 - 5 + 1 = 1
+            assert finding.loc == 1
+
+    def test_loc_zero_when_invalid_range(self) -> None:
+        """Test that loc is 0 when start_line > end_line (invalid range)."""
+        client = MagicMock()
+        # Invalid range: start_line > end_line
+        client.get_symbols_overview.return_value = {
+            "kind": 12,
+            "name_path": "invalid_func",
+            "body_location": {"start_line": 20, "end_line": 10},
+        }
+        client.find_references.return_value = []
+
+        # Mock Path.glob to return only one test file
+        with patch("vibe3.analysis.serena_service.Path") as mock_path:
+            mock_root = MagicMock()
+            mock_root.exists.return_value = True
+            mock_file = MagicMock()
+            mock_file.__str__ = lambda self: "src/vibe3/test.py"
+            mock_root.glob.return_value = [mock_file]
+            mock_path.return_value = mock_root
+
+            service = SerenaService(client=client)
+            report = service.scan_dead_code()
+
+            assert len(report.findings) == 1
+            finding = report.findings[0]
+            assert finding.line == 20
+            # loc should be 0 because start > end
+            assert finding.loc == 0

@@ -3,7 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import Union, cast
+from typing import Any, Union, cast
 
 from loguru import logger
 
@@ -61,6 +61,60 @@ def extract_function_names(payload: dict[str, Union[str, int, list]]) -> list[st
             seen.add(name)
             result.append(name)
     return result
+
+
+def extract_function_locations(
+    payload: dict[str, Union[str, int, list]],
+) -> dict[str, dict[str, int]]:
+    """Extract function names with line locations from Serena symbol overview.
+
+    Returns:
+        Dict mapping function name to {"start_line": int, "end_line": int}
+    """
+    locations: dict[str, dict[str, int]] = {}
+
+    def walk(node: dict[str, Union[str, int, list]] | list) -> None:
+        if isinstance(node, dict):
+            if node.get("kind") == FUNCTION_KIND:
+                name = node.get("name_path") or node.get("name")
+                if isinstance(name, str) and name not in locations:
+                    body: Any = node.get("body_location", {})
+                    if isinstance(body, dict):
+                        locations[name] = {
+                            "start_line": body.get("start_line", 0),
+                            "end_line": body.get("end_line", 0),
+                        }
+                    else:
+                        locations[name] = {"start_line": 0, "end_line": 0}
+            functions = node.get("Function")
+            if isinstance(functions, list):
+                for item in functions:
+                    if isinstance(item, dict):
+                        nested_name = item.get("name_path") or item.get("name")
+                        if (
+                            isinstance(nested_name, str)
+                            and nested_name not in locations
+                        ):
+                            nested_body: Any = item.get("body_location", {})
+                            if isinstance(nested_body, dict):
+                                locations[nested_name] = {
+                                    "start_line": nested_body.get("start_line", 0),
+                                    "end_line": nested_body.get("end_line", 0),
+                                }
+                            else:
+                                locations[nested_name] = {
+                                    "start_line": 0,
+                                    "end_line": 0,
+                                }
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+    return locations
 
 
 def count_references(payload: dict[str, Union[str, int, list]]) -> int:
