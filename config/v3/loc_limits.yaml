@@ -153,6 +153,9 @@ code_limits:
       - path: "src/vibe3/server/registry.py"
         limit: 560
         reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）；#2596 新增 webhook router mounting（+13 行）"
+      - path: "src/vibe3/server/control_plane.py"
+        limit: 700
+        reason: "Local control-plane API 完整实现（Issue #2678），包含 publish/dispatch/query 端点、认证、幂等性、事件构造、审计日志等紧密耦合逻辑；与 server/app.py (620)、server/registry.py (560) 保持一致的 exception 策略"
 
       # Shell / 脚本兼容入口
       - path: "scripts/install.sh"
