@@ -13,10 +13,11 @@ Tests assert invariants from ADR-0004:
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models import FlowBlocked, IssueState
+from vibe3.models.domain_events import DomainEvent
 from vibe3.models.event_bus import EventPublisher
 from vibe3.services.flow.blocked_state_io import BlockedStateIO
 from vibe3.services.flow.blocked_state_service import BlockedStateService
@@ -59,6 +60,16 @@ class StubLabelService:
         return "advanced"
 
 
+class StubIssueFlowService:
+    """Stub task issue resolver for FlowService.block_flow tests."""
+
+    def __init__(self, store: SQLiteClient):
+        self.store = store
+
+    def resolve_task_issue_number(self, branch: str) -> int:
+        return 123
+
+
 def test_blocked_state_is_written_through_service_path(tmp_path: Path) -> None:
     """Assert BlockedStateService.block() writes blocked state to database."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
@@ -92,59 +103,69 @@ def test_flow_blocked_event_published_after_service_writes(tmp_path: Path) -> No
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
+    github = StubGitHubClient()
+    label_service = StubLabelService()
     call_order = []
 
-    # Mock BlockedStateService.block to track call order
-    with patch.object(BlockedStateService, "block", wraps=None) as mock_block:
-        mock_block.side_effect = lambda *args, **kwargs: call_order.append("service")
+    def publish_after_write(event: DomainEvent) -> None:
+        flow_state = store.get_flow_state("test-branch")
+        assert flow_state is not None
+        assert flow_state.get("flow_status") == "blocked"
+        assert flow_state.get("blocked_reason") == "Test reason"
+        events = store.get_events("test-branch")
+        assert [e.get("event_type") for e in events] == ["flow_blocked"]
+        assert isinstance(event, FlowBlocked)
+        call_order.append("event_after_write")
 
-        # Mock IssueFlowService.resolve_task_issue_number to return an issue number
-        with patch(
-            "vibe3.services.issue.flow.IssueFlowService"
-        ) as mock_issue_flow_service:
-            mock_issue_service = MagicMock()
-            mock_issue_service.resolve_task_issue_number.return_value = 123
-            mock_issue_flow_service.return_value = mock_issue_service
+    with (
+        patch("vibe3.services.issue.flow.IssueFlowService", StubIssueFlowService),
+        patch("vibe3.services.flow.blocked_state_io.GitHubClient", return_value=github),
+        patch(
+            "vibe3.services.flow.blocked_state_io.LabelService",
+            return_value=label_service,
+        ),
+        patch("vibe3.models.publish") as mock_publish,
+    ):
+        mock_publish.side_effect = publish_after_write
 
-            # Mock publish to track call order - patch at the import location
-            with patch("vibe3.models.publish") as mock_publish:
-                mock_publish.side_effect = lambda event: call_order.append("event")
+        flow_service = FlowService(store=store)
+        flow_service.block_flow(
+            branch="test-branch",
+            reason="Test reason",
+            actor="test_actor",
+        )
 
-                flow_service = FlowService(store=store)
-                flow_service.block_flow(
-                    branch="test-branch",
-                    reason="Test reason",
-                    actor="test_actor",
-                )
-
-    # Verify call order: service before event
-    assert call_order == ["service", "event"]
-    assert mock_block.called
+    assert call_order == ["event_after_write"]
     assert mock_publish.called
 
 
-def test_flow_blocked_handler_does_not_mutate_blocked_state(tmp_path: Path) -> None:
-    """Assert FlowBlocked handler does NOT call BlockedStateService.block()."""
+def test_registered_flow_blocked_handlers_do_not_mutate_state(
+    tmp_path: Path,
+) -> None:
+    """Assert registered FlowBlocked handlers never write blocked state."""
     EventPublisher.reset()
 
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
-    def spy_handler(event: FlowBlocked) -> None:
-        pass
+    from vibe3.domain import register_event_handlers
 
-    # Subscribe handler to FlowBlocked
-    publisher = EventPublisher()
-    publisher.subscribe("FlowBlocked", spy_handler)
+    with patch.object(
+        BlockedStateService,
+        "block",
+        side_effect=AssertionError("FlowBlocked handler must not write state"),
+    ) as mock_block:
+        register_event_handlers()
 
-    # Publish FlowBlocked event
-    test_event = FlowBlocked(
-        issue_number=123,
-        branch="test-branch",
-        blocked_reason="test reason",
-        actor="test_actor",
-    )
-    publisher.publish(test_event)
+        test_event = FlowBlocked(
+            issue_number=123,
+            branch="test-branch",
+            blocked_reason="test reason",
+            actor="test_actor",
+        )
+        EventPublisher().publish(test_event)
+
+    assert not mock_block.called
 
     # Verify database was NOT mutated
     flow_state = store.get_flow_state("test-branch")
@@ -229,15 +250,23 @@ def test_multi_dependency_preserved_in_body_projection(tmp_path: Path) -> None:
 
 
 def test_multi_dependency_preserved_through_service_layer(tmp_path: Path) -> None:
-    """Assert service layer passes blocked_by_issue to BlockedStateService."""
+    """Assert service-layer repeated blocks preserve body dependencies."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
-    flow_service = FlowService(store=store)
+    github = StubGitHubClient()
+    label_service = StubLabelService()
 
-    # Track calls to BlockedStateService.block
-    with patch.object(BlockedStateService, "block", wraps=None) as mock_block:
-        mock_block.return_value = None  # Avoid actual implementation
+    with (
+        patch("vibe3.services.issue.flow.IssueFlowService", StubIssueFlowService),
+        patch("vibe3.services.flow.blocked_state_io.GitHubClient", return_value=github),
+        patch(
+            "vibe3.services.flow.blocked_state_io.LabelService",
+            return_value=label_service,
+        ),
+        patch("vibe3.models.publish"),
+    ):
+        flow_service = FlowService(store=store)
 
         flow_service.block_flow(
             branch="test-branch",
@@ -245,8 +274,13 @@ def test_multi_dependency_preserved_through_service_layer(tmp_path: Path) -> Non
             blocked_by_issue=456,
             actor="test_actor",
         )
+        flow_service.block_flow(
+            branch="test-branch",
+            reason=None,
+            blocked_by_issue=789,
+            actor="test_actor",
+        )
 
-        # Verify last call captured the blocked_by_issue
-        assert mock_block.called
-        call_kwargs = mock_block.call_args[1]
-        assert call_kwargs.get("blocked_by_issue") == 456
+    state = BlockedStateIO(github_client=github).read_body_projection(123)
+    assert state.is_blocked is True
+    assert state.blocked_by == [456, 789]
