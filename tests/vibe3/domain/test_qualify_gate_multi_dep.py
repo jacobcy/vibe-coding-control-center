@@ -35,8 +35,6 @@ def test_multi_dep_all_satisfied_unblocks():
     truth = CoordinationTruth(
         projection_state="blocked",
         projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_reason="Blocked by #100 and #200",
-        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
         blocked_by_issues=[100, 200],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
@@ -94,8 +92,6 @@ def test_multi_dep_partial_satisfaction_remains_blocked():
     truth = CoordinationTruth(
         projection_state="blocked",
         projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_reason="Blocked by #100 and #200",
-        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
         blocked_by_issues=[100, 200],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
@@ -137,8 +133,6 @@ def test_single_dep_satisfied_unblocks_backward_compat():
     truth = CoordinationTruth(
         projection_state="blocked",
         projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_reason="Blocked by #100",
-        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
         blocked_by_issues=[100],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
