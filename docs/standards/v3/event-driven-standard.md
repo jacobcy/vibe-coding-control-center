@@ -515,6 +515,7 @@ LabelService().transition(
 
 ### 11.1 引用标准
 
+- **[ADR-0004](../../decisions/0004-domain-flow-event-boundary.md)**: 定义 DomainEvent 与 FlowEvent 的边界和投影关系，本文件 §十二 实现该决策。
 - **[worktree-ownership-standard.md](worktree-ownership-standard.md)**: 定义执行层级与 worktree 语义，本文件补充事件语义。
 - **[vibe3-orchestra-runtime-standard.md](../vibe3-orchestra-runtime-standard.md)**: 定义 driver/tick/async child 架构，事件发布时机参考该文件。
 - **[command-standard.md](command-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
@@ -529,7 +530,116 @@ LabelService().transition(
 
 ---
 
-## 十二、三层概念说明：governance / apply / runtime
+## 十二、DomainEvent → FlowEvent 投影规则
+
+### 12.1 投影原则
+
+根据 [ADR-0004](../../decisions/0004-domain-flow-event-boundary.md)，DomainEvent 到 FlowEvent 的投影**不是默认行为**。只有对 flow 场景具有审计价值的 DomainEvent 才应投影到 FlowEvent。
+
+### 12.2 事件分类与投影规则
+
+#### Flow Lifecycle Events（投影）
+
+这些事件直接改变 flow 场景，具有人类审计价值，**投影到 FlowEvent**。
+
+- `FlowBlocked`
+- `FlowCompleted`
+- `IssueFailed`
+- `PRMerged`
+
+#### Dispatch Intent Events（仅运行时）
+
+这些事件驱动编排流程，但**不是时间线事件**，不投影。
+
+- `ManagerDispatchIntent`
+- `PlannerDispatchIntent`
+- `ExecutorDispatchIntent`
+- `ReviewerDispatchIntent`
+
+#### Governance Scan Events（仅 Serve/运行时观察）
+
+这些事件用于治理扫描观察，**不投影**。
+
+- `GovernanceScanStarted`
+- `GovernanceScanCompleted`
+- `GovernanceDecisionRequired`
+- `PolicyChanged`
+
+#### Supervisor Apply Events（仅 Serve/运行时观察）
+
+这些事件记录 Supervisor 执行过程，**不投影**。
+
+- `SupervisorIssueIdentified`
+- `SupervisorPromptRendered`
+- `SupervisorApplyDispatched`
+- `SupervisorApplyStarted`
+- `SupervisorApplyCompleted`
+- `SupervisorApplyDelegated`
+
+#### External Trigger Events（仅运行时）
+
+这些事件是外部触发信号，**不投影**。
+
+- `WebhookLabelChanged`
+- `WebhookIssueUpdated`
+- `WebhookPRMerged`
+- `WebhookPRReviewed`
+- `WebhookIssueClosed`
+
+#### CLI Invocation Events（仅运行时）
+
+这些事件是 CLI 用户操作，**不投影**。
+
+- `ManualPlanIntent`
+- `ManualRunIntent`
+- `ManualReviewIntent`
+
+#### Infrastructure Events（仅 Serve/运行时观察）
+
+- `ControlPlaneEventPublished`：用于 `serve status` 审计记录，**不投影**。
+
+### 12.3 投影规则表
+
+| DomainEvent | → FlowEvent? | flow_event_type | Layer | Rationale |
+|---|---|---|---|---|
+| `FlowBlocked` | Yes | `flow_blocked` | Flow Timeline | Human-visible blocked state; note: blocked state remains owned by blocked-state/flow store write paths |
+| `FlowCompleted` | Yes | `flow_completed` | Flow Timeline | Flow lifecycle milestone |
+| `IssueFailed` | Yes | `flow_failed` | Flow Timeline | Flow-level error audit |
+| `PRMerged` | Yes | `pr_merged` | Flow Timeline | Flow lifecycle milestone |
+| `*DispatchIntent` (4 events) | No | — | Runtime | Orchestration signals, not timeline |
+| `GovernanceScan*` (3 events) | No | — | Serve/Runtime | Governance observation only |
+| `Supervisor*` (6 events) | No | — | Serve/Runtime | Supervisor execution recording |
+| `Webhook*` (5 events) | No | — | Serve/Runtime | External trigger signals |
+| `Manual*Intent` (3 events) | No | — | Runtime | CLI user actions |
+| `PolicyChanged` | No | — | Serve/Runtime | Configuration change observation |
+| `ControlPlaneEventPublished` | No | — | Serve/Runtime | Audit record for serve status |
+
+### 12.4 FlowBlocked 显式规则
+
+`FlowBlocked` DomainEvent 可能投影到 `flow_blocked` FlowEvent，但需明确：
+
+- **Blocked 状态归属**：flow 是否 blocked、blocked 原因、依赖追踪，这些状态由 blocked-state service 和 flow store 写入路径管理
+- **FlowEvent 性质**：`flow_blocked` FlowEvent 是只读审计投影，不决定也不修改 blocked 状态
+- **单状态机原则**：这确保时间线不会成为第二个状态机
+
+### 12.5 Blocked / Failed / Warning 区分
+
+- `flow_blocked` (FlowEvent)：flow 被阻塞，需要人工关注，显示在 flow 时间线
+- `flow_failed` (FlowEvent)：运行时错误发生，显示在 flow 时间线用于审计
+- `IssueFailed` (DomainEvent)：运行时因果事件，由错误处理器消费；作为**可能**投影到 `flow_failed` 的源信号
+- Warning-level events（如 `codeagent_*_warning`）：是 FlowEvent 层的显示变体，不是 DomainEvent 投影
+
+### 12.6 维护要求
+
+新增 DomainEvent 类型时，**必须**在此表格中分类并明确投影规则。
+
+### 12.7 规范回链
+
+本投影规则表实现了 [ADR-0004](../../decisions/0004-domain-flow-event-boundary.md) 定义的单向投影关系。
+
+---
+
+## 十三、三层概念说明：governance / apply / runtime
 
 以下三个概念容易混淆，特此明确：
 
@@ -568,7 +678,7 @@ LabelService().transition(
 
 ---
 
-## 十三、变更历史
+## 十四、变更历史
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
