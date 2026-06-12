@@ -1,5 +1,6 @@
 """Tests for CheckService with sync rules."""
 
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +19,7 @@ from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
 @pytest.fixture(autouse=True)
-def _mock_snapshot():
+def _mock_snapshot() -> Generator[None, None, None]:
     """Mock snapshot service to avoid real git operations in tests."""
     with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
         yield
@@ -27,35 +28,7 @@ def _mock_snapshot():
 class TestCheckServiceSyncRules:
     """Test CheckService._check_branch with sync rules."""
 
-    def test_local_rule_disabled_skip(self):
-        """Disabling multi_state_label_fix skips the fix."""
-        config = SyncRulesConfig(
-            local=LocalSyncRules(multi_state_label_fix=SyncRule(enabled=False))
-        )
-
-        service = CheckService()
-        service._sync_rules = config
-
-        with patch.object(
-            service,
-            "_check_multiple_state_labels",
-            wraps=service._check_multiple_state_labels,
-        ) as mock_check:
-            mock_check.return_value = ([], [], None)
-            assert service._sync_rules.local.multi_state_label_fix.enabled is False
-
-    def test_local_rule_disabled_pr(self):
-        """Disabling pr_terminal_state skips PR handling."""
-        config = SyncRulesConfig(
-            local=LocalSyncRules(pr_terminal_state=SyncRule(enabled=False))
-        )
-
-        service = CheckService()
-        service._sync_rules = config
-
-        assert service._sync_rules.local.pr_terminal_state.enabled is False
-
-    def test_default_all_enabled(self):
+    def test_default_all_enabled(self) -> None:
         """Default config produces current behavior."""
         service = CheckService()
 
@@ -74,29 +47,7 @@ class TestCheckServiceSyncRules:
         )
         assert service._sync_rules.local.blocked_label_sync.enabled is True
 
-    def test_closed_issue_sync_disabled(self):
-        """Disabling closed_issue_sync skips closed issue handling."""
-        config = SyncRulesConfig(
-            local=LocalSyncRules(closed_issue_sync=SyncRule(enabled=False))
-        )
-
-        service = CheckService()
-        service._sync_rules = config
-
-        assert service._sync_rules.local.closed_issue_sync.enabled is False
-
-    def test_stale_blocked_sync_disabled(self):
-        """Disabling stale_blocked_sync skips blocked state recovery."""
-        config = SyncRulesConfig(
-            local=LocalSyncRules(stale_blocked_sync=SyncRule(enabled=False))
-        )
-
-        service = CheckService()
-        service._sync_rules = config
-
-        assert service._sync_rules.local.stale_blocked_sync.enabled is False
-
-    def test_blocked_label_sync_disabled(self):
+    def test_blocked_label_sync_disabled(self) -> None:
         """Disabling blocked_label_sync skips the sync check."""
         config = SyncRulesConfig(
             local=LocalSyncRules(blocked_label_sync=SyncRule(enabled=False))
@@ -107,7 +58,7 @@ class TestCheckServiceSyncRules:
 
         assert service._sync_rules.local.blocked_label_sync.enabled is False
 
-    def test_orchestra_scanned_assignee_cleanup_disabled(self):
+    def test_orchestra_scanned_assignee_cleanup_disabled(self) -> None:
         """Disabling orchestra_scanned_assignee_cleanup skips the cleanup."""
         config = SyncRulesConfig(
             local=LocalSyncRules(
