@@ -162,7 +162,7 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 
 | 子包 | 职责 | 可导入自 | 禁止导入自 |
 | :--- | :--- | :--- | :--- |
-| `shared/` | 跨领域公共能力（branches, labels, paths, roles, timeline, status_query） | `services/protocols`, L4-L6 模块 | `services/flow`, `services/pr`, `services/issue`, `services/task`, `services/orchestra`（9 个已知违规作为技术债务追踪） |
+| `shared/` | 跨领域公共能力（branches, labels, paths, roles, timeline, status_query） | `services/protocols`, L4-L6 模块 | `services/flow`, `services/pr`, `services/issue`, `services/task`, `services/orchestra`（10 个已知违规作为技术债务追踪） |
 | `protocols/` | 协议/接口定义（依赖倒置） | 仅 L4-L6 模块 | 所有 `services/` 实现子包 |
 | `flow/` | Flow 状态机、生命周期、重建、恢复、投影 | `issue`, `pr`, `task`, `shared`, `protocols` | 不得形成新的双向耦合（超出 4 个已知循环） |
 | `pr/` | PR 操作、解析器 | `flow`, `issue`, `task`, `shared`, `protocols` | 不得引入新的耦合 |
