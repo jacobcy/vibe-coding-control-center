@@ -46,7 +46,8 @@ def mock_all_dependencies() -> Generator[dict[str, MagicMock], None, None]:
         patch("vibe3.services.pr.analysis._get_recent_commits") as mock_commits,
         patch("vibe3.services.pr.analysis._get_pr_commit_count") as mock_count,
         patch("vibe3.services.pr.analysis.dag_service") as mock_dag,
-        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitClient") as mock_git_client_class,
+        patch("vibe3.clients.GitHubClient") as mock_github_client_class,
     ):
         # Setup default returns
         mock_files.return_value = [
@@ -90,6 +91,10 @@ def mock_all_dependencies() -> Generator[dict[str, MagicMock], None, None]:
         mock_git_client.get_diff.return_value = "+line1\n-line2\n+line3"
         mock_git_client_class.return_value = mock_git_client
 
+        # Mock GitHubClient to avoid gh CLI calls (requires GH_TOKEN in CI)
+        mock_github_client = MagicMock()
+        mock_github_client_class.return_value = mock_github_client
+
         yield {
             "files": mock_files,
             "filter": mock_filter,
@@ -99,6 +104,7 @@ def mock_all_dependencies() -> Generator[dict[str, MagicMock], None, None]:
             "count": mock_count,
             "dag": mock_dag,
             "git_client": mock_git_client,
+            "github_client": mock_github_client,
         }
 
 

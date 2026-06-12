@@ -80,21 +80,33 @@ class TestGitStateIndependence:
         from vibe3.commands.inspect import app
 
         runner = CliRunner()
-        mock_git = MagicMock()
-        mock_git.get_changed_files.return_value = []
 
-        with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
-            with patch(
+        # Create a mock GitClient instance
+        mock_git_instance = MagicMock()
+        mock_git_instance.get_changed_files.return_value = []
+        mock_git_instance._run.return_value = "abc123"  # Fake commit SHA for rev-parse
+
+        # Create a mock GitHubClient instance
+        mock_github_instance = MagicMock()
+
+        with (
+            # Mock at import point (clients package public API)
+            patch("vibe3.clients.GitClient", return_value=mock_git_instance),
+            patch("vibe3.clients.GitHubClient", return_value=mock_github_instance),
+            # Mock other dependencies
+            patch(
                 "vibe3.utils.git_helpers.get_current_branch", return_value="test-branch"
-            ):
-                with patch("vibe3.config.loader.get_config") as mock_config:
-                    mock_config.return_value.review_scope.critical_paths = []
-                    mock_config.return_value.review_scope.public_api_paths = []
-                    with patch(
-                        "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
-                        return_value=MagicMock(base_branch="main"),
-                    ):
-                        result = runner.invoke(app, ["base"])
+            ),
+            patch("vibe3.config.loader.get_config") as mock_config,
+            patch(
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                return_value=MagicMock(base_branch="main"),
+            ),
+        ):
+            mock_config.return_value.review_scope.critical_paths = []
+            mock_config.return_value.review_scope.public_api_paths = []
+
+            result = runner.invoke(app, ["base"])
 
         assert result.exit_code == 0
 
