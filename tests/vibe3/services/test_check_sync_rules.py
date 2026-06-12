@@ -178,3 +178,64 @@ class TestCheckServiceSyncRules:
         flow = store.get_flow_state(branch)
         assert flow is not None
         assert flow["flow_status"] == "aborted"
+
+    def test_blocked_label_sync_syncs_local_flow_to_blocked(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """blocked_label_sync must align local flow_status to remote BLOCKED.
+
+        Regression test: when the remote issue carries state/blocked but the
+        local flow_status is not "blocked", rule_blocked_label_sync must sync
+        local flow_status to "blocked" (cache-from-truth). It must NOT call
+        the unblock/resume path, which would do the opposite of the rule's
+        documented intent.
+        """
+        issue_number = 9998
+        branch = f"task/issue-{issue_number}"
+
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(branch, flow_status="active")
+        store.add_issue_link(branch, issue_number, "task")
+
+        git_client = MagicMock(spec=GitClient)
+        git_client.get_current_branch.return_value = branch
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
+
+        github_client = MagicMock(spec=GitHubClient)
+        github_client.view_issue.return_value = {
+            "state": "OPEN",
+            "title": "Test issue",
+            "body": "Description",
+            "labels": [{"name": "state/blocked"}],
+        }
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, branch)
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
+        service = CheckService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+        )
+
+        # Disable pr_terminal_state to avoid PR lookups; blocked_label_sync
+        # remains enabled (default True).
+        config = SyncRulesConfig(
+            local=LocalSyncRules(pr_terminal_state=SyncRule(enabled=False))
+        )
+        service._sync_rules = config
+
+        result = service.verify_current_flow()
+
+        assert result is not None
+        assert result.is_valid is True
+        assert result.issues == []
+
+        flow = store.get_flow_state(branch)
+        assert flow is not None
+        assert flow["flow_status"] == "blocked"
+
+        # Remote truth must remain untouched — sync is cache-only.
+        github_client.update_issue_body.assert_not_called()

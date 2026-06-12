@@ -164,20 +164,21 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
         return None
 
     from vibe3.services.check.service import CheckResult
+    from vibe3.services.flow import BlockedStateService
 
     try:
-        result = svc.recovery_svc.recover(
+        BlockedStateService(
+            github_client=svc.github_client,
+            store=svc.store,
+        ).write_cache(
             branch=ctx.branch,
-            issue_number=ctx.task_issue,
             reason="Remote state/blocked label detected",
-            auto=True,
-            ensure_worktree=True,
+            blocked_by_issue=None,
+            actor="check:blocked_label_sync",
         )
         logger.info(
-            "Synced blocked label to local flow",
+            "Synced blocked label to local flow status (cache-from-truth)",
             branch=ctx.branch,
-            action=result.action.value,
-            detail=result.detail,
         )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
     except Exception as e:
