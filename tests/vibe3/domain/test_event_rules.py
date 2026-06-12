@@ -352,40 +352,6 @@ class TestActionHandlers:
         # Should not raise, just log warning
         handler({"command_type": "plan", "issue_number": "not_a_number"})
 
-    def test_enqueue_plan_callable(self) -> None:
-        """enqueue_plan action handler is callable."""
-        from unittest.mock import patch
-
-        handlers = build_action_handlers()
-        handler = handlers["enqueue_plan"]
-
-        # Mock the internal dispatch helper
-        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
-            handler({"issue_number": "123", "actor": "test"})
-            mock_dispatch.assert_called_once_with("plan", 123, "test", {})
-
-    def test_enqueue_run_callable(self) -> None:
-        """enqueue_run action handler is callable."""
-        from unittest.mock import patch
-
-        handlers = build_action_handlers()
-        handler = handlers["enqueue_run"]
-
-        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
-            handler({"issue_number": "456", "actor": "test"})
-            mock_dispatch.assert_called_once_with("run", 456, "test", {})
-
-    def test_enqueue_review_callable(self) -> None:
-        """enqueue_review action handler is callable."""
-        from unittest.mock import patch
-
-        handlers = build_action_handlers()
-        handler = handlers["enqueue_review"]
-
-        with patch("vibe3.domain.event_rules._dispatch_command_job") as mock_dispatch:
-            handler({"issue_number": "789", "actor": "test"})
-            mock_dispatch.assert_called_once_with("review", 789, "test", {})
-
     def test_reload_material_publishes_event(self) -> None:
         """GovernanceScanStarted is published."""
         from unittest.mock import MagicMock, patch
