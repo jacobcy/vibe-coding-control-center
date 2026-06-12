@@ -9,7 +9,7 @@ related_docs:
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/handoff/v3-rewrite-plan.md
-  - .agent/rules/python-standards.md
+  - .claude/rules/python-standards.md
 purpose: Phase 1 基础设施层的核心文档，包含架构设计、编码标准、测试标准等技术规范
 ---
 

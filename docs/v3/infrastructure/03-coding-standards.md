@@ -9,14 +9,14 @@ related_docs:
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/infrastructure/02-architecture.md
-  - .agent/rules/python-standards.md
+  - .claude/rules/python-standards.md
 ---
 
 # Vibe 3.0 - 编码标准
 
 本文档定义 Vibe 3.0 的**架构相关编码标准**。
 
-**通用 Python 标准**：见 **[.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)**
+**通用 Python 标准**：见 **[.claude/rules/python-standards.md](../../../.claude/rules/python-standards.md)**
 
 ---
 
@@ -42,7 +42,7 @@ related_docs:
 
 ## 类型注解与命名规范
 
-见 **[.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)** §类型注解、§命名规范
+见 **[.claude/rules/python-standards.md](../../../.claude/rules/python-standards.md)** §类型注解、§命名规范
 
 ---
 
@@ -247,7 +247,7 @@ markers = [
 
 ## 参考文档
 
-- **[.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)** - 完整 Python 标准
+- **[.claude/rules/python-standards.md](../../../.claude/rules/python-standards.md)** - 完整 Python 标准
 - **[02-architecture.md](02-architecture.md)** - 架构设计
 - **[06-error-handling.md](06-error-handling.md)** - 异常处理
 
@@ -255,3 +255,4 @@ markers = [
 
 **维护者**：Vibe Team
 **最后更新**：2026-03-15
+
