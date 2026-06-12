@@ -27,13 +27,13 @@ def test_blocked_truth_from_reason():
 
 
 def test_blocked_truth_from_issue():
-    """Test blocked state inferred from blocked_by_issue."""
+    """Test blocked state inferred from blocked_by_issues."""
     truth = CoordinationTruth(
-        blocked_by_issue=456,
+        blocked_by_issues=[456],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
     assert truth.is_blocked is True
-    assert truth.blocked_by_issue == 456
+    assert truth.blocked_by_issue == 456  # computed property for backward compat
 
 
 def test_truth_with_dependencies():
@@ -64,9 +64,9 @@ def test_source_required_for_blocked_reason():
 
 
 def test_source_required_for_blocked_by_issue():
-    """Test that blocked_by_issue requires blocked_by_issue_source."""
+    """Test that blocked_by_issues requires blocked_by_issue_source."""
     with pytest.raises(ValidationError, match="blocked_by_issue_source must be set"):
-        CoordinationTruth(blocked_by_issue=999)
+        CoordinationTruth(blocked_by_issues=[999])
 
 
 def test_source_required_for_dependencies():

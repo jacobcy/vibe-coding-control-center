@@ -38,9 +38,9 @@ class CoordinationTruth(BaseModel):
         description="Provenance: ISSUE_BODY_FALLBACK or LOCAL_SQLITE",
     )
 
-    blocked_by_issue: int | None = Field(
-        default=None,
-        description="Blocking issue number from issue body or local DB",
+    blocked_by_issues: list[int] = Field(
+        default_factory=list,
+        description="Blocking issue numbers from issue body or local DB",
     )
     blocked_by_issue_source: DataSource | None = Field(
         default=None,
@@ -77,9 +77,10 @@ class CoordinationTruth(BaseModel):
             raise ValueError(
                 "blocked_reason_source must be set when blocked_reason is provided"
             )
-        if self.blocked_by_issue is not None and self.blocked_by_issue_source is None:
+        if self.blocked_by_issues and self.blocked_by_issue_source is None:
             raise ValueError(
-                "blocked_by_issue_source must be set when blocked_by_issue is provided"
+                "blocked_by_issue_source must be set when "
+                "blocked_by_issues are provided"
             )
         if self.dependencies and self.dependencies_source is None:
             raise ValueError(
@@ -89,13 +90,19 @@ class CoordinationTruth(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
+    def blocked_by_issue(self) -> int | None:
+        """Backward compatibility: return first blocking issue if any."""
+        return self.blocked_by_issues[0] if self.blocked_by_issues else None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
     def is_blocked(self) -> bool:
         """Compute blocked state from projection state and blocked payload.
 
         Remote blocked truth is defined as:
         - Explicit projection state is 'blocked', or
-        - Blocked payload present (blocked_reason or blocked_by_issue)
+        - Blocked payload present (blocked_reason or blocked_by_issues)
         """
         if self.projection_state in BLOCKED_PROJECTION_STATES:
             return True
-        return bool(self.blocked_reason or self.blocked_by_issue)
+        return bool(self.blocked_reason or self.blocked_by_issues)

@@ -56,7 +56,7 @@ class CoordinationResolver:
         # Step 1: Try remote read for collaboration fields
         projection_state_remote: str | None = None
         blocked_reason_remote = None
-        blocked_by_issue_remote = None
+        blocked_by_issues_remote: list[int] = []
         dependencies_remote: list[int] = []
         remote_success = False  # Track remote read success separately
 
@@ -68,7 +68,7 @@ class CoordinationResolver:
                     remote_success = True
                     projection_state_remote = remote_truth.get("projection_state")
                     blocked_reason_remote = remote_truth.get("blocked_reason")
-                    blocked_by_issue_remote = remote_truth.get("blocked_by_issue")
+                    blocked_by_issues_remote = remote_truth.get("blocked_by_issues", [])
                     dependencies_remote = remote_truth.get("dependencies", [])
             except Exception as e:
                 # GitHub API failure → enter degraded mode
@@ -104,11 +104,16 @@ class CoordinationResolver:
             if remote_success
             else (flow_state.get("blocked_reason") if flow_state else None)
         )
-        blocked_by_issue = (
-            blocked_by_issue_remote
-            if remote_success
-            else (flow_state.get("blocked_by_issue") if flow_state else None)
-        )
+        # Handle blocked_by_issues with proper type narrowing
+        if remote_success:
+            blocked_by_issues = blocked_by_issues_remote
+        elif flow_state:
+            local_blocked_by = flow_state.get("blocked_by_issue")
+            blocked_by_issues = (
+                [local_blocked_by] if local_blocked_by is not None else []
+            )
+        else:
+            blocked_by_issues = []
         dependencies = (
             dependencies_remote
             if remote_success
@@ -130,7 +135,7 @@ class CoordinationResolver:
                 if remote_success
                 else DataSource.LOCAL_SQLITE if flow_state else None
             ),
-            blocked_by_issue=blocked_by_issue,
+            blocked_by_issues=blocked_by_issues,
             blocked_by_issue_source=(
                 DataSource.ISSUE_BODY_FALLBACK
                 if remote_success
@@ -182,9 +187,7 @@ class CoordinationResolver:
             return {
                 "projection_state": projection.state,
                 "blocked_reason": projection.blocked_reason,
-                "blocked_by_issue": (
-                    projection.blocked_by[0] if projection.blocked_by else None
-                ),
+                "blocked_by_issues": projection.blocked_by,
                 "dependencies": projection.dependencies,
             }
         except Exception:

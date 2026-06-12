@@ -222,12 +222,31 @@ class QualifyGateService:
             return None
 
         truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
-        if truth.is_blocked and truth.blocked_by_issue:
-            dep_closed = self._is_dependency_satisfied(truth.blocked_by_issue)
-            if dep_closed:
+        if truth.is_blocked and truth.blocked_by_issues:
+            # Check if ALL dependencies are satisfied
+            all_satisfied = all(
+                self._is_dependency_satisfied(dep) for dep in truth.blocked_by_issues
+            )
+            if all_satisfied:
+                # All dependencies closed - unblock
                 return self._resume_dep_resolved(
-                    branch, issue.number, truth.blocked_by_issue
+                    branch, issue.number, truth.blocked_by_issues
                 )
+            else:
+                # Some dependencies still open - remain blocked
+                from vibe3.observability import append_orchestra_event
+
+                open_deps = [
+                    dep
+                    for dep in truth.blocked_by_issues
+                    if not self._is_dependency_satisfied(dep)
+                ]
+                append_orchestra_event(
+                    "dispatcher",
+                    f"qualify_gate skip #{issue.number}: blocked by dependencies "
+                    f"{open_deps} (some still open)",
+                )
+                return None
 
         flow_state = self._store.get_flow_state(branch)
         result = self.run_qualify_gate(
@@ -245,9 +264,9 @@ class QualifyGateService:
         return result
 
     def _resume_dep_resolved(
-        self, branch: str, issue_number: int, dep_issue_number: int
+        self, branch: str, issue_number: int, dep_issue_numbers: list[int]
     ) -> IssueState:
-        """Clear blocked state after a dependency has been resolved.
+        """Clear blocked state after all dependencies have been resolved.
 
         Placeholder flows intentionally have no git branch or worktree yet, so
         this path only clears the blocked sources. The dispatcher later upgrades
@@ -256,7 +275,7 @@ class QualifyGateService:
         Args:
             branch: Flow branch
             issue_number: Issue number that was blocked
-            dep_issue_number: Dependency issue number that closed
+            dep_issue_numbers: List of dependency issue numbers that closed
 
         Returns:
             Target issue state after blocked markers are cleared.
@@ -283,7 +302,7 @@ class QualifyGateService:
             target_state=target_state,
             issue_number=issue_number,
             actor="orchestra:qualify",
-            detail=f"Dependency #{dep_issue_number} closed",
+            detail=f"Dependencies #{', #'.join(map(str, dep_issue_numbers))} closed",
         )
         if not result.label_cleared:
             raise RuntimeError(
@@ -295,8 +314,8 @@ class QualifyGateService:
         append_orchestra_event(
             "dispatcher",
             f"qualify_gate dep_resolved #{issue_number}: "
-            f"dependency #{dep_issue_number} closed, cleared blocked state "
-            f"to {target_state.to_label()}",
+            f"dependencies #{', #'.join(map(str, dep_issue_numbers))} closed, "
+            f"cleared blocked state to {target_state.to_label()}",
         )
         return target_state
 
