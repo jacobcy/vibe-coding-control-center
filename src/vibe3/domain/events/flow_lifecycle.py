@@ -5,6 +5,7 @@ See vibe3.models.domain_events for the canonical definitions.
 """
 
 from vibe3.models import (
+    ControlPlaneEventPublished,
     ExecutorDispatchIntent,
     FlowBlocked,
     FlowCompleted,
@@ -24,6 +25,7 @@ from vibe3.models import (
 )
 
 __all__ = [
+    "ControlPlaneEventPublished",
     "ExecutorDispatchIntent",
     "FlowBlocked",
     "FlowCompleted",

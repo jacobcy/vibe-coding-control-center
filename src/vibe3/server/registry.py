@@ -9,7 +9,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -161,7 +161,7 @@ def _build_server_with_launch_cwd(
         cleanup_service=None,
         actor_cleanup=_cleanup_expired_actors,
     )
-    heartbeat.register(facade)  # type: ignore[arg-type]
+    heartbeat.register(facade)
 
     # Wire event rules engine into EventPublisher
     try:
@@ -172,7 +172,7 @@ def _build_server_with_launch_cwd(
         action_handlers = build_action_handlers()
         publisher = get_publisher()
 
-        def rule_engine_hook(event: DomainEvent) -> None:  # type: ignore[valid-type]
+        def rule_engine_hook(event: DomainEvent) -> None:
             evaluate_rules(event, rules, action_handlers)
 
         publisher.add_publish_hook(rule_engine_hook)
@@ -201,7 +201,7 @@ def _build_server_with_launch_cwd(
     fastapi_app.state.status_service = status_service
 
     @fastapi_app.get("/status")
-    async def get_status() -> dict:
+    async def get_status() -> dict[str, Any]:
         """Get current orchestra status snapshot with job monitoring data."""
         from vibe3.execution import ActiveJob, JobMonitorService
 
@@ -209,7 +209,7 @@ def _build_server_with_launch_cwd(
         job_svc = JobMonitorService()
         jobs = job_svc.snapshot()
 
-        def _job_to_dict(job: ActiveJob) -> dict:
+        def _job_to_dict(job: ActiveJob) -> dict[str, Any]:
             return {
                 "actor_id": job.actor_id,
                 "job_type": job.job_type.value,
@@ -284,6 +284,24 @@ def _build_server_with_launch_cwd(
     except Exception as exc:
         logger.bind(domain="orchestra").warning(
             f"Failed to mount webhook router, continuing without webhook: {exc}"
+        )
+
+    # Mount control-plane API router (optional, controlled by config or graceful)
+    try:
+        from .control_plane import router as control_plane_router
+
+        # Warn at startup if control-plane token not configured
+        if not os.getenv("VIBE_CONTROL_PLANE_TOKEN"):
+            logger.bind(domain="orchestra").warning(
+                "VIBE_CONTROL_PLANE_TOKEN not set, control-plane API will accept "
+                "requests without authentication"
+            )
+
+        fastapi_app.include_router(control_plane_router)
+        logger.bind(domain="orchestra").info("Control-plane API mounted at /api")
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Failed to mount control-plane API, continuing without it: {exc}"
         )
 
     return heartbeat, fastapi_app

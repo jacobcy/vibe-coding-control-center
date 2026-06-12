@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
     from vibe3.models.dispatch import DispatchExclusion
     from vibe3.models.domain_events import (
+        ControlPlaneEventPublished,
         DomainEvent,
         ExecutorDispatchIntent,
         FlowBlocked,
@@ -141,6 +142,7 @@ if TYPE_CHECKING:
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "ControlPlaneEventPublished": "vibe3.models.domain_events",
     "DomainEvent": "vibe3.models.domain_events",
     "ExecutorDispatchIntent": "vibe3.models.domain_events",
     "FlowBlocked": "vibe3.models.domain_events",
@@ -289,6 +291,7 @@ __all__: list[str] = [
     "CommitInfo",
     "CommitSource",
     "CommandType",
+    "ControlPlaneEventPublished",
     "CoordinationTruth",
     "CoverageReport",
     "CreatePRRequest",
