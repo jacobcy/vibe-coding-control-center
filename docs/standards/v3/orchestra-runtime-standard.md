@@ -144,15 +144,17 @@ service 在这一层只负责：
 
 异步 child session 有两种 dispatch 入口：
 
-| 入口形式 | 适用场景 | 示例 | 实现 |
-|---------|---------|------|------|
-| CLI 命令 (`vibe3 internal`) | 需要 issue 参数、手动/脚本触发 | manager, supervisor/apply | `commands/internal.py` → `run_issue_role_async/sync()` |
-| 事件 handler | 全局周期性、无特定参数 | governance scan, supervisor scan | `domain/handlers/` → `handle_*_started()` |
+| 入口形式 | 适用场景 | 示例 | Guard |
+|---------|---------|------|-------|
+| 事件 handler | 系统/heartbeat/script 触发 | `GovernanceScanStarted`, `ManagerDispatchIntent` | 无（canonical 入口） |
+| CLI 命令 (`vibe3 internal`) | Async child 自调用 ONLY | `internal manager <N> --no-async` | 需要 `VIBE3_ASYNC_CHILD=1` 或 `--force` |
 
 两种入口最终都通过 `ExecutionRequest` 走相同的执行管道（由 `ExecutionCoordinator.dispatch_execution()` 执行），区别仅在于触发方式：
 
-- **CLI 入口**：orchestra tick 判定某个 issue 需要处理后，构造 `vibe3 internal <role> <issue>` 命令，在 tmux 中启动独立 session
-- **事件入口**：tick 直接在进程内发布 DomainEvent（如 `GovernanceScanStarted`），由对应 handler 构造 `ExecutionRequest` 并 dispatch
+- **事件入口**：是外部触发的 canonical 路径（人类、脚本、服务器 API、heartbeat）。事件 handler 构造 `ExecutionRequest` 并 dispatch，并在 tmux 中启动异步 child session。Child session 内部调用 `vibe3 internal` 命令作为 sync 重新进入点。
+- **CLI 入口**：**仅限 async child 自调用**。外部直接调用 `vibe3 internal *` 会被 guard 拦截并警告，需加 `--force` 才能绕过。Guard 通过检查 `VIBE3_ASYNC_CHILD` 环境变量判定是否在 async child 上下文中。
+
+**注意**：`internal bootstrap` 命令无 guard，因为它是 skill/workflow 层的辅助入口，不是 dispatch 入口。
 
 ## 4. Governance 语义
 

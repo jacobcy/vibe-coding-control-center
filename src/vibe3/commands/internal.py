@@ -1,6 +1,8 @@
 """Internal system commands for Orchestra routing (hidden from users)."""
 
 import json
+import logging
+import os
 from typing import Annotated
 
 import typer
@@ -13,6 +15,29 @@ from vibe3.commands.command_options import (
 )
 from vibe3.config import load_orchestra_config
 from vibe3.services import load_issue_info
+
+logger = logging.getLogger(__name__)
+
+
+def _require_async_child(force: bool = False) -> None:
+    """Guard: ensure internal commands are called from async child context.
+
+    When VIBE3_ASYNC_CHILD is not set, this is a direct invocation (not from
+    tmux wrapper). Emit a warning; abort unless --force is given.
+
+    Args:
+        force: If True, allow direct invocation despite missing marker.
+    """
+    if os.environ.get("VIBE3_ASYNC_CHILD") == "1":
+        return
+    logger.warning(
+        "vibe3 internal commands are intended for async child execution only. "
+        "External dispatch should use event entry points (DomainEvent). "
+        "Pass --force to override."
+    )
+    if not force:
+        raise typer.Exit(code=1)
+
 
 app = typer.Typer(
     name="internal",
@@ -32,8 +57,16 @@ def internal_manager_dispatch(
         str | None,
         typer.Option("--branch", help="Branch name or issue number"),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Allow direct invocation without async child marker"
+        ),
+    ] = False,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
+    _require_async_child(force=force)
+
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
@@ -71,8 +104,16 @@ def internal_apply_dispatch(
             help="Run synchronously (blocking) instead of async tmux session",
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Allow direct invocation without async child marker"
+        ),
+    ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
+    _require_async_child(force=force)
+
     from vibe3.roles import dispatch_supervisor_execution
 
     dispatch_supervisor_execution(issue_number=issue, no_async=no_async)
@@ -95,6 +136,12 @@ def internal_governance_dispatch(
             help="Override material rotation with specific governance role",
         ),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Allow direct invocation without async child marker"
+        ),
+    ] = False,
 ) -> None:
     """L3: Dispatch the Governance scan agent (execution-only).
 
@@ -104,6 +151,8 @@ def internal_governance_dispatch(
     Note: This command is only called via CLI self-invocation (internal governance)
     from the tmux wrapper launched by governance_scan handler. It always runs sync.
     """
+    _require_async_child(force=force)
+
     from vibe3.roles import dispatch_governance_execution
 
     dispatch_governance_execution(

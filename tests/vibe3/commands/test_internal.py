@@ -10,8 +10,72 @@ from vibe3.cli import app as cli_app
 runner = CliRunner()
 
 
-def test_internal_manager_dispatch():
+# Guard tests: verify _require_async_child behavior
+
+
+def test_internal_manager_guard_blocks_direct_call(monkeypatch):
+    """Invoke internal manager without env var and without --force → exit 1."""
+    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(cli_app, ["internal", "manager", "123", "--no-async"])
+        assert result.exit_code == 1
+        mock_run.assert_not_called()
+
+
+def test_internal_manager_guard_allows_force(monkeypatch):
+    """Invoke internal manager --force without VIBE3_ASYNC_CHILD → exit 0."""
+    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(
+            cli_app, ["internal", "manager", "123", "--no-async", "--force"]
+        )
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+
+
+def test_internal_manager_guard_passes_with_env(monkeypatch):
+    """Set VIBE3_ASYNC_CHILD=1 → exit 0 without --force."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(cli_app, ["internal", "manager", "123", "--no-async"])
+        assert result.exit_code == 0
+        assert mock_run.call_args.kwargs["issue_number"] == 123
+
+
+def test_internal_apply_guard_blocks_direct_call(monkeypatch):
+    """Invoke internal apply without VIBE3_ASYNC_CHILD and without --force → exit 1."""
+    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_run:
+        result = runner.invoke(cli_app, ["internal", "apply", "42", "--no-async"])
+        assert result.exit_code == 1
+        mock_run.assert_not_called()
+
+
+def test_internal_governance_guard_blocks_direct_call(monkeypatch):
+    """Invoke internal governance without env var and without --force → exit 1."""
+    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+    with patch(
+        "vibe3.roles.scan_service.dispatch_governance_execution"
+    ) as mock_dispatch:
+        result = runner.invoke(cli_app, ["internal", "governance", "8", "0"])
+        assert result.exit_code == 1
+        mock_dispatch.assert_not_called()
+
+
+# Existing tests: updated to set VIBE3_ASYNC_CHILD via monkeypatch
+
+
+def test_internal_manager_dispatch(monkeypatch):
     """测试 internal manager 命令参数解析和调用."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -25,8 +89,9 @@ def test_internal_manager_dispatch():
         assert mock_run.call_args.kwargs["spec"].role_name == "manager"
 
 
-def test_internal_manager_dry_run():
+def test_internal_manager_dry_run(monkeypatch):
     """测试 internal manager --dry-run 参数透传."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -40,8 +105,9 @@ def test_internal_manager_dry_run():
         assert mock_run.call_args.kwargs["show_prompt"] is False
 
 
-def test_internal_manager_show_prompt():
+def test_internal_manager_show_prompt(monkeypatch):
     """测试 internal manager --show-prompt 参数透传."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -56,8 +122,9 @@ def test_internal_manager_show_prompt():
         assert mock_run.call_args.kwargs["show_prompt"] is True
 
 
-def test_internal_manager_branch_override():
+def test_internal_manager_branch_override(monkeypatch):
     """测试 internal manager --branch 参数透传 (sync path)."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -79,8 +146,9 @@ def test_internal_manager_branch_override():
         assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
 
 
-def test_internal_manager_branch_override_async():
+def test_internal_manager_branch_override_async(monkeypatch):
     """测试 internal manager --branch 参数透传 (async path)."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
     ) as mock_run:
@@ -95,8 +163,9 @@ def test_internal_manager_branch_override_async():
         assert mock_run.call_args.kwargs["dry_run"] is False
 
 
-def test_internal_manager_branch_numeric():
+def test_internal_manager_branch_numeric(monkeypatch):
     """测试 --branch 接受 issue number，CLI 层透传原始值由 runner 解析."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -109,8 +178,9 @@ def test_internal_manager_branch_numeric():
         assert mock_run.call_args.kwargs["branch"] == "1905"
 
 
-def test_internal_apply_dispatch():
+def test_internal_apply_dispatch(monkeypatch):
     """测试 internal apply 命令参数解析和调用."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
     ) as mock_run:
@@ -126,8 +196,9 @@ def test_internal_apply_dispatch():
         assert mock_run.call_args.kwargs["spec"].role_name == "supervisor"
 
 
-def test_internal_governance_dispatch_forwards_tick_and_material():
+def test_internal_governance_dispatch_forwards_tick_and_material(monkeypatch):
     """测试 internal governance 会透传 tick 和 material."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
     with patch(
         "vibe3.roles.scan_service.dispatch_governance_execution"
     ) as mock_dispatch:
