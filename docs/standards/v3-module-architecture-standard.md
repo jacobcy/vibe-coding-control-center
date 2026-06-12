@@ -196,7 +196,7 @@ task   → flow, issue, pr
 
 ### 8.4 已知 shared/ 边界违规
 
-`shared/` 当前存在 9 个违规导入业务子包的实例，作为技术债务在 `KNOWN_SHARED_VIOLATIONS` 中注册：
+`shared/` 当前存在 10 个违规导入业务子包的实例，作为技术债务在 `KNOWN_SHARED_VIOLATIONS` 中注册：
 
 | 文件 | 违规导入 |
 | :--- | :--- |
