@@ -88,6 +88,11 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
 
+      # Models 层 —— 允许 410
+      - path: "src/vibe3/models/flow.py"
+        limit: 410
+        reason: "Flow 模型聚合，包含 FlowState/FlowStatusResponse/IssueLink/TimelineEvent 等核心模型、legacy 状态迁移逻辑、verdict 解析、issue role 迁移等紧密耦合逻辑；Issue #2734 新增 scene completeness 字段（has_branch/has_worktree/is_placeholder）修复占位 flow 显示错误（+10 行）"
+
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
         limit: 450
