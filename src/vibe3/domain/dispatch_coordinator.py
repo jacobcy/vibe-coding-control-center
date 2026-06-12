@@ -9,6 +9,9 @@ Queue strategy:
 3. Give blocked-only rebuilds one dispatch-time qualify pass
 4. If candidates remain blocked, pause recollection until work changes
 5. Capacity still gates actual dispatch intents
+6. Every collection re-qualifies BLOCKED issues (see
+   _requalify_blocked_issues) so resolved blockers get relabeled and
+   picked up on the next pass
 """
 
 from __future__ import annotations
@@ -205,10 +208,6 @@ class GlobalDispatchCoordinator:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
-        append_orchestra_event(
-            "dispatcher",
-            "GlobalDispatchCoordinator: starting queue collection",
-        )
         try:
             collected_issues = await asyncio.get_running_loop().run_in_executor(
                 self._executor,
@@ -267,19 +266,42 @@ class GlobalDispatchCoordinator:
                     "select_ready_issues_from_collected_issues failed for "
                     f"{state.value}: {exc}"
                 )
+        self._requalify_blocked_issues(collected_issues)
+
         if queue:
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: queue collection complete, "
                 f"total={len(queue)} issues",
             )
-        else:
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: queue collection complete, "
-                "no actionable issues found",
-            )
         return queue
+
+    def _requalify_blocked_issues(self, collected_issues: list[IssueInfo]) -> None:
+        """Re-run the qualify gate for issues collected as BLOCKED.
+
+        BLOCKED issues are excluded from the frozen queue (they cannot be
+        dispatched), so without this pass an issue whose blockers have
+        resolved would never be re-qualified until some other trigger
+        forces a collection. ``qualify_blocked_issue`` performs its own
+        label transition and event logging when an issue becomes
+        resumable; the relabeled issue is then picked up normally on the
+        next collection cycle.
+        """
+        for issue in collected_issues:
+            if issue.state != IssueState.BLOCKED:
+                continue
+            try:
+                self._qualify_gate.qualify_blocked_issue(issue)
+            except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: requalify failed for "
+                    f"#{issue.number}: {exc}",
+                )
+                logger.bind(
+                    domain="global_dispatch",
+                    issue=issue.number,
+                ).warning(f"qualify_blocked_issue failed for #{issue.number}: {exc}")
 
     def _check_dispatch_health(self, issue: IssueInfo) -> bool:
         """Pre-dispatch health check. Returns True if issue can be dispatched.

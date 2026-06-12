@@ -416,3 +416,174 @@ class TestQueueOperations:
         assert len(selected) == 1
         assert selected[0].number == 2
         assert call_count[0] == 2  # Both issues were processed
+
+
+class TestCollectFrozenQueueBlockedRequalification:
+    """Regression tests for issue #2765: BLOCKED issues must be
+    re-qualified during collection so resolved blockers get relabeled and
+    picked up on the next pass."""
+
+    @pytest.mark.asyncio
+    async def test_requalifies_blocked_issues_during_collection(
+        self, make_capacity, make_coordinator
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+        coordinator._github.list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Ready",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+            {
+                "number": 2,
+                "title": "Blocked",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+        ]
+
+        qualify_mock = MagicMock(return_value=None)
+        coordinator._qualify_gate.qualify_blocked_issue = qualify_mock
+
+        queue = await coordinator._collect_frozen_queue()
+
+        qualify_mock.assert_called_once()
+        called_issue = qualify_mock.call_args[0][0]
+        assert called_issue.number == 2
+        assert [entry.issue_number for entry in queue] == [1]
+
+    @pytest.mark.asyncio
+    async def test_requalify_failure_does_not_abort_collection(
+        self, make_capacity, make_coordinator, monkeypatch
+    ) -> None:
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+        coordinator._github.list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Ready",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+            {
+                "number": 2,
+                "title": "Blocked",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+        ]
+
+        def raise_qualify(issue):
+            raise RuntimeError("qualify gate boom")
+
+        coordinator._qualify_gate.qualify_blocked_issue = raise_qualify
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        monkeypatch.setattr(
+            "vibe3.domain.dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        queue = await coordinator._collect_frozen_queue()
+
+        assert [entry.issue_number for entry in queue] == [1]
+        assert any(
+            "requalify failed for #2" in e for e in events
+        ), f"Expected requalify failure event for #2, got: {events}"
+
+
+class TestCollectFrozenQueueLogging:
+    """Regression tests for issue #2765 AC4: empty collections must not
+    emit starting/complete orchestra events."""
+
+    @pytest.mark.asyncio
+    async def test_empty_collection_suppresses_logs(
+        self, make_capacity, make_coordinator, monkeypatch
+    ) -> None:
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+        coordinator._github.list_issues.return_value = []
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        monkeypatch.setattr(
+            "vibe3.domain.dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        queue = await coordinator._collect_frozen_queue()
+
+        assert queue == []
+        assert not any(
+            "starting queue collection" in e or "queue collection complete" in e
+            for e in events
+        ), f"Expected no starting/complete logs for empty collection, got: {events}"
+
+    @pytest.mark.asyncio
+    async def test_nonempty_collection_logs_complete(
+        self, make_capacity, make_coordinator, monkeypatch
+    ) -> None:
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+        coordinator._github.list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Ready",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+                "state": "OPEN",
+            },
+        ]
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        monkeypatch.setattr(
+            "vibe3.domain.dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        queue = await coordinator._collect_frozen_queue()
+
+        assert [entry.issue_number for entry in queue] == [1]
+        assert any(
+            "queue collection complete, total=1 issues" in e for e in events
+        ), f"Expected completion log for non-empty collection, got: {events}"
+        assert not any("starting queue collection" in e for e in events)
