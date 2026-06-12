@@ -706,7 +706,7 @@ class QualifyGateService:
         )
         service.block(
             branch=branch,
-            reason="Blocked by unresolved dependencies",
+            reason=None,
             blocked_by_issue=truth.blocked_by_issue or unresolved[0],
             actor="orchestra:dispatcher",
             issue_number=issue.number,
