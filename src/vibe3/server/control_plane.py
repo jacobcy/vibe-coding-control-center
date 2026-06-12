@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from loguru import logger
@@ -34,7 +34,7 @@ class EventPublishRequest(BaseModel):
     """Request to publish an allowlisted DomainEvent."""
 
     event_type: str  # e.g. "WebhookLabelChanged"
-    payload: dict  # Fields for the target DomainEvent
+    payload: dict[str, Any]  # Fields for the target DomainEvent
     actor: str  # e.g. "dashboard:jacobcy"
     source: str = "api-client"  # e.g. "web-dashboard"
     idempotency_key: str  # Client-generated unique key
@@ -66,7 +66,7 @@ class EventEntry(BaseModel):
     event_type: str
     actor: str
     detail: str | None
-    refs: dict | None
+    refs: dict[str, Any] | None
     created_at: str
 
 
@@ -95,7 +95,7 @@ class JobsResponse(BaseModel):
 
     active: list[JobEntry]
     recent: list[JobEntry]
-    summary: dict
+    summary: dict[str, Any]
 
 
 # =============================================================================
@@ -158,15 +158,16 @@ class IdempotencyStore:
     """In-memory idempotency key tracker with TTL (default 1 hour)."""
 
     def __init__(self, ttl_seconds: int = 3600):
-        self._keys: dict[str, float] = {}
+        self._keys: dict[str, tuple[float, str]] = {}  # key -> (timestamp, endpoint)
         self._lock = threading.Lock()
         self._ttl = ttl_seconds
 
-    def check_and_record(self, key: str) -> bool:
+    def check_and_record(self, key: str, endpoint: str) -> bool:
         """Check if key is new and record it.
 
         Args:
             key: Idempotency key to check
+            endpoint: Endpoint name for debugging (e.g., "/api/events")
 
         Returns:
             True if key is new (should proceed), False if duplicate
@@ -174,16 +175,21 @@ class IdempotencyStore:
         now = time.time()
         with self._lock:
             # Clean expired keys
-            expired = [k for k, t in self._keys.items() if now - t > self._ttl]
+            expired = [k for k, (t, _) in self._keys.items() if now - t > self._ttl]
             for k in expired:
                 del self._keys[k]
 
             # Check if key exists
             if key in self._keys:
+                timestamp, prev_endpoint = self._keys[key]
+                logger.bind(domain="control-plane").warning(
+                    f"Duplicate idempotency key {key[:16]}... "
+                    f"(previously used at {prev_endpoint} {int(now - timestamp)}s ago)"
+                )
                 return False
 
             # Record new key
-            self._keys[key] = now
+            self._keys[key] = (now, endpoint)
             return True
 
 
@@ -196,7 +202,7 @@ _idempotency_store = IdempotencyStore()
 # =============================================================================
 
 
-def _construct_event(event_type: str, payload: dict) -> DomainEvent | None:
+def _construct_event(event_type: str, payload: dict[str, Any]) -> DomainEvent | None:
     """Construct a DomainEvent from event_type and payload.
 
     Args:
@@ -378,6 +384,15 @@ def _construct_dispatch_event(
         elif role == "supervisor-apply":
             from vibe3.models import SupervisorIssueIdentified
 
+            # Note: supervisor-apply creates minimal SupervisorIssueIdentified events
+            # with empty issue_title and supervisor_file. Downstream handlers should
+            # handle these minimal fields. Log warning for visibility.
+            logger.bind(domain="control-plane").warning(
+                "Creating SupervisorIssueIdentified with minimal fields "
+                "(empty issue_title and supervisor_file)",
+                extra={"issue_number": issue_number, "actor": actor},
+            )
+
             return SupervisorIssueIdentified(
                 issue_number=issue_number,
                 issue_title="",
@@ -414,7 +429,7 @@ async def publish_event(
         ApiResponse with status and detail
     """
     # Check idempotency
-    if not _idempotency_store.check_and_record(request.idempotency_key):
+    if not _idempotency_store.check_and_record(request.idempotency_key, "/api/events"):
         return ApiResponse(
             status="duplicate",
             detail="Request already processed",
@@ -472,8 +487,14 @@ async def publish_event(
     try:
         publish(audit_event)
     except Exception as exc:
-        logger.exception(f"Failed to publish audit event: {exc}")
-        # Don't fail the request if audit fails
+        # CRITICAL: Audit event publish failure means loss of accountability record.
+        # Log with high priority but don't fail the request (per acceptance criteria).
+        # TODO: Add monitoring/alerting for audit failures in production.
+        logger.bind(domain="control-plane").error(
+            f"CRITICAL: Failed to publish audit event for {request.event_type} "
+            f"(actor={request.actor}, key={request.idempotency_key[:16]}...). "
+            f"Audit trail entry LOST. Error: {exc}"
+        )
 
     return ApiResponse(
         status="ok",
@@ -500,7 +521,9 @@ async def trigger_dispatch(
         ApiResponse with status and detail
     """
     # Check idempotency
-    if not _idempotency_store.check_and_record(request.idempotency_key):
+    if not _idempotency_store.check_and_record(
+        request.idempotency_key, f"/api/dispatch/{role}"
+    ):
         return ApiResponse(
             status="duplicate",
             detail="Request already processed",
@@ -565,8 +588,15 @@ async def trigger_dispatch(
     try:
         publish(audit_event)
     except Exception as exc:
-        logger.exception(f"Failed to publish audit event: {exc}")
-        # Don't fail the request if audit fails
+        # CRITICAL: Audit event publish failure means loss of accountability record.
+        # Log with high priority but don't fail the request (per acceptance criteria).
+        # TODO: Add monitoring/alerting for audit failures in production.
+        logger.bind(domain="control-plane").error(
+            f"CRITICAL: Failed to publish audit event for dispatch/{role} "
+            f"(actor={request.actor}, issue={request.issue_number}, "
+            f"key={request.idempotency_key[:16]}...). "
+            f"Audit trail entry LOST. Error: {exc}"
+        )
 
     return ApiResponse(
         status="ok",
