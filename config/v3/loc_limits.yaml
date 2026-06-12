@@ -358,14 +358,14 @@ code_limits:
 
   total_file_loc:
     v2_shell: 3500         # Shell 核心代码总行数
-    # Python LOC reduction milestones (Issue #274)
-    # Current: 67,130 LOC (as of 2026-06-04)
-    # Milestone 1: 65,000 LOC (intermediate target)
-    # Milestone 2: 60,000 LOC (stretch target)
-    # Final target: 55,000 LOC (governance goal)
-    v3_python: 75000        # Python 核心代码总行数（临时提升 7000，PR #2349 dep-closure 架构统一后超标）
+    # Python LOC tracking (Issue #274)
+    # Current: ~67,500 LOC (as of 2026-06-12, PR #2723 snapshot optimization)
+    # Milestone 1: 70,000 LOC (new feature expansion phase)
+    # Milestone 2: 65,000 LOC (post-refactor target)
+    # Final target: 60,000 LOC (long-term governance goal)
+    v3_python: 80000        # Python 核心代码总行数（提升至 80k 支持新特性扩展：PR #2723 snapshot limit、event rules engine、webhook integration、domain event system）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
-    last_reviewed: "2026-06-07"    # Track last governance review (Issue #625)
+    last_reviewed: "2026-06-12"    # Track last governance review (Issue #625)
 
   # 统计口径（路径定义）
   code_paths:
