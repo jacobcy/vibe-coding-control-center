@@ -118,7 +118,7 @@ uv run python src/vibe3/cli.py serve start -vv   # DEBUG
 - 真源告诉你"结果是什么"
 - 两者必须一致，否则有状态同步 bug
 
-**重要**：`serve status` 观察运行时 DomainEvents（因果信号）。对于 flow 特定的时间线记录，使用 `flow show` 观察 FlowEvents（审计投影）。详见 [event-driven-standard.md](./v3/event-driven-standard.md) §十二 了解 DomainEvent → FlowEvent 投影规则。
+**重要**：`serve status` 观察运行时 DomainEvents（因果信号）。对于 flow 特定的时间线记录，使用 `flow show` 观察 FlowEvents（审计投影）。详见 [event-driven-standard.md](event-driven-standard.md) §十二 了解 DomainEvent → FlowEvent 投影规则。
 
 ---
 
