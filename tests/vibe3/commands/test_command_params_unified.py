@@ -353,6 +353,7 @@ def test_internal_manager_dry_run_forwards_param(
     monkeypatch.setattr(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync", mock_execute
     )
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
 
     runner.invoke(internal_app, ["manager", "123", "--no-async", "--dry-run"])
 
@@ -452,6 +453,7 @@ def test_internal_manager_show_prompt_forwarded(
     monkeypatch.setattr(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync", mock_execute
     )
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
 
     runner.invoke(
         internal_app, ["manager", "123", "--no-async", "--dry-run", "--show-prompt"]
