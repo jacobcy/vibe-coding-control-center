@@ -155,8 +155,12 @@ def analyze_file(file_path: str) -> FileStructure:
         raise StructureError(f"Unsupported file type: {file_path}")
 
 
-def collect_python_file_structures(root: str = "src/vibe3") -> list[FileStructure]:
+def collect_python_file_structures(root: str | None = None) -> list[FileStructure]:
     """Collect structure data for all Python files under a root directory."""
+    if root is None:
+        from vibe3.config.settings import get_source_root
+
+        root = get_source_root()
     log = logger.bind(domain="structure", action="collect_python_files", root=root)
     log.info("Collecting Python file structures")
 

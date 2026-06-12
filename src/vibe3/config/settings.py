@@ -101,7 +101,8 @@ __all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
            "PRScoringWeights", "PRScoringThresholds", "LineChangeWeights",
            "FileChangeWeights", "ModuleChangeWeights", "SizeThreshold",
            "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig",
-           "CheckCleanupSettings"]
+           "CheckCleanupSettings", "PathsConfig", "get_source_root",
+           "get_commands_root"]
 # fmt: on
 
 # Prompt content fields in prompts.yaml that map to VibeConfig sections.
@@ -203,6 +204,23 @@ class TotalFileLocConfig(BaseModel):
 class CodePathsConfig(BaseModel):
     v2_shell: list[str] = Field(default_factory=list)
     v3_python: list[str] = Field(default_factory=list)
+
+
+class PathsConfig(BaseModel):
+    """Project source path configuration for cross-project deployment."""
+
+    policies_root: str = Field(
+        default="supervisor/policies",
+        description="Policies directory (plan/run/review strategy files)",
+    )
+    vibe3_root: str = Field(
+        default="src/vibe3",
+        description="Main vibe3 source root directory",
+    )
+    commands_root: str = Field(
+        default="src/vibe3/commands",
+        description="CLI commands directory (relative to repo root)",
+    )
 
 
 class ScriptsPathsConfig(BaseModel):
@@ -337,6 +355,7 @@ class VibeConfig(BaseModel):
     ai: AIConfig = Field(default_factory=AIConfig)
     orchestra: OrchestraConfig = Field(default_factory=OrchestraConfig)
     check_cleanup: CheckCleanupSettings = Field(default_factory=CheckCleanupSettings)
+    paths: PathsConfig = Field(default_factory=PathsConfig)
 
     @classmethod
     def _load_supplementary(cls, data: dict, config_path: Path | None = None) -> dict:
@@ -456,3 +475,23 @@ class VibeConfig(BaseModel):
         if root_legacy_path.exists():
             return cls.from_yaml(root_legacy_path)
         return cls()
+
+
+def get_source_root() -> str:
+    """Get the configured vibe3 source root directory.
+
+    Returns configured path or default "src/vibe3".
+    """
+    from vibe3.config.loader import get_config
+
+    return get_config().paths.vibe3_root
+
+
+def get_commands_root() -> str:
+    """Get the configured commands root directory.
+
+    Returns configured path or default "src/vibe3/commands".
+    """
+    from vibe3.config.loader import get_config
+
+    return get_config().paths.commands_root

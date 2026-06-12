@@ -6,7 +6,51 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config.settings import (
+    PathsConfig,
+    VibeConfig,
+    get_commands_root,
+    get_source_root,
+)
+
+
+class TestPathsConfig:
+    """Tests for PathsConfig model and helper functions."""
+
+    def test_paths_config_defaults(self) -> None:
+        """PathsConfig() produces correct defaults."""
+        pc = PathsConfig()
+        assert pc.vibe3_root == "src/vibe3"
+        assert pc.commands_root == "src/vibe3/commands"
+        assert pc.policies_root == "supervisor/policies"
+
+    def test_paths_config_custom_vibe3_root(self) -> None:
+        """VibeConfig with custom paths works."""
+        vc = VibeConfig(paths={"vibe3_root": "custom/src"})
+        assert vc.paths.vibe3_root == "custom/src"
+        assert vc.paths.commands_root == "src/vibe3/commands"  # unchanged default
+
+    def test_paths_config_custom_all(self) -> None:
+        """VibeConfig with all custom paths works."""
+        vc = VibeConfig(
+            paths={
+                "vibe3_root": "custom/src",
+                "commands_root": "custom/src/commands",
+                "policies_root": "custom/policies",
+            }
+        )
+        assert vc.paths.vibe3_root == "custom/src"
+        assert vc.paths.commands_root == "custom/src/commands"
+
+    def test_get_source_root_default(self) -> None:
+        """get_source_root() returns default via config."""
+        root = get_source_root()
+        assert root == "src/vibe3"
+
+    def test_get_commands_root_default(self) -> None:
+        """get_commands_root() returns default via config."""
+        root = get_commands_root()
+        assert root == "src/vibe3/commands"
 
 
 class TestExpandConfigVariables:

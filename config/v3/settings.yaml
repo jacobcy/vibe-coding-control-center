@@ -8,6 +8,10 @@
 paths:
   # Policies 目录（包含 plan/run/review 的策略文件）
   policies_root: "supervisor/policies"
+  # 主源码根目录
+  vibe3_root: "src/vibe3"
+  # CLI 命令目录
+  commands_root: "${paths.vibe3_root}/commands"
 
 # Flow 配置
 # 控制流程管理行为
