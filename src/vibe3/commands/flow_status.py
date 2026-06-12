@@ -265,7 +265,11 @@ def show(
                 )
             )
     else:
-        parent_branch = find_parent_branch(target_branch)
+        # Check if branch exists before finding parent
+        parent_branch = None
+        if flow_status.has_branch:
+            parent_branch = find_parent_branch(target_branch)
+
         render_flow_timeline(
             flow_status,
             events,
@@ -274,6 +278,16 @@ def show(
             show_all=show_all,
             actor_filter=actor_filter,
         )
+
+        # Show hint for placeholder flows
+        if flow_status.is_placeholder:
+            msg = (
+                "\n[yellow]提示：当前 flow 为占位 flow（暂未分配 branch 和 worktree），"
+                "\n等待依赖解决后可通过 "
+                f"`vibe3 task resume {flow_status.task_issue_number}` 恢复。[/]"
+            )
+            console.print(msg)
+
         if flow_status.task_issue_number is None:
             hint = build_bind_task_hint()
             console.print(f"[yellow]提示：当前 flow 还没有 task，建议 {hint}[/]")

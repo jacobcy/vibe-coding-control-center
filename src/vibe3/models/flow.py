@@ -279,6 +279,16 @@ class FlowStatusResponse(BaseModel):
     timeline: list[TimelineEvent] = Field(default_factory=list)
     # Provenance tracking
     data_source: DataSource | None = None
+    # Scene completeness status (computed at read time)
+    has_branch: bool = Field(
+        default=True, description="Git branch exists in repository"
+    )
+    has_worktree: bool = Field(
+        default=True, description="Worktree directory exists (if recorded)"
+    )
+    is_placeholder: bool = Field(
+        default=False, description="Placeholder flow (DB record only, no git branch)"
+    )
 
     @field_validator("flow_status", mode="before")
     @classmethod
@@ -325,6 +335,9 @@ class FlowStatusResponse(BaseModel):
         pr_number: int | None = None,
         pr_ready: bool | None = None,
         worktree_root: str | None = None,
+        has_branch: bool = True,
+        has_worktree: bool = True,
+        is_placeholder: bool = False,
     ) -> "FlowStatusResponse":
         """Build a hydrated response from state and links."""
         data = state.model_dump() if isinstance(state, FlowState) else dict(state)
@@ -369,6 +382,9 @@ class FlowStatusResponse(BaseModel):
             execution_completed_at=data.get("execution_completed_at"),
             latest_verdict=data.get("latest_verdict"),
             worktree_root=worktree_root,
+            has_branch=has_branch,
+            has_worktree=has_worktree,
+            is_placeholder=is_placeholder,
         )
 
 

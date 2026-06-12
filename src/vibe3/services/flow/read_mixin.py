@@ -98,6 +98,29 @@ class FlowReadMixin:
         except Exception:
             pass
 
+        # Compute scene completeness status
+        has_branch = False
+        try:
+            # Runtime: git_client is actually a GitClient instance
+            # Type: declared as GitPathProtocol for minimal interface
+            from vibe3.clients import GitClient
+
+            if isinstance(self.git_client, GitClient):
+                has_branch = self.git_client.branch_exists(branch)
+        except Exception:
+            pass
+
+        # Check worktree existence (if recorded in DB)
+        has_worktree = False
+        worktree_path = flow_data.get("worktree_path")
+        if worktree_path:
+            from pathlib import Path
+
+            has_worktree = Path(worktree_path).exists()
+
+        # Placeholder flow: DB record exists but no git branch
+        is_placeholder = not has_branch
+
         try:
             return FlowStatusResponse.from_state(
                 flow_data,
@@ -105,6 +128,9 @@ class FlowReadMixin:
                 pr_number=pr_number,
                 pr_ready=pr_ready,
                 worktree_root=worktree_root,
+                has_branch=has_branch,
+                has_worktree=has_worktree,
+                is_placeholder=is_placeholder,
             )
         except ValidationError as exc:
             logger.bind(domain="flow", branch=branch).warning(
