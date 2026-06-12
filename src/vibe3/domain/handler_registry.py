@@ -7,7 +7,7 @@ from typing import TypeVar, cast
 
 from loguru import logger
 
-from vibe3.domain.events.base import DomainEvent
+from vibe3.domain import DomainEvent
 
 T = TypeVar("T", bound=DomainEvent)
 
@@ -31,7 +31,7 @@ def register_handler(event_name: str) -> Callable[
         def handle_flow_created(event):
             ...
     """
-    from vibe3.domain.publisher import subscribe
+    from vibe3.domain import subscribe
 
     def decorator(
         func: Callable[[T], None],

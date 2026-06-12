@@ -6,8 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.agents.models import CodeagentResult
-from vibe3.domain.events.flow_lifecycle import IssueFailed
-from vibe3.domain.publisher import EventPublisher
+from vibe3.domain import EventPublisher, IssueFailed
 from vibe3.roles.run import publish_run_command_failure, publish_run_command_success
 from vibe3.roles.run_helpers import ensure_plan_file_exists
 

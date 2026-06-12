@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable, cast
 from loguru import logger
 
 from vibe3.clients import GitHubClient
+from vibe3.domain import publish
 from vibe3.domain.dispatch_preflight import (
     DispatchPreflightDecision,
     DispatchPreflightService,
@@ -36,7 +37,6 @@ from vibe3.domain.protocols.dispatch_protocols import (
     QueueSelectorProtocol,
 )
 from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
-from vibe3.domain.publisher import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry

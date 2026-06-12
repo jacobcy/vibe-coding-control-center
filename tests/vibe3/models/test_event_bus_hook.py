@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from vibe3.models.domain_events import DomainEvent
-from vibe3.models.event_bus import EventPublisher
+from vibe3.models import DomainEvent, EventPublisher
 
 
 @dataclass(frozen=True)
