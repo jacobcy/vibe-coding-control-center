@@ -87,41 +87,33 @@ class TestSessionManagerSafety:
 class TestClearAllSessions:
     """Tests for SessionRegistryService.clear_all_sessions()."""
 
-    def _make_registry(self, sessions: list[dict]) -> object:
+    def _make_registry(self, session_count: int) -> object:
         from unittest.mock import MagicMock
 
         from vibe3.environment.session_registry import SessionRegistryService
 
         store = MagicMock()
-        store.list_live_runtime_sessions.return_value = sessions
+        store.stop_all_live_sessions.return_value = session_count
         backend = MagicMock()
         registry = SessionRegistryService(store=store, backend=backend)
         return registry, store
 
     def test_clear_all_marks_all_sessions_stopped(self) -> None:
-        sessions = [
-            {"id": 1, "tmux_session": "vibe3-manager-1", "role": "manager"},
-            {"id": 2, "tmux_session": None, "role": "planner"},
-            {"id": 3, "tmux_session": "vibe3-executor-3", "role": "executor"},
-        ]
-        registry, store = self._make_registry(sessions)
+        registry, store = self._make_registry(3)
 
         cleared = registry.clear_all_sessions()
 
         assert cleared == 3
-        assert store.update_runtime_session.call_count == 3
-        for call in store.update_runtime_session.call_args_list:
-            assert call.kwargs.get("status") == "stopped" or call.args[1] == "stopped"
+        assert store.stop_all_live_sessions.call_count == 1
 
     def test_clear_all_no_sessions_returns_zero(self) -> None:
-        registry, store = self._make_registry([])
+        registry, store = self._make_registry(0)
         assert registry.clear_all_sessions() == 0
-        store.update_runtime_session.assert_not_called()
+        store.stop_all_live_sessions.assert_called_once()
 
     def test_clear_all_does_not_check_tmux(self) -> None:
         """clear_all_sessions skips tmux check — that's the whole point."""
-        sessions = [{"id": 1, "tmux_session": "alive-session", "role": "manager"}]
-        registry, store = self._make_registry(sessions)
+        registry, store = self._make_registry(1)
 
         # Even if tmux is alive, we still clear
         cleared = registry.clear_all_sessions()

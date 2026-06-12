@@ -468,19 +468,7 @@ class SessionRegistryService:
         Returns:
             Number of sessions cleared.
         """
-        sessions = self._store.list_live_runtime_sessions()
-        cleared = 0
-        for session in sessions:
-            session_id = session.get("id")
-            if session_id is not None:
-                self._store.update_runtime_session(int(session_id), status="stopped")
-                cleared += 1
-                logger.bind(
-                    domain="session_registry",
-                    session_id=session_id,
-                    tmux=session.get("tmux_session"),
-                    role=session.get("role"),
-                ).debug(f"clear_all_sessions: marked session {session_id} as stopped")
+        cleared = self._store.stop_all_live_sessions()
         if cleared:
             logger.bind(domain="session_registry", cleared=cleared).info(
                 f"Server lifecycle cleanup: {cleared} sessions marked stopped "
