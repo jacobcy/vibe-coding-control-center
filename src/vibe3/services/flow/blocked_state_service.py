@@ -83,6 +83,11 @@ class BlockedStateService:
             issue_number: Issue to label as BLOCKED (optional)
             event_type: Timeline event type (default: "flow_blocked")
         """
+        if reason is not None and blocked_by_issue is not None:
+            raise ValueError(
+                "blocked_reason and blocked_by_issue are mutually exclusive"
+            )
+
         if issue_number:
             try:
                 self._io.write_body_projection(

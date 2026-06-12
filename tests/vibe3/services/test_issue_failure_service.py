@@ -99,7 +99,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
 
 
 def test_block_flow_uses_new_fields():
-    """Test block_flow writes blocked_by_issue + blocked_reason (new fields).
+    """Test block_flow writes blocked_by_issue without blocked_reason for deps.
 
     Note: flow_status no longer set to "blocked" (2026-04-28).
     Blocked status inferred from IssueState.BLOCKED label.
@@ -123,7 +123,7 @@ def test_block_flow_uses_new_fields():
             # Block flow with dependency issue
             flow_service.block_flow(
                 branch,
-                reason="Blocked by dependency",
+                reason=None,
                 blocked_by_issue=301,
                 actor="test-actor",
             )
@@ -132,7 +132,7 @@ def test_block_flow_uses_new_fields():
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
         assert flow_state["blocked_by_issue"] == 301
-        assert flow_state["blocked_reason"] == "Blocked by dependency"
+        assert flow_state["blocked_reason"] is None
 
         # Verify event was recorded
         events = store.get_events(branch)

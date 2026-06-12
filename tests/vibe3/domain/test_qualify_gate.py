@@ -490,7 +490,6 @@ def test_auto_resume_blocked_uses_task_resume_operations() -> None:
         result = service._auto_resume_blocked(
             issue_number=303,
             branch="task/issue-303",
-            labels=["state/blocked"],
             flow_state=service._store.get_flow_state.return_value,
         )
 
@@ -517,7 +516,6 @@ def test_auto_resume_blocked_with_none_flow_state_returns_ready() -> None:
         result = service._auto_resume_blocked(
             issue_number=303,
             branch="task/issue-303",
-            labels=["state/blocked"],
             flow_state=None,
         )
 

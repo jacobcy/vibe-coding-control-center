@@ -202,6 +202,23 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     assert result["branch"] == "dev/issue-501"
 
 
+def test_bootstrap_issue_flow_rejects_dependency_and_reason_together() -> None:
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    with pytest.raises(ValueError, match="blocked_reason cannot be combined"):
+        service.bootstrap_issue_flow(
+            IssueInfo(number=501, title="Bootstrap me"),
+            branch="dev/issue-501",
+            source="skill",
+            dependency_issue_numbers=(701,),
+            blocked_reason="manual block",
+        )
+
+
 def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
     config = load_orchestra_config()
     service = FlowOrchestratorService(config)

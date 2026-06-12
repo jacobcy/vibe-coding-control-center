@@ -106,14 +106,14 @@ def test_qualify_blocked_issue_success(
 def test_qualify_blocked_issue_reuses_truth(
     qualify_gate_service, sample_issue, mock_flow_manager
 ):
-    """qualify_blocked_issue should reuse pre-resolved truth."""
+    """qualify_blocked_issue checks deps and returns None if still blocked."""
     mock_flow_manager.get_flow_for_issue.return_value = {
         "branch": "task/issue-123-test"
     }
     mock_truth = CoordinationTruth(
         blocked_reason="Blocked by #456",
         blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_by_issue=456,
+        blocked_by_issues=[456],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
         dependencies=[],
         dependencies_source=None,
@@ -126,23 +126,18 @@ def test_qualify_blocked_issue_reuses_truth(
         return_value=mock_truth,
     ) as mock_resolve:
         qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-        qualify_gate_service.run_qualify_gate = Mock(
-            return_value=IssueState.IN_PROGRESS
-        )
 
         result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
     mock_resolve.assert_called_once_with("task/issue-123-test", 123)
-    qualify_gate_service.run_qualify_gate.assert_called_once()
-    call_kwargs = qualify_gate_service.run_qualify_gate.call_args.kwargs
-    assert call_kwargs["truth"] is mock_truth
-    assert result == IssueState.IN_PROGRESS
+    # Should return None because dependency is still open
+    assert result is None
 
 
-def test_qualify_blocked_issue_resumes_when_dependency_closed(
+def test_qualify_blocked_issue_stays_blocked_when_manual_reason_present(
     qualify_gate_service, sample_issue, mock_flow_manager, mock_store
 ):
-    """Closed dependency should clear blocked state and become dispatchable."""
+    """Manual blocked_reason should prevent auto-resume even if deps are closed."""
     mock_flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-123"}
     mock_store.get_flow_state.return_value = {
         "branch": "task/issue-123",
@@ -153,7 +148,7 @@ def test_qualify_blocked_issue_resumes_when_dependency_closed(
     mock_truth = CoordinationTruth(
         blocked_reason="Blocked by #456",
         blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_by_issue=456,
+        blocked_by_issues=[456],
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
         dependencies=[],
         dependencies_source=None,
@@ -166,13 +161,7 @@ def test_qualify_blocked_issue_resumes_when_dependency_closed(
         return_value=mock_truth,
     ):
         qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
-        with patch("vibe3.domain.qualify_gate.BlockedStateService") as service_cls:
-            service = service_cls.return_value
-            service.unblock.return_value.label_cleared = True
 
-            result = qualify_gate_service.qualify_blocked_issue(sample_issue)
+        result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
-    assert result == IssueState.READY
-    service.unblock.assert_called_once()
-    assert service.unblock.call_args.kwargs["branch"] == "task/issue-123"
-    assert service.unblock.call_args.kwargs["issue_number"] == 123
+    assert result is None

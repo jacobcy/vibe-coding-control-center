@@ -203,6 +203,13 @@ def intake(
         raise typer.Exit(1)
     local_manager = managers[0]
 
+    if blocked_by is not None and blocked_reason is not None:
+        typer.echo(
+            "Error: 不能同时指定 --blocked-by 与 --blocked-reason",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     client = GitHubClient()
     issue = client.view_issue(
         issue_id, fields=["labels", "assignees", "state", "title"]

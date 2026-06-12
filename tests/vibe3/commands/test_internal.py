@@ -277,3 +277,46 @@ def test_internal_bootstrap_dispatch() -> None:
     assert call.kwargs["blocked_reason"] is None
     payload = json.loads(result.stdout)
     assert payload["branch"] == "dev/issue-123"
+
+
+def test_internal_bootstrap_rejects_dependency_and_reason_together() -> None:
+    """internal bootstrap should reject blocked reason when dependencies exist."""
+    issue_payload = {
+        "number": 123,
+        "title": "Bootstrap me",
+        "state": "OPEN",
+        "labels": [{"name": "state/claimed"}],
+        "assignees": [],
+        "comments": [],
+    }
+
+    with patch("vibe3.commands.internal.load_orchestra_config") as load_config:
+        load_config.return_value = MagicMock(repo="owner/repo")
+        with patch("vibe3.clients.sqlite_client.SQLiteClient"):
+            with patch("vibe3.clients.git_client.GitClient"):
+                with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
+                    with patch("vibe3.services.FlowOrchestratorService") as service_cls:
+                        github = MagicMock()
+                        github.view_issue.return_value = issue_payload
+                        github_cls.return_value = github
+                        service = MagicMock()
+                        service_cls.return_value = service
+
+                        result = runner.invoke(
+                            cli_app,
+                            [
+                                "internal",
+                                "bootstrap",
+                                "123",
+                                "--branch",
+                                "dev/issue-123",
+                                "--dependency",
+                                "789",
+                                "--blocked-reason",
+                                "manual block",
+                            ],
+                        )
+
+    assert result.exit_code == 1
+    assert "不能同时指定" in result.output
+    service.bootstrap_issue_flow.assert_not_called()

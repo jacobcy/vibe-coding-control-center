@@ -200,6 +200,13 @@ def internal_bootstrap(
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services import FlowOrchestratorService
 
+    if dependency_issue_numbers and blocked_reason is not None:
+        typer.echo(
+            "Error: 不能同时指定 --blocked-reason 与 --blocked-by/--dependency",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     config = load_orchestra_config()
     store = SQLiteClient()
     git = GitClient()

@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.blocked_state_service import (
@@ -42,8 +44,8 @@ class StubLabelService:
         return "advanced"
 
 
-def test_block_writes_to_all_three_sources(tmp_path: Path) -> None:
-    """Verify block() writes to database, issue body, and labels."""
+def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
+    """Verify dependency block writes to database, issue body, and labels."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
@@ -58,7 +60,7 @@ def test_block_writes_to_all_three_sources(tmp_path: Path) -> None:
 
     service.block(
         branch="test-branch",
-        reason="Worktree corrupted",
+        reason=None,
         blocked_by_issue=456,
         actor="executor/agent",
         issue_number=123,
@@ -68,15 +70,32 @@ def test_block_writes_to_all_three_sources(tmp_path: Path) -> None:
     flow_state = store.get_flow_state("test-branch")
     assert flow_state is not None
     assert flow_state.get("flow_status") == "blocked"
-    assert flow_state.get("blocked_reason") == "Worktree corrupted"
+    assert flow_state.get("blocked_reason") is None
     assert flow_state.get("blocked_by_issue") == 456
 
     # Verify issue body
     assert "blocked" in github._issue_body.lower()
-    assert "Worktree corrupted" in github._issue_body
+    assert "- **Blocked by**: #456" in github._issue_body
 
     # Verify label
     assert label_service.current_state == IssueState.BLOCKED
+
+
+def test_block_rejects_reason_and_dependency_together(tmp_path: Path) -> None:
+    """Reason and dependency metadata should remain mutually exclusive."""
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+
+    service = BlockedStateService(store=store, github_client=StubGitHubClient())
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        service.block(
+            branch="test-branch",
+            reason="Manual block",
+            blocked_by_issue=456,
+            actor="executor/agent",
+            issue_number=123,
+        )
 
 
 def test_unblock_clears_all_three_sources(tmp_path: Path) -> None:
