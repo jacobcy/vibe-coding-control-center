@@ -124,8 +124,6 @@ def __getattr__(name: str) -> object:
 
         module = importlib.import_module(_LAZY_IMPORTS[name])
         symbol = getattr(module, name)
-        # Cache in module globals for faster subsequent access
-        globals()[name] = symbol
         return symbol
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
