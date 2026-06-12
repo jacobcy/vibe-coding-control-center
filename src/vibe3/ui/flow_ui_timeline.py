@@ -279,7 +279,7 @@ def _render_timeline(
             if e.actor and fnmatch.fnmatch(e.actor.lower(), actor_filter.lower())
         ]
 
-    console.print("[bold]--- Timeline ---[/]")
+    console.print("[bold]--- Flow Timeline ---[/]")
     console.print()
 
     for event in reversed(events):

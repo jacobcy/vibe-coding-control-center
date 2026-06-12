@@ -455,6 +455,10 @@ def status() -> None:
     # Display active jobs from actor registry
     _display_active_jobs(console)
 
+    # Cross-reference hints for other observation layers
+    console.print("[dim]For flow timeline events, use: vibe3 flow show[/]")
+    console.print("[dim]For task aggregation, use:    vibe3 task status[/]")
+
 
 @app.command()
 def stop() -> None:

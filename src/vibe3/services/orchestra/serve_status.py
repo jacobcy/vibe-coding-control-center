@@ -49,6 +49,7 @@ class ServeStatusService:
         self._display_recent_activity()
         self._display_failed_gate()
         self._display_error_tracking()
+        self.console.print("\n[dim]For flow timeline events: vibe3 flow show[/]")
 
     @staticmethod
     def _clean_error_message(error_message: str, max_length: int = 100) -> str:
@@ -142,7 +143,9 @@ class ServeStatusService:
             last_tick = tick_matches[-1]
             tick_time, tick_num, tick_status = last_tick
             status_str = "in progress" if tick_status == "start" else "completed"
-            self.console.print("[cyan]Last Tick Activity:[/cyan]")
+            self.console.print(
+                "[bold]Orchestration Activity[/] [dim](runtime, not flow timeline)[/]"
+            )
             self.console.print(f"  - Tick #{tick_num} ({status_str} at {tick_time})")
 
             # Extract dispatcher activity for this tick
