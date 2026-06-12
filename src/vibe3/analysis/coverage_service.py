@@ -204,9 +204,12 @@ class CoverageService:
         """Analyze coverage for a specific architectural layer.
 
         Args:
-            coverage_data: Parsed coverage.json data
+            coverage_data: Parsed coverage.json data (unused when _layer_files is given)
             layer_name: Layer name (services, clients, commands)
-            _layer_files: Pre-categorized files for this layer (optional optimization)
+            _layer_files: Pre-categorized files for this layer (optional optimization).
+                When provided, coverage_data is not re-inspected.
+                When None, falls back to independent re-filtering for
+                backward compatibility.
 
         Returns:
             LayerCoverage for the specified layer
@@ -214,6 +217,9 @@ class CoverageService:
         if _layer_files is not None:
             files = _layer_files
         else:
+            # Fallback path: re-filter coverage_data by layer for backward
+            # compatibility with direct callers. In production, run_coverage_check
+            # always provides _layer_files; this path exists for testability.
             layer_path = f"src/vibe3/{layer_name}"
             files = {
                 fp: fd
