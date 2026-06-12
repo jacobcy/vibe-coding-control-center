@@ -27,8 +27,7 @@ def _publish_governance_event(
             preserved for future tick-based material rotation support)
         tick_count: Tick count for the scan (default 0 for manual scans)
     """
-    from vibe3.domain import publish
-    from vibe3.domain.events.governance import GovernanceScanStarted
+    from vibe3.domain import GovernanceScanStarted, publish
 
     event = GovernanceScanStarted(
         tick_count=tick_count,
@@ -74,8 +73,7 @@ def _publish_supervisor_events(
         supervisor_file is left empty and resolved by the domain handler,
         which allows manual scans to use the same resolution logic as heartbeat scans.
     """
-    from vibe3.domain import publish
-    from vibe3.models.domain_events import SupervisorIssueIdentified
+    from vibe3.domain import SupervisorIssueIdentified, publish
 
     for candidate in candidates:
         event = SupervisorIssueIdentified(
