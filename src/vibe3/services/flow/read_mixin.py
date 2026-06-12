@@ -161,13 +161,10 @@ class FlowReadMixin:
         Returns:
             Flow data dict or None if not found
         """
-        # Query all flows and find one with matching task_issue_number
-        flows = self.list_flows(status=None)
-        for flow in flows:
-            if flow.task_issue_number == issue_number:
-                flow_data = self.store.get_flow_state(flow.branch)
-                if flow_data:
-                    return flow_data
+        # Direct branch lookup via indexed SQL
+        branch = self.store.get_branch_for_task_issue(issue_number)
+        if branch:
+            return self.store.get_flow_state(branch)
         return None
 
     def list_flows(
