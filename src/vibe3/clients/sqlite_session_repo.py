@@ -115,6 +115,30 @@ class SQLiteSessionRepo(_HasConnection):
             fields=list(kwargs.keys()),
         ).debug("Updated runtime session")
 
+    def stop_all_live_sessions(self) -> int:
+        """Mark all live (starting/running) sessions as stopped in a single query.
+
+        Returns:
+            Number of sessions updated.
+        """
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            now = _utcnow_iso()
+            cursor.execute(
+                "UPDATE runtime_session SET status = 'stopped', "
+                "updated_at = ?, ended_at = ? "
+                "WHERE status IN ('starting', 'running')",
+                (now, now),
+            )
+            count = cursor.rowcount
+        logger.bind(
+            external="sqlite",
+            operation="stop_all_live_sessions",
+            count=count,
+        ).debug("Stopped all live sessions")
+        return count
+
     def list_live_runtime_sessions(
         self, *, role: str | None = None
     ) -> list[dict[str, Any]]:

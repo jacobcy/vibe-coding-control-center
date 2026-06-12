@@ -309,3 +309,47 @@ def test_get_latest_session_with_backend_id_filters_by_role(
 
     result = store.get_latest_session_with_backend_id(branch=branch, role="executor")
     assert result is None
+
+
+def test_stop_all_live_sessions(tmp_path: pytest.TempPathFactory) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+    # Create sessions in different states
+    id1 = store.create_runtime_session(
+        role="manager",
+        target_type="issue",
+        target_id="1",
+        branch="b1",
+        session_name="s1",
+        status="starting",
+    )
+    id2 = store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="2",
+        branch="b1",
+        session_name="s2",
+        status="running",
+    )
+    id3 = store.create_runtime_session(
+        role="planner",
+        target_type="issue",
+        target_id="3",
+        branch="b1",
+        session_name="s3",
+        status="stopped",
+    )
+
+    count = store.stop_all_live_sessions()
+    assert count == 2
+
+    # Verify live sessions are now stopped
+    assert store.get_runtime_session(id1)["status"] == "stopped"
+    assert store.get_runtime_session(id2)["status"] == "stopped"
+    # Already-stopped session unchanged
+    assert store.get_runtime_session(id3)["status"] == "stopped"
+
+
+def test_stop_all_live_sessions_no_sessions(tmp_path: pytest.TempPathFactory) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    assert store.stop_all_live_sessions() == 0
