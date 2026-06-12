@@ -107,6 +107,51 @@ class FlowManager:
             ensure_worktree=True,  # Orchestra task flows must use worktree
         )
 
+    def _upgrade_placeholder(self, issue: IssueInfo, branch: str) -> dict:
+        """Upgrade a placeholder (blocked, no branch) flow to a real flow.
+
+        Creates git branch + worktree, transitions flow_status to active,
+        and preserves existing dependency links.
+        """
+        slug = f"issue-{issue.number}"
+
+        # Preserve dependency links before bootstrap overwrites flow state
+        existing_deps = self.store.get_dependency_links(branch)
+
+        result = self._bootstrap_service.bootstrap_issue_flow(
+            issue,
+            branch=branch,
+            slug=slug,
+            source="dispatch",
+            ensure_worktree=True,
+        )
+
+        # Restore dependency links (bootstrap creates a fresh flow record)
+        for dep_issue in existing_deps:
+            self.task_service.link_issue(
+                branch,
+                issue_number=dep_issue,
+                role="dependency",
+                actor="dispatch:upgrade_placeholder",
+            )
+
+        # Transition from blocked to active
+        self.store.update_flow_state(
+            branch,
+            flow_status="active",
+            blocked_reason=None,
+            blocked_by_issue=None,
+            latest_actor="dispatch:upgrade_placeholder",
+        )
+
+        logger.bind(
+            domain="orchestra",
+            action="upgrade_placeholder",
+            issue=issue.number,
+        ).info(f"Upgraded placeholder flow for #{issue.number} to real flow")
+
+        return self.store.get_flow_state(branch) or result
+
     def get_active_flow_count(self) -> int:
         active = 0
         for flow in self.store.get_all_flows():
@@ -160,6 +205,13 @@ class FlowManager:
             None,
         )
         if existing_canonical:
+            # Placeholder flow detection: blocked + no git branch
+            if str(
+                existing_canonical.get("flow_status") or ""
+            ) == "blocked" and not self.git.branch_exists(branch):
+                log.info(f"Upgrading placeholder flow for #{issue.number} to real flow")
+                return self._upgrade_placeholder(issue, branch)
+
             if str(existing_canonical.get("flow_status") or "") == "stale":
                 log.info(f"Rebuilding stale canonical flow for issue #{issue.number}")
                 return self._bootstrap_service.rebuild_stale_issue_flow(

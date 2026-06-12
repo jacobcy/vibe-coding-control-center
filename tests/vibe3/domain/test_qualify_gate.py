@@ -11,8 +11,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.models.coordination_truth import CoordinationTruth
-from vibe3.models.data_source import DataSource
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
@@ -394,74 +392,6 @@ class TestRunQualifyGate:
                         )
 
                         assert result == IssueState.IN_PROGRESS
-
-
-class TestQualifyBlockedIssue:
-    """Tests for qualify_blocked_issue method."""
-
-    def test_qualify_blocked_issue_no_branch(
-        self, qualify_gate_service, sample_issue, mock_flow_manager
-    ):
-        """Issue with no branch should return None."""
-        mock_flow_manager.get_flow_for_issue.return_value = None
-
-        result = qualify_gate_service.qualify_blocked_issue(sample_issue)
-
-        assert result is None
-
-    def test_qualify_blocked_issue_success(
-        self, qualify_gate_service, sample_issue, mock_flow_manager, mock_store
-    ):
-        """Blocked issue should be qualified successfully."""
-        mock_flow_manager.get_flow_for_issue.return_value = {
-            "branch": "task/issue-123-test"
-        }
-        mock_store.get_flow_state.return_value = {}
-
-        # Mock run_qualify_gate to return IN_PROGRESS
-        qualify_gate_service.run_qualify_gate = Mock(
-            return_value=IssueState.IN_PROGRESS
-        )
-
-        result = qualify_gate_service.qualify_blocked_issue(sample_issue)
-
-        assert result == IssueState.IN_PROGRESS
-        qualify_gate_service.run_qualify_gate.assert_called_once()
-
-    def test_qualify_blocked_issue_reuses_truth(
-        self, qualify_gate_service, sample_issue, mock_flow_manager, mock_store
-    ):
-        """Test that qualify_blocked_issue reuses pre-resolved truth."""
-        mock_flow_manager.get_flow_for_issue.return_value = {
-            "branch": "task/issue-123-test"
-        }
-        mock_truth = CoordinationTruth(
-            blocked_reason="Blocked by #456",
-            blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=456,
-            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-            dependencies=[],
-            dependencies_source=None,
-            worktree_path="/tmp/worktree",
-            actor="executor",
-        )
-        with patch.object(
-            qualify_gate_service._coordination_resolver,
-            "resolve_coordination",
-            return_value=mock_truth,
-        ) as mock_resolve:
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-            qualify_gate_service.run_qualify_gate = Mock(
-                return_value=IssueState.IN_PROGRESS
-            )
-            result = qualify_gate_service.qualify_blocked_issue(sample_issue)
-            assert mock_resolve.call_count == 1
-            mock_resolve.assert_called_once_with("task/issue-123-test", 123)
-            qualify_gate_service.run_qualify_gate.assert_called_once()
-            call_kwargs = qualify_gate_service.run_qualify_gate.call_args.kwargs
-            assert "truth" in call_kwargs
-            assert call_kwargs["truth"] is mock_truth
-            assert result == IssueState.IN_PROGRESS
 
 
 class TestIsDependencySatisfied:

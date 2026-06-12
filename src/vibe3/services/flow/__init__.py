@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from vibe3.services.flow.abandon import AbandonFlowService
     from vibe3.services.flow.block_mixin import FlowLifecycleMixin
-    from vibe3.services.flow.blocked_state_io import BlockedStateIO
+    from vibe3.services.flow.blocked_state_io import (
+        BlockedStateIO,
+    )
     from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.blocked_state_types import (
         BlockedState,
