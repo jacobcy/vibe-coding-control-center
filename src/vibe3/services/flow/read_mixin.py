@@ -1,11 +1,12 @@
 """Flow read operations mixin."""
 
+from pathlib import Path
 from typing import Any, Literal, Self, cast
 
 from loguru import logger
 from pydantic import ValidationError
 
-from vibe3.clients import GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.models import FlowEvent, FlowState, FlowStatusResponse, IssueLink
 from vibe3.services.shared.paths import GitPathProtocol, get_git_common_dir
 
@@ -98,6 +99,10 @@ class FlowReadMixin:
         except Exception:
             pass
 
+        has_branch, has_worktree, is_placeholder = self._compute_scene_completeness(
+            branch, flow_data
+        )
+
         try:
             return FlowStatusResponse.from_state(
                 flow_data,
@@ -105,12 +110,47 @@ class FlowReadMixin:
                 pr_number=pr_number,
                 pr_ready=pr_ready,
                 worktree_root=worktree_root,
+                has_branch=has_branch,
+                has_worktree=has_worktree,
+                is_placeholder=is_placeholder,
             )
         except ValidationError as exc:
             logger.bind(domain="flow", branch=branch).warning(
                 f"Flow status has invalid data: {exc}"
             )
             return None
+
+    def _compute_scene_completeness(
+        self: Self, branch: str, flow_data: dict[str, Any]
+    ) -> tuple[bool, bool, bool]:
+        """Compute scene completeness flags for a flow.
+
+        Args:
+            branch: Branch name
+            flow_data: Raw flow state dict from store
+
+        Returns:
+            Tuple of (has_branch, has_worktree, is_placeholder)
+        """
+        has_branch = False
+        try:
+            # Runtime: git_client is actually a GitClient instance
+            # Type: declared as GitPathProtocol for minimal interface
+            if isinstance(self.git_client, GitClient):
+                has_branch = self.git_client.branch_exists(branch)
+        except Exception:
+            pass
+
+        # Check worktree existence (if recorded in DB)
+        has_worktree = False
+        worktree_path = flow_data.get("worktree_path")
+        if worktree_path:
+            has_worktree = Path(worktree_path).exists()
+
+        # Placeholder flow: DB record exists but no git branch
+        is_placeholder = not has_branch
+
+        return has_branch, has_worktree, is_placeholder
 
     def get_flow_for_issue(self: Self, issue_number: int) -> dict[str, Any] | None:
         """Get flow data for an issue number.
@@ -162,9 +202,18 @@ class FlowReadMixin:
                 except Exception:
                     pass
 
+                has_branch, has_worktree, is_placeholder = (
+                    self._compute_scene_completeness(branch, flow)
+                )
+
                 flows.append(
                     FlowStatusResponse.from_state(
-                        flow, issues=issues, worktree_root=worktree_root
+                        flow,
+                        issues=issues,
+                        worktree_root=worktree_root,
+                        has_branch=has_branch,
+                        has_worktree=has_worktree,
+                        is_placeholder=is_placeholder,
                     )
                 )
             except (ValidationError, KeyError) as exc:

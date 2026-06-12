@@ -100,11 +100,17 @@ def _render_snapshot_format(
         )
         if network_error or projection.hydrate_error or projection.pr_fetch_error:
             render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
+
+        # Check if branch exists before finding parent
+        parent_branch = None
+        if flow_status.has_branch:
+            parent_branch = find_parent_branch(projection.branch)
+
         render_flow_status(
             flow_status,
             issue_titles,
             pr_data,
-            parent_branch=find_parent_branch(projection.branch),
+            parent_branch=parent_branch,
             worktree_root=flow_status.worktree_root,
         )
 
