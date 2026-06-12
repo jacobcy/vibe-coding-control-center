@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from vibe3.config.branch_convention import BranchConvention
     from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
     from vibe3.config.config_loader import load_config_for_role
-    from vibe3.config.convention_resolver import diagnose_profile
+    from vibe3.config.convention_resolver import diagnose_profile, get_convention
     from vibe3.config.loader import (
         get_config,
         load_config,

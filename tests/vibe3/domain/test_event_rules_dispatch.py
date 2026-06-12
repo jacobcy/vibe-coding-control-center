@@ -12,6 +12,8 @@ class TestDispatchIntentPublishing:
         """enqueue_command_job(manager) publishes ManagerDispatchIntent."""
         from unittest.mock import MagicMock, patch
 
+        from vibe3.models import ManagerDispatchIntent
+
         handlers = build_action_handlers()
         handler = handlers["enqueue_command_job"]
 
@@ -27,13 +29,17 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, ManagerDispatchIntent)
         assert event.issue_number == 100
+        assert event.branch == "task/issue-100"
         assert event.trigger_state == "ready"
         assert event.actor == "test_actor"
 
     def test_enqueue_command_job_publishes_plan_intent(self) -> None:
         """enqueue_command_job(plan) publishes PlannerDispatchIntent."""
         from unittest.mock import MagicMock, patch
+
+        from vibe3.models import PlannerDispatchIntent
 
         handlers = build_action_handlers()
         handler = handlers["enqueue_command_job"]
@@ -46,13 +52,17 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, PlannerDispatchIntent)
         assert event.issue_number == 200
+        assert event.branch == "task/issue-200"
         assert event.trigger_state == "claimed"
         assert event.actor == "test_actor"
 
     def test_enqueue_command_job_publishes_run_intent(self) -> None:
         """enqueue_command_job(run) publishes ExecutorDispatchIntent."""
         from unittest.mock import MagicMock, patch
+
+        from vibe3.models import ExecutorDispatchIntent
 
         handlers = build_action_handlers()
         handler = handlers["enqueue_command_job"]
@@ -65,13 +75,17 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, ExecutorDispatchIntent)
         assert event.issue_number == 300
+        assert event.branch == "task/issue-300"
         assert event.trigger_state == "in-progress"
         assert event.actor == "test_actor"
 
     def test_enqueue_command_job_publishes_review_intent(self) -> None:
         """enqueue_command_job(review) publishes ReviewerDispatchIntent."""
         from unittest.mock import MagicMock, patch
+
+        from vibe3.models import ReviewerDispatchIntent
 
         handlers = build_action_handlers()
         handler = handlers["enqueue_command_job"]
@@ -84,7 +98,9 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, ReviewerDispatchIntent)
         assert event.issue_number == 400
+        assert event.branch == "task/issue-400"
         assert event.trigger_state == "review"
         assert event.actor == "test_actor"
 
@@ -122,6 +138,8 @@ class TestDispatchIntentPublishing:
         """enqueue_plan action handler publishes PlannerDispatchIntent."""
         from unittest.mock import MagicMock, patch
 
+        from vibe3.models import PlannerDispatchIntent
+
         handlers = build_action_handlers()
         handler = handlers["enqueue_plan"]
 
@@ -131,13 +149,17 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, PlannerDispatchIntent)
         assert event.issue_number == 123
+        assert event.branch == "task/issue-123"
         assert event.trigger_state == "claimed"
         assert event.actor == "test_actor"
 
     def test_enqueue_run_callable(self) -> None:
         """enqueue_run action handler publishes ExecutorDispatchIntent."""
         from unittest.mock import MagicMock, patch
+
+        from vibe3.models import ExecutorDispatchIntent
 
         handlers = build_action_handlers()
         handler = handlers["enqueue_run"]
@@ -148,13 +170,17 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, ExecutorDispatchIntent)
         assert event.issue_number == 456
+        assert event.branch == "task/issue-456"
         assert event.trigger_state == "in-progress"
         assert event.actor == "test_actor"
 
     def test_enqueue_review_callable(self) -> None:
         """enqueue_review action handler publishes ReviewerDispatchIntent."""
         from unittest.mock import MagicMock, patch
+
+        from vibe3.models import ReviewerDispatchIntent
 
         handlers = build_action_handlers()
         handler = handlers["enqueue_review"]
@@ -165,6 +191,8 @@ class TestDispatchIntentPublishing:
 
         assert mock_publish.called
         event = mock_publish.call_args[0][0]
+        assert isinstance(event, ReviewerDispatchIntent)
         assert event.issue_number == 789
+        assert event.branch == "task/issue-789"
         assert event.trigger_state == "review"
         assert event.actor == "test_actor"

@@ -193,9 +193,7 @@ def _resolve_branch_from_issue(params: dict[str, str], issue_number: int) -> str
     from vibe3.config import get_convention
 
     convention = get_convention()
-    # canonical_branch returns str, but typing says Any
-    # We cast to str for type safety
-    return str(convention.branch.canonical_branch(issue_number))
+    return convention.branch.canonical_branch(issue_number)
 
 
 def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
