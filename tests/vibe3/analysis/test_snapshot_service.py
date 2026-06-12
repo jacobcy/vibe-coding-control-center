@@ -203,3 +203,84 @@ def test_read_snapshot_metadata_nonexistent_file(tmp_path: Path) -> None:
     nonexistent = tmp_path / "does-not-exist.json"
     result = _read_snapshot_metadata(nonexistent)
     assert result is None
+
+
+def test_list_snapshots_with_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that limit parameter restricts number of snapshots returned."""
+    from vibe3.analysis import snapshot_service
+
+    snapshot_dir = tmp_path / "vibe3" / "structure" / "snapshots"
+    snapshot_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    # Create 10 test snapshots with different timestamps
+    for i in range(10):
+        snapshot = {
+            "snapshot_id": f"snapshot-{i:02d}",
+            "branch": "main",
+            "commit": f"commit{i}",
+            "commit_short": f"commit{i}",
+            "created_at": f"2026-06-{12-i:02d}T10:00:00",  # Descending dates
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        }
+        filepath = snapshot_dir / f"snapshot-{i:02d}.json"
+        filepath.write_text(json.dumps(snapshot))
+
+    # Test with limit=5
+    result = snapshot_service.list_snapshots(limit=5)
+    assert len(result) == 5
+    # Should be newest first
+    assert result[0] == "snapshot-00"  # 2026-06-12
+    assert result[4] == "snapshot-04"  # 2026-06-08
+
+    # Test with limit=None (all snapshots)
+    result_all = snapshot_service.list_snapshots(limit=None)
+    assert len(result_all) == 10
+
+    # Test default limit (50)
+    result_default = snapshot_service.list_snapshots()
+    assert len(result_default) == 10  # Only 10 snapshots exist
+
+
+def test_list_snapshots_limit_less_than_total(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test limit behavior when limit < total snapshots."""
+    from vibe3.analysis import snapshot_service
+
+    snapshot_dir = tmp_path / "vibe3" / "structure" / "snapshots"
+    snapshot_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    # Create 60 snapshots
+    for i in range(60):
+        snapshot = {
+            "snapshot_id": f"snapshot-{i:03d}",
+            "branch": "main",
+            "commit": f"commit{i}",
+            "created_at": f"2026-06-{12-i:02d}T10:00:00",
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        }
+        filepath = snapshot_dir / f"snapshot-{i:03d}.json"
+        filepath.write_text(json.dumps(snapshot))
+
+    # Default limit (50) should truncate
+    result = snapshot_service.list_snapshots(limit=50)
+    assert len(result) == 50
+
+    # Verify it returns the most recent 50
+    result_all = snapshot_service.list_snapshots(limit=None)
+    assert len(result_all) == 60
+    assert result == result_all[:50]

@@ -223,11 +223,19 @@ def load_snapshot(snapshot_id: str | None = None) -> StructureSnapshot:
         raise SnapshotError(f"Failed to load snapshot: {e}") from e
 
 
-def list_snapshots(include_baselines: bool = False) -> list[str]:
-    """List all available snapshot IDs (newest first).
+def list_snapshots(
+    include_baselines: bool = False, limit: int | None = 50
+) -> list[str]:
+    """List available snapshot IDs (newest first).
 
     Args:
         include_baselines: If True, include auto-saved baselines in the list
+        limit: Maximum number of snapshots to return (default: 50).
+               Set to None to return all snapshots.
+
+    Returns:
+        List of snapshot IDs, sorted by creation time (newest first).
+        Limited to `limit` entries if specified.
     """
     snapshots = []
 
@@ -262,7 +270,13 @@ def list_snapshots(include_baselines: bool = False) -> list[str]:
                     }
                 )
 
+    # Sort by creation time (newest first)
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
+
+    # Apply limit if specified
+    if limit is not None:
+        snapshots = snapshots[:limit]
+
     return [s["id"] for s in snapshots]
 
 
