@@ -130,7 +130,9 @@ class GitClientProtocol(Protocol):
         self, base_ref: str, head_ref: str = "HEAD"
     ) -> list[str]: ...
 
-    def get_changed_files(self, source: ChangeSource) -> list[str]: ...
+    def get_changed_files(
+        self, source: ChangeSource, pathspec: str | None = None
+    ) -> list[str]: ...
 
     def get_diff(self, source: ChangeSource) -> str: ...
 
@@ -286,9 +288,13 @@ class GitClient:
         """
         _remove_worktree(Path(wt_path), force=force)
 
-    def get_changed_files(self, source: ChangeSource) -> list[str]:
+    def get_changed_files(
+        self, source: ChangeSource, pathspec: str | None = None
+    ) -> list[str]:
         """统一接口：获取改动文件列表."""
-        return _get_changed_files(self._run, source, self._github_client)
+        return _get_changed_files(
+            self._run, source, self._github_client, pathspec=pathspec
+        )
 
     def get_diff(self, source: ChangeSource) -> str:
         """统一接口：获取 diff 内容."""

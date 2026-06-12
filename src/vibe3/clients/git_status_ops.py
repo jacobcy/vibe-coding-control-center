@@ -1,6 +1,7 @@
 """Git status operations - diff and status helpers."""
 
 import re
+from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
@@ -22,6 +23,7 @@ def get_changed_files(
     run: Callable[[list[str]], str],
     source: ChangeSource,
     github_client: "GitHubClient | None" = None,
+    pathspec: str | None = None,
 ) -> list[str]:
     """统一接口：获取改动文件列表.
 
@@ -29,6 +31,7 @@ def get_changed_files(
         run: Git command runner function
         source: 改动源（PR/Commit/Branch/Uncommitted）
         github_client: 可选的 GitHubClient 实例，用于处理 PR 相关操作
+        pathspec: 可选的 git pathspec 过滤模式（如 '*.py'）
 
     Returns:
         改动文件路径列表
@@ -40,19 +43,19 @@ def get_changed_files(
     log.info("Getting changed files")
 
     if source.type == ChangeSourceType.UNCOMMITTED:
-        files = _get_uncommitted_files(run)
+        files = _get_uncommitted_files(run, pathspec=pathspec)
     elif source.type == ChangeSourceType.COMMIT:
         if not isinstance(source, CommitSource):
             raise SystemError(
                 f"Type mismatch: expected CommitSource, got {type(source).__name__}"
             )
-        files = _get_commit_files(run, source.sha)
+        files = _get_commit_files(run, source.sha, pathspec=pathspec)
     elif source.type == ChangeSourceType.BRANCH:
         if not isinstance(source, BranchSource):
             raise SystemError(
                 f"Type mismatch: expected BranchSource, got {type(source).__name__}"
             )
-        files = _get_branch_files(run, source.branch, source.base)
+        files = _get_branch_files(run, source.branch, source.base, pathspec=pathspec)
     elif source.type == ChangeSourceType.PR:
         if not isinstance(source, PRSource):
             raise SystemError(
@@ -64,6 +67,8 @@ def get_changed_files(
                 "PR source requires GitHubClient injection",
             )
         files = github_client.get_pr_files(source.pr_number)
+        if pathspec:
+            files = [f for f in files if fnmatch(f, pathspec)]
     else:
         raise GitError("get_changed_files", f"Unknown source type: {source.type}")
 
@@ -131,11 +136,14 @@ def get_diff(
     return diff
 
 
-def _get_uncommitted_files(run: Callable[[list[str]], str]) -> list[str]:
+def _get_uncommitted_files(
+    run: Callable[[list[str]], str], pathspec: str | None = None
+) -> list[str]:
     """获取未提交改动文件（暂存 + 工作区）."""
-    staged = run(["diff", "--name-only", "--cached"])
-    unstaged = run(["diff", "--name-only"])
-    untracked = run(["ls-files", "--others", "--exclude-standard"])
+    pargs = ["--", pathspec] if pathspec else []
+    staged = run(["diff", "--name-only", "--cached"] + pargs)
+    unstaged = run(["diff", "--name-only"] + pargs)
+    untracked = run(["ls-files", "--others", "--exclude-standard"] + pargs)
     all_files = set()
     for line in (staged + "\n" + unstaged + "\n" + untracked).splitlines():
         if line.strip():
@@ -149,17 +157,23 @@ def get_untracked_files(run: Callable[[list[str]], str]) -> list[str]:
     return [f for f in output.splitlines() if f.strip()]
 
 
-def _get_commit_files(run: Callable[[list[str]], str], sha: str) -> list[str]:
+def _get_commit_files(
+    run: Callable[[list[str]], str], sha: str, pathspec: str | None = None
+) -> list[str]:
     """获取指定 commit 的改动文件."""
-    output = run(["diff-tree", "--no-commit-id", "-r", "--name-only", "-m", sha])
+    pargs = ["--", pathspec] if pathspec else []
+    output = run(
+        ["diff-tree", "--no-commit-id", "-r", "--name-only", "-m", sha] + pargs
+    )
     return sorted(set(f for f in output.splitlines() if f.strip()))
 
 
 def _get_branch_files(
-    run: Callable[[list[str]], str], branch: str, base: str
+    run: Callable[[list[str]], str], branch: str, base: str, pathspec: str | None = None
 ) -> list[str]:
     """获取分支相对于 base 的改动文件."""
-    output = run(["diff", "--name-only", f"{base}...{branch}"])
+    pargs = ["--", pathspec] if pathspec else []
+    output = run(["diff", "--name-only", f"{base}...{branch}"] + pargs)
     return [f for f in output.splitlines() if f.strip()]
 
 

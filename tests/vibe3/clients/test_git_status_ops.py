@@ -4,7 +4,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.git_status_ops import _numstat_via_merge_base, get_numstat
+from vibe3.clients.git_status_ops import (
+    _numstat_via_merge_base,
+    get_changed_files,
+    get_numstat,
+)
 from vibe3.exceptions import GitError, SystemError
 from vibe3.models.change_source import (
     BranchSource,
@@ -156,3 +160,86 @@ class TestNumstatViaMergeBase:
         get_merge_base = MagicMock(return_value="ghij" + "0" * 36)
         with pytest.raises(SystemError, match="invalid SHA format"):
             _numstat_via_merge_base(run, get_merge_base, "feature", "main")
+
+
+class TestGetChangedFilesPathspec:
+    """Test get_changed_files pathspec parameter."""
+
+    def test_uncommitted_source_passes_pathspec(self) -> None:
+        """Test that pathspec is passed to git commands for uncommitted source."""
+        run = MagicMock(side_effect=["", "", "file.py"])
+        source = UncommittedSource()
+
+        result = get_changed_files(run, source, pathspec="*.py")
+
+        # Verify pathspec was added to all three git commands
+        assert run.call_count == 3
+        for call in run.call_args_list:
+            assert call[0][0][-2:] == ["--", "*.py"]
+        assert result == ["file.py"]
+
+    def test_commit_source_passes_pathspec(self) -> None:
+        """Test that pathspec is passed to git diff-tree for commit source."""
+        run = MagicMock(return_value="src/main.py\nsrc/utils.py")
+        source = CommitSource(sha="abc123")
+
+        result = get_changed_files(run, source, pathspec="*.py")
+
+        run.assert_called_once()
+        args = run.call_args[0][0]
+        assert args[:6] == [
+            "diff-tree",
+            "--no-commit-id",
+            "-r",
+            "--name-only",
+            "-m",
+            "abc123",
+        ]
+        assert args[-2:] == ["--", "*.py"]
+        assert result == ["src/main.py", "src/utils.py"]
+
+    def test_branch_source_passes_pathspec(self) -> None:
+        """Test that pathspec is passed to git diff for branch source."""
+        run = MagicMock(return_value="feature.py")
+        source = BranchSource(branch="feature", base="main")
+
+        result = get_changed_files(run, source, pathspec="*.py")
+
+        run.assert_called_once_with(
+            ["diff", "--name-only", "main...feature", "--", "*.py"]
+        )
+        assert result == ["feature.py"]
+
+    def test_pr_source_filters_with_fnmatch(self) -> None:
+        """Test that PR source uses fnmatch filtering for pathspec."""
+        run = MagicMock()
+        github_client = MagicMock()
+        github_client.get_pr_files.return_value = [
+            "src/main.py",
+            "bin/script",
+            "README.md",
+        ]
+        source = PRSource(pr_number=42)
+
+        result = get_changed_files(
+            run, source, github_client=github_client, pathspec="*.py"
+        )
+
+        github_client.get_pr_files.assert_called_once_with(42)
+        assert result == ["src/main.py"]
+
+    def test_pr_source_no_pathspec_returns_all(self) -> None:
+        """Test that PR source returns all files when no pathspec."""
+        run = MagicMock()
+        github_client = MagicMock()
+        github_client.get_pr_files.return_value = [
+            "src/main.py",
+            "bin/script",
+            "README.md",
+        ]
+        source = PRSource(pr_number=42)
+
+        result = get_changed_files(run, source, github_client=github_client)
+
+        github_client.get_pr_files.assert_called_once_with(42)
+        assert len(result) == 3

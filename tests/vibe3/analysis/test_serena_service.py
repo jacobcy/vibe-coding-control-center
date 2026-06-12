@@ -90,7 +90,13 @@ class TestAnalyzeChanges:
     @pytest.fixture
     def mock_git(self) -> MagicMock:
         git = MagicMock()
-        git.get_changed_files.return_value = ["src/vibe3/config/loader.py", "bin/vibe"]
+        # Default behavior: return all files when called without pathspec
+        # Return only Python files when called with pathspec="*.py"
+        git.get_changed_files.side_effect = lambda source, pathspec=None: (
+            ["src/vibe3/config/loader.py", "bin/vibe"]
+            if pathspec is None
+            else ["src/vibe3/config/loader.py"]
+        )
         return git
 
     def test_changed_files_in_report(
@@ -108,6 +114,13 @@ class TestAnalyzeChanges:
         service = SerenaService(client=mock_client, git_client=mock_git)
         source = UncommittedSource()
         service.analyze_changes(source)
+        # Verify get_changed_files was called twice:
+        # 1. Once without pathspec (for all changed files)
+        # 2. Once with pathspec="*.py" (for Python files)
+        assert mock_git.get_changed_files.call_count == 2
+        # Verify the second call had pathspec="*.py"
+        calls = mock_git.get_changed_files.call_args_list
+        assert calls[1][1].get("pathspec") == "*.py"
         # get_symbols_overview 只应被调用一次（只有 loader.py 是 Python）
         assert mock_client.get_symbols_overview.call_count == 1
 

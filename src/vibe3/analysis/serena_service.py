@@ -226,7 +226,7 @@ class SerenaService:
 
         try:
             files = self.git_client.get_changed_files(source)
-            python_files = [f for f in files if f.endswith(".py")]
+            python_files = self.git_client.get_changed_files(source, pathspec="*.py")
 
             log.bind(
                 total_files=len(files),
