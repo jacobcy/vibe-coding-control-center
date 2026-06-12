@@ -102,22 +102,24 @@ def test_upgrade_placeholder_preserves_dependency_links():
         return_value={"branch": "task/issue-888", "flow_status": "active"}
     )
 
-    # Mock flow_service.block_flow for dependency re-linking
-    manager.flow_service.block_flow = MagicMock()
+    # Mock task_service.link_issue for dependency re-linking
+    manager.task_service.link_issue = MagicMock()
 
     issue = IssueInfo(number=888, title="Test issue")
     result = manager._upgrade_placeholder(issue, "task/issue-888")
 
     # Verify dependency links were preserved (re-linked after bootstrap)
-    assert manager.flow_service.block_flow.call_count == 2
-    manager.flow_service.block_flow.assert_any_call(
+    assert manager.task_service.link_issue.call_count == 2
+    manager.task_service.link_issue.assert_any_call(
         "task/issue-888",
-        blocked_by_issue=123,
+        issue_number=123,
+        role="dependency",
         actor="dispatch:upgrade_placeholder",
     )
-    manager.flow_service.block_flow.assert_any_call(
+    manager.task_service.link_issue.assert_any_call(
         "task/issue-888",
-        blocked_by_issue=456,
+        issue_number=456,
+        role="dependency",
         actor="dispatch:upgrade_placeholder",
     )
 

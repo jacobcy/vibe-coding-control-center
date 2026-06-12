@@ -128,9 +128,10 @@ class FlowManager:
 
         # Restore dependency links (bootstrap creates a fresh flow record)
         for dep_issue in existing_deps:
-            self.flow_service.block_flow(
+            self.task_service.link_issue(
                 branch,
-                blocked_by_issue=dep_issue,
+                issue_number=dep_issue,
+                role="dependency",
                 actor="dispatch:upgrade_placeholder",
             )
 
