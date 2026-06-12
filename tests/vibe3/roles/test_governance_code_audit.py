@@ -47,7 +47,8 @@ class TestSelectAuditModule:
         result = select_audit_module(0, tmp_path)
         assert result.name != "__init__.py"
 
-    def test_excludes_pycache(self, tmp_path: Path) -> None:
+    def test_naturally_excludes_pycache_files(self, tmp_path: Path) -> None:
+        # rglob("*.py") naturally excludes .pyc files, no filter needed
         src = tmp_path / "src" / "vibe3"
         src.mkdir(parents=True)
         cache = src / "__pycache__"

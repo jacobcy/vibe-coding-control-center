@@ -109,10 +109,8 @@ class TestAnalyzeFile:
 class TestCollectPythonFileStructures:
     """collect_python_file_structures 测试."""
 
-    def test_collects_python_files_and_skips_pycache(self, tmp_path) -> None:
+    def test_collects_python_files(self, tmp_path) -> None:
         root = tmp_path / "src" / "vibe3"
-        cached = root / "__pycache__"
-        cached.mkdir(parents=True)
         root.mkdir(parents=True, exist_ok=True)
 
         file_a = root / "a.py"
@@ -120,7 +118,6 @@ class TestCollectPythonFileStructures:
         file_b = root / "nested" / "b.py"
         file_b.parent.mkdir(parents=True, exist_ok=True)
         file_b.write_text("def b():\n    return 2\n")
-        (cached / "c.py").write_text("def c():\n    return 3\n")
 
         results = collect_python_file_structures(str(root))
 

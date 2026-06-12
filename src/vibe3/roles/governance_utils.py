@@ -190,16 +190,12 @@ def get_governed_issue_numbers(
 def select_audit_module(tick_count: int, repo_root: Path | None = None) -> Path:
     """Select a module from src/vibe3/ for audit using tick-based rotation.
 
-    Excludes __init__.py files and __pycache__ directories.
+    Excludes __init__.py files.
     Returns a deterministic but rotating selection based on tick_count.
     """
     root = repo_root or Path(".").resolve()
     src_root = root / "src" / "vibe3"
-    candidates = sorted(
-        p
-        for p in src_root.rglob("*.py")
-        if p.name != "__init__.py" and "__pycache__" not in p.parts
-    )
+    candidates = sorted(p for p in src_root.rglob("*.py") if p.name != "__init__.py")
     if not candidates:
         return src_root / "cli.py"
     return candidates[tick_count % len(candidates)]
