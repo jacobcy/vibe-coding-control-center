@@ -673,3 +673,56 @@ def test_create_placeholder_flow_returns_flow_dict() -> None:
     assert "flow_status" in result
     assert result["branch"] == "task/issue-999"
     assert result["flow_status"] == "blocked"
+
+
+def test_bootstrap_issue_flow_creates_baseline() -> None:
+    """Bootstrap should auto-create snapshot baseline (best-effort)."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-100",
+        "flow_slug": "issue-100",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-100"})
+    )
+
+    with patch("vibe3.analysis.snapshot_service.save_branch_baseline") as mock_baseline:
+        mock_baseline.return_value = Path("/tmp/baseline.json")
+        service.bootstrap_issue_flow(
+            IssueInfo(number=100, title="Baseline test"),
+            branch="dev/issue-100",
+            source="skill",
+            ensure_worktree=False,
+        )
+        mock_baseline.assert_called_once_with("dev/issue-100", force=False)
+
+
+def test_bootstrap_issue_flow_skips_baseline_when_skip_git() -> None:
+    """Bootstrap with skip_git=True should NOT create baseline."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    store.get_flow_state.return_value = {
+        "branch": "task/issue-200",
+        "flow_slug": "issue-200",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "task/issue-200"})
+    )
+
+    with patch("vibe3.analysis.snapshot_service.save_branch_baseline") as mock_baseline:
+        service.bootstrap_issue_flow(
+            IssueInfo(number=200, title="Skip git test"),
+            branch="task/issue-200",
+            source="intake",
+            skip_git=True,
+        )
+        mock_baseline.assert_not_called()

@@ -219,8 +219,10 @@ class FlowOrchestratorService:
                     from vibe3.analysis import snapshot_service
 
                     snapshot_service.save_branch_baseline(branch, force=False)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to auto-create baseline (best-effort): {exc}"
+                    )
 
             return result
         except Exception as exc:
