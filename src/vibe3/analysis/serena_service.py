@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 from loguru import logger
 
@@ -268,7 +268,6 @@ class SerenaService:
             SerenaError: If scan fails
         """
         from vibe3.analysis.dead_code_rules import (
-            classify_confidence,
             get_router_functions,
             is_dead_code,
         )
@@ -316,7 +315,7 @@ class SerenaService:
                         is_cli_command = sym_type == "cli_command"
 
                         # Apply dead code rules
-                        is_dead, reason = is_dead_code(
+                        is_dead, reason, confidence = is_dead_code(
                             sym_name, ref_count, is_cli_command, router_funcs
                         )
 
@@ -331,31 +330,23 @@ class SerenaService:
                                 else 0
                             )
 
-                            confidence = classify_confidence(
-                                sym_name, ref_count, is_cli_command, router_funcs
+                            # Type narrowing: is_dead=True → confidence != "excluded"
+                            confidence_narrowed = cast(
+                                Literal["high", "medium", "low"], confidence
                             )
-                            # Type narrowing
-                            if confidence == "excluded":
-                                continue
-
                             findings.append(
                                 DeadCodeFinding(
                                     symbol=sym_name,
                                     file=relative_file,
                                     line=line,
                                     loc=loc,
-                                    confidence=confidence,
+                                    confidence=confidence_narrowed,
                                     category="unused_function",
                                     reason=reason,
                                 )
                             )
                             total_dead += 1
-                        elif (
-                            classify_confidence(
-                                sym_name, ref_count, is_cli_command, router_funcs
-                            )
-                            == "excluded"
-                        ):
+                        elif confidence == "excluded":
                             excluded.append(f"{relative_file}:{sym_name}")
                             total_excluded += 1
 

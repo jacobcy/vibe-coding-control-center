@@ -128,7 +128,7 @@ class TestIsDeadCode:
         reason_contains: str,
     ):
         """Test functions that should not be flagged as dead."""
-        is_dead, reason = is_dead_code(func_name, ref_count, is_cli_command)
+        is_dead, reason, _ = is_dead_code(func_name, ref_count, is_cli_command)
         assert is_dead is expected_is_dead
         assert reason_contains in reason
 
@@ -143,7 +143,7 @@ class TestIsDeadCode:
     )
     def test_is_dead(self, func_name: str, ref_count: int, expected_confidence: str):
         """Test functions that should be flagged as dead."""
-        is_dead, reason = is_dead_code(func_name, ref_count)
+        is_dead, reason, _ = is_dead_code(func_name, ref_count)
         assert is_dead is True
         assert expected_confidence in reason
 

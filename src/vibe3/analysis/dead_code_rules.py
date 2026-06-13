@@ -178,7 +178,7 @@ def is_dead_code(
     ref_count: int,
     is_cli_command: bool = False,
     router_funcs: set[str] | None = None,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, Literal["high", "medium", "low", "excluded"]]:
     """Determine if a symbol is dead code.
 
     Args:
@@ -188,7 +188,7 @@ def is_dead_code(
         router_funcs: Set of router-decorated function names (for exclusion check)
 
     Returns:
-        Tuple of (is_dead: bool, reason: str)
+        Tuple of (is_dead: bool, reason: str, confidence: str)
     """
     confidence = classify_confidence(
         symbol_name, ref_count, is_cli_command, router_funcs
@@ -196,17 +196,23 @@ def is_dead_code(
 
     if confidence == "excluded":
         if is_cli_command:
-            return False, "CLI command (invoked via CLI, not code)"
+            return False, "CLI command (invoked via CLI, not code)", confidence
         if router_funcs is not None and symbol_name in router_funcs:
-            return False, "FastAPI endpoint (invoked via HTTP router)"
+            return False, "FastAPI endpoint (invoked via HTTP router)", confidence
         if should_exclude(symbol_name):
-            return False, "Excluded pattern (test/special method)"
-        return False, f"Has {ref_count} references"
+            return False, "Excluded pattern (test/special method)", confidence
+        return False, f"Has {ref_count} references", confidence
 
     if confidence == "high":
-        return True, "Unused function with 0 references (high confidence)"
+        return True, "Unused function with 0 references (high confidence)", confidence
 
     if confidence == "medium":
-        return True, "Unused private function with 0 references (medium confidence)"
+        return (
+            True,
+            "Unused private function with 0 references (medium confidence)",
+            confidence,
+        )
 
-    return False, "Not dead code"
+    return False, "Not dead code", confidence
+
+    return False, "Not dead code", confidence
