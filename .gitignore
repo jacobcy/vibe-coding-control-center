@@ -78,6 +78,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Test mock artifacts (unittest.mock.MagicMock paths)
+MagicMock/
+<MagicMock*/
+
 # =============================================================================
 # Node / JavaScript
 # =============================================================================
