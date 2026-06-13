@@ -266,25 +266,26 @@ class TestIsCliFile:
         cli_file = tmp_path / "cli.py"
         cli_file.write_text("import typer\napp = typer.Typer()\n")
 
-        result1 = _is_cli_file(str(cli_file))
-        result2 = _is_cli_file(str(cli_file))
+        with patch("builtins.open", side_effect=open) as mock_open:
+            result1 = _is_cli_file(str(cli_file))
+            result2 = _is_cli_file(str(cli_file))
 
-        assert result1 is True
-        assert result2 is True
-        assert _is_cli_file.cache_info().hits == 1
-        assert _is_cli_file.cache_info().misses == 1
+            assert result1 is True
+            assert result2 is True
+            assert mock_open.call_count == 1
 
     def test_non_cli_file_cached(self, tmp_path: Path) -> None:
         """Non-CLI files should also be cached."""
         normal_file = tmp_path / "normal.py"
         normal_file.write_text("def foo(): pass\n")
 
-        result1 = _is_cli_file(str(normal_file))
-        result2 = _is_cli_file(str(normal_file))
+        with patch("builtins.open", side_effect=open) as mock_open:
+            result1 = _is_cli_file(str(normal_file))
+            result2 = _is_cli_file(str(normal_file))
 
-        assert result1 is False
-        assert result2 is False
-        assert _is_cli_file.cache_info().hits == 1
+            assert result1 is False
+            assert result2 is False
+            assert mock_open.call_count == 1
 
     def test_nonexistent_file_returns_false(self) -> None:
         """Missing files should return False (not cached on error)."""
