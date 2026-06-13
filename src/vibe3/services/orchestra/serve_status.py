@@ -142,7 +142,9 @@ class ServeStatusService:
             last_tick = tick_matches[-1]
             tick_time, tick_num, tick_status = last_tick
             status_str = "in progress" if tick_status == "start" else "completed"
-            self.console.print("[cyan]Last Tick Activity:[/cyan]")
+            self.console.print(
+                "[bold]Orchestration Activity[/] [dim](runtime, not flow timeline)[/]"
+            )
             self.console.print(f"  - Tick #{tick_num} ({status_str} at {tick_time})")
 
             # Extract dispatcher activity for this tick

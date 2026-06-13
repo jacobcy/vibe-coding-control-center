@@ -408,6 +408,9 @@ def _full_status_dashboard(
         ]
         render_completed_flows(completed_flows)
 
+    # Cross-reference hint for runtime observation layer
+    console.print("[dim]For runtime health: vibe3 serve status[/]")
+
 
 def status(
     check: Annotated[

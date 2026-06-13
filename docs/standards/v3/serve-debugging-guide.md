@@ -113,6 +113,11 @@ uv run python src/vibe3/cli.py serve start -vv   # DEBUG
 | Task 状态 | `vibe3 task status` | Task Pool 聚合 | Issue 归属、执行阶段、最新 actor |
 | GitHub Issue | `gh issue view <number>` | 外部事实 | 外部可见状态、labels、comments |
 
+**观察层边界**（参见 ADR 0004）：
+- `vibe3 serve status` — 运行时编排观测（runtime observation）
+- `vibe3 flow show` — 单 flow 时间线/审计（flow-local audit）
+- `vibe3 task status` — 任务池聚合（task pool aggregation）
+
 **调试原则**：
 - 日志告诉你"发生了什么"
 - 真源告诉你"结果是什么"
