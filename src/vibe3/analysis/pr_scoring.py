@@ -26,6 +26,13 @@ class RiskLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
+class PRScoringError(VibeError):
+    """PR 评分失败."""
+
+    def __init__(self, details: str) -> None:
+        super().__init__(f"PR scoring failed: {details}", recoverable=False)
+
+
 class PRDimensions(BaseModel):
     """PR 评分维度输入."""
 

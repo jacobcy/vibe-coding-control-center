@@ -193,16 +193,9 @@ def discover_bridge_modules() -> Dict[str, List[Dict]]:
 
 
 # Known baseline bridges
-KNOWN_PURE_BRIDGES = {
-    "src/vibe3/services/issue/branch_resolver.py",  # re-exports from services.shared
-}
+KNOWN_PURE_BRIDGES = set()
 
-KNOWN_LAYER_CROSSING_BRIDGES = {
-    "src/vibe3/services/orchestra/helpers.py",  # re-exports from vibe3.config
-    "src/vibe3/services/shared/label_anomalies.py",  # re-exports from vibe3.clients
-    "src/vibe3/services/flow/reader.py",  # re-exports from vibe3.clients
-    # Note: pr/scoring.py has local PRScoringError class, so classifier may exclude it
-}
+KNOWN_LAYER_CROSSING_BRIDGES = set()
 
 ROOT_BARREL_IMPORT_BASELINE = 128
 SHARED_BARREL_IMPORT_BASELINE = 1
