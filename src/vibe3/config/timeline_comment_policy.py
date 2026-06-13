@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 from pydantic import BaseModel
 
-from vibe3.config.settings import _vibe3_config_root
+from vibe3.config.loader import find_install_root
 
 
 class TimelineCommentPolicy(BaseModel):
@@ -113,7 +113,11 @@ class TimelineCommentPolicy(BaseModel):
         from vibe3.config.loader import load_yaml_config
 
         # Use install root for cross-project invocation support
-        yaml_path = path or _vibe3_config_root() / "config" / "v3" / "timeline.yaml"
+        try:
+            default_path = find_install_root() / "config" / "v3" / "timeline.yaml"
+        except OSError:
+            default_path = Path("config/v3/timeline.yaml")
+        yaml_path = path or default_path
         data = load_yaml_config(yaml_path)
 
         if not data:
