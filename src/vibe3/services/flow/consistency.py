@@ -55,7 +55,9 @@ def check_flow_consistency(
     worktree_path = git_client.find_worktree_path_for_branch(branch)
     if worktree_path is None:
         # Placeholder flow: blocked + no git branch is a legal state
-        if flow_state.get("flow_status") == "blocked":
+        if flow_state.get("flow_status") == "blocked" and not git_client.branch_exists(
+            branch
+        ):
             return FlowConsistencyResult(needs_rebuild=False)
         return FlowConsistencyResult(
             needs_rebuild=True,
