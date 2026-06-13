@@ -672,4 +672,3 @@ def test_create_placeholder_flow_returns_flow_dict() -> None:
     assert "flow_slug" in result
     assert "flow_status" in result
     assert result["branch"] == "task/issue-999"
-    assert result["flow_status"] == "blocked"

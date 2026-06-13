@@ -218,10 +218,16 @@ def base(
     _config = load_config_and_validate_model("review", agent, backend, model)
 
     flow_service, current_branch = ensure_flow_for_current_branch()
+
+    # Get creation_source from flow state if available
+    flow_state = flow_service.get_flow_status(current_branch)
+    creation_source = flow_state.creation_source if flow_state else None
+
     try:
         resolved_base = build_base_resolution_usecase().resolve_review_base(
             base_branch,
             current_branch=current_branch,
+            creation_source=creation_source,
         )
     except UserError as error:
         typer.echo(f"Error: {error}", err=True)

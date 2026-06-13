@@ -51,24 +51,28 @@ class BaseResolutionUsecase:
         self,
         requested_base: str | None,
         current_branch: str,
+        creation_source: str | None = None,
     ) -> ResolvedBase:
         """Resolve base branch for inspect-base mode."""
         return self.resolve_base(
             requested_base=requested_base,
             current_branch=current_branch,
             default_policy="parent",
+            creation_source=creation_source,
         )
 
     def resolve_review_base(
         self,
         requested_base: str | None,
         current_branch: str,
+        creation_source: str | None = None,
     ) -> ResolvedBase:
         """Resolve base branch for review-base mode."""
         return self.resolve_base(
             requested_base=requested_base,
             current_branch=current_branch,
             default_policy="parent",
+            creation_source=creation_source,
         )
 
     def resolve_flow_create_base(
@@ -89,6 +93,7 @@ class BaseResolutionUsecase:
         requested_base: str | None,
         current_branch: str,
         default_policy: BaseDefaultPolicy,
+        creation_source: str | None = None,
     ) -> ResolvedBase:
         """Resolve base branch using unified policy tokens.
 
@@ -96,8 +101,17 @@ class BaseResolutionUsecase:
         - parent: closest parent branch inferred from topology
         - current: current branch
         - main: origin/main
+
+        If creation_source is provided, it takes precedence over parent detection.
+        This ensures we use the static branch creation source rather than
+        dynamically calculated topology.
         """
         token = (requested_base or default_policy).strip()
+
+        # Prefer creation_source over dynamic parent detection
+        if token == "parent" and creation_source:
+            return ResolvedBase(base_branch=creation_source, auto_detected=False)
+
         if token == "parent":
             inferred = self.parent_branch_finder(current_branch)
             if inferred is None:

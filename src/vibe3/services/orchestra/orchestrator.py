@@ -130,6 +130,7 @@ class FlowOrchestratorService:
         dependency_issue_numbers: tuple[int, ...] = (),
         blocked_reason: str | None = None,
         skip_git: bool = False,
+        force_baseline: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
 
@@ -140,6 +141,9 @@ class FlowOrchestratorService:
 
         It centralizes branch preparation, flow creation/reactivation, issue binding,
         optional worktree resolution, and compatible related/dependency linkage.
+
+        force_baseline forces an overwrite of any existing snapshot baseline
+        (used by flow rebuild to discard the stale pre-rebuild baseline).
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
@@ -150,9 +154,10 @@ class FlowOrchestratorService:
             )
 
         try:
+            branch_based_on_scene = False
             if not skip_git:
                 if self.git.branch_exists(branch):
-                    self._validate_or_recreate_branch(
+                    branch_based_on_scene = self._validate_or_recreate_branch(
                         branch,
                         issue_number=issue.number,
                         ensure_worktree=ensure_worktree,
@@ -164,6 +169,7 @@ class FlowOrchestratorService:
                         issue_number=issue.number,
                         ensure_worktree=ensure_worktree,
                     )
+                    branch_based_on_scene = True
 
             existing_state = self.store.get_flow_state(branch)
             if reactivate_existing and existing_state:
@@ -179,6 +185,9 @@ class FlowOrchestratorService:
                     actor=actor,
                     initiated_by=initiator,
                     source=source,
+                    creation_source=(
+                        self.config.scene_base_ref if branch_based_on_scene else None
+                    ),
                 )
 
             self.task_service.link_issue(branch, issue.number, "task", actor=actor)
@@ -218,7 +227,7 @@ class FlowOrchestratorService:
                 try:
                     from vibe3.analysis import snapshot_service
 
-                    snapshot_service.save_branch_baseline(branch, force=False)
+                    snapshot_service.save_branch_baseline(branch, force=force_baseline)
                 except Exception:
                     pass
 
@@ -261,7 +270,7 @@ class FlowOrchestratorService:
         issue_number: int,
         ensure_worktree: bool = False,
         reactivate_existing: bool = False,
-    ) -> None:
+    ) -> bool:
         """Validate existing branch is based on origin/main, or force-recreate it.
 
         When a branch already exists with the target name (e.g. stale branch
@@ -270,6 +279,11 @@ class FlowOrchestratorService:
         diverged from a different parent (e.g. another task/dev branch),
         it is force-deleted and recreated from scene_base_ref to prevent
         scope baseline pollution.
+
+        Returns:
+            True if the branch is verified or recreated as based on
+            scene_base_ref. False if a diverged branch was kept as-is for
+            reactivation, meaning its actual creation source is unknown.
         """
         # Fetch latest to ensure accurate merge-base comparison
         remote, ref = self.config.scene_base_ref.split("/", 1)
@@ -306,7 +320,7 @@ class FlowOrchestratorService:
                 issue=issue_number,
                 merge_base=merge_base[:8],
             ).info("Existing branch verified: based on scene_base_ref")
-            return
+            return True
 
         if reactivate_existing:
             logger.bind(
@@ -319,7 +333,7 @@ class FlowOrchestratorService:
                 "Existing branch diverged from scene_base_ref but "
                 "reactivate_existing=True; keeping as-is"
             )
-            return
+            return False
 
         logger.bind(
             domain="flow",
@@ -336,6 +350,7 @@ class FlowOrchestratorService:
         self.git.create_branch_ref(branch, start_ref=base_ref)
         if not ensure_worktree:
             self.git.switch_branch(branch)
+        return True
 
     def _fetch_and_create_branch(
         self,

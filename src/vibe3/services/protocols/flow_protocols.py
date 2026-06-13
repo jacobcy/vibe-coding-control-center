@@ -28,6 +28,7 @@ class FlowBootstrapProtocol(Protocol):
         reactivate_existing: bool = ...,
         related_issue_numbers: tuple[int, ...] = ...,
         dependency_issue_numbers: tuple[int, ...] = ...,
+        force_baseline: bool = ...,
     ) -> dict[str, Any]:
         """Bootstrap a flow for an issue.
 
@@ -40,6 +41,7 @@ class FlowBootstrapProtocol(Protocol):
             reactivate_existing: False
             related_issue_numbers: ()
             dependency_issue_numbers: ()
+            force_baseline: False
 
         Args:
             issue: The issue to create a flow for
@@ -52,6 +54,8 @@ class FlowBootstrapProtocol(Protocol):
             reactivate_existing: Whether to reactivate existing flow
             related_issue_numbers: Related issue numbers
             dependency_issue_numbers: Dependency issue numbers
+            force_baseline: Force-overwrite existing baseline snapshot
+                (used by flow rebuild)
 
         Returns:
             Flow creation result dictionary

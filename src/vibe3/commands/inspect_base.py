@@ -65,9 +65,18 @@ def register(app: typer.Typer) -> None:
             enable_method_trace()
 
         current_branch = get_current_branch()
+
+        # Get creation_source from flow state if available
+        from vibe3.services import FlowService
+
+        flow_service = FlowService()
+        flow_state = flow_service.get_flow_status(current_branch)
+        creation_source = flow_state.creation_source if flow_state else None
+
         resolved = build_base_resolution_usecase().resolve_inspect_base(
             base_branch,
             current_branch=current_branch,
+            creation_source=creation_source,
         )
         resolved_base = resolved.base_branch
 

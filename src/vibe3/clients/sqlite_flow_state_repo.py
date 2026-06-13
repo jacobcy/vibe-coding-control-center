@@ -45,6 +45,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         "transition_count",  # State transition counter for no-op gate
         "deleted_at",  # Soft delete timestamp (ISO 8601 or NULL)
         "worktree_path",  # Canonical worktree path for flow execution
+        "creation_source",  # Static branch creation source (e.g., "origin/main")
         "noop_gate_github_retry_count",  # GitHub API retry counter
         "noop_gate_malformed_retry_count",  # Malformed response retry counter
     }

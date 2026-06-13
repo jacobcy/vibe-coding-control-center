@@ -75,6 +75,7 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
         initiated_by="flow:rebuild",
         ensure_worktree=True,
         reactivate_existing=False,
+        force_baseline=True,
     )
     handoff.append_current_handoff.assert_called_once()
     label_resume.assert_called_once_with(

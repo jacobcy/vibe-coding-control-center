@@ -120,3 +120,77 @@ def test_resolve_inspect_base_keeps_parent_when_not_merged() -> None:
         assert resolved.base_branch == "task/active-branch"
         assert resolved.auto_detected is True
         mock_merged.assert_called_once_with("task/active-branch")
+
+
+def test_resolve_base_prefers_creation_source_for_parent_token() -> None:
+    """creation_source should take precedence over dynamic parent detection."""
+    parent_finder = MagicMock(return_value="feature/dynamic-parent")
+    usecase = BaseResolutionUsecase(parent_branch_finder=parent_finder)
+
+    resolved = usecase.resolve_base(
+        requested_base=None,
+        current_branch="task/child",
+        default_policy="parent",
+        creation_source="origin/main",
+    )
+
+    assert resolved.base_branch == "origin/main"
+    assert resolved.auto_detected is False
+    parent_finder.assert_not_called()
+
+
+def test_resolve_base_falls_back_to_parent_detection_without_creation_source() -> None:
+    """Without creation_source, parent token falls back to dynamic detection."""
+    usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: "feature/root")
+
+    resolved = usecase.resolve_base(
+        requested_base=None,
+        current_branch="task/child",
+        default_policy="parent",
+        creation_source=None,
+    )
+
+    assert resolved.base_branch == "feature/root"
+    assert resolved.auto_detected is True
+
+
+def test_resolve_base_ignores_creation_source_for_non_parent_token() -> None:
+    """creation_source must not override an explicit non-parent base token."""
+    usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: "feature/root")
+
+    resolved = usecase.resolve_base(
+        requested_base="main",
+        current_branch="task/child",
+        default_policy="parent",
+        creation_source="origin/develop",
+    )
+
+    assert resolved.base_branch == "origin/main"
+
+
+def test_resolve_inspect_base_prefers_creation_source() -> None:
+    """resolve_inspect_base should forward creation_source to resolve_base."""
+    parent_finder = MagicMock(return_value="feature/dynamic-parent")
+    usecase = BaseResolutionUsecase(parent_branch_finder=parent_finder)
+
+    resolved = usecase.resolve_inspect_base(
+        None, current_branch="task/child", creation_source="origin/main"
+    )
+
+    assert resolved.base_branch == "origin/main"
+    assert resolved.auto_detected is False
+    parent_finder.assert_not_called()
+
+
+def test_resolve_review_base_prefers_creation_source() -> None:
+    """resolve_review_base should forward creation_source to resolve_base."""
+    parent_finder = MagicMock(return_value="feature/dynamic-parent")
+    usecase = BaseResolutionUsecase(parent_branch_finder=parent_finder)
+
+    resolved = usecase.resolve_review_base(
+        None, current_branch="task/child", creation_source="origin/main"
+    )
+
+    assert resolved.base_branch == "origin/main"
+    assert resolved.auto_detected is False
+    parent_finder.assert_not_called()
