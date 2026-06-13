@@ -7,7 +7,7 @@ import pytest
 
 from vibe3.analysis.dead_code_rules import (
     classify_confidence,
-    has_router_decorator,
+    get_router_functions,
     is_dead_code,
     is_private,
     should_exclude,
@@ -148,7 +148,7 @@ class TestIsDeadCode:
         assert expected_confidence in reason
 
 
-class TestHasRouterDecorator:
+class TestGetRouterFunctions:
     """Test FastAPI router decorator detection."""
 
     def test_detects_router_post(self):
@@ -166,7 +166,8 @@ async def publish_event(request: dict) -> dict:
             f.flush()
             file_path = f.name
 
-        assert has_router_decorator(file_path, "publish_event") is True
+        result = get_router_functions(file_path)
+        assert "publish_event" in result
         Path(file_path).unlink()
 
     def test_detects_router_get(self):
@@ -184,7 +185,8 @@ async def list_events() -> list:
             f.flush()
             file_path = f.name
 
-        assert has_router_decorator(file_path, "list_events") is True
+        result = get_router_functions(file_path)
+        assert "list_events" in result
         Path(file_path).unlink()
 
     def test_detects_app_post(self):
@@ -202,7 +204,8 @@ async def handle_webhook(request: dict) -> dict:
             f.flush()
             file_path = f.name
 
-        assert has_router_decorator(file_path, "handle_webhook") is True
+        result = get_router_functions(file_path)
+        assert "handle_webhook" in result
         Path(file_path).unlink()
 
     def test_no_decorator(self):
@@ -215,7 +218,8 @@ async def regular_function() -> str:
             f.flush()
             file_path = f.name
 
-        assert has_router_decorator(file_path, "regular_function") is False
+        result = get_router_functions(file_path)
+        assert result == set()
         Path(file_path).unlink()
 
     def test_classify_excludes_router_endpoint(self):
@@ -233,6 +237,7 @@ async def publish_event(request: dict) -> dict:
             f.flush()
             file_path = f.name
 
-        confidence = classify_confidence("publish_event", 0, False, file_path)
+        router_funcs = get_router_functions(file_path)
+        confidence = classify_confidence("publish_event", 0, False, router_funcs)
         assert confidence == "excluded"
         Path(file_path).unlink()
