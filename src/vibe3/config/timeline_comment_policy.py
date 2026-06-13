@@ -44,11 +44,14 @@ class TimelineCommentPolicy(BaseModel):
         "report_recorded",  # Legacy alias for handoff_report
     ]
 
+    # Handoff updates - NO COMMENTS (routine operation records)
+    # Note: handoff_append is configured via YAML to allow flexibility
+    handoff_updates_events: list[str] = []  # Populated from YAML
+
     # Milestone events - WRITE COMMENTS (important progress markers)
     # NOTE: Must be routed through FlowTimelineService.record_timeline_event()
-    # handoff_append is now routed through HandoffService.append_current_handoff()
     milestone_events: list[str] = [
-        "handoff_append",  # Important milestone records (routed via HandoffService)
+        "flow_rebuild",  # Flow rebuild milestone (rebuild.py)
         "milestone_recorded",  # Example: Future milestone event (placeholder)
     ]
 
@@ -64,8 +67,8 @@ class TimelineCommentPolicy(BaseModel):
     # - pr_created: PRService creates PR (pr_service.py:310-315)
     # - handoff_verdict: VerdictService records verdict (verdict_service.py:140-146)
     # - state_transitioned: NoopGate state transition (noop_gate.py:406-424)
+    # - handoff_append: HandoffService updates (handoff/service.py:225-231) - NO COMMENT
     #
-    # handoff_append is NOW routed through FlowTimelineService via HandoffService
     # To enable policy filtering, route through FlowTimelineService first
 
     def should_write_comment(self, event_type: str) -> bool:
@@ -87,6 +90,10 @@ class TimelineCommentPolicy(BaseModel):
 
         # Artifact file references - never write comments
         if event_type in self.artifact_ref_events:
+            return False
+
+        # Handoff updates - never write comments
+        if event_type in self.handoff_updates_events:
             return False
 
         # Milestone events - write comments
@@ -135,6 +142,9 @@ class TimelineCommentPolicy(BaseModel):
             ),
             artifact_ref_events=no_comment.get(
                 "artifact_ref", cls.model_fields["artifact_ref_events"].default
+            ),
+            handoff_updates_events=no_comment.get(
+                "handoff_updates", cls.model_fields["handoff_updates_events"].default
             ),
             milestone_events=write_comment.get(
                 "milestone", cls.model_fields["milestone_events"].default

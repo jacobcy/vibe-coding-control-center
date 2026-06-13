@@ -22,11 +22,15 @@ no_comment:
     - plan_recorded
     - report_recorded
 
+  # Handoff 更新（日常操作记录，不需要通知）
+  handoff_updates:
+    - handoff_append
+
 # 写 comment 的事件分类
 write_comment:
   # 重要里程碑
   milestone:
-    - handoff_append
+    - flow_rebuild
     - milestone_recorded
 
   # 人类可读的状态变化

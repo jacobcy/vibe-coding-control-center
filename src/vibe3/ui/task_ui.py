@@ -249,12 +249,18 @@ def render_task_show(
 def render_task_comments(
     issue: dict[str, object], max_comments: int = MAX_COMMENTS_DISPLAY
 ) -> None:
-    """Render last N comments with human/agent labels.
+    """Render issue body and last N comments with human/agent labels.
 
     Args:
-        issue: Issue dict with comments
+        issue: Issue dict with body and comments
         max_comments: Maximum number of recent comments to show
     """
+    # Display issue body first
+    body = str(issue.get("body") or "").strip()
+    if body:
+        console.print("\n[bold]Issue Body[/]\n")
+        console.print(body)
+
     comments = issue.get("comments") or []
     if not isinstance(comments, list):
         comments = []
@@ -272,7 +278,7 @@ def render_task_comments(
     shown = len(recent_comments)
     console.print(f"\n[bold]Recent Comments (last {shown} of {total})[/]\n")
 
-    for idx, comment in enumerate(recent_comments):
+    for comment in recent_comments:
         if not isinstance(comment, dict):
             continue
 
@@ -296,11 +302,6 @@ def render_task_comments(
             # Bug 4: Human comments label
             console.print(f"[bold cyan]\\[user:{login}][/bold cyan]")
 
-        # Only truncate if NOT the last comment (most recent)
-        # Last comment should be shown in full for agent context
-        is_last = idx == len(recent_comments) - 1
-        if not is_last and len(body) > 300:
-            body = body[:300] + "..."
-
+        # Show full comment body without truncation
         console.print(body)
         console.print()  # Empty line between comments
