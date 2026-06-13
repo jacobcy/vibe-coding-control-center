@@ -109,7 +109,8 @@ class GitHubClientBase:
 
         Returns:
             CompletedProcess on success.
-            None on TimeoutExpired or FileNotFoundError (gh not installed).
+            None on any failure (TimeoutExpired, FileNotFoundError,
+            CalledProcessError).
         """
         env = {**os.environ, "GH_PAGER": "cat"} if pager else None
         effective_timeout = timeout if timeout is not None else GH_API_TIMEOUT
@@ -128,6 +129,18 @@ class GitHubClientBase:
             return None
         except FileNotFoundError:
             logger.bind(external="github").warning("gh CLI not found")
+            return None
+        except subprocess.CalledProcessError as exc:
+            error_text = (exc.stderr or exc.stdout or str(exc)).strip()
+            # Truncate long error messages to prevent log flooding
+            error_preview = (
+                error_text[:200] + "..." if len(error_text) > 200 else error_text
+            )
+            logger.bind(
+                external="github",
+                cmd=" ".join(cmd[:3]),
+                returncode=exc.returncode,
+            ).warning(f"gh command failed [{exc.returncode}]: {error_preview}")
             return None
 
     def get_current_user(self) -> str:

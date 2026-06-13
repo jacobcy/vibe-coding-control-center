@@ -75,6 +75,28 @@ class JobExecutor:
         self._coordinator = coordinator
         self._store = store
 
+    @staticmethod
+    def _log_execution_error(exc: Exception) -> None:
+        """Log execution error without stack trace for known external errors.
+
+        GitHub API and other external dependency failures produce predictable
+        error messages — a full traceback adds noise without diagnostic value.
+        These are logged at WARNING and recorded to error_log separately.
+        All other errors still get a full traceback via logger.exception().
+        """
+        from subprocess import CalledProcessError
+
+        from vibe3.exceptions import GitHubError
+
+        if isinstance(exc, (GitHubError, CalledProcessError)):
+            # External dependency error: log message only, no traceback
+            error_text = str(exc)
+            preview = error_text[:200] + "..." if len(error_text) > 200 else error_text
+            logger.bind(external=True).warning(f"External error in job: {preview}")
+        else:
+            # Internal/unexpected error: full traceback for diagnosis
+            logger.exception(f"Job execution failed: {exc}")
+
     def _resolve_coordinator(self, config: object) -> ExecutionCoordinator:
         """Resolve or create an ExecutionCoordinator.
 
@@ -285,7 +307,7 @@ class JobExecutor:
             return job_result
 
         except Exception as e:
-            logger.exception(f"Job execution failed: {e}")
+            self._log_execution_error(e)
 
             # Record actor failure and lifecycle failure
             actor_obj.record_failure(error=str(e))
