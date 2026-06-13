@@ -332,6 +332,8 @@ def test_list_issue_comments_success(github_client: GitHubClient) -> None:
 
         result = github_client.list_issue_comments(issue_number=123)
 
+        mock_view.assert_called_once_with(123, repo=None, fields=["comments"])
+
         assert len(result) == 2
         assert result[0]["body"] == "First comment"
         assert result[1]["body"] == "Second comment"
