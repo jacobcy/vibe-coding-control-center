@@ -10,20 +10,19 @@ enabling on_publish hooks and the rule engine to observe all executions.
 
 from __future__ import annotations
 
-import subprocess
 from types import SimpleNamespace
 from typing import Any
 
 from loguru import logger
 
 from vibe3.domain.handler_registry import register_handler
-from vibe3.exceptions import GitHubError
 from vibe3.models import (
     ManualPlanIntent,
     ManualReviewIntent,
     ManualRunIntent,
     ReviewRequest,
 )
+from vibe3.services import log_dispatch_error
 
 # Result sink for CLI commands that need return values (review verdict).
 # Handler stores result after execution; CLI reads via get_pending_result().
@@ -33,16 +32,6 @@ _pending_results: dict[str, Any] = {}
 def get_pending_result(key: str) -> Any | None:
     """Retrieve and clear a pending result stored by a handler."""
     return _pending_results.pop(key, None)
-
-
-def _log_dispatch_error(context: str, exc: Exception) -> None:
-    """Log dispatch error: warning for external errors, full traceback for internal."""
-    if isinstance(exc, (GitHubError, subprocess.CalledProcessError)):
-        error_text = str(exc)
-        preview = error_text[:200] + "..." if len(error_text) > 200 else error_text
-        logger.bind(external=True).warning(f"{context} dispatch failed: {preview}")
-    else:
-        logger.exception(f"{context} dispatch failed: {exc}")
 
 
 def _store_pending_error(key: str, exc: Exception) -> None:
@@ -144,7 +133,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
             typer.echo(f"tmux session: {result.tmux_session}")
             typer.echo(f"log: {result.log_path}")
     except Exception as e:
-        _log_dispatch_error("Manual plan", e)
+        log_dispatch_error("Manual plan dispatch failed", e)
         _store_pending_error("plan", e)
 
 
@@ -201,7 +190,7 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
             publish=event.publish,
         )
     except Exception as e:
-        _log_dispatch_error("Manual run", e)
+        log_dispatch_error("Manual run dispatch failed", e)
         _store_pending_error("run", e)
 
 
@@ -273,8 +262,8 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
                     config=config,
                     show_prompt=event.show_prompt,
                 )
-            except Exception:
-                _log_dispatch_error("Review", Exception("review execution failed"))
+            except Exception as e:
+                log_dispatch_error("Review dispatch failed", e)
                 result = ReviewRunResult("ERROR", None, event.issue_number)
             # Store result for CLI to retrieve
             _pending_results["review"] = result

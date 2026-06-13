@@ -7,7 +7,6 @@ ensuring API errors are captured for FailedGate threshold checking.
 from __future__ import annotations
 
 import os
-import subprocess
 from typing import Callable
 
 from loguru import logger
@@ -16,21 +15,10 @@ from typer import echo
 from vibe3.agents import CodeagentBackend
 from vibe3.clients import get_store
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
-from vibe3.exceptions import GitHubError
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services import record_dispatch_failure_if_unexpected
-
-
-def _log_dispatch_error(context: str, exc: Exception) -> None:
-    """Log dispatch error: warning for external errors, full traceback for internal."""
-    if isinstance(exc, (GitHubError, subprocess.CalledProcessError)):
-        error_text = str(exc)
-        preview = error_text[:200] + "..." if len(error_text) > 200 else error_text
-        logger.bind(external=True).warning(f"{context} dispatch failed: {preview}")
-    else:
-        logger.exception(f"{context} dispatch failed: {exc}")
+from vibe3.services import log_dispatch_error, record_dispatch_failure_if_unexpected
 
 
 def run_governance_sync(
@@ -276,7 +264,7 @@ def run_governance_async(
                 exception=exc,
                 tick_id=tick_count,
             )
-            _log_dispatch_error("Governance scan", exc)
+            log_dispatch_error("Governance scan dispatch failed", exc)
             raise
 
     if result and result.launched:

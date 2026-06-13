@@ -94,6 +94,7 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
+        log_dispatch_error,
         record_dispatch_failure_if_unexpected,
         record_error,
     )
@@ -251,6 +252,7 @@ __all__ = [
     "is_dev_collab_branch",
     "is_running_issue",
     "load_issue_info",
+    "log_dispatch_error",
     "normalize_assignees",
     "normalize_labels",
     "record_dispatch_failure_if_unexpected",
@@ -366,6 +368,7 @@ _SYMBOL_MODULES = {
     "is_dev_collab_branch": "vibe3.services.shared.status_query",
     "is_running_issue": "vibe3.services.orchestra.status",
     "load_issue_info": "vibe3.services.issue.context",
+    "log_dispatch_error": "vibe3.services.shared.errors",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
