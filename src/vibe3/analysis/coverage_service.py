@@ -9,6 +9,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.config import get_source_root
 from vibe3.models import CoverageReport, LayerCoverage
 
 
@@ -64,9 +65,10 @@ class CoverageService:
         categorized: dict[str, dict[str, dict[str, Any]]] = {
             name: {} for name in layer_names
         }
+        src_root = get_source_root()
         for file_path, file_data in coverage_data.get("files", {}).items():
             for layer_name in layer_names:
-                if file_path.startswith(f"src/vibe3/{layer_name}"):
+                if file_path.startswith(f"{src_root}/{layer_name}"):
                     categorized[layer_name][file_path] = file_data
                     break  # each file belongs to at most one layer
         return categorized
@@ -149,7 +151,7 @@ class CoverageService:
             "uv",
             "run",
             "pytest",
-            "--cov=src/vibe3",
+            f"--cov={get_source_root()}",
             f"--cov-report=json:{cov_file}",
             "--cov-report=term-missing:skip-covered",
             "-q",  # Quiet mode
@@ -220,7 +222,7 @@ class CoverageService:
             # Fallback path: re-filter coverage_data by layer for backward
             # compatibility with direct callers. In production, run_coverage_check
             # always provides _layer_files; this path exists for testability.
-            layer_path = f"src/vibe3/{layer_name}"
+            layer_path = f"{get_source_root()}/{layer_name}"
             files = {
                 fp: fd
                 for fp, fd in coverage_data.get("files", {}).items()

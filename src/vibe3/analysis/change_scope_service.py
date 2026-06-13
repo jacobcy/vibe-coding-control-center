@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Sequence
 
 from loguru import logger
 
+from vibe3.config import get_source_root
+
 if TYPE_CHECKING:
     from vibe3.analysis.serena_service import SerenaService
     from vibe3.models import ChangeSource
@@ -39,7 +41,8 @@ def is_test_file(filepath: str) -> bool:
 
 def is_v3_source_file(filepath: str) -> bool:
     """Return True for Python source under src/vibe3."""
-    return filepath.startswith("src/vibe3/") and filepath.endswith(".py")
+    src_root = get_source_root()
+    return filepath.startswith(f"{src_root}/") and filepath.endswith(".py")
 
 
 def is_v3_test_file(filepath: str) -> bool:

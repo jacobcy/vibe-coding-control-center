@@ -108,7 +108,7 @@ def _extract_imports(file_path: str) -> list[str]:
     return imports
 
 
-def build_module_graph(src_root: str = "src/vibe3") -> dict[str, ModuleNode]:
+def build_module_graph(src_root: str | None = None) -> dict[str, ModuleNode]:
     """解析 import 构建模块依赖图.
 
     Args:
@@ -120,6 +120,11 @@ def build_module_graph(src_root: str = "src/vibe3") -> dict[str, ModuleNode]:
     Raises:
         DAGError: 构建失败
     """
+    if src_root is None:
+        from vibe3.config import get_source_root
+
+        src_root = get_source_root()
+
     log = logger.bind(domain="dag", action="build_module_graph", src_root=src_root)
     log.info("Building module graph")
 

@@ -76,8 +76,11 @@ def select_pre_push_tests(
         # Layer 3: Directory-scoped fallback: run tests in the same subdirectory
         # as the unmapped source files rather than the full suite.
         dir_targets: set[str] = set()
+        from vibe3.config import get_source_root
+
+        src_root = get_source_root()
         for src_path in unmapped_sources:
-            src_rel = Path(src_path).relative_to("src/vibe3")
+            src_rel = Path(src_path).relative_to(src_root)
             test_dir = root / "tests" / "vibe3" / src_rel.parent
             if test_dir.exists() and any(test_dir.glob("test_*.py")):
                 dir_targets.add(test_dir.relative_to(root).as_posix())
@@ -187,8 +190,11 @@ def _existing_targets(root: Path, targets: Sequence[str]) -> list[str]:
 
 
 def _map_source_to_tests(source_path: str, root: Path) -> list[str]:
+    from vibe3.config import get_source_root
+
     src = Path(source_path)
-    rel = src.relative_to("src/vibe3")
+    src_root = get_source_root()
+    rel = src.relative_to(src_root)
     test_dir = root / "tests" / "vibe3" / rel.parent
     stem = rel.stem
 

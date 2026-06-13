@@ -255,11 +255,11 @@ class SerenaService:
             log.bind(error=str(e)).error("Change analysis failed")
             raise SerenaError("analyze_changes", str(e)) from e
 
-    def scan_dead_code(self, root: str = "src/vibe3") -> "DeadCodeReport":
+    def scan_dead_code(self, root: str | None = None) -> "DeadCodeReport":
         """Scan for dead code (unused functions) in the codebase.
 
         Args:
-            root: Root directory to scan (default: "src/vibe3")
+            root: Root directory to scan (None uses configured source root)
 
         Returns:
             DeadCodeReport with findings
@@ -267,6 +267,11 @@ class SerenaService:
         Raises:
             SerenaError: If scan fails
         """
+        if root is None:
+            from vibe3.config import get_source_root
+
+            root = get_source_root()
+
         from vibe3.analysis.dead_code_rules import (
             get_router_functions,
             is_dead_code,
