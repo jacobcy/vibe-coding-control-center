@@ -160,9 +160,10 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 
 - **通过三级审查**：
   - 移除 `state/ready`，补 `state/handoff`（从备选池进入执行池）
-  - **Label 操作命令**（参考 manager.md 标准，确保单一 state label）：
+  - **Label 操作命令**（仅限 supervisor issue: 此类 issue 由 supervisor 独立管理生命周期，不走普通 dev flow 的 vibe3 命令链）：
     ```bash
     # 单个 issue handoff 操作
+    # [supervisor-only] 此操作仅用于 supervisor issue，普通 dev issue 必须用 vibe3 task intake
     gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
 
     # 示例：issue #770 通过审查
@@ -322,7 +323,7 @@ Forbidden:
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
      ```bash
-     # 确保 issue 只有一个 state label
+     # [supervisor-only] 仅用于 supervisor issue，内部 state 转换不走 vibe3 task 命令
      gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
      ```
    - 不通过：建议关闭，记录到 Actions

@@ -578,6 +578,8 @@ Steps:
     - 执行：
 
     ```bash
+    # [manager-internal] 此操作仅由 manager agent 在执行 dispatch 时执行
+    # 其他 agent/skill 禁止直接操作 state/ 标签，必须使用 vibe3 task 命令
     gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
     ```
 
