@@ -3,6 +3,7 @@ document_type: core-entry
 authority:
   - project-structure
   - file-organization
+  - docs/decisions/ (Architecture Decision Records - authority for "WHY" decisions)
 audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
@@ -28,6 +29,21 @@ Vibe Center 包含**两个并行实现**：
 - **V2 (Shell)** - Shell 实现，Zsh，入口 `bin/vibe`
 
 本文档以 **V3 为主视角**进行说明。
+
+### 核心架构 (3-Tier Model)
+
+V3 采用 3-Tier 顶层架构，定义系统的战略职责边界：
+
+- **Tier 3 (Cognitive / Governance Layer)**: 负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划。
+- **Tier 2 (Skill Layer)**: 负责 Flow 状态机、任务编排、Agent 执行 (Plan/Run/Review)。
+- **Tier 1 (Shell Layer)**: 提供原子级能力访问、状态读取、环境原语与项目信息检索。
+
+### 执行等级 (Execution Levels)
+
+- **Level 1 (L1 - Inspection)**: 无 Worktree 观察层，负责只读观察与 Metadata 扫描。
+- **Level 2 (L2 - Governance)**: 临时隔离治理层，使用临时 Worktree 进行文档治理、测试修补。
+- **Level 3 (L3 - Main Development)**: 持久隔离开发层，承载完整的 Plan/Run/Review 生命周期。
+- **Level 4 (L4 - Atomic)**: 原子工具层，负责底层原子操作执行。
 
 ## 📁 根目录结构
 
@@ -68,9 +84,12 @@ vibe-center/
 ├── tests/                       # 测试 (vibe2, vibe3, 覆盖率报告)
 ├── skills/                      # 技能定义 (Canonical Source)
 ├── docs/                        # 人类文档区 (Standards, PRDs, Specs, Reports)
+│   ├── decisions/               # [Authority] ADR 系统 (Architecture Decision Records)
 │   ├── directives/              # [V3 Active] 指令集文档 (Executor/Manager/Supervisor)
 │   ├── handoff/                 # [V3 Active] 执行交接现场 (Artifacts, Results)
-│   └── standards/               # 项目标准与规范
+│   ├── publish-directives/      # [V3 Active] 发布指令集 (Post-Review Actions)
+│   ├── standards/               # 项目标准与规范
+│   └── validation/              # [V3 Active] 验证报告与一致性检查
 │
 ├── debug/                       # 调试信息与临时分析报告
 ├── openspec/                    # 开放规范集成区

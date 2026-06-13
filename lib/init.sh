@@ -291,8 +291,8 @@ vibe_init() {
 
     # Create supervisor structure if profile requires
     if [[ "$ENABLE_SUPERVISOR" == true ]]; then
-        mkdir -p "$REPO_ROOT/.agent/supervisor"
-        _log_success "Created: .agent/supervisor/ directory"
+        mkdir -p "$REPO_ROOT/supervisor"
+        _log_success "Created: supervisor/ directory"
     fi
 
     _seed_claude_assets "$PROFILE_NAME" "$REPO_ROOT"
@@ -477,8 +477,8 @@ vibe_init() {
         fi
         echo "  4. Optional: start orchestra with ${CYAN}vibe3 serve${NC}"
         echo "  5. Review created directories: ${CYAN}.agent/${NC}, ${CYAN}skills/${NC}, ${CYAN}.claude/${NC}"
-        echo "  6. Policies and prompts from: ${CYAN}.agent/policies${NC} and ${CYAN}config/prompts${NC}"
-        echo "  7. Supervisor orchestration: ${CYAN}.agent/supervisor/${NC}"
+        echo "  6. Policies and prompts from: ${CYAN}supervisor/policies/${NC} and ${CYAN}config/prompts${NC}"
+        echo "  7. Supervisor orchestration: ${CYAN}supervisor/${NC}"
     fi
     echo ""
 }
