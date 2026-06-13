@@ -130,6 +130,7 @@ class FlowOrchestratorService:
         dependency_issue_numbers: tuple[int, ...] = (),
         blocked_reason: str | None = None,
         skip_git: bool = False,
+        force_baseline: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
 
@@ -140,6 +141,9 @@ class FlowOrchestratorService:
 
         It centralizes branch preparation, flow creation/reactivation, issue binding,
         optional worktree resolution, and compatible related/dependency linkage.
+
+        force_baseline forces an overwrite of any existing snapshot baseline
+        (used by flow rebuild to discard the stale pre-rebuild baseline).
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
@@ -223,7 +227,7 @@ class FlowOrchestratorService:
                 try:
                     from vibe3.analysis import snapshot_service
 
-                    snapshot_service.save_branch_baseline(branch, force=False)
+                    snapshot_service.save_branch_baseline(branch, force=force_baseline)
                 except Exception:
                     pass
 
