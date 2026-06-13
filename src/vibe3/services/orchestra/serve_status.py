@@ -49,7 +49,6 @@ class ServeStatusService:
         self._display_recent_activity()
         self._display_failed_gate()
         self._display_error_tracking()
-        self.console.print("\n[dim]For flow timeline events: vibe3 flow show[/]")
 
     @staticmethod
     def _clean_error_message(error_message: str, max_length: int = 100) -> str:
