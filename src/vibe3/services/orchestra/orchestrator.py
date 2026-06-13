@@ -212,6 +212,16 @@ class FlowOrchestratorService:
                 self.store.update_flow_state(
                     branch, worktree_path=str(worktree_ctx.path)
                 )
+
+            # Auto-create snapshot baseline on flow creation (best-effort)
+            if not skip_git:
+                try:
+                    from vibe3.analysis import snapshot_service
+
+                    snapshot_service.save_branch_baseline(branch, force=False)
+                except Exception:
+                    pass
+
             return result
         except Exception as exc:
             # CRITICAL: Complete cleanup on bootstrap failure

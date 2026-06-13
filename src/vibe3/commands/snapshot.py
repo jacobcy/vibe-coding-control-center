@@ -91,6 +91,10 @@ def save(
         bool,
         typer.Option("--as-baseline", help="Save as branch baseline for diff"),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force/--no-force", help="Force overwrite existing baseline"),
+    ] = False,
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
@@ -101,9 +105,13 @@ def save(
     Use --as-baseline to save as the branch's baseline for `snapshot diff`.
     This is automatically called at development start points (vibe-new, state/claimed).
 
+    By default, saving a baseline is idempotent (won't overwrite if exists).
+    Use --force to overwrite an existing baseline.
+
     Examples:
         vibe3 snapshot save
         vibe3 snapshot save --as-baseline
+        vibe3 snapshot save --as-baseline --force
         vibe3 snapshot save --json
     """
     from vibe3.clients import GitClient
@@ -116,7 +124,9 @@ def save(
             # Save as branch baseline (for diff workflow)
             git = GitClient()
             current_branch = git.get_current_branch()
-            filepath = snapshot_service.save_branch_baseline(current_branch)
+            filepath = snapshot_service.save_branch_baseline(
+                current_branch, force=force
+            )
             if filepath is None:
                 typer.echo("Error: Failed to save baseline", err=True)
                 raise typer.Exit(1)

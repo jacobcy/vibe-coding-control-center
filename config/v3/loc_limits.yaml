@@ -73,7 +73,9 @@ code_limits:
           PR #2542 新增 bulk retrieval 方法，修复 N+1 查询模式，减少 100x 数据库查询（+62 行）
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
-      # Commands 层 —— 允许 480-550
+      - path: "src/vibe3/commands/snapshot.py"
+        limit: 410
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
@@ -97,8 +99,8 @@ code_limits:
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
-        limit: 530
-        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线"
+        limit: 540
+        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）"
       - path: "src/vibe3/services/shared/paths.py"
         limit: 450
         reason: "Shared utilities 聚合，由 path_helpers.py + git_path_client.py 合理合并而成（解决 tight coupling），包含路径规范化、Git path 解析、handoff target resolution、ref normalization 等紧密耦合的路径处理逻辑；职责单一（path utilities）且架构质量已通过 code-reviewer 评估；PR #2406 Phase 1-2a modularity refactoring 创建；Issue #2514 新增三个 centralized path helpers（get_vibe3_cache_path/get_vibe3_db_path/get_vibe3_log_dir）以消除 8 个文件中的重复路径构造，提升代码一致性"
@@ -112,8 +114,8 @@ code_limits:
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
       - path: "src/vibe3/analysis/snapshot_service.py"
-        limit: 480
-        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑"
+        limit: 490
+        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑；Issue #2762 新增 idempotency guard（+5 行）"
       - path: "src/vibe3/services/shared/status_query.py"
         limit: 480
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"
