@@ -71,63 +71,64 @@ def is_private(symbol_name: str) -> bool:
     return bool(re.match(PRIVATE_PATTERN, symbol_name))
 
 
-def has_router_decorator(file_path: str, func_name: str) -> bool:
-    """Check if function has FastAPI router decorator.
+def get_router_functions(file_path: str) -> set[str]:
+    """Extract all FastAPI router-decorated function names from a file.
 
     Args:
         file_path: Relative file path
-        func_name: Function name
 
     Returns:
-        True if function has @router.post/get/put/delete decorator
+        Set of function names that have @router.post/get/put/delete decorators
     """
     try:
         source = Path(file_path).read_text(encoding="utf-8")
         tree = ast.parse(source)
+        result: set[str] = set()
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name == func_name:
-                    for decorator in node.decorator_list:
-                        # Check decorator patterns:
-                        # @router.post(...)
-                        # @router.get(...)
-                        # @app.post(...)
-                        # etc.
-                        if isinstance(decorator, ast.Call):
-                            if isinstance(decorator.func, ast.Attribute):
-                                attr_name = decorator.func.attr
-                                if attr_name in (
-                                    "post",
-                                    "get",
-                                    "put",
-                                    "delete",
-                                    "patch",
-                                ):
-                                    if isinstance(decorator.func.value, ast.Name):
-                                        # router.post, app.post, etc.
-                                        return True
-                        # Also check @router.post without call
-                        elif isinstance(decorator, ast.Attribute):
-                            if decorator.attr in (
+                for decorator in node.decorator_list:
+                    # Check decorator patterns:
+                    # @router.post(...)
+                    # @router.get(...)
+                    # @app.post(...)
+                    # etc.
+                    if isinstance(decorator, ast.Call):
+                        if isinstance(decorator.func, ast.Attribute):
+                            attr_name = decorator.func.attr
+                            if attr_name in (
                                 "post",
                                 "get",
                                 "put",
                                 "delete",
                                 "patch",
                             ):
-                                return True
-        return False
+                                if isinstance(decorator.func.value, ast.Name):
+                                    # router.post, app.post, etc.
+                                    result.add(node.name)
+                                    break
+                    # Also check @router.post without call
+                    elif isinstance(decorator, ast.Attribute):
+                        if decorator.attr in (
+                            "post",
+                            "get",
+                            "put",
+                            "delete",
+                            "patch",
+                        ):
+                            result.add(node.name)
+                            break
+        return result
     except Exception:
-        # If parsing fails, assume no router decorator
-        return False
+        # If parsing fails, assume no router decorators
+        return set()
 
 
 def classify_confidence(
     symbol_name: str,
     ref_count: int,
     is_cli_command: bool = False,
-    file_path: str | None = None,
+    router_funcs: set[str] | None = None,
 ) -> Literal["high", "medium", "low", "excluded"]:
     """Classify the confidence level of a dead code finding.
 
@@ -135,7 +136,7 @@ def classify_confidence(
         symbol_name: Name of the symbol
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
-        file_path: File path for decorator detection
+        router_funcs: Set of router-decorated function names (for exclusion check)
 
     Returns:
         Confidence level: "high", "medium", "low", or "excluded"
@@ -145,12 +146,11 @@ def classify_confidence(
         return "excluded"
 
     # Exclude functions with router decorators (FastAPI endpoints)
-    if file_path and has_router_decorator(file_path, symbol_name):
+    if router_funcs is not None and symbol_name in router_funcs:
         logger.bind(
             domain="dead_code_rules",
             action="classify_confidence",
             symbol=symbol_name,
-            file=file_path,
         ).debug("Symbol has router decorator, excluded")
         return "excluded"
 
@@ -177,7 +177,7 @@ def is_dead_code(
     symbol_name: str,
     ref_count: int,
     is_cli_command: bool = False,
-    file_path: str | None = None,
+    router_funcs: set[str] | None = None,
 ) -> tuple[bool, str]:
     """Determine if a symbol is dead code.
 
@@ -185,17 +185,19 @@ def is_dead_code(
         symbol_name: Name of the symbol
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
-        file_path: File path for decorator detection
+        router_funcs: Set of router-decorated function names (for exclusion check)
 
     Returns:
         Tuple of (is_dead: bool, reason: str)
     """
-    confidence = classify_confidence(symbol_name, ref_count, is_cli_command, file_path)
+    confidence = classify_confidence(
+        symbol_name, ref_count, is_cli_command, router_funcs
+    )
 
     if confidence == "excluded":
         if is_cli_command:
             return False, "CLI command (invoked via CLI, not code)"
-        if file_path and has_router_decorator(file_path, symbol_name):
+        if router_funcs is not None and symbol_name in router_funcs:
             return False, "FastAPI endpoint (invoked via HTTP router)"
         if should_exclude(symbol_name):
             return False, "Excluded pattern (test/special method)"

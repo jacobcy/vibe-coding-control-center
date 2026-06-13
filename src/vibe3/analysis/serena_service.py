@@ -267,7 +267,11 @@ class SerenaService:
         Raises:
             SerenaError: If scan fails
         """
-        from vibe3.analysis.dead_code_rules import classify_confidence, is_dead_code
+        from vibe3.analysis.dead_code_rules import (
+            classify_confidence,
+            get_router_functions,
+            is_dead_code,
+        )
         from vibe3.models import DeadCodeFinding, DeadCodeReport
 
         log = logger.bind(domain="serena", action="scan_dead_code", root=root)
@@ -299,6 +303,9 @@ class SerenaService:
                     symbols = file_result.get("symbols", [])
                     total_symbols += len(symbols)
 
+                    # Get router-decorated functions for this file (single parse)
+                    router_funcs = get_router_functions(relative_file)
+
                     # Check each symbol
                     for sym in symbols:
                         sym_name = sym.get("name", "")
@@ -310,7 +317,7 @@ class SerenaService:
 
                         # Apply dead code rules
                         is_dead, reason = is_dead_code(
-                            sym_name, ref_count, is_cli_command, relative_file
+                            sym_name, ref_count, is_cli_command, router_funcs
                         )
 
                         if is_dead:
@@ -325,7 +332,7 @@ class SerenaService:
                             )
 
                             confidence = classify_confidence(
-                                sym_name, ref_count, is_cli_command, relative_file
+                                sym_name, ref_count, is_cli_command, router_funcs
                             )
                             # Type narrowing
                             if confidence == "excluded":
@@ -345,7 +352,7 @@ class SerenaService:
                             total_dead += 1
                         elif (
                             classify_confidence(
-                                sym_name, ref_count, is_cli_command, relative_file
+                                sym_name, ref_count, is_cli_command, router_funcs
                             )
                             == "excluded"
                         ):
