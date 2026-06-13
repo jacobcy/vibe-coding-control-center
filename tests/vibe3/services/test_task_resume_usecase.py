@@ -1,7 +1,7 @@
 """Tests for task resume usecase error reporting."""
 
 import inspect
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task import TaskResumeUsecase
@@ -28,7 +28,9 @@ def test_resume_issues_surfaces_operation_error_in_skipped_reason() -> None:
         "flow": None,
     }
     usecase.status_service.fetch_resume_candidates.return_value = [candidate]
-    usecase.candidates.verify_issue_state_for_resume = MagicMock(return_value=True)
+    usecase.candidates.verify_issue_state_for_resume = MagicMock(
+        return_value=(True, None)
+    )
     usecase.operations.reset_issue_to_ready = MagicMock(
         side_effect=RuntimeError("scene cleanup failed")
     )
@@ -51,7 +53,9 @@ def test_resume_issues_uses_exception_class_when_message_missing() -> None:
         "flow": None,
     }
     usecase.status_service.fetch_resume_candidates.return_value = [candidate]
-    usecase.candidates.verify_issue_state_for_resume = MagicMock(return_value=True)
+    usecase.candidates.verify_issue_state_for_resume = MagicMock(
+        return_value=(True, None)
+    )
     usecase.operations.reset_issue_to_ready = MagicMock(side_effect=RuntimeError())
 
     result = usecase.resume_issues(dry_run=False)
@@ -72,7 +76,9 @@ def test_resume_issues_defaults_to_label_auto_and_skips_reset_comment() -> None:
         "flow": MagicMock(branch="task/issue-303"),
     }
     usecase.status_service.fetch_resume_candidates.return_value = [candidate]
-    usecase.candidates.verify_issue_state_for_resume = MagicMock(return_value=True)
+    usecase.candidates.verify_issue_state_for_resume = MagicMock(
+        return_value=(True, None)
+    )
     usecase.operations.reset_issue_to_ready = MagicMock()
     result = usecase.resume_issues(dry_run=False)
 
@@ -86,3 +92,93 @@ def test_resume_issues_has_no_all_task_candidate_mode() -> None:
     params = inspect.signature(TaskResumeUsecase.resume_issues).parameters
 
     assert "candidate_mode" not in params
+
+
+def test_verify_rejects_when_blocked_by_dependency_still_open() -> None:
+    """Test that resume is rejected when blocked_by_issue is still OPEN."""
+    usecase = _make_usecase()
+    usecase.label_service.get_state.return_value = MagicMock(value="blocked")
+    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
+        "blocked_by_issue": 999
+    }
+
+    # Mock gh CLI to return OPEN state
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout='{"state": "OPEN"}', stderr=""
+        )
+        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+            123, "blocked", None
+        )
+
+    assert can_resume is False
+    assert reason == "task 不满足 resume 条件，所依赖的 task #999 尚未关闭"
+
+
+def test_verify_allows_when_blocked_by_dependency_closed() -> None:
+    """Test that resume is allowed when blocked_by_issue is CLOSED."""
+    usecase = _make_usecase()
+    usecase.label_service.get_state.return_value = MagicMock(value="blocked")
+    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
+        "blocked_by_issue": 999
+    }
+
+    # Mock gh CLI to return CLOSED state
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout='{"state": "CLOSED"}', stderr=""
+        )
+        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+            123, "blocked", None
+        )
+
+    assert can_resume is True
+    assert reason is None
+
+
+def test_verify_skips_check_when_blocked_by_issue_empty() -> None:
+    """Test that dependency check is skipped when blocked_by_issue is None or 0."""
+    usecase = _make_usecase()
+    usecase.label_service.get_state.return_value = MagicMock(value="blocked")
+
+    # Test with None
+    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
+        "blocked_by_issue": None
+    }
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
+    assert can_resume is True
+    assert reason is None
+
+    # Test with 0
+    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
+        "blocked_by_issue": 0
+    }
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
+    assert can_resume is True
+    assert reason is None
+
+
+def test_verify_allows_when_gh_command_fails() -> None:
+    """Test that resume is allowed (fail open) when gh command fails."""
+    usecase = _make_usecase()
+    usecase.label_service.get_state.return_value = MagicMock(value="blocked")
+    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
+        "blocked_by_issue": 999
+    }
+
+    # Mock gh CLI to fail (non-zero return code)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=1, stdout="", stderr="error: issue not found"
+        )
+        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+            123, "blocked", None
+        )
+
+    # Should fail open: allow resume despite gh failure
+    assert can_resume is True
+    assert reason is None

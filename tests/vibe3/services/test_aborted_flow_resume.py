@@ -63,7 +63,7 @@ class TestAbortedFlowRecovery:
 
         mock_status_service.fetch_resume_candidates.return_value = candidates
         resume_usecase.candidates.verify_issue_state_for_resume = MagicMock(
-            return_value=True
+            return_value=(True, None)
         )
 
         with patch.object(

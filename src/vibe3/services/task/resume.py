@@ -6,6 +6,8 @@ scene rebuild belongs to FlowRebuildUsecase.
 
 from __future__ import annotations
 
+import json
+import subprocess
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
@@ -320,7 +322,7 @@ class TaskResumeCandidates:
 
     def verify_issue_state_for_resume(
         self, issue_number: int, resume_kind: str, repo: str | None
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Verify issue is still in expected state for resume.
 
         Args:
@@ -329,7 +331,8 @@ class TaskResumeCandidates:
             repo: Repository (owner/repo format, optional)
 
         Returns:
-            True if issue can be resumed, False otherwise
+            Tuple of (can_resume, reason). can_resume is True if issue can be resumed.
+            reason is a human-readable message if can_resume is False, None otherwise.
         """
         # ✅ Use authoritative truth: check if issue has merged PR
         from vibe3.services import has_merged_pr_for_issue
@@ -341,22 +344,87 @@ class TaskResumeCandidates:
                 issue_number=issue_number,
                 resume_kind=resume_kind,
             ).info("Issue has merged PR, cannot be resumed")
-            return False
+            return False, f"Issue #{issue_number} has a merged PR, cannot be resumed"
 
         current_state = self.label_service.get_state(issue_number)
 
         if current_state is None:
-            return False
+            return False, None
 
         if resume_kind == "blocked":
-            return current_state.value == "blocked"
+            if current_state.value != "blocked":
+                return (
+                    False,
+                    f"Issue #{issue_number} is not in expected state for {resume_kind}",
+                )
+
+            # Check blocked_by_issue dependency
+            flow_dict = self._flow_service.get_flow_for_issue(issue_number)
+            if flow_dict:
+                blocked_by_issue = flow_dict.get("blocked_by_issue")
+                if isinstance(blocked_by_issue, int) and blocked_by_issue > 0:
+                    # Query the dependency issue state via gh CLI
+                    try:
+                        result = subprocess.run(
+                            [
+                                "gh",
+                                "issue",
+                                "view",
+                                str(blocked_by_issue),
+                                "--json",
+                                "state",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                        )
+                        if result.returncode == 0:
+                            data = json.loads(result.stdout)
+                            if data.get("state") != "CLOSED":
+                                return (
+                                    False,
+                                    f"task 不满足 resume 条件，所依赖的 "
+                                    f"task #{blocked_by_issue} 尚未关闭",
+                                )
+                        else:
+                            # gh command failed, log warning but continue (fail open)
+                            logger.bind(
+                                domain="resume",
+                                issue_number=issue_number,
+                                blocked_by_issue=blocked_by_issue,
+                            ).warning(
+                                f"Failed to check dependency issue #{blocked_by_issue} "
+                                f"state, allowing resume"
+                            )
+                    except (
+                        subprocess.TimeoutExpired,
+                        json.JSONDecodeError,
+                        FileNotFoundError,
+                    ) as e:
+                        # Fail open: if gh is not available or times out, allow resume
+                        logger.bind(
+                            domain="resume",
+                            issue_number=issue_number,
+                            blocked_by_issue=blocked_by_issue,
+                            error=str(e),
+                        ).warning(
+                            f"Error checking dependency issue #{blocked_by_issue}, "
+                            f"allowing resume"
+                        )
+
+            return True, None
         elif resume_kind == "aborted":
             # Aborted flows can be resumed from READY or HANDOFF states
             # The flow_status=aborted check is done in fetch_resume_candidates
             # Here we verify the issue is in a valid state for resumption
-            return current_state.value in ("ready", "handoff")
+            if current_state.value not in ("ready", "handoff"):
+                return (
+                    False,
+                    f"Issue #{issue_number} is not in expected state for {resume_kind}",
+                )
+            return True, None
 
-        return False
+        return False, None
 
 
 def _format_resume_failure_reason(exc: Exception) -> str:
@@ -397,7 +465,7 @@ class TaskResumeUsecase:
             return self._flow_service_input
         from vibe3.services import FlowService
 
-        return FlowService()  # type: ignore[return-value]
+        return FlowService()
 
     @property
     def flow_service(self) -> "FlowQueryProtocol":
@@ -520,13 +588,14 @@ class TaskResumeUsecase:
                 branch=branch,
             ).info("Processing resume candidate")
 
-            if not self.candidates.verify_issue_state_for_resume(
+            can_resume, verify_reason = self.candidates.verify_issue_state_for_resume(
                 issue_number, resume_kind, repo
-            ):
+            )
+            if not can_resume:
                 result["skipped"].append(
                     {
                         "number": issue_number,
-                        "reason": "状态验证失败，跳过恢复",
+                        "reason": verify_reason or "状态验证失败，跳过恢复",
                     }
                 )
                 continue
