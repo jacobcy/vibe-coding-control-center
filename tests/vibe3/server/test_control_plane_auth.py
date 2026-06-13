@@ -221,3 +221,23 @@ class TestIdempotency:
             response2 = client.post("/api/dispatch/manager", json=dispatch_request)
             assert response2.status_code == 200
             assert response2.json()["status"] == "duplicate"
+
+    def test_empty_idempotency_key_rejected(
+        self, client: TestClient, clean_idempotency_store, monkeypatch
+    ):
+        """Empty string idempotency_key is rejected by Pydantic validation."""
+        monkeypatch.delenv("VIBE_CONTROL_PLANE_TOKEN", raising=False)
+        request_data = {
+            "event_type": "WebhookLabelChanged",
+            "payload": {
+                "issue_number": 123,
+                "label": "x",
+                "action": "labeled",
+                "sender": "u",
+            },
+            "actor": "test-actor",
+            "source": "test-source",
+            "idempotency_key": "",
+        }
+        response = client.post("/api/events", json=request_data)
+        assert response.status_code == 422  # Pydantic validation error

@@ -13,6 +13,8 @@ from vibe3.models import (
     WebhookIssueClosed,
     WebhookIssueUpdated,
     WebhookLabelChanged,
+    WebhookPRMerged,
+    WebhookPRReviewed,
 )
 from vibe3.server.control_plane import _idempotency_store, router
 
@@ -206,6 +208,62 @@ class TestPublishEvent:
             assert isinstance(event, SupervisorIssueIdentified)
             assert event.issue_number == 123
 
+    def test_webhookprmerged_publishes_event(
+        self, client: TestClient, clean_idempotency_store, monkeypatch
+    ):
+        """WebhookPRMerged event publishes correctly."""
+        monkeypatch.delenv("VIBE_CONTROL_PLANE_TOKEN", raising=False)
+
+        request_data = {
+            "event_type": "WebhookPRMerged",
+            "payload": {
+                "pr_number": 456,
+                "sender": "test-user",
+            },
+            "actor": "test-actor",
+            "source": "test-source",
+            "idempotency_key": "test-key",
+        }
+
+        with patch("vibe3.models.publish") as _mock_publish:
+            response = client.post("/api/events", json=request_data)
+            assert response.status_code == 200
+
+            first_call = _mock_publish.call_args_list[0]
+            event = first_call[0][0]
+            assert isinstance(event, WebhookPRMerged)
+            assert event.pr_number == 456
+
+    def test_webhookprreviewed_publishes_event(
+        self, client: TestClient, clean_idempotency_store, monkeypatch
+    ):
+        """WebhookPRReviewed event publishes correctly."""
+        monkeypatch.delenv("VIBE_CONTROL_PLANE_TOKEN", raising=False)
+
+        request_data = {
+            "event_type": "WebhookPRReviewed",
+            "payload": {
+                "pr_number": 789,
+                "reviewer": "reviewer-user",
+                "state": "approved",
+                "sender": "test-user",
+            },
+            "actor": "test-actor",
+            "source": "test-source",
+            "idempotency_key": "test-key",
+        }
+
+        with patch("vibe3.models.publish") as _mock_publish:
+            response = client.post("/api/events", json=request_data)
+            assert response.status_code == 200
+
+            first_call = _mock_publish.call_args_list[0]
+            event = first_call[0][0]
+            assert isinstance(event, WebhookPRReviewed)
+            assert event.pr_number == 789
+            assert event.reviewer == "reviewer-user"
+            assert event.state == "approved"
+
 
 class TestListEvents:
     """Test events listing endpoint."""
@@ -239,7 +297,7 @@ class TestListEvents:
     def test_filter_by_event_type(
         self, client: TestClient, clean_idempotency_store, monkeypatch
     ):
-        """Verify filtering by event type works."""
+        """Verify filtering by event type works at DB level."""
         monkeypatch.delenv("VIBE_CONTROL_PLANE_TOKEN", raising=False)
 
         mock_events = [
@@ -252,21 +310,18 @@ class TestListEvents:
                 "refs": {"issue": 123},
                 "created_at": "2024-01-01T00:00:00Z",
             },
-            {
-                "id": 2,
-                "branch": "test-branch",
-                "event_type": "WebhookIssueUpdated",
-                "actor": "test-actor",
-                "detail": "Test detail",
-                "refs": {"issue": 456},
-                "created_at": "2024-01-01T01:00:00Z",
-            },
         ]
 
-        with patch("vibe3.clients.SQLiteClient.get_events", return_value=mock_events):
+        with patch(
+            "vibe3.clients.SQLiteClient.get_events", return_value=mock_events
+        ) as mock_get:
             response = client.get("/api/events?event_type=WebhookLabelChanged")
             assert response.status_code == 200
             data = response.json()
             # Should only return the WebhookLabelChanged event
             assert data["count"] == 1
             assert data["events"][0]["event_type"] == "WebhookLabelChanged"
+            # Verify event_type was passed to DB-level query
+            mock_get.assert_called_once_with(
+                limit=50, branch=None, event_type="WebhookLabelChanged"
+            )
