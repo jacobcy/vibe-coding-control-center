@@ -1,6 +1,6 @@
 {
   "default_backend": "opencode",
-  "default_model": "volcengine/kimi-k2.5",
+  "default_model": "deepseek/deepseek-v4-flash",
   "backends": {
     "codex": {},
     "claude": {},
@@ -10,19 +10,19 @@
   "agents": {
     "vibe-manager": {
       "backend": "claude",
-      "model": "sonnet",
+      "model": "haiku",
       "yolo": true,
       "description": "Orchestra manager: dispatch coordination and execution supervision"
     },
     "vibe-planner": {
       "backend": "claude",
-      "model": "opus",
+      "model": "sonnet",
       "yolo": true,
       "description": "Strategic planner: design implementation plans and architecture"
     },
     "vibe-executor": {
       "backend": "claude",
-      "model": "sonnet",
+      "model": "haiku",
       "yolo": true,
       "description": "Task executor: implement features and fix bugs"
     },
@@ -67,7 +67,7 @@
     },
     "orchestra-explorer": {
       "backend": "claude",
-      "model": "sonnet",
+      "model": "haiku",
       "description": "MCP ask tool: lightweight project knowledge explorer"
     }
   }
