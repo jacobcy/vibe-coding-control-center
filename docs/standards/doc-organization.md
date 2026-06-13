@@ -41,7 +41,7 @@ related_docs:
 
 ```
 docs/
-├── README.md                        # 项目文档总览和索引
+├── README.md                        # 项目索引
 ├── standards/                       # 标准和规范文档
 │   ├── doc-organization.md          # 本文档组织标准
 │   ├── glossary.md                  # 术语真源 (T1-T3 & L1-L4)
@@ -53,20 +53,23 @@ docs/
 │   ├── INDEX.md                     # 决策总表
 │   └── NNNN-kebab-title.md          # 具体决策文件
 ├── plans/                           # 执行计划
+├── directives/                      # [V3 Active] 指令集文档 (Executor/Manager/Supervisor)
+├── handoff/                         # [V3 Active] 执行交接现场 (Artifacts, Results)
 ├── reports/                         # 报告与总结
 ├── references/                      # 外部参考资料
 ├── archive/                         # 历史文档归档
+├── handoffs/                        # [Legacy] 旧版交接记录归档
 
 核心系统目录说明：
 - `src/vibe3/` - V3 Python 实现 (Tier 1/2/3)
-- `lib3/` - V3 Python 核心包装器 (Tier 1)
+- `lib3/` - V3 Python 核心包装器 (Tier 1 Core Wrapper)
 - `supervisor/` - 治理与决策指令集 (Tier 3 Governance)
 - `skills/` - 技能定义权威来源 (Canonical Source)
 - `.agent/` - AI 运行时上下文 (Context/Memory, Templates)
 - `.claude/` - AI 规则与技能运行时真源 (Rules, Skills runtime)
 
 AI 工作区中的临时产物与模板：
-- `.agent/context/memory/` - [TRACKED] AI 上下文记忆
+- `.agent/context/memory/` - [TRACKED] 持久化模式记忆目录；注意：claude-memory MCP 是会话回溯的主工具
 - `.agent/templates/` - AI 工作模板 (prd, spec, plan, etc.)
 - `.claude/rules/` - 编码规则真源 (coding-standards, python-standards, etc.)
 - `.claude/skills/` - 技能运行时规则与指令

@@ -43,6 +43,7 @@ vibe-center/
 ├── VERSION                      # 当前版本号
 │
 ├── .agent/                      # [Group: AI Workspace] Agent 核心配置与工作流
+│   └── context/memory/          # [TRACKED] 持久化模式记忆目录；注意：claude-memory MCP 是会话回溯的主工具
 ├── .claude/                     # [Group: AI Workspace] Claude 专用配置与规则
 ├── .gemini/                     # [Group: AI Workspace] Gemini 专用配置
 ├── .codex/                      # [Group: AI Workspace] Codex 专用配置与环境
@@ -67,6 +68,9 @@ vibe-center/
 ├── tests/                       # 测试 (vibe2, vibe3, 覆盖率报告)
 ├── skills/                      # 技能定义 (Canonical Source)
 ├── docs/                        # 人类文档区 (Standards, PRDs, Specs, Reports)
+│   ├── directives/              # [V3 Active] 指令集文档 (Executor/Manager/Supervisor)
+│   ├── handoff/                 # [V3 Active] 执行交接现场 (Artifacts, Results)
+│   └── standards/               # 项目标准与规范
 │
 ├── debug/                       # 调试信息与临时分析报告
 ├── openspec/                    # 开放规范集成区
@@ -148,7 +152,6 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
 - `prompts/` - Prompt 模板组装与变量解析
-- `resources/` - 运行时资产与静态资源
 - `roles/` - 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
@@ -228,9 +231,9 @@ from vibe3.services.flow_reader import FlowReader
 - `keys.sh` - API 密钥管理
 - `utils.sh` - 通用工具函数
 
-### `lib3/` - V3 Python 核心包装器 (hub)
+### `lib3/` - V3 Python 核心包装器 (Tier 1 Core Wrapper)
 
-**职责**：V3 Python 核心的运行时包装器，负责仓库重定向和加载密钥。
+**职责**：V3 Python 核心的运行时包装器，负责仓库重定向和加载密钥。作为 Tier 1 能力的统一入口（hub）。
 
 **规则**：
 - 是 V3 Python 运行时的辅助入口。
@@ -319,7 +322,8 @@ from vibe3.services.flow_reader import FlowReader
 
 | 路径 | 职责 | 更新频率 |
 |------|------|---------|
-| `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具）。 | 仅补充关键模式 |
+| memory/ | **[TRACKED]** 持久化模式记忆目录（用于存放长期模式与规则补丁）；**注意**：`claude-memory` MCP 是跨会话主动回溯（Active Recall）的主工具。 | 仅补充关键模式 |
+
 
 #### `.agent/templates/` - 文档模板
 
@@ -424,11 +428,19 @@ ls ~/.vibe/
 
 ### `docs/` - 人类文档区
 
-**职责**：所有给人类阅读的文档
+**职责**：所有给人类阅读的文档。包含标准、PRD、Spec、Plan、Directive 与 Handoff。
 
-**重要性**：这是人类主权区，AI 只读不写
-
-**详细结构**：见 [docs/README.md](docs/README.md)
+| 目录 | 职责 | 备注 |
+|------|------|------|
+| `standards/` | **项目标准真源**。定义命名、术语、编码规范与工作流标准。 | Canonical Truth |
+| `directives/` | **[V3 Active]** 指令集文档。包含 Executor、Manager 与 Supervisor 的具体执行指令。 | Execution Truth |
+| `handoff/` | **[V3 Active]** 执行交接现场。存放 Handoff Artifacts、中间产物与执行结果证据。 | Artifact Store |
+| `prds/` | **产品需求文档**。描述业务目标与核心数据流。 | Cognition |
+| `specs/` | **技术规范**。接口契约与核心不变量。 | Spec |
+| `plans/` | **执行计划**。上下文圈定与任务拆分。 | Plan |
+| `reports/` | **执行报告**。审计结果与变更总结。 | Report |
+| `decisions/` | **架构决策 (ADR)**。记录决策背景、理由与结果。 | Architecture |
+| `archive/` | **历史文档归档**。存放过时或已完成的文档。 | Archive |
 
 #### docs/standards/ - 标准和规范
 

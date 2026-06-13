@@ -242,14 +242,7 @@ vibe keys check
 
 检查 `~/.vibe/` 运行时资产是否完整（由 `vibe update run` 分发）。
 
-**Step 5.1: 检查全局资源目录**
-
-```bash
-# 检查 vibe3 resources 目录
-test -d ~/.vibe/src/vibe3/resources && echo "ok" || echo "MISSING: ~/.vibe/src/vibe3/resources"
-```
-
-**Step 5.2: 检查 prompts 配置文件**
+**Step 5.1: 检查 prompts 配置文件**
 
 ```bash
 # 检查 prompts.yaml
@@ -259,7 +252,7 @@ test -f ~/.vibe/config/prompts/prompts.yaml && echo "ok" || echo "MISSING: ~/.vi
 test -f ~/.vibe/config/prompts/prompt-recipes.yaml && echo "ok" || echo "MISSING: ~/.vibe/config/prompts/prompt-recipes.yaml"
 ```
 
-**Step 5.3: 检查 supervisor 配置**
+**Step 5.2: 检查 supervisor 配置**
 
 ```bash
 # 检查 manager.md
@@ -313,7 +306,7 @@ Agent: 已停止检查。请切换到 vibe-center repo 运行：
        完成后回到此项目重新运行 vibe-project-check。
 ```
 
-**验证**: `ls ~/.vibe/src/vibe3/resources/` 显示文件；所有 14 个路径均存在。
+**验证**: 所有 13 个路径均存在。
 
 ---
 
@@ -527,7 +520,7 @@ fi
 ✅ 运行时验证通过
 
 ### Cross-Project Readiness（跨项目就绪状态）
-✅ Global runtime assets: 14/14 present
+✅ Global runtime assets: 13/13 present
 ✅ Target repo init: .vibe/config.yaml valid, profile=github-flow
 ✅ Agent/toolchain: all essential tools available
 ✅ Prompt readiness: plan/run/review/internal manager ok
