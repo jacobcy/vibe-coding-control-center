@@ -454,7 +454,14 @@ roadmap-intake 在扫描和决策阶段的依赖操作约束：
    - Issue body 或 title 中的 `Blocked by #N`、`Depends on #N`、`依赖 #N`
 
 4. **实现支持**
-   - `src/vibe3/clients/github_issues_ops.py:parse_blocked_by` 使用正则匹配 `blocked\s+by|depends\s+on|依赖`
+   - `src/vibe3/clients/github_issues_ops.py:parse_blocked_by` 使用正则匹配：
+     ```python
+     _BLOCKED_BY_RE = re.compile(
+         r"(?:blocked\s+by|depends\s+on|依赖)[:\s]+([#\d,\s#]+)",
+         re.IGNORECASE,
+     )
+     ```
+   - 支持中英文依赖声明，自动提取 issue 编号列表
    - 以上四种格式的依赖声明均会被正确解析
 
 ### 依赖验证要求
@@ -491,11 +498,24 @@ roadmap-intake 在扫描和决策阶段的依赖操作约束：
      ```bash
      vibe3 task intake <issue> --blocked-by <dep1>
      ```
-   - 在 suggest comment 中记录剩余依赖：
+   - 在 suggest comment 中添加显式提醒（使用 `## Manager Checklist` section）：
+     ```markdown
+     ## Manager Checklist
+
+     ⚠️ **多依赖注意**：已通过 `--blocked-by #dep1` 入池。
+
+     **主依赖**：#dep1（已注册）
+     **剩余依赖**：#dep2, #dep3（已在 body 的 `## Dependencies` section 中注册）
+
+     Manager 入场时须通过以下命令正式化剩余依赖：
+     ```bash
+     vibe3 flow blocked --task <dep2>
+     vibe3 flow blocked --task <dep3>
      ```
-     已通过 --blocked-by #dep1 入池。额外依赖：#dep2, #dep3 — 已在 body 中注册，manager 入场时会正式化
+
+     参考：roadmap-common.md "Manager 的衔接职责"
      ```
-   - Manager 的"衔接职责"（roadmap-common.md line 331）会在入场时正式化剩余依赖
+   - Manager 的"衔接职责"（roadmap-common.md line 331）会在入场时读取此 checklist 并执行正式化
 
 **原因**：`vibe3 task intake` 的 guard check (`needs_guard`) 阻止对同一 issue 重复调用。第一次调用创建 placeholder flow 并记录主依赖，其余依赖保留在 issue body 的 `## Dependencies` section 中。
 
@@ -529,10 +549,10 @@ roadmap-intake 在扫描和决策阶段的依赖操作约束：
 
 ### 操作约束
 
+遵循 [roadmap-common.md § Pre-flow Dependency Rules](../roadmap-common.md) 的 Forbidden 约束，特别强调：
+
 - ✅ `state/blocked` 标签由 intake 命令原子设置 — intake 不再需要避免 `state/blocked`
 - ✅ 在 suggest comment 中用自然语言说明依赖关系
-- ❌ 禁止直接添加 `state/blocked` 标签 — 必须通过 `vibe3 task intake --blocked-by` 命令
-- ❌ 禁止写 managed section（`<!-- vibe3-flow-state-start -->` 块中的结构化字段）
-- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — intake 阶段应使用 `--blocked-by` 参数
+- ✅ 多依赖场景使用 `## Manager Checklist` section 确保后续依赖不会被遗漏
 
 **记录方式**：依赖关系通过 `vibe3 task intake --blocked-by` 命令建立，自动写入 flow_state 和 flow_issue_links。
