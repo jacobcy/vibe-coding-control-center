@@ -19,15 +19,15 @@ def build_snapshot_diff(
     structure_diff: StructureDiff | None = None
 
     try:
-        log.info("Building current snapshot")
-        current = build_snapshot()
-
         log.info(f"Loading baseline snapshot for branch: {base_branch}")
         baseline = find_snapshot_by_branch(base_branch, current_branch)
 
         if baseline is None:
             log.warning(f"No baseline snapshot found for branch: {base_branch}")
             return None
+
+        log.info("Building current snapshot")
+        current = build_snapshot()
 
         log.info("Computing structure diff")
         structure_diff = compute_diff(baseline, current)
