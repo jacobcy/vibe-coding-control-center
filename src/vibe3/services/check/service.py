@@ -394,9 +394,13 @@ class CheckService(CheckRemote):
                 resolver = CoordinationResolver(store=self.store)
                 truth = resolver.resolve_coordination(branch, task_issue)
                 if truth.dependencies:
+                    from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
+
                     unresolved = []
                     for dep in truth.dependencies:
-                        dep_issue = self.github_client.view_issue(dep)
+                        dep_issue = self.github_client.view_issue(
+                            dep, fields=list(GITHUB_FIELDS_STATE_ONLY)
+                        )  # type: ignore[call-overload]
                         if (
                             not isinstance(dep_issue, dict)
                             or dep_issue.get("state") != "closed"
