@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from vibe3.models import DomainEvent
@@ -37,7 +37,7 @@ class EventPublishRequest(BaseModel):
     payload: dict[str, Any]  # Fields for the target DomainEvent
     actor: str  # e.g. "dashboard:jacobcy"
     source: str = "api-client"  # e.g. "web-dashboard"
-    idempotency_key: str  # Client-generated unique key
+    idempotency_key: str = Field(min_length=1)  # Client-generated unique key
 
 
 class DispatchRequest(BaseModel):
@@ -47,7 +47,7 @@ class DispatchRequest(BaseModel):
     branch: str
     actor: str
     source: str = "api-client"
-    idempotency_key: str
+    idempotency_key: str = Field(min_length=1)
 
 
 class ApiResponse(BaseModel):
@@ -626,11 +626,7 @@ async def list_events(
     store = SQLiteClient()
 
     # Query events
-    events_data = store.get_events(limit=limit, branch=None)
-
-    # Filter by event_type if provided
-    if event_type:
-        events_data = [e for e in events_data if e.get("event_type") == event_type]
+    events_data = store.get_events(limit=limit, branch=None, event_type=event_type)
 
     # Convert to EventEntry models
     events = [
