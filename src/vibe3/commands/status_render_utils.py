@@ -16,19 +16,12 @@ from vibe3.utils import (
 
 def extract_blocked_reason_summary(
     blocked_reason: str,
-    structured_summary: str | None = None,
 ) -> str:
     """Extract key information from blocked_reason for status display.
-
-    Uses pre-computed structured_summary when available.
-    Falls back to string parsing for historical data.
 
     Filters out verbose runtime details (TMPDIR, Recent Errors, stdin mode).
     Preserves short status messages and error codes for quick diagnosis.
     """
-    if structured_summary:
-        return structured_summary
-
     if not blocked_reason:
         return ""
 

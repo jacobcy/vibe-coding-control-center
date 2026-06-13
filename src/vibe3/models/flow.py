@@ -89,7 +89,6 @@ class FlowState(BaseModel):
         None  # NEW: Dependency issue number (semantic clarity)
     )
     blocked_reason: str | None = None  # Block reason text
-    blocked_reason_summary: str | None = None  # Pre-computed display summary
     next_step: str | None = None
     flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
     # Note: "blocked" restored for remote sync semantics.
@@ -264,7 +263,6 @@ class FlowStatusResponse(BaseModel):
     initiated_by: str | None = None
     blocked_by_issue: int | None = None  # NEW: Dependency issue number
     blocked_reason: str | None = None  # Block reason text
-    blocked_reason_summary: str | None = None  # Pre-computed display summary
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
     planner_status: ExecutionStatus | None = None
@@ -371,7 +369,6 @@ class FlowStatusResponse(BaseModel):
             initiated_by=data.get("initiated_by"),
             blocked_by_issue=data.get("blocked_by_issue"),
             blocked_reason=data.get("blocked_reason"),
-            blocked_reason_summary=data.get("blocked_reason_summary"),
             next_step=data.get("next_step"),
             issues=issues,
             planner_status=data.get("planner_status"),

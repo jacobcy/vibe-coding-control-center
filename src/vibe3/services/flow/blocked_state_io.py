@@ -18,7 +18,6 @@ from vibe3.models import FlowStateProjection, IssueState
 from vibe3.services.flow.blocked_state_types import BlockedState
 from vibe3.services.issue.body import merge_projection, parse_projection
 from vibe3.services.shared.label_service import LabelService
-from vibe3.utils import compute_blocked_reason_summary
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -122,12 +121,10 @@ class BlockedStateIO:
         """Write blocked state to database cache."""
         if not self.store:
             return
-        summary = compute_blocked_reason_summary(reason) if reason else None
         self.store.update_flow_state(
             branch,
             flow_status="blocked",
             blocked_reason=reason,
-            blocked_reason_summary=summary,
             blocked_by_issue=blocked_by_issue,
             latest_actor=actor,
         )
@@ -146,7 +143,6 @@ class BlockedStateIO:
             branch,
             flow_status="active",
             blocked_reason=None,
-            blocked_reason_summary=None,
             blocked_by_issue=None,
             transition_count=0,  # Reset loop protection counter
             latest_actor=actor,

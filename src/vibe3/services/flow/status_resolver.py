@@ -9,7 +9,6 @@ from loguru import logger
 from vibe3.models import DataSource, FlowStatusResponse
 from vibe3.services.flow.service import FlowService
 from vibe3.services.issue.body import parse_projection
-from vibe3.utils import compute_blocked_reason_summary
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -163,11 +162,6 @@ class FlowStatusResolver:
 
         # Build response with timeline
         blocked_reason_val = projection.blocked_reason
-        blocked_summary = (
-            compute_blocked_reason_summary(blocked_reason_val)
-            if blocked_reason_val
-            else None
-        )
         return FlowStatusResponse(
             branch=branch,
             flow_slug=branch.replace("/", "-"),
@@ -176,7 +170,6 @@ class FlowStatusResolver:
                 projection.blocked_by[0] if projection.blocked_by else None
             ),
             blocked_reason=blocked_reason_val,
-            blocked_reason_summary=blocked_summary,
             timeline=timeline,  # NEW: timeline from comments
             data_source=DataSource.ISSUE_BODY_FALLBACK,
         )
