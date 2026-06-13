@@ -10,18 +10,25 @@ from typing import Final
 # GitHub Issue Field Constants
 # =============================================================================
 
-# Default fields for view_issue - excludes expensive 'comments' field
-# Suitable for callers that need issue metadata but not comments
-GITHUB_DEFAULT_VIEW_FIELDS: Final[tuple[str, ...]] = (
+# Shared metadata fields used by both view and list operations
+GITHUB_FIELDS_ISSUE_META: Final[tuple[str, ...]] = (
     "number",
     "title",
-    "body",
     "state",
     "updatedAt",
     "labels",
-    "milestone",
     "assignees",
+    "milestone",
 )
+
+# Default fields for view_issue — includes body and url
+GITHUB_DEFAULT_VIEW_FIELDS: Final[tuple[str, ...]] = GITHUB_FIELDS_ISSUE_META + (
+    "body",
+    "url",
+)
+
+# Default fields for list_issues — excludes body (expensive) and url
+GITHUB_DEFAULT_LIST_FIELDS: Final[tuple[str, ...]] = GITHUB_FIELDS_ISSUE_META
 
 # Minimal field sets for specific operations
 GITHUB_FIELDS_STATE_ONLY: Final[tuple[str, ...]] = ("state",)

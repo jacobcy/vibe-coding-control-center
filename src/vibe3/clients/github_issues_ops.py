@@ -9,6 +9,7 @@ from typing import Any, cast
 from loguru import logger
 
 from vibe3.clients.github_field_constants import (
+    GITHUB_DEFAULT_LIST_FIELDS,
     GITHUB_DEFAULT_VIEW_FIELDS,
     GITHUB_KNOWN_ISSUE_FIELDS,
 )
@@ -25,8 +26,6 @@ _BLOCKED_BY_RE = re.compile(
     r"(?:blocked\s+by|depends\s+on|依赖)[:\s]+([#\d,\s#]+)",
     re.IGNORECASE,
 )
-
-_DEFAULT_LIST_FIELDS = "number,title,state,updatedAt,labels,assignees,milestone"
 
 # Pre-computed set for O(1) field validation lookups
 _KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_ISSUE_FIELDS)
@@ -181,7 +180,11 @@ class IssuesMixin(IssueAdminMixin):
             search=search,
             fields=fields,
         ).debug("Calling GitHub API: list_issues")
-        json_fields = ",".join(fields) if fields is not None else _DEFAULT_LIST_FIELDS
+        json_fields = (
+            ",".join(fields)
+            if fields is not None
+            else ",".join(GITHUB_DEFAULT_LIST_FIELDS)
+        )
         cmd = [
             "gh",
             "issue",
