@@ -269,6 +269,7 @@ def _construct_event(event_type: str, payload: dict[str, Any]) -> DomainEvent | 
 
             return WebhookPRMerged(
                 pr_number=pr_number,
+                branch=payload.get("branch", ""),
                 sender=payload.get("sender", ""),
                 timestamp=payload.get("timestamp"),
             )

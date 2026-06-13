@@ -218,6 +218,7 @@ class TestPublishEvent:
             "event_type": "WebhookPRMerged",
             "payload": {
                 "pr_number": 456,
+                "branch": "feature/test",
                 "sender": "test-user",
             },
             "actor": "test-actor",
@@ -233,6 +234,7 @@ class TestPublishEvent:
             event = first_call[0][0]
             assert isinstance(event, WebhookPRMerged)
             assert event.pr_number == 456
+            assert event.branch == "feature/test"
 
     def test_webhookprreviewed_publishes_event(
         self, client: TestClient, clean_idempotency_store, monkeypatch
