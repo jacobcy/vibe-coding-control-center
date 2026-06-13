@@ -108,7 +108,6 @@ class TestRemoteBlockedReason:
                     "task/issue-123-test",
                     flow_status="blocked",
                     blocked_reason="Remote block from issue body",
-                    blocked_reason_summary="Remote block from issue body",
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
@@ -162,7 +161,6 @@ class TestRemoteBlockedReason:
                     "task/issue-123-test",
                     flow_status="blocked",
                     blocked_reason="Local block from SQLite",
-                    blocked_reason_summary="Local block from SQLite",
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
@@ -327,7 +325,6 @@ class TestRemoteDependencies:
                     "task/issue-123-test",
                     flow_status="blocked",
                     blocked_reason=None,
-                    blocked_reason_summary=None,
                     blocked_by_issue=456,
                     latest_actor="system:qualify_gate",
                 )
@@ -481,7 +478,6 @@ class TestE2EBlockedReconciliation:
                     "task/issue-994",
                     flow_status="blocked",
                     blocked_reason="API design pending",
-                    blocked_reason_summary="API design pending",
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
@@ -598,7 +594,6 @@ class TestE2EBlockedReconciliation:
                     "task/issue-994",
                     flow_status="blocked",
                     blocked_reason=None,
-                    blocked_reason_summary=None,
                     blocked_by_issue=456,
                     latest_actor="system:qualify_gate",
                 )

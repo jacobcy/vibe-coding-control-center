@@ -226,10 +226,7 @@ def render_blocked_items(blocked_items: list[dict[str, object]]) -> None:
                 console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
 
             if blocked_reason:
-                summary = flow.blocked_reason_summary if flow else None
-                reason_summary = extract_blocked_reason_summary(
-                    blocked_reason, structured_summary=summary
-                )
+                reason_summary = extract_blocked_reason_summary(blocked_reason)
                 console.print(f"         [yellow]reason:[/] {reason_summary}")
     else:
         console.print("  [dim](none)[/]")

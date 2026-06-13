@@ -1,8 +1,8 @@
 """Tests for blocked_state_io module."""
 
 
-def test_write_database_cache_stores_summary(tmp_path):
-    """write_database_cache should compute and store blocked_reason_summary."""
+def test_write_database_cache_stores_reason(tmp_path):
+    """write_database_cache should store blocked_reason and flow_status."""
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.flow.blocked_state_io import BlockedStateIO
 
@@ -17,14 +17,13 @@ def test_write_database_cache_stores_summary(tmp_path):
         actor="test-actor",
     )
 
-    # Verify both blocked_reason and blocked_reason_summary are stored
+    # Verify blocked_reason and flow_status are stored
     flow = db.get_flow_state("test-branch")
     assert flow is not None
     assert (
         flow.get("blocked_reason")
         == "codeagent-wrapper failed (code 1): Actual error message"
     )
-    assert flow.get("blocked_reason_summary") == "Actual error message"
     assert flow.get("flow_status") == "blocked"
 
 
