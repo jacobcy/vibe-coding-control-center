@@ -100,7 +100,7 @@ code_limits:
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
         limit: 560
-        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）"
+        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）"
       - path: "src/vibe3/services/shared/paths.py"
         limit: 450
         reason: "Shared utilities 聚合，由 path_helpers.py + git_path_client.py 合理合并而成（解决 tight coupling），包含路径规范化、Git path 解析、handoff target resolution、ref normalization 等紧密耦合的路径处理逻辑；职责单一（path utilities）且架构质量已通过 code-reviewer 评估；PR #2406 Phase 1-2a modularity refactoring 创建；Issue #2514 新增三个 centralized path helpers（get_vibe3_cache_path/get_vibe3_db_path/get_vibe3_log_dir）以消除 8 个文件中的重复路径构造，提升代码一致性"
@@ -301,7 +301,7 @@ code_limits:
         reason: "Qualify gate open PR 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0b: open PR + running planner/executor → review、no worker → skip、already review/done → skip、no PR → skip 等 6 个紧密耦合场景，共享 fixture"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 700
-        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试等紧密耦合场景，共享 fixture，拆分收益低；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）"
+        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试、placeholder flow 创建等紧密耦合场景，共享 fixture；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）；Issue #2762 follow-up 将分支校验与 baseline snapshot 相关测试（_validate_or_recreate_branch、creation_source、force_baseline，共 8 个测试）拆分至 test_flow_orchestrator_branch_baseline.py（802→674 行）"
       - path: "tests/vibe3/runtime/test_heartbeat.py"
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
