@@ -4,36 +4,11 @@ from loguru import logger
 
 from vibe3.analysis import (
     SnapshotError,
-    build_change_analysis,
     build_snapshot,
     compute_diff,
     find_snapshot_by_branch,
 )
-from vibe3.exceptions import SystemError
 from vibe3.models import StructureDiff
-
-_SUBCOMMAND_TO_SOURCE_TYPE: dict[str, str] = {
-    "pr": "pr",
-    "base": "branch",
-}
-
-
-def run_inspect_json(args: list[str]) -> dict[str, object]:
-    """Call inspect subcommand and return parsed JSON result."""
-    if not args:
-        raise SystemError("Missing inspect subcommand")
-
-    subcommand = args[0]
-    if subcommand not in _SUBCOMMAND_TO_SOURCE_TYPE:
-        raise SystemError(f"Unknown inspect subcommand: {subcommand}")
-
-    if len(args) < 2:
-        raise SystemError(f"Missing identifier for inspect {subcommand}")
-
-    identifier = args[1]
-
-    source_type = _SUBCOMMAND_TO_SOURCE_TYPE[subcommand]
-    return build_change_analysis(source_type, identifier)
 
 
 def build_snapshot_diff(
