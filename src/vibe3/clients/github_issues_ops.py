@@ -366,7 +366,7 @@ class IssuesMixin(IssueAdminMixin):
         Returns:
             List of comment dicts with keys: id, body, author, etc.
         """
-        result = self.view_issue(issue_number, repo=repo)
+        result = self.view_issue(issue_number, repo=repo, fields=["comments"])
         if isinstance(result, dict):
             return cast(list[dict[str, Any]], result.get("comments", []))
         return []
