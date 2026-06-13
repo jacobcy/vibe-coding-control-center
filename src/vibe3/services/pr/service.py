@@ -79,7 +79,9 @@ class PRService:
             try:
                 git_common_dir = self.git_client.get_git_common_dir()
                 repo_path = (
-                    Path(git_common_dir).parent if git_common_dir else Path.cwd()
+                    Path(git_common_dir).parent
+                    if isinstance(git_common_dir, str) and git_common_dir
+                    else Path.cwd()
                 )
             except Exception:
                 repo_path = Path.cwd()
