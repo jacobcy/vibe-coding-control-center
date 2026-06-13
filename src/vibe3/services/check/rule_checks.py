@@ -233,6 +233,8 @@ def rule_orphaned_flow_cleanup(ctx: CheckContext, svc: Any) -> CheckResult | Non
     """Mark orphaned active flows (>100 commits behind) as aborted."""
     if not svc._sync_rules.local.orphaned_flow_cleanup.enabled:
         return None
+    if ctx.flow_status == "blocked":  # protect placeholder flows
+        return None
     if not (
         ctx.flow_status == "active"
         and not ctx.task_issue
@@ -268,6 +270,8 @@ def rule_orphaned_flow_cleanup(ctx: CheckContext, svc: Any) -> CheckResult | Non
 def rule_empty_ready_cleanup(ctx: CheckContext, svc: Any) -> CheckResult | None:
     """Mark empty ready flows as stale."""
     if not svc._sync_rules.local.empty_ready_cleanup.enabled:
+        return None
+    if ctx.flow_status == "blocked":  # protect placeholder flows
         return None
     if not (
         ctx.flow_status == "active"

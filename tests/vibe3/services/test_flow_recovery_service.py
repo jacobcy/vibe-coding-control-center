@@ -34,6 +34,16 @@ class TestClassifyRecovery:
         action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.RESUME_ONLY
 
+    def test_placeholder_flow_classify_returns_resume_only(self):
+        """Placeholder flow (blocked + no worktree) should classify as RESUME_ONLY."""
+        svc = _make_service(
+            worktree_path=None,
+            flow_state={"flow_status": "blocked"},
+        )
+        action, consistency = svc.classify("task/issue-1")
+        assert action == RecoveryAction.RESUME_ONLY
+        assert consistency is None  # No consistency check result
+
     def test_missing_worktree_returns_rebuild(self):
         svc = _make_service(worktree_path=None, flow_state={})
         action, _ = svc.classify("task/issue-1")

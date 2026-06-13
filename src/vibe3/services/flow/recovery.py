@@ -81,6 +81,12 @@ class FlowRecoveryService:
         if flow_state is None:
             return (RecoveryAction.REBUILD, None)
 
+        # Placeholder flows (blocked + no worktree) need resume only
+        if flow_state.get("flow_status") == "blocked":
+            worktree = self.git_client.find_worktree_path_for_branch(branch)
+            if worktree is None:
+                return (RecoveryAction.RESUME_ONLY, None)
+
         consistency = check_flow_consistency(
             branch, flow_state, git_client=self.git_client
         )
