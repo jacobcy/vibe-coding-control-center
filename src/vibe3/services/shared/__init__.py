@@ -3,6 +3,10 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.clients import (
+        LabelAnomaly,
+        collect_label_anomalies,
+    )
     from vibe3.services.shared.actors import (
         extract_role_from_actor,
         format_agent_actor,
@@ -28,10 +32,6 @@ if TYPE_CHECKING:
         record_error,
     )
     from vibe3.services.shared.events import emit_issue_failed
-    from vibe3.services.shared.label_anomalies import (
-        LabelAnomaly,
-        collect_label_anomalies,
-    )
     from vibe3.services.shared.label_service import LabelService
     from vibe3.services.shared.labels import (
         ORCHESTRA_GOVERNED_LABEL,
@@ -173,11 +173,11 @@ _SYMBOL_MODULES = {
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
     # labels
-    "LabelAnomaly": "vibe3.services.shared.label_anomalies",
+    "LabelAnomaly": "vibe3.clients",
     "LabelService": "vibe3.services.shared.label_service",
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
-    "collect_label_anomalies": "vibe3.services.shared.label_anomalies",
+    "collect_label_anomalies": "vibe3.clients",
     "get_conflicting_states": "vibe3.services.shared.labels",
     "get_highest_priority_state": "vibe3.services.shared.labels",
     "get_state_labels": "vibe3.services.shared.labels",

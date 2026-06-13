@@ -8,10 +8,6 @@ if TYPE_CHECKING:
         parse_projection,
         render_projection,
     )
-    from vibe3.services.issue.branch_resolver import (
-        iter_issue_branch_candidates,
-        resolve_issue_branch_input,
-    )
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
     from vibe3.services.issue.dispatch_policy import (
@@ -33,6 +29,10 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.shared.branch_resolver import (
+        iter_issue_branch_candidates,
+        resolve_issue_branch_input,
+    )
 
 __all__ = [
     # Classes
@@ -76,8 +76,8 @@ _SYMBOL_MODULES = {
     "parse_projection": "vibe3.services.issue.body",
     "render_projection": "vibe3.services.issue.body",
     # Functions - branch_resolver
-    "iter_issue_branch_candidates": "vibe3.services.issue.branch_resolver",
-    "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
+    "iter_issue_branch_candidates": "vibe3.services.shared.branch_resolver",
+    "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",
     # Functions - context
     "load_issue_info": "vibe3.services.issue.context",
     # Functions - failure

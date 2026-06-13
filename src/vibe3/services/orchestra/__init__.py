@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.orchestra.helpers import (
+    from vibe3.config import (
         get_handoff_state_label,
         get_manager_usernames,
     )
@@ -28,8 +28,8 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     # From helpers
-    "get_manager_usernames": "vibe3.services.orchestra.helpers",
-    "get_handoff_state_label": "vibe3.services.orchestra.helpers",
+    "get_manager_usernames": "vibe3.config",
+    "get_handoff_state_label": "vibe3.config",
     # From orchestrator
     "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
     # From status

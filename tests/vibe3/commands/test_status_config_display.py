@@ -67,7 +67,7 @@ class TestAnalyzeOrchestraConfigSources:
 class TestRenderConfigurationOutput:
     """Tests for _render_configuration output format."""
 
-    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
+    @patch("vibe3.config.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_configuration_shows_source_annotations(
@@ -97,7 +97,7 @@ class TestRenderConfigurationOutput:
         # Check for Configuration Sources section
         assert "Configuration Sources:" in result.output
 
-    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
+    @patch("vibe3.config.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_configuration_shows_debug_mode(
@@ -126,7 +126,7 @@ class TestRenderConfigurationOutput:
         assert "Debug mode:" in result.output
         assert "OFF" in result.output
 
-    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
+    @patch("vibe3.config.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     def test_status_shows_orchestra_and_config_sections(
@@ -200,7 +200,7 @@ class TestRenderConfigurationOutput:
 class TestTaskStatusExcludesSystemStatus:
     """Tests that task status does not show system status sections."""
 
-    @patch("vibe3.services.orchestra.helpers.get_manager_usernames")
+    @patch("vibe3.config.get_manager_usernames")
     @patch("vibe3.config.orchestra_settings.load_orchestra_config")
     @patch("vibe3.services.orchestra.status.OrchestraStatusService.fetch_live_snapshot")
     @patch("vibe3.services.flow.service.FlowService")

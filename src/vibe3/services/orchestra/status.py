@@ -9,15 +9,15 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from vibe3.clients import (
+    FlowReader,
     GitClient,
     GitHubClient,
     GitHubClientProtocol,
     parse_blocked_by,
 )
+from vibe3.config import get_manager_usernames
 from vibe3.models import IssueState, OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
-from vibe3.services.flow.reader import FlowReader
-from vibe3.services.orchestra.helpers import get_manager_usernames
 from vibe3.services.pr.service import PRService
 from vibe3.services.shared.label_service import LabelService
 from vibe3.services.shared.status_query import (

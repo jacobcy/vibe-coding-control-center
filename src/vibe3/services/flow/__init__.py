@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.clients import FlowReader
     from vibe3.services.flow.abandon import AbandonFlowService
     from vibe3.services.flow.block_mixin import FlowLifecycleMixin
     from vibe3.services.flow.blocked_state_io import (
@@ -33,7 +34,6 @@ if TYPE_CHECKING:
     from vibe3.services.flow.factory import create_flow_manager
     from vibe3.services.flow.projection import FlowProjection, FlowProjectionService
     from vibe3.services.flow.read_mixin import FlowReadMixin
-    from vibe3.services.flow.reader import FlowReader
     from vibe3.services.flow.rebuild import FlowRebuildUsecase
     from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
     from vibe3.services.flow.recovery import (
@@ -124,7 +124,7 @@ _SYMBOL_MODULES = {
     "assert_rebuild_postconditions": "vibe3.services.flow.rebuild_postconditions",
     "RecoveryAction": "vibe3.services.flow.recovery",
     "RecoveryResult": "vibe3.services.flow.recovery",
-    "FlowReader": "vibe3.services.flow.reader",
+    "FlowReader": "vibe3.clients",
     "FlowTimelineService": "vibe3.services.flow.timeline",
     "TIMELINE_DISPLAY_MAP": "vibe3.services.flow.timeline",
 }

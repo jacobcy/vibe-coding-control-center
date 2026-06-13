@@ -20,11 +20,10 @@ from vibe3.commands.common import (
     run_full_check_shortcut,
     validate_trace_options,
 )
-from vibe3.config import OVERRIDE_RULES
+from vibe3.config import OVERRIDE_RULES, get_manager_usernames
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
 from vibe3.server import validate_pid_file
-from vibe3.services import get_manager_usernames
 from vibe3.ui import console
 from vibe3.utils import format_age_aware_time
 
