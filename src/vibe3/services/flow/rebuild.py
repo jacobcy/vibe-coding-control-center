@@ -14,7 +14,6 @@ from vibe3.config import load_orchestra_config
 from vibe3.models import IssueInfo
 from vibe3.services.flow.cleanup import FlowCleanupService
 from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
-from vibe3.services.handoff.service import HandoffService
 from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
 
 LabelResume = Callable[..., None]
@@ -114,16 +113,22 @@ class FlowRebuildUsecase:
             store=self.store,
         )
 
-        HandoffService(
-            store=self.store,
-            git_client=self.git_client,
-            github_client=self.github_client,
-        ).append_current_handoff(
-            message=f"Flow rebuilt: {reason}",
-            actor="vibe3:flow_rebuild",
-            kind="milestone",
-            branch=branch,
-        )
+        # Record flow_rebuild timeline event
+        from vibe3.services.flow.timeline import FlowTimelineService
+        from vibe3.services.issue.flow import IssueFlowService
+
+        issue_number = IssueFlowService(self.store).resolve_task_issue_number(branch)
+        if issue_number:
+            FlowTimelineService(
+                store=self.store,
+                github_client=self.github_client,
+            ).record_timeline_event(
+                branch=branch,
+                event_type="flow_rebuild",
+                actor="vibe3:flow_rebuild",
+                detail=f"Flow rebuilt: {reason}",
+                issue_number=issue_number,
+            )
 
         self._label_resume(
             issue_number=issue.number,

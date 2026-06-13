@@ -40,7 +40,8 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
 
     with (
         patch("vibe3.services.flow.rebuild.FlowCleanupService") as cleanup_cls,
-        patch("vibe3.services.flow.rebuild.HandoffService") as handoff_cls,
+        patch("vibe3.services.flow.timeline.FlowTimelineService") as timeline_cls,
+        patch("vibe3.services.issue.flow.IssueFlowService") as issue_flow_cls,
     ):
         cleanup = cleanup_cls.return_value
         cleanup.cleanup_flow_scene.return_value = {
@@ -50,7 +51,9 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
             "handoff": True,
             "flow_record": True,
         }
-        handoff = handoff_cls.return_value
+        issue_flow = issue_flow_cls.return_value
+        issue_flow.resolve_task_issue_number.return_value = 303
+        timeline = timeline_cls.return_value
 
         result = usecase.rebuild_issue_flow(
             issue=issue,
@@ -77,7 +80,13 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
         reactivate_existing=False,
         force_baseline=True,
     )
-    handoff.append_current_handoff.assert_called_once()
+    timeline.record_timeline_event.assert_called_once_with(
+        branch="task/issue-303",
+        event_type="flow_rebuild",
+        actor="vibe3:flow_rebuild",
+        detail="Flow rebuilt: missing worktree",
+        issue_number=303,
+    )
     label_resume.assert_called_once_with(
         issue_number=303,
         branch="task/issue-303",
@@ -116,7 +125,8 @@ def test_rebuild_issue_flow_fails_when_rebuilt_worktree_is_missing() -> None:
 
     with (
         patch("vibe3.services.flow.rebuild.FlowCleanupService") as cleanup_cls,
-        patch("vibe3.services.flow.rebuild.HandoffService") as handoff_cls,
+        patch("vibe3.services.flow.timeline.FlowTimelineService") as timeline_cls,
+        patch("vibe3.services.issue.flow.IssueFlowService"),
         pytest.raises(RuntimeError, match="Rebuild postcondition failed"),
     ):
         cleanup = cleanup_cls.return_value
@@ -136,5 +146,5 @@ def test_rebuild_issue_flow_fails_when_rebuilt_worktree_is_missing() -> None:
             ensure_worktree=True,
         )
 
-    handoff_cls.return_value.append_current_handoff.assert_not_called()
+    timeline_cls.return_value.record_timeline_event.assert_not_called()
     label_resume.assert_not_called()
