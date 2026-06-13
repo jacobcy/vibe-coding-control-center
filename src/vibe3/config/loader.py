@@ -7,7 +7,7 @@ from typing import Any, cast
 import yaml
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig, _vibe3_config_root
+from vibe3.config.settings import VibeConfig
 
 
 def _expand_variables(
@@ -30,6 +30,35 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
             merged[key] = value
 
     return merged
+
+
+def find_install_root() -> Path:
+    """Find the vibe3 installation root by walking up from this module's file.
+
+    Returns the directory containing config/v3/settings.yaml, which is the
+    vibe3 installation root (repo root for source installs, ~/.vibe for pip
+    installs). Used as fallback when CWD-relative config paths fail
+    (cross-project invocation).
+    """
+    current = Path(__file__).resolve()
+    for _ in range(10):
+        parent = current.parent
+        if parent == current:
+            break
+        if (parent / "config" / "v3" / "settings.yaml").exists():
+            return parent
+        current = parent
+
+    current = Path(__file__).resolve()
+    for _ in range(10):
+        parent = current.parent
+        if parent == current:
+            break
+        if (parent / "src" / "vibe3").exists():
+            return parent
+        current = parent
+
+    return Path.cwd()
 
 
 def load_yaml_config(path: Path, strict: bool = False) -> dict[str, Any]:
@@ -116,13 +145,17 @@ def find_config_file() -> Path | None:
         return old_config
 
     # Check vibe3 installation root as fallback (for cross-project invocation)
-    import_root = _vibe3_config_root()
-    root_config = import_root / "config" / "v3" / "settings.yaml"
-    if root_config.exists() and root_config.resolve() != new_config.resolve():
-        logger.bind(domain="config", action="find", path=str(root_config)).debug(
-            "Found vibe3 installation config"
-        )
-        return root_config
+    try:
+        import_root = find_install_root()
+    except OSError:
+        import_root = None
+    if import_root is not None:
+        root_config = import_root / "config" / "v3" / "settings.yaml"
+        if root_config.exists() and root_config.resolve() != new_config.resolve():
+            logger.bind(domain="config", action="find", path=str(root_config)).debug(
+                "Found vibe3 installation config"
+            )
+            return root_config
 
     # Check global config
     global_config = Path.home() / ".vibe" / "config.yaml"
@@ -185,7 +218,12 @@ def load_config(
             else Path("config/v3/settings.yaml")
         )
         if not repo_config_path.exists():
-            repo_config_path = _vibe3_config_root() / "config" / "v3" / "settings.yaml"
+            try:
+                repo_config_path = (
+                    find_install_root() / "config" / "v3" / "settings.yaml"
+                )
+            except OSError:
+                pass  # Keep as non-existent path; load_config falls through to defaults
 
         # Check if config_path is auto-detected or explicit
         auto_detected = find_config_file()

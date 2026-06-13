@@ -28,47 +28,6 @@ from vibe3.config.settings_pr import (
 )
 
 
-def _vibe3_config_root() -> Path:
-    """Find the vibe3 config root directory by walking up from this module.
-
-    Returns the directory containing config/v3/settings.yaml, which is the vibe3
-    installation root (repo root for source installs, ~/.vibe for pip installs).
-
-    Used as fallback when CWD-relative config paths fail (cross-project invocation).
-    """
-    # Start from this module's location
-    current = Path(__file__).resolve()
-
-    # Walk up to find the directory containing config/v3/settings.yaml
-    # Max 10 levels to prevent infinite loops
-    for _ in range(10):
-        parent = current.parent
-        if parent == current:
-            # Reached filesystem root, stop
-            break
-
-        # Check if this parent contains config/v3/settings.yaml
-        if (parent / "config" / "v3" / "settings.yaml").exists():
-            return parent
-
-        current = parent
-
-    # Fallback: return parent of src/ directory (repo root for source installs)
-    # This handles the case where config/v3/settings.yaml doesn't exist yet
-    # Walk up from __file__ to find the directory containing src/vibe3/
-    current = Path(__file__).resolve()
-    for _ in range(10):
-        parent = current.parent
-        if parent == current:
-            break
-        if (parent / "src" / "vibe3").exists():
-            return parent
-        current = parent
-
-    # Last resort: return current working directory
-    return Path.cwd()
-
-
 class AIConfig(BaseModel):
     """AI 辅助配置.
 
@@ -374,9 +333,14 @@ class VibeConfig(BaseModel):
         # Try new path first, then fallback to old path
         new_loc_limits_path = Path("config/v3/loc_limits.yaml")
         if not new_loc_limits_path.exists():
-            new_loc_limits_path = (
-                _vibe3_config_root() / "config" / "v3" / "loc_limits.yaml"
-            )
+            from vibe3.config.loader import find_install_root
+
+            try:
+                new_loc_limits_path = (
+                    find_install_root() / "config" / "v3" / "loc_limits.yaml"
+                )
+            except OSError:
+                new_loc_limits_path = Path("config/v3/loc_limits.yaml")  # fallback
         old_loc_limits_path = Path("config/loc_limits.yaml")
         loc_limits_path = None
 
@@ -464,7 +428,12 @@ class VibeConfig(BaseModel):
         if new_default_path.exists():
             return cls.from_yaml(new_default_path)
         # Fallback: vibe3 installation default config
-        root = _vibe3_config_root()
+        from vibe3.config.loader import find_install_root
+
+        try:
+            root = find_install_root()
+        except OSError:
+            return cls()  # Last resort: pure defaults
         root_new_path = root / "config" / "v3" / "settings.yaml"
         if root_new_path.exists():
             return cls.from_yaml(root_new_path)
