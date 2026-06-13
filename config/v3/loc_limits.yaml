@@ -280,8 +280,8 @@ code_limits:
         limit: 500
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低；#2381 新增 test_dispatch_loop_rechecks_qualify_gate_for_ready_issue 测试验证 dispatch-time qualify gate recheck（+29 行）"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
-        limit: 450
-        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2536 新增 test_single_issue_qualify_failure_does_not_abort_batch 回归测试验证单个 issue 失败不阻塞整个批次（+66 行）"
+        limit: 600
+        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2765 新增 BLOCKED 重资格化和空队列日志抑制回归测试（+50 行）"
       - path: "tests/vibe3/orchestra/test_failed_gate.py"
         limit: 470
         reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop），合并后内聚度高，拆分会破坏测试场景完整性"
