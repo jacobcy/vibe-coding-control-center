@@ -108,6 +108,9 @@ class FlowState(BaseModel):
     )
     worktree_path: str | None = None  # NEW: Worktree path for path resolution
     transition_count: int = 0  # NEW: State transition count for loop prevention
+    creation_source: str | None = (
+        None  # NEW: Static branch creation source (e.g., "origin/main")
+    )
 
     model_config = {"extra": "ignore"}
 
@@ -273,6 +276,7 @@ class FlowStatusResponse(BaseModel):
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None
     worktree_root: str | None = None  # NEW: Worktree root path for path resolution
+    creation_source: str | None = None  # NEW: Static branch creation source
     # Timeline events from GitHub comments
     timeline: list[TimelineEvent] = Field(default_factory=list)
     # Provenance tracking
@@ -379,6 +383,7 @@ class FlowStatusResponse(BaseModel):
             execution_completed_at=data.get("execution_completed_at"),
             latest_verdict=data.get("latest_verdict"),
             worktree_root=worktree_root,
+            creation_source=data.get("creation_source"),
             has_branch=has_branch,
             has_worktree=has_worktree,
             is_placeholder=is_placeholder,

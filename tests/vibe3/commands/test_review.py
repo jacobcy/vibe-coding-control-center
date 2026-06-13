@@ -145,7 +145,10 @@ class TestReviewBaseExitCodes:
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
             patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
         ):
-            mock_flow.return_value = (object(), "feature/test")
+            # Create a mock flow_service with get_flow_status method
+            mock_flow_service = MagicMock()
+            mock_flow_service.get_flow_status.return_value = None  # No flow state
+            mock_flow.return_value = (mock_flow_service, "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
                 "ResolvedBase",
                 (),
@@ -178,7 +181,10 @@ class TestReviewBaseExitCodes:
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
             patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
         ):
-            mock_flow.return_value = (object(), "feature/test")
+            # Create a mock flow_service with get_flow_status method
+            mock_flow_service = MagicMock()
+            mock_flow_service.get_flow_status.return_value = None  # No flow state
+            mock_flow.return_value = (mock_flow_service, "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
                 "ResolvedBase",
                 (),
@@ -212,7 +218,10 @@ class TestReviewBaseExitCodes:
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
             patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
         ):
-            mock_flow.return_value = (object(), "feature/test")
+            # Create a mock flow_service with get_flow_status method
+            mock_flow_service = MagicMock()
+            mock_flow_service.get_flow_status.return_value = None  # No flow state
+            mock_flow.return_value = (mock_flow_service, "feature/test")
             mock_base.return_value.resolve_review_base.return_value = type(
                 "ResolvedBase",
                 (),
@@ -253,7 +262,10 @@ def test_review_base_show_prompt_forwarded_to_sync():
         patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
         patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
     ):
-        mock_flow.return_value = (object(), "feature/test")
+        # Create a mock flow_service with get_flow_status method
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_flow_status.return_value = None  # No flow state
+        mock_flow.return_value = (mock_flow_service, "feature/test")
         mock_base.return_value.resolve_review_base.return_value = type(
             "ResolvedBase",
             (),

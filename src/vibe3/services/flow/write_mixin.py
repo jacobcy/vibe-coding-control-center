@@ -62,6 +62,7 @@ class FlowWriteMixin(FlowReadMixin):
         initiated_by: str | None = None,
         *,
         source: str = "unknown",
+        creation_source: str | None = None,
     ) -> FlowStatusResponse:
         """Create a new flow.
 
@@ -72,6 +73,8 @@ class FlowWriteMixin(FlowReadMixin):
             initiated_by: Optional initiator identifier
             source: Caller identity for audit logging
                 (e.g. "dispatch", "cli", "agent").
+            creation_source: Static branch creation source
+                (e.g., "origin/main"). Records where the branch was created from.
 
         Returns:
             Created flow state
@@ -154,6 +157,7 @@ class FlowWriteMixin(FlowReadMixin):
             flow_slug=slug,
             latest_actor=effective_actor,
             initiated_by=initiated_by,
+            creation_source=creation_source,
         )
 
         self.store.add_event(

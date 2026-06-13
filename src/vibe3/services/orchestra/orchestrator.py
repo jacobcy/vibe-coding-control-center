@@ -179,6 +179,9 @@ class FlowOrchestratorService:
                     actor=actor,
                     initiated_by=initiator,
                     source=source,
+                    creation_source=(
+                        self.config.scene_base_ref if not skip_git else None
+                    ),
                 )
 
             self.task_service.link_issue(branch, issue.number, "task", actor=actor)

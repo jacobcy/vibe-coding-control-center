@@ -202,4 +202,6 @@ def test_inspect_base_uses_shared_base_resolver():
                     result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
-    mock_resolve.assert_called_once_with(None, current_branch="feature/test")
+    mock_resolve.assert_called_once_with(
+        None, current_branch="feature/test", creation_source=None
+    )
