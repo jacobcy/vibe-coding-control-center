@@ -204,7 +204,7 @@ KNOWN_LAYER_CROSSING_BRIDGES = {
     # Note: pr/scoring.py has local PRScoringError class, so classifier may exclude it
 }
 
-ROOT_BARREL_IMPORT_BASELINE = 126
+ROOT_BARREL_IMPORT_BASELINE = 128
 SHARED_BARREL_IMPORT_BASELINE = 1
 PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
 LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
@@ -214,7 +214,9 @@ def test_root_barrel_import_count() -> None:
     """Verify root barrel imports (from vibe3.services import ...).
 
     Goal: Zero root barrel imports (all imports should be direct).
-    Current baseline: 126 call sites across 76 files.
+    Current baseline: 128 call sites across 77 files (PR #2788 added 2 new
+    `from vibe3.services import log_dispatch_error` call sites for the
+    consolidated dispatch error logging helper).
     """
     imports = count_barrel_imports("vibe3.services")
 

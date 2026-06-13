@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from vibe3.services.shared.context_cache import FlowContextCacheService
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
+        log_dispatch_error,
         record_dispatch_failure_if_unexpected,
         record_error,
     )
@@ -99,6 +100,7 @@ __all__ = [
     "sanitize_event_detail_paths",
     # errors
     "has_recent_specific_error",
+    "log_dispatch_error",
     "record_dispatch_failure_if_unexpected",
     "record_error",
     # labels
@@ -167,6 +169,7 @@ _SYMBOL_MODULES = {
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     # errors
     "has_recent_specific_error": "vibe3.services.shared.errors",
+    "log_dispatch_error": "vibe3.services.shared.errors",
     "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
     "record_error": "vibe3.services.shared.errors",
     # labels

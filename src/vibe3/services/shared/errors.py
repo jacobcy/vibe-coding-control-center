@@ -208,3 +208,23 @@ def record_dispatch_failure_if_unexpected(
             domain=f"{role}_dispatch",
             issue_number=issue_number,
         ).warning(f"Failed to record dispatch error: {exc}")
+
+
+def log_dispatch_error(context: str, exc: Exception) -> None:
+    """Log a dispatch/execution error, classifying known external failures.
+
+    GitHubError and subprocess.CalledProcessError (rate-limit, auth, network)
+    are logged as a truncated WARNING with external=True binding, avoiding
+    noisy tracebacks. All other exceptions get a full traceback via
+    logger.exception for diagnosis.
+    """
+    from subprocess import CalledProcessError
+
+    from vibe3.exceptions import GitHubError
+
+    if isinstance(exc, (GitHubError, CalledProcessError)):
+        error_text = str(exc)
+        preview = error_text[:200] + "..." if len(error_text) > 200 else error_text
+        logger.bind(external=True).warning(f"{context}: {preview}")
+    else:
+        logger.exception(f"{context}: {exc}")

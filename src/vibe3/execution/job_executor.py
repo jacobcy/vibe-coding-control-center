@@ -285,7 +285,9 @@ class JobExecutor:
             return job_result
 
         except Exception as e:
-            logger.exception(f"Job execution failed: {e}")
+            from vibe3.services import log_dispatch_error
+
+            log_dispatch_error("Job execution failed", e)
 
             # Record actor failure and lifecycle failure
             actor_obj.record_failure(error=str(e))

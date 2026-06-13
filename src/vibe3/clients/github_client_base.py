@@ -109,7 +109,7 @@ class GitHubClientBase:
 
         Returns:
             CompletedProcess on success.
-            None on TimeoutExpired or FileNotFoundError (gh not installed).
+            None on any failure (TimeoutExpired, FileNotFoundError).
         """
         env = {**os.environ, "GH_PAGER": "cat"} if pager else None
         effective_timeout = timeout if timeout is not None else GH_API_TIMEOUT

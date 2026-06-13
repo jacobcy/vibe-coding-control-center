@@ -223,8 +223,8 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/services/test_shared_errors.py"
-        limit: 383
-        reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file"
+        limit: 446
+        reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file; PR #2788 follow-up added TestLogDispatchError class with 4 test methods (test_github_error_logged_as_warning_without_traceback, test_called_process_error_logged_as_warning_without_traceback, test_generic_exception_logged_with_traceback, test_long_error_message_truncated) to verify error log grading behavior for GitHub API vs internal errors (+65 lines)"
       - path: "tests/vibe3/models/test_job.py"
         limit: 510
         reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"

@@ -88,6 +88,34 @@ class TestManualReviewIntentErrorPaths:
 
         assert get_pending_result("review") == ReviewRunResult("ERROR", None, 789)
 
+    def test_execution_exception_logs_real_exception(self) -> None:
+        """The real caught exception (not a synthetic placeholder) must drive
+        log_dispatch_error's classification."""
+        event = ManualReviewIntent(
+            issue_number=789,
+            branch="main",
+            is_base_review=True,
+            request=_make_review_request(),
+            no_async=True,
+        )
+        real_exc = RuntimeError("execution boom")
+
+        with (
+            patch("vibe3.config.load_config_for_role") as mock_load_config,
+            patch("vibe3.roles.execute_manual_review_sync") as mock_execute,
+            patch(
+                "vibe3.domain.handlers.manual_dispatch.log_dispatch_error"
+            ) as mock_log_dispatch_error,
+        ):
+            mock_load_config.return_value = object()
+            mock_execute.side_effect = real_exc
+            handle_manual_review_intent(event)
+
+        mock_log_dispatch_error.assert_called_once_with(
+            "Review dispatch failed", real_exc
+        )
+        assert get_pending_result("review") == ReviewRunResult("ERROR", None, 789)
+
 
 class TestManualPlanIntentErrorPaths:
     """Manual plan failures must be visible to the CLI after publish()."""

@@ -22,6 +22,7 @@ from vibe3.models import (
     ManualRunIntent,
     ReviewRequest,
 )
+from vibe3.services import log_dispatch_error
 
 # Result sink for CLI commands that need return values (review verdict).
 # Handler stores result after execution; CLI reads via get_pending_result().
@@ -132,7 +133,7 @@ def handle_manual_plan_intent(event: ManualPlanIntent, /) -> None:
             typer.echo(f"tmux session: {result.tmux_session}")
             typer.echo(f"log: {result.log_path}")
     except Exception as e:
-        logger.exception(f"Manual plan execution failed: {e}")
+        log_dispatch_error("Manual plan dispatch failed", e)
         _store_pending_error("plan", e)
 
 
@@ -189,7 +190,7 @@ def handle_manual_run_intent(event: ManualRunIntent, /) -> None:
             publish=event.publish,
         )
     except Exception as e:
-        logger.exception(f"Manual run execution failed: {e}")
+        log_dispatch_error("Manual run dispatch failed", e)
         _store_pending_error("run", e)
 
 
@@ -261,8 +262,8 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> None:
                     config=config,
                     show_prompt=event.show_prompt,
                 )
-            except Exception:
-                logger.exception("Review execution failed")
+            except Exception as e:
+                log_dispatch_error("Review dispatch failed", e)
                 result = ReviewRunResult("ERROR", None, event.issue_number)
             # Store result for CLI to retrieve
             _pending_results["review"] = result

@@ -18,7 +18,7 @@ from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services import record_dispatch_failure_if_unexpected
+from vibe3.services import log_dispatch_error, record_dispatch_failure_if_unexpected
 
 
 def run_governance_sync(
@@ -264,7 +264,7 @@ def run_governance_async(
                 exception=exc,
                 tick_id=tick_count,
             )
-            logger.exception(f"Governance scan dispatch failed: {exc}")
+            log_dispatch_error("Governance scan dispatch failed", exc)
             raise
 
     if result and result.launched:
