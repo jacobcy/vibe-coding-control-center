@@ -14,9 +14,8 @@ from vibe3.agents import (
     create_codeagent_command,
     describe_review_sections,
     make_review_context_builder,
-    run_inspect_json,
 )
-from vibe3.analysis import changed_symbols
+from vibe3.analysis import build_change_analysis, changed_symbols
 
 # public-api: pending upstream export
 from vibe3.config import (
@@ -307,14 +306,15 @@ def build_manual_review_request_payload(
     *,
     issue_number: int | None = None,
     head_branch: str | None = None,
-    inspect_args: list[str],
+    source_type: str,
+    identifier: str,
     structure_diff: StructureDiff | None = None,
-    inspect_runner: Callable[[list[str]], dict[str, object]] = run_inspect_json,
+    analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
 ) -> tuple[ReviewRequest, int | None, str | None]:
     """Consolidated factory for manual review request payloads (PR and Base)."""
     request = ReviewRequest(
         scope=scope,
-        changed_symbols=changed_symbols(inspect_runner(inspect_args)),
+        changed_symbols=changed_symbols(analysis_runner(source_type, identifier)),
         structure_diff=structure_diff,
     )
     return request, issue_number, head_branch
@@ -325,7 +325,7 @@ def build_base_review_request(
     base_branch: str,
     *,
     flow_service: FlowService | None = None,
-    inspect_runner: Callable[[list[str]], dict[str, object]] = run_inspect_json,
+    analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
     snapshot_diff_builder: Callable[
         [str, str | None], object | None
     ] = build_snapshot_diff,
@@ -337,11 +337,12 @@ def build_base_review_request(
     return build_manual_review_request_payload(
         scope=ReviewScope.for_base(base_branch),
         issue_number=flow.task_issue_number if flow else None,
-        inspect_args=["base", base_branch],
+        source_type="branch",
+        identifier=base_branch,
         structure_diff=(
             cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
         ),
-        inspect_runner=inspect_runner,
+        analysis_runner=analysis_runner,
     )
 
 

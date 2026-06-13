@@ -87,11 +87,10 @@ def run_risk_gate(console: Console, pr_number: int) -> None:
         Exit: If risk gate fails
         Exception: If risk check fails (fail-fast, no interactive bypass)
     """
-    from vibe3.agents import run_inspect_json
-    from vibe3.analysis import score
+    from vibe3.analysis import build_change_analysis, score
 
     # Call inspect pr to get risk score
-    analysis = run_inspect_json(["pr", str(pr_number)])
+    analysis = build_change_analysis("pr", str(pr_number))
     risk_score = score(analysis)
 
     # Check if blocked

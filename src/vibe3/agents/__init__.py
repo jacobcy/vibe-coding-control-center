@@ -27,7 +27,6 @@ Prompt Builders:
 
 Review Helpers:
 - ``build_snapshot_diff`` — build structural diff for review context
-- ``run_inspect_json`` — helper to call inspect subcommand for review analysis
 
 Types:
 - ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
@@ -57,10 +56,7 @@ if TYPE_CHECKING:
         describe_plan_sections,
         make_plan_context_builder,
     )
-    from vibe3.agents.review_pipeline_helpers import (
-        build_snapshot_diff,
-        run_inspect_json,
-    )
+    from vibe3.agents.review_pipeline_helpers import build_snapshot_diff
     from vibe3.agents.review_prompt import (
         build_review_prompt_body,
         describe_review_sections,
@@ -90,7 +86,6 @@ _LAZY_IMPORTS = {
     "describe_plan_sections": "vibe3.agents.plan_prompt",
     "make_plan_context_builder": "vibe3.agents.plan_prompt",
     "build_snapshot_diff": "vibe3.agents.review_pipeline_helpers",
-    "run_inspect_json": "vibe3.agents.review_pipeline_helpers",
     "build_review_prompt_body": "vibe3.agents.review_prompt",
     "describe_review_sections": "vibe3.agents.review_prompt",
     "make_review_context_builder": "vibe3.agents.review_prompt",
@@ -133,7 +128,6 @@ __all__ = [
     "make_review_context_builder",
     "make_run_context_builder",
     "make_skill_context_builder",
-    "run_inspect_json",
     "start_async_command",
     "sync_models_json",
 ]
