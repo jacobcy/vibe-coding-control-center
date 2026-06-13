@@ -2,6 +2,7 @@
 
 import time
 from datetime import datetime
+from os import PathLike
 from pathlib import Path
 from typing import cast
 
@@ -80,7 +81,7 @@ class PRService:
                 git_common_dir = self.git_client.get_git_common_dir()
                 repo_path = (
                     Path(git_common_dir).parent
-                    if isinstance(git_common_dir, str) and git_common_dir
+                    if isinstance(git_common_dir, (str, PathLike)) and git_common_dir
                     else Path.cwd()
                 )
             except Exception:

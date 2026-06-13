@@ -155,6 +155,7 @@ class FlowOrchestratorService:
                     self._validate_or_recreate_branch(
                         branch,
                         issue_number=issue.number,
+                        ensure_worktree=ensure_worktree,
                         reactivate_existing=reactivate_existing,
                     )
                 else:
@@ -248,6 +249,7 @@ class FlowOrchestratorService:
         branch: str,
         *,
         issue_number: int,
+        ensure_worktree: bool = False,
         reactivate_existing: bool = False,
     ) -> None:
         """Validate existing branch is based on origin/main, or force-recreate it.
@@ -322,6 +324,8 @@ class FlowOrchestratorService:
 
         self.git.delete_branch(branch, force=True)
         self.git.create_branch_ref(branch, start_ref=base_ref)
+        if not ensure_worktree:
+            self.git.switch_branch(branch)
 
     def _fetch_and_create_branch(
         self,
