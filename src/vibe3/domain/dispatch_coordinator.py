@@ -9,6 +9,9 @@ Queue strategy:
 3. Give blocked-only rebuilds one dispatch-time qualify pass
 4. If candidates remain blocked, pause recollection until work changes
 5. Capacity still gates actual dispatch intents
+6. Every collection re-qualifies BLOCKED issues (see
+   _requalify_blocked_issues) so resolved blockers get relabeled and
+   picked up on the next pass
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from loguru import logger
 
 from vibe3.clients import GitHubClient
 from vibe3.domain import publish
+from vibe3.domain.dispatch_health import DispatchHealthService
 from vibe3.domain.dispatch_preflight import (
     DispatchPreflightDecision,
     DispatchPreflightService,
@@ -56,9 +60,6 @@ if TYPE_CHECKING:
 # Hard limit to prevent extreme tick duration in edge cases
 MAX_INTENTS_PER_TICK = 10
 
-# Transient error prefixes: fail-open instead of blocking the flow
-_TRANSIENT_ERROR_PREFIXES = ("Cannot verify", "No flow record")
-
 
 class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
@@ -85,6 +86,7 @@ class GlobalDispatchCoordinator:
     _remote_check_runner: Callable[[], None] | None
     _remote_check_interval: int
     _last_remote_check_tick: int
+    _dispatch_health: DispatchHealthService
     _dispatch_preflight: DispatchPreflightService
 
     def __init__(
@@ -152,6 +154,17 @@ class GlobalDispatchCoordinator:
         self._remote_check_runner = remote_check_runner
         self._remote_check_interval = remote_check_interval
         self._last_remote_check_tick: int = 0
+
+        def _emit(category: str, message: str) -> None:
+            append_orchestra_event(category, message)
+
+        self._dispatch_health = DispatchHealthService(
+            check_service=lambda: self._check_service,
+            store=store,
+            flow_blocker=flow_blocker,
+            flow_context=lambda issue_number: self._flow_context(issue_number),
+            emit_event=_emit,
+        )
         self._dispatch_preflight = DispatchPreflightService(
             qualify_gate=self._qualify_gate,
             flow_context=lambda issue_number: self._flow_context(issue_number),
@@ -205,10 +218,6 @@ class GlobalDispatchCoordinator:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
-        append_orchestra_event(
-            "dispatcher",
-            "GlobalDispatchCoordinator: starting queue collection",
-        )
         try:
             collected_issues = await asyncio.get_running_loop().run_in_executor(
                 self._executor,
@@ -267,91 +276,46 @@ class GlobalDispatchCoordinator:
                     "select_ready_issues_from_collected_issues failed for "
                     f"{state.value}: {exc}"
                 )
-        append_orchestra_event(
-            "dispatcher",
-            f"GlobalDispatchCoordinator: queue collection complete, "
-            f"total={len(queue)} issues",
-        )
-        return queue
+        self._requalify_blocked_issues(collected_issues)
 
-    def _check_dispatch_health(self, issue: IssueInfo) -> bool:
-        """Pre-dispatch health check. Returns True if issue can be dispatched.
-
-        Delegates structural checks to CheckService, with terminal state
-        and transient error handling inlined directly in this method.
-        """
-        branch, _ = self._flow_context(issue.number)
-
-        # Empty-branch guard: fail-open only for manager entry states
-        if not branch:
-            issue_state = issue.state
-            if issue_state not in {IssueState.READY, IssueState.HANDOFF}:
-                state_value = issue_state.value if issue_state else "unknown"
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                    f"(missing flow context for {state_value})",
-                )
-                return False
-            return True
-
-        result = self._check_service.verify_branch(branch)
-
-        flow_state = self._store.get_flow_state(branch)
-        flow_status = (
-            flow_state.get("flow_status", "active") if flow_state else "active"
-        )
-
-        # Terminal state: skip dispatch cleanly
-        if flow_status in ("done", "aborted", "stale", "review"):
+        if queue:
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(flow is {flow_status})",
+                f"GlobalDispatchCoordinator: queue collection complete, "
+                f"total={len(queue)} issues",
             )
-            return False
+        return queue
 
-        if not result.is_valid:
-            # Transient errors: fail-open
-            is_transient = any(
-                any(err.startswith(prefix) for err in result.issues)
-                for prefix in _TRANSIENT_ERROR_PREFIXES
-            )
-            if is_transient:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
-                    f"(transient: {', '.join(result.issues)})",
-                )
-                return True
+    def _requalify_blocked_issues(self, collected_issues: list[IssueInfo]) -> None:
+        """Re-run the qualify gate for issues collected as BLOCKED.
 
-            # Genuine failure: block and skip
-            reason = f"Health check failed: {', '.join(result.issues)}"
-            block_succeeded = False
+        BLOCKED issues are excluded from the frozen queue (they cannot be
+        dispatched), so without this pass an issue whose blockers have
+        resolved would never be re-qualified until some other trigger
+        forces a collection. ``qualify_blocked_issue`` performs its own
+        label transition and event logging when an issue becomes
+        resumable; the relabeled issue is then picked up normally on the
+        next collection cycle.
+        """
+        for issue in collected_issues:
+            if issue.state != IssueState.BLOCKED:
+                continue
             try:
-                self._flow_blocker.block_flow(
-                    branch=branch, reason=reason, actor="orchestra:dispatcher"
-                )
-                block_succeeded = True
+                self._qualify_gate.qualify_blocked_issue(issue)
             except Exception as exc:
-                logger.bind(domain="orchestra", action="health_check").warning(
-                    f"Failed to block flow for #{issue.number}: {exc}"
-                )
                 append_orchestra_event(
                     "dispatcher",
-                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
-                    f"(error: {exc}, health check: {reason})",
+                    f"GlobalDispatchCoordinator: requalify failed for "
+                    f"#{issue.number}: {exc}",
                 )
+                logger.bind(
+                    domain="global_dispatch",
+                    issue=issue.number,
+                ).warning(f"qualify_blocked_issue failed for #{issue.number}: {exc}")
 
-            if block_succeeded:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
-                    f"(health check failed: {reason})",
-                )
-            return False
-
-        return True
+    def _check_dispatch_health(self, issue: IssueInfo) -> bool:
+        """Pre-dispatch health check. Returns True if issue can be dispatched."""
+        return self._dispatch_health.check(issue)
 
     def _run_dispatch_preflight(self, issue: IssueInfo) -> DispatchPreflightDecision:
         """Run the unified pre-dispatch gate for one issue."""
@@ -474,6 +438,11 @@ class GlobalDispatchCoordinator:
             entry = self._frozen_queue[index]
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (issue not found or state missing)",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
@@ -492,6 +461,11 @@ class GlobalDispatchCoordinator:
                 continue
 
             if issue.state == IssueState.DONE:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (state terminal: done)",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
@@ -518,11 +492,21 @@ class GlobalDispatchCoordinator:
 
             preflight = self._run_dispatch_preflight(issue)
             if not preflight.allowed or preflight.target_state is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    f"from queue (preflight failed: {preflight.reason})",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
             role = find_role_for_state(preflight.target_state)
             if role is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    f"from queue (no role for state {preflight.target_state})",
+                )
                 self._frozen_queue.pop(index)
                 continue
             entry.collected_state = preflight.target_state.value
@@ -668,6 +652,11 @@ class GlobalDispatchCoordinator:
             dispatched_count
         )
         if need_collect:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue exhausted after dispatch, "
+                "rebuilding for next tick",
+            )
             fresh = await self._collect_frozen_queue()
             # Invalidate PR cache after fresh collection
             self._check_service.invalidate_pr_cache()

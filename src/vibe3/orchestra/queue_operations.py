@@ -218,11 +218,20 @@ def promote_progressed_entries(
 
         entry.waiting_state = None
         entry.collected_state = current_state
-        promoted.append(entry)
-        append_orchestra_event(
-            "dispatcher",
-            f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
-            f"to front after state change to {current_state}",
-        )
+
+        if issue.state in {IssueState.DONE, IssueState.BLOCKED}:
+            removed.append(entry)
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                f"from queue (state terminal: {current_state})",
+            )
+        else:
+            promoted.append(entry)
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
+                f"to front after state change to {current_state}",
+            )
 
     return promoted, retained, removed

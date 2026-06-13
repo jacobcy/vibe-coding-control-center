@@ -357,9 +357,16 @@ class TestLoggingBehavior:
             re.sub(r"\x1b\[[0-9;]*m", "", message) for message in events
         ]
 
-        assert normalized_events[0] == (
-            "GlobalDispatchCoordinator: dispatch-intent #467 (planner)"
+        intent_idx = next(
+            i
+            for i, m in enumerate(normalized_events)
+            if "dispatch-intent #467 (planner)" in m
         )
-        assert normalized_events[1] == (
-            "planner launch failed for #467: Failed to resolve permanent worktree"
+        side_effect_idx = next(
+            i
+            for i, m in enumerate(normalized_events)
+            if "planner launch failed for #467" in m
         )
+        assert (
+            intent_idx < side_effect_idx
+        ), "dispatch-intent should be logged before emit side effect"
