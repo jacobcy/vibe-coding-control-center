@@ -465,7 +465,7 @@ class TaskResumeUsecase:
             return self._flow_service_input
         from vibe3.services import FlowService
 
-        return FlowService()  # type: ignore[return-value]
+        return FlowService()
 
     @property
     def flow_service(self) -> "FlowQueryProtocol":
