@@ -438,12 +438,121 @@ gh issue edit <issue-number> --add-label "orchestra-scanned"
 
 roadmap-intake 在扫描和决策阶段的依赖操作约束：
 
-- ✅ 当 intake 候选有明确依赖（body/title 中的 `Blocked by #N`）时，使用 `vibe3 task intake <M> --blocked-by <N>`
-- ✅ 这将创建 placeholder flow（仅 DB 记录）并设置 `state/blocked` 标签 — issue 进入执行池并记录依赖
+### 依赖声明识别
+
+识别以下四种依赖声明格式：
+
+1. **`## Dependencies` section**（推荐格式）
+   - Issue body 中包含 `## Dependencies` 标题
+   - 下方列表项：`- Depends on #N`、`- Blocked by #N`
+   - 参考：`docs/standards/issue-dependency-standard.md` 和 `vibe-issue` SKILL.md
+
+2. **中文等效表达**
+   - `- 依赖 #N`、`- 阻塞于 #N`
+
+3. **自由文本格式**（向后兼容）
+   - Issue body 或 title 中的 `Blocked by #N`、`Depends on #N`、`依赖 #N`
+
+4. **实现支持**
+   - `src/vibe3/clients/github_issues_ops.py:parse_blocked_by` 使用正则匹配：
+     ```python
+     _BLOCKED_BY_RE = re.compile(
+         r"(?:blocked\s+by|depends\s+on|依赖)[:\s]+([#\d,\s#]+)",
+         re.IGNORECASE,
+     )
+     ```
+   - 支持中英文依赖声明，自动提取 issue 编号列表
+   - 以上四种格式的依赖声明均会被正确解析
+
+### 依赖验证要求
+
+在调用 `vibe3 task intake --blocked-by` 前，必须验证依赖状态：
+
+1. **验证命令**：
+   ```bash
+   gh issue view <N> --json state,labels
+   ```
+
+2. **依赖已解除判定**（满足任一条件）：
+   - GitHub state 为 CLOSED
+   - 有 `state/done` 或 `state/merge-ready` 标签
+   - 有已合并的 PR
+
+3. **处理策略**：
+   - **已解除依赖**：在 suggest comment 中记录"依赖 #N 已完成"，不触发 `--blocked-by`
+   - **未解除依赖**：调用 `vibe3 task intake <issue> --blocked-by <N>`
+
+**验证标准参考**：`roadmap-common.md` Level 2（line 179）"依赖项状态已验证"
+
+### 多依赖处理策略
+
+当 issue 有多个依赖时：
+
+1. **单个依赖**：
+   ```bash
+   vibe3 task intake <issue> --blocked-by <dep>
+   ```
+
+2. **多个依赖**：
+   - 调用 intake 命令时使用**第一个未解除依赖**：
+     ```bash
+     vibe3 task intake <issue> --blocked-by <dep1>
+     ```
+   - 在 suggest comment 中添加显式提醒（使用 `## Manager Checklist` section）：
+     ```markdown
+     ## Manager Checklist
+
+     ⚠️ **多依赖注意**：已通过 `--blocked-by #dep1` 入池。
+
+     **主依赖**：#dep1（已注册）
+     **剩余依赖**：#dep2, #dep3（已在 body 的 `## Dependencies` section 中注册）
+
+     Manager 入场时须通过以下命令正式化剩余依赖：
+     ```bash
+     vibe3 flow blocked --task <dep2>
+     vibe3 flow blocked --task <dep3>
+     ```
+
+     参考：roadmap-common.md "Manager 的衔接职责"
+     ```
+   - Manager 的"衔接职责"（roadmap-common.md line 331）会在入场时读取此 checklist 并执行正式化
+
+**原因**：`vibe3 task intake` 的 guard check (`needs_guard`) 阻止对同一 issue 重复调用。第一次调用创建 placeholder flow 并记录主依赖，其余依赖保留在 issue body 的 `## Dependencies` section 中。
+
+### 后置验证要求
+
+执行 `vibe3 task intake --blocked-by` 后，必须验证：
+
+1. **标签验证**：
+   ```bash
+   gh issue view <N> --json labels
+   ```
+   确认 `state/blocked` 标签已设置
+
+2. **Assignee 验证**：
+   确认 issue 已分配 manager assignee
+
+3. **失败处理**：
+   - 在 suggest comment 中记录警告
+   - 标记需人工审查
+
+### 依赖阻塞 vs 设计决策阻塞
+
+区分两类阻塞并采用不同路由：
+
+| 阻塞类型 | 特征 | 路由 |
+|---------|------|------|
+| **依赖阻塞** | • 存在具体的 GitHub issue #N<br>• Issue #N 处于 open 状态<br>• 工作内容明确、可交付 | 使用 `vibe3 task intake --blocked-by <N>` |
+| **设计决策阻塞** | • 需要 RFC/架构决策<br>• 缺少具体 issue 依赖<br>• 阻塞原因是架构方向、人类对齐、范围未定 | 路由到 `roadmap/rfc`，**禁止**使用 `--blocked-by` |
+
+**判断标准**：如果阻塞项可识别为**具体的 open GitHub issue 且有明确的可交付成果**，则为依赖阻塞；如果阻塞项是架构决策、人类对齐、或范围未定义，则为设计决策阻塞。
+
+### 操作约束
+
+遵循 [roadmap-common.md § Pre-flow Dependency Rules](../roadmap-common.md) 的 Forbidden 约束，特别强调：
+
 - ✅ `state/blocked` 标签由 intake 命令原子设置 — intake 不再需要避免 `state/blocked`
-- ✅ 在 suggest comment 中用自然语言说明依赖关系（"已通过 --blocked-by #N 入池"）
-- ❌ 禁止直接添加 `state/blocked` 标签 — 必须通过 `vibe3 task intake --blocked-by` 命令
-- ❌ 禁止写 managed section（`<!-- vibe3-flow-state-start -->` 块中的结构化字段）
-- ❌ 禁止调用 `vibe3 flow blocked / flow bind` — intake 阶段应使用 `--blocked-by` 参数
+- ✅ 在 suggest comment 中用自然语言说明依赖关系
+- ✅ 多依赖场景使用 `## Manager Checklist` section 确保后续依赖不会被遗漏
 
 **记录方式**：依赖关系通过 `vibe3 task intake --blocked-by` 命令建立，自动写入 flow_state 和 flow_issue_links。
