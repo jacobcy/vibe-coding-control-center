@@ -232,7 +232,7 @@ def test_view_issue_with_default_fields(github_client: GitHubClient) -> None:
         json_index = call_args.index("--json")
         assert (
             call_args[json_index + 1]
-            == "number,title,body,state,updatedAt,labels,milestone,assignees"
+            == "number,title,state,updatedAt,labels,assignees,milestone,body,url"
         )
 
 
