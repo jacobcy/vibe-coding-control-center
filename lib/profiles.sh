@@ -90,9 +90,9 @@ PROFILE_VIBE_CENTER=(
     "conventions.labels.state_prefix:state/"
     "conventions.labels.vibe_task:vibe-task"
     "conventions.supervisor.enabled:true"
-    "conventions.supervisor.apply_file:.agent/supervisor/apply.md"
+    "conventions.supervisor.apply_file:supervisor/apply.md"
     "conventions.agents.manager_name:vibe-manager-agent"
-    "paths.policies_root:.agent/policies"
+    "paths.policies_root:supervisor/policies"
     "paths.prompts_root:config/prompts"
     "paths.skills_manifest:config/v3/skills.json"
 )
