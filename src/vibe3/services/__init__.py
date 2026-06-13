@@ -3,6 +3,18 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.analysis import (
+        PRDimensions,
+        generate_score_report,
+    )
+    from vibe3.clients import (
+        LabelAnomaly,
+        collect_label_anomalies,
+    )
+    from vibe3.config import (
+        get_handoff_state_label,
+        get_manager_usernames,
+    )
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.flow.blocked_state_service import BlockedStateService
@@ -28,7 +40,6 @@ if TYPE_CHECKING:
     from vibe3.services.handoff.resolution import resolve_handoff_target
     from vibe3.services.handoff.service import HandoffService
     from vibe3.services.handoff.status import HandoffStatusService
-    from vibe3.services.issue.branch_resolver import resolve_issue_branch_input
     from vibe3.services.issue.collection import IssueCollectionService
     from vibe3.services.issue.context import load_issue_info
     from vibe3.services.issue.failure import (
@@ -46,10 +57,6 @@ if TYPE_CHECKING:
     )
     from vibe3.services.orchestra.coordination import CoordinationResolver
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
-    from vibe3.services.orchestra.helpers import (
-        get_handoff_state_label,
-        get_manager_usernames,
-    )
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
     from vibe3.services.orchestra.serve_status import ServeStatusService
     from vibe3.services.orchestra.status import (
@@ -76,10 +83,6 @@ if TYPE_CHECKING:
         resolve_branch_from_pr,
         resolve_command_branch,
     )
-    from vibe3.services.pr.scoring import (
-        PRDimensions,
-        generate_score_report,
-    )
     from vibe3.services.pr.service import PRService
     from vibe3.services.pr.verdict_policy import requires_audit_ref
     from vibe3.services.pr.verdict_service import VerdictService
@@ -88,6 +91,7 @@ if TYPE_CHECKING:
         MissingTaskIssueError,
         build_bind_task_hint,
     )
+    from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
     from vibe3.services.shared.branches import (
         resolve_branch_and_issue,
         resolve_branch_arg,
@@ -106,10 +110,6 @@ if TYPE_CHECKING:
         material_loader,
         policy_loader,
         resolve_manager_usernames,
-    )
-    from vibe3.services.shared.label_anomalies import (
-        LabelAnomaly,
-        collect_label_anomalies,
     )
     from vibe3.services.shared.label_service import LabelService
     from vibe3.services.shared.labels import (
@@ -301,7 +301,7 @@ _SYMBOL_MODULES = {
     "IssueFlowService": "vibe3.services.issue.flow",
     "IssueStatusEntry": "vibe3.services.orchestra.status",
     "IssueTitleCacheService": "vibe3.services.issue.title_cache",
-    "LabelAnomaly": "vibe3.services.shared.label_anomalies",
+    "LabelAnomaly": "vibe3.clients",
     "LabelService": "vibe3.services.shared.label_service",
     "FileLoader": "vibe3.services.shared.file_loader",
     "material_loader": "vibe3.services.shared.file_loader",
@@ -309,7 +309,7 @@ _SYMBOL_MODULES = {
     "OrchestraSnapshot": "vibe3.services.orchestra.status",
     "OrchestraStatusService": "vibe3.services.orchestra.status",
     "PRCreateUsecase": "vibe3.services.pr.create",
-    "PRDimensions": "vibe3.services.pr.scoring",
+    "PRDimensions": "vibe3.analysis",
     "PRService": "vibe3.services.pr.service",
     "policy_loader": "vibe3.services.shared.file_loader",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
@@ -346,12 +346,12 @@ _SYMBOL_MODULES = {
     "has_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "format_issue_runtime_line": "vibe3.services.orchestra.status",
     "format_issue_summary_line": "vibe3.services.orchestra.status",
-    "generate_score_report": "vibe3.services.pr.scoring",
+    "generate_score_report": "vibe3.analysis",
     "get_conflicting_states": "vibe3.services.shared.labels",
     "get_flow_state": "vibe3.services.flow.classifier",
     "get_highest_priority_state": "vibe3.services.shared.labels",
-    "get_handoff_state_label": "vibe3.services.orchestra.helpers",
-    "get_manager_usernames": "vibe3.services.orchestra.helpers",
+    "get_handoff_state_label": "vibe3.config",
+    "get_manager_usernames": "vibe3.config",
     "get_pr_changed_files": "vibe3.services.pr.analysis",
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
@@ -380,13 +380,13 @@ _SYMBOL_MODULES = {
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
-    "resolve_issue_branch_input": "vibe3.services.issue.branch_resolver",
+    "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",
     "resolve_manager_usernames": "vibe3.services.shared.file_loader",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
     "clean_old_state_labels": "vibe3.services.shared.labels",
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
-    "collect_label_anomalies": "vibe3.services.shared.label_anomalies",
+    "collect_label_anomalies": "vibe3.clients",
     "should_skip_from_queue": "vibe3.services.shared.labels",
     "ORCHESTRA_GOVERNED_LABEL": "vibe3.services.shared.labels",
 }

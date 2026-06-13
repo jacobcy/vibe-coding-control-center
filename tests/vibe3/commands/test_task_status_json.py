@@ -24,7 +24,7 @@ def _make_config_mock() -> MagicMock:
 
 
 @patch(
-    "vibe3.services.orchestra.helpers.get_manager_usernames",
+    "vibe3.config.get_manager_usernames",
     return_value=["manager-bot"],
 )
 @patch("vibe3.config.orchestra_settings.load_orchestra_config")

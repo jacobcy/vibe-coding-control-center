@@ -3,6 +3,14 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from vibe3.analysis import (
+        PRDimensions,
+        RiskLevel,
+        RiskScore,
+        calculate_risk_score,
+        determine_risk_level,
+        generate_score_report,
+    )
     from vibe3.services.pr.analysis import (
         analyze_critical_files,
         build_pr_analysis,
@@ -20,15 +28,7 @@ if TYPE_CHECKING:
         resolve_command_branch,
     )
     from vibe3.services.pr.review import PRReviewBriefingService
-    from vibe3.services.pr.scoring import (
-        PRDimensions,
-        PRScoringError,
-        RiskLevel,
-        RiskScore,
-        calculate_risk_score,
-        determine_risk_level,
-        generate_score_report,
-    )
+    from vibe3.services.pr.scoring import PRScoringError
     from vibe3.services.pr.service import PRService
     from vibe3.services.pr.status_checker import (
         get_merged_pr_for_issue,
@@ -87,15 +87,15 @@ _SYMBOL_MODULES = {
     # Classes
     "PRCreateResult": "vibe3.services.pr.create",
     "PRCreateUsecase": "vibe3.services.pr.create",
-    "PRDimensions": "vibe3.services.pr.scoring",
+    "PRDimensions": "vibe3.analysis",
     "PRLocCommentService": "vibe3.services.pr.loc_comment",
     "PRReviewBriefingService": "vibe3.services.pr.review",
     "PRScoringError": "vibe3.services.pr.scoring",
     "PRService": "vibe3.services.pr.service",
     "PrReadyAbortedError": "vibe3.services.pr.ready",
     "PrReadyUsecase": "vibe3.services.pr.ready",
-    "RiskLevel": "vibe3.services.pr.scoring",
-    "RiskScore": "vibe3.services.pr.scoring",
+    "RiskLevel": "vibe3.analysis",
+    "RiskScore": "vibe3.analysis",
     "VerdictService": "vibe3.services.pr.verdict_service",
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
@@ -103,11 +103,11 @@ _SYMBOL_MODULES = {
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "build_pr_body": "vibe3.services.pr.utils",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
-    "calculate_risk_score": "vibe3.services.pr.scoring",
+    "calculate_risk_score": "vibe3.analysis",
     "check_upstream_conflicts": "vibe3.services.pr.utils",
-    "determine_risk_level": "vibe3.services.pr.scoring",
+    "determine_risk_level": "vibe3.analysis",
     "filter_critical_files": "vibe3.services.pr.analysis",
-    "generate_score_report": "vibe3.services.pr.scoring",
+    "generate_score_report": "vibe3.analysis",
     "get_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "get_metadata_from_flow": "vibe3.services.pr.utils",
     "get_pr_changed_files": "vibe3.services.pr.analysis",

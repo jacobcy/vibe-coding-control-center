@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from vibe3.config import get_manager_usernames
 from vibe3.config.env_override import (
     OVERRIDE_RULES,
     EnvOverrideRule,
@@ -14,7 +15,6 @@ from vibe3.config.env_override import (
 )
 from vibe3.config.loader import load_keys_env_fallback
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.orchestra.helpers import get_manager_usernames
 
 
 def _mock_repo_root_not_found() -> Path:

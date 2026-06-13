@@ -1,6 +1,6 @@
 """Regression tests for shared label anomaly rules."""
 
-from vibe3.services.shared.label_anomalies import collect_label_anomalies
+from vibe3.clients import collect_label_anomalies
 from vibe3.services.shared.labels import has_roadmap_label
 
 

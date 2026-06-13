@@ -189,8 +189,8 @@ def test_check_remote_dry_run(mock_remote):
 @patch("vibe3.commands.check.execute_remote_check")
 def test_check_remote_with_anomalies_display(mock_remote):
     """Display formatting: anomalies grouped by rule with actions and totals."""
+    from vibe3.clients import LabelAnomaly
     from vibe3.commands.check_support import ExecuteCheckResult
-    from vibe3.services.shared import LabelAnomaly
 
     anomalies = [
         LabelAnomaly(

@@ -5,16 +5,17 @@ from typing import Any
 from loguru import logger
 
 from vibe3.analysis import (
+    PRDimensions,
     SerenaService,
     collect_changed_symbols,
     count_changed_lines,
     dag_service,
+    generate_score_report,
 )
 from vibe3.clients import GitClient
 from vibe3.config import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models import BranchSource
-from vibe3.services import PRDimensions, generate_score_report
 
 
 def _code_paths() -> list[str]:
