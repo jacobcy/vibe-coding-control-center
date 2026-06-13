@@ -181,3 +181,69 @@ def test_save_branch_baseline_creates_baseline_for_diff(
     assert loaded.snapshot_id == "test-snapshot-1"
     assert loaded.branch == "feature-test"
     assert loaded.baseline_for == "feature-test"
+
+
+def test_save_branch_baseline_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test save_branch_baseline is idempotent with force=False."""
+    from vibe3.analysis import snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Mock build_snapshot to return different snapshots on each call
+    call_count = 0
+
+    def mock_build() -> StructureSnapshot:
+        nonlocal call_count
+        call_count += 1
+        return StructureSnapshot(
+            snapshot_id=f"test-snapshot-{call_count}",
+            branch="feature-test",
+            commit="abc1234",
+            commit_short="abc1234",
+            created_at=f"2026-04-30T10:00:0{call_count}",
+            root="src/vibe3",
+            files=[],
+            modules=[],
+            dependencies=[],
+            metrics=StructureMetrics(
+                total_files=10,
+                total_loc=1000,
+                total_functions=50,
+                python_files=8,
+            ),
+        )
+
+    monkeypatch.setattr(snapshot_service, "build_snapshot", mock_build)
+
+    # First save with force=False -> baseline created
+    filepath1 = snapshot_service.save_branch_baseline("feature-test", force=False)
+    assert filepath1 is not None
+    assert filepath1.exists()
+
+    # Read the first snapshot
+    data1 = json.loads(filepath1.read_text())
+    assert data1["snapshot_id"] == "test-snapshot-1"
+
+    # Second save with force=False -> returns same path, file unchanged
+    filepath2 = snapshot_service.save_branch_baseline("feature-test", force=False)
+    assert filepath2 is not None
+    assert filepath2 == filepath1
+
+    # Verify the file was not overwritten (still has first snapshot ID)
+    data2 = json.loads(filepath2.read_text())
+    assert data2["snapshot_id"] == "test-snapshot-1"
+
+    # Save with force=True -> overwrites with new content
+    filepath3 = snapshot_service.save_branch_baseline("feature-test", force=True)
+    assert filepath3 is not None
+    assert filepath3 == filepath1
+
+    # Verify the file was overwritten (now has third snapshot ID)
+    data3 = json.loads(filepath3.read_text())
+    assert data3["snapshot_id"] == "test-snapshot-3"

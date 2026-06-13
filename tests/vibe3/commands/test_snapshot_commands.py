@@ -44,7 +44,9 @@ def test_snapshot_save_as_baseline_json_outputs_saved_baseline(monkeypatch):
     monkeypatch.setattr(
         snapshot_command.snapshot_service,
         "save_branch_baseline",
-        lambda branch: Path(f"/tmp/baseline_{branch.replace('/', '-')}.json"),
+        lambda branch, force=False: Path(
+            f"/tmp/baseline_{branch.replace('/', '-')}.json"
+        ),
     )
     monkeypatch.setattr(
         snapshot_command.snapshot_service,
@@ -63,3 +65,50 @@ def test_snapshot_save_as_baseline_json_outputs_saved_baseline(monkeypatch):
     assert '"snapshot_id": "saved-baseline"' in result.output
     assert '"baseline_for": "feature/test"' in result.output
     assert "second-build" not in result.output
+
+
+def test_snapshot_save_as_baseline_force(monkeypatch):
+    """--force flag should be passed through to save_branch_baseline."""
+    from vibe3.commands import snapshot as snapshot_command
+
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "feature/test"
+    monkeypatch.setattr("vibe3.clients.git_client.GitClient", lambda: fake_git)
+
+    # Track calls to save_branch_baseline
+    calls = []
+
+    def mock_save_branch_baseline(branch: str, force: bool = False):
+        calls.append((branch, force))
+        return Path(f"/tmp/baseline_{branch.replace('/', '-')}.json")
+
+    monkeypatch.setattr(
+        snapshot_command.snapshot_service,
+        "save_branch_baseline",
+        mock_save_branch_baseline,
+    )
+    monkeypatch.setattr(
+        snapshot_command.snapshot_service,
+        "load_branch_baseline",
+        lambda branch: _snapshot("saved-baseline", baseline_for=branch),
+    )
+
+    # Test without --force (default force=False)
+    result = runner.invoke(app, ["save", "--as-baseline"])
+    assert result.exit_code == 0
+    assert len(calls) == 1
+    assert calls[0] == ("feature/test", False)
+
+    # Test with --force
+    calls.clear()
+    result = runner.invoke(app, ["save", "--as-baseline", "--force"])
+    assert result.exit_code == 0
+    assert len(calls) == 1
+    assert calls[0] == ("feature/test", True)
+
+    # Test with --no-force
+    calls.clear()
+    result = runner.invoke(app, ["save", "--as-baseline", "--no-force"])
+    assert result.exit_code == 0
+    assert len(calls) == 1
+    assert calls[0] == ("feature/test", False)

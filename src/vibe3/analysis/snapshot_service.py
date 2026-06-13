@@ -407,7 +407,7 @@ def _load_snapshots_for_branch(
     return snapshots
 
 
-def save_branch_baseline(branch: str) -> Path | None:
+def save_branch_baseline(branch: str, force: bool = False) -> Path | None:
     """Build current snapshot and save as baseline for the specified branch.
 
     This function is called when a flow completes (PR merge or auto-complete).
@@ -415,6 +415,7 @@ def save_branch_baseline(branch: str) -> Path | None:
 
     Args:
         branch: Branch name to save baseline for
+        force: Force overwrite existing baseline (default: False)
 
     Returns:
         Path to saved baseline, or None if build failed
@@ -433,6 +434,10 @@ def save_branch_baseline(branch: str) -> Path | None:
         safe_branch = branch.replace("/", "-")
         filename = f"baseline_{safe_branch}.json"
         filepath = baseline_dir / filename
+
+        if filepath.exists() and not force:
+            log.info("Baseline already exists, skipping (idempotent)")
+            return filepath
 
         filepath.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
 
