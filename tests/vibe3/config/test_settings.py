@@ -58,27 +58,85 @@ class TestPathsConfig:
         root = get_commands_root()
         assert root == "src/vibe3/commands"
 
-    def test_get_source_root_integration_with_analysis_modules(self) -> None:
-        """Verify source root is used by analysis modules."""
-        # This test verifies that the config-driven default works
-        # The actual behavior is tested by existing tests in analysis/
-        from vibe3.analysis.dag_service import build_module_graph
+    def test_dag_service_uses_custom_source_root(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """build_module_graph() uses configured source root."""
+        from vibe3.analysis.dag_service import DAGError, build_module_graph
 
-        # Should work with default config
-        graph = build_module_graph()
-        assert len(graph) > 0  # Should have modules
+        # Set custom source root by patching get_config
+        custom_root = "custom/src/vibe3"
+        custom_config = VibeConfig(paths=PathsConfig(vibe3_root=custom_root))
+        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
 
-    def test_get_commands_root_integration_with_command_analyzer(self) -> None:
-        """Verify commands root is used by command analyzer."""
-        from vibe3.analysis.command_analyzer import analyze_command
+        # Should fail because custom path doesn't exist, proving it tried to use it
+        with pytest.raises(DAGError) as exc_info:
+            build_module_graph()
 
-        # Should work with default config (might fail if command doesn't exist)
-        try:
-            result = analyze_command("flow")
-            assert result.command == "flow"
-        except Exception:
-            # Expected if command doesn't exist, but proves config path is used
-            pass
+        assert custom_root in str(exc_info.value)
+
+    def test_coverage_service_categorize_uses_custom_source_root(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_categorize_by_layer uses configured source root."""
+        from vibe3.analysis.coverage_service import CoverageService
+
+        # Set custom source root by patching get_config
+        custom_root = "custom/src"
+        custom_config = VibeConfig(paths=PathsConfig(vibe3_root=custom_root))
+        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
+
+        service = CoverageService()
+        coverage_data = {
+            "files": {
+                f"{custom_root}/services/flow_service.py": {"summary": {}},
+                "src/vibe3/services/other_service.py": {"summary": {}},
+            }
+        }
+
+        categorized = service._categorize_by_layer(
+            coverage_data, ("services", "clients")
+        )
+
+        # Only file under custom_root should be categorized
+        assert f"{custom_root}/services/flow_service.py" in categorized["services"]
+        assert "src/vibe3/services/other_service.py" not in categorized["services"]
+
+    def test_is_v3_source_file_uses_custom_source_root(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """is_v3_source_file uses configured source root prefix."""
+        from vibe3.analysis.change_scope_service import is_v3_source_file
+
+        # Set custom source root by patching get_config
+        custom_root = "custom/src"
+        custom_config = VibeConfig(paths=PathsConfig(vibe3_root=custom_root))
+        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
+
+        # Should return True for custom_root path
+        assert is_v3_source_file(f"{custom_root}/services/flow_service.py")
+        # Should return False for default path
+        assert not is_v3_source_file("src/vibe3/services/flow_service.py")
+
+    def test_command_analyzer_uses_custom_commands_root(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """analyze_command() uses configured commands root."""
+        from vibe3.analysis.command_analyzer import (
+            CommandAnalyzerError,
+            analyze_command,
+        )
+
+        # Set custom commands root by patching get_config
+        custom_root = "custom/commands"
+        custom_config = VibeConfig(paths=PathsConfig(commands_root=custom_root))
+        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
+
+        # Should fail because custom path doesn't exist, proving it tried to use it
+        with pytest.raises(CommandAnalyzerError) as exc_info:
+            analyze_command("flow")
+
+        assert "Command file not found" in str(exc_info.value)
 
 
 class TestExpandConfigVariables:
