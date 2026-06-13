@@ -9,9 +9,10 @@ from vibe3.services.flow.consistency import (
 )
 
 
-def _make_git_client(worktree_path=None):
+def _make_git_client(worktree_path=None, branch_exists=True):
     git = MagicMock()
     git.find_worktree_path_for_branch.return_value = worktree_path
+    git.branch_exists.return_value = branch_exists
     return git
 
 
@@ -63,3 +64,21 @@ def test_non_task_branch_skips_recorded_check():
     state = {}  # no worktree_path
     result = check_flow_consistency("dev/issue-1", state, git_client=git)
     assert result.code == FlowConsistencyCode.OK
+
+
+def test_placeholder_flow_blocked_no_worktree_returns_ok():
+    """Placeholder flow: blocked + no branch is a legal state."""
+    git = _make_git_client(None, branch_exists=False)
+    state = {"flow_status": "blocked"}
+    result = check_flow_consistency("task/issue-1", state, git_client=git)
+    assert result.code == FlowConsistencyCode.OK
+    assert not result.needs_rebuild
+
+
+def test_blocked_flow_with_worktree_still_valid():
+    """Blocked status alone doesn't skip valid worktree flows."""
+    git = _make_git_client(Path("/wt/task/issue-1"))
+    state = {"flow_status": "blocked", "worktree_path": "/wt/task/issue-1"}
+    result = check_flow_consistency("task/issue-1", state, git_client=git)
+    assert result.code == FlowConsistencyCode.OK
+    assert not result.needs_rebuild

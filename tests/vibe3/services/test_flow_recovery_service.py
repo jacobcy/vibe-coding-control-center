@@ -16,11 +16,13 @@ def _make_service(
     worktree_path=None,
     flow_state=None,
     ref_exists=True,
+    branch_exists=True,
 ):
     store = MagicMock()
     store.get_flow_state.return_value = flow_state or {}
     git = MagicMock()
     git.find_worktree_path_for_branch.return_value = worktree_path
+    git.branch_exists.return_value = branch_exists
     github = MagicMock()
     return FlowRecoveryService(store=store, git_client=git, github_client=github)
 
@@ -33,6 +35,17 @@ class TestClassifyRecovery:
         )
         action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.RESUME_ONLY
+
+    def test_placeholder_flow_classify_returns_resume_only(self):
+        """Placeholder flow (blocked + no branch) should classify as RESUME_ONLY."""
+        svc = _make_service(
+            worktree_path=None,
+            flow_state={"flow_status": "blocked"},
+            branch_exists=False,
+        )
+        action, consistency = svc.classify("task/issue-1")
+        assert action == RecoveryAction.RESUME_ONLY
+        assert consistency is None  # No consistency check result
 
     def test_missing_worktree_returns_rebuild(self):
         svc = _make_service(worktree_path=None, flow_state={})
