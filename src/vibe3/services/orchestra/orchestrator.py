@@ -150,37 +150,19 @@ class FlowOrchestratorService:
             )
 
         try:
-            if not skip_git and not self.git.branch_exists(branch):
-                # Ensure scene_base_ref remote is up-to-date before creating branch
-                remote, ref = self.config.scene_base_ref.split("/", 1)
-                for attempt in range(MAX_FETCH_RETRIES):
-                    try:
-                        self.git.fetch(remote, ref)
-                        break
-                    except GitError as e:
-                        if (
-                            is_transient_git_error(str(e))
-                            and attempt < MAX_FETCH_RETRIES - 1
-                        ):
-                            logger.bind(
-                                domain="flow",
-                                branch=branch,
-                                issue=issue.number,
-                            ).warning(
-                                f"Git ref lock conflict "
-                                f"(attempt {attempt + 1}/{MAX_FETCH_RETRIES}): {e}"
-                            )
-                            self.git.pack_refs_all()
-                            time.sleep(FETCH_RETRY_DELAY * (attempt + 1))
-                            continue
-                        raise
-                self.git.create_branch_ref(
-                    branch,
-                    start_ref=self.config.scene_base_ref,
-                )
-                # For non-worktree mode, checkout the newly created branch
-                if not ensure_worktree:
-                    self.git.switch_branch(branch)
+            if not skip_git:
+                if self.git.branch_exists(branch):
+                    self._validate_or_recreate_branch(
+                        branch,
+                        issue_number=issue.number,
+                        reactivate_existing=reactivate_existing,
+                    )
+                else:
+                    self._fetch_and_create_branch(
+                        branch,
+                        issue_number=issue.number,
+                        ensure_worktree=ensure_worktree,
+                    )
 
             existing_state = self.store.get_flow_state(branch)
             if reactivate_existing and existing_state:
@@ -260,6 +242,120 @@ class FlowOrchestratorService:
                     branch=branch,
                 ).error(f"Failed cleanup after bootstrap failure: {cleanup_exc}")
             raise
+
+    def _validate_or_recreate_branch(
+        self,
+        branch: str,
+        *,
+        issue_number: int,
+        reactivate_existing: bool = False,
+    ) -> None:
+        """Validate existing branch is based on origin/main, or force-recreate it.
+
+        When a branch already exists with the target name (e.g. stale branch
+        from a previous flow that was incompletely cleaned up), this guard
+        verifies the branch is a descendant of scene_base_ref. If the branch
+        diverged from a different parent (e.g. another task/dev branch),
+        it is force-deleted and recreated from scene_base_ref to prevent
+        scope baseline pollution.
+        """
+        # Fetch latest to ensure accurate merge-base comparison
+        remote, ref = self.config.scene_base_ref.split("/", 1)
+        for attempt in range(MAX_FETCH_RETRIES):
+            try:
+                self.git.fetch(remote, ref)
+                break
+            except GitError as e:
+                if is_transient_git_error(str(e)) and attempt < MAX_FETCH_RETRIES - 1:
+                    self.git.pack_refs_all()
+                    time.sleep(FETCH_RETRY_DELAY * (attempt + 1))
+                    continue
+                raise
+
+        base_ref = self.config.scene_base_ref
+        try:
+            merge_base = self.git.get_merge_base(branch, base_ref)
+            # get_merge_base(ref, ref) returns the tip of ref
+            base_head = self.git.get_merge_base(base_ref, base_ref)
+        except GitError:
+            # Can't resolve references — branch is likely corrupted
+            logger.bind(
+                domain="flow",
+                branch=branch,
+                issue=issue_number,
+            ).warning("Cannot resolve merge-base; force-recreating branch")
+            merge_base = None
+            base_head = None
+
+        if merge_base and base_head and merge_base == base_head:
+            logger.bind(
+                domain="flow",
+                branch=branch,
+                issue=issue_number,
+                merge_base=merge_base[:8],
+            ).info("Existing branch verified: based on scene_base_ref")
+            return
+
+        if reactivate_existing:
+            logger.bind(
+                domain="flow",
+                branch=branch,
+                issue=issue_number,
+                merge_base=(merge_base or "unknown")[:8],
+                base_head=(base_head or "unknown")[:8],
+            ).warning(
+                "Existing branch diverged from scene_base_ref but "
+                "reactivate_existing=True; keeping as-is"
+            )
+            return
+
+        logger.bind(
+            domain="flow",
+            branch=branch,
+            issue=issue_number,
+            merge_base=(merge_base or "unknown")[:8] if merge_base else "unknown",
+            base_head=(base_head or "unknown")[:8] if base_head else "unknown",
+        ).warning(
+            "Existing branch diverged from scene_base_ref; "
+            "force-recreating from scene_base_ref"
+        )
+
+        self.git.delete_branch(branch, force=True)
+        self.git.create_branch_ref(branch, start_ref=base_ref)
+
+    def _fetch_and_create_branch(
+        self,
+        branch: str,
+        *,
+        issue_number: int,
+        ensure_worktree: bool = False,
+    ) -> None:
+        """Fetch scene_base_ref and create a new branch from it."""
+        remote, ref = self.config.scene_base_ref.split("/", 1)
+        for attempt in range(MAX_FETCH_RETRIES):
+            try:
+                self.git.fetch(remote, ref)
+                break
+            except GitError as e:
+                if is_transient_git_error(str(e)) and attempt < MAX_FETCH_RETRIES - 1:
+                    logger.bind(
+                        domain="flow",
+                        branch=branch,
+                        issue=issue_number,
+                    ).warning(
+                        f"Git ref lock conflict "
+                        f"(attempt {attempt + 1}/{MAX_FETCH_RETRIES}): {e}"
+                    )
+                    self.git.pack_refs_all()
+                    time.sleep(FETCH_RETRY_DELAY * (attempt + 1))
+                    continue
+                raise
+        self.git.create_branch_ref(
+            branch,
+            start_ref=self.config.scene_base_ref,
+        )
+        if not ensure_worktree:
+            self.git.switch_branch(branch)
 
     def rebuild_stale_issue_flow(
         self,
