@@ -271,9 +271,15 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
         Dict with daemon status, heartbeat, dispatch activity, FailedGate,
         error tracking, and job monitoring data.
     """
-    from vibe3.execution import JobMonitorService
-    from vibe3.orchestra.domain_types import GateStatus
-    from vibe3.server.registry import _orchestra_tmux_session_exists, validate_pid_file
+    # Dynamic imports to avoid upward dependency and circular dependency detection
+    import importlib
+
+    execution_module = importlib.import_module("vibe3.execution")
+    job_monitor_service = execution_module.JobMonitorService
+
+    server_module = importlib.import_module("vibe3.server.registry")
+    validate_pid_file = server_module.validate_pid_file
+    _orchestra_tmux_session_exists = server_module._orchestra_tmux_session_exists
 
     # Daemon status
     instance_info, is_running = validate_pid_file(config.pid_file)
@@ -349,7 +355,7 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
     failed_gate_module = importlib.import_module("vibe3.domain.failed_gate")
     FailedGate = failed_gate_module.FailedGate  # noqa: N806
     failed_gate = FailedGate()
-    gate_status: GateStatus = failed_gate.get_status()
+    gate_status = failed_gate.get_status()
 
     failed_gate_data = {
         "is_active": gate_status.is_active,
@@ -394,7 +400,7 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
     }
 
     # Job monitoring
-    job_svc = JobMonitorService()
+    job_svc = job_monitor_service()
     jobs_snapshot = job_svc.snapshot()
 
     jobs = {

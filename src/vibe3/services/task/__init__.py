@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     )
     from vibe3.services.task.status import (
         TaskStatusData,
+        build_api_task_data,
         classify_task_issues_for_rendering,
         fetch_task_status_data,
     )
@@ -53,6 +54,7 @@ __all__ = [
     "has_task_issue",
     "build_bind_task_hint",
     # Functions - status
+    "build_api_task_data",
     "fetch_task_status_data",
     "classify_task_issues_for_rendering",
     # Functions - classifier
@@ -83,6 +85,7 @@ _SYMBOL_MODULES = {
     "has_task_issue": "vibe3.services.shared.binding_guard",
     "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     # Functions - status
+    "build_api_task_data": "vibe3.services.task.status",
     "fetch_task_status_data": "vibe3.services.task.status",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     # Functions - classifier

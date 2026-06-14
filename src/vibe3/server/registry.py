@@ -23,6 +23,40 @@ if TYPE_CHECKING:
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
+def validate_pid_file(pid_file: Path) -> tuple["OrchestraInstanceInfo | None", bool]:
+    """Validate PID file and check if process is a running orchestra instance.
+
+    Returns:
+        tuple of (instance_info, is_running):
+        - (None, False): No PID file or invalid format
+        - (info, False): Valid PID file but process is dead/not orchestra
+        - (info, True): Valid PID file and process is running orchestra
+    """
+    from vibe3.runtime import read_instance_info, validate_instance
+
+    info = read_instance_info(pid_file)
+    if info is None:
+        return None, False
+
+    is_running = validate_instance(info)
+    return info, is_running
+
+
+def _orchestra_tmux_session_exists() -> bool:
+    """Return whether the orchestra tmux session currently exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
 def _resolve_dispatcher_models_root(
     config: "OrchestraConfig",
     launch_cwd: Path | None = None,
@@ -203,14 +237,14 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/api/tasks")
     async def get_api_tasks(all_flows: bool = False) -> dict[str, Any]:
         """Get task status data as JSON."""
-        from vibe3.services.task.status import build_api_task_data
+        from vibe3.services import build_api_task_data
 
         return await run_in_threadpool(build_api_task_data, all_flows)
 
     @fastapi_app.get("/api/serve")
     async def get_api_serve() -> dict[str, Any]:
         """Get serve status data as JSON."""
-        from vibe3.services.orchestra.serve_status import fetch_serve_status_data
+        from vibe3.services import fetch_serve_status_data
 
         return await run_in_threadpool(fetch_serve_status_data, config)
 
@@ -406,28 +440,6 @@ def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
     return True, stdout or f"Tailscale webhook configured for port {port}"
 
 
-def validate_pid_file(pid_file: Path) -> tuple["OrchestraInstanceInfo | None", bool]:
-    """Validate PID file and check if process is a running orchestra instance.
-
-    Returns:
-        tuple of (instance_info, is_running):
-        - (None, False): No PID file or invalid format
-        - (info, False): Valid PID file but process is dead/not orchestra
-        - (info, True): Valid PID file and process is running orchestra
-    """
-    from vibe3.runtime import (
-        read_instance_info,
-        validate_instance,
-    )
-
-    info = read_instance_info(pid_file)
-    if info is None:
-        return None, False
-
-    is_running = validate_instance(info)
-    return info, is_running
-
-
 def _build_async_serve_command(
     config: "OrchestraConfig",
     verbose: int,
@@ -534,21 +546,6 @@ def _start_async_serve(config: "OrchestraConfig", verbose: int) -> tuple[bool, s
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )
-
-
-def _orchestra_tmux_session_exists() -> bool:
-    """Return whether the orchestra tmux session currently exists."""
-    try:
-        result = subprocess.run(
-            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except Exception:
-        return False
-    return result.returncode == 0
 
 
 def _kill_orchestra_tmux_session() -> bool:
