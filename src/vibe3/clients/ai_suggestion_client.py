@@ -73,6 +73,7 @@ class AISuggestionClient:
         commits: list[str],
         changed_files: list[str] | None = None,
         inspect_summary: str = "",
+        enriched_files: str = "",
     ) -> tuple[str | None, str | None] | None:
         if self.ai_client is None:
             return None
@@ -107,7 +108,7 @@ class AISuggestionClient:
             body_system,
             body_template.format(
                 commits=commits_text,
-                changed_files=files_text,
+                changed_files=enriched_files or files_text,
                 inspect_summary=inspect_summary,
             ),
         )

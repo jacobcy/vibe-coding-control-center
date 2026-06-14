@@ -82,6 +82,39 @@ def _build_inspect_summary(branch: str, base_branch: str) -> str:
         return ""  # Gracefully degrade - inspect data is optional
 
 
+def _enrich_changed_files(changed_files: list[str], branch: str, base: str) -> str:
+    """Enrich file list with LOC info from git diff for AI context."""
+    try:
+        from vibe3.clients import GitClient
+        from vibe3.models import BranchSource
+
+        git = GitClient()
+        source = BranchSource(branch=branch, base=base)
+        diff = git.get_diff(source)
+        if not diff:
+            return "\n".join(f"- {f}" for f in changed_files)
+
+        loc_map: dict[str, int] = {}
+        for line in diff.split("\n"):
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                try:
+                    added = int(parts[0]) if parts[0] != "-" else 0
+                    removed = int(parts[1]) if parts[1] != "-" else 0
+                    loc_map[parts[2]] = added - removed
+                except ValueError:
+                    pass
+
+        lines = ["## Changed Files"]
+        for f in changed_files:
+            delta = loc_map.get(f, 0)
+            sign = "+" if delta >= 0 else ""
+            lines.append(f"- {f} ({sign}{delta} LOC)")
+        return "\n".join(lines)
+    except Exception:
+        return "\n".join(f"- {f}" for f in changed_files)
+
+
 class PRCreateUsecase:
     """Coordinate PR creation: AI suggestions, title resolution, flow checks."""
 
@@ -135,6 +168,8 @@ class PRCreateUsecase:
 
         # Collect inspect base data for richer AI context
         inspect_summary = _build_inspect_summary(branch, base_branch)
+        # Enrich file list with LOC from git diff
+        enriched_files = _enrich_changed_files(changed_files, branch, base_branch)
 
         if not commits:
             if interactive:
@@ -156,7 +191,10 @@ class PRCreateUsecase:
             ai_client=ai_client_instance, prompts_path=prompts_path
         )
         result = ai_client.suggest_pr_content(
-            commits, changed_files, inspect_summary=inspect_summary
+            commits,
+            changed_files,
+            inspect_summary=inspect_summary,
+            enriched_files=enriched_files,
         )
 
         if not result:
