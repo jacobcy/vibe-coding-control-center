@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         FlowCleanupService,
         LiveSessionsDetectedError,
     )
+    from vibe3.services.flow.event_projection import build_event_projection_hook
     from vibe3.services.flow.factory import create_flow_manager
     from vibe3.services.flow.projection import FlowProjection, FlowProjectionService
     from vibe3.services.flow.rebuild import FlowRebuildUsecase
@@ -58,6 +59,7 @@ __all__ = [
     "get_flow_state",
     "FlowCleanupService",
     "LiveSessionsDetectedError",
+    "build_event_projection_hook",
     "create_flow_manager",
     "FlowProjection",
     "FlowProjectionService",
@@ -83,6 +85,7 @@ _SYMBOL_MODULES = {
     "get_flow_state": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
     "LiveSessionsDetectedError": "vibe3.services.flow.cleanup",
+    "build_event_projection_hook": "vibe3.services.flow.event_projection",
     "create_flow_manager": "vibe3.services.flow.factory",
     "FlowProjection": "vibe3.services.flow.projection",
     "FlowProjectionService": "vibe3.services.flow.projection",

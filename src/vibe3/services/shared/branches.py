@@ -33,7 +33,7 @@ def resolve_branch_arg(
 
     if flow_service is None:
         # Use public API for cross-module import (allows test patching)
-        from vibe3.services.flow import FlowService
+        from vibe3.services import FlowService
 
         flow_service = FlowService()
 

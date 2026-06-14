@@ -63,7 +63,7 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
             return_value="HEAD",
         ),
         patch("vibe3.services.ErrorTrackingService") as mock_tracking,
-        patch("vibe3.services.FlowRebuildUsecase") as rebuild_cls,
+        patch("vibe3.services.flow.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
         rebuild_cls.return_value = rebuild
@@ -128,7 +128,7 @@ def test_auto_scene_reset_does_not_directly_unblock_without_rebuild(
             return_value="HEAD",
         ),
         patch("vibe3.services.ErrorTrackingService"),
-        patch("vibe3.services.FlowRebuildUsecase"),
+        patch("vibe3.services.flow.FlowRebuildUsecase"),
         patch("vibe3.services.BlockedStateService") as blocked_cls,
     ):
         service.maybe_reset_damaged_scene(
@@ -174,7 +174,7 @@ def test_auto_scene_reset_skips_when_live_session_exists(
 
     with (
         patch("vibe3.services.ErrorTrackingService") as mock_tracking,
-        patch("vibe3.services.FlowRebuildUsecase") as mock_cleanup_cls,
+        patch("vibe3.services.flow.FlowRebuildUsecase") as mock_cleanup_cls,
     ):
         result = service.maybe_reset_damaged_scene(
             request,
@@ -232,7 +232,7 @@ def test_auto_scene_reset_reports_rebuild_failure(
             return_value="HEAD",
         ),
         patch("vibe3.services.ErrorTrackingService") as mock_tracking,
-        patch("vibe3.services.FlowRebuildUsecase") as rebuild_cls,
+        patch("vibe3.services.flow.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
         rebuild.rebuild_issue_flow.side_effect = RuntimeError("cleanup failed")

@@ -280,7 +280,7 @@ def _record_missing_manager_sections(sections: dict[str, Any]) -> None:
     msg = f"Manager prompt sections missing from prompts.yaml: {missing}"
     logger.bind(domain="manager").warning(msg)
     try:
-        from vibe3.services.orchestra.error_tracking import ErrorTrackingService
+        from vibe3.services.orchestra import ErrorTrackingService
 
         ErrorTrackingService.get_instance().record_error(
             error_code="E_CONFIG_MISSING",

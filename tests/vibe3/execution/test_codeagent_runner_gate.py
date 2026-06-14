@@ -440,7 +440,7 @@ class TestSeverityAwareErrorHandling:
                 "vibe3.execution.codeagent_runner.format_agent_actor",
                 return_value="agent:manager",
             ),
-            patch("vibe3.services.record_error") as mock_record_error,
+            patch("vibe3.services.shared.record_error") as mock_record_error,
             patch(
                 "vibe3.execution.codeagent_runner.persist_execution_lifecycle_event"
             ) as mock_persist_event,

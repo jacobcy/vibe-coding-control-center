@@ -310,7 +310,7 @@ def build_governance_recipe(
 def _record_assembly_warnings(warnings: tuple[str, ...]) -> None:
     for msg in warnings:
         try:
-            from vibe3.services.orchestra.error_tracking import ErrorTrackingService
+            from vibe3.services.orchestra import ErrorTrackingService
 
             ErrorTrackingService.get_instance().record_error(
                 error_code="E_CONFIG_MISSING",
