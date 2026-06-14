@@ -113,12 +113,25 @@ def test_block_flow_uses_new_fields():
         flow_service.create_flow(slug="issue-300", branch=branch, actor="test-user")
         store.add_issue_link(branch, 300, "task")
 
-        with patch(
-            "vibe3.services.flow.blocked_state_io.GitHubClient"
-        ) as mock_github_class:
+        with (
+            patch(
+                "vibe3.services.flow.blocked_state_io.GitHubClient"
+            ) as mock_github_class,
+            patch(
+                "vibe3.services.flow.event_projection.SQLiteClient", return_value=store
+            ),
+        ):
             mock_github = MagicMock()
             mock_github.get_issue_body.return_value = "User content"
             mock_github_class.return_value = mock_github
+
+            # Register projection hook to test timeline event creation
+            from vibe3.models import EventPublisher
+            from vibe3.services.flow.event_projection import build_event_projection_hook
+
+            EventPublisher.reset()
+            publisher = EventPublisher()
+            publisher.add_publish_hook(build_event_projection_hook())
 
             # Block flow with dependency issue
             flow_service.block_flow(
@@ -128,13 +141,15 @@ def test_block_flow_uses_new_fields():
                 actor="test-actor",
             )
 
+            EventPublisher.reset()
+
         # Verify flow state in database (blocked metadata, NOT flow_status)
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
         assert flow_state["blocked_by_issue"] == 301
         assert flow_state["blocked_reason"] is None
 
-        # Verify event was recorded
+        # Verify event was recorded (via projection hook)
         events = store.get_events(branch)
         blocked_events = [e for e in events if e.get("event_type") == "flow_blocked"]
         assert len(blocked_events) >= 1

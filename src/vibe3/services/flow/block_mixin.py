@@ -35,7 +35,6 @@ class FlowLifecycleMixin:
         blocked_by_issue: int | None = None,
         actor: str | None = None,
         repo: str | None = None,  # noqa: ARG002 - reserved for cross-repo scenarios
-        event_type: str = "flow_blocked",
     ) -> None:
         """Mark flow as blocked.
 
@@ -48,7 +47,6 @@ class FlowLifecycleMixin:
             blocked_by_issue: Dependency issue number
             actor: Actor performing the block
             repo: Repository (defaults to current repo)
-            event_type: Event type for timeline ("flow_blocked" or "flow_failed")
         """
         from vibe3.services.flow.blocked_state_service import BlockedStateService
 
@@ -96,13 +94,12 @@ class FlowLifecycleMixin:
         issue_number = issue_flow_service.resolve_task_issue_number(branch)
 
         service = BlockedStateService(store=self.store)
-        service.block(
+        service.block_state_only(
             branch=branch,
             reason=reason,
             blocked_by_issue=blocked_by_issue,
             actor=effective_actor,
             issue_number=issue_number,
-            event_type=event_type,
         )
 
         # Publish FlowBlocked event if we have a valid issue context

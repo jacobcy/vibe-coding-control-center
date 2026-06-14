@@ -6,7 +6,7 @@ from vibe3.services.flow.service import FlowService
 
 
 def test_block_flow_calls_blocked_state_service() -> None:
-    """Test that block_flow calls BlockedStateService.block method."""
+    """Test that block_flow calls BlockedStateService.block_state_only method."""
     service = FlowService()
 
     with (
@@ -41,12 +41,12 @@ def test_block_flow_calls_blocked_state_service() -> None:
             actor="claude/sonnet-4.6",
         )
 
-        # Verify BlockedStateService.block called with correct args
-        mock_blocked_instance.block.assert_called_once_with(
+        # Verify BlockedStateService.block_state_only called with correct args
+        # (no event_type parameter since timeline write is now via projection)
+        mock_blocked_instance.block_state_only.assert_called_once_with(
             branch="dev/issue-123",
             reason="API design pending",
             blocked_by_issue=456,
             actor="claude/sonnet-4.6",
             issue_number=123,
-            event_type="flow_blocked",
         )

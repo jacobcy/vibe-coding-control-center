@@ -99,7 +99,12 @@ def test_blocked_state_is_written_through_service_path(tmp_path: Path) -> None:
 
 
 def test_flow_blocked_event_published_after_service_writes(tmp_path: Path) -> None:
-    """Assert FlowBlocked is published after BlockedStateService writes state."""
+    """Assert FlowBlocked is published after BlockedStateService writes state.
+
+    The timeline event is now written by the projection hook, not directly by
+    BlockedStateService. This test verifies that state is written before the
+    event is published, ensuring proper ordering.
+    """
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
@@ -108,12 +113,14 @@ def test_flow_blocked_event_published_after_service_writes(tmp_path: Path) -> No
     call_order = []
 
     def publish_after_write(event: DomainEvent) -> None:
+        # State should be written before the event is published
         flow_state = store.get_flow_state("test-branch")
         assert flow_state is not None
         assert flow_state.get("flow_status") == "blocked"
         assert flow_state.get("blocked_reason") == "Test reason"
+        # Timeline event is NOT written before publish - it's written by projection hook
         events = store.get_events("test-branch")
-        assert [e.get("event_type") for e in events] == ["flow_blocked"]
+        assert len(events) == 0, "Timeline event should not exist before projection"
         assert isinstance(event, FlowBlocked)
         call_order.append("event_after_write")
 
