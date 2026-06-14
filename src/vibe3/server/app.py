@@ -28,18 +28,20 @@ from vibe3.observability import (
     setup_logging,
 )
 from vibe3.runtime import OrchestraInstanceInfo, write_instance_info
+from vibe3.utils import orchestra_tmux_session_exists, validate_pid_file
 
 from .registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
-    _orchestra_tmux_session_exists,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
     _start_async_serve,
-    validate_pid_file,
 )
 from .server_utils import find_available_port
+
+# Backward compatibility alias for internal consumers
+_orchestra_tmux_session_exists = orchestra_tmux_session_exists
 
 app = typer.Typer(
     help="Orchestra server: heartbeat polling + HTTP status endpoints",

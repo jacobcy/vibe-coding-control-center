@@ -66,6 +66,12 @@ if TYPE_CHECKING:
         resolve_roadmap_rank,
         sort_ready_issues,
     )
+    from vibe3.utils.serve_helpers import (
+        ORCHESTRA_TMUX_SESSION,
+        job_to_dict,
+        orchestra_tmux_session_exists,
+        validate_pid_file,
+    )
     from vibe3.utils.time_format import format_age_aware_time
 
 # Lazy imports
@@ -116,6 +122,10 @@ _LAZY_IMPORTS = {
     "VERDICT_UNKNOWN": "vibe3.utils.constants",
     "write_instance_info": "vibe3.utils.orchestra_instance",
     "check_branch_behind": "vibe3.utils.branch_compare",
+    "ORCHESTRA_TMUX_SESSION": "vibe3.utils.serve_helpers",
+    "job_to_dict": "vibe3.utils.serve_helpers",
+    "orchestra_tmux_session_exists": "vibe3.utils.serve_helpers",
+    "validate_pid_file": "vibe3.utils.serve_helpers",
 }
 
 
@@ -176,4 +186,8 @@ __all__ = [
     "try_parse_issue_number",
     "validate_instance",
     "write_instance_info",
+    "ORCHESTRA_TMUX_SESSION",
+    "job_to_dict",
+    "orchestra_tmux_session_exists",
+    "validate_pid_file",
 ]

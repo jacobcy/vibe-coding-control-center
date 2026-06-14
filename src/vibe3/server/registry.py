@@ -18,43 +18,16 @@ if TYPE_CHECKING:
     from fastapi.responses import RedirectResponse
 
     from vibe3.models import OrchestraConfig
-    from vibe3.runtime import HeartbeatServer, OrchestraInstanceInfo
+    from vibe3.runtime import HeartbeatServer
 
-ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
+from vibe3.utils import (
+    ORCHESTRA_TMUX_SESSION,
+    job_to_dict,
+    orchestra_tmux_session_exists,
+)
 
-
-def validate_pid_file(pid_file: Path) -> tuple["OrchestraInstanceInfo | None", bool]:
-    """Validate PID file and check if process is a running orchestra instance.
-
-    Returns:
-        tuple of (instance_info, is_running):
-        - (None, False): No PID file or invalid format
-        - (info, False): Valid PID file but process is dead/not orchestra
-        - (info, True): Valid PID file and process is running orchestra
-    """
-    from vibe3.runtime import read_instance_info, validate_instance
-
-    info = read_instance_info(pid_file)
-    if info is None:
-        return None, False
-
-    is_running = validate_instance(info)
-    return info, is_running
-
-
-def _orchestra_tmux_session_exists() -> bool:
-    """Return whether the orchestra tmux session currently exists."""
-    try:
-        result = subprocess.run(
-            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except Exception:
-        return False
-    return result.returncode == 0
+# Backward compatibility alias for internal consumers
+_orchestra_tmux_session_exists = orchestra_tmux_session_exists
 
 
 def _resolve_dispatcher_models_root(
@@ -254,29 +227,17 @@ def _build_server_with_launch_cwd(
 
         This endpoint preserves backward compatibility with fetch_live_snapshot().
         """
-        from vibe3.execution import ActiveJob, JobMonitorService
+        from vibe3.execution import JobMonitorService
 
         snapshot = await run_in_threadpool(status_service.snapshot)
         job_svc = JobMonitorService()
         jobs = job_svc.snapshot()
 
-        def _job_to_dict(job: ActiveJob) -> dict[str, Any]:
-            return {
-                "actor_id": job.actor_id,
-                "job_type": job.job_type.value,
-                "status": job.status.value,
-                "issue_number": job.issue_number,
-                "branch": job.branch,
-                "started_at": job.started_at,
-                "completed_at": job.completed_at,
-                "pid": job.pid,
-            }
-
         result = {
             **snapshot.__dict__,
             "jobs": {
-                "active": [_job_to_dict(j) for j in jobs.active_jobs],
-                "recent": [_job_to_dict(j) for j in jobs.recent_jobs],
+                "active": [job_to_dict(j) for j in jobs.active_jobs],
+                "recent": [job_to_dict(j) for j in jobs.recent_jobs],
                 "summary": {
                     "running": jobs.running_count,
                     "completed": jobs.completed_count,

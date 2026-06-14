@@ -16,6 +16,9 @@ from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
     format_age_aware_time,
+    job_to_dict,
+    orchestra_tmux_session_exists,
+    validate_pid_file,
 )
 
 
@@ -271,20 +274,15 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
         Dict with daemon status, heartbeat, dispatch activity, FailedGate,
         error tracking, and job monitoring data.
     """
-    # Dynamic imports to avoid upward dependency and circular dependency detection
     import importlib
 
     execution_module = importlib.import_module("vibe3.execution")
     job_monitor_service = execution_module.JobMonitorService
 
-    server_module = importlib.import_module("vibe3.server.registry")
-    validate_pid_file = server_module.validate_pid_file
-    _orchestra_tmux_session_exists = server_module._orchestra_tmux_session_exists
-
-    # Daemon status
+    # Daemon status (uses utils functions, no layer violation)
     instance_info, is_running = validate_pid_file(config.pid_file)
     pid = instance_info.pid if instance_info else None
-    tmux_exists = _orchestra_tmux_session_exists()
+    tmux_exists = orchestra_tmux_session_exists()
 
     daemon_status = {
         "pid": pid,
@@ -312,7 +310,7 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
             )
             if tick_matches:
                 last_tick = tick_matches[-1]
-                tick_time, tick_num, tick_status = last_tick
+                tick_time, tick_num, _tick_status = last_tick
                 heartbeat["tick_count"] = int(tick_num)
                 heartbeat["last_tick_time"] = tick_time
         except Exception:
@@ -330,7 +328,6 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
     if events_log.exists():
         try:
             log_content = events_log.read_text()
-            # Get last tick's dispatcher events
             tick_matches = re.findall(
                 r"\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\] "
                 r"\[server\] tick #(\d+) (start|completed)",
@@ -345,13 +342,14 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
                 )
                 for match in dispatcher_matches[-5:]:
                     clean_match = re.sub(r"\x1b\[[0-9;]*m", "", match)
+                    # Truncate long entries to avoid confusing display in HTML
+                    if len(clean_match) > 200:
+                        clean_match = clean_match[:197] + "..."
                     dispatch_activity.append(clean_match)
         except Exception:
             pass
 
     # FailedGate status
-    import importlib
-
     failed_gate_module = importlib.import_module("vibe3.domain.failed_gate")
     FailedGate = failed_gate_module.FailedGate  # noqa: N806
     failed_gate = FailedGate()
@@ -404,32 +402,8 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
     jobs_snapshot = job_svc.snapshot()
 
     jobs = {
-        "active": [
-            {
-                "actor_id": job.actor_id,
-                "job_type": job.job_type.value,
-                "status": job.status.value,
-                "issue_number": job.issue_number,
-                "branch": job.branch,
-                "started_at": job.started_at,
-                "completed_at": job.completed_at,
-                "pid": job.pid,
-            }
-            for job in jobs_snapshot.active_jobs
-        ],
-        "recent": [
-            {
-                "actor_id": job.actor_id,
-                "job_type": job.job_type.value,
-                "status": job.status.value,
-                "issue_number": job.issue_number,
-                "branch": job.branch,
-                "started_at": job.started_at,
-                "completed_at": job.completed_at,
-                "pid": job.pid,
-            }
-            for job in jobs_snapshot.recent_jobs
-        ],
+        "active": [job_to_dict(job) for job in jobs_snapshot.active_jobs],
+        "recent": [job_to_dict(job) for job in jobs_snapshot.recent_jobs],
         "summary": {
             "running": jobs_snapshot.running_count,
             "completed": jobs_snapshot.completed_count,
