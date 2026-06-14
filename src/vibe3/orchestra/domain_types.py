@@ -257,6 +257,18 @@ class QualifyGateServiceProtocol(Protocol):
         ...
 
 
+class DispatchCoordinatorProtocol(Protocol):
+    """Protocol for dispatch coordinator state checking."""
+
+    def is_dispatch_paused(self) -> bool:
+        """Check if dispatch is paused due to exhausted pool.
+
+        Returns:
+            True if dispatch is paused (only blocked issues in queue)
+        """
+        ...
+
+
 __all__ = [
     "GateResult",
     "GateStatus",
@@ -271,4 +283,5 @@ __all__ = [
     "CleanupServiceProtocol",
     "LabelServiceProtocol",
     "QualifyGateServiceProtocol",
+    "DispatchCoordinatorProtocol",
 ]

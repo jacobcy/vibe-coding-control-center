@@ -58,7 +58,6 @@ if TYPE_CHECKING:
     from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
         CheckServiceProtocol,
-        DispatchCoordinatorProtocol,
         FlowServiceProtocol,
         LabelDispatchCallable,
     )
@@ -110,7 +109,6 @@ _LAZY_IMPORTS: dict[str, str] = {
     # Protocols
     "CapacityServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
     "CheckServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
-    "DispatchCoordinatorProtocol": "vibe3.domain.protocols.dispatch_protocols",
     "FlowServiceProtocol": "vibe3.domain.protocols.dispatch_protocols",
     "LabelDispatchCallable": "vibe3.domain.protocols.dispatch_protocols",
     "FlowManagerProtocol": "vibe3.domain.protocols.flow_protocols",
@@ -194,7 +192,6 @@ __all__ = [
     # Protocols
     "CapacityServiceProtocol",
     "CheckServiceProtocol",
-    "DispatchCoordinatorProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",
     "LabelDispatchCallable",

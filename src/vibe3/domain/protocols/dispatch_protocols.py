@@ -247,15 +247,3 @@ class TriggerableRoleDefinitionProtocol(Protocol):
     def dispatch_predicate(self) -> Callable[[dict[str, object], bool], bool]:
         """Predicate to determine if role should dispatch."""
         ...
-
-
-class DispatchCoordinatorProtocol(Protocol):
-    """Protocol for dispatch coordinator state checking."""
-
-    def is_dispatch_paused(self) -> bool:
-        """Check if dispatch is paused due to exhausted pool.
-
-        Returns:
-            True if dispatch is paused (only blocked issues in queue)
-        """
-        ...

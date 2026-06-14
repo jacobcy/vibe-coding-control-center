@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         CapacityServiceProtocol,
         CheckServiceProtocol,
         CleanupServiceProtocol,
+        DispatchCoordinatorProtocol,
         FlowManagerProtocol,
         FlowServiceProtocol,
         GateResult,
@@ -68,6 +69,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "CleanupServiceProtocol": "vibe3.orchestra.domain_types",
     "LabelServiceProtocol": "vibe3.orchestra.domain_types",
     "QualifyGateServiceProtocol": "vibe3.orchestra.domain_types",
+    "DispatchCoordinatorProtocol": "vibe3.orchestra.domain_types",
 }
 
 
@@ -106,4 +108,5 @@ __all__ = [
     "CleanupServiceProtocol",
     "LabelServiceProtocol",
     "QualifyGateServiceProtocol",
+    "DispatchCoordinatorProtocol",
 ]
