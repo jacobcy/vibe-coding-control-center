@@ -39,7 +39,7 @@ jobs:
           sys.path.insert(0, "src")
 
           from vibe3.models.orchestration import IssueState
-          from vibe3.services.label_service import LabelService
+          from vibe3.services.shared import LabelService
 
           # Read PR body from GitHub event JSON (safe from shell interpolation)
           event_path = os.environ.get("GITHUB_EVENT_PATH")
