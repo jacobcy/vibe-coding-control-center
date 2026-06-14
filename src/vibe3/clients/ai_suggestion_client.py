@@ -21,10 +21,12 @@ DEFAULT_PROMPTS = {
             "system": "You are an assistant that generates PR descriptions.",
             "user": (
                 "Commits:\n{commits}\n\n{changed_files}\n\n"
+                "{inspect_summary}\n"
                 "Generate a PR description with:\n"
                 "1. Summary (1-2 sentences)\n"
                 "2. Changes (bullet list)\n"
-                "3. Testing (how to verify)\n\n"
+                "3. Risk Assessment (impact, risk level, review focus)\n"
+                "4. Testing (how to verify)\n\n"
                 "Use markdown format."
             ),
         },
@@ -70,6 +72,7 @@ class AISuggestionClient:
         self,
         commits: list[str],
         changed_files: list[str] | None = None,
+        inspect_summary: str = "",
     ) -> tuple[str | None, str | None] | None:
         if self.ai_client is None:
             return None
@@ -102,7 +105,11 @@ class AISuggestionClient:
 
         body_result = self.ai_client.generate_text(
             body_system,
-            body_template.format(commits=commits_text, changed_files=files_text),
+            body_template.format(
+                commits=commits_text,
+                changed_files=files_text,
+                inspect_summary=inspect_summary,
+            ),
         )
 
         logger.bind(module="ai_suggestion_client").debug(

@@ -158,6 +158,10 @@ class TestPRCreateCommandAI:
                                     "vibe3.services.pr.create.PRCreateUsecase.check_flow_task"
                                 ),
                                 patch(
+                                    "vibe3.services.pr.create._build_inspect_summary",
+                                    return_value="",
+                                ),
+                                patch(
                                     "vibe3.commands.pr_create.PRService"
                                 ) as mock_service,
                                 patch(
