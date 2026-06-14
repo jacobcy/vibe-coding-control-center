@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models.domain_events import DomainEvent, FlowCompleted
+from vibe3.models import DomainEvent, FlowCompleted
 
 if TYPE_CHECKING:
-    from vibe3.models.event_bus import PublishHook
+    from vibe3.models import PublishHook
 
 
 # Declarative mapping from DomainEvent types to flow_events.event_type strings.

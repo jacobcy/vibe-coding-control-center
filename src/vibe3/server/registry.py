@@ -193,7 +193,7 @@ def _build_server_with_launch_cwd(
 
     # Wire domain event to flow_event projection hook
     try:
-        from vibe3.services.flow.event_projection import build_event_projection_hook
+        from vibe3.services import build_event_projection_hook
 
         publisher = get_publisher()
         publisher.add_publish_hook(build_event_projection_hook())
