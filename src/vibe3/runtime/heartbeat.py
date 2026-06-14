@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
+from vibe3.domain.protocols.dispatch_protocols import DispatchCoordinatorProtocol
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
 from vibe3.orchestra import ServiceBase
@@ -59,7 +60,7 @@ class HeartbeatServer:
         check_service: object | None = None,
         cleanup_service: object | None = None,
         actor_cleanup: Callable[[], list[str]] | None = None,
-        dispatch_coordinator: object | None = None,
+        dispatch_coordinator: DispatchCoordinatorProtocol | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -72,8 +73,10 @@ class HeartbeatServer:
         self._check_service: object | None = check_service
         self._cleanup_service: object | None = cleanup_service
         self._actor_cleanup: Callable[[], list[str]] | None = actor_cleanup
-        self._dispatch_coordinator: object | None = dispatch_coordinator
-        self._exhausted_ticks = 0
+        self._dispatch_coordinator: DispatchCoordinatorProtocol | None = (
+            dispatch_coordinator
+        )
+        self._exhausted_ticks = 0  # Consecutive ticks with exhausted pool
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -368,8 +371,8 @@ class HeartbeatServer:
     def _is_pool_exhausted(self) -> bool:
         """Check if pool is exhausted (no qualifiable candidates).
 
-        Pool is considered exhausted when dispatch_coordinator has
-        _dispatch_paused=True, indicating only blocked issues remain.
+        Pool is considered exhausted when dispatch_coordinator reports
+        dispatch is paused, indicating only blocked issues remain.
 
         Returns:
             True if pool exhausted, False otherwise
@@ -377,9 +380,8 @@ class HeartbeatServer:
         if self._dispatch_coordinator is None:
             return False
 
-        # Check dispatch_paused flag from coordinator
-        # Pool exhausted = dispatch_paused (only blocked issues in queue)
-        return bool(getattr(self._dispatch_coordinator, "_dispatch_paused", False))
+        # Use public API to check dispatch pause state
+        return self._dispatch_coordinator.is_dispatch_paused()
 
     async def _tick_service(self, service: ServiceBase, tick_id: int) -> None:
         async with self._semaphore:
