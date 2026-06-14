@@ -38,7 +38,7 @@ def run() -> None:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.config import load_orchestra_config
     from vibe3.domain import FlowManager
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services.orchestra import OrchestraStatusService
 
     config = load_orchestra_config()
 

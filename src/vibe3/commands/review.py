@@ -25,7 +25,8 @@ from vibe3.roles import (
     build_base_review_request,
     validate_review_prerequisites,
 )
-from vibe3.services import FlowService, resolve_branch_arg
+from vibe3.services.flow import FlowService
+from vibe3.services.shared import resolve_branch_arg
 
 app = typer.Typer(
     name="review",

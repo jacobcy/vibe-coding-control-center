@@ -23,17 +23,17 @@ from vibe3.domain.qualify_gate_support import (
     transition_to_review,
 )
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
-from vibe3.services import (
+from vibe3.services.flow import (
     BlockedStateService,  # noqa: F401
-    CoordinationResolver,
     FlowCleanupService,  # noqa: F401
     FlowService,  # noqa: F401
     FlowStatusService,  # noqa: F401
-    IssueFlowService,  # noqa: F401
-    LabelService,  # noqa: F401
-    TaskResumeOperations,
     infer_resume_label,
 )
+from vibe3.services.issue import IssueFlowService  # noqa: F401
+from vibe3.services.orchestra import CoordinationResolver
+from vibe3.services.shared import LabelService  # noqa: F401
+from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -77,7 +77,7 @@ class QualifyGateService:
         self._blocked_label = self._convention.state_label(
             self._convention.blocked_label
         )
-        self._coordination_resolver = CoordinationResolver(store=store)
+        self._coordination_resolver = CoordinationResolver(store=store)  # type: ignore[misc]
 
     def run_qualify_gate(
         self,

@@ -20,7 +20,7 @@ from vibe3.domain.events.flow_lifecycle import (
 )
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import ExecutionRequest
-from vibe3.services import load_issue_info
+from vibe3.services.issue import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
 
@@ -105,7 +105,7 @@ def _dispatch_role_intent(
             # Check if bottom layer already recorded a specific error
             # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
             # If no, record E_DISPATCH_FAILURE for infrastructure visibility
-            from vibe3.services import has_recent_specific_error
+            from vibe3.services.shared import has_recent_specific_error
 
             if has_recent_specific_error(
                 issue_number=issue_number,
@@ -129,7 +129,7 @@ def _dispatch_role_intent(
         else:
             # Dispatch-level infrastructure failure - record to error_log
             # FailedGate will control dispatch based on threshold
-            from vibe3.services import record_error
+            from vibe3.services.shared import record_error
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:

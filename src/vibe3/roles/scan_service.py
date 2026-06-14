@@ -24,7 +24,7 @@ def extract_material_description(material_name: str) -> str:
     """
     from vibe3.clients import resolve_runtime_asset
     from vibe3.prompts import MaterialEntry
-    from vibe3.services import material_loader
+    from vibe3.services.shared import material_loader
 
     try:
         materials_dir = resolve_runtime_asset("supervisor/governance")
@@ -128,7 +128,7 @@ def fetch_supervisor_candidates(
         - total_issues_scanned: Total number of open issues queried
         - matching_candidates: List of candidate issues (number, title, labels)
     """
-    from vibe3.services import normalize_labels
+    from vibe3.services.shared import normalize_labels
 
     try:
         raw_issues = github_client.list_issues(limit=100, state="open", repo=repo)

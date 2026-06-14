@@ -163,7 +163,7 @@ class JobExecutor:
             adapter_hash = None
 
         from vibe3.clients import resolve_runtime_asset
-        from vibe3.services import material_loader, policy_loader
+        from vibe3.services.shared import material_loader, policy_loader
 
         materials_dir = resolve_runtime_asset("supervisor/governance")
         material_hash = (
@@ -285,7 +285,7 @@ class JobExecutor:
             return job_result
 
         except Exception as e:
-            from vibe3.services import log_dispatch_error
+            from vibe3.services.shared import log_dispatch_error
 
             log_dispatch_error("Job execution failed", e)
 
@@ -377,7 +377,7 @@ class JobExecutor:
             Execution launch result from the coordinator
         """
         from vibe3.config import load_orchestra_config
-        from vibe3.services import load_issue_info
+        from vibe3.services.issue import load_issue_info
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)
@@ -446,7 +446,7 @@ class JobExecutor:
             Execution launch result
         """
         from vibe3.config import load_orchestra_config
-        from vibe3.services import load_issue_info
+        from vibe3.services.issue import load_issue_info
 
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)

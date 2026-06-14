@@ -87,7 +87,7 @@ class TaskResumeOperations:
         emit_progress("checking consistency and recovering")
 
         # Delegate to unified recovery service (manual path: auto=False)
-        from vibe3.services import FlowRecoveryService
+        from vibe3.services.flow import FlowRecoveryService
 
         recovery = FlowRecoveryService(
             store=self._flow_service.store,
@@ -127,7 +127,7 @@ class TaskResumeOperations:
     ) -> IssueState:
         if not label_state:
             from vibe3.models import FlowState
-            from vibe3.services import infer_resume_label
+            from vibe3.services.flow import infer_resume_label
 
             fs_dict = (
                 self._flow_service.store.get_flow_state(branch)
@@ -335,7 +335,7 @@ class TaskResumeCandidates:
             reason is a human-readable message if can_resume is False, None otherwise.
         """
         # ✅ Use authoritative truth: check if issue has merged PR
-        from vibe3.services import has_merged_pr_for_issue
+        from vibe3.services.pr import has_merged_pr_for_issue
 
         if has_merged_pr_for_issue(issue_number, repo):
             # Issue has merged PR, cannot be resumed
@@ -463,7 +463,7 @@ class TaskResumeUsecase:
         """Return injected or fallback flow service."""
         if self._flow_service_input is not None:
             return self._flow_service_input
-        from vibe3.services import FlowService
+        from vibe3.services.flow import FlowService
 
         return FlowService()
 

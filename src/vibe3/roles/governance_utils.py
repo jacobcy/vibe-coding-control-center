@@ -6,16 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.clients import GitHubClient
+from vibe3.config import get_manager_usernames
 from vibe3.models import OrchestraConfig
-from vibe3.services import (
-    ORCHESTRA_GOVERNED_LABEL,
+from vibe3.services.orchestra import (
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
-    get_manager_usernames,
+    is_running_issue,
+)
+from vibe3.services.shared import (
+    ORCHESTRA_GOVERNED_LABEL,
     has_orchestra_governed,
     has_roadmap_label,
-    is_running_issue,
     normalize_assignees,
     normalize_labels,
 )

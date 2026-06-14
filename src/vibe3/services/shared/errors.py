@@ -80,7 +80,7 @@ def record_error(
     Returns:
         (threshold_reached, error_count_in_window)
     """
-    from vibe3.services import ErrorTrackingService
+    from vibe3.services.orchestra.error_tracking import ErrorTrackingService
 
     error_svc = ErrorTrackingService.get_instance(store=store)
     return error_svc.record_error(

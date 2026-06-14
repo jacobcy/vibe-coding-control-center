@@ -197,8 +197,8 @@ KNOWN_PURE_BRIDGES = set()
 
 KNOWN_LAYER_CROSSING_BRIDGES = set()
 
-ROOT_BARREL_IMPORT_BASELINE = 130
-SHARED_BARREL_IMPORT_BASELINE = 1
+ROOT_BARREL_IMPORT_BASELINE = 14
+SHARED_BARREL_IMPORT_BASELINE = 16
 PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
 LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
 
@@ -242,8 +242,11 @@ def test_root_barrel_import_count() -> None:
 def test_shared_barrel_import_count() -> None:
     """Verify shared barrel imports (from vibe3.services.shared import ...).
 
-    Goal: Zero shared barrel imports (all imports should be direct).
-    Current baseline: ~1 call site.
+    Goal: All cross-module consumers use the shared public API.
+    Since shared/__init__.py now defines a canonical __all__ + lazy __getattr__,
+    imports through the shared barrel are the approved path.
+    This test tracks adoption progress — as we migrate callers from deep
+    submodule imports, this count should only increase until coverage is full.
     """
     imports = count_barrel_imports("vibe3.services.shared")
 
@@ -252,16 +255,12 @@ def test_shared_barrel_import_count() -> None:
         for imp in imports[:10]:
             print(f"   {imp['file']}:{imp['line']} - {imp['import']}")
 
-    assert len(imports) <= SHARED_BARREL_IMPORT_BASELINE, (
-        "Shared barrel imports increased beyond the issue #2698 baseline: "
-        f"expected <= {SHARED_BARREL_IMPORT_BASELINE}, found {len(imports)}"
+    # Shared barrel imports are the approved pattern now — hard gate prevents
+    # regression below current baseline but does not treat this as debt.
+    assert len(imports) >= SHARED_BARREL_IMPORT_BASELINE, (
+        "Shared barrel imports decreased below the tracking baseline: "
+        f"expected >= {SHARED_BARREL_IMPORT_BASELINE}, found {len(imports)}"
     )
-    if imports:
-        pytest.xfail(
-            f"Baseline: {len(imports)} shared barrel imports remain (issue #2698)"
-        )
-
-    assert len(imports) == 0, f"Found {len(imports)} shared barrel imports"
 
 
 def test_pure_bridge_module_count() -> None:

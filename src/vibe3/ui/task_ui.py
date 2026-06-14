@@ -5,7 +5,8 @@ import re
 from dataclasses import asdict
 from types import ModuleType
 
-from vibe3.services import TaskShowResult, ref_to_handoff_cmd
+from vibe3.services.shared import ref_to_handoff_cmd
+from vibe3.services.task import TaskShowResult
 from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils import AUTOMATED_MARKERS

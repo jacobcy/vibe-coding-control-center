@@ -35,7 +35,7 @@ from vibe3.roles.governance_utils import (
     find_material_in_catalog,
     get_governed_issue_numbers,
 )
-from vibe3.services import OrchestraStatusService
+from vibe3.services.orchestra import OrchestraStatusService
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
@@ -74,7 +74,7 @@ _GOVERNANCE_RUNTIME_VARS = (
 def _compute_material_hash() -> str | None:
     """Compute aggregate hash of governance material files on disk."""
     from vibe3.clients import resolve_runtime_asset
-    from vibe3.services import material_loader
+    from vibe3.services.shared import material_loader
     from vibe3.utils import compute_hash_from_loader
 
     materials_dir = resolve_runtime_asset("supervisor/governance")
@@ -310,7 +310,7 @@ def build_governance_recipe(
 def _record_assembly_warnings(warnings: tuple[str, ...]) -> None:
     for msg in warnings:
         try:
-            from vibe3.services import ErrorTrackingService
+            from vibe3.services.orchestra.error_tracking import ErrorTrackingService
 
             ErrorTrackingService.get_instance().record_error(
                 error_code="E_CONFIG_MISSING",

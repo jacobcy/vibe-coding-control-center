@@ -14,7 +14,7 @@ from vibe3.execution import (
 )
 from vibe3.models import AgentOptions, FlowStatusResponse, IssueState, OrchestraConfig
 from vibe3.roles.definitions import RoleOutputContract, TriggerableRoleDefinition
-from vibe3.services import FlowService
+from vibe3.services.flow import FlowService
 
 
 def validate_run_prerequisites(
@@ -127,7 +127,7 @@ def publish_run_command_failure(
     reason: str,
 ) -> None:
     """Publish run failure lifecycle for command-mode execution."""
-    from vibe3.services import emit_issue_failed
+    from vibe3.services.shared import emit_issue_failed
 
     emit_issue_failed(issue_number=issue_number, reason=reason, actor="agent:run")
 
@@ -194,7 +194,7 @@ def ensure_plan_file_exists(
     if Path(plan_file).is_absolute() and Path(plan_file).exists():
         return
     # Import via public API for cross-module call (allows test patching)
-    from vibe3.services import resolve_handoff_target
+    from vibe3.services.handoff import resolve_handoff_target
 
     try:
         resolve_handoff_target(plan_file, branch=branch)

@@ -22,6 +22,9 @@ if TYPE_CHECKING:
         IssueStatusEntry,
         OrchestraSnapshot,
         OrchestraStatusService,
+        format_issue_runtime_line,
+        format_issue_summary_line,
+        is_running_issue,
     )
 
 __all__ = [
@@ -36,6 +39,9 @@ __all__ = [
     "IssueStatusEntry",
     "OrchestraSnapshot",
     "OrchestraStatusService",
+    "format_issue_runtime_line",
+    "format_issue_summary_line",
+    "is_running_issue",
 ]
 
 _SYMBOL_MODULES = {
@@ -50,6 +56,9 @@ _SYMBOL_MODULES = {
     "IssueStatusEntry": "vibe3.services.orchestra.status",
     "OrchestraSnapshot": "vibe3.services.orchestra.status",
     "OrchestraStatusService": "vibe3.services.orchestra.status",
+    "format_issue_runtime_line": "vibe3.services.orchestra.status",
+    "format_issue_summary_line": "vibe3.services.orchestra.status",
+    "is_running_issue": "vibe3.services.orchestra.status",
 }
 
 
