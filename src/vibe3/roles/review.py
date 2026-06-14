@@ -10,12 +10,11 @@ from loguru import logger
 
 from vibe3.agents import (
     build_review_prompt_body,
-    build_snapshot_diff,
     create_codeagent_command,
     describe_review_sections,
     make_review_context_builder,
 )
-from vibe3.analysis import build_change_analysis, changed_symbols
+from vibe3.analysis import build_change_analysis, build_snapshot_diff, changed_symbols
 
 # public-api: pending upstream export
 from vibe3.config import (

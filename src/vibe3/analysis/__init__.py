@@ -70,6 +70,7 @@ if TYPE_CHECKING:
     from vibe3.analysis.snapshot_service import (
         SnapshotError,
         build_snapshot,
+        build_snapshot_diff,
         find_snapshot_by_branch,
     )
 
@@ -108,6 +109,7 @@ _LAZY_IMPORTS = {
     "LocalReviewReport": "vibe3.analysis.local_review_report",
     "SnapshotError": "vibe3.analysis.snapshot_service",
     "build_snapshot": "vibe3.analysis.snapshot_service",
+    "build_snapshot_diff": "vibe3.analysis.snapshot_service",
     "find_snapshot_by_branch": "vibe3.analysis.snapshot_service",
     "build_snapshot_diff_section": "vibe3.analysis.snapshot_diff_section",
     "snapshot_service": "vibe3.analysis.snapshot_service",
@@ -167,6 +169,7 @@ __all__ = [
     "LocalReviewReport",
     "SnapshotError",
     "build_snapshot",
+    "build_snapshot_diff",
     "find_snapshot_by_branch",
     "build_snapshot_diff_section",
     "snapshot_service",
