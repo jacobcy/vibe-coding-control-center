@@ -166,7 +166,7 @@ function render(data) {
   const banner = document.getElementById('failed-gate-banner');
   if (failed_gate.is_active) {
     banner.classList.add('active');
-    banner.innerHTML = `<strong>FailedGate ACTIVE</strong> — Reason: ${failed_gate.reason || 'Unknown'} — Blocked ticks: ${failed_gate.blocked_ticks}<br><span style="font-size:12px;opacity:0.8;">To resume: vibe3 serve resume --reason "&lt;reason&gt;"</span>`;
+    banner.innerHTML = `<strong>FailedGate ACTIVE</strong> — Reason: ${escapeHtml(failed_gate.reason) || 'Unknown'} — Blocked ticks: ${failed_gate.blocked_ticks}<br><span style="font-size:12px;opacity:0.8;">To resume: vibe3 serve resume --reason "&lt;reason&gt;"</span>`;
   } else {
     banner.classList.remove('active');
   }
