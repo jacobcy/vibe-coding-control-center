@@ -50,17 +50,3 @@ class SQLiteSnapshotRepo(_HasConnection):
         )
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    def list_snapshots_from_db(
-        self, include_baselines: bool = False, limit: int | None = 50
-    ) -> list[str]:
-        """List snapshot IDs ordered by creation time (newest first)."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        query = "SELECT snapshot_id FROM snapshot_registry ORDER BY created_at DESC"
-        params: list = []
-        if limit is not None:
-            query += " LIMIT ?"
-            params.append(limit)
-        cursor.execute(query, params)
-        return [row[0] for row in cursor.fetchall()]
