@@ -25,9 +25,6 @@ Prompt Builders:
 - ``describe_plan_sections`` / ``describe_run_plan_sections`` /
   ``describe_review_sections`` — section key inspectors for dry-run summaries
 
-Review Helpers:
-- ``build_snapshot_diff`` — build structural diff for review context
-
 Types:
 - ``RunPromptMode`` — literal type for run prompt mode (coding/retry)
 
@@ -56,7 +53,6 @@ if TYPE_CHECKING:
         describe_plan_sections,
         make_plan_context_builder,
     )
-    from vibe3.agents.review_pipeline_helpers import build_snapshot_diff
     from vibe3.agents.review_prompt import (
         build_review_prompt_body,
         describe_review_sections,
@@ -85,7 +81,6 @@ _LAZY_IMPORTS = {
     "build_plan_prompt_body": "vibe3.agents.plan_prompt",
     "describe_plan_sections": "vibe3.agents.plan_prompt",
     "make_plan_context_builder": "vibe3.agents.plan_prompt",
-    "build_snapshot_diff": "vibe3.agents.review_pipeline_helpers",
     "build_review_prompt_body": "vibe3.agents.review_prompt",
     "describe_review_sections": "vibe3.agents.review_prompt",
     "make_review_context_builder": "vibe3.agents.review_prompt",
@@ -118,7 +113,6 @@ __all__ = [
     "build_plan_prompt_body",
     "build_review_prompt_body",
     "build_run_prompt_body",
-    "build_snapshot_diff",
     "create_codeagent_command",
     "describe_plan_sections",
     "describe_review_sections",

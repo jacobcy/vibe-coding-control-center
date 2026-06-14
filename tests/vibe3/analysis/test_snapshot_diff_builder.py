@@ -1,12 +1,11 @@
-"""Tests for review_pipeline_helpers."""
+"""Tests for build_snapshot_diff in analysis layer."""
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.agents.review_pipeline_helpers import build_snapshot_diff
-from vibe3.analysis import SnapshotError
+from vibe3.analysis import SnapshotError, build_snapshot_diff
 
 
-@patch("vibe3.agents.review_pipeline_helpers.find_snapshot_by_branch")
+@patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")
 def test_build_snapshot_diff_no_baseline(mock_find):
     """Test when no baseline snapshot is found."""
     mock_find.return_value = None
@@ -15,9 +14,9 @@ def test_build_snapshot_diff_no_baseline(mock_find):
     mock_find.assert_called_once_with("main", None)
 
 
-@patch("vibe3.agents.review_pipeline_helpers.compute_diff")
-@patch("vibe3.agents.review_pipeline_helpers.build_snapshot")
-@patch("vibe3.agents.review_pipeline_helpers.find_snapshot_by_branch")
+@patch("vibe3.analysis.snapshot_diff.compute_diff")
+@patch("vibe3.analysis.snapshot_service.build_snapshot")
+@patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")
 def test_build_snapshot_diff_success(mock_find, mock_build, mock_compute):
     """Test successful build of snapshot diff."""
     mock_baseline = MagicMock()
@@ -39,7 +38,7 @@ def test_build_snapshot_diff_success(mock_find, mock_build, mock_compute):
     mock_compute.assert_called_once_with(mock_baseline, mock_current)
 
 
-@patch("vibe3.agents.review_pipeline_helpers.find_snapshot_by_branch")
+@patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")
 def test_build_snapshot_diff_snapshot_error(mock_find):
     """Test handling of SnapshotError."""
     mock_find.side_effect = SnapshotError("Test error")
@@ -47,7 +46,7 @@ def test_build_snapshot_diff_snapshot_error(mock_find):
     assert result is None
 
 
-@patch("vibe3.agents.review_pipeline_helpers.find_snapshot_by_branch")
+@patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")
 def test_build_snapshot_diff_unexpected_error(mock_find):
     """Test handling of unexpected exceptions."""
     mock_find.side_effect = Exception("Unexpected error")
