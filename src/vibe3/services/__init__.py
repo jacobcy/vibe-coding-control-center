@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         get_flow_state,
     )
     from vibe3.services.flow.cleanup import FlowCleanupService
+    from vibe3.services.flow.event_projection import build_event_projection_hook
     from vibe3.services.flow.factory import create_flow_manager
     from vibe3.services.flow.projection import (
         FlowProjection,
@@ -203,6 +204,7 @@ __all__ = [
     "block_manager_noop_issue",
     "build_api_task_data",
     "build_bind_task_hint",
+    "build_event_projection_hook",
     "build_pr_analysis",
     "calculate_pr_risk_score",
     "check_ref_exists",
@@ -308,6 +310,7 @@ _SYMBOL_MODULES = {
     "block_manager_noop_issue": "vibe3.services.issue.failure",
     "build_api_task_data": "vibe3.services.task.status",
     "build_bind_task_hint": "vibe3.services.shared.binding_guard",
+    "build_event_projection_hook": "vibe3.services.flow.event_projection",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
     "check_ref_exists": "vibe3.services.shared.paths",
