@@ -8,7 +8,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from vibe3.services import OrchestraSnapshot, OrchestraStatusService
+    from vibe3.services.orchestra import OrchestraSnapshot, OrchestraStatusService
 
 
 def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:

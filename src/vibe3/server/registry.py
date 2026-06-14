@@ -84,7 +84,8 @@ def _build_server_with_launch_cwd(
         FailedGateProtocol,
         HeartbeatServer,
     )
-    from vibe3.services import CheckService, OrchestraStatusService
+    from vibe3.services.check import CheckService
+    from vibe3.services.orchestra import OrchestraStatusService
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -194,7 +195,7 @@ def _build_server_with_launch_cwd(
 
     # Wire domain event to flow_event projection hook
     try:
-        from vibe3.services import build_event_projection_hook
+        from vibe3.services.flow import build_event_projection_hook
 
         publisher = get_publisher()
         publisher.add_publish_hook(build_event_projection_hook())
@@ -223,14 +224,14 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/api/tasks")
     async def get_api_tasks(all_flows: bool = False) -> dict[str, Any]:
         """Get task status data as JSON."""
-        from vibe3.services import build_api_task_data
+        from vibe3.services.task import build_api_task_data
 
         return await run_in_threadpool(build_api_task_data, all_flows)
 
     @fastapi_app.get("/api/serve")
     async def get_api_serve() -> dict[str, Any]:
         """Get serve status data as JSON."""
-        from vibe3.services import fetch_serve_status_data
+        from vibe3.services.orchestra import fetch_serve_status_data
 
         return await run_in_threadpool(fetch_serve_status_data, config)
 

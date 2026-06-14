@@ -238,7 +238,9 @@ def test_internal_bootstrap_dispatch() -> None:
         with patch("vibe3.clients.sqlite_client.SQLiteClient"):
             with patch("vibe3.clients.git_client.GitClient"):
                 with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
-                    with patch("vibe3.services.FlowOrchestratorService") as service_cls:
+                    with patch(
+                        "vibe3.services.orchestra.FlowOrchestratorService"
+                    ) as service_cls:
                         github = MagicMock()
                         github.view_issue.return_value = issue_payload
                         github_cls.return_value = github
@@ -295,7 +297,9 @@ def test_internal_bootstrap_rejects_dependency_and_reason_together() -> None:
         with patch("vibe3.clients.sqlite_client.SQLiteClient"):
             with patch("vibe3.clients.git_client.GitClient"):
                 with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
-                    with patch("vibe3.services.FlowOrchestratorService") as service_cls:
+                    with patch(
+                        "vibe3.services.orchestra.FlowOrchestratorService"
+                    ) as service_cls:
                         github = MagicMock()
                         github.view_issue.return_value = issue_payload
                         github_cls.return_value = github

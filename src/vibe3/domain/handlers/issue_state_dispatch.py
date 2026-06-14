@@ -14,10 +14,8 @@ from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
 from vibe3.models import IssueInfo, IssueState
-from vibe3.services import (
-    block_manager_noop_issue,
-    record_dispatch_failure_if_unexpected,
-)
+from vibe3.services.issue import block_manager_noop_issue
+from vibe3.services.shared import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentBackend

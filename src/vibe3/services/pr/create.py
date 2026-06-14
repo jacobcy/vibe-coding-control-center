@@ -133,7 +133,7 @@ class PRCreateUsecase:
         """Return injected or fallback flow service."""
         if self._service_input is not None:
             return self._service_input
-        from vibe3.services import FlowService
+        from vibe3.services.flow import FlowService
 
         return FlowService()  # type: ignore[return-value]
 

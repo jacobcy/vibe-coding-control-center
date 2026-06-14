@@ -163,8 +163,9 @@ class TestFailedGateExecThreshold:
         """E_EXEC_* errors reaching threshold should trigger FailedGate."""
         from vibe3.orchestra.failed_gate import FailedGate
 
-        # ErrorTrackingService is imported via public API inside _check_error_threshold
-        with patch("vibe3.services.ErrorTrackingService") as mock_ets:
+        # ErrorTrackingService is imported via orchestra public API inside
+        # threshold checks.
+        with patch("vibe3.services.orchestra.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
             mock_instance.has_critical_error.return_value = False
             mock_instance.has_model_config_error.return_value = False
@@ -184,7 +185,7 @@ class TestFailedGateExecThreshold:
         """Single E_EXEC_* error below threshold should not trigger."""
         from vibe3.orchestra.failed_gate import FailedGate
 
-        with patch("vibe3.services.ErrorTrackingService") as mock_ets:
+        with patch("vibe3.services.orchestra.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
             mock_instance.has_critical_error.return_value = False
             mock_instance.has_model_config_error.return_value = False

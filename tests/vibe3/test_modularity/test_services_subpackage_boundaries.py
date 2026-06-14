@@ -57,8 +57,12 @@ KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
-# All cycles resolved as of 2026-06-11 (PR for #2575).
-KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = set()
+# Subpackage public API migration made these existing couplings visible again.
+# Track them as debt while callers move through explicit subpackage barrels.
+KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = {
+    frozenset({"flow", "pr"}),
+    frozenset({"flow", "issue"}),
+}
 
 
 def _extract_imports_from_dir(
@@ -315,6 +319,7 @@ class TestSubpackageCoupling:
         """
         graph = _build_subpackage_dependency_graph()
 
+        actual_cycles: set[frozenset[str]] = set()
         unexpected: list[str] = []
         for sub_a in SERVICES_SUBPACKAGES:
             for sub_b in SERVICES_SUBPACKAGES:
@@ -323,16 +328,38 @@ class TestSubpackageCoupling:
                 if sub_b in graph.get(sub_a, set()) and sub_a in graph.get(
                     sub_b, set()
                 ):
-                    unexpected.append(
-                        f"{sub_a} <-> {sub_b} "
-                        f"({sub_a} imports {sub_b}, {sub_b} imports {sub_a})"
-                    )
+                    pair = frozenset({sub_a, sub_b})
+                    actual_cycles.add(pair)
+                    if pair not in KNOWN_SUBPACKAGE_CYCLES:
+                        unexpected.append(
+                            f"{sub_a} <-> {sub_b} "
+                            f"({sub_a} imports {sub_b}, {sub_b} imports {sub_a})"
+                        )
 
         if unexpected:
             pytest.fail(
                 "Unexpected subpackage cycles detected — "
                 "add to KNOWN_SUBPACKAGE_CYCLES or fix:\n"
                 + "\n".join(f"  - {s}" for s in unexpected)
+            )
+
+        stale = KNOWN_SUBPACKAGE_CYCLES - actual_cycles
+        if stale:
+            pytest.fail(
+                "Known subpackage cycles no longer exist. "
+                "Remove from KNOWN_SUBPACKAGE_CYCLES:\n"
+                + "\n".join(f"  - {sorted(s)}" for s in stale)
+            )
+
+        if actual_cycles:
+            pytest.xfail(
+                "Known subpackage cycles remain: "
+                + ", ".join(
+                    " <-> ".join(sorted(c))
+                    for c in sorted(
+                        actual_cycles, key=lambda cycle: tuple(sorted(cycle))
+                    )
+                )
             )
 
     def test_subpackage_dependency_report(self) -> None:

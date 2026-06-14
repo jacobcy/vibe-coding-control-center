@@ -16,8 +16,8 @@ def test_manager_uses_flow_factory():
     # Should NOT import FlowManager from domain
     assert "from vibe3.domain import FlowManager" not in content
 
-    # Should use create_flow_manager via services public API
-    assert "from vibe3.services import create_flow_manager" in content
+    # Should use create_flow_manager via services.flow public API
+    assert "from vibe3.services.flow import create_flow_manager" in content
 
 
 def test_server_registry_imports_from_domain():

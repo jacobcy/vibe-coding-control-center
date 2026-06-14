@@ -14,7 +14,8 @@ from loguru import logger
 from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import UserError
 from vibe3.observability import setup_logging
-from vibe3.services import FlowService, PrReadyAbortedError, PrReadyUsecase, PRService
+from vibe3.services.flow import FlowService
+from vibe3.services.pr import PrReadyAbortedError, PrReadyUsecase, PRService
 from vibe3.ui import render_pr_ready
 
 

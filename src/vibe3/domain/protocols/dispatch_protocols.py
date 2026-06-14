@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-    from vibe3.services import CheckResult
+    from vibe3.services.check import CheckResult
 
     from .flow_protocols import FlowManagerProtocol
 

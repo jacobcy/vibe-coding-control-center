@@ -10,6 +10,22 @@ from .conftest import extract_cross_module_imports
 class TestModuleAPICompliance:
     """Test that modules respect API boundaries defined by __all__."""
 
+    def test_services_subpackage_barrels_are_public_api_imports(self) -> None:
+        """Services sub-package barrels are public APIs, not deep imports."""
+        imports = extract_cross_module_imports("commands")
+
+        shared_import = next(
+            imp for imp in imports if imp.import_path == "vibe3.services.shared"
+        )
+        assert shared_import.target_module == "services.shared"
+        assert shared_import.is_deep is False
+
+        flow_import = next(
+            imp for imp in imports if imp.import_path == "vibe3.services.flow"
+        )
+        assert flow_import.target_module == "services.flow"
+        assert flow_import.is_deep is False
+
     def test_module_api_compliance(
         self, module_registry: list[str], module_public_api: dict[str, set[str]]
     ) -> None:

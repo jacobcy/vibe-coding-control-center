@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Callable, cast
 from loguru import logger
 
 from vibe3.clients import GitHubClient
+from vibe3.config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.dispatch_health import DispatchHealthService
 from vibe3.domain.dispatch_preflight import (
@@ -45,12 +46,8 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
-from vibe3.services import (
-    IssueCollectionService,
-    clean_old_state_labels,
-    get_manager_usernames,
-    should_skip_from_queue,
-)
+from vibe3.services.issue import IssueCollectionService
+from vibe3.services.shared import clean_old_state_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient

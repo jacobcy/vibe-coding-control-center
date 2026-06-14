@@ -253,7 +253,7 @@ class TestEnsurePlanFileExists:
 
         # Mock the public API import (cross-module call uses public API)
         monkeypatch.setattr(
-            "vibe3.services.resolve_handoff_target",
+            "vibe3.services.handoff.resolve_handoff_target",
             mock_resolve,
         )
 

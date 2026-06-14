@@ -207,7 +207,7 @@ class TestSyncDispatch:
             )
             mock_coordinator_class.return_value = mock_coordinator
 
-            with patch("vibe3.services.load_issue_info") as mock_load_issue:
+            with patch("vibe3.services.issue.load_issue_info") as mock_load_issue:
                 mock_issue = Mock()
                 mock_issue.number = 123
                 mock_load_issue.return_value = mock_issue

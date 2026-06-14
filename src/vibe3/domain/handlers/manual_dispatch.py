@@ -22,7 +22,7 @@ from vibe3.models import (
     ManualRunIntent,
     ReviewRequest,
 )
-from vibe3.services import log_dispatch_error
+from vibe3.services.shared import log_dispatch_error
 
 # Result sink for CLI commands that need return values (review verdict).
 # Handler stores result after execution; CLI reads via get_pending_result().

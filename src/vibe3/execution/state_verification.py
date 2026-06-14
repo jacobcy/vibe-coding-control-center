@@ -196,7 +196,7 @@ class StateVerificationService:
             return
 
         try:
-            from vibe3.services import record_error
+            from vibe3.services.shared import record_error
 
             record_error(
                 error_code="E_API_UNAVAILABLE",

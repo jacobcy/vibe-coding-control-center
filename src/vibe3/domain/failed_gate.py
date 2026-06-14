@@ -119,7 +119,7 @@ class FailedGate:
         Returns:
             GateResult with blocked=True if threshold reached
         """
-        from vibe3.services import ErrorTrackingService
+        from vibe3.services.orchestra import ErrorTrackingService
 
         log = logger.bind(domain="orchestra", action="error_threshold_check")
         log.debug("Checking error threshold")
@@ -238,7 +238,7 @@ class FailedGate:
             )
 
         # Also clear error log (use store-specific instance for consistency)
-        from vibe3.services import ErrorTrackingService
+        from vibe3.services.orchestra import ErrorTrackingService
 
         ErrorTrackingService.get_instance(store=self.store).clear(cleared_by, reason)
 

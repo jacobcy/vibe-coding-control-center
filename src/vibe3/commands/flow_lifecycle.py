@@ -7,13 +7,9 @@ from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
 from vibe3.config import load_orchestra_config
-from vibe3.services import (
-    FlowRebuildUsecase,
-    FlowService,
-    load_issue_info,
-    resolve_branch_and_issue,
-    resolve_branch_arg,
-)
+from vibe3.services.flow import FlowRebuildUsecase, FlowService
+from vibe3.services.issue import load_issue_info
+from vibe3.services.shared import resolve_branch_and_issue, resolve_branch_arg
 
 
 def blocked(

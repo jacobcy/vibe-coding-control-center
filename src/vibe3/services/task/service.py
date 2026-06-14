@@ -72,7 +72,7 @@ class TaskService:
         """Return injected or fallback flow service."""
         if self._flow_service_input is not None:
             return self._flow_service_input
-        from vibe3.services import FlowService
+        from vibe3.services.flow import FlowService
 
         return FlowService(store=self.store)  # type: ignore[return-value]
 

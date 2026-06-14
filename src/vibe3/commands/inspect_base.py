@@ -69,7 +69,7 @@ def register(app: typer.Typer) -> None:
         current_branch = get_current_branch()
 
         # Get creation_source from flow state if available
-        from vibe3.services import FlowService
+        from vibe3.services.flow import FlowService
 
         flow_service = FlowService()
         flow_state = flow_service.get_flow_status(current_branch)

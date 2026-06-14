@@ -340,7 +340,9 @@ class VibeConfig(BaseModel):
                     find_install_root() / "config" / "v3" / "loc_limits.yaml"
                 )
             except OSError:
-                new_loc_limits_path = Path("config/v3/loc_limits.yaml")  # fallback
+                new_loc_limits_path = Path(
+                    "config/v3/loc_limits.yaml"
+                )  # keep non-existent
         old_loc_limits_path = Path("config/loc_limits.yaml")
         loc_limits_path = None
 

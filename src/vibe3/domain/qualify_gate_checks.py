@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from vibe3.domain.qualify_gate_support import _append_orchestra_event
-from vibe3.services import BlockedStateService, LabelService
+from vibe3.services.flow import BlockedStateService
+from vibe3.services.shared import LabelService
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient

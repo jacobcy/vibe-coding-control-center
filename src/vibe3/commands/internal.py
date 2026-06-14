@@ -14,7 +14,7 @@ from vibe3.commands.command_options import (
     validate_show_prompt_dependency,
 )
 from vibe3.config import load_orchestra_config
-from vibe3.services import load_issue_info
+from vibe3.services.issue import load_issue_info
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ def internal_bootstrap(
 ) -> None:
     """Bootstrap a standardized flow scene through the shared service path."""
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-    from vibe3.services import FlowOrchestratorService
+    from vibe3.services.orchestra import FlowOrchestratorService
 
     if dependency_issue_numbers and blocked_reason is not None:
         typer.echo(

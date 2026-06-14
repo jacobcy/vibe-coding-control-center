@@ -212,7 +212,7 @@ def get_module_public_api(module_name: str) -> set[str]:
     Returns:
         Set of symbol names in __all__, or empty set if __all__ not found
     """
-    init_path = Path(f"src/vibe3/{module_name}/__init__.py")
+    init_path = Path("src/vibe3", *module_name.split("."), "__init__.py")
     if not init_path.exists():
         return set()
 
@@ -245,6 +245,20 @@ def get_module_public_api(module_name: str) -> set[str]:
                     return symbols
 
     return set()
+
+
+def _resolve_public_import_target(parts: list[str]) -> tuple[str, bool]:
+    """Resolve the public API target and whether an import bypasses it."""
+    target_module = parts[1]
+
+    if target_module == "services" and len(parts) >= 3:
+        subpackage = parts[2]
+        subpackage_init = Path("src/vibe3/services") / subpackage / "__init__.py"
+        if subpackage_init.exists():
+            public_target = f"services.{subpackage}"
+            return public_target, len(parts) > 3
+
+    return target_module, len(parts) > 2
 
 
 def extract_cross_module_imports(source_module: str) -> list[CrossModuleImport]:
@@ -292,16 +306,13 @@ def extract_cross_module_imports(source_module: str) -> list[CrossModuleImport]:
                 if len(parts) < 2:
                     continue
 
-                target_module = parts[1]  # e.g., 'services' from 'vibe3.services'
+                target_module, is_deep = _resolve_public_import_target(parts)
+                source_top_module = source_module.split(".", maxsplit=1)[0]
+                target_top_module = target_module.split(".", maxsplit=1)[0]
 
                 # Skip same-module imports
-                if target_module == source_module:
+                if target_top_module == source_top_module:
                     continue
-
-                # Determine if this is a deep import
-                # Deep import: from vibe3.X.submodule import Y (parts >= 3)
-                # Top-level import: from vibe3.X import Y (parts == 2)
-                is_deep = len(parts) > 2
 
                 # Extract imported symbols
                 symbols = [alias.name for alias in node.names]
@@ -350,10 +361,20 @@ def module_public_api(module_registry: list[str]) -> dict[str, set[str]]:
     Returns:
         Dict mapping module name to set of symbols in __all__
     """
-    return {
+    public_api = {
         module_name: get_module_public_api(module_name)
         for module_name in module_registry
     }
+
+    services_dir = Path("src/vibe3/services")
+    if services_dir.exists():
+        for item in services_dir.iterdir():
+            if item.is_dir() and (item / "__init__.py").exists():
+                public_api[f"services.{item.name}"] = get_module_public_api(
+                    f"services.{item.name}"
+                )
+
+    return public_api
 
 
 @pytest.fixture

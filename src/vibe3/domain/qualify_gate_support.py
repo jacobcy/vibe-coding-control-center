@@ -6,16 +6,16 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from vibe3.clients import GitClient
 from vibe3.models import FlowStatusResponse, IssueState, PRResponse
-from vibe3.services import (
+from vibe3.services.flow import (
     BlockedStateService,
     FlowCleanupService,
     FlowService,
     FlowStatusService,
-    IssueFlowService,
-    LabelService,
-    TaskResumeOperations,
     infer_resume_label,
 )
+from vibe3.services.issue import IssueFlowService
+from vibe3.services.shared import LabelService
+from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
