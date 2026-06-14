@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.domain.protocols.dispatch_protocols import DispatchCoordinatorProtocol
+from vibe3.domain import DispatchCoordinatorProtocol
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event, append_orchestra_run_separator
 from vibe3.orchestra import ServiceBase
