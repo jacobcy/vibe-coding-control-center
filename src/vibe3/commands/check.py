@@ -9,7 +9,7 @@ from rich.markup import escape
 from vibe3.commands.check_support import execute_check_mode, execute_remote_check
 from vibe3.commands.common import enable_method_trace
 from vibe3.observability import setup_logging
-from vibe3.services import CheckService
+from vibe3.services.check import CheckService
 
 app = typer.Typer(
     help="Verify handoff store consistency",

@@ -9,7 +9,7 @@ from vibe3.agents import ExecutionRole
 from vibe3.clients import SQLiteClient
 from vibe3.config import get_role_output_contract
 from vibe3.models import VerdictRecord, VerdictValue
-from vibe3.services import get_role_block_function
+from vibe3.services.shared import get_role_block_function
 
 # Loop prevention constants
 SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair

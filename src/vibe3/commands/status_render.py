@@ -11,7 +11,7 @@ from vibe3.commands.status_render_utils import (
     render_task_item_details,
 )
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
-from vibe3.services import TaskStatusBucket
+from vibe3.services.task import TaskStatusBucket
 from vibe3.ui import console
 
 

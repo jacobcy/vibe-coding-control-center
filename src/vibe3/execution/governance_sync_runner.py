@@ -18,7 +18,10 @@ from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-from vibe3.services import log_dispatch_error, record_dispatch_failure_if_unexpected
+from vibe3.services.shared import (
+    log_dispatch_error,
+    record_dispatch_failure_if_unexpected,
+)
 
 
 def run_governance_sync(
@@ -51,7 +54,7 @@ def run_governance_sync(
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services.orchestra import OrchestraStatusService
 
     status_service = OrchestraStatusService.create(config)
     snapshot = status_service.snapshot()
@@ -114,7 +117,7 @@ def run_governance_sync(
     except Exception as exc:
         # Error tracking: classify and record for FailedGate threshold
         from vibe3.exceptions import classify_error_hybrid
-        from vibe3.services import record_error
+        from vibe3.services.shared import record_error
 
         error_code = classify_error_hybrid(exc)
 
@@ -160,7 +163,7 @@ def run_governance_async(
         resolve_orchestra_repo_root,
     )
     from vibe3.observability import append_governance_event
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services.orchestra import OrchestraStatusService
 
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)

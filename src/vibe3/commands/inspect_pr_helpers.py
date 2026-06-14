@@ -11,6 +11,6 @@ from vibe3.models import (  # noqa: F401
     CriticalFileInfo,
     PRCriticalAnalysis,
 )
-from vibe3.services import build_pr_analysis  # noqa: F401
+from vibe3.services.pr import build_pr_analysis  # noqa: F401
 
 __all__ = ["build_pr_analysis", "CommitInfo", "CriticalFileInfo", "PRCriticalAnalysis"]

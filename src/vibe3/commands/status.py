@@ -28,7 +28,7 @@ from vibe3.ui import console
 from vibe3.utils import format_age_aware_time
 
 if TYPE_CHECKING:
-    from vibe3.services import OrchestraSnapshot
+    from vibe3.services.orchestra import OrchestraSnapshot
 
 
 def _resolve_server_label(
@@ -80,7 +80,7 @@ def _render_runtime_versions() -> None:
     governance directory contents.
     """
     from vibe3.clients import resolve_runtime_asset
-    from vibe3.services import material_loader, policy_loader
+    from vibe3.services.shared import material_loader, policy_loader
     from vibe3.utils import compute_hash_from_loader
 
     console.print("[bold]Runtime Versions[/] [dim](current)[/]")
@@ -253,7 +253,7 @@ def _fetch_system_snapshot(
     import time
     from dataclasses import replace
 
-    from vibe3.services import FlowOrchestratorService, OrchestraStatusService
+    from vibe3.services.orchestra import FlowOrchestratorService, OrchestraStatusService
 
     snapshot = OrchestraStatusService.fetch_live_snapshot(config)
     if snapshot is None:
@@ -341,7 +341,7 @@ def _full_status_dashboard(
         render_rfc_items,
         render_supervisor_issues,
     )
-    from vibe3.services import (
+    from vibe3.services.task import (
         classify_task_issues_for_rendering,
         fetch_task_status_data,
     )

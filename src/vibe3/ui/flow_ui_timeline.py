@@ -1,7 +1,7 @@
 """Flow UI timeline rendering components."""
 
 from vibe3.models import FlowEvent, FlowStatusResponse
-from vibe3.services import check_ref_exists, ref_to_handoff_cmd
+from vibe3.services.shared import check_ref_exists, ref_to_handoff_cmd
 from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 

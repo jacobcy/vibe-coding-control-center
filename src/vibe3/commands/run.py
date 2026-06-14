@@ -26,7 +26,9 @@ from vibe3.roles import (
     resolve_skill_path,
     validate_run_prerequisites,
 )
-from vibe3.services import FlowService, resolve_branch_arg, resolve_handoff_target
+from vibe3.services.flow import FlowService
+from vibe3.services.handoff import resolve_handoff_target
+from vibe3.services.shared import resolve_branch_arg
 
 app = typer.Typer(
     name="run",

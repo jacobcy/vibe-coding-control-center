@@ -15,12 +15,10 @@ from vibe3.commands.handoff_render import (
     _render_handoff_events,
 )
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services import (
-    FlowService,
-    HandoffStatusService,
-    resolve_command_branch,
-    resolve_issue_branch_input,
-)
+from vibe3.services.flow import FlowService
+from vibe3.services.handoff import HandoffStatusService
+from vibe3.services.pr import resolve_command_branch
+from vibe3.services.shared import resolve_issue_branch_input
 from vibe3.ui import console, render_handoff_detail
 
 
@@ -125,7 +123,7 @@ def show(
     if trace:
         enable_method_trace()
 
-    from vibe3.services import resolve_handoff_target
+    from vibe3.services.handoff import resolve_handoff_target
 
     if target is None:
         typer.echo(_HANDOFF_SHOW_HELP)

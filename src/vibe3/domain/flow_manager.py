@@ -12,14 +12,12 @@ from loguru import logger
 from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
 from vibe3.environment import SessionRegistryService
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig
-from vibe3.services import (
-    FlowOrchestratorService,
-    FlowService,
-    IssueFlowService,
-    LabelService,
-    PRService,
-    TaskService,
-)
+from vibe3.services.flow import FlowService
+from vibe3.services.issue import IssueFlowService
+from vibe3.services.orchestra import FlowOrchestratorService
+from vibe3.services.pr import PRService
+from vibe3.services.shared import LabelService
+from vibe3.services.task import TaskService
 
 
 class FlowManager:

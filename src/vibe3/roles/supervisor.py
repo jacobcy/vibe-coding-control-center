@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from vibe3.config import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
+    get_handoff_state_label,
     get_resolver,
 )
 from vibe3.execution import ExecutionRolePolicyService, use_current_branch
@@ -29,7 +30,7 @@ from vibe3.prompts import (
 )
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.roles.governance import _build_runtime_registry, _record_assembly_warnings
-from vibe3.services import IssueFlowService, get_handoff_state_label
+from vibe3.services.issue import IssueFlowService
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",

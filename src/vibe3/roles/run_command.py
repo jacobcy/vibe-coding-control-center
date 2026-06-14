@@ -41,7 +41,7 @@ from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
 )
-from vibe3.services import record_dispatch_failure_if_unexpected
+from vibe3.services.shared import record_dispatch_failure_if_unexpected
 
 
 @dataclass

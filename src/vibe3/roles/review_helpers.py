@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from vibe3.services import FlowService
+from vibe3.services.flow import FlowService
 from vibe3.utils import VERDICT_UNKNOWN
 
 

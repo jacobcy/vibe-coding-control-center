@@ -13,7 +13,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.services import FlowService, FlowTimelineService
+from vibe3.services.flow import FlowService, FlowTimelineService
 from vibe3.services.issue.flow import IssueFlowService
 
 _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
@@ -83,7 +83,7 @@ def mark_issue(
         return
 
     if action == "fail":
-        timeline = FlowTimelineService(store=store)
+        timeline = FlowTimelineService(store=store)  # type: ignore[misc]
         # Dispatcher error: record to SQLite only, do NOT write GitHub comment
         # Runtime errors are exposed via `vibe3 serve status`, not issue comments
         timeline.record_timeline_event(
@@ -213,7 +213,7 @@ def block_manager_noop_issue(
             return
 
         # Reuse block_flow() - eliminates ALL duplication
-        from vibe3.services import FlowService
+        from vibe3.services.flow import FlowService
 
         FlowService(store=store).block_flow(branch, reason=reason, actor=actor)
         # No separate event needed - block_flow() already adds flow_blocked event

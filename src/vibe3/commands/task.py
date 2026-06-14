@@ -18,15 +18,11 @@ from vibe3.config import (
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models import IssueState
 from vibe3.observability import setup_logging
-from vibe3.services import (
-    FlowOrchestratorService,
-    FlowService,
-    IssueFlowService,
-    LabelService,
-    TaskResumeUsecase,
-    TaskService,
-    load_issue_info,
-)
+from vibe3.services.flow import FlowService
+from vibe3.services.issue import IssueFlowService, load_issue_info
+from vibe3.services.orchestra import FlowOrchestratorService
+from vibe3.services.shared import LabelService
+from vibe3.services.task import TaskResumeUsecase, TaskService
 from vibe3.ui import (
     render_task_comments,
     render_task_show,

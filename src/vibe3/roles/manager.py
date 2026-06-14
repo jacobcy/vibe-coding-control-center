@@ -47,7 +47,8 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services import create_flow_manager, fail_manager_issue
+from vibe3.services.flow import create_flow_manager
+from vibe3.services.issue import fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -173,7 +174,7 @@ def build_manager_request(
 
         # Record to error_log table (with guard to avoid masking original error)
         try:
-            from vibe3.services import record_error
+            from vibe3.services.shared import record_error
 
             record_error(
                 error_code="E_DISPATCH_FAILURE",
@@ -279,7 +280,7 @@ def _record_missing_manager_sections(sections: dict[str, Any]) -> None:
     msg = f"Manager prompt sections missing from prompts.yaml: {missing}"
     logger.bind(domain="manager").warning(msg)
     try:
-        from vibe3.services import ErrorTrackingService
+        from vibe3.services.orchestra import ErrorTrackingService
 
         ErrorTrackingService.get_instance().record_error(
             error_code="E_CONFIG_MISSING",

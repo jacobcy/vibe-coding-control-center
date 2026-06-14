@@ -15,9 +15,9 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
-from vibe3.services import (
+from vibe3.services.issue import load_issue_info
+from vibe3.services.shared import (
     format_agent_actor,
-    load_issue_info,
     record_dispatch_failure_if_unexpected,
     resolve_branch_arg,
 )

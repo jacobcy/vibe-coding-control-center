@@ -31,15 +31,14 @@ from vibe3.commands.flow_status_helpers import (
 )
 from vibe3.config import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services import (
+from vibe3.services.flow import (
     FlowProjectionService,
     FlowService,
     FlowStatusResolver,
-    IssueFlowService,
-    PRService,
-    build_bind_task_hint,
-    resolve_command_branch,
 )
+from vibe3.services.issue import IssueFlowService
+from vibe3.services.pr import PRService, resolve_command_branch
+from vibe3.services.shared import build_bind_task_hint
 from vibe3.ui import (
     console,
     render_error,
@@ -183,7 +182,7 @@ def show(
     if snapshot:
         # Use resolver's flow_status directly (already source-aware)
         # Do NOT re-read from local via FlowProjectionService.get_projection
-        from vibe3.services import FlowProjection
+        from vibe3.services.flow import FlowProjection
 
         projection = FlowProjection.from_flow_status(flow_status)
 
@@ -334,7 +333,7 @@ def status(
         raise typer.Exit(0)
 
     # Try to fetch cached issue titles from orchestra server first
-    from vibe3.services import OrchestraStatusService
+    from vibe3.services.orchestra import OrchestraStatusService
 
     config = load_orchestra_config()
     orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)

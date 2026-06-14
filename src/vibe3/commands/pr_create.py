@@ -14,12 +14,9 @@ from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.models import PRResponse, UpdatePRRequest
 from vibe3.observability import setup_logging
-from vibe3.services import (
-    FlowService,
-    MissingTaskIssueError,
-    PRCreateUsecase,
-    PRService,
-)
+from vibe3.services.flow import FlowService
+from vibe3.services.pr import PRCreateUsecase, PRService
+from vibe3.services.shared import MissingTaskIssueError
 from vibe3.ui import console, render_pr_confirmed, render_pr_created
 from vibe3.utils import check_branch_behind, format_branch_behind_body
 

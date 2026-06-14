@@ -6,15 +6,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
-from vibe3.services import (
+from vibe3.services.orchestra import OrchestraSnapshot
+from vibe3.services.shared import (
     StatusQueryService,
-    is_auto_task_branch,
-    is_dev_collab_branch,
-)
-from vibe3.services.orchestra.status import OrchestraSnapshot
-from vibe3.services.shared.labels import (
     has_orchestra_governed,
     has_roadmap_label,
+    is_auto_task_branch,
+    is_dev_collab_branch,
     normalize_labels,
 )
 from vibe3.services.task.classifier import TaskStatusBucket, classify_task_status
@@ -84,7 +82,7 @@ def fetch_task_status_data(
     assert orch_snapshot is not None
 
     # Fetch flows
-    from vibe3.services import FlowService
+    from vibe3.services.flow import FlowService
 
     service = FlowService()  # type: ignore[assignment]
     flows = service.list_flows(status=None if all_flows else "active")

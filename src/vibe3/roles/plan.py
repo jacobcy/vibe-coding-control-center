@@ -47,7 +47,8 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services import fail_planner_issue, record_dispatch_failure_if_unexpected
+from vibe3.services.issue import fail_planner_issue
+from vibe3.services.shared import record_dispatch_failure_if_unexpected
 
 PLANNER_ROLE = TriggerableRoleDefinition(
     name="planner",
@@ -96,7 +97,8 @@ def _build_plan_task_guidance(
     branch: str,
 ) -> str | None:
     """Build plan task guidance from flow and issue context."""
-    from vibe3.services import FlowService, SpecRefService
+    from vibe3.services.flow import FlowService
+    from vibe3.services.shared import SpecRefService
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -289,7 +291,8 @@ def resolve_spec_plan_input(
     2. Flow's existing spec_ref (if available)
     3. Error if none available
     """
-    from vibe3.services import FlowService, SpecRefService
+    from vibe3.services.flow import FlowService
+    from vibe3.services.shared import SpecRefService
 
     # Case 1: Explicit file provided
     if file:

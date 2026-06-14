@@ -29,7 +29,8 @@ from vibe3.execution.execution_lifecycle import (
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
 from vibe3.models import AgentOptions, ExecutionRequest
-from vibe3.services import HandoffService, format_agent_actor
+from vibe3.services.handoff import HandoffService
+from vibe3.services.shared import format_agent_actor
 
 
 def _severity_event_type(role: str, severity: "ErrorSeverity") -> str:
@@ -86,8 +87,7 @@ class CodeagentExecutionService:
         the next tick does not re-dispatch the same issue.
         """
         from vibe3.clients import GhIssueLabelPort
-        from vibe3.config import load_orchestra_config
-        from vibe3.services import get_handoff_state_label
+        from vibe3.config import get_handoff_state_label, load_orchestra_config
 
         config = load_orchestra_config()
         handoff_label = get_handoff_state_label(config.supervisor_handoff)
@@ -447,7 +447,7 @@ class CodeagentExecutionService:
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.services import record_error
+            from vibe3.services.shared import record_error
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.

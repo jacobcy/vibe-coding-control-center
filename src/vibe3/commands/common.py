@@ -51,7 +51,7 @@ def run_full_check_shortcut() -> None:
     The status dashboard should still render even if the full check reports
     unfixable issues or raises unexpectedly, but users must see a warning.
     """
-    from vibe3.services import CheckService
+    from vibe3.services.check import CheckService
 
     try:
         result = execute_check_mode(CheckService(), "fix_all", show_progress=False)
