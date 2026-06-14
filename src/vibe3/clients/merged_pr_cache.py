@@ -176,11 +176,22 @@ class MergedPRCache:
         try:
             merged_prs = github_client.list_merged_prs(limit=limit)
         except Exception as exc:
-            logger.bind(
-                domain="merged_pr_cache",
-                error=str(exc),
-                exc_info=True,
-            ).error("Failed to fetch merged PRs")
+            from vibe3.exceptions import classify_error_hybrid
+            from vibe3.services import record_error
+
+            error_code = classify_error_hybrid(exc)
+            error_message = f"Failed to fetch merged PRs (sync): {exc}"
+
+            try:
+                record_error(
+                    error_code=error_code,
+                    error_message=error_message,
+                    tick_id=0,
+                )
+            except Exception as record_exc:
+                logger.bind(domain="merged_pr_cache").warning(
+                    f"Failed to record error: {record_exc}"
+                )
             return 0
 
         cache = self._load_cache()
@@ -233,11 +244,22 @@ class MergedPRCache:
         try:
             merged_prs = github_client.list_merged_prs(limit=None)
         except Exception as exc:
-            logger.bind(
-                domain="merged_pr_cache",
-                error=str(exc),
-                exc_info=True,
-            ).error("Failed to fetch merged PRs for rebuild")
+            from vibe3.exceptions import classify_error_hybrid
+            from vibe3.services import record_error
+
+            error_code = classify_error_hybrid(exc)
+            error_message = f"Failed to fetch merged PRs (rebuild): {exc}"
+
+            try:
+                record_error(
+                    error_code=error_code,
+                    error_message=error_message,
+                    tick_id=0,
+                )
+            except Exception as record_exc:
+                logger.bind(domain="merged_pr_cache").warning(
+                    f"Failed to record error: {record_exc}"
+                )
             return 0
 
         prs: dict[str, Any] = {}
