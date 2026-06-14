@@ -405,7 +405,12 @@ class TestSeverityAwareErrorHandling:
     """Test severity-based error handling in codeagent_runner."""
 
     def test_agent_execution_metadata_is_recorded_on_failure(self) -> None:
-        """Backend diagnostics should reach error log and lifecycle refs."""
+        """Backend diagnostics should reach lifecycle refs.
+
+        Note: error_log recording is now handled by IssueFailed projection hook,
+        not directly in codeagent_runner. This test verifies metadata is still
+        passed to flow timeline event construction.
+        """
         mock_store = _make_mock_store()
         command = CodeagentCommand(
             role="manager",
@@ -440,7 +445,6 @@ class TestSeverityAwareErrorHandling:
                 "vibe3.execution.codeagent_runner.format_agent_actor",
                 return_value="agent:manager",
             ),
-            patch("vibe3.services.shared.record_error") as mock_record_error,
             patch(
                 "vibe3.execution.codeagent_runner.persist_execution_lifecycle_event"
             ) as mock_persist_event,
@@ -454,11 +458,7 @@ class TestSeverityAwareErrorHandling:
             except AgentExecutionError:
                 pass
 
-        error_message = mock_record_error.call_args.kwargs["error_message"]
-        assert "backend=claude" in error_message
-        assert "model=sonnet" in error_message
-        assert "prompt_length=1234" in error_message
-
+        # Verify metadata reaches lifecycle event
         refs = mock_persist_event.call_args.kwargs["refs"]
         assert refs["backend"] == "claude"
         assert refs["model"] == "sonnet"

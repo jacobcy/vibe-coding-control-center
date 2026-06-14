@@ -33,6 +33,7 @@ E_EXEC_AUTO_SCENE_RESET: Final[str] = "E_EXEC_AUTO_SCENE_RESET"
 E_EXEC_UNKNOWN: Final[str] = "E_EXEC_UNKNOWN"
 E_DISPATCH_FAILURE: Final[str] = "E_DISPATCH_FAILURE"
 E_EXEC_FLOW_FAILURE: Final[str] = "E_EXEC_FLOW_FAILURE"
+E_ISSUE_FAILED: Final[str] = "E_ISSUE_FAILED"
 
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"

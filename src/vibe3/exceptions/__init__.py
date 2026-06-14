@@ -236,6 +236,7 @@ class InvalidBranchLinkError(SystemError):
 # Lazy imports to avoid circular dependencies
 _LAZY_IMPORTS = {
     "E_EXEC_AUTO_SCENE_RESET": "vibe3.exceptions.error_codes",
+    "E_ISSUE_FAILED": "vibe3.exceptions.error_codes",
     "ErrorHandlingContract": "vibe3.exceptions.error_severity",
     "ErrorSeverity": "vibe3.exceptions.error_severity",
     "GitHubAPIError": "vibe3.exceptions.runtime_errors",
@@ -266,6 +267,7 @@ __all__ = [
     "ConfigError",
     "DiagnosticContext",
     "E_EXEC_AUTO_SCENE_RESET",
+    "E_ISSUE_FAILED",
     "ErrorHandlingContract",
     "ErrorSeverity",
     "GitError",
