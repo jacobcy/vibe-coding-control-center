@@ -150,11 +150,20 @@ async def test_pool_exhaustion_stops_at_threshold(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_pool_exhaustion_no_coordinator_returns_false() -> None:
-    """Should return False when coordinator is None (no crash)."""
-    from vibe3.runtime.pool_exhaustion import is_pool_exhausted
+async def test_pool_exhaustion_no_coordinator_no_crash() -> None:
+    """Should not crash when coordinator is None."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
 
-    assert is_pool_exhausted(None) is False
+    config = _config()
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    result = check_pool_exhaustion(None, config, exhausted_ticks=5, stop_callback=_stop)
+    assert result == 0
+    assert not stop_called
 
 
 @pytest.mark.asyncio

@@ -7,16 +7,6 @@ from collections.abc import Callable
 
 from vibe3.models import OrchestraConfig
 from vibe3.observability import append_orchestra_event
-from vibe3.orchestra import DispatchCoordinatorProtocol
-
-
-def is_pool_exhausted(
-    dispatch_coordinator: DispatchCoordinatorProtocol | None,
-) -> bool:
-    """Check if pool is exhausted (only blocked issues remain)."""
-    if dispatch_coordinator is None:
-        return False
-    return dispatch_coordinator.is_dispatch_paused()
 
 
 def check_pool_exhaustion(
