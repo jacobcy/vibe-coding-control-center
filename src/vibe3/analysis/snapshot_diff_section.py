@@ -6,6 +6,40 @@ to format StructureDiff data for review context.
 
 from vibe3.models import StructureDiff
 
+_MAX_FILES_PER_MODULE = 3
+_MAX_TOTAL_FILES = 15
+
+
+def _extract_module(file_path: str) -> str:
+    """Extract top-level module from file path."""
+    parts = file_path.split("/")
+    if len(parts) > 1:
+        return parts[0]
+    return "other"
+
+
+def _group_files_by_module(
+    file_changes: list,
+) -> list[list]:
+    """Group file changes by top-level module.
+
+    Each module is limited to _MAX_FILES_PER_MODULE entries.
+    """
+    from collections import OrderedDict
+
+    groups: OrderedDict = OrderedDict()
+    for fc in file_changes:
+        module = _extract_module(fc.path)
+        if module not in groups:
+            groups[module] = []
+        if len(groups[module]) < _MAX_FILES_PER_MODULE:
+            groups[module].append(fc)
+
+    result: list[list] = []
+    for module, changes in groups.items():
+        result.append(changes)
+    return result
+
 
 def build_snapshot_diff_section(structure_diff: StructureDiff | None) -> str | None:
     """Build snapshot diff section for review context.
@@ -72,27 +106,48 @@ def build_snapshot_diff_section(structure_diff: StructureDiff | None) -> str | N
         parts.append("### Dependency Changes\n" + "\n".join(dep_parts))
 
     if structure_diff.file_changes:
+        module_groups = _group_files_by_module(structure_diff.file_changes)
         file_parts = []
-        for fc in structure_diff.file_changes[:10]:
-            if fc.change_type == "added":
-                file_parts.append(
-                    f"  + {fc.path} (+{fc.new_loc} LOC, +{fc.new_function_count} funcs)"
-                )
-            elif fc.change_type == "removed":
-                file_parts.append(
-                    f"  - {fc.path} (-{fc.old_loc} LOC, -{fc.old_function_count} funcs)"
-                )
-            else:
-                loc_delta = (fc.new_loc or 0) - (fc.old_loc or 0)
-                func_delta = (fc.new_function_count or 0) - (fc.old_function_count or 0)
-                file_parts.append(
-                    f"  ~ {fc.path} ({loc_delta:+d} LOC, {func_delta:+d} funcs)"
-                )
-        if len(structure_diff.file_changes) > 10:
-            file_parts.append(
-                f"  ... and {len(structure_diff.file_changes) - 10} more files"
-            )
-        parts.append("### File Details (Top 10)\n" + "\n".join(file_parts))
+        shown = 0
+        for group in module_groups:
+            if not group:
+                continue
+            module = _extract_module(group[0].path)
+            if len(module_groups) > 1:
+                file_parts.append(f"  [{module}/]")
+            for fc in group:
+                if fc.change_type == "added":
+                    entry = (
+                        f"    + {fc.path} "
+                        f"(+{fc.new_loc} LOC, +{fc.new_function_count} funcs)"
+                    )
+                    file_parts.append(entry)
+                elif fc.change_type == "removed":
+                    entry = (
+                        f"    - {fc.path} "
+                        f"(-{fc.old_loc} LOC, -{fc.old_function_count} funcs)"
+                    )
+                    file_parts.append(entry)
+                else:
+                    loc_delta = (fc.new_loc or 0) - (fc.old_loc or 0)
+                    func_delta = (fc.new_function_count or 0) - (
+                        fc.old_function_count or 0
+                    )
+                    entry = (
+                        f"    ~ {fc.path} "
+                        f"({loc_delta:+d} LOC, {func_delta:+d} funcs)"
+                    )
+                    file_parts.append(entry)
+                shown += 1
+                if shown >= _MAX_TOTAL_FILES:
+                    break
+            if shown >= _MAX_TOTAL_FILES:
+                break
+        total = len(structure_diff.file_changes)
+        if total > shown:
+            remaining = total - shown
+            file_parts.append(f"  ... and {remaining} more files")
+        parts.append("### File Details (by module)\n" + "\n".join(file_parts))
 
     if structure_diff.warnings:
         warning_parts = []
