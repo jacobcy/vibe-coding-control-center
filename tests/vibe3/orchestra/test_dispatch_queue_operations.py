@@ -587,3 +587,124 @@ class TestCollectFrozenQueueLogging:
             "queue collection complete, total=1 issues" in e for e in events
         ), f"Expected completion log for non-empty collection, got: {events}"
         assert not any("starting queue collection" in e for e in events)
+
+
+class TestRefreshQueueItem:
+    """Tests for refresh_queue_item method."""
+
+    def test_refresh_queue_item_reorders(
+        self, make_capacity, make_coordinator, install_issue_loader
+    ) -> None:
+        """Entry moves to correct position after priority change."""
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=3),
+            mock_health_check=True,
+        )
+
+        # Create frozen queue with 3 entries
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+            QueueEntry(issue_number=2, collected_state="ready"),
+            QueueEntry(issue_number=3, collected_state="ready"),
+        ]
+
+        # Setup issue loader to return issues with different priorities
+        def load_issue(issue_number: int):
+            from vibe3.models import IssueInfo
+
+            priorities = {
+                1: ["priority/1"],  # Low priority
+                2: [
+                    "priority/9",
+                    "state/ready",
+                ],  # High priority - should move to front
+                3: ["priority/5", "state/ready"],  # Medium priority
+            }
+            return IssueInfo(
+                number=issue_number,
+                title=f"Issue {issue_number}",
+                labels=priorities.get(issue_number, ["state/ready"]),
+                state=IssueState.READY,
+                assignees=[],
+                milestone=None,
+            )
+
+        install_issue_loader(
+            coordinator, {1: IssueState.READY, 2: IssueState.READY, 3: IssueState.READY}
+        )
+        coordinator._load_issue = load_issue
+
+        # Refresh issue #2 (high priority) - should move to front
+        coordinator.refresh_queue_item(2)
+
+        # Verify order: 2 (priority 9), then 1 and 3
+        assert coordinator._frozen_queue[0].issue_number == 2
+
+    def test_refresh_queue_item_missing_issue(
+        self, make_capacity, make_coordinator
+    ) -> None:
+        """Early return when issue not found."""
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+
+        # Create frozen queue
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+        ]
+
+        # Issue loader returns None for non-existent issue
+        coordinator._load_issue = lambda n: None
+
+        # Should not raise, just return early
+        coordinator.refresh_queue_item(999)
+
+        # Queue should remain unchanged
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].issue_number == 1
+
+    def test_refresh_queue_item_empty_queue(
+        self, make_capacity, make_coordinator
+    ) -> None:
+        """Early return when queue is empty or None."""
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+
+        # Test with None queue
+        coordinator._frozen_queue = None
+        coordinator._load_issue = lambda n: None
+        coordinator.refresh_queue_item(1)  # Should not raise
+
+        # Test with empty queue
+        coordinator._frozen_queue = []
+        coordinator.refresh_queue_item(1)  # Should not raise
+
+    def test_refresh_queue_item_not_in_queue(
+        self, make_capacity, make_coordinator, install_issue_loader
+    ) -> None:
+        """Early return when issue is not in the queue."""
+        coordinator = make_coordinator(
+            "manager",
+            capacity=make_capacity(remaining=1),
+            mock_health_check=True,
+        )
+
+        # Create frozen queue with one entry
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+        ]
+
+        install_issue_loader(coordinator, {1: IssueState.READY, 2: IssueState.READY})
+
+        # Try to refresh issue #2 which is not in the queue
+        coordinator.refresh_queue_item(2)
+
+        # Queue should remain unchanged
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].issue_number == 1

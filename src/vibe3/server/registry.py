@@ -170,6 +170,14 @@ def _build_server_with_launch_cwd(
     )
     heartbeat.register(facade)
 
+    # Register queue refresh callback for event-driven queue updates
+    from vibe3.domain.event_rules import register_queue_refresh_callback
+
+    register_queue_refresh_callback(
+        lambda issue_number: facade.refresh_queue_item(issue_number)
+    )
+    logger.bind(domain="orchestra").info("Queue refresh callback registered")
+
     # Wire event rules engine into EventPublisher
     try:
         from vibe3.utils import find_repo_root

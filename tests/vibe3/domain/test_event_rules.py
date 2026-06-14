@@ -298,7 +298,10 @@ class TestActionHandlers:
         assert set(handlers.keys()) == expected_keys
 
     def test_refresh_queue_priority_publishes_intent(self) -> None:
-        """ManagerDispatchIntent is published with correct issue_number."""
+        """ManagerDispatchIntent is published with correct issue_number.
+
+        Fallback when no callback is registered.
+        """
         from unittest.mock import MagicMock, patch
 
         handlers = build_action_handlers()
@@ -314,8 +317,74 @@ class TestActionHandlers:
         assert event.trigger_state == "ready"
         assert event.actor == "test_actor"
 
+    def test_refresh_queue_priority_calls_callback(self) -> None:
+        """When callback is registered, it is called with issue_number."""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.domain.event_rules import register_queue_refresh_callback
+
+        # Register a mock callback
+        mock_callback = MagicMock()
+        register_queue_refresh_callback(mock_callback)
+
+        handlers = build_action_handlers()
+        handler = handlers["refresh_queue_priority"]
+
+        # Clear debounce state for clean test
+        from vibe3.domain.event_rules import _last_queue_refresh
+
+        _last_queue_refresh.clear()
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            handler({"issue": "456", "actor": "test_actor"})
+
+        # Callback should be called, not publish
+        assert mock_callback.called
+        assert mock_callback.call_args[0][0] == 456
+        assert not mock_publish.called
+
+        # Reset callback for other tests
+        register_queue_refresh_callback(None)
+
+    def test_refresh_queue_priority_debounce(self) -> None:
+        """Rapid successive calls are debounced."""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.domain.event_rules import (
+            _last_queue_refresh,
+            register_queue_refresh_callback,
+        )
+
+        # Register a mock callback
+        mock_callback = MagicMock()
+        register_queue_refresh_callback(mock_callback)
+
+        handlers = build_action_handlers()
+        handler = handlers["refresh_queue_priority"]
+
+        # Clear debounce state for clean test
+        _last_queue_refresh.clear()
+
+        mock_publish = MagicMock()
+        with patch("vibe3.domain.publish", mock_publish):
+            # First call should succeed
+            handler({"issue": "789", "actor": "test_actor"})
+            assert mock_callback.call_count == 1
+
+            # Immediate second call should be debounced
+            handler({"issue": "789", "actor": "test_actor"})
+            assert mock_callback.call_count == 1  # No additional call
+
+        # Reset callback for other tests
+        register_queue_refresh_callback(None)
+        _last_queue_refresh.clear()
+
     def test_refresh_queue_priority_loop_guard(self) -> None:
-        """Re-entrant call with actor='event:refresh_queue_priority' is skipped."""
+        """Re-entrant call with actor='event:refresh_queue_priority' is skipped.
+
+        This is for the fallback path when no callback is registered.
+        """
         from unittest.mock import MagicMock, patch
 
         handlers = build_action_handlers()
@@ -323,7 +392,7 @@ class TestActionHandlers:
 
         mock_publish = MagicMock()
         with patch("vibe3.domain.publish", mock_publish):
-            # This should be skipped due to loop guard
+            # This should be skipped due to loop guard (fallback path)
             handler({"issue": "123", "actor": "event:refresh_queue_priority"})
 
         assert not mock_publish.called

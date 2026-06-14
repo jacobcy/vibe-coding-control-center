@@ -17,6 +17,7 @@ Queue strategy:
 from __future__ import annotations
 
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Callable, cast
 
@@ -88,6 +89,7 @@ class GlobalDispatchCoordinator:
     _last_remote_check_tick: int
     _dispatch_health: DispatchHealthService
     _dispatch_preflight: DispatchPreflightService
+    _queue_lock: threading.Lock
 
     def __init__(
         self,
@@ -170,6 +172,7 @@ class GlobalDispatchCoordinator:
             flow_context=lambda issue_number: self._flow_context(issue_number),
             structural_check=lambda issue: self._check_dispatch_health(issue),
         )
+        self._queue_lock = threading.Lock()
 
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
@@ -184,6 +187,85 @@ class GlobalDispatchCoordinator:
         """Get the set of issue numbers currently in the frozen queue."""
         self._queue_persistence.frozen_queue = self._frozen_queue
         return self._queue_persistence.get_queued_issue_numbers()
+
+    def refresh_queue_item(self, issue_number: int) -> None:
+        """Refresh frozen queue ordering for a single issue.
+
+        Re-evaluates the position of an issue in the frozen queue based on
+        current priority labels. Called by event-driven queue refresh when
+        label/priority changes are detected.
+
+        Args:
+            issue_number: Issue number to refresh
+        """
+        from vibe3.utils import sort_ready_issues
+
+        # Load latest issue state
+        issue = self._load_issue(issue_number)
+        if issue is None:
+            logger.bind(domain="global_dispatch", issue_number=issue_number).debug(
+                "refresh_queue_item: issue not found, skipping"
+            )
+            return
+
+        # Thread-safe queue mutation
+        with self._queue_lock:
+            if not self._frozen_queue:
+                logger.bind(domain="global_dispatch", issue_number=issue_number).debug(
+                    "refresh_queue_item: queue is empty, skipping"
+                )
+                return
+
+            # Find the entry for this issue
+            entry_index = None
+            entry = None
+            for i, e in enumerate(self._frozen_queue):
+                if e.issue_number == issue_number:
+                    entry_index = i
+                    entry = e
+                    break
+
+            if entry_index is None or entry is None:
+                logger.bind(domain="global_dispatch", issue_number=issue_number).debug(
+                    "refresh_queue_item: issue not in queue, skipping"
+                )
+                return
+
+            # Remove entry from current position
+            self._frozen_queue.pop(entry_index)
+
+            # Update entry's collected_state to reflect current issue state
+            if issue.state:
+                entry.collected_state = issue.state.value
+
+            # Collect all issues from remaining queue entries for sorting
+            queue_issues = []
+            for e in self._frozen_queue:
+                queue_issue = self._load_issue(e.issue_number)
+                if queue_issue:
+                    queue_issues.append(queue_issue)
+
+            # Add the refreshed issue
+            queue_issues.append(issue)
+
+            # Sort all issues using standard queue ordering
+            sorted_issues = sort_ready_issues(queue_issues)
+
+            # Find the new position for our issue
+            new_position = 0
+            for i, sorted_issue in enumerate(sorted_issues):
+                if sorted_issue.number == issue_number:
+                    new_position = i
+                    break
+
+            # Re-insert entry at the new position
+            self._frozen_queue.insert(new_position, entry)
+
+            logger.bind(
+                domain="global_dispatch",
+                issue_number=issue_number,
+                trigger="event",
+            ).info(f"refresh_queue_item: moved issue to position {new_position}")
 
     def _sync_queue_persistence_issue_loader(self) -> None:
         """Keep queue persistence aligned with the coordinator issue loader."""

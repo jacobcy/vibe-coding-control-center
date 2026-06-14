@@ -131,6 +131,17 @@ class OrchestrationFacade(ServiceBase):
             return self._coordinator.get_queued_issue_numbers()
         return set()
 
+    def refresh_queue_item(self, issue_number: int) -> None:
+        """Refresh frozen queue ordering for a single issue.
+
+        Delegates to GlobalDispatchCoordinator for event-driven queue refresh.
+
+        Args:
+            issue_number: Issue number to refresh
+        """
+        if self._coordinator:
+            self._coordinator.refresh_queue_item(issue_number)
+
     async def on_tick(self, tick_id: int = 0) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
 

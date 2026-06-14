@@ -40,50 +40,27 @@ rules:
     action: reload_material
     scope: [governance, prompts]
 
-  # P1: Supervisor issue identified → trigger governance scan
-  - event: SupervisorIssueIdentified
-    action: trigger_governance_scan
+  # P0: Webhook label changed → refresh frozen queue priority
+  - event: WebhookLabelChanged
+    action: refresh_queue_priority
     params:
-      issue_number: "{{ event.issue_number }}"
+      issue: "{{ event.issue_number }}"
+      actor: "event:label_changed"
 
-  # P1: Supervisor issue identified → log for tracking
-  - event: SupervisorIssueIdentified
-    action: log
-    params:
-      message: "supervisor candidate: issue #{{ event.issue_number }}"
-
-  # P2: Issue failed → notify (stub)
-  - event: IssueFailed
-    action: notify
-    params:
-      message: "issue #{{ event.issue_number }} failed: {{ event.reason }}"
-      target: "manager"
-
-  # Manual plan triggered via CLI
-  - event: ManualPlanIntent
-    action: log
-    params:
-      message: "CLI plan triggered for issue #{{ event.issue_number }} (branch={{ event.branch }})"
-
-  # Manual run triggered via CLI
-  - event: ManualRunIntent
-    action: log
-    params:
-      message: "CLI run triggered for issue #{{ event.issue_number }} (mode={{ event.summary_mode }})"
-
-  # Manual review triggered via CLI
-  - event: ManualReviewIntent
-    action: log
-    params:
-      message: "CLI review triggered for issue #{{ event.issue_number }} (base={{ event.is_base_review }})"
-
-  # Webhook: label changed → log (upstream handler can refresh queue)
+  # P1: Webhook label changed → log for observability
   - event: WebhookLabelChanged
     action: log
     params:
       message: "webhook label changed: issue #{{ event.issue_number }} label={{ event.label }} action={{ event.action }}"
 
-  # Webhook: issue updated → log
+  # P0: Webhook issue updated → refresh frozen queue priority
+  - event: WebhookIssueUpdated
+    action: refresh_queue_priority
+    params:
+      issue: "{{ event.issue_number }}"
+      actor: "event:issue_updated"
+
+  # P1: Webhook issue updated → log for observability
   - event: WebhookIssueUpdated
     action: log
     params:

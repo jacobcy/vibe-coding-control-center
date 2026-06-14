@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -17,6 +18,23 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from vibe3.models import DomainEvent
+
+# Module-level callback registry for queue refresh
+_queue_refresh_callback: Callable[[int], None] | None = None
+
+# Debounce state for queue refresh
+QUEUE_REFRESH_COOLDOWN_SECONDS = 5
+_last_queue_refresh: dict[int, float] = {}
+
+
+def register_queue_refresh_callback(callback: Callable[[int], None]) -> None:
+    """Register callback for event-driven queue refresh.
+
+    Args:
+        callback: Function to call with issue_number when queue refresh is triggered
+    """
+    global _queue_refresh_callback
+    _queue_refresh_callback = callback
 
 
 @dataclass(frozen=True)
@@ -382,20 +400,10 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
     def refresh_queue_priority_action(params: dict[str, str]) -> None:
         """Refresh queue priority action handler.
 
-        Publishes ManagerDispatchIntent to trigger queue rebuild.
-        Uses actor-based loop guard to prevent re-entrant publishing.
+        When callback is registered, calls it directly for queue refresh.
+        Otherwise (test environment), falls back to ManagerDispatchIntent publish.
+        Uses debounce cooldown to prevent rapid successive refreshes.
         """
-        from vibe3.domain import publish
-        from vibe3.models import ManagerDispatchIntent
-
-        # Loop guard: skip if we're already in a refresh cycle
-        actor_param = params.get("actor", "")
-        if actor_param == "event:refresh_queue_priority":
-            logger.bind(domain="event_rules").debug(
-                "refresh_queue_priority loop detected, skipping re-entrant publish"
-            )
-            return
-
         issue_number_str = params.get("issue")
         if not issue_number_str:
             issue_number_str = params.get("issue_number")
@@ -411,6 +419,39 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
         except ValueError:
             logger.bind(domain="event_rules").warning(
                 f"refresh_queue_priority invalid issue '{issue_number_str}', skipping"
+            )
+            return
+
+        # Debounce: skip if same issue was refreshed within cooldown window
+        current_time = time.time()
+        last_refresh = _last_queue_refresh.get(issue_number, 0.0)
+        if current_time - last_refresh < QUEUE_REFRESH_COOLDOWN_SECONDS:
+            logger.bind(domain="event_rules", issue_number=issue_number).debug(
+                f"refresh_queue_priority debounced "
+                f"(cooldown: {QUEUE_REFRESH_COOLDOWN_SECONDS}s)"
+            )
+            return
+
+        # Update debounce timestamp
+        _last_queue_refresh[issue_number] = current_time
+
+        # If callback is registered, use it for direct queue refresh
+        if _queue_refresh_callback is not None:
+            _queue_refresh_callback(issue_number)
+            logger.bind(domain="event_rules", issue_number=issue_number).info(
+                "Called queue refresh callback"
+            )
+            return
+
+        # Fallback: publish ManagerDispatchIntent (test environment)
+        from vibe3.domain import publish
+        from vibe3.models import ManagerDispatchIntent
+
+        # Loop guard for fallback path
+        actor_param = params.get("actor", "")
+        if actor_param == "event:refresh_queue_priority":
+            logger.bind(domain="event_rules").debug(
+                "refresh_queue_priority loop detected, skipping re-entrant publish"
             )
             return
 
@@ -435,7 +476,7 @@ def build_action_handlers() -> dict[str, Callable[[dict[str, str]], None]]:
         logger.bind(
             domain="event_rules",
             issue_number=issue_number,
-        ).info("Published ManagerDispatchIntent for queue refresh")
+        ).info("Published ManagerDispatchIntent for queue refresh (fallback)")
 
     def _publish_governance_scan(actor: str, tick_count: int) -> None:
         """Publish GovernanceScanStarted with the given actor and tick."""
