@@ -124,6 +124,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "EventPublisher": "vibe3.domain.publisher",
     "EventHandler": "vibe3.domain.publisher",
     "publish": "vibe3.domain.publisher",
+    "publish_and_wait": "vibe3.domain.publisher",
     "subscribe": "vibe3.domain.publisher",
     "get_publisher": "vibe3.domain.publisher",
     # Event rules
@@ -201,6 +202,7 @@ __all__ = [
     "EventHandler",
     "get_publisher",
     "publish",
+    "publish_and_wait",
     "subscribe",
     # Event rules
     "EventRule",

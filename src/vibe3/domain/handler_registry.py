@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from loguru import logger
 
@@ -13,8 +13,8 @@ T = TypeVar("T", bound=DomainEvent)
 
 
 def register_handler(event_name: str) -> Callable[
-    [Callable[[T], None]],
-    Callable[[T], None],
+    [Callable[[T], Any | None]],
+    Callable[[T], Any | None],
 ]:
     """Decorator to register a handler for an event.
 
@@ -34,9 +34,9 @@ def register_handler(event_name: str) -> Callable[
     from vibe3.domain import subscribe
 
     def decorator(
-        func: Callable[[T], None],
-    ) -> Callable[[T], None]:
-        subscribe(event_name, cast(Callable[[DomainEvent], None], func))
+        func: Callable[[T], Any | None],
+    ) -> Callable[[T], Any | None]:
+        subscribe(event_name, cast(Callable[[DomainEvent], Any | None], func))
         logger.bind(domain="events").info(
             f"{func.__name__} registered for {event_name}"
         )
