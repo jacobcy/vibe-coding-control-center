@@ -147,7 +147,21 @@ def test_flow_blocked_appends_multiple_tasks_idempotently() -> None:
         issues=[],
     )
 
-    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+    # Mock store for branch resolution
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
+        {
+            "branch": "task/issue-235",
+            "flow_status": "active",
+            "flow_slug": "issue-235",
+        }
+    ]
+    flow_service.store = mock_store
+
+    with (
+        patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
+        patch("vibe3.services.FlowService", return_value=flow_service),
+    ):
         result = runner.invoke(
             app,
             [
