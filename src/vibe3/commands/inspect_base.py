@@ -51,6 +51,8 @@ def register(app: typer.Typer) -> None:
         Focus on critical paths and public API files only.
         Shows impact scope, not detailed diffs.
 
+        Automatically detects uncommitted changes if no committed branch diff is found.
+
         Examples:
             vibe inspect base                # Compare current branch vs parent branch
             vibe inspect base origin/develop # Compare current branch vs origin/develop
@@ -58,7 +60,7 @@ def register(app: typer.Typer) -> None:
         """
         from vibe3.clients import GitClient, GitHubClient
         from vibe3.config import get_config
-        from vibe3.models import BranchSource
+        from vibe3.models import BranchSource, UncommittedSource
         from vibe3.utils import get_current_branch
 
         if trace:
@@ -93,8 +95,15 @@ def register(app: typer.Typer) -> None:
         log.info("Analyzing core file changes")
 
         git = GitClient(github_client=GitHubClient())
+
+        # Collect both committed and uncommitted changes
         source = BranchSource(branch=current_branch, base=resolved_base)
-        all_changed_files = git.get_changed_files(source)
+        all_changed_files = list(git.get_changed_files(source))
+
+        uncommitted_files = git.get_changed_files(UncommittedSource())
+        for f in uncommitted_files:
+            if f not in all_changed_files:
+                all_changed_files.append(f)
 
         # Count changed lines only in code paths
         changed_lines = count_changed_lines_in_code_paths(git, source)

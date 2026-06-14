@@ -15,7 +15,7 @@ from vibe3.analysis import (
 from vibe3.clients import GitClient
 from vibe3.config import get_config
 from vibe3.exceptions import GitError, UserError
-from vibe3.models import BranchSource
+from vibe3.models import ChangeSource
 
 
 def _code_paths() -> list[str]:
@@ -58,7 +58,7 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
         ) from None
 
 
-def count_changed_lines_in_code_paths(git: GitClient, source: BranchSource) -> int:
+def count_changed_lines_in_code_paths(git: GitClient, source: ChangeSource) -> int:
     """Count changed lines only in configured code paths."""
     code_paths = _code_paths()
     return count_changed_lines(git.get_diff(source), code_paths=code_paths)
@@ -66,7 +66,7 @@ def count_changed_lines_in_code_paths(git: GitClient, source: BranchSource) -> i
 
 def build_json_output(
     git: GitClient,
-    source: BranchSource,
+    source: ChangeSource,
     current_branch: str,
     base_branch: str,
     all_changed_files: list[str],
