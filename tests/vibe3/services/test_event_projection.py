@@ -14,6 +14,7 @@ from vibe3.models.domain_events import (
     FlowCompleted,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
+    PRMerged,
     ReviewerDispatchIntent,
 )
 from vibe3.services.flow.event_projection import (
@@ -46,6 +47,11 @@ class TestProjectionTable:
         """FlowCompleted is in the projection table."""
         assert FlowCompleted in PROJECTION_TABLE
         assert PROJECTION_TABLE[FlowCompleted] == "flow_completed"
+
+    def test_pr_merged_in_table(self):
+        """PRMerged is in the projection table."""
+        assert PRMerged in PROJECTION_TABLE
+        assert PROJECTION_TABLE[PRMerged] == "pr_merged"
 
     def test_flow_blocked_not_in_table(self):
         """FlowBlocked is explicitly excluded from initial table."""
@@ -83,6 +89,29 @@ class TestProjectDomainEvent:
         assert "completed_state=done" in events[0]["detail"]
         assert "issue_number=123" in events[0]["detail"]
         assert events[0]["refs"] == {"issue_number": 123}
+
+    def test_pr_merged_projects(self, temp_db):
+        """PRMerged is projected to flow_events."""
+        event = PRMerged(
+            issue_number=100,
+            branch="task/issue-100-test",
+            pr_number=42,
+            merged_by="user:test",
+            actor="system:check",
+        )
+
+        result = project_domain_event(event)
+
+        assert result is True
+
+        events = temp_db.get_events(branch="task/issue-100-test")
+        assert len(events) == 1
+        assert events[0]["event_type"] == "pr_merged"
+        assert events[0]["branch"] == "task/issue-100-test"
+        assert events[0]["actor"] == "system:check"
+        assert "pr_number=42" in events[0]["detail"]
+        assert "merged_by=user:test" in events[0]["detail"]
+        assert events[0]["refs"] == {"issue_number": 100, "pr_number": 42}
 
     def test_unknown_event_not_projected(self, temp_db):
         """Event not in projection table is not projected."""
@@ -142,6 +171,31 @@ class TestPublishIntegration:
         assert len(events) == 1
         assert events[0]["event_type"] == "flow_completed"
         assert events[0]["actor"] == "integration:test"
+
+    def test_publish_pr_merged_creates_timeline_record(self, temp_db, clean_publisher):
+        """Publishing PRMerged creates a flow_events record."""
+        publisher = EventPublisher()
+
+        # Register projection hook
+        publisher.add_publish_hook(build_event_projection_hook())
+
+        # Publish PRMerged
+        event = PRMerged(
+            issue_number=200,
+            branch="task/issue-200-test",
+            pr_number=55,
+            merged_by="user:integration",
+        )
+        publisher.publish(event)
+
+        # Verify projection
+        events = temp_db.get_events(branch="task/issue-200-test")
+        assert len(events) == 1
+        assert events[0]["event_type"] == "pr_merged"
+        assert events[0]["actor"] == "system:check"
+        assert "pr_number=55" in events[0]["detail"]
+        assert "merged_by=user:integration" in events[0]["detail"]
+        assert events[0]["refs"] == {"issue_number": 200, "pr_number": 55}
 
     def test_publish_unknown_event_no_timeline_record(self, temp_db, clean_publisher):
         """Publishing unknown event does not create timeline record."""
@@ -243,3 +297,47 @@ class TestProjectionFields:
 
         events = temp_db.get_events(branch="task/issue-99")
         assert events[0]["actor"] == "system:flow"
+
+    def test_pr_merged_has_correct_fields(self, temp_db):
+        """PRMerged projection has all expected fields."""
+        event = PRMerged(
+            issue_number=42,
+            branch="feature/pr-test",
+            pr_number=123,
+            merged_by="user:alice",
+        )
+
+        project_domain_event(event)
+
+        events = temp_db.get_events(branch="feature/pr-test")
+        assert len(events) == 1
+
+        proj = events[0]
+        assert proj["event_type"] == "pr_merged"
+        assert proj["branch"] == "feature/pr-test"
+        assert proj["actor"] == "system:check"
+        assert "pr_number=123" in proj["detail"]
+        assert "merged_by=user:alice" in proj["detail"]
+        assert proj["refs"] == {"issue_number": 42, "pr_number": 123}
+
+    def test_pr_merged_without_merged_by(self, temp_db):
+        """PRMerged without merged_by still projects correctly."""
+        event = PRMerged(
+            issue_number=50,
+            branch="feature/pr-test-2",
+            pr_number=999,
+            merged_by=None,  # Explicitly None
+        )
+
+        project_domain_event(event)
+
+        events = temp_db.get_events(branch="feature/pr-test-2")
+        assert len(events) == 1
+
+        proj = events[0]
+        assert proj["event_type"] == "pr_merged"
+        assert proj["actor"] == "system:check"
+        # merged_by should not appear in detail when None
+        assert "pr_number=999" in proj["detail"]
+        assert "merged_by" not in proj["detail"]
+        assert proj["refs"] == {"issue_number": 50, "pr_number": 999}
