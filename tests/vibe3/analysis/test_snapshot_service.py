@@ -267,6 +267,116 @@ def test_read_snapshot_metadata_nonexistent_file(tmp_path: Path) -> None:
     assert result is None
 
 
+def test_read_snapshot_metadata_large_file_tail_read(tmp_path: Path) -> None:
+    """Test tail read path for baseline_for in files >4KB."""
+    from vibe3.analysis.snapshot_service import _read_snapshot_metadata
+
+    # Create a snapshot file >4KB with large files array
+    # StructureSnapshot field order: snapshot_id → ... → files → modules →
+    # dependencies → metrics → baseline_for
+    large_files = [
+        {
+            "path": f"/path/to/file_{i}.py",
+            "language": "python",
+            "total_loc": 100,
+            "functions": [],
+            "function_count": 0,
+            "imports": [],
+        }
+        for i in range(100)
+    ]
+
+    snapshot_file = tmp_path / "large-snapshot.json"
+    snapshot_file.write_text(
+        json.dumps(
+            {
+                "snapshot_id": "2026-06-15T10-00-00_main_abc1234",
+                "created_at": "2026-06-15T10:00:00",
+                "branch": "main",
+                "commit": "abc1234",
+                "commit_short": "abc1234",
+                "root": "/project",
+                "files": large_files,
+                "modules": [],
+                "dependencies": {},
+                "metrics": {
+                    "total_files": 100,
+                    "total_loc": 10000,
+                    "total_functions": 0,
+                },
+                "baseline_for": "feature-branch",
+            },
+            indent=2,
+        )
+    )
+
+    # Verify file is large enough to trigger tail read (>4KB)
+    file_size = snapshot_file.stat().st_size
+    assert file_size > 4096, f"Test file must be >4KB, got {file_size} bytes"
+
+    # Extract metadata and verify baseline_for is found via tail read
+    result = _read_snapshot_metadata(snapshot_file)
+    assert result is not None
+    assert result["snapshot_id"] == "2026-06-15T10-00-00_main_abc1234"
+    assert result["created_at"] == "2026-06-15T10:00:00"
+    assert result["branch"] == "main"
+    assert result["commit"] == "abc1234"
+    assert (
+        result["baseline_for"] == "feature-branch"
+    ), "baseline_for must be extracted via tail read for large files"
+
+
+def test_read_snapshot_metadata_large_file_baseline_for_null(tmp_path: Path) -> None:
+    """Test tail read path extracts null baseline_for from large files."""
+    from vibe3.analysis.snapshot_service import _read_snapshot_metadata
+
+    large_files = [
+        {
+            "path": f"/path/to/file_{i}.py",
+            "language": "python",
+            "total_loc": 100,
+            "functions": [],
+            "function_count": 0,
+            "imports": [],
+        }
+        for i in range(100)
+    ]
+
+    snapshot_file = tmp_path / "large-snapshot-null.json"
+    snapshot_file.write_text(
+        json.dumps(
+            {
+                "snapshot_id": "2026-06-15T11-00-00_main_def5678",
+                "created_at": "2026-06-15T11:00:00",
+                "branch": "main",
+                "commit": "def5678",
+                "commit_short": "def5678",
+                "root": "/project",
+                "files": large_files,
+                "modules": [],
+                "dependencies": {},
+                "metrics": {
+                    "total_files": 100,
+                    "total_loc": 10000,
+                    "total_functions": 0,
+                },
+                "baseline_for": None,
+            },
+            indent=2,
+        )
+    )
+
+    file_size = snapshot_file.stat().st_size
+    assert file_size > 4096, f"Test file must be >4KB, got {file_size} bytes"
+
+    result = _read_snapshot_metadata(snapshot_file)
+    assert result is not None
+    assert result["snapshot_id"] == "2026-06-15T11-00-00_main_def5678"
+    assert (
+        result["baseline_for"] is None
+    ), "null baseline_for must be extracted via tail read for large files"
+
+
 def test_list_snapshots_with_limit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
