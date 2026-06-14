@@ -315,3 +315,134 @@ def classify_task_issues_for_rendering(
         "blocked_items": blocked_items,
         "open_issue_numbers": open_issue_numbers,
     }
+
+
+def _flow_to_dict(flow: FlowStatusResponse) -> dict[str, Any]:
+    """Convert FlowStatusResponse to JSON-serializable dict."""
+    return flow.model_dump(mode="json")
+
+
+def _issue_to_dict(item: dict[str, object]) -> dict[str, Any]:
+    """Convert issue item to JSON-serializable dict with all required fields."""
+    flow = cast(FlowStatusResponse | None, item.get("flow"))
+    state = cast(IssueState | None, item.get("state"))
+    verdict = item.get("latest_verdict")
+
+    result: dict[str, Any] = {
+        "number": cast(int, item.get("number")),
+        "title": cast(str, item.get("title", "")),
+        "state": state.value if state else None,
+        "assignee": cast(str | None, item.get("assignee")),
+        "flow_branch": flow.branch if flow else None,
+        "queue_rank": cast(int | None, item.get("queue_rank")),
+        "plan_ref": flow.plan_ref if flow else None,
+        "report_ref": flow.report_ref if flow else None,
+        "audit_ref": flow.audit_ref if flow else None,
+        "blocked_by": cast(int | None, item.get("blocked_by")),
+        "priority": cast(str | None, item.get("priority")),
+        "roadmap": cast(str | None, item.get("roadmap")),
+        "remote": cast(bool, item.get("remote", False)),
+        "labels": cast(list[str], item.get("labels", [])),
+    }
+
+    # Convert verdict
+    if verdict is not None:
+        from vibe3.models import VerdictRecord
+
+        if isinstance(verdict, VerdictRecord):
+            result["verdict"] = {
+                "verdict": verdict.verdict,  # Already a string Literal
+                "actor": verdict.actor,
+                "role": verdict.role,
+                "timestamp": (
+                    verdict.timestamp.isoformat() if verdict.timestamp else None
+                ),
+                "reason": verdict.reason,
+                "issues": verdict.issues,
+            }
+        else:
+            result["verdict"] = verdict
+    else:
+        result["verdict"] = None
+
+    return result
+
+
+def build_api_task_data(all_flows: bool = False) -> dict[str, Any]:
+    """Build JSON-serializable task status data for API endpoint.
+
+    Args:
+        all_flows: If True, include all flow statuses;
+            otherwise active/done/blocked only.
+
+    Returns:
+        Dict with config_summary, server_status, classified_issues, flows.
+    """
+    data = fetch_task_status_data(all_flows)
+    classified = classify_task_issues_for_rendering(
+        data.orchestrated_issues, data.config
+    )
+
+    # Config summary
+    config_summary = {
+        "repo": data.config.repo,
+        "port": data.config.port,
+        "polling_interval": data.config.polling_interval,
+        "max_concurrent_flows": data.config.max_concurrent_flows,
+    }
+
+    # Server status
+    server_status = {
+        "running": data.orch_snapshot.server_running,
+        "snapshot_found": data.snapshot_found,
+        "polling_interval": data.orch_snapshot.polling_interval,
+        "port": data.orch_snapshot.port,
+        "active_issues": [
+            {
+                "number": issue.number,
+                "state": issue.state.value if issue.state else None,
+            }
+            for issue in data.orch_snapshot.active_issues
+        ],
+        "queued_issues": list(data.orch_snapshot.queued_issues),
+        "active_flows": data.orch_snapshot.active_flows,
+        "active_worktrees": data.orch_snapshot.active_worktrees,
+    }
+
+    # Convert classified issues - bucketed_items needs special handling
+    classified_issues: dict[str, Any] = {}
+
+    # Convert simple lists
+    for key in [
+        "supervisor_items",
+        "roadmap_rfc_items",
+        "roadmap_epic_items",
+        "waiting_for_pool_items",
+        "governed_anomaly_items",
+        "human_collab_items",
+        "task_progress_items",
+        "remote_items",
+        "pr_ref_items",
+        "blocked_items",
+    ]:
+        classified_issues[key] = [_issue_to_dict(item) for item in classified[key]]
+
+    # Convert bucketed_items (dict with TaskStatusBucket keys)
+    bucketed: dict[str, list[dict[str, Any]]] = {}
+    for bucket, items in classified["bucketed_items"].items():
+        bucket_key = bucket.value if hasattr(bucket, "value") else str(bucket)
+        bucketed[bucket_key] = [_issue_to_dict(item) for item in items]
+    classified_issues["bucketed_items"] = bucketed
+
+    # Convert open_issue_numbers (set to list)
+    classified_issues["open_issue_numbers"] = list(classified["open_issue_numbers"])
+
+    # Convert flows
+    flows = [_flow_to_dict(flow) for flow in data.flows]
+
+    return {
+        "config_summary": config_summary,
+        "server_status": server_status,
+        "classified_issues": classified_issues,
+        "flows": flows,
+    }

@@ -58,7 +58,10 @@ if TYPE_CHECKING:
     from vibe3.services.orchestra.coordination import CoordinationResolver
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
-    from vibe3.services.orchestra.serve_status import ServeStatusService
+    from vibe3.services.orchestra.serve_status import (
+        ServeStatusService,
+        fetch_serve_status_data,
+    )
     from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
@@ -150,6 +153,7 @@ if TYPE_CHECKING:
     from vibe3.services.task.service import TaskService
     from vibe3.services.task.show import TaskShowResult
     from vibe3.services.task.status import (
+        build_api_task_data,
         classify_task_issues_for_rendering,
         fetch_task_status_data,
     )
@@ -208,6 +212,7 @@ __all__ = [
     "VerdictService",
     "analyze_critical_files",
     "block_manager_noop_issue",
+    "build_api_task_data",
     "build_bind_task_hint",
     "build_pr_analysis",
     "calculate_pr_risk_score",
@@ -224,6 +229,7 @@ __all__ = [
     "fail_manager_issue",
     "fail_planner_issue",
     "fail_reviewer_issue",
+    "fetch_serve_status_data",
     "fetch_task_status_data",
     "filter_critical_files",
     "format_agent_actor",
@@ -327,6 +333,7 @@ _SYMBOL_MODULES = {
     # Functions
     "analyze_critical_files": "vibe3.services.pr.analysis",
     "block_manager_noop_issue": "vibe3.services.issue.failure",
+    "build_api_task_data": "vibe3.services.task.status",
     "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     "build_pr_analysis": "vibe3.services.pr.analysis",
     "calculate_pr_risk_score": "vibe3.services.pr.analysis",
@@ -340,9 +347,10 @@ _SYMBOL_MODULES = {
     "fail_manager_issue": "vibe3.services.issue.failure",
     "fail_planner_issue": "vibe3.services.issue.failure",
     "fail_reviewer_issue": "vibe3.services.issue.failure",
-    "format_agent_actor": "vibe3.services.shared.actors",
-    "filter_critical_files": "vibe3.services.pr.analysis",
+    "fetch_serve_status_data": "vibe3.services.orchestra.serve_status",
     "fetch_task_status_data": "vibe3.services.task.status",
+    "filter_critical_files": "vibe3.services.pr.analysis",
+    "format_agent_actor": "vibe3.services.shared.actors",
     "has_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "format_issue_runtime_line": "vibe3.services.orchestra.status",
     "format_issue_summary_line": "vibe3.services.orchestra.status",

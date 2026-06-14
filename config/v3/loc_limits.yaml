@@ -101,6 +101,9 @@ code_limits:
       - path: "src/vibe3/services/orchestra/orchestrator.py"
         limit: 560
         reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）"
+      - path: "src/vibe3/services/orchestra/serve_status.py"
+        limit: 460
+        reason: "Serve status data aggregation for API endpoint and CLI display, includes daemon status, heartbeat, dispatch activity, FailedGate, error tracking, and job monitoring data; uses dynamic imports to avoid upward dependency and circular dependency detection (Issue #2787)"
       - path: "src/vibe3/services/shared/paths.py"
         limit: 450
         reason: "Shared utilities 聚合，由 path_helpers.py + git_path_client.py 合理合并而成（解决 tight coupling），包含路径规范化、Git path 解析、handoff target resolution、ref normalization 等紧密耦合的路径处理逻辑；职责单一（path utilities）且架构质量已通过 code-reviewer 评估；PR #2406 Phase 1-2a modularity refactoring 创建；Issue #2514 新增三个 centralized path helpers（get_vibe3_cache_path/get_vibe3_db_path/get_vibe3_log_dir）以消除 8 个文件中的重复路径构造，提升代码一致性"
@@ -110,6 +113,9 @@ code_limits:
       - path: "src/vibe3/services/task/service.py"
         limit: 500
         reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低；Issue #2575 Protocol/DI 重构后新增公共 flow_service 属性（+5 行）供测试访问"
+      - path: "src/vibe3/services/task/status.py"
+        limit: 460
+        reason: "Task status data aggregation for API endpoint and CLI display, includes system snapshot fetch, server status rendering, runtime versions, and configuration analysis (Issue #2787)"
       - path: "src/vibe3/services/handoff/resolution.py"
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
@@ -160,8 +166,8 @@ code_limits:
         limit: 620
         reason: "Orchestra CLI 入口聚合，包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查、全局单例实例管理、serve start/stop/status 增强；#2174 新增 Active Jobs 面板显示运行态 job 监控数据（+83 行）"
       - path: "src/vibe3/server/registry.py"
-        limit: 560
-        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）；#2596 新增 webhook router mounting（+13 行）"
+        limit: 600
+        reason: "Orchestra 服务注册与启动聚合，包含 serve 命令构建、async child process 启动、FastAPI 路由注册；#2174 新增 /status jobs 字段和 / 路由重定向（+46 行）；#2169 新增 event rules engine 初始化与 EventPublisher hook 注册（+24 行）；#2553 新增 actor_cleanup 依赖注入回调（+7 行）；#2596 新增 webhook router mounting（+13 行）；#2787 新增 /api/tasks, /api/serve, /api/orchestra 三个 API 端点（+65 行）"
       - path: "src/vibe3/server/control_plane.py"
         limit: 720
         reason: "Local control-plane API 完整实现（Issue #2678），包含 publish/dispatch/query 端点、认证、幂等性、事件构造、审计日志等紧密耦合逻辑；与 server/app.py (620)、server/registry.py (560) 保持一致的 exception 策略；PR #2717 新增端点元数据追踪、审计失败增强日志（+12 行）"

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
         get_manager_usernames,
     )
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
+    from vibe3.services.orchestra.serve_status import fetch_serve_status_data
     from vibe3.services.orchestra.status import (
         IssueStatusEntry,
         OrchestraSnapshot,
@@ -20,6 +21,8 @@ __all__ = [
     "get_handoff_state_label",
     # From orchestrator
     "FlowOrchestratorService",
+    # From serve_status
+    "fetch_serve_status_data",
     # From status
     "IssueStatusEntry",
     "OrchestraSnapshot",
@@ -32,6 +35,8 @@ _SYMBOL_MODULES = {
     "get_handoff_state_label": "vibe3.config",
     # From orchestrator
     "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
+    # From serve_status
+    "fetch_serve_status_data": "vibe3.services.orchestra.serve_status",
     # From status
     "IssueStatusEntry": "vibe3.services.orchestra.status",
     "OrchestraSnapshot": "vibe3.services.orchestra.status",

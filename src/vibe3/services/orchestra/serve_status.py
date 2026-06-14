@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from rich.console import Console
 from rich.table import Table
@@ -15,6 +16,9 @@ from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
     format_age_aware_time,
+    job_to_dict,
+    orchestra_tmux_session_exists,
+    validate_pid_file,
 )
 
 
@@ -258,3 +262,160 @@ class ServeStatusService:
                 self.console.print(table)
         else:
             self.console.print("  No errors recorded")
+
+
+def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
+    """Fetch serve status data as JSON-serializable dict for API endpoint.
+
+    Args:
+        config: Orchestra configuration.
+
+    Returns:
+        Dict with daemon status, heartbeat, dispatch activity, FailedGate,
+        error tracking, and job monitoring data.
+    """
+    import importlib
+
+    execution_module = importlib.import_module("vibe3.execution")
+    job_monitor_service = execution_module.JobMonitorService
+
+    # Daemon status (uses utils functions, no layer violation)
+    instance_info, is_running = validate_pid_file(config.pid_file)
+    pid = instance_info.pid if instance_info else None
+    tmux_exists = orchestra_tmux_session_exists()
+
+    daemon_status = {
+        "pid": pid,
+        "is_valid": is_running,
+        "tmux_exists": tmux_exists,
+        "port": config.port,
+        "log_path": str(orchestra_events_log_path()),
+    }
+
+    # Heartbeat ticks from events.log
+    heartbeat = {
+        "tick_count": 0,
+        "last_tick_time": None,
+        "polling_interval": config.polling_interval,
+    }
+
+    events_log = orchestra_events_log_path()
+    if events_log.exists():
+        try:
+            log_content = events_log.read_text()
+            tick_matches = re.findall(
+                r"\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\] "
+                r"\[server\] tick #(\d+) (start|completed)",
+                log_content,
+            )
+            if tick_matches:
+                last_tick = tick_matches[-1]
+                tick_time, tick_num, _tick_status = last_tick
+                heartbeat["tick_count"] = int(tick_num)
+                heartbeat["last_tick_time"] = tick_time
+        except Exception:
+            pass
+
+    # Try to get runtime polling interval from live snapshot
+    from vibe3.services.orchestra.status import OrchestraStatusService
+
+    live = OrchestraStatusService.fetch_live_snapshot(config)
+    if live is not None:
+        heartbeat["polling_interval"] = live.polling_interval
+
+    # Dispatch activity from events.log (last 5 events)
+    dispatch_activity = []
+    if events_log.exists():
+        try:
+            log_content = events_log.read_text()
+            tick_matches = re.findall(
+                r"\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\] "
+                r"\[server\] tick #(\d+) (start|completed)",
+                log_content,
+            )
+            if tick_matches:
+                last_tick_time = tick_matches[-1][0]
+                dispatcher_matches = re.findall(
+                    rf"\[{last_tick_time[:10]}.*?\] \[dispatcher\] "
+                    r"GlobalDispatchCoordinator: (.+)",
+                    log_content,
+                )
+                for match in dispatcher_matches[-5:]:
+                    clean_match = re.sub(r"\x1b\[[0-9;]*m", "", match)
+                    # Truncate long entries to avoid confusing display in HTML
+                    if len(clean_match) > 200:
+                        clean_match = clean_match[:197] + "..."
+                    dispatch_activity.append(clean_match)
+        except Exception:
+            pass
+
+    # FailedGate status
+    failed_gate_module = importlib.import_module("vibe3.domain.failed_gate")
+    FailedGate = failed_gate_module.FailedGate  # noqa: N806
+    failed_gate = FailedGate()
+    gate_status = failed_gate.get_status()
+
+    failed_gate_data = {
+        "is_active": gate_status.is_active,
+        "reason": gate_status.reason,
+        "triggered_at": gate_status.triggered_at,
+        "triggered_by_error_code": gate_status.triggered_by_error_code,
+        "cleared_at": gate_status.cleared_at,
+        "cleared_by": gate_status.cleared_by,
+        "cleared_reason": gate_status.cleared_reason,
+        "blocked_ticks": gate_status.blocked_ticks,
+    }
+
+    # Error tracking
+    error_tracking_svc = ErrorTrackingService.get_instance()
+    all_errors_status = error_tracking_svc.get_all_errors_status()
+    windowed_status = error_tracking_svc.get_status()
+    recent_errors = error_tracking_svc.get_recent_errors(limit=10)
+
+    error_tracking = {
+        "total_errors": all_errors_status["total_errors"],
+        "critical_count": all_errors_status["critical_count"],
+        "error_count": all_errors_status["error_count"],
+        "warning_count": all_errors_status["warning_count"],
+        "windowed": {
+            "total_errors": windowed_status["total_errors"],
+            "time_window_minutes": windowed_status["time_window_minutes"],
+            "threshold": windowed_status["threshold"],
+        },
+        "recent_errors": [
+            {
+                "tick_id": err["tick_id"],
+                "issue_number": err.get("issue_number"),
+                "severity": err.get("severity", "ERROR"),
+                "error_code": err["error_code"],
+                "created_at": err.get("created_at", ""),
+                "error_message": ServeStatusService._clean_error_message(
+                    err["error_message"]
+                ),
+            }
+            for err in recent_errors
+        ],
+    }
+
+    # Job monitoring
+    job_svc = job_monitor_service()
+    jobs_snapshot = job_svc.snapshot()
+
+    jobs = {
+        "active": [job_to_dict(job) for job in jobs_snapshot.active_jobs],
+        "recent": [job_to_dict(job) for job in jobs_snapshot.recent_jobs],
+        "summary": {
+            "running": jobs_snapshot.running_count,
+            "completed": jobs_snapshot.completed_count,
+            "failed": jobs_snapshot.failed_count,
+        },
+    }
+
+    return {
+        "daemon": daemon_status,
+        "heartbeat": heartbeat,
+        "dispatch_activity": dispatch_activity,
+        "failed_gate": failed_gate_data,
+        "error_tracking": error_tracking,
+        "jobs": jobs,
+    }

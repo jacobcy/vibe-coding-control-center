@@ -11,11 +11,11 @@ if TYPE_CHECKING:
         format_snapshot_for_mcp,
     )
 
-    # Registry (public API)
-    from vibe3.server.registry import validate_pid_file
-
     # Server utilities
     from vibe3.server.server_utils import find_available_port
+
+    # Registry (public API) - re-exported from utils
+    from vibe3.utils import validate_pid_file
 
 # Lazy imports for all symbols (avoid circular init dependencies)
 _LAZY_IMPORTS = {
@@ -25,7 +25,7 @@ _LAZY_IMPORTS = {
     # Server utilities
     "find_available_port": "vibe3.server.server_utils",
     # Registry (public API)
-    "validate_pid_file": "vibe3.server.registry",
+    "validate_pid_file": "vibe3.utils",
 }
 
 

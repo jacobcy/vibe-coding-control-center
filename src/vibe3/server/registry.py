@@ -18,9 +18,16 @@ if TYPE_CHECKING:
     from fastapi.responses import RedirectResponse
 
     from vibe3.models import OrchestraConfig
-    from vibe3.runtime import HeartbeatServer, OrchestraInstanceInfo
+    from vibe3.runtime import HeartbeatServer
 
-ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
+from vibe3.utils import (
+    ORCHESTRA_TMUX_SESSION,
+    job_to_dict,
+    orchestra_tmux_session_exists,
+)
+
+# Backward compatibility alias for internal consumers
+_orchestra_tmux_session_exists = orchestra_tmux_session_exists
 
 
 def _resolve_dispatcher_models_root(
@@ -200,32 +207,37 @@ def _build_server_with_launch_cwd(
     # Store status_service for HTTP endpoint
     fastapi_app.state.status_service = status_service
 
-    @fastapi_app.get("/status")
-    async def get_status() -> dict[str, Any]:
-        """Get current orchestra status snapshot with job monitoring data."""
-        from vibe3.execution import ActiveJob, JobMonitorService
+    @fastapi_app.get("/api/tasks")
+    async def get_api_tasks(all_flows: bool = False) -> dict[str, Any]:
+        """Get task status data as JSON."""
+        from vibe3.services import build_api_task_data
+
+        return await run_in_threadpool(build_api_task_data, all_flows)
+
+    @fastapi_app.get("/api/serve")
+    async def get_api_serve() -> dict[str, Any]:
+        """Get serve status data as JSON."""
+        from vibe3.services import fetch_serve_status_data
+
+        return await run_in_threadpool(fetch_serve_status_data, config)
+
+    @fastapi_app.get("/api/orchestra")
+    async def get_api_orchestra() -> dict[str, Any]:
+        """Get orchestra snapshot + jobs (old /status JSON format).
+
+        This endpoint preserves backward compatibility with fetch_live_snapshot().
+        """
+        from vibe3.execution import JobMonitorService
 
         snapshot = await run_in_threadpool(status_service.snapshot)
         job_svc = JobMonitorService()
         jobs = job_svc.snapshot()
 
-        def _job_to_dict(job: ActiveJob) -> dict[str, Any]:
-            return {
-                "actor_id": job.actor_id,
-                "job_type": job.job_type.value,
-                "status": job.status.value,
-                "issue_number": job.issue_number,
-                "branch": job.branch,
-                "started_at": job.started_at,
-                "completed_at": job.completed_at,
-                "pid": job.pid,
-            }
-
         result = {
             **snapshot.__dict__,
             "jobs": {
-                "active": [_job_to_dict(j) for j in jobs.active_jobs],
-                "recent": [_job_to_dict(j) for j in jobs.recent_jobs],
+                "active": [job_to_dict(j) for j in jobs.active_jobs],
+                "recent": [job_to_dict(j) for j in jobs.recent_jobs],
                 "summary": {
                     "running": jobs.running_count,
                     "completed": jobs.completed_count,
@@ -237,15 +249,21 @@ def _build_server_with_launch_cwd(
 
     @fastapi_app.get("/")
     async def root_redirect() -> RedirectResponse:
-        """Redirect root to /status."""
+        """Redirect root to /web."""
         from fastapi.responses import RedirectResponse
 
-        return RedirectResponse(url="/status", status_code=301)
+        return RedirectResponse(url="/web", status_code=301)
+
+    @fastapi_app.get("/status", response_class=HTMLResponse)
+    async def get_status_dashboard() -> str:
+        """Serve the Orchestra serve status web console."""
+        html_path = Path(__file__).parent / "static" / "serve.html"
+        return html_path.read_text(encoding="utf-8")
 
     @fastapi_app.get("/web", response_class=HTMLResponse)
     async def get_web_dashboard() -> str:
-        """Serve the Orchestra status web console."""
-        html_path = Path(__file__).parent / "static" / "status.html"
+        """Serve the Orchestra task status web console."""
+        html_path = Path(__file__).parent / "static" / "tasks.html"
         return html_path.read_text(encoding="utf-8")
 
     # Mount MCP server (gracefully degrades if not available)
@@ -383,28 +401,6 @@ def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
     return True, stdout or f"Tailscale webhook configured for port {port}"
 
 
-def validate_pid_file(pid_file: Path) -> tuple["OrchestraInstanceInfo | None", bool]:
-    """Validate PID file and check if process is a running orchestra instance.
-
-    Returns:
-        tuple of (instance_info, is_running):
-        - (None, False): No PID file or invalid format
-        - (info, False): Valid PID file but process is dead/not orchestra
-        - (info, True): Valid PID file and process is running orchestra
-    """
-    from vibe3.runtime import (
-        read_instance_info,
-        validate_instance,
-    )
-
-    info = read_instance_info(pid_file)
-    if info is None:
-        return None, False
-
-    is_running = validate_instance(info)
-    return info, is_running
-
-
 def _build_async_serve_command(
     config: "OrchestraConfig",
     verbose: int,
@@ -511,21 +507,6 @@ def _start_async_serve(config: "OrchestraConfig", verbose: int) -> tuple[bool, s
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )
-
-
-def _orchestra_tmux_session_exists() -> bool:
-    """Return whether the orchestra tmux session currently exists."""
-    try:
-        result = subprocess.run(
-            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except Exception:
-        return False
-    return result.returncode == 0
 
 
 def _kill_orchestra_tmux_session() -> bool:
