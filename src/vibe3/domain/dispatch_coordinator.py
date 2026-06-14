@@ -668,3 +668,11 @@ class GlobalDispatchCoordinator:
             else:
                 self._dispatch_paused = False
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
+
+    def is_dispatch_paused(self) -> bool:
+        """Check if dispatch is paused due to exhausted pool.
+
+        Returns:
+            True if dispatch is paused (only blocked issues in queue)
+        """
+        return self._dispatch_paused

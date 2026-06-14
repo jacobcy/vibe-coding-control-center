@@ -15,6 +15,7 @@ from vibe3.orchestra import ServiceBase
 from vibe3.utils import PACK_REFS_INTERVAL_TICKS
 
 from .periodic_check_executor import execute_periodic_check
+from .pool_exhaustion import check_pool_exhaustion
 
 if TYPE_CHECKING:
     from vibe3.domain import GateResult
@@ -59,6 +60,7 @@ class HeartbeatServer:
         check_service: object | None = None,
         cleanup_service: object | None = None,
         actor_cleanup: Callable[[], list[str]] | None = None,
+        dispatch_coordinator: object | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -71,6 +73,8 @@ class HeartbeatServer:
         self._check_service: object | None = check_service
         self._cleanup_service: object | None = cleanup_service
         self._actor_cleanup: Callable[[], list[str]] | None = actor_cleanup
+        self._dispatch_coordinator: object | None = dispatch_coordinator
+        self._exhausted_ticks = 0  # Consecutive ticks with exhausted pool
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -327,6 +331,7 @@ class HeartbeatServer:
                 f"tick #{tick_number} completed in {duration:.2f}s",
             )
 
+            # Check debug tick limit (existing logic)
             if self.config.debug and tick_number >= self.config.debug_max_ticks:
                 append_orchestra_event(
                     "server",
@@ -336,6 +341,14 @@ class HeartbeatServer:
                     ),
                 )
                 self.stop()
+
+            # Check pool exhaustion (new logic)
+            self._exhausted_ticks = check_pool_exhaustion(
+                self._dispatch_coordinator,
+                self.config,
+                self._exhausted_ticks,
+                self.stop,
+            )
 
     async def _tick_service(self, service: ServiceBase, tick_id: int) -> None:
         async with self._semaphore:
