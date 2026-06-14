@@ -30,7 +30,11 @@ from vibe3.models import (
 from . import dag_service as dag_service_module
 
 
-def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:
+def build_change_analysis(
+    source_type: str,
+    identifier: str,
+    base_branch: str | None = None,
+) -> dict[str, object]:
     """Run change analysis pipeline and return impact/dag/score."""
     from vibe3.clients import GitClient, GitHubClient
 
@@ -47,7 +51,7 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     elif source_type == "uncommit":
         source = UncommittedSource()
     else:
-        source = BranchSource(branch=identifier)
+        source = BranchSource(branch=identifier, base=base_branch or "main")
 
     old_stderr = sys.stderr
     sys.stderr = StringIO()

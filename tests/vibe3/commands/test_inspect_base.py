@@ -205,3 +205,66 @@ def test_inspect_base_uses_shared_base_resolver():
     mock_resolve.assert_called_once_with(
         None, current_branch="feature/test", creation_source=None
     )
+
+
+def test_inspect_base_json_includes_uncommitted_only_changes() -> None:
+    """Uncommitted-only changes should affect score and changed symbols."""
+    mock_git = MagicMock()
+    mock_git.get_changed_files.side_effect = [
+        [],
+        ["src/core/working.py"],
+    ]
+    mock_git.get_diff.side_effect = [
+        "",
+        "diff --git a/src/core/working.py b/src/core/working.py\n"
+        "--- a/src/core/working.py\n"
+        "+++ b/src/core/working.py\n"
+        "+print('hi')\n",
+    ]
+
+    mock_dag = MagicMock()
+    mock_dag.impacted_modules = ["vibe3.core"]
+
+    with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
+        with patch(
+            "vibe3.utils.git_helpers.get_current_branch",
+            return_value="feature/test",
+        ):
+            with patch("vibe3.config.get_config") as mock_config:
+                mock_config.return_value.review_scope.critical_paths = ["src/core/"]
+                mock_config.return_value.review_scope.public_api_paths = []
+                mock_config.return_value.code_limits.code_paths.v2_shell = []
+                mock_config.return_value.code_limits.code_paths.v3_python = [
+                    "src/core/"
+                ]
+                with patch("pathlib.Path.exists", return_value=True):
+                    with patch(
+                        "vibe3.analysis.dag_service.expand_impacted_modules",
+                        return_value=mock_dag,
+                    ):
+                        with patch(
+                            "vibe3.commands.inspect_base_helpers.collect_changed_symbols",
+                            return_value=({"src/core/working.py": ["run"]}, 0),
+                        ):
+                            with patch(
+                                "vibe3.commands.inspect_base_helpers.generate_score_report"
+                            ) as mock_score:
+                                mock_score.return_value = {
+                                    "score": 1,
+                                    "level": "LOW",
+                                    "block": False,
+                                    "dimensions": {"changed_lines": 1},
+                                }
+                                with patch(
+                                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                                    return_value=MagicMock(base_branch="feature/root"),
+                                ):
+                                    result = runner.invoke(app, ["base", "--json"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["total_changed"] == 1
+    assert data["score"]["dimensions"]["changed_lines"] == 1
+    assert data["changed_symbols"] == {"src/core/working.py": ["run"]}

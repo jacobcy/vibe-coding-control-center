@@ -83,6 +83,65 @@ def test_build_snapshot_uses_shared_python_collection(
     assert "imported_by" not in snapshot.files[0].model_dump()
 
 
+def test_build_snapshot_custom_root_does_not_scan_workspace_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Custom root snapshots should stay inside the provided tree."""
+    from vibe3.analysis import snapshot_service
+
+    root = tmp_path / "src" / "vibe3"
+    root.mkdir(parents=True)
+    (root / "a.py").write_text("def a():\n    return 1\n")
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "settings.yaml").write_text("x: 1\n")
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "demo.md").write_text("# demo\n")
+
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "task/demo"
+    fake_git.get_current_commit.return_value = "abcdef1234567890"
+    monkeypatch.setattr(snapshot_service, "GitClient", lambda: fake_git)
+
+    monkeypatch.setattr(
+        snapshot_service.structure_service,
+        "collect_python_file_structures",
+        lambda root_arg: [
+            FileStructure(
+                path=str(root / "a.py"),
+                language="python",
+                total_loc=2,
+                functions=[FunctionInfo(name="a", line=1, loc=2)],
+                function_count=1,
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        snapshot_service.dag_service,
+        "_extract_imports",
+        lambda path: [],
+    )
+    monkeypatch.setattr(
+        snapshot_service.dag_service,
+        "build_module_graph",
+        lambda root_arg: {},
+    )
+
+    mock_config = MagicMock()
+    mock_config.review_scope.critical_paths = ["src/vibe3/execution/"]
+    mock_config.review_scope.public_api_paths = ["config/", "skills/"]
+    import vibe3.config
+
+    monkeypatch.setattr(vibe3.config, "get_config", lambda: mock_config)
+
+    snapshot = snapshot_service.build_snapshot(root=str(root))
+
+    assert any(
+        f.path == str(tmp_path / "config" / "settings.yaml") for f in snapshot.files
+    )
+    assert any(f.path == str(tmp_path / "skills" / "demo.md") for f in snapshot.files)
+    assert all(Path(f.path).is_relative_to(tmp_path) for f in snapshot.files)
+
+
 def test_read_snapshot_metadata_extracts_all_fields(tmp_path: Path) -> None:
     """Test normal snapshot file extraction - all 5 fields extracted correctly."""
     from vibe3.analysis.snapshot_service import _read_snapshot_metadata

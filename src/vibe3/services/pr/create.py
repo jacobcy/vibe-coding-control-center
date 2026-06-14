@@ -53,7 +53,7 @@ def _build_inspect_summary(branch: str, base_branch: str) -> str:
     try:
         from vibe3.analysis import build_change_analysis
 
-        result = build_change_analysis("branch", branch)
+        result = build_change_analysis("branch", branch, base_branch)
         score = result.get("score", {})
         if not isinstance(score, dict):
             return ""
@@ -90,12 +90,12 @@ def _enrich_changed_files(changed_files: list[str], branch: str, base: str) -> s
 
         git = GitClient()
         source = BranchSource(branch=branch, base=base)
-        diff = git.get_diff(source)
-        if not diff:
+        numstat = git.get_numstat(source)
+        if not numstat:
             return "\n".join(f"- {f}" for f in changed_files)
 
         loc_map: dict[str, int] = {}
-        for line in diff.split("\n"):
+        for line in numstat.split("\n"):
             parts = line.split("\t")
             if len(parts) >= 3:
                 try:

@@ -113,13 +113,24 @@ def _detect_language(file_path: str) -> str:
     return lang
 
 
-def _collect_other_file_snapshots(tracked_dirs: list[str]) -> list[FileSnapshot]:
+def _resolve_snapshot_repo_root(root: str) -> Path:
+    """Infer the repository root that owns the provided source root."""
+    root_path = Path(root).resolve()
+    if root_path.name == "vibe3" and root_path.parent.name == "src":
+        return root_path.parent.parent
+    return root_path
+
+
+def _collect_other_file_snapshots(
+    tracked_dirs: list[str], repo_root: Path
+) -> list[FileSnapshot]:
     """Collect basic snapshots for non-Python files in tracked directories."""
     files: list[FileSnapshot] = []
     seen: set[str] = set()
+    cwd = Path.cwd().resolve()
 
     for top_dir in tracked_dirs:
-        top = Path(top_dir)
+        top = Path(top_dir) if repo_root == cwd else repo_root / top_dir
         if not top.exists() or not top.is_dir():
             continue
         for f in sorted(top.rglob("*")):
@@ -175,6 +186,8 @@ def build_snapshot(root: str | None = None) -> StructureSnapshot:
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         snapshot_id = StructureSnapshot.generate_id(branch, commit_short, timestamp)
 
+        repo_root = _resolve_snapshot_repo_root(root)
+
         # Scan Python files (deep AST analysis)
         file_structures = structure_service.collect_python_file_structures(root)
         files: list[FileSnapshot] = []
@@ -222,7 +235,7 @@ def build_snapshot(root: str | None = None) -> StructureSnapshot:
             config.review_scope.critical_paths + config.review_scope.public_api_paths
         ):
             tracked_dirs.add(entry.split("/")[0])
-        other_files = _collect_other_file_snapshots(sorted(tracked_dirs))
+        other_files = _collect_other_file_snapshots(sorted(tracked_dirs), repo_root)
         for f_snap in other_files:
             if f_snap.path not in file_paths_seen:
                 files.append(f_snap)
