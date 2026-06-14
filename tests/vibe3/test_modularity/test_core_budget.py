@@ -53,6 +53,7 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     "heartbeat_timer": [
         "runtime.heartbeat",
         "runtime.periodic_check_executor",
+        "runtime.pool_exhaustion",
     ],
     "event_ingestion": [
         "runtime.heartbeat",  # on_tick drives event ingestion

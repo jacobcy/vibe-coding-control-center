@@ -514,6 +514,9 @@ async def test_pool_exhaustion_counter_increments(monkeypatch) -> None:
             server.stop()
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
     server._running = True
 
@@ -592,6 +595,9 @@ async def test_pool_exhaustion_stops_at_threshold(monkeypatch) -> None:
         return None
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _no_wait)
     server._running = True
 
@@ -608,13 +614,9 @@ async def test_pool_exhaustion_stops_at_threshold(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_pool_exhaustion_no_coordinator_returns_false() -> None:
     """Should return False when coordinator is None (no crash)."""
-    server = HeartbeatServer(
-        OrchestraConfig(polling_interval=1, max_concurrent_flows=3),
-        dispatch_coordinator=None,
-    )
+    from vibe3.runtime.pool_exhaustion import is_pool_exhausted
 
-    # Should not crash, should return False
-    assert server._is_pool_exhausted() is False
+    assert is_pool_exhausted(None) is False
 
 
 @pytest.mark.asyncio
