@@ -77,3 +77,77 @@ class TestClientsModularity:
                 + "\n\nclients module should not depend on the services layer. "
                 "Pass service callbacks into clients instead."
             )
+
+    def test_clients_no_exceptions_import(self) -> None:
+        """Verify clients module does not import from vibe3.exceptions barrel.
+
+        Clients are lower-level adapters/cache helpers. Importing from the exceptions
+        barrel creates a dependency on the lazy __getattr__ re-export graph and can
+        perturb mypy's type inference.
+
+        This test establishes a baseline to detect regression. Current baseline
+        allows existing violations but prevents new growth.
+        """
+        import ast
+
+        clients_path = Path("src/vibe3/clients")
+
+        if not clients_path.exists():
+            pytest.skip("clients module not found")
+
+        # Use AST parsing to count barrel imports
+        violations = []
+        for py_file in clients_path.rglob("*.py"):
+            if "__pycache__" in str(py_file):
+                continue
+
+            try:
+                tree = ast.parse(py_file.read_text())
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ImportFrom):
+                        module = node.module or ""
+                        if module == "vibe3.exceptions":
+                            imported_names = ", ".join(
+                                alias.name for alias in node.names
+                            )
+                            violations.append(
+                                {
+                                    "file": str(py_file.relative_to(clients_path)),
+                                    "line": node.lineno,
+                                    "import": f"from {module} import {imported_names}",
+                                }
+                            )
+            except SyntaxError:
+                continue
+
+        # Baseline: 15 violations (as of issue #2848)
+        # These are primarily exception TYPE imports
+        # (GitError, GitHubError, etc.) which are defined directly
+        # in exceptions/__init__.py (not lazy imports).
+        # Only 2 are lazy FUNCTION imports
+        # (classify_error_hybrid, get_error_handling_contract)
+        # which are problematic for mypy.
+        baseline = 15
+
+        if violations:
+            print(
+                f"\n⚠️  Found {len(violations)} "
+                f"exceptions barrel imports in clients/:"
+            )
+            for v in violations[:10]:
+                print(f"   {v['file']}:{v['line']} - {v['import']}")
+            if len(violations) > 10:
+                print(f"   ... and {len(violations) - 10} more")
+
+        # Hard gate: prevent growth beyond baseline
+        assert len(violations) <= baseline, (
+            f"Exceptions barrel imports in clients/ increased: "
+            f"expected <= {baseline}, found {len(violations)}"
+        )
+
+        # Expected state: baseline violations remain (tracked by issue #2848)
+        if violations:
+            pytest.xfail(
+                f"Baseline: {len(violations)} exceptions barrel imports in clients/ "
+                f"(issue #2848)"
+            )
