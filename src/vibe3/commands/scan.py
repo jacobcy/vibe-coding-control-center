@@ -51,6 +51,11 @@ def _run_governance_scan(
         no_async: Deprecated flag (logs warning, always uses async dispatch
             via event bus)
     """
+    # Register event handlers before publishing (required for standalone scan)
+    from vibe3.domain import register_event_handlers
+
+    register_event_handlers()
+
     if no_async:
         logger.warning(
             "--no-async is deprecated and ignored. Event bus now triggers handler "
@@ -120,6 +125,11 @@ def _run_supervisor_scan() -> tuple[int, int]:
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
+    # Register event handlers before publishing (required for standalone scan)
+    from vibe3.domain import register_event_handlers
+
+    register_event_handlers()
+
     from vibe3.roles import fetch_supervisor_candidates
 
     config = load_orchestra_config()
@@ -246,6 +256,11 @@ def governance(
         typer.echo("")  # Blank line for readability
 
     _run_governance_scan(material_override=role, no_async=no_async)
+
+    # User feedback: confirm event published and handler registered
+    typer.echo(
+        "Governance scan event published. Check tmux session for execution status."
+    )
     if no_async:
         typer.echo("Governance scan completed")
 
