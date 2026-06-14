@@ -373,9 +373,11 @@ bin/vibe clean                 # 清理临时文件
 ```bash
 # 核心运行时管理
 vibe3 serve status      # 查看 Orchestra 服务状态与门禁
-vibe3 task status       # 总览活跃 flow 与 orchestra 状态
+vibe3 task status       # [推荐] 总览全局任务面板与 Flow 状态
+vibe3 task show         # 查看当前任务详情
 vibe3 check             # V3 Handoff 存储一致性与共享状态审计
-vibe3 snapshot show     # 项目健康度、指标与 LOC 限制度量仪表盘
+vibe3 snapshot show     # [推荐] 查看项目健康度、指标与结构变更 (persistence-based)
+vibe3 snapshot diff     # 比较当前结构与基准快照
 
 # Flow 与协作
 vibe3 flow show         # 查看当前 flow 上下文与绑定信息
@@ -383,7 +385,8 @@ vibe3 flow update       # 注册/更新当前分支为活跃 flow
 vibe3 flow bind         # 显式绑定 issue-flow 关系
 vibe3 handoff show      # 查看 agent 间的 handoff 链路
 vibe3 handoff append    # 向当前 flow 追加 handoff 记录
-vibe3 internal bootstrap # 初始化/同步当前 flow 环境
+vibe3 internal bootstrap # [推荐] 初始化/同步当前 flow 环境
+```
 
 # 代码智能与执行 (Agent 模式)
 vibe3 inspect symbols   # AST 级代码结构分析

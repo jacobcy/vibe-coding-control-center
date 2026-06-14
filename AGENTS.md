@@ -94,9 +94,9 @@ This project has **two parallel implementations**:
 
 ## 🚀 Quick Start
 
-1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
-2. **检查当前 flow**: 运行 `vibe3 flow show`
-3. **查看全局状态**: 运行 `vibe3 task status`
+1. **初始化环境**: 运行 `vibe3 internal bootstrap`
+2. **查看全局状态**: 运行 `vibe3 task status`
+3. **查看当前 flow**: 运行 `vibe3 flow show`
 4. **了解执行规则**: 阅读 [.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)
 
 ## 🔁 Handoff 命令约定

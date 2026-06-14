@@ -47,8 +47,11 @@ vibe3 snapshot show    # 查看项目健康度仪表盘
 vibe3 flow show        # 查看当前分支 Flow 详情
 ```
 # 2. 如果是首次使用或环境变更，执行初始化
-# 这会同步基础文件并初始化本地 worktree (symlinks, hooks, etc.)
-zsh scripts/init.sh
+# 这会同步基础文件并初始化本地环境 (skills, hooks, etc.)
+vibe3 internal bootstrap
+
+# (Legacy) 也可以使用脚本初始化
+# zsh scripts/init.sh
 
 # 3. 如果需要全局安装 Vibe 工具链 (vibe2 shell aliases)
 zsh scripts/install.sh && source ~/.zshrc
