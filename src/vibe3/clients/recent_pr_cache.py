@@ -100,10 +100,6 @@ class RecentPRCache:
         prs = cache.get("prs", {})
         return prs if isinstance(prs, dict) else {}
 
-    def get_branch_pr(self, branch: str) -> dict[str, Any] | None:
-        """Return cached PR entry for a branch, if present."""
-        return self.get_all_branch_prs().get(branch)
-
     def sync(self, github_client: Any, limit: int = 50) -> int:
         """Replace cache with latest recent PR snapshot from GitHub."""
         logger.bind(domain="recent_pr_cache", limit=limit).info(
