@@ -489,22 +489,42 @@ _METADATA_FIELDS = ("snapshot_id", "created_at", "branch", "commit", "baseline_f
 def _read_snapshot_metadata(filepath: Path) -> dict[str, str | None] | None:
     """Extract top-level string fields from a snapshot JSON file.
 
-    Uses regex to extract only scalar fields without deserializing the
-    heavy nested structures (files, modules, dependencies, metrics).
+    Uses bounded head/tail reads instead of loading the full file,
+    since metadata fields are concentrated at the beginning/end of the
+    serialized JSON (StructureSnapshot). The large nested structures
+    (files, modules, dependencies, metrics) are never deserialized.
     Returns None if the file cannot be read or has no recognizable metadata.
     """
+    # --- Head read for early metadata fields ---
     try:
-        text = filepath.read_text(encoding="utf-8")
+        file_size = filepath.stat().st_size
+        head_size = min(4096, file_size)
+        with filepath.open("r", encoding="utf-8") as f:
+            head = f.read(head_size)
     except OSError:
+        return None
+    if not head.strip():
         return None
 
     try:
         metadata: dict[str, str | None] = {}
         for field in _METADATA_FIELDS:
-            m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', text)
+            # baseline_for is the last field in StructureSnapshot (after metrics)
+            # -> read from tail for large files
+            source = head
+            if field == "baseline_for" and file_size > head_size:
+                try:
+                    tail_size = min(2048, file_size)
+                    with filepath.open("rb") as f:
+                        f.seek(file_size - tail_size)
+                        source = f.read(tail_size).decode("utf-8", errors="replace")
+                except OSError:
+                    source = head  # fallback to head
+
+            m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', source)
             if m:
                 metadata[field] = m.group(1)
-            elif re.search(rf'"{field}"\s*:\s*null', text):
+            elif re.search(rf'"{field}"\s*:\s*null', source):
                 metadata[field] = None
         return metadata if metadata else None
     except Exception:
