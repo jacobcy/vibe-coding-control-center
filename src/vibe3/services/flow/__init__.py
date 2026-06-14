@@ -1,11 +1,21 @@
-"""Flow domain services subpackage."""
+"""Flow domain services subpackage.
+
+Public API Contract:
+- FlowService: Main flow orchestration service
+- FlowCategory, FlowState, classify_flow, get_flow_state: Flow classification
+- BlockedStateService, BlockedState, BlockedStateIO: Blocked state management
+- FlowCleanupService, FlowRecoveryService: Cleanup and recovery
+- FlowProjection, FlowProjectionService: Flow projections
+- FlowRebuildUsecase, FlowStatusService, FlowStatusResolver: Core utilities
+- create_flow_manager, infer_resume_label: Factory and utilities
+
+All other symbols are internal to the flow package and should be imported directly.
+"""
 
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.clients import FlowReader
     from vibe3.services.flow.abandon import AbandonFlowService
-    from vibe3.services.flow.block_mixin import FlowLifecycleMixin
     from vibe3.services.flow.blocked_state_io import (
         BlockedStateIO,
     )
@@ -25,32 +35,16 @@ if TYPE_CHECKING:
         FlowCleanupService,
         LiveSessionsDetectedError,
     )
-    from vibe3.services.flow.consistency import (
-        FlowConsistencyCode,
-        FlowConsistencyResult,
-        apply_consistency_fix,
-        check_flow_consistency,
-    )
     from vibe3.services.flow.factory import create_flow_manager
     from vibe3.services.flow.projection import FlowProjection, FlowProjectionService
-    from vibe3.services.flow.read_mixin import FlowReadMixin
     from vibe3.services.flow.rebuild import FlowRebuildUsecase
-    from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
-    from vibe3.services.flow.recovery import (
-        FlowRecoveryService,
-        RecoveryAction,
-        RecoveryResult,
-    )
+    from vibe3.services.flow.recovery import FlowRecoveryService
     from vibe3.services.flow.resume_resolver import infer_resume_label
     from vibe3.services.flow.service import FlowService
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
-    from vibe3.services.flow.timeline import TIMELINE_DISPLAY_MAP, FlowTimelineService
-    from vibe3.services.flow.transition import FlowTransitionMixin
-    from vibe3.services.flow.write_mixin import FlowWriteMixin
 
 __all__ = [
-    # Public API (exported via services/__init__.py)
     "AbandonFlowService",
     "BlockedState",
     "BlockedStateIO",
@@ -72,25 +66,9 @@ __all__ = [
     "FlowService",
     "FlowStatusResolver",
     "FlowStatusService",
-    # Internal API (used within flow package)
-    "FlowConsistencyCode",
-    "FlowConsistencyResult",
-    "check_flow_consistency",
-    "apply_consistency_fix",
-    "FlowReadMixin",
-    "FlowWriteMixin",
-    "FlowLifecycleMixin",
-    "FlowTransitionMixin",
-    "assert_rebuild_postconditions",
-    "RecoveryAction",
-    "RecoveryResult",
-    "FlowReader",
-    "FlowTimelineService",
-    "TIMELINE_DISPLAY_MAP",
 ]
 
 _SYMBOL_MODULES = {
-    # Public API
     "AbandonFlowService": "vibe3.services.flow.abandon",
     "BlockedState": "vibe3.services.flow.blocked_state_types",
     "BlockedStateIO": "vibe3.services.flow.blocked_state_io",
@@ -112,21 +90,6 @@ _SYMBOL_MODULES = {
     "FlowService": "vibe3.services.flow.service",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
-    # Internal API
-    "FlowConsistencyCode": "vibe3.services.flow.consistency",
-    "FlowConsistencyResult": "vibe3.services.flow.consistency",
-    "check_flow_consistency": "vibe3.services.flow.consistency",
-    "apply_consistency_fix": "vibe3.services.flow.consistency",
-    "FlowReadMixin": "vibe3.services.flow.read_mixin",
-    "FlowWriteMixin": "vibe3.services.flow.write_mixin",
-    "FlowLifecycleMixin": "vibe3.services.flow.block_mixin",
-    "FlowTransitionMixin": "vibe3.services.flow.transition",
-    "assert_rebuild_postconditions": "vibe3.services.flow.rebuild_postconditions",
-    "RecoveryAction": "vibe3.services.flow.recovery",
-    "RecoveryResult": "vibe3.services.flow.recovery",
-    "FlowReader": "vibe3.clients",
-    "FlowTimelineService": "vibe3.services.flow.timeline",
-    "TIMELINE_DISPLAY_MAP": "vibe3.services.flow.timeline",
 }
 
 

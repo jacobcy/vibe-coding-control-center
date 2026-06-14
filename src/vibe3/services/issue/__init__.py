@@ -1,4 +1,15 @@
-"""Issue domain services subpackage."""
+"""Issue domain services subpackage.
+
+Public API Contract:
+- IssueCollectionService, IssueFlowService, IssueTitleCacheService: Core services
+- IssueDispatchPolicy, DispatchExclusion: Dispatch policy
+- load_issue_info: Context loading
+- Failure functions: fail_issue, fail_executor_issue, fail_manager_issue, etc.
+- Body functions: parse_projection, render_projection, merge_projection
+- Branch resolution: resolve_issue_branch_input, iter_issue_branch_candidates
+
+All exports are part of the public API.
+"""
 
 from typing import TYPE_CHECKING, Any
 

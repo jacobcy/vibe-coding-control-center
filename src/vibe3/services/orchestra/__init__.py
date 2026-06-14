@@ -1,4 +1,13 @@
-"""Orchestra service package - status aggregation and helpers."""
+"""Orchestra service package - status aggregation and helpers.
+
+Public API Contract:
+- FlowOrchestratorService: Main orchestration service
+- OrchestraStatusService, OrchestraSnapshot, IssueStatusEntry: Status management
+- fetch_serve_status_data: Serve status utilities
+- get_manager_usernames, get_handoff_state_label: Config utilities
+
+All exports are part of the public API.
+"""
 
 from typing import TYPE_CHECKING, Any
 

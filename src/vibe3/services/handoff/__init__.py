@@ -1,4 +1,14 @@
-"""Handoff domain services subpackage."""
+"""Handoff domain services subpackage.
+
+Public API Contract:
+- HandoffService: Main handoff service
+- HandoffStatusService, HandoffStatusResult: Status tracking
+- HandoffStorage: Storage operations
+- resolve_handoff_target, is_shared_handoff_ref, to_display_target: Resolution utilities
+- validate_authoritative_ref: Validation utilities
+
+All exports are part of the public API.
+"""
 
 from typing import TYPE_CHECKING, Any
 

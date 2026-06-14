@@ -1,4 +1,15 @@
-"""Task domain services subpackage."""
+"""Task domain services subpackage.
+
+Public API Contract:
+- TaskService: Main task service
+- TaskShowService, TaskShowResult, TaskRefSummary, etc.: Show operations
+- TaskResumeUsecase, TaskResumeOperations, TaskResumeCandidates: Resume operations
+- TaskStatusBucket, TaskStatusData: Status types
+- MissingTaskIssueError, ensure_task_issue_bound, has_task_issue: Binding guard
+- build_api_task_data, fetch_task_status_data, classify_task_status: Status utilities
+
+All exports are part of the public API.
+"""
 
 from typing import TYPE_CHECKING, Any
 

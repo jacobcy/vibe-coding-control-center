@@ -1,51 +1,37 @@
-"""Check domain services subpackage."""
+"""Check domain services subpackage.
+
+Public API Contract:
+- CheckService: Main check orchestration service
+- CheckResult: Result type for check operations
+- CheckCleanupService: Cleanup service for check resources
+- CheckPRService: PR-specific check operations
+- InitResult: Result type for initialization
+
+All other symbols are internal to the check package and should be imported directly.
+"""
 
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vibe3.services.check.cleanup import CheckCleanupService
-    from vibe3.services.check.lock import check_lock
     from vibe3.services.check.pr_service import CheckPRService
-    from vibe3.services.check.remote import (
-        CheckRemote,
-        InitResult,
-        is_empty_auto_scene,
-        issue_state_from_payload,
-        requires_handoff,
-        resolve_task_issue_number,
-    )
+    from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
 
 __all__ = [
-    # Public API (exported via services/__init__.py)
     "CheckService",
     "CheckResult",
     "CheckCleanupService",
     "CheckPRService",
     "InitResult",
-    # Internal API (used within check package)
-    "check_lock",
-    "CheckRemote",
-    "issue_state_from_payload",
-    "requires_handoff",
-    "resolve_task_issue_number",
-    "is_empty_auto_scene",
 ]
 
 _SYMBOL_MODULES = {
-    # Public API
     "CheckService": "vibe3.services.check.service",
     "CheckResult": "vibe3.services.check.service",
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckPRService": "vibe3.services.check.pr_service",
     "InitResult": "vibe3.services.check.remote",
-    # Internal API
-    "check_lock": "vibe3.services.check.lock",
-    "CheckRemote": "vibe3.services.check.remote",
-    "issue_state_from_payload": "vibe3.services.check.remote",
-    "requires_handoff": "vibe3.services.check.remote",
-    "resolve_task_issue_number": "vibe3.services.check.remote",
-    "is_empty_auto_scene": "vibe3.services.check.remote",
 }
 
 
