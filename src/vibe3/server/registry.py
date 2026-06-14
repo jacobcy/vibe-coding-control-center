@@ -191,6 +191,18 @@ def _build_server_with_launch_cwd(
             f"Event rules engine initialization failed (non-fatal): {exc}"
         )
 
+    # Wire domain event to flow_event projection hook
+    try:
+        from vibe3.services.flow.event_projection import build_event_projection_hook
+
+        publisher = get_publisher()
+        publisher.add_publish_hook(build_event_projection_hook())
+        logger.bind(domain="orchestra").info("Domain event projection hook registered")
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Event projection hook initialization failed (non-fatal): {exc}"
+        )
+
     # Combined shutdown callback for all services
     def shutdown_all() -> None:
         """Cleanup all services on shutdown."""
