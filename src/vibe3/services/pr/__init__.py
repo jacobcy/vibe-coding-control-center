@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         get_pr_commit_count,
         get_recent_commits,
     )
+    from vibe3.services.pr.base_resolution import BaseResolutionUsecase
     from vibe3.services.pr.create import PRCreateResult, PRCreateUsecase
     from vibe3.services.pr.loc_comment import PRLocCommentService
     from vibe3.services.pr.ready import PrReadyAbortedError, PrReadyUsecase
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     # Classes
+    "BaseResolutionUsecase",
     "PRCreateResult",
     "PRCreateUsecase",
     "PRDimensions",
@@ -97,6 +99,7 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     # Classes
+    "BaseResolutionUsecase": "vibe3.services.pr.base_resolution",
     "PRCreateResult": "vibe3.services.pr.create",
     "PRCreateUsecase": "vibe3.services.pr.create",
     "PRDimensions": "vibe3.analysis",
