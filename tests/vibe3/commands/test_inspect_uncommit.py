@@ -37,6 +37,8 @@ def test_inspect_uncommit_json() -> None:
     ):
         result = runner.invoke(app, ["uncommit", "--json"])
     assert result.exit_code == 0
+    # Deprecation warning on stderr, JSON on stdout
+    assert "deprecated" in result.stderr.lower()
     data = json.loads(result.output)
     assert data["source_type"] == "uncommit"
     assert data["identifier"] == "working-tree"
