@@ -1,5 +1,6 @@
 """Inspect base command helpers."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from loguru import logger
@@ -15,7 +16,7 @@ from vibe3.analysis import (
 from vibe3.clients import GitClient
 from vibe3.config import get_config
 from vibe3.exceptions import GitError, UserError
-from vibe3.models import BranchSource
+from vibe3.models import ChangeSource
 
 
 def _code_paths() -> list[str]:
@@ -58,15 +59,26 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
         ) from None
 
 
-def count_changed_lines_in_code_paths(git: GitClient, source: BranchSource) -> int:
+def count_changed_lines_in_code_paths(git: GitClient, source: ChangeSource) -> int:
     """Count changed lines only in configured code paths."""
     code_paths = _code_paths()
     return count_changed_lines(git.get_diff(source), code_paths=code_paths)
 
 
+def _merge_symbol_map(
+    target: dict[str, list[str]], incoming: dict[str, list[str]]
+) -> None:
+    """Merge symbol maps while preserving first-seen order."""
+    for path, symbols in incoming.items():
+        existing = target.setdefault(path, [])
+        for symbol in symbols:
+            if symbol not in existing:
+                existing.append(symbol)
+
+
 def build_json_output(
     git: GitClient,
-    source: BranchSource,
+    source: ChangeSource,
     current_branch: str,
     base_branch: str,
     all_changed_files: list[str],
@@ -74,6 +86,7 @@ def build_json_output(
     deleted_files: list[str],
     core_files: list[dict[str, Any]],
     changed_lines: int,
+    source_file_sets: Iterable[tuple[ChangeSource, list[str]]] | None = None,
 ) -> dict[str, Any]:
     """Build JSON output for inspect base command."""
     code_paths = _code_paths()
@@ -83,11 +96,19 @@ def build_json_output(
     changed_symbols_by_file: dict[str, list[str]] = {}
     if existing_files:
         svc = SerenaService(git_client=git)
-        changed_symbols_by_file, skipped_tests = collect_changed_symbols(
-            svc,
-            source,
-            existing_files,
-        )
+        skipped_tests = 0
+        sets = list(source_file_sets or [(source, existing_files)])
+        for change_source, files_for_source in sets:
+            eligible_files = [f for f in files_for_source if f in existing_files]
+            if not eligible_files:
+                continue
+            source_symbols, source_skipped_tests = collect_changed_symbols(
+                svc,
+                change_source,
+                eligible_files,
+            )
+            _merge_symbol_map(changed_symbols_by_file, source_symbols)
+            skipped_tests += source_skipped_tests
         if skipped_tests > 0:
             logger.bind(skipped_test_files=skipped_tests).info(
                 "Skipped test files for AST analysis"

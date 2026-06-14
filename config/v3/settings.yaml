@@ -65,15 +65,40 @@ review_scope:
     - "src/vibe3/clients/git_client.py"          # Git 客户端
     - "src/vibe3/clients/github_client.py"       # GitHub 客户端
 
+    # 核心编排层 - 执行控制与角色调度
+    - "src/vibe3/execution/"                     # 执行控制平面
+    - "src/vibe3/roles/"                         # 角色定义与执行
+
+    # 核心业务逻辑 - 领域服务
+    - "src/vibe3/services/flow/"                 # Flow 服务子模块
+    - "src/vibe3/services/task/"                 # Task 服务
+    - "src/vibe3/services/handoff/"              # Handoff 服务
+    - "src/vibe3/orchestra/"                     # 编排中枢
+
+    # Agent 执行层
+    - "src/vibe3/agents/"                        # Agent 执行
+
   # 公开 API：改动这些路径可能影响兼容性
   # 用于 risk assessment 的 public_api_touch 维度
   # 适用范围：整个项目的所有改动文件（不限于 src/vibe3）
   public_api_paths:
     # V2 (Shell) - 公开接口
     - "bin/vibe"             # 主入口
+    - "bin/vibe3"            # V3 入口
 
     # V3 (Python) - 命令层（公开 API）
     - "src/vibe3/commands/"  # v3 命令层
+
+    # 技能层 - 人机协作入口真源
+    - "skills/"              # 人机协作入口
+    - ".claude/skills/"      # Agent 技能 symlink
+
+    # 治理层 - 角色与规则契约
+    - "supervisor/"          # 自动化角色材料
+
+    # 规则与配置 - 项目契约
+    - ".claude/rules/"       # 项目规则
+    - "config/"              # 配置真源
 
 # 质量标准
 quality:

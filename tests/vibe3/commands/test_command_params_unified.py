@@ -337,8 +337,15 @@ def test_review_base_dry_run_returns_dry_run_verdict(
     monkeypatch.setattr("vibe3.roles.review.execute_manual_review_sync", mock_execute)
     # Mock at lazy import cache (handler does from vibe3.roles import ...)
     monkeypatch.setattr("vibe3.roles.execute_manual_review_sync", mock_execute)
+    # Mock change detection gate
+    monkeypatch.setattr(
+        "vibe3.clients.git_status_ops.get_changed_files",
+        lambda *a, **kw: ["test.py"],
+    )
 
-    result = runner.invoke(review_app, ["base", "main", "--dry-run", "--no-async"])
+    result = runner.invoke(
+        review_app, ["base", "main", "--dry-run", "--no-async", "--yes"]
+    )
 
     assert result.exit_code == 0
     mock_execute.assert_called_once()
@@ -438,6 +445,7 @@ def test_review_show_prompt_forwarded(
     monkeypatch.setattr(
         "vibe3.execution.issue_role_sync_runner.run_issue_role_sync", mock_execute
     )
+    monkeypatch.setattr("vibe3.commands.review._check_report_ref", lambda b: True)
 
     runner.invoke(review_app, ["--branch", "42", "--dry-run", "--show-prompt"])
 

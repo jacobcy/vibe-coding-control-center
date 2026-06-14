@@ -81,6 +81,7 @@ def test_review_no_arg_defaults_to_current_branch():
             "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
         ) as mock_async,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+        patch("vibe3.commands.review._check_report_ref", return_value=True),
     ):
         mock_flow = MagicMock()
         mock_flow.task_issue_number = 42
@@ -144,6 +145,10 @@ class TestReviewBaseExitCodes:
             patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
             patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
+            patch(
+                "vibe3.clients.git_status_ops.get_changed_files",
+                return_value=["test.py"],
+            ) as _mock_changes,
         ):
             # Create a mock flow_service with get_flow_status method
             mock_flow_service = MagicMock()
@@ -164,7 +169,7 @@ class TestReviewBaseExitCodes:
             )
             mock_execute_cache.return_value = mock_execute.return_value
 
-            result = runner.invoke(app, ["base", "main", "--no-async"])
+            result = runner.invoke(app, ["base", "main", "--no-async", "--yes"])
 
         assert result.exit_code == 0
 
@@ -180,6 +185,10 @@ class TestReviewBaseExitCodes:
             patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
             patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
             patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
+            patch(
+                "vibe3.clients.git_status_ops.get_changed_files",
+                return_value=["test.py"],
+            ) as _mock_changes,
         ):
             # Create a mock flow_service with get_flow_status method
             mock_flow_service = MagicMock()
@@ -200,7 +209,7 @@ class TestReviewBaseExitCodes:
             )
             mock_execute_cache.return_value = mock_execute.return_value
 
-            result = runner.invoke(app, ["base", "main", "--no-async"])
+            result = runner.invoke(app, ["base", "main", "--no-async", "--yes"])
 
         assert result.exit_code == 1
 
@@ -233,7 +242,7 @@ class TestReviewBaseExitCodes:
             mock_execute.side_effect = RuntimeError("simulated review crash")
             mock_execute_cache.side_effect = mock_execute.side_effect
 
-            result = runner.invoke(app, ["base", "main", "--no-async"])
+            result = runner.invoke(app, ["base", "main", "--no-async", "--yes"])
 
         assert result.exit_code == 1
         assert "=== Verdict: ERROR ===" in _strip_ansi(result.output)
@@ -261,6 +270,9 @@ def test_review_base_show_prompt_forwarded_to_sync():
         patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
         patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
         patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
+        patch(
+            "vibe3.clients.git_status_ops.get_changed_files", return_value=["test.py"]
+        ) as _mock_changes,
     ):
         # Create a mock flow_service with get_flow_status method
         mock_flow_service = MagicMock()
@@ -282,7 +294,7 @@ def test_review_base_show_prompt_forwarded_to_sync():
         mock_execute_cache.return_value = mock_execute.return_value
 
         result = runner.invoke(
-            app, ["base", "main", "--no-async", "--dry-run", "--show-prompt"]
+            app, ["base", "main", "--no-async", "--yes", "--dry-run", "--show-prompt"]
         )
 
     assert result.exit_code == 0
@@ -320,6 +332,7 @@ def test_review_fresh_session_propagates():
             "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
         ) as mock_sync,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+        patch("vibe3.commands.review._check_report_ref", return_value=True),
     ):
         mock_flow = MagicMock()
         mock_flow.task_issue_number = 42
@@ -358,6 +371,7 @@ def test_review_cli_option_propagates(
         ) as _mock_sync,
         patch("vibe3.execution.run_issue_role_sync") as mock_sync_cache,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+        patch("vibe3.commands.review._check_report_ref", return_value=True),
     ):
         import vibe3.config
 

@@ -20,6 +20,36 @@ from vibe3.models import (
     StructureSnapshot,
 )
 
+_EXCLUDED_DIRS = frozenset(
+    {
+        ".git",
+        ".venv",
+        "__pycache__",
+        "node_modules",
+        ".worktrees",
+        ".codex",
+        "temp",
+        ".agent/plans",
+    }
+)
+
+_LANG_BY_EXT: dict[str, str] = {
+    ".py": "python",
+    ".sh": "shell",
+    ".zsh": "shell",
+    ".bash": "shell",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".md": "markdown",
+    ".toml": "toml",
+    ".json": "json",
+    ".cfg": "config",
+    ".ini": "config",
+    ".txt": "text",
+    ".csv": "csv",
+    ".lock": "lock",
+}
+
 
 class SnapshotError(VibeError):
     """Snapshot operation failed."""
@@ -75,8 +105,72 @@ def _get_module_from_path(file_path: str, root: str = "src/vibe3") -> str:
     return "vibe3"
 
 
+def _detect_language(file_path: str) -> str:
+    """Detect file language from extension and path hints."""
+    p = Path(file_path)
+    ext = p.suffix.lower()
+    lang = _LANG_BY_EXT.get(ext, "other")
+    return lang
+
+
+def _resolve_snapshot_repo_root(root: str) -> Path:
+    """Infer the repository root that owns the provided source root."""
+    root_path = Path(root).resolve()
+    if root_path.name == "vibe3" and root_path.parent.name == "src":
+        return root_path.parent.parent
+    return root_path
+
+
+def _collect_other_file_snapshots(
+    tracked_dirs: list[str], repo_root: Path
+) -> list[FileSnapshot]:
+    """Collect basic snapshots for non-Python files in tracked directories."""
+    files: list[FileSnapshot] = []
+    seen: set[str] = set()
+    cwd = Path.cwd().resolve()
+
+    for top_dir in tracked_dirs:
+        top = Path(top_dir) if repo_root == cwd else repo_root / top_dir
+        if not top.exists() or not top.is_dir():
+            continue
+        for f in sorted(top.rglob("*")):
+            if not f.is_file():
+                continue
+            rel = str(f)
+            # Skip excluded dirs
+            parts = rel.split("/")
+            if any(part in _EXCLUDED_DIRS for part in parts):
+                continue
+            # Skip if already tracked by Python analysis
+            if rel in seen:
+                continue
+            # Skip hidden files
+            if any(p.startswith(".") for p in parts[:-1]):
+                continue
+            # Skip symlinks to files already tracked
+            if f.is_symlink():
+                continue
+            # Count lines
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+                loc = len(text.splitlines())
+            except Exception:
+                loc = 0
+            lang = _detect_language(rel)
+            if lang == "other":
+                continue  # Skip unknown binary files
+
+            seen.add(rel)
+            files.append(FileSnapshot(path=rel, language=lang, total_loc=loc))
+    return files
+
+
 def build_snapshot(root: str | None = None) -> StructureSnapshot:
-    """Build a structure snapshot from the current codebase."""
+    """Build a structure snapshot from the current codebase.
+
+    By default scans Python files in src/vibe3/ plus all non-Python files
+    tracked by review_scope paths (skills/, supervisor/, config/, etc.).
+    """
     if root is None:
         from vibe3.config import get_source_root
 
@@ -92,12 +186,17 @@ def build_snapshot(root: str | None = None) -> StructureSnapshot:
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         snapshot_id = StructureSnapshot.generate_id(branch, commit_short, timestamp)
 
+        repo_root = _resolve_snapshot_repo_root(root)
+
+        # Scan Python files (deep AST analysis)
         file_structures = structure_service.collect_python_file_structures(root)
         files: list[FileSnapshot] = []
         module_map: dict[str, ModuleSnapshot] = {}
+        file_paths_seen: set[str] = set()
 
         for file_struct in file_structures:
             rel_path = file_struct.path
+            file_paths_seen.add(rel_path)
             imports = dag_service._extract_imports(rel_path)
 
             file_snapshot = FileSnapshot(
@@ -126,6 +225,34 @@ def build_snapshot(root: str | None = None) -> StructureSnapshot:
             module_map[module].file_count += 1
             module_map[module].total_loc += file_struct.total_loc
             module_map[module].total_functions += file_struct.function_count
+
+        # Scan non-Python files from review_scope config paths directly
+        from vibe3.config import get_config
+
+        config = get_config()
+        tracked_dirs: set[str] = set()
+        for entry in (
+            config.review_scope.critical_paths + config.review_scope.public_api_paths
+        ):
+            tracked_dirs.add(entry.split("/")[0])
+        other_files = _collect_other_file_snapshots(sorted(tracked_dirs), repo_root)
+        for f_snap in other_files:
+            if f_snap.path not in file_paths_seen:
+                files.append(f_snap)
+                file_paths_seen.add(f_snap.path)
+                # Create a basic module entry based on top-level dir
+                top_dir = f_snap.path.split("/")[0]
+                if top_dir not in module_map:
+                    module_map[top_dir] = ModuleSnapshot(
+                        module=top_dir,
+                        files=[],
+                        file_count=0,
+                        total_loc=0,
+                        total_functions=0,
+                    )
+                module_map[top_dir].files.append(f_snap.path)
+                module_map[top_dir].file_count += 1
+                module_map[top_dir].total_loc += f_snap.total_loc
 
         module_graph = dag_service.build_module_graph(root)
         dependencies = [

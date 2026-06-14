@@ -51,6 +51,8 @@ def register(app: typer.Typer) -> None:
         Focus on critical paths and public API files only.
         Shows impact scope, not detailed diffs.
 
+        Automatically detects uncommitted changes if no committed branch diff is found.
+
         Examples:
             vibe inspect base                # Compare current branch vs parent branch
             vibe inspect base origin/develop # Compare current branch vs origin/develop
@@ -58,7 +60,7 @@ def register(app: typer.Typer) -> None:
         """
         from vibe3.clients import GitClient, GitHubClient
         from vibe3.config import get_config
-        from vibe3.models import BranchSource
+        from vibe3.models import BranchSource, UncommittedSource
         from vibe3.utils import get_current_branch
 
         if trace:
@@ -93,11 +95,21 @@ def register(app: typer.Typer) -> None:
         log.info("Analyzing core file changes")
 
         git = GitClient(github_client=GitHubClient())
-        source = BranchSource(branch=current_branch, base=resolved_base)
-        all_changed_files = git.get_changed_files(source)
 
-        # Count changed lines only in code paths
+        # Collect both committed and uncommitted changes
+        source = BranchSource(branch=current_branch, base=resolved_base)
+        branch_files = list(git.get_changed_files(source))
+        uncommitted_source = UncommittedSource()
+        uncommitted_files = git.get_changed_files(uncommitted_source)
+        all_changed_files = list(branch_files)
+        for f in uncommitted_files:
+            if f not in all_changed_files:
+                all_changed_files.append(f)
+
+        # Count changed lines from both committed and working tree diffs.
         changed_lines = count_changed_lines_in_code_paths(git, source)
+        if uncommitted_files:
+            changed_lines += count_changed_lines_in_code_paths(git, uncommitted_source)
 
         # Track all files for scoring, but note which ones are deleted
         # Deleted files should still participate in risk assessment
@@ -133,6 +145,9 @@ def register(app: typer.Typer) -> None:
                     }
                 )
 
+        branch_existing_files = [f for f in branch_files if Path(f).exists()]
+        uncommitted_existing_files = [f for f in uncommitted_files if Path(f).exists()]
+
         if json_out:
             result = build_json_output(
                 git=git,
@@ -144,6 +159,10 @@ def register(app: typer.Typer) -> None:
                 deleted_files=deleted_files,
                 core_files=core_files,
                 changed_lines=changed_lines,
+                source_file_sets=[
+                    (source, branch_existing_files),
+                    (uncommitted_source, uncommitted_existing_files),
+                ],
             )
             typer.echo(json.dumps(result, indent=2, default=str))
             return
@@ -158,6 +177,10 @@ def register(app: typer.Typer) -> None:
                 deleted_files=deleted_files,
                 core_files=core_files,
                 changed_lines=changed_lines,
+                source_file_sets=[
+                    (source, branch_existing_files),
+                    (uncommitted_source, uncommitted_existing_files),
+                ],
             )
             # Convert to JSON-serializable dict first (handles enums, etc.)
             clean_result = json.loads(json.dumps(result, default=str))

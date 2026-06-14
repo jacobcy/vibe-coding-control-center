@@ -10,7 +10,9 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.config.settings import AIConfig
+from vibe3.models import BranchSource
 from vibe3.models.pr import UpdatePRRequest
+from vibe3.services.pr.create import _build_inspect_summary, _enrich_changed_files
 from vibe3.utils.branch_compare import BranchBehindInfo
 
 
@@ -158,6 +160,10 @@ class TestPRCreateCommandAI:
                                     "vibe3.services.pr.create.PRCreateUsecase.check_flow_task"
                                 ),
                                 patch(
+                                    "vibe3.services.pr.create._build_inspect_summary",
+                                    return_value="",
+                                ),
+                                patch(
                                     "vibe3.commands.pr_create.PRService"
                                 ) as mock_service,
                                 patch(
@@ -219,6 +225,48 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 1
         assert "requires commits to generate suggestions" in result.output
         assert "Commit your changes first" in result.output
+
+
+def test_build_inspect_summary_uses_explicit_base_branch() -> None:
+    """Inspect summary should analyze against the caller's base branch."""
+    with patch("vibe3.analysis.build_change_analysis") as mock_analysis:
+        mock_analysis.return_value = {
+            "score": {
+                "level": "LOW",
+                "score": 1,
+                "recommendations": [],
+                "dimensions": {},
+            }
+        }
+
+        _build_inspect_summary("feature/child", "feature/parent")
+
+    mock_analysis.assert_called_once_with("branch", "feature/child", "feature/parent")
+
+
+def test_enrich_changed_files_uses_numstat_loc_deltas() -> None:
+    """Changed file enrichment should parse LOC from numstat, not patch diff."""
+    mock_git = MagicMock()
+    mock_git.get_numstat.return_value = (
+        "12\t3\tsrc/vibe3/services/pr/create.py\n"
+        "7\t0\tsrc/vibe3/analysis/snapshot_service.py"
+    )
+
+    with patch("vibe3.clients.GitClient", return_value=mock_git):
+        result = _enrich_changed_files(
+            [
+                "src/vibe3/services/pr/create.py",
+                "src/vibe3/analysis/snapshot_service.py",
+            ],
+            "feature/child",
+            "feature/parent",
+        )
+
+    mock_git.get_numstat.assert_called_once_with(
+        BranchSource(branch="feature/child", base="feature/parent")
+    )
+    assert "- src/vibe3/services/pr/create.py (+9 LOC)" in result
+    assert "- src/vibe3/analysis/snapshot_service.py (+7 LOC)" in result
 
 
 class TestPRCreateBranchBehind:

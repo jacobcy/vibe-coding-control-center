@@ -131,7 +131,7 @@ def test_build_snapshot_diff_section_none():
         pytest.param(
             "file_details",
             [
-                "### File Details (Top 10)",
+                "### File Details (by module)",
                 "+ src/vibe3/services/new_service.py",
                 "- src/vibe3/commands/old_cmd.py",
                 "~ src/vibe3/services/flow_service.py",
@@ -252,4 +252,4 @@ def test_build_snapshot_diff_section_many_files():
 
     result = build_snapshot_diff_section(diff)
     assert result is not None
-    assert "... and 5 more files" in result
+    assert "... and 12 more files" in result

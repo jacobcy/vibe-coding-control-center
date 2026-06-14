@@ -18,6 +18,168 @@ description: Use when the user wants to resume work on an existing branch or flo
 2. **模糊问题**（范围疑问、设计决策、性能取舍）→ 向用户报告，等决策
 3. **无问题** → 报告结果，进入下一步
 
+**任务类型判断**（进入流程前的第一步）：
+
+```
+flow 有 plan/run/review_ref?
+  ├─ 有 → 恢复已有状态（标准实现流程）
+  └─ 无 → 检查 issue 标签
+       ├─ roadmap/rfc → 进入 RFC 探索模式（见下方）
+       ├─ roadmap/design → 进入 RFC 探索模式
+       ├─ roadmap/epic → 不在此处处理，请使用 /vibe-new 选择 sub-issue
+       └─ 其他 → 标准实现流程
+```
+
+- `roadmap/rfc` 和 `roadmap/design` 标签的 issue 自动走 RFC 探索模式
+- 用户明确说"探索/研究/分析"等关键词时也进入探索模式
+- 探索模式不执行 `vibe3 plan`/`vibe3 run`/`vibe3 review`
+
+---
+
+## RFC 探索模式
+
+**适用于**：`roadmap/rfc`、`roadmap/design` 标签的 issue，或用户明确要求探索/研究/分析的任务。
+
+**目标**：探索问题空间、质询假设、比较方案、形成结论。**不产生代码实现**。
+
+### 探索流程
+
+```
+Explore (了解领域) → Analyze (逐项质询) → Converge (收敛结论) → Record (记录输出)
+```
+
+### Grill-Me 质询思想
+
+探索模式的灵魂是苏格拉底式质询 — "烤"问每个假设和方案：
+
+```
+质询维度：
+  ├─ 假设质询  "这个假设成立吗？证据是什么？不成立会怎样？"
+  ├─ 边界扫描  "我们忽略了什么边界情况？极端条件下会怎样？"
+  ├─ 代价分析  "这个方案的代价是什么？（复杂度/维护/性能/学习成本）"
+  ├─ 逆向思考  "如果这个方案是错的，会怎样？反例是什么？"
+  ├─ 简化挑战  "有更简单的方案吗？我们是不是在做过度工程？"
+  └─ 替代追问  "还有其他方案吗？为什么选这个不选那个？"
+```
+
+### Step E1: Explore — 了解领域
+
+并行执行：
+
+```bash
+vibe3 flow show [--branch <b>]
+vibe3 handoff show @current [--branch <b>]
+gh issue view <number> --json body,labels,comments
+git status
+```
+
+然后：
+1. **阅读 issue body 和相关资料** — 理解问题背景、相关文档、已有讨论
+2. **阅读关键源码** — 定位核心文件和实现，画出当前架构
+3. **Grill-Me 入门**：用以下问题"烤"自己：
+   - "问题描述是否完整？有没有隐藏的前提？"
+   - "issue 提到的问题在代码中真实存在吗？"
+4. **输出**：领域理解 + 关键文件清单 + 初步问题列表
+
+### Step E2: Analyze — 逐项质询
+
+对每个子问题使用以下结构化分析：
+
+```
+  单点分析框架
+  ==============================
+
+  1. 现状描述
+     "当前是什么情况？"
+
+  2. 假设清单
+     "隐含了哪些假设？"
+     -> 逐条列出并标注可信度
+
+  3. 质询 (Grill Me)
+     a) "这个假设被违反会怎样？"
+     b) "边界条件是什么？"
+     c) "代价和收益是否匹配？"
+     d) "有反例吗？"
+     e) "更简单的做法是什么？"
+
+  4. 方案发散
+     "有哪些可能的方案？"
+     -> 列出 2-3 种方案及其 trade-off
+
+  5. 收敛
+     "推荐哪个？理由是什么？"
+     -> 明确推荐 + 开放问题
+```
+
+**使用指导**：
+- issue 的每个子问题各走一轮 Analyze
+- 发现新问题分支时新增一轮
+- 一轮分析应控制在 3-5 次交互，不无限发散
+
+### Step E3: Converge — 收敛结论
+
+将各轮分析的结论汇总：
+
+```
+分析结论：
++ 已确认问题：N 个（每个附证据）
+- 已排除问题：M 个（附排除理由）
+? 开放问题：K 个（需进一步研究）
+* 推荐方案：（如果有）
+! 风险提示：（已知盲区）
+```
+
+**Grill-Me 终审**：
+- "这些结论经得起反向质询吗？"
+- "是否还有未考虑的第三方视角？"
+- "如果半年后回看，这个结论会不会显得天真？"
+
+### Step E4: Record — 记录输出
+
+```bash
+# 记录分析结论到 handoff
+vibe3 handoff append "<分析结论摘要>" --actor vibe-continue --kind analysis
+```
+
+**可能的输出形式**：
+- **Issue comment**：分析结论回写到 GitHub issue（明确方案或研究结论时）
+- **ADR 记录**：关键设计决策需记录
+- **Handoff**：中间分析状态保存
+- **新 Issue**：发现了新的子问题 -> 告知用户创建新 issue
+
+### Step E5: 探索出口
+
+探索完成后，可转向以下方向：
+
+```
+探索完成？
++ 结论明确，可进入实现 -> 告知用户创建实现 issue 或继续 /vibe-new
++ 发现新问题 -> 告知用户创建新 issue
++ 需要决策 -> 告知用户结论，等待决策
++ 继续探索 -> 回到 Step E1 继续
+```
+
+### 探索模式报告格式
+
+每步向用户报告探索进度：
+
+```
+RFC 探索进度 (Issue #XXXX):
+- [x] E1 Explore: 已了解领域 (关键文件: N 个)
+- [ ] E2 Analyze: 待分析 (剩余 M 个子问题)
+- [ ] E3 Converge: 待收敛
+- [ ] E4 Record: 待记录
+
+当前发现：
+- 问题 A: 确认存在（证据: ...）
+- 问题 B: 需进一步研究
+
+下一步：继续 Analyze 子问题 X
+```
+
+---
+
 ## Step 1: 恢复上下文
 
 并行执行：
@@ -36,7 +198,19 @@ TaskList  # 查看活跃 Monitor
 
 提取当前状态，决定下一步。
 
-## Step 2: 执行下一步
+## Step 2: 判断流程 + 执行下一步
+
+### 流程判断
+
+先判断任务类型：
+
+```
+当前是 RFC 探索模式？
+  ├─ Yes → 执行 RFC 探索流程（Step E1-E5，参见上方 RFC 探索模式章节）
+  └─ No  → 执行标准实现流程（plan → run → review → publish，如下）
+```
+
+### 标准实现流程
 
 根据 flow 状态决定：
 
@@ -98,9 +272,9 @@ Monitor 触发（命令完成/失败/超时）
 **启动序列**：启动命令 → 创建 Monitor → 设置 ScheduleWakeup 作为 fallback
 
 **禁止**：
-- ❌ 同时运行多个 Monitor 监听同一命令
-- ❌ Monitor 触发后不清理让它继续运行
-- ❌ 让已超时的 Monitor 残留
+- 同时运行多个 Monitor 监听同一命令
+- Monitor 触发后不清理让它继续运行
+- 让已超时的 Monitor 残留
 
 **示例**：
 ```bash
@@ -207,6 +381,7 @@ PR 已创建：https://github.com/.../pull/XXXX
 
 每步修正完成后，向用户报告**修正了什么**和**当前状态**：
 
+标准实现流程报告：
 ```
 Issue #XXXX 进度：
 - [x] plan：通过（修正了 1 处范围遗漏）
@@ -216,6 +391,8 @@ Issue #XXXX 进度：
 
 下一步：执行 vibe3 review
 ```
+
+RFC 探索模式报告（见 RFC 探索模式章节的报告格式）。
 
 **只在以下情况询问用户**：
 - 修正涉及设计决策（需要选择方案）
@@ -260,6 +437,13 @@ vibe3 run --publish --branch <b>         # 创建 PR
 | `vibe3 review` | `requesting-code-review` | `openspec:verify` |
 | `vibe3 run --publish` | `finishing-a-development-branch` | `openspec:archive` |
 
+| RFC 探索模式 | 等效能力 |
+|--------------|----------|
+| E1 Explore | `openspec-explore` 探索模式 |
+| E2 Analyze (Grill Me) | 苏格拉底式质询 / 魔鬼代言人 |
+| E3 Converge | 方案对比与收敛 |
+| E4 Record | Issue comment / ADR 记录 |
+
 ## 限制
 
 - 每步必须审查 + 修正，不能跳过直接进入下一步
@@ -269,3 +453,4 @@ vibe3 run --publish --branch <b>         # 创建 PR
 - 不把 handoff 当真源（先看 flow show）
 - Monitor 完成后立即 TaskStop 清理，不留残留
 - 每次循环只保留一个活跃 Monitor 和一个 ScheduleWakeup
+- **RFC 探索模式不产生代码实现**，仅输出分析结论和文档变更。如果探索过程中发现问题需要修复代码，应暂停探索模式，告知用户后进入标准实现流程

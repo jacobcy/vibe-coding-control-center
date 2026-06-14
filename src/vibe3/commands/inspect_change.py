@@ -26,7 +26,18 @@ def register(app: typer.Typer) -> None:
             typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
-        """Run analysis for uncommitted working tree changes."""
+        """Run analysis for uncommitted working tree changes.
+
+        Deprecated: Use 'vibe3 inspect base' instead, which automatically
+        detects uncommitted changes when no committed branch diff exists.
+        """
+        import typer
+
+        typer.echo(
+            "⚠️  'inspect uncommit' is deprecated. "
+            "Use 'inspect base' instead (auto-detects uncommitted changes).\n",
+            err=True,
+        )
 
         if trace:
             enable_method_trace()

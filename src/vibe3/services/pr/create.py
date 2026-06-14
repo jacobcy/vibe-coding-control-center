@@ -30,6 +30,91 @@ class PRCreateResult:
     actor: str
 
 
+class BranchMaterial:
+    """Branch analysis material for AI suggestions."""
+
+    def __init__(
+        self,
+        commits: list[str],
+        changed_files: list[str],
+        body: str,
+        base_branch: str,
+        actor: str,
+    ) -> None:
+        self.commits = commits
+        self.changed_files = changed_files
+        self.body = body
+        self.base_branch = base_branch
+        self.actor = actor
+
+
+def _build_inspect_summary(branch: str, base_branch: str) -> str:
+    """Build a human-readable inspect summary for AI prompt context."""
+    try:
+        from vibe3.analysis import build_change_analysis
+
+        result = build_change_analysis("branch", branch, base_branch)
+        score = result.get("score", {})
+        if not isinstance(score, dict):
+            return ""
+        level = score.get("level", "UNKNOWN")
+        points = score.get("score", 0)
+        recs = score.get("recommendations", [])
+        dims = score.get("dimensions", {})
+        if not isinstance(dims, dict):
+            dims = {}
+
+        lines = [
+            "## Impact Analysis (inspect base)",
+            f"- Risk Level: {level} (score: {points})",
+            f"- Public API changes: {dims.get('public_api_touch', False)}",
+            f"- Critical path changes: {dims.get('critical_path_touch', False)}",
+            f"- Changed lines: {dims.get('changed_lines', 0)}",
+            f"- Changed files: {dims.get('changed_files', 0)}",
+            f"- Impacted modules: {dims.get('impacted_modules', 0)}",
+        ]
+        if recs:
+            lines.append("- Recommendations:")
+            for r in recs:
+                lines.append(f"  - {r}")
+        return "\n".join(lines)
+    except Exception:
+        return ""  # Gracefully degrade - inspect data is optional
+
+
+def _enrich_changed_files(changed_files: list[str], branch: str, base: str) -> str:
+    """Enrich file list with LOC info from git diff for AI context."""
+    try:
+        from vibe3.clients import GitClient
+        from vibe3.models import BranchSource
+
+        git = GitClient()
+        source = BranchSource(branch=branch, base=base)
+        numstat = git.get_numstat(source)
+        if not numstat:
+            return "\n".join(f"- {f}" for f in changed_files)
+
+        loc_map: dict[str, int] = {}
+        for line in numstat.split("\n"):
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                try:
+                    added = int(parts[0]) if parts[0] != "-" else 0
+                    removed = int(parts[1]) if parts[1] != "-" else 0
+                    loc_map[parts[2]] = added - removed
+                except ValueError:
+                    pass
+
+        lines = ["## Changed Files"]
+        for f in changed_files:
+            delta = loc_map.get(f, 0)
+            sign = "+" if delta >= 0 else ""
+            lines.append(f"- {f} ({sign}{delta} LOC)")
+        return "\n".join(lines)
+    except Exception:
+        return "\n".join(f"- {f}" for f in changed_files)
+
+
 class PRCreateUsecase:
     """Coordinate PR creation: AI suggestions, title resolution, flow checks."""
 
@@ -81,6 +166,11 @@ class PRCreateUsecase:
         commits = getattr(material, "commits", [])
         changed_files = getattr(material, "changed_files", [])
 
+        # Collect inspect base data for richer AI context
+        inspect_summary = _build_inspect_summary(branch, base_branch)
+        # Enrich file list with LOC from git diff
+        enriched_files = _enrich_changed_files(changed_files, branch, base_branch)
+
         if not commits:
             if interactive:
                 Console().print(
@@ -100,7 +190,12 @@ class PRCreateUsecase:
         ai_client = AISuggestionClient(
             ai_client=ai_client_instance, prompts_path=prompts_path
         )
-        result = ai_client.suggest_pr_content(commits, changed_files)
+        result = ai_client.suggest_pr_content(
+            commits,
+            changed_files,
+            inspect_summary=inspect_summary,
+            enriched_files=enriched_files,
+        )
 
         if not result:
             if interactive:

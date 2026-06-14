@@ -40,6 +40,15 @@ BranchOption = Annotated[
     typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
 ]
 
+_YES_OPT = Annotated[
+    bool,
+    typer.Option(
+        "--yes",
+        "-y",
+        help="Skip gate checks (report_ref, empty changes)",
+    ),
+]
+
 
 def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
     """Render review result summary consistently."""
@@ -50,12 +59,26 @@ def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
         typer.echo(f"-> Review saved to: {handoff_file}")
 
 
+def _check_report_ref(branch: str) -> bool:
+    """Check if run report exists for the given branch flow.
+
+    Returns True if report_ref exists, False otherwise.
+    Only applicable for manual review path (orchestra skips this).
+    """
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(branch)
+    if flow and flow.report_ref:
+        return True
+    return False
+
+
 def _review_branch_impl(
     branch: str,
     trace: bool,
     dry_run: bool,
     no_async: bool,
     show_prompt: bool,
+    yes: bool = False,
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
@@ -83,6 +106,15 @@ def _review_branch_impl(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
+    # Gate check: report_ref must exist (unless --yes or orchestra path)
+    if not yes and not _check_report_ref(branch):
+        typer.echo(
+            "No execution report found (report_ref is empty). "
+            "Run 'vibe3 run --branch <b>' first, or use --yes to skip this check.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     # Publish ManualReviewIntent event (handler will execute)
     domain_publish(
         ManualReviewIntent(
@@ -108,6 +140,7 @@ def default(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    yes: _YES_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -128,6 +161,7 @@ def default(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        yes=yes,
         agent=agent,
         backend=backend,
         model=model,
@@ -143,6 +177,7 @@ def issue_command(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    yes: _YES_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -156,6 +191,7 @@ def issue_command(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
+        yes=yes,
         agent=agent,
         backend=backend,
         model=model,
@@ -179,6 +215,7 @@ def base(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
+    yes: _YES_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -244,6 +281,29 @@ def base(
     )
     log.info("Starting branch review")
     typer.echo(f"-> Review: {current_branch} vs {resolved_base.base_branch}")
+
+    # Gate check: warn if no changes detected (unless --yes)
+    if not yes:
+        from vibe3.clients import GitClient
+        from vibe3.models import BranchSource, UncommittedSource
+
+        git = GitClient()
+        branch_files = git.get_changed_files(
+            BranchSource(branch=current_branch, base=resolved_base.base_branch)
+        )
+        uncommitted = git.get_changed_files(UncommittedSource())
+        if not branch_files and not uncommitted:
+            typer.echo(
+                "No changes detected. Skipping review.\n"
+                "Use --yes to force review anyway.",
+                err=True,
+            )
+            raise typer.Exit(0)
+        log.info(
+            "Changes detected: {} committed + {} uncommitted",
+            len(branch_files),
+            len(uncommitted),
+        )
 
     request, issue_number, _ = build_base_review_request(
         current_branch,
