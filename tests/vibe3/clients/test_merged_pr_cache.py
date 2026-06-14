@@ -98,6 +98,11 @@ def test_get_merged_pr_for_issue_hit_and_miss(cache: MergedPRCache) -> None:
     }
     cache._save_cache(test_data)
 
+    # Verify issue_index is created
+    loaded = cache._load_cache()
+    assert "issue_index" in loaded
+    assert loaded["issue_index"] == {"456": "100", "789": "101"}
+
     result = cache.get_merged_pr_for_issue(456)
     assert result is not None
     assert result["number"] == 100
@@ -298,6 +303,10 @@ def test_single_pr_closes_multiple_issues(cache: MergedPRCache) -> None:
     }
     cache._save_cache(test_data)
 
+    # Verify index has entries for both issues
+    loaded = cache._load_cache()
+    assert loaded["issue_index"] == {"456": "100", "789": "100"}
+
     for issue in [456, 789]:
         result = cache.get_merged_pr_for_issue(issue)
         assert result is not None
@@ -345,3 +354,46 @@ def test_sync_and_rebuild_index_all_linked_issues(cache: MergedPRCache) -> None:
     assert loaded["prs"]["200"]["issues"] == [111, 222]
     for issue in [111, 222]:
         assert cache.get_merged_pr_for_issue(issue) is not None
+
+
+def test_get_merged_pr_for_issue_fallback_on_missing_index(
+    cache: MergedPRCache,
+) -> None:
+    """get_merged_pr_for_issue falls back to linear scan when index is missing."""
+    import json
+
+    # Manually write a cache file without issue_index (legacy format)
+    test_data = {
+        "last_sync": "2024-01-15T10:00:00Z",
+        "prs": {
+            "100": {
+                "number": 100,
+                "headRefName": "feature/foo",
+                "body": "Closes #456",
+                "mergedAt": "2024-01-10T12:00:00Z",
+                "issues": [456],
+            },
+            "101": {
+                "number": 101,
+                "headRefName": "feature/bar",
+                "body": "Fixes #789",
+                "mergedAt": "2024-01-11T12:00:00Z",
+                "issues": [789],
+            },
+        },
+    }
+    # Write directly to file to avoid index building in _save_cache
+    cache._ensure_dir()
+    with open(cache.cache_file, "w") as f:
+        json.dump(test_data, f, indent=2)
+
+    # Verify lookup still works via fallback path
+    result = cache.get_merged_pr_for_issue(456)
+    assert result is not None
+    assert result["number"] == 100
+    assert 456 in result["issues"]
+
+    result = cache.get_merged_pr_for_issue(789)
+    assert result is not None and result["number"] == 101 and 789 in result["issues"]
+
+    assert cache.get_merged_pr_for_issue(999) is None

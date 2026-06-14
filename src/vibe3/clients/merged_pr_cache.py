@@ -82,6 +82,23 @@ class MergedPRCache:
         # Return empty structure
         return {"last_sync": None, "prs": {}}
 
+    def _build_issue_index(self, prs: dict[str, Any]) -> dict[str, str]:
+        """Build reverse index from issue_number to pr_number.
+
+        Args:
+            prs: Dict of PR data keyed by PR number (as string)
+
+        Returns:
+            Dict mapping issue_number (as string) to pr_number (as string)
+        """
+        index: dict[str, str] = {}
+        for pr_number_str, pr_data in prs.items():
+            if not isinstance(pr_data, dict):
+                continue
+            for issue_number in pr_data.get("issues", []):
+                index[str(issue_number)] = pr_number_str
+        return index
+
     def _save_cache(self, data: dict[str, Any]) -> None:
         """Save cache to file.
 
@@ -89,6 +106,7 @@ class MergedPRCache:
             data: Cache data structure
         """
         self._ensure_dir()
+        data["issue_index"] = self._build_issue_index(data.get("prs", {}))
         with open(self.cache_file, "w") as f:
             json.dump(data, f, indent=2)
 
@@ -104,7 +122,22 @@ class MergedPRCache:
         """
         cache = self._load_cache()
         prs = cache.get("prs", {})
+        issue_index = cache.get("issue_index")
 
+        # Fast path: O(1) lookup via index
+        if issue_index is not None:
+            pr_number_str = issue_index.get(str(issue_number))
+            if pr_number_str is not None:
+                pr_data = prs.get(pr_number_str)
+                if isinstance(pr_data, dict):
+                    logger.bind(
+                        domain="merged_pr_cache",
+                        issue_number=issue_number,
+                        pr_number=pr_data.get("number"),
+                    ).debug("Cache hit for issue")
+                    return pr_data
+
+        # Fallback path: linear scan (backward compat with old cache)
         for pr_data in prs.values():
             if not isinstance(pr_data, dict):
                 continue
