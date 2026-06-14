@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Literal, cast
 from loguru import logger
 
 from vibe3.analysis.serena_file_analyzer import analyze_files
-from vibe3.clients import GitClient, SerenaClient
+from vibe3.clients import GitClient, SerenaClient, extract_function_locations
 from vibe3.exceptions import SerenaError
 from vibe3.models import ChangeSource
 
@@ -115,8 +115,6 @@ class SerenaService:
         Returns:
             List of function names that appear to be changed
         """
-        import ast
-
         logger.bind(
             domain="serena",
             action="get_changed_functions",
@@ -130,20 +128,19 @@ class SerenaService:
             ranges = self.git_client.get_diff_hunk_ranges(file_path, source)
             if not ranges:
                 return []
-            # 2. Parse AST to find functions in these ranges
-            source_code = Path(file_path).read_text(encoding="utf-8")
-            tree = ast.parse(source_code)
+            # 2. Get function locations from Serena client (already cached/available)
+            overview = self.client.get_symbols_overview(file_path)
+            func_locations = extract_function_locations(overview)
             changed_functions: list[str] = []
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    func_start = node.lineno
-                    func_end = getattr(node, "end_lineno", node.lineno)
-                    # Check if function overlaps with any changed range
-                    for range_start, range_end in ranges:
-                        # Overlap: not (end < start or start > end)
-                        if not (func_end < range_start or func_start > range_end):
-                            changed_functions.append(node.name)
-                            break
+            for func_name, loc in func_locations.items():
+                func_start = loc.get("start_line", 0)
+                func_end = loc.get("end_line", 0)
+                # Check if function overlaps with any changed range
+                for range_start, range_end in ranges:
+                    # Overlap: not (end < start or start > end)
+                    if not (func_end < range_start or func_start > range_end):
+                        changed_functions.append(func_name)
+                        break
             logger.bind(file=file_path, changed_functions=changed_functions).debug(
                 "Found changed functions in diff"
             )
