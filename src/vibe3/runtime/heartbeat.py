@@ -59,6 +59,7 @@ class HeartbeatServer:
         check_service: object | None = None,
         cleanup_service: object | None = None,
         actor_cleanup: Callable[[], list[str]] | None = None,
+        dispatch_coordinator: object | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
@@ -71,6 +72,8 @@ class HeartbeatServer:
         self._check_service: object | None = check_service
         self._cleanup_service: object | None = cleanup_service
         self._actor_cleanup: Callable[[], list[str]] | None = actor_cleanup
+        self._dispatch_coordinator: object | None = dispatch_coordinator
+        self._exhausted_ticks = 0
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -327,6 +330,7 @@ class HeartbeatServer:
                 f"tick #{tick_number} completed in {duration:.2f}s",
             )
 
+            # Check debug tick limit (existing logic)
             if self.config.debug and tick_number >= self.config.debug_max_ticks:
                 append_orchestra_event(
                     "server",
@@ -336,6 +340,46 @@ class HeartbeatServer:
                     ),
                 )
                 self.stop()
+
+            # Check pool exhaustion (new logic)
+            if self.config.auto_stop_on_exhaustion:
+                if self._is_pool_exhausted():
+                    self._exhausted_ticks += 1
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"pool exhausted for {self._exhausted_ticks} "
+                            "consecutive tick(s)"
+                        ),
+                    )
+                    if self._exhausted_ticks >= self.config.exhaustion_threshold_ticks:
+                        append_orchestra_event(
+                            "server",
+                            (
+                                f"pool exhausted for {self._exhausted_ticks} ticks, "
+                                "stopping server"
+                            ),
+                        )
+                        self.stop()
+                else:
+                    # Pool has candidates, reset counter
+                    self._exhausted_ticks = 0
+
+    def _is_pool_exhausted(self) -> bool:
+        """Check if pool is exhausted (no qualifiable candidates).
+
+        Pool is considered exhausted when dispatch_coordinator has
+        _dispatch_paused=True, indicating only blocked issues remain.
+
+        Returns:
+            True if pool exhausted, False otherwise
+        """
+        if self._dispatch_coordinator is None:
+            return False
+
+        # Check dispatch_paused flag from coordinator
+        # Pool exhausted = dispatch_paused (only blocked issues in queue)
+        return bool(getattr(self._dispatch_coordinator, "_dispatch_paused", False))
 
     async def _tick_service(self, service: ServiceBase, tick_id: int) -> None:
         async with self._semaphore:

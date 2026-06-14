@@ -167,6 +167,7 @@ def _build_server_with_launch_cwd(
         check_service=shared_check_service,
         cleanup_service=None,
         actor_cleanup=_cleanup_expired_actors,
+        dispatch_coordinator=facade.coordinator,
     )
     heartbeat.register(facade)
 

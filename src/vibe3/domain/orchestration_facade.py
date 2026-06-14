@@ -125,6 +125,11 @@ class OrchestrationFacade(ServiceBase):
         if self._coordinator:
             self._coordinator.shutdown()
 
+    @property
+    def coordinator(self) -> "GlobalDispatchCoordinator | None":
+        """Get the internal dispatch coordinator for pool exhaustion checks."""
+        return self._coordinator
+
     def get_queued_issue_numbers(self) -> set[int]:
         """Get issue numbers currently in the dispatch queue."""
         if self._coordinator:

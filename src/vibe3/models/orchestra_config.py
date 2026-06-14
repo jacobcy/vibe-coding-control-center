@@ -190,6 +190,15 @@ class OrchestraConfig(BaseModel):
     debug_polling_interval: int = Field(default=60, ge=1)
     debug_max_ticks: int = Field(default=10, ge=1)
     debug: bool = False
+    auto_stop_on_exhaustion: bool = Field(
+        default=True,
+        description="Auto-stop server when pool exhausted for consecutive ticks",
+    )
+    exhaustion_threshold_ticks: int = Field(
+        default=10,
+        ge=1,
+        description="Stop server after N consecutive exhausted ticks",
+    )
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
