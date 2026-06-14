@@ -540,18 +540,12 @@ class GlobalDispatchCoordinator:
 
         return dispatched_count
 
-    async def coordinate(self, tick_id: int = 0) -> None:
-        """Run one heartbeat tick against the frozen queue.
-
-        Args:
-            tick_id: Current tick number from heartbeat (default: 0)
-
-        Queue Collection Strategy:
-            Only collect fresh queue when actionable (non-blocked) candidates
-            are exhausted AFTER dispatch. This avoids wasted GitHub API calls.
-        """
-        # Step 1: Restore queue from persistence if None
+    def _queue_startup_restore(self) -> None:
+        """Restore queue from persistence on cold start."""
         if self._frozen_queue is None:
+            logger.bind(domain="global_dispatch", trigger="startup_restore").debug(
+                "Restoring queue from persistence"
+            )
             self._queue_persistence.frozen_queue = None
             self._sync_queue_persistence_issue_loader()
             restored = self._queue_persistence.restore()
@@ -560,7 +554,11 @@ class GlobalDispatchCoordinator:
             # Invalidate PR cache on restore to ensure fresh PR state
             self._check_service.invalidate_pr_cache()
 
-        # Step 2: Promote progressed entries (state changes)
+    def _queue_promote_progressed(self) -> None:
+        """Promote state-changed entries to front; remove terminal entries."""
+        logger.bind(domain="global_dispatch", trigger="promote_progressed").debug(
+            "Promoting progressed entries"
+        )
         self._queue_persistence.frozen_queue = self._frozen_queue
         self._sync_queue_persistence_issue_loader()
         cleared_all = self._queue_persistence.promote()
@@ -574,42 +572,39 @@ class GlobalDispatchCoordinator:
         if self._frozen_queue is None:
             self._frozen_queue = []
 
-        # Step 2.5: Periodic remote check (before collection)
-        if (
-            self._remote_check_runner
-            and tick_id - self._last_remote_check_tick >= self._remote_check_interval
-        ):
-            try:
-                self._remote_check_runner()
-            except Exception as exc:
-                logger.bind(domain="check", action="remote").warning(
-                    f"Remote check failed: {exc}"
-                )
-            finally:
-                # Always update tick to prevent repeated attempts on failure
-                self._last_remote_check_tick = tick_id
+    async def _queue_scheduled_refresh(self, tick_id: int) -> bool:
+        """Run scheduled full queue refresh if tick matches interval.
 
-        queue_refreshed = False
+        Returns:
+            True if the queue was refreshed.
+        """
         periodic_check = self._config.periodic_check
         if (
             tick_id > 0
             and periodic_check.enabled
             and tick_id % periodic_check.interval_ticks == 0
         ):
+            logger.bind(domain="global_dispatch", trigger="scheduled_refresh").debug(
+                "Running scheduled full queue refresh"
+            )
             fresh = await self._collect_frozen_queue()
             self._check_service.invalidate_pr_cache()
             self._dispatch_paused = bool(
                 fresh and all(entry.collected_state == "blocked" for entry in fresh)
             )
             self._frozen_queue = fresh
-            queue_refreshed = True
+            return True
+        return False
 
-        paused_with_pending_blocked = False
+    def _queue_paused_blocked_check(self) -> bool:
+        """Check paused state and re-qualify blocked entries.
 
-        # Step 3: Paused mode waits for human task resume to create a
-        # non-blocked candidate again. Keep existing waiting entries resident.
-        # Blocked-only rebuilds get one dispatch-time qualify pass before the
-        # coordinator enters a quiet paused state.
+        Returns:
+            True if paused with only non-qualifiable blocked entries remaining.
+        """
+        logger.bind(domain="global_dispatch", trigger="paused_blocked_check").debug(
+            "Checking paused state and blocked entries"
+        )
         if self._dispatch_paused:
             if self._has_actionable_entries():
                 self._dispatch_paused = False
@@ -618,37 +613,20 @@ class GlobalDispatchCoordinator:
                     # A blocked entry can be dispatched now — unpause to let it through
                     self._dispatch_paused = False
                 else:
-                    paused_with_pending_blocked = True
+                    return True
+        return False
 
-        # Step 4: Dispatch actionable entries FIRST
-        # Note: dispatch event logging is handled by _dispatch_loop internally
-        dispatched_count = self._dispatch_loop(tick_id)
-
-        # Step 5: Persist queue state AFTER dispatch but BEFORE collection.
-        # Entries that were dispatched this tick have been popped (blocked entries
-        # that failed qualify_gate are removed). Entries skipped due to capacity
-        # limits remain in the queue and are persisted as-is.
-        # Freshly collected entries from Step 6 are NOT included in this snapshot.
-        self._queue_persistence.frozen_queue = self._frozen_queue
-        self._queue_persistence.persist()
-
-        # Step 5b: Early-exit when paused with only non-qualifiable blocked entries.
-        # Skip collection — it would fetch the same all-blocked result again and
-        # immediately re-enter the paused state, wasting GitHub API quota.
-        if paused_with_pending_blocked:
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: dispatch paused "
-                "(blocked entries pending, no qualifiable candidates"
-                " — skipping collection)",
-            )
-            return
-
-        # Step 6: Rebuild active candidates once active queue is exhausted.
+    async def _queue_exhausted_refresh(
+        self, dispatched_count: int, queue_refreshed: bool
+    ) -> None:
+        """Rebuild queue when actionable candidates are exhausted after dispatch."""
         need_collect = not queue_refreshed and self._should_collect_after_dispatch(
             dispatched_count
         )
         if need_collect:
+            logger.bind(domain="global_dispatch", trigger="queue_exhausted").debug(
+                "Queue exhausted after dispatch, rebuilding for next tick"
+            )
             append_orchestra_event(
                 "dispatcher",
                 "GlobalDispatchCoordinator: queue exhausted after dispatch, "
@@ -668,6 +646,63 @@ class GlobalDispatchCoordinator:
             else:
                 self._dispatch_paused = False
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
+
+    async def coordinate(self, tick_id: int = 0) -> None:
+        """Run one heartbeat tick against the frozen queue.
+
+        Args:
+            tick_id: Current tick number from heartbeat (default: 0)
+
+        Queue Collection Strategy:
+            Only collect fresh queue when actionable (non-blocked) candidates
+            are exhausted AFTER dispatch. This avoids wasted GitHub API calls.
+        """
+        # Step 1: Restore from persistence on cold start
+        self._queue_startup_restore()
+
+        # Step 2: Promote state-changed entries
+        self._queue_promote_progressed()
+
+        # Step 2.5: Periodic remote check (before collection)
+        if (
+            self._remote_check_runner
+            and tick_id - self._last_remote_check_tick >= self._remote_check_interval
+        ):
+            try:
+                self._remote_check_runner()
+            except Exception as exc:
+                logger.bind(domain="check", action="remote").warning(
+                    f"Remote check failed: {exc}"
+                )
+            finally:
+                # Always update tick to prevent repeated attempts on failure
+                self._last_remote_check_tick = tick_id
+
+        # Step 3: Periodic full refresh
+        queue_refreshed = await self._queue_scheduled_refresh(tick_id)
+
+        # Step 4: Paused mode blocked re-qualification
+        paused_with_pending_blocked = self._queue_paused_blocked_check()
+
+        # Step 5: Dispatch actionable entries
+        dispatched_count = self._dispatch_loop(tick_id)
+
+        # Step 6: Persist queue state
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.persist()
+
+        # Step 7: Early-exit when paused with only non-qualifiable blocked
+        if paused_with_pending_blocked:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: dispatch paused "
+                "(blocked entries pending, no qualifiable candidates"
+                " — skipping collection)",
+            )
+            return
+
+        # Step 8: Rebuild when candidates exhausted
+        await self._queue_exhausted_refresh(dispatched_count, queue_refreshed)
 
     def is_dispatch_paused(self) -> bool:
         """Check if dispatch is paused due to exhausted pool.
