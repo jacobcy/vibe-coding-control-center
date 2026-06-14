@@ -70,9 +70,11 @@ def test_recent_pr_cache_sync_replaces_snapshot(cache: RecentPRCache) -> None:
             draft=False,
             is_ready=True,
             ci_passed=False,
+            ci_status=None,
             created_at=None,
             updated_at=None,
             merged_at=None,
+            closed_at=None,
             metadata=None,
         ),
         PRResponse(
@@ -86,9 +88,11 @@ def test_recent_pr_cache_sync_replaces_snapshot(cache: RecentPRCache) -> None:
             draft=False,
             is_ready=True,
             ci_passed=False,
+            ci_status=None,
             created_at=None,
             updated_at=None,
             merged_at=datetime.now(timezone.utc),
+            closed_at=None,
             metadata=None,
         ),
     ]
@@ -106,3 +110,94 @@ def test_recent_pr_cache_sync_replaces_snapshot(cache: RecentPRCache) -> None:
     merged_at = cached["feature/merged"]["merged_at"]
     assert merged_at is not None
     datetime.fromisoformat(merged_at)
+
+
+def test_upsert_branch_pr_inserts_new(cache: RecentPRCache) -> None:
+    """New branch entry is persisted and retrievable via get_all_branch_prs()."""
+    pr_data = {
+        "number": 301,
+        "title": "New PR",
+        "state": "OPEN",
+        "head_branch": "feature/new",
+        "base_branch": "main",
+        "url": "https://github.com/test/pr/301",
+        "draft": False,
+    }
+
+    cache.upsert_branch_pr("feature/new", pr_data)
+
+    cached = cache.get_all_branch_prs()
+    assert "feature/new" in cached
+    assert cached["feature/new"]["number"] == 301
+    assert cached["feature/new"]["state"] == "OPEN"
+
+    # Verify persistence by re-creating cache instance
+    new_cache = RecentPRCache(cache.repo_path)
+    cached_persisted = new_cache.get_all_branch_prs()
+    assert cached_persisted["feature/new"]["number"] == 301
+
+
+def test_upsert_branch_pr_overwrites_existing(cache: RecentPRCache) -> None:
+    """Same branch key overwrites previous data."""
+    initial_pr = {
+        "number": 401,
+        "title": "Initial PR",
+        "state": "OPEN",
+        "head_branch": "feature/update",
+    }
+    cache.upsert_branch_pr("feature/update", initial_pr)
+
+    updated_pr = {
+        "number": 402,
+        "title": "Updated PR",
+        "state": "CLOSED",
+        "head_branch": "feature/update",
+    }
+    cache.upsert_branch_pr("feature/update", updated_pr)
+
+    cached = cache.get_all_branch_prs()
+    assert len(cached) == 1
+    assert cached["feature/update"]["number"] == 402
+    assert cached["feature/update"]["title"] == "Updated PR"
+    assert cached["feature/update"]["state"] == "CLOSED"
+
+
+def test_upsert_branch_pr_does_not_affect_other_branches(
+    cache: RecentPRCache,
+) -> None:
+    """Upsert for branch A does not modify branch B's entry."""
+    pr_a = {
+        "number": 501,
+        "title": "PR for branch A",
+        "state": "OPEN",
+        "head_branch": "feature/a",
+    }
+    pr_b = {
+        "number": 502,
+        "title": "PR for branch B",
+        "state": "CLOSED",
+        "head_branch": "feature/b",
+    }
+
+    cache.upsert_branch_pr("feature/a", pr_a)
+    cache.upsert_branch_pr("feature/b", pr_b)
+
+    cached = cache.get_all_branch_prs()
+    assert len(cached) == 2
+    assert cached["feature/a"]["number"] == 501
+    assert cached["feature/b"]["number"] == 502
+
+    # Update branch A, verify branch B unchanged
+    pr_a_updated = {
+        "number": 503,
+        "title": "Updated PR for branch A",
+        "state": "MERGED",
+        "head_branch": "feature/a",
+    }
+    cache.upsert_branch_pr("feature/a", pr_a_updated)
+
+    cached = cache.get_all_branch_prs()
+    assert cached["feature/a"]["number"] == 503
+    assert cached["feature/a"]["state"] == "MERGED"
+    assert cached["feature/b"]["number"] == 502  # B unchanged
+    assert cached["feature/b"]["state"] == "CLOSED"
