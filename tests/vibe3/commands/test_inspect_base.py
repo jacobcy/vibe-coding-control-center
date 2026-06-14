@@ -107,24 +107,33 @@ def test_inspect_base_json_output():
             with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
+                mock_config.return_value.code_limits.code_paths.v2_shell = []
+                mock_config.return_value.code_limits.code_paths.v3_python = [
+                    "src/core/"
+                ]
                 dag_mod = "vibe3.analysis.dag_service"
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-                        # Mock score generation to avoid config loading
+                        # Mock symbol collection to avoid SerenaService initialization
                         with patch(
-                            "vibe3.analysis.generate_score_report"
-                        ) as mock_score:
-                            mock_score.return_value = {
-                                "score": 5,
-                                "level": "MEDIUM",
-                                "block": False,
-                            }
+                            "vibe3.commands.inspect_base_helpers.collect_changed_symbols",
+                            return_value=({}, 0),
+                        ):
+                            # Mock score generation to avoid config loading
                             with patch(
-                                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
-                                return_value=MagicMock(base_branch="feature/root"),
-                            ):
-                                result = runner.invoke(app, ["base", "--json"])
+                                "vibe3.analysis.generate_score_report"
+                            ) as mock_score:
+                                mock_score.return_value = {
+                                    "score": 5,
+                                    "level": "MEDIUM",
+                                    "block": False,
+                                }
+                                with patch(
+                                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                                    return_value=MagicMock(base_branch="feature/root"),
+                                ):
+                                    result = runner.invoke(app, ["base", "--json"])
 
     assert result.exit_code == 0
     import json
@@ -153,20 +162,31 @@ def test_inspect_base_json_custom_branch():
             with patch("vibe3.config.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
+                mock_config.return_value.code_limits.code_paths.v2_shell = []
+                mock_config.return_value.code_limits.code_paths.v3_python = [
+                    "src/core/"
+                ]
                 dag_mod = "vibe3.analysis.dag_service"
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-                        # Mock score generation to avoid config loading
+                        # Mock symbol collection to avoid SerenaService initialization
                         with patch(
-                            "vibe3.analysis.generate_score_report"
-                        ) as mock_score:
-                            mock_score.return_value = {
-                                "score": 5,
-                                "level": "MEDIUM",
-                                "block": False,
-                            }
-                            result = runner.invoke(app, ["base", "develop", "--json"])
+                            "vibe3.commands.inspect_base_helpers.collect_changed_symbols",
+                            return_value=({}, 0),
+                        ):
+                            # Mock score generation to avoid config loading
+                            with patch(
+                                "vibe3.analysis.generate_score_report"
+                            ) as mock_score:
+                                mock_score.return_value = {
+                                    "score": 5,
+                                    "level": "MEDIUM",
+                                    "block": False,
+                                }
+                                result = runner.invoke(
+                                    app, ["base", "develop", "--json"]
+                                )
 
     assert result.exit_code == 0
     import json

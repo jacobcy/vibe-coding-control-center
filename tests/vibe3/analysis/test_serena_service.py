@@ -249,7 +249,23 @@ class TestAnalyzeFilesSkipped:
         git_client = GitClient()
         git_client.get_untracked_files = lambda: [str(new_file)]
 
-        service = SerenaService(git_client=git_client)
+        # Mock SerenaClient to provide symbols overview
+        client = MagicMock()
+        client.get_symbols_overview.return_value = {
+            "Function": [
+                {
+                    "kind": 12,
+                    "name_path": "alpha",
+                    "body_location": {"start_line": 1, "end_line": 2},
+                },
+                {
+                    "kind": 12,
+                    "name_path": "beta",
+                    "body_location": {"start_line": 4, "end_line": 5},
+                },
+            ]
+        }
+        service = SerenaService(client=client, git_client=git_client)
 
         result = service.get_changed_functions(
             str(new_file), source=UncommittedSource()
