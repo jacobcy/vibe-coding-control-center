@@ -102,4 +102,7 @@ def test_recent_pr_cache_sync_replaces_snapshot(cache: RecentPRCache) -> None:
     assert cached["feature/open"]["state"] == "OPEN"
     assert cached["feature/merged"]["number"] == 202
     assert cached["feature/merged"]["state"] == "CLOSED"
-    assert cached["feature/merged"]["merged_at"] is not None
+    # Verify merged_at is a valid ISO 8601 string
+    merged_at = cached["feature/merged"]["merged_at"]
+    assert merged_at is not None
+    datetime.fromisoformat(merged_at)
