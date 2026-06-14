@@ -1,4 +1,16 @@
-"""PR domain services subpackage."""
+"""PR domain services subpackage.
+
+Public API Contract:
+- PRService, PRCreateUsecase, PrReadyUsecase: Core PR services
+- VerdictService, PRLocCommentService, PRReviewBriefingService: PR utilities
+- PRDimensions, RiskLevel, RiskScore: Risk analysis types
+- Analysis functions: analyze_critical_files, build_pr_analysis, etc.
+- Resolution functions: resolve_command_branch, resolve_branch_from_pr
+- Verdict functions: passes_review, blocks_merge, requires_audit_ref
+- Status functions: has_merged_pr_for_issue, get_merged_pr_for_issue
+
+All exports are part of the public API.
+"""
 
 from typing import TYPE_CHECKING, Any
 

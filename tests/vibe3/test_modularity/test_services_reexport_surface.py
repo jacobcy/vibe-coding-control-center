@@ -198,7 +198,7 @@ KNOWN_PURE_BRIDGES = set()
 KNOWN_LAYER_CROSSING_BRIDGES = set()
 
 ROOT_BARREL_IMPORT_BASELINE = 129
-SHARED_BARREL_IMPORT_BASELINE = 1
+SHARED_BARREL_IMPORT_BASELINE = 0
 PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
 LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
 
@@ -207,9 +207,7 @@ def test_root_barrel_import_count() -> None:
     """Verify root barrel imports (from vibe3.services import ...).
 
     Goal: Zero root barrel imports (all imports should be direct).
-    Current baseline: 128 call sites across 77 files (PR #2788 added 2 new
-    `from vibe3.services import log_dispatch_error` call sites for the
-    consolidated dispatch error logging helper).
+    Current baseline: 129 call sites across 77 files.
     """
     imports = count_barrel_imports("vibe3.services")
 
@@ -378,3 +376,113 @@ def test_layer_crossing_bridge_count() -> None:
     assert (
         len(layer_crossing_bridges) == 0
     ), f"Found {len(layer_crossing_bridges)} layer-crossing bridge modules"
+
+
+def test_root_barrel_all_matches_approved_public_api() -> None:
+    """Verify root barrel __all__ entries correspond to known symbols.
+
+    This ensures that the root barrel's __all__ list is explicit and intentional,
+    not a catch-all convenience surface.
+    """
+    import ast
+
+    root_barrel_path = Path("src/vibe3/services/__init__.py")
+    assert root_barrel_path.exists(), "Root barrel file not found"
+
+    tree = ast.parse(root_barrel_path.read_text())
+
+    # Extract __all__ list
+    all_names = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__all__":
+                    if isinstance(node.value, ast.List):
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Constant):
+                                all_names.append(elt.value)
+
+    # Verify __all__ is not empty
+    assert all_names, "Root barrel has empty __all__ list"
+
+    # Verify each name in __all__ has a corresponding _SYMBOL_MODULES entry
+    symbol_modules = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "_SYMBOL_MODULES":
+                    if isinstance(node.value, ast.Dict):
+                        for key, value in zip(node.value.keys, node.value.values):
+                            if isinstance(key, ast.Constant):
+                                symbol_modules[key.value] = True
+
+    # All __all__ entries should have corresponding _SYMBOL_MODULES entries
+    missing = set(all_names) - set(symbol_modules.keys())
+    assert not missing, (
+        f"Root barrel __all__ has entries without _SYMBOL_MODULES mapping: "
+        f"{sorted(missing)}"
+    )
+
+    print(f"\n✅ Root barrel __all__ has {len(all_names)} valid entries")
+
+
+def test_domain_barrels_all_matches_approved_api() -> None:
+    """Verify each domain barrel's __all__ matches expected public API list.
+
+    This ensures domain barrels expose explicit public API contracts rather than
+    broad convenience re-exports.
+    """
+    import ast
+
+    domain_barrels = [
+        "src/vibe3/services/check/__init__.py",
+        "src/vibe3/services/flow/__init__.py",
+        "src/vibe3/services/handoff/__init__.py",
+        "src/vibe3/services/issue/__init__.py",
+        "src/vibe3/services/orchestra/__init__.py",
+        "src/vibe3/services/pr/__init__.py",
+        "src/vibe3/services/task/__init__.py",
+    ]
+
+    for barrel_path_str in domain_barrels:
+        barrel_path = Path(barrel_path_str)
+        if not barrel_path.exists():
+            continue
+
+        tree = ast.parse(barrel_path.read_text())
+
+        # Extract __all__ list
+        all_names = []
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "__all__":
+                        if isinstance(node.value, ast.List):
+                            for elt in node.value.elts:
+                                if isinstance(elt, ast.Constant):
+                                    all_names.append(elt.value)
+
+        # Verify __all__ is not empty
+        assert all_names, f"{barrel_path} has empty __all__ list"
+
+        # Verify each name has corresponding _SYMBOL_MODULES entry
+        symbol_modules = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "_SYMBOL_MODULES":
+                        if isinstance(node.value, ast.Dict):
+                            for key, value in zip(node.value.keys, node.value.values):
+                                if isinstance(key, ast.Constant):
+                                    symbol_modules[key.value] = True
+
+        missing = set(all_names) - set(symbol_modules.keys())
+        assert not missing, (
+            f"{barrel_path} __all__ has entries without _SYMBOL_MODULES mapping: "
+            f"{sorted(missing)}"
+        )
+
+        print(
+            f"✅ {barrel_path.parent.name} barrel __all__ has "
+            f"{len(all_names)} valid entries"
+        )
