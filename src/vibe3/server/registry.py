@@ -207,9 +207,7 @@ def _build_server_with_launch_cwd(
 
     # Wire domain event to error_log projection hook
     try:
-        from vibe3.services.orchestra.error_projection import (
-            build_error_projection_hook,
-        )
+        from vibe3.services.orchestra import build_error_projection_hook
 
         publisher = get_publisher()
         publisher.add_publish_hook(build_error_projection_hook())
