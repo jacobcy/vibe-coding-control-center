@@ -202,8 +202,10 @@ def select_audit_module(tick_count: int, repo_root: Path | None = None) -> Path:
     Excludes __init__.py files.
     Returns a deterministic but rotating selection based on tick_count.
     """
+    from vibe3.config import get_source_root
+
     root = repo_root or Path(".").resolve()
-    src_root = root / "src" / "vibe3"
+    src_root = root / get_source_root()
     candidates = sorted(p for p in src_root.rglob("*.py") if p.name != "__init__.py")
     if not candidates:
         return src_root / "cli.py"
@@ -216,13 +218,15 @@ def resolve_test_path(module_path: Path, repo_root: Path | None = None) -> Path:
     Maps src/vibe3/{subdir}/foo.py -> tests/vibe3/{subdir}/
     so the agent knows where to look for corresponding tests.
     """
+    from vibe3.config import get_source_root
+
     root = repo_root or Path(".").resolve()
-    src_vibe3 = root / "src" / "vibe3"
+    src_vibe3 = root / get_source_root()
     try:
         rel = module_path.relative_to(src_vibe3)
     except ValueError:
         try:
-            rel = module_path.relative_to("src/vibe3")
+            rel = module_path.relative_to(get_source_root())
         except ValueError:
             return root / "tests" / "vibe3"
     return root / "tests" / "vibe3" / rel.parent

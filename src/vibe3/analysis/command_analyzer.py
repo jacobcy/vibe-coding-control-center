@@ -85,14 +85,14 @@ def _extract_calls(file_path: str, func_name: str) -> list[CallEdge]:
 def analyze_command(
     command: str,
     subcommand: str | None = None,
-    commands_root: str = "src/vibe3/commands",
+    commands_root: str | None = None,
 ) -> CommandInspection:
     """静态分析命令调用链路.
 
     Args:
         command: 顶层命令（如 "pr"、"flow"）
         subcommand: 子命令（如 "draft"、"merge"）
-        commands_root: commands 目录路径
+        commands_root: commands 目录路径（None uses configured commands root）
 
     Returns:
         命令检查结果（包含层次化调用树）
@@ -100,6 +100,11 @@ def analyze_command(
     Raises:
         CommandAnalyzerError: 分析失败
     """
+    if commands_root is None:
+        from vibe3.config import get_commands_root
+
+        commands_root = get_commands_root()
+
     full_cmd = f"{command} {subcommand}" if subcommand else command
     log = logger.bind(domain="command_analyzer", action="analyze", command=full_cmd)
     log.info("Analyzing command call chain")

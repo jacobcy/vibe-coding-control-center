@@ -108,16 +108,19 @@ def find_callee_file(callee: str, caller_file: str) -> str | None:
     Returns:
         被调用者文件路径或 None
     """
+    from vibe3.config import get_source_root
+
     # Heuristic: look for patterns like "service.xxx" -> "services/xxx_service.py"
     parts = callee.split(".")
     if len(parts) >= 2:
         obj_name = parts[0]
 
         # Common patterns
+        src = get_source_root()
         patterns = [
-            f"src/vibe3/services/{obj_name}_service.py",
-            f"src/vibe3/clients/{obj_name}_client.py",
-            f"src/vibe3/clients/{obj_name}_ops.py",
+            f"{src}/services/{obj_name}_service.py",
+            f"{src}/clients/{obj_name}_client.py",
+            f"{src}/clients/{obj_name}_ops.py",
         ]
 
         for pattern in patterns:
@@ -130,18 +133,23 @@ def find_callee_file(callee: str, caller_file: str) -> str | None:
 def find_command_file(
     command: str,
     subcommand: str | None = None,
-    commands_root: str = "src/vibe3/commands",
+    commands_root: str | None = None,
 ) -> str | None:
     """在 commands 目录查找命令对应的文件.
 
     Args:
         command: 命令名（如 "pr" 或 "flow"）
         subcommand: 子命令名（如 "show"、"draft"）
-        commands_root: commands 目录路径
+        commands_root: commands 目录路径（None uses configured commands root）
 
     Returns:
         文件路径或 None
     """
+    if commands_root is None:
+        from vibe3.config import get_commands_root
+
+        commands_root = get_commands_root()
+
     root = Path(commands_root)
 
     # Try to find the specific subcommand file first
