@@ -209,7 +209,7 @@ class OrchestraStatusService:
         import urllib.request
         from urllib.error import URLError
 
-        url = f"http://127.0.0.1:{config.port}/status"
+        url = f"http://127.0.0.1:{config.port}/api/orchestra"
         try:
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=3.0) as response:

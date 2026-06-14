@@ -200,9 +200,26 @@ def _build_server_with_launch_cwd(
     # Store status_service for HTTP endpoint
     fastapi_app.state.status_service = status_service
 
-    @fastapi_app.get("/status")
-    async def get_status() -> dict[str, Any]:
-        """Get current orchestra status snapshot with job monitoring data."""
+    @fastapi_app.get("/api/tasks")
+    async def get_api_tasks(all_flows: bool = False) -> dict[str, Any]:
+        """Get task status data as JSON."""
+        from vibe3.services.task.status import build_api_task_data
+
+        return await run_in_threadpool(build_api_task_data, all_flows)
+
+    @fastapi_app.get("/api/serve")
+    async def get_api_serve() -> dict[str, Any]:
+        """Get serve status data as JSON."""
+        from vibe3.services.orchestra.serve_status import fetch_serve_status_data
+
+        return await run_in_threadpool(fetch_serve_status_data, config)
+
+    @fastapi_app.get("/api/orchestra")
+    async def get_api_orchestra() -> dict[str, Any]:
+        """Get orchestra snapshot + jobs (old /status JSON format).
+
+        This endpoint preserves backward compatibility with fetch_live_snapshot().
+        """
         from vibe3.execution import ActiveJob, JobMonitorService
 
         snapshot = await run_in_threadpool(status_service.snapshot)
@@ -237,15 +254,21 @@ def _build_server_with_launch_cwd(
 
     @fastapi_app.get("/")
     async def root_redirect() -> RedirectResponse:
-        """Redirect root to /status."""
+        """Redirect root to /web."""
         from fastapi.responses import RedirectResponse
 
-        return RedirectResponse(url="/status", status_code=301)
+        return RedirectResponse(url="/web", status_code=301)
+
+    @fastapi_app.get("/status", response_class=HTMLResponse)
+    async def get_status_dashboard() -> str:
+        """Serve the Orchestra serve status web console."""
+        html_path = Path(__file__).parent / "static" / "serve.html"
+        return html_path.read_text(encoding="utf-8")
 
     @fastapi_app.get("/web", response_class=HTMLResponse)
     async def get_web_dashboard() -> str:
-        """Serve the Orchestra status web console."""
-        html_path = Path(__file__).parent / "static" / "status.html"
+        """Serve the Orchestra task status web console."""
+        html_path = Path(__file__).parent / "static" / "tasks.html"
         return html_path.read_text(encoding="utf-8")
 
     # Mount MCP server (gracefully degrades if not available)
