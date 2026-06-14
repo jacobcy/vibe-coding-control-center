@@ -21,6 +21,17 @@ class MockGitHubClient:
         return self.merged_prs[:limit]
 
 
+class FailingGitHubClient:
+    """Mock GitHub client that raises while fetching merged PRs."""
+
+    def __init__(self, exc: Exception) -> None:
+        self.exc = exc
+
+    def list_merged_prs(self, limit: int | None = 100) -> list[dict[str, Any]]:
+        """Raise the configured exception."""
+        raise self.exc
+
+
 @pytest.fixture
 def temp_repo_path(tmp_path: Path) -> Path:
     """Create temporary repo path with .git/vibe3 directory."""
@@ -397,3 +408,49 @@ def test_get_merged_pr_for_issue_fallback_on_missing_index(
     assert result is not None and result["number"] == 101 and 789 in result["issues"]
 
     assert cache.get_merged_pr_for_issue(999) is None
+
+
+def test_sync_records_fetch_errors(cache: MergedPRCache) -> None:
+    """sync() records GitHub fetch errors when a recorder is supplied."""
+    calls: list[dict[str, Any]] = []
+
+    def record_error(**kwargs: Any) -> tuple[bool, int]:
+        calls.append(kwargs)
+        return False, 1
+
+    result = cache.sync(
+        FailingGitHubClient(RuntimeError("api down")),
+        error_recorder=record_error,
+    )
+
+    assert result == 0
+    assert calls == [
+        {
+            "error_code": "E_EXEC_UNKNOWN",
+            "error_message": "Failed to fetch merged PRs (sync): api down",
+            "tick_id": 0,
+        }
+    ]
+
+
+def test_rebuild_records_fetch_errors(cache: MergedPRCache) -> None:
+    """rebuild() records GitHub fetch errors when a recorder is supplied."""
+    calls: list[dict[str, Any]] = []
+
+    def record_error(**kwargs: Any) -> tuple[bool, int]:
+        calls.append(kwargs)
+        return False, 1
+
+    result = cache.rebuild(
+        FailingGitHubClient(RuntimeError("api down")),
+        error_recorder=record_error,
+    )
+
+    assert result == 0
+    assert calls == [
+        {
+            "error_code": "E_EXEC_UNKNOWN",
+            "error_message": "Failed to fetch merged PRs (rebuild): api down",
+            "tick_id": 0,
+        }
+    ]

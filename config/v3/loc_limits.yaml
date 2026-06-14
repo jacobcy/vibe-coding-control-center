@@ -345,6 +345,9 @@ code_limits:
       - path: "tests/vibe3/services/test_check_pr_status.py"
         limit: 600
         reason: "Check PR 状态测试集，覆盖 PR closed 检测、terminal 状态判断、duplicate handling、check priority fix (PR merged before issue-closed) 等紧密耦合场景，新增 PR merged with closed issue 回归测试后略微超标（#2284）；PR #2667 删除 TestOpenPRFlowTransition 测试类（-276 行），迁移至 qualify_gate 测试"
+      - path: "tests/vibe3/clients/test_merged_pr_cache.py"
+        limit: 500
+        reason: "Merged PR cache 测试集，覆盖 cache load/save、sync/rebuild、index 回退、错误记录注入等紧密耦合场景；PR #2843 增加 error_recorder 注入与错误回归测试后增至 456 行，保留单文件以维持 cache API 与行为测试的一致性"
       - path: "tests/vibe3/services/test_check_service.py"
         limit: 650
         reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）；Issue #2329 rename handle_closed_pr → handle_pr_terminal_state 增加行数（长方法名需换行，2个超长函数名需 noqa 注释）；Issue #2432 新增 3 个测试覆盖 _transfer_dependencies 方法及其集成（+82 行）；PR #2667 删除 test_verify_branch_returns_warning_for_open_pr_with_running_worker 测试（-64 行），迁移至 qualify_gate 测试"
