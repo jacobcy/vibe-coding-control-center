@@ -208,14 +208,3 @@ def handle_governance_scan_started(
         )
 
     return result
-
-    if result and result.launched:
-        append_governance_event(
-            f"governance agent launched: tick={event.tick_count} "
-            f"session={result.tmux_session}",
-        )
-    elif result:
-        append_governance_event(
-            f"governance dispatch skipped: tick={event.tick_count} "
-            f"reason={result.reason}",
-        )

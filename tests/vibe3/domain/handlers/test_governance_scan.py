@@ -39,7 +39,13 @@ class TestGovernanceScanHandler:
         ]
         mock_registry_cls.return_value = mock_registry
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.skipped is True
+        assert result.reason_code == "governance_already_running"
 
         mock_registry.mark_governance_sessions_done_when_tmux_gone.assert_called_once()
         mock_coordinator_cls.return_value.dispatch_execution.assert_not_called()
@@ -90,9 +96,15 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = mock_snapshot
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(
+        result = handle_governance_scan_started(
             GovernanceScanStarted(tick_count=5, execution_count=3)
         )
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is True
+        assert result.tmux_session == "vibe3-gov-1"
+        assert result.log_path == "/tmp/gov.log"
 
         mock_coordinator.dispatch_execution.assert_called_once()
         # Verify CLI self-invocation command structure
@@ -135,7 +147,13 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="open")
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.skipped is True
+        assert result.reason_code == "circuit_breaker_open"
 
         mock_append_governance_event.assert_called_once()
         assert "circuit breaker OPEN" in mock_append_governance_event.call_args.args[0]
@@ -179,7 +197,13 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.reason == "capacity full"
+        assert result.reason_code == "capacity_full"
 
         mock_coordinator.dispatch_execution.assert_called_once()
         mock_append_governance_event.assert_called()
@@ -223,7 +247,13 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.reason_code == "handler_exception"
+        assert "dispatch failed" in result.reason
 
         mock_coordinator.dispatch_execution.assert_called_once()
 
@@ -269,7 +299,13 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.reason == "capacity full"
+        assert result.reason_code == "capacity_full"
 
         mock_record_failure.assert_called_once_with(
             result=result,
@@ -320,7 +356,13 @@ class TestGovernanceScanHandler:
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
         mock_status_cls.return_value = mock_status
 
-        handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+        result = handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        # Verify return value
+        assert result is not None
+        assert result.launched is False
+        assert result.reason_code == "handler_exception"
+        assert "dispatch failed" in result.reason
 
         mock_record_failure.assert_called_once()
         call_kwargs = mock_record_failure.call_args.kwargs
