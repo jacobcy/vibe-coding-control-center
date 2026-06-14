@@ -1,5 +1,20 @@
 # 更新日志
 
+## [3.0.0] - 2026-06-14
+
+### ✨ New Features
+- **3-Tier Architecture Adoption**: 落地三层治理架构（Tier 1: Shell, Tier 2: Skill, Tier 3: Governance）
+- **ADR (Architecture Decision Records)**: 引入正式的架构决策记录机制，所有重大变更均需通过 ADR
+- **Snapshot Improvements**: 增强项目结构追踪能力，支持持久化 snapshot、diff 比较与健康度仪表盘
+- **Task Registry Audit & Repair**: 任务注册表全量审计与自动修复系统
+  - 三阶段审计：数据质量 -> 确定性检查 -> 语义分析
+  - 支持交互式修复模式与自动备份
+- **vibe3 internal bootstrap**: 统一初始化入口，自动化同步技能环境与本地配置
+
+### 🔧 Refactor
+- **Domain Events Refinement**: 优化领域事件总线，增强异步执行下的状态一致性
+- **Command Consolidation**: 收敛 vibe3 命令集，明确各 tier 命令职责边界
+
 ## [2.4.0] - 2026-04-08
 
 ### ✨ New Features
