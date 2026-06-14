@@ -16,6 +16,7 @@ from vibe3.models import (
     FileSnapshot,
     FunctionSnapshot,
     ModuleSnapshot,
+    StructureDiff,
     StructureMetrics,
     StructureSnapshot,
 )
@@ -610,3 +611,41 @@ def load_branch_baseline(branch: str) -> StructureSnapshot | None:
     except Exception as e:
         logger.warning(f"Failed to load branch baseline: {e}")
         return None
+
+
+def build_snapshot_diff(
+    base_branch: str = "main", current_branch: str | None = None
+) -> StructureDiff | None:
+    """Build snapshot diff for review context."""
+    # Local import to avoid circular dependency:
+    # snapshot_diff.py imports SnapshotError from snapshot_service
+    from vibe3.analysis.snapshot_diff import compute_diff
+
+    log = logger.bind(domain="review", action="build_snapshot_diff")
+    structure_diff: StructureDiff | None = None
+
+    try:
+        log.info(f"Loading baseline snapshot for branch: {base_branch}")
+        baseline = find_snapshot_by_branch(base_branch, current_branch)
+
+        if baseline is None:
+            log.warning(f"No baseline snapshot found for branch: {base_branch}")
+            return None
+
+        log.info("Building current snapshot")
+        current = build_snapshot()
+
+        log.info("Computing structure diff")
+        structure_diff = compute_diff(baseline, current)
+        log.bind(
+            files_changed=structure_diff.summary.files_added
+            + structure_diff.summary.files_removed
+            + structure_diff.summary.files_modified
+        ).info("Structure diff computed")
+
+    except SnapshotError as error:
+        log.bind(error=str(error)).warning("Snapshot operation failed")
+    except Exception as error:  # pragma: no cover - defensive
+        log.bind(error=str(error)).error("Unexpected error building snapshot diff")
+
+    return structure_diff

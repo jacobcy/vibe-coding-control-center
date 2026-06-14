@@ -120,8 +120,8 @@ code_limits:
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
       - path: "src/vibe3/analysis/snapshot_service.py"
-        limit: 650
-        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析、非代码文件追踪（review_scope 路径扩展）、语言检测等紧密耦合逻辑；Issue #2810 RFC 扩展了非 Python 文件追踪能力，当前实现约 612 行，提升上限以容纳后续小幅增长"
+        limit: 660
+        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析、非代码文件追踪（review_scope 路径扩展）、语言检测、build_snapshot_diff（从 agents 层迁移，Issue #2827）等紧密耦合逻辑；Issue #2810 RFC 扩展了非 Python 文件追踪能力；Issue #2827 将 build_snapshot_diff 从 agents.review_pipeline_helpers 迁移至此，消除冗余包装层，提升上限以容纳后续小幅增长"
       - path: "src/vibe3/services/shared/status_query.py"
         limit: 480
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"

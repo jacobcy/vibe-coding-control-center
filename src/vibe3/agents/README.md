@@ -14,12 +14,11 @@ Agent backend 实现层，提供具体的 agent 执行能力和 prompt 构建。
 | backends/codeagent_config.py | 246 | Codeagent 配置解析、环境准备 |
 | models.py | 147 | AgentOptions / AgentResult / CodeagentCommand |
 | backends/session_manager.py | 71 | Agent 会话管理、状态持久化 |
-| review_pipeline_helpers.py | 66 | Review 分析辅助函数 |
 | base.py | 38 | AgentBackend 协议定义 |
 | __init__.py | 76 | 公共导出：协议、模型、后端、prompt 构建器 |
 | backends/__init__.py | 27 | 后端公共导出：CodeagentBackend、异步执行、配置解析 |
 
-**总计**: 12 文件，2247 行代码
+**总计**: 11 文件，2181 行代码
 
 ## 架构说明
 
@@ -78,9 +77,8 @@ agents/
 │   ├── plan_prompt.py (依赖 prompts/, config/, models/)
 │   ├── run_prompt.py (依赖 prompts/, config/, models/)
 │   └── review_prompt.py (依赖 prompts/, config/, models/, analysis/)
-└── 辅助层（无依赖）
-    ├── models.py (数据模型定义)
-    └── review_pipeline_helpers.py (辅助函数)
+└── 数据模型层（无依赖）
+    └── models.py (数据模型定义)
 ```
 
 **循环依赖检查**: ✅ 无循环依赖
