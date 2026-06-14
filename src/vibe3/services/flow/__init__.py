@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow.service import FlowService
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
+    from vibe3.services.flow.timeline import FlowTimelineService
 
 __all__ = [
     "AbandonFlowService",
@@ -66,6 +67,7 @@ __all__ = [
     "FlowService",
     "FlowStatusResolver",
     "FlowStatusService",
+    "FlowTimelineService",
 ]
 
 _SYMBOL_MODULES = {
@@ -90,6 +92,7 @@ _SYMBOL_MODULES = {
     "FlowService": "vibe3.services.flow.service",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
+    "FlowTimelineService": "vibe3.services.flow.timeline",
 }
 
 
