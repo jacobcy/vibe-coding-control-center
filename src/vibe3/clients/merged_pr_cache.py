@@ -12,12 +12,28 @@ while this cache persists merged PR status for issue completion checks.
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from loguru import logger
 
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.utils import get_vibe3_cache_path
+
+
+class ErrorRecorder(Protocol):
+    """Callable used by higher layers to persist external API failures."""
+
+    def __call__(
+        self,
+        *,
+        error_code: str,
+        error_message: str,
+        tick_id: int = 0,
+        issue_number: int | None = None,
+        branch: str | None = None,
+    ) -> tuple[bool, int]:
+        """Record an error and return threshold state/count."""
+        ...
 
 
 class MergedPRCache:
@@ -156,7 +172,50 @@ class MergedPRCache:
         )
         return None
 
-    def sync(self, github_client: Any, limit: int = 200) -> int:
+    def _record_fetch_error(
+        self,
+        exc: Exception,
+        *,
+        action: str,
+        error_recorder: ErrorRecorder | None,
+    ) -> None:
+        """Record or log a GitHub fetch failure without depending on services."""
+        if error_recorder is None:
+            logger.bind(
+                domain="merged_pr_cache",
+                action=action,
+                error=str(exc),
+                exc_info=True,
+            ).error("Failed to fetch merged PRs")
+            return
+
+        from vibe3.exceptions import classify_error_hybrid
+
+        error_code = classify_error_hybrid(exc)
+        error_message = f"Failed to fetch merged PRs ({action}): {exc}"
+
+        try:
+            error_recorder(
+                error_code=error_code,
+                error_message=error_message,
+                tick_id=0,
+            )
+        except Exception as record_exc:
+            logger.bind(
+                domain="merged_pr_cache",
+                action=action,
+                error=str(exc),
+                record_error=str(record_exc),
+                exc_info=True,
+            ).warning("Failed to record merged PR fetch error")
+
+    def sync(
+        self,
+        github_client: Any,
+        limit: int = 200,
+        *,
+        error_recorder: ErrorRecorder | None = None,
+    ) -> int:
         """Sync cache with latest merged PRs from GitHub.
 
         Fetches the most recent N merged PRs and merges new entries into cache.
@@ -176,22 +235,11 @@ class MergedPRCache:
         try:
             merged_prs = github_client.list_merged_prs(limit=limit)
         except Exception as exc:
-            from vibe3.exceptions import classify_error_hybrid
-            from vibe3.services import record_error
-
-            error_code = classify_error_hybrid(exc)
-            error_message = f"Failed to fetch merged PRs (sync): {exc}"
-
-            try:
-                record_error(
-                    error_code=error_code,
-                    error_message=error_message,
-                    tick_id=0,
-                )
-            except Exception as record_exc:
-                logger.bind(domain="merged_pr_cache").warning(
-                    f"Failed to record error: {record_exc}"
-                )
+            self._record_fetch_error(
+                exc,
+                action="sync",
+                error_recorder=error_recorder,
+            )
             return 0
 
         cache = self._load_cache()
@@ -228,7 +276,12 @@ class MergedPRCache:
         )
         return new_count
 
-    def rebuild(self, github_client: Any) -> int:
+    def rebuild(
+        self,
+        github_client: Any,
+        *,
+        error_recorder: ErrorRecorder | None = None,
+    ) -> int:
         """Rebuild cache from scratch with all merged PRs.
 
         Fetches all merged PRs (limit=None) and replaces the entire cache.
@@ -244,22 +297,11 @@ class MergedPRCache:
         try:
             merged_prs = github_client.list_merged_prs(limit=None)
         except Exception as exc:
-            from vibe3.exceptions import classify_error_hybrid
-            from vibe3.services import record_error
-
-            error_code = classify_error_hybrid(exc)
-            error_message = f"Failed to fetch merged PRs (rebuild): {exc}"
-
-            try:
-                record_error(
-                    error_code=error_code,
-                    error_message=error_message,
-                    tick_id=0,
-                )
-            except Exception as record_exc:
-                logger.bind(domain="merged_pr_cache").warning(
-                    f"Failed to record error: {record_exc}"
-                )
+            self._record_fetch_error(
+                exc,
+                action="rebuild",
+                error_recorder=error_recorder,
+            )
             return 0
 
         prs: dict[str, Any] = {}

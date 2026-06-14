@@ -44,3 +44,36 @@ class TestClientsModularity:
                 + "\n\nclients module should not depend on config module. "
                 "See issue #1682 for architectural context."
             )
+
+    def test_clients_no_services_import(self) -> None:
+        """Verify clients module does not import from vibe3.services.
+
+        Clients are lower-level adapters/cache helpers. Importing the services
+        barrel from clients creates an upward dependency and can perturb the
+        lazy re-export graph used by mypy.
+        """
+        import re
+
+        clients_path = Path("src/vibe3/clients")
+
+        if not clients_path.exists():
+            pytest.skip("clients module not found")
+
+        pattern = re.compile(r"from vibe3\.services\b|import vibe3\.services\b")
+
+        violations = []
+        for py_file in clients_path.rglob("*.py"):
+            content = py_file.read_text()
+            match = pattern.search(content)
+            if match:
+                violations.append(
+                    f"{py_file.relative_to(clients_path)}: {match.group()}"
+                )
+
+        if violations:
+            pytest.fail(
+                "clients module contains forbidden services imports:\n"
+                + "\n".join(f"  - {v}" for v in violations)
+                + "\n\nclients module should not depend on the services layer. "
+                "Pass service callbacks into clients instead."
+            )

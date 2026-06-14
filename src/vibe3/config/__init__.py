@@ -14,11 +14,22 @@ if TYPE_CHECKING:
         resolve_repo_agent_preset_name,
     )
     from vibe3.config.branch_convention import BranchConvention
-    from vibe3.config.cli_overrides import ROLE_CONFIG_SECTIONS, RoleCliOverrides
+    from vibe3.config.cli_overrides import (
+        ROLE_CONFIG_SECTIONS,
+        RoleCliOverrides,
+        build_role_cli_overrides,
+    )
     from vibe3.config.config_loader import load_config_for_role
-    from vibe3.config.convention_resolver import diagnose_profile, get_convention
+    from vibe3.config.convention_resolver import (
+        ConventionResolver,
+        diagnose_profile,
+        get_convention,
+        get_resolver,
+    )
+    from vibe3.config.env_override import OVERRIDE_RULES
     from vibe3.config.loader import (
         get_config,
+        get_config_with_env_override,
         load_config,
         load_keys_env_fallback,
         load_runtime_config,
@@ -28,7 +39,7 @@ if TYPE_CHECKING:
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.config.orchestra_config import PeriodicCheckConfig
+    from vibe3.config.orchestra_config import OrchestraConfig, PeriodicCheckConfig
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.config.profile_config import ProfileConfig
     from vibe3.config.profile_convention import LabelsConvention, ProfileConvention

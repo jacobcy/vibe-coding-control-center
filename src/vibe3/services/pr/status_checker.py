@@ -69,7 +69,9 @@ def get_merged_pr_for_issue(
     ).debug("Cache miss, syncing cache")
 
     try:
-        cache.sync(github_client, limit=200)
+        from vibe3.services.shared.errors import record_error
+
+        cache.sync(github_client, limit=200, error_recorder=record_error)
 
         cached_pr = cache.get_merged_pr_for_issue(issue_number)
         if cached_pr:
@@ -88,7 +90,7 @@ def get_merged_pr_for_issue(
 
     except Exception as exc:
         from vibe3.exceptions import classify_error_hybrid
-        from vibe3.services import record_error
+        from vibe3.services.shared.errors import record_error
 
         error_code = classify_error_hybrid(exc)
         error_message = (
@@ -103,9 +105,13 @@ def get_merged_pr_for_issue(
                 issue_number=issue_number,
             )
         except Exception as record_exc:
-            logger.bind(domain="pr_status", issue_number=issue_number).warning(
-                f"Failed to record error: {record_exc}"
-            )
+            logger.bind(
+                domain="pr_status",
+                issue_number=issue_number,
+                error=str(exc),
+                record_error=str(record_exc),
+                exc_info=True,
+            ).warning("Failed to record merged PR status error")
         return None
 
 

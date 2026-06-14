@@ -42,12 +42,12 @@ def load_config_for_role(
 
     # Validate model requires backend
     cli_overrides = build_role_cli_overrides(role, agent, backend, model)
-    if cli_overrides and cli_overrides.model:
+    if model:
         config_backend = backend  # CLI backend takes precedence
         if not config_backend:
             raise ValueError(
                 f"--model requires --backend to be specified "
-                f"(role={role}, model={cli_overrides.model})"
+                f"(role={role}, model={model})"
             )
 
     try:

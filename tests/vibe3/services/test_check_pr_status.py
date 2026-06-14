@@ -301,6 +301,34 @@ class TestMergedPRCacheIntegration:
                 # Sync should have been called (via list_merged_prs)
                 mock_client.list_merged_prs.assert_called()
 
+    def test_cache_miss_records_sync_api_error(self, tmp_path: Path) -> None:
+        """Cache sync API failures should be recorded, not silently swallowed."""
+        from vibe3.services.pr.status_checker import get_merged_pr_for_issue
+
+        with patch(
+            "vibe3.services.pr.status_checker.get_git_common_dir"
+        ) as mock_git_dir:
+            mock_git_dir.return_value = str(tmp_path / ".git")
+
+            with patch(
+                "vibe3.services.pr.status_checker.GitHubClient"
+            ) as mock_client_class:
+                mock_client = MagicMock()
+                mock_client.list_merged_prs.side_effect = RuntimeError("api down")
+                mock_client_class.return_value = mock_client
+
+                with patch("vibe3.services.shared.errors.record_error") as mock_record:
+                    mock_record.return_value = (False, 1)
+
+                    result = get_merged_pr_for_issue(456)
+
+        assert result is None
+        mock_record.assert_called_once_with(
+            error_code="E_EXEC_UNKNOWN",
+            error_message="Failed to fetch merged PRs (sync): api down",
+            tick_id=0,
+        )
+
 
 class TestClosedPRIdempotency:
     """Test idempotency guard for closed PR handling."""
