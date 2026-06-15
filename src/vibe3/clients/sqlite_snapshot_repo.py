@@ -59,17 +59,3 @@ class SQLiteSnapshotRepo(_HasConnection):
         )
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    def find_baseline(self, branch: str) -> dict | None:
-        """Return the baseline registry row for a branch, or None."""
-        cursor = self._get_connection().cursor()
-        cursor.execute(
-            "SELECT * FROM snapshot_registry WHERE baseline_for = ? "
-            "ORDER BY created_at DESC LIMIT 1",
-            (branch,),
-        )
-        row = cursor.fetchone()
-        if not row:
-            return None
-        columns = [col[0] for col in cursor.description]
-        return dict(zip(columns, row))

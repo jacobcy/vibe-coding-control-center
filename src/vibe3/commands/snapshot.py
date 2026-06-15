@@ -369,11 +369,7 @@ def diff(
                     typer.echo("  No baseline snapshot found, using git diff")
                     typer.echo(f"  Branch: {current_branch}")
                     typer.echo("\n  Summary:")
-                    typer.echo(
-                        f"    Files: +{summary.files_added} "
-                        f"-{summary.files_removed} "
-                        f"~{summary.files_modified}"
-                    )
+                    typer.echo(f"    Files changed: {summary.files_modified}")
                     typer.echo(f"    LOC delta: {summary.total_loc_delta:+d}")
                     if summary.total_functions_delta:
                         typer.echo(f"    Functions: {summary.total_functions_delta:+d}")
