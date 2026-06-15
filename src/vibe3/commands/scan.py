@@ -1,7 +1,9 @@
 """Scan command: standalone governance/supervisor scans without HeartbeatServer."""
 
+from __future__ import annotations
+
 import asyncio
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from loguru import logger
@@ -11,30 +13,43 @@ from vibe3.commands.command_options import _ASYNC_OPT
 from vibe3.config import load_orchestra_config
 from vibe3.observability import setup_logging
 
+if TYPE_CHECKING:
+    from vibe3.models import ExecutionLaunchResult
+
 app = typer.Typer(
     help="Run governance and supervisor scans without starting the server",
     no_args_is_help=True,
 )
 
 
-def _publish_governance_event(
+def _publish_and_wait_governance_event(
     material_override: str | None = None, tick_count: int = 0
-) -> None:
-    """Publish GovernanceScanStarted event to the event bus.
+) -> ExecutionLaunchResult | None:
+    """Publish GovernanceScanStarted event and wait for handler result.
 
     Args:
         material_override: Optional governance role (not used in event,
             preserved for future tick-based material rotation support)
         tick_count: Tick count for the scan (default 0 for manual scans)
+
+    Returns:
+        ExecutionLaunchResult from handler, or None if no result
     """
-    from vibe3.domain import GovernanceScanStarted, publish
+    from vibe3.domain import GovernanceScanStarted
+    from vibe3.models import ExecutionLaunchResult, publish_and_wait
 
     event = GovernanceScanStarted(
         tick_count=tick_count,
         execution_count=0,
         actor="cli:scan-governance",
     )
-    publish(event)
+    result = publish_and_wait(event)  # type: ignore[operator]
+    # Type narrowing: publish_and_wait returns Any | None,
+    # but we know handlers return ExecutionLaunchResult | None
+    if result is None:
+        return None
+    assert isinstance(result, ExecutionLaunchResult)
+    return result
 
 
 def _run_governance_scan(
@@ -51,8 +66,10 @@ def _run_governance_scan(
         no_async: Deprecated flag (logs warning, always uses async dispatch
             via event bus)
     """
-    # Register event handlers before publishing (required for standalone scan)
+    from rich.console import Console
+
     from vibe3.domain import register_event_handlers
+    from vibe3.ui import display_execution_result
 
     register_event_handlers()
 
@@ -62,8 +79,16 @@ def _run_governance_scan(
             "with async tmux dispatch. For synchronous execution, use "
             "'vibe3 internal governance' directly."
         )
-    _publish_governance_event(material_override=material_override)
-    logger.bind(domain="orchestra").info("Governance scan event published")
+
+    result = _publish_and_wait_governance_event(material_override=material_override)
+
+    if result:
+        console = Console()
+        display_execution_result(console, result)
+    else:
+        logger.bind(domain="orchestra").info(
+            "Governance scan completed (no result returned from handler)"
+        )
 
 
 def _publish_supervisor_events(
@@ -312,9 +337,18 @@ async def _run_combined_scan_async() -> None:
 
     Publishes events which trigger domain handlers to dispatch via ExecutionCoordinator.
     """
-    # Governance: publish event
-    _publish_governance_event(material_override=None)
-    logger.bind(domain="orchestra").info("Governance scan event published")
+    # Governance: publish event and get result
+    result = _publish_and_wait_governance_event(material_override=None)
+
+    if result:
+        from rich.console import Console
+
+        from vibe3.ui import display_execution_result
+
+        console = Console()
+        display_execution_result(console, result)
+    else:
+        logger.bind(domain="orchestra").info("Governance scan completed (no result)")
 
     # Supervisor: publish events
     total_scanned, matched_count = _run_supervisor_scan()

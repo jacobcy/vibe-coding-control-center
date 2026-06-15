@@ -6,14 +6,14 @@ can publish and subscribe without creating circular dependencies.
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from loguru import logger
 
 from vibe3.models.domain_events import DomainEvent
 
 E = TypeVar("E", bound=DomainEvent)
-EventHandler = Callable[[E], None]
+EventHandler = Callable[[E], Any | None]
 PublishHook = Callable[[DomainEvent], None]
 
 
@@ -88,6 +88,53 @@ class EventPublisher:
                     f"Handler failed for {event_type}: {e}"
                 )
 
+    def publish_and_wait(self, event: DomainEvent, timeout: int = 30) -> Any | None:
+        """Publish event and wait for first handler result (synchronous).
+
+        Unlike publish(), this method returns the first non-None result from
+        handlers. Handlers can return Any | None instead of just None.
+
+        Args:
+            event: The domain event to publish
+            timeout: Safety net timeout (unused in sync model,
+                kept for API compatibility)
+
+        Returns:
+            First non-None result from handlers, or None if all handlers return None
+        """
+        event_type = type(event).__name__
+
+        # Fire publish hooks before type-specific dispatch
+        for hook in self._hooks:
+            try:
+                hook(event)
+            except Exception as e:
+                logger.bind(domain="events").error(f"Publish hook failed: {e}")
+
+        handlers = self._handlers.get(event_type, [])
+
+        if not handlers:
+            logger.bind(domain="events").warning(
+                f"No handlers registered for event: {event_type}"
+            )
+            return None
+
+        logger.bind(domain="events").info(
+            f"Publishing {event_type} to {len(handlers)} handler(s)"
+        )
+
+        for handler in handlers:
+            try:
+                result = handler(event)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.bind(domain="events").error(
+                    f"Handler failed for {event_type}: {e}"
+                )
+
+        return None
+
 
 def get_publisher() -> EventPublisher:
     """Get the global event publisher singleton."""
@@ -97,6 +144,19 @@ def get_publisher() -> EventPublisher:
 def publish(event: DomainEvent) -> None:
     """Publish an event using the global publisher."""
     EventPublisher().publish(event)
+
+
+def publish_and_wait(event: DomainEvent, timeout: int = 30) -> Any | None:
+    """Publish event and wait for first handler result (synchronous).
+
+    Args:
+        event: The domain event to publish
+        timeout: Safety net timeout (unused in sync model, kept for API compatibility)
+
+    Returns:
+        First non-None result from handlers, or None if all handlers return None
+    """
+    return EventPublisher().publish_and_wait(event, timeout=timeout)
 
 
 def subscribe(event_type: str, handler: Callable[[DomainEvent], None]) -> None:

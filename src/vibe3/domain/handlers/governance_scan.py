@@ -64,7 +64,7 @@ class GovernanceScanDependencies:
 @register_handler("GovernanceScanStarted")
 def handle_governance_scan_started(
     event: GovernanceScanStarted, /, deps: GovernanceScanDependencies | None = None
-) -> None:
+) -> ExecutionLaunchResult | None:
     """Dispatch governance scan via CLI self-invocation."""
     from vibe3.execution import (
         resolve_async_cli_project_root,
@@ -106,7 +106,7 @@ def handle_governance_scan_started(
             ).info(
                 "Skipping governance scan because another governance session is live"
             )
-            return
+            return skip_result
 
     snapshot = resolved.status_service.snapshot()
 
@@ -116,7 +116,12 @@ def handle_governance_scan_started(
     # Check circuit breaker before dispatching
     if snapshot.circuit_breaker_state == "open":
         append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
-        return
+        return ExecutionLaunchResult(
+            launched=False,
+            skipped=True,
+            reason="circuit breaker open",
+            reason_code="circuit_breaker_open",
+        )
 
     execution_name = build_governance_execution_name(event.tick_count)
 
@@ -185,7 +190,11 @@ def handle_governance_scan_started(
                 domain="governance_handler",
                 tick=event.tick_count,
             ).exception(f"Governance scan dispatch failed: {exc}")
-            return
+            return ExecutionLaunchResult(
+                launched=False,
+                reason=str(exc),
+                reason_code="handler_exception",
+            )
 
     if result and result.launched:
         append_governance_event(
@@ -197,3 +206,5 @@ def handle_governance_scan_started(
             f"governance dispatch skipped: tick={event.tick_count} "
             f"reason={result.reason}",
         )
+
+    return result

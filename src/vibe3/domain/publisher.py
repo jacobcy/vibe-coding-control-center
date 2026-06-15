@@ -9,6 +9,7 @@ from vibe3.models import (
     EventPublisher,
     get_publisher,
     publish,
+    publish_and_wait,
     subscribe,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "EventPublisher",
     "get_publisher",
     "publish",
+    "publish_and_wait",
     "subscribe",
 ]
