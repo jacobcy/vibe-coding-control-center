@@ -83,7 +83,7 @@ def mark_issue(
         return
 
     if action == "fail":
-        timeline = FlowTimelineService(store=store)  # type: ignore[misc]
+        timeline = FlowTimelineService(store=store)
         # Dispatcher error: record to SQLite only, do NOT write GitHub comment
         # Runtime errors are exposed via `vibe3 serve status`, not issue comments
         timeline.record_timeline_event(
