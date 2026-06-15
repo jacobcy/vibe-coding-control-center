@@ -88,8 +88,9 @@ class TestMergedPRHandling:
         mock_store.update_flow_state.assert_called_once_with(
             "feature/test-branch", flow_status="done"
         )
-        mock_store.add_event.assert_called_once()
-        assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
+        # After dual-write elimination: add_event should NOT be called
+        # (FlowCompleted event is projected to flow_events by projection hook)
+        mock_store.add_event.assert_not_called()
         # Branch cleanup is now deferred to --clean-branch
         check_service.git_client.delete_branch.assert_not_called()
 
@@ -121,7 +122,9 @@ class TestMergedPRHandling:
         mock_store.update_flow_state.assert_called_once_with(
             "feature/test-branch", flow_status="done"
         )
-        assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
+        # After dual-write elimination: add_event should NOT be called
+        # (FlowCompleted event is projected to flow_events by projection hook)
+        mock_store.add_event.assert_not_called()
 
     def test_merged_cleanup_still_attempts_branch_delete_when_worktree_cleanup_fails(
         self, check_service, mock_store, mock_github_client
