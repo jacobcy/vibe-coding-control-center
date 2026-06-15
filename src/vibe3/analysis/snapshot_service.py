@@ -668,6 +668,7 @@ def save_branch_baseline(branch: str, force: bool = False) -> Path | None:
                 commit_hash=snapshot.commit,
                 created_at=snapshot.created_at,
                 file_path=str(filepath),
+                baseline_for=branch,
             )
         except Exception:
             logger.warning("Failed to register baseline in DB (non-fatal)")

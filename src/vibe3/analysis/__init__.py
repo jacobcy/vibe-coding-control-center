@@ -63,6 +63,9 @@ if TYPE_CHECKING:
     # Snapshot diff
     from vibe3.analysis.snapshot_diff import compute_diff
 
+    # Snapshot diff facade
+    from vibe3.analysis.snapshot_diff_facade import get_diff_summary
+
     # Snapshot diff section
     from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
 
@@ -105,6 +108,7 @@ _LAZY_IMPORTS = {
     "dag": "vibe3.analysis.inspect_output_adapter",
     "pr_analysis_summary": "vibe3.analysis.inspect_output_adapter",
     "compute_diff": "vibe3.analysis.snapshot_diff",
+    "get_diff_summary": "vibe3.analysis.snapshot_diff_facade",
     "find_latest_prepush_report": "vibe3.analysis.local_review_report",
     "LocalReviewReport": "vibe3.analysis.local_review_report",
     "SnapshotError": "vibe3.analysis.snapshot_service",
@@ -165,6 +169,7 @@ __all__ = [
     "pr_analysis_summary",
     # Snapshot diff
     "compute_diff",
+    "get_diff_summary",
     "find_latest_prepush_report",
     "LocalReviewReport",
     "SnapshotError",

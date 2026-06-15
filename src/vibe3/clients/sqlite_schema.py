@@ -423,6 +423,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
         stmt = stmt.strip()
         if stmt:
             cursor.execute(stmt)
+
+    # Migration: add baseline_for column to snapshot_registry
+    registry_columns = {
+        row[1]
+        for row in cursor.execute("PRAGMA table_info(snapshot_registry)").fetchall()
+    }
+    if "baseline_for" not in registry_columns:
+        cursor.execute("ALTER TABLE snapshot_registry ADD COLUMN baseline_for TEXT")
+
     cursor.execute(_CREATE_TRANSITION_HISTORY)
     for stmt in _CREATE_TRANSITION_HISTORY_INDEXES.strip().split(";"):
         stmt = stmt.strip()
