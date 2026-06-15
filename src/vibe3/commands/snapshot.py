@@ -359,7 +359,7 @@ def diff(
             baseline_snapshot = snapshot_service.load_branch_baseline(current_branch)
             if not baseline_snapshot:
                 # Fallback: use git diff when no baseline exists
-                from vibe3.analysis.snapshot_diff_facade import get_diff_summary
+                from vibe3.analysis import get_diff_summary
 
                 summary = get_diff_summary(current_branch)
                 if json_out:

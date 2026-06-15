@@ -161,7 +161,7 @@ def _get_diff_summary_for_pr(branch: str) -> DiffSummary | None:
     Non-blocking for PR creation.
     """
     try:
-        from vibe3.analysis.snapshot_diff_facade import get_diff_summary
+        from vibe3.analysis import get_diff_summary
 
         return get_diff_summary(branch)
     except Exception:
