@@ -129,11 +129,11 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 
 ## 5. Aggregator Import Policy
 
-Package aggregators (barrel modules like `vibe3.services`, `vibe3.exceptions`, `vibe3.config`) use lazy `__getattr__` exports for convenience and backward compatibility. However, these patterns have implications for static type checking and architecture integrity.
+Package aggregators (barrel modules like `vibe3.services`, `vibe3.exceptions`, `vibe3.config`) use lazy `__getattr__` exports for convenience and backward compatibility. The public API remains the contract: all cross-module imports MUST go through the target package's `__init__` per [modularity-standards.md](../../.claude/rules/modularity-standards.md).
 
-### 5.1 When to Use Barrel Imports
+### 5.1 When Barrel Imports Are Appropriate
 
-**Allowed**: High-level orchestration code (L1-L3) that needs many symbols from a package and prioritizes import convenience over static analysis precision.
+**Recommended**: High-level orchestration code (L1-L3) that consumes many symbols from a package and benefits from the convenience surface.
 
 Example:
 ```python
@@ -147,78 +147,80 @@ from vibe3.services import (
 
 **Rationale**: The `vibe3.services` barrel is explicitly designed as the aggregator for service-layer consumers. It provides a stable convenience surface for orchestration code.
 
-### 5.2 When to Use Concrete Imports
+### 5.2 When to Be Cautious
 
-**Required**: Low-level modules (L4-L6, especially `clients/`, `config/`, `exceptions/`, `utils/`, `adapters/`, `analysis/`, `environment/`, `agents/`, `prompts/`) must import from concrete submodules, not through lazy-export barrels.
+Low-level modules (L6 infrastructure: `clients/`, `utils/`, `adapters/`) should be careful about depending on barrels that re-export from higher layers. This is a **layer discipline** concern, not a type-safety concern:
 
-Example:
-```python
-# Bad: L6 module importing through barrel
-from vibe3.exceptions import classify_error_hybrid  # Lazy import via __getattr__
+- An L6 `clients/` module importing from `vibe3.services` barrel creates an upward dependency on L3 orchestration code — this violates layer blindness.
+- An L6 module importing exception **types** (defined directly in `exceptions/__init__.py`) from `vibe3.exceptions` is legitimate — exception types are L6 infrastructure.
+- An L6 module importing lazy **functions** (like `classify_error_hybrid`) from `vibe3.exceptions` barrel creates a dependency on the lazy-export graph — assess whether this dependency belongs at L6.
 
-# Good: Direct concrete import
-from vibe3.exceptions.error_classification import classify_error_hybrid
+**If a low-level module genuinely needs a capability currently accessed through a barrel**: resolve through proper architectural channels — dependency injection, protocol extraction, callback registration, ownership move, or enhancing the typed public API. Never resolve by bypassing the public API with deep imports.
 
-# Good: TYPE_CHECKING for type-only usage
-from typing import TYPE_CHECKING
+### 5.3 How TYPE_CHECKING Ensures Mypy Safety
 
-if TYPE_CHECKING:
-    from vibe3.exceptions.runtime_errors import GitHubAPIError
-```
-
-**Rationale**:
-1. **Mypy Safety**: The `__getattr__` pattern works at runtime but returns `Any` to mypy, breaking type inference chains across the module graph.
-2. **Architecture Integrity**: Low-level modules should not depend on the lazy-export graph of higher-level aggregators. This prevents hidden dependency cycles and import graph perturbations.
-3. **Layer Discipline**: Importing through barrels creates implicit upward dependencies that violate the L6 blind-state principle.
-
-### 5.3 Why Barrel Imports Are Risky for Mypy
-
-The lazy `__getattr__` pattern:
+The lazy `__getattr__` pattern is paired with `TYPE_CHECKING` blocks to give mypy full type information:
 
 ```python
 # vibe3/exceptions/__init__.py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.exceptions.error_classification import (
+        classify_error_hybrid,
+        get_error_handling_contract,
+    )
+
+_LAZY_IMPORTS = {
+    “classify_error_hybrid”: “vibe3.exceptions.error_classification”,
+}
+
 def __getattr__(name: str) -> object:
     if name in _LAZY_IMPORTS:
         module = importlib.import_module(_LAZY_IMPORTS[name])
-        return getattr(module, name)
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
     raise AttributeError(...)
 ```
 
-At runtime: Returns the actual function/class.  
-To mypy: Returns `Any` (unknown type).
+**How it works**:
+- At runtime: `__getattr__` lazily imports and returns the actual function/class.
+- At type-check time: mypy sees the `TYPE_CHECKING` block and resolves full type information. The `__getattr__` body is not executed by mypy.
 
-Consequences:
-- Type annotations using imported names become `Any`
-- Method calls on imported instances bypass type checking
-- Cascading `Any` contamination across the call graph
+When mypy has proper project context (`uv run mypy src/vibe3`), TYPE_CHECKING blocks provide correct type information for all barrel exports. If mypy returns `Any` for project functions, check `ignore_missing_imports` configuration — files outside the project tree lack the context mypy needs to resolve TYPE_CHECKING imports.
 
-### 5.4 Enforced Rules
+### 5.4 Enforced Import Boundaries
 
-The following rules are enforced by automated tests:
+The following boundaries are enforced by automated tests as layer-discipline guards:
 
-1. **`src/vibe3/clients/**` must not import from `vibe3.services` barrel**  
-   Enforced by: `tests/vibe3/test_modularity/test_clients_no_config_import.py::TestClientsModularity::test_clients_no_services_import`
+1. **`src/vibe3/clients/**` must not import from `vibe3.services` barrel**
+   - Enforced by: `test_clients_no_services_import`
+   - Rationale: L6 infrastructure must not depend on L3 orchestration barrels.
 
-2. **`src/vibe3/clients/**` must not import from `vibe3.exceptions` barrel**  
-   Enforced by: `tests/vibe3/test_modularity/test_clients_no_config_import.py::TestClientsModularity::test_clients_no_exceptions_import`
+2. **`src/vibe3/clients/**` imports from `vibe3.exceptions` barrel are tracked**
+   - Enforced by: `test_clients_no_exceptions_import`
+   - Rationale: L6 clients may legitimately depend on exception types (defined directly in `__init__.py`). Lazy function imports from the barrel are flagged for review. This is a **baseline tracking gate**, not a hard block — increases require justification.
 
-3. **Barrel import baselines are tracked**  
-   - `vibe3.services`: Baseline 16 (tracked by `test_services_reexport_surface.py`)
-   - `vibe3.exceptions`: Baseline 159 (tracked by `test_barrel_import_tracking.py`)
+3. **Barrel import baselines are tracked project-wide**
+   - `vibe3.exceptions`: Baseline 161 (tracked by `test_barrel_import_tracking.py`)
    - `vibe3.config`: Baseline 140 (tracked by `test_barrel_import_tracking.py`)
+   - Rationale: Risk/trend observation. Increases trigger xfail warnings and require justification. This is NOT a migration plan to replace barrel imports with deep imports.
 
-Violations of rules #1 and #2 cause immediate test failure.  
-Increases in baselines #3 trigger xfail warnings and require justification.
+Violations of rule #1 cause immediate test failure.
+Increases in baselines #2 and #3 trigger xfail warnings and require justification.
 
-### 5.5 Migration Path
+### 5.5 Resolving Import Boundary Issues Correctly
 
-For existing violations:
-1. Identify barrel imports using `rg “from vibe3\.(services|exceptions|config) import”`
-2. Replace with direct submodule imports: `from vibe3.xxx.yyy import ZZZ`
-3. For type-only dependencies, use `TYPE_CHECKING` block with direct import
-4. Update baselines in test files if necessary
+When a module's dependency on a barrel creates a genuine architectural problem (upward dependency, import cycle risk, excessive coupling), resolve through:
 
-The goal is zero barrel imports from L6 modules, tracked via baseline regression gates.
+1. **Dependency Injection**: Pass the capability as a parameter rather than importing it.
+2. **Protocol Extraction**: Define a `Protocol` in a shared low-level module; the barrel re-exports implement it.
+3. **Callback Registration**: Register handlers at startup rather than importing them at call sites.
+4. **Ownership Move**: Move the needed symbol to a lower-level module that both sides can legitimately depend on.
+5. **Enhance Typed Public API**: Add missing TYPE_CHECKING imports or `.pyi` stubs if type information is incomplete.
+
+**Never** resolve by replacing a barrel import with a deep import (`from vibe3.xxx.yyy import ZZZ`) — this violates [modularity-standards.md](../../.claude/rules/modularity-standards.md) and breaks the public API contract.
 
 ## 6. 公共接口设计规范 (Public Interface)
 

@@ -79,14 +79,17 @@ class TestClientsModularity:
             )
 
     def test_clients_no_exceptions_import(self) -> None:
-        """Verify clients module does not import from vibe3.exceptions barrel.
+        """Track clients/ imports from vibe3.exceptions barrel.
 
-        Clients are lower-level adapters/cache helpers. Importing from the exceptions
-        barrel creates a dependency on the lazy __getattr__ re-export graph and can
-        perturb mypy's type inference.
+        L6 clients/ may legitimately depend on exception TYPES (GitError,
+        GitHubError, etc.) defined directly in exceptions/__init__.py — these
+        are L6 infrastructure. Lazy FUNCTION imports (classify_error_hybrid,
+        get_error_handling_contract) through the barrel warrant review for
+        dependency direction but are valid public API usage.
 
-        This test establishes a baseline to detect regression. Current baseline
-        allows existing violations but prevents new growth.
+        This is a baseline tracking gate, not a hard block. Increases over
+        the baseline require justification. Do NOT resolve by replacing barrel
+        imports with deep imports — public API is the contract.
         """
         import ast
 
@@ -96,7 +99,7 @@ class TestClientsModularity:
             pytest.skip("clients module not found")
 
         # Use AST parsing to count barrel imports
-        violations = []
+        imports_found = []
         for py_file in clients_path.rglob("*.py"):
             if "__pycache__" in str(py_file):
                 continue
@@ -110,7 +113,7 @@ class TestClientsModularity:
                             imported_names = ", ".join(
                                 alias.name for alias in node.names
                             )
-                            violations.append(
+                            imports_found.append(
                                 {
                                     "file": str(py_file.relative_to(clients_path)),
                                     "line": node.lineno,
@@ -120,34 +123,33 @@ class TestClientsModularity:
             except SyntaxError:
                 continue
 
-        # Baseline: 15 violations (as of issue #2848)
-        # These are primarily exception TYPE imports
-        # (GitError, GitHubError, etc.) which are defined directly
-        # in exceptions/__init__.py (not lazy imports).
-        # Only 2 are lazy FUNCTION imports
-        # (classify_error_hybrid, get_error_handling_contract)
-        # which are problematic for mypy.
+        # Baseline: 15 imports (as of issue #2848)
+        # Most are exception TYPE imports (GitError, GitHubError, etc.)
+        # defined directly in exceptions/__init__.py — legitimate L6 deps.
+        # A few are lazy FUNCTION imports (classify_error_hybrid,
+        # get_error_handling_contract) — valid public API usage, flagged
+        # for dependency direction awareness.
         baseline = 15
 
-        if violations:
+        if imports_found:
             print(
-                f"\n⚠️  Found {len(violations)} "
+                f"\n⚠️  Found {len(imports_found)} "
                 f"exceptions barrel imports in clients/:"
             )
-            for v in violations[:10]:
+            for v in imports_found[:10]:
                 print(f"   {v['file']}:{v['line']} - {v['import']}")
-            if len(violations) > 10:
-                print(f"   ... and {len(violations) - 10} more")
+            if len(imports_found) > 10:
+                print(f"   ... and {len(imports_found) - 10} more")
 
         # Hard gate: prevent growth beyond baseline
-        assert len(violations) <= baseline, (
+        assert len(imports_found) <= baseline, (
             f"Exceptions barrel imports in clients/ increased: "
-            f"expected <= {baseline}, found {len(violations)}"
+            f"expected <= {baseline}, found {len(imports_found)}"
         )
 
-        # Expected state: baseline violations remain (tracked by issue #2848)
-        if violations:
+        # Expected state: baseline imports remain (tracked by issue #2848)
+        if imports_found:
             pytest.xfail(
-                f"Baseline: {len(violations)} exceptions barrel imports in clients/ "
+                f"Baseline: {len(imports_found)} exceptions barrel imports in clients/ "
                 f"(issue #2848)"
             )

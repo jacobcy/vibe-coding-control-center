@@ -1,8 +1,12 @@
 """Barrel import tracking for vibe3.exceptions and vibe3.config.
 
-These tests establish baselines for barrel imports to detect regression
-and prevent growth. They use AST parsing (same approach as
-test_services_reexport_surface.py) for fast, reliable import detection.
+These tests establish baselines for barrel imports as risk/trend observation.
+They prevent uncontrolled growth of barrel import call sites but do NOT imply
+that barrel imports should be replaced with deep imports. Barrel imports through
+public API are the correct pattern per modularity-standards.md.
+
+Uses AST parsing (same approach as test_services_reexport_surface.py)
+for fast, reliable import detection.
 """
 
 import ast
@@ -59,13 +63,18 @@ def count_barrel_imports(import_target: str) -> List[Dict]:
 def test_exceptions_barrel_import_count() -> None:
     """Track barrel imports from vibe3.exceptions across src/ and tests/.
 
-    Goal: Prevent growth of exceptions barrel imports.
+    Goal: Prevent uncontrolled growth of exceptions barrel imports.
     Baseline: 161 call sites (as of issue #2848).
 
     Most barrel imports are for exception TYPES (GitError, GitHubError, etc.)
-    which are defined directly in exceptions/__init__.py and safe for mypy.
-    A few are for lazy FUNCTIONS (classify_error_hybrid, get_error_handling_contract)
-    which are problematic and should be migrated to direct submodule imports.
+    which are defined directly in exceptions/__init__.py — these are legitimate
+    public API imports. A subset are lazy FUNCTIONS (classify_error_hybrid,
+    get_error_handling_contract) accessed through the barrel's __getattr__;
+    these are also valid public API usage but warrant awareness for dependency
+    direction (e.g., an L6 module depending on error classification logic).
+
+    This is a risk/trend observation baseline. It does NOT prescribe migrating
+    barrel imports to deep imports — public API is the contract.
     """
     imports = count_barrel_imports("vibe3.exceptions")
 
@@ -103,12 +112,13 @@ def test_exceptions_barrel_import_count() -> None:
 def test_config_barrel_import_count() -> None:
     """Track barrel imports from vibe3.config across src/ and tests/.
 
-    Goal: Prevent growth of config barrel imports.
+    Goal: Prevent uncontrolled growth of config barrel imports.
     Baseline: 140 call sites (as of issue #2848).
 
-    The config barrel uses lazy __getattr__ for re-exports, which is safe
-    when importing TYPES (ConventionResolver, OrchestraConfig) but can
-    break mypy when importing FUNCTIONS or when the import graph is perturbed.
+    The config barrel uses lazy __getattr__ with TYPE_CHECKING blocks for
+    re-exports. When mypy has proper project context, TYPE_CHECKING provides
+    full type information. This baseline tracks import volume as a trend
+    indicator, not as a list of violations to migrate away from.
     """
     imports = count_barrel_imports("vibe3.config")
 
