@@ -468,6 +468,12 @@ def restore_flow(
         console.print(f"[yellow]Flow '{target_branch}' is already active[/]")
         raise typer.Exit(0)
 
+    if not yes and not typer.confirm(
+        f"Restore flow '{target_branch}' to active state?", default=False
+    ):
+        console.print("[yellow]Restore aborted[/]")
+        raise typer.Exit(0)
+
     # Restore the flow
     store.restore_flow(target_branch)
     console.print(f"[green]✓[/] Flow '{target_branch}' restored successfully")

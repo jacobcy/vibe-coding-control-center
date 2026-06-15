@@ -412,14 +412,13 @@ def rule_label_constraint_enforcement(
                 labels_to_remove.update(lb for lb in state_labels if lb != keep)
         elif v.constraint_name in (
             "no_state_without_assignee",
-            "scanned_forbids_state",
             "ready_requires_assignee",
         ):
             labels_to_remove.update(
                 lb for lb in ctx.issue_labels if lb.startswith("state/")
             )
-            if v.constraint_name == "scanned_forbids_state":
-                labels_to_remove.add("orchestra-scanned")
+        elif v.constraint_name == "scanned_forbids_state":
+            labels_to_remove.add("orchestra-scanned")
         elif v.constraint_name == "scanned_governed_no_assignee":
             labels_to_remove.update({"orchestra-scanned", "orchestra-governed"})
 
@@ -460,7 +459,11 @@ def rule_label_constraint_enforcement(
                 f"removed: {sorted(labels_to_remove)}"
             ],
         )
-    except (subprocess.CalledProcessError, RuntimeError):
+    except (subprocess.CalledProcessError, RuntimeError) as exc:
+        message = f"Label constraint auto-fix failed: {exc}"
+        logger.bind(domain="check", branch=ctx.branch, issue=ctx.task_issue).error(
+            message
+        )
         return None
     except Exception as exc:
         ctx.issues.append(f"Label constraint auto-fix failed: {exc}")

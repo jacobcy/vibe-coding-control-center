@@ -577,10 +577,12 @@ class CheckService(CheckRemote):
         config = load_orchestra_config()
         fixed_count = 0
 
-        # Query issues most likely to have constraint violations:
-        # 1. orchestra-scanned + open (may conflict with state/* or governed)
-        # 2. no assignee + state/* labels
-        for label_filter in ("orchestra-scanned",):
+        label_filters = ("orchestra-scanned",) + tuple(
+            state.to_label() for state in IssueState
+        )
+        seen_numbers: set[int] = set()
+
+        for label_filter in label_filters:
             try:
                 raw_issues = self.github_client.list_issues(
                     limit=100,
@@ -588,13 +590,19 @@ class CheckService(CheckRemote):
                     label=label_filter,
                     repo=config.repo,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.bind(domain="check", label_filter=label_filter).error(
+                    f"Failed to list issues for label constraint enforcement: {exc}"
+                )
                 continue
 
             for issue in raw_issues:
                 number = issue.get("number")
                 if not isinstance(number, int):
                     continue
+                if number in seen_numbers:
+                    continue
+                seen_numbers.add(number)
 
                 labels = normalize_labels(issue.get("labels", []))
                 assignees = issue.get("assignees", [])
@@ -623,14 +631,13 @@ class CheckService(CheckRemote):
                             )
                     elif v.constraint_name in (
                         "no_state_without_assignee",
-                        "scanned_forbids_state",
                         "ready_requires_assignee",
                     ):
                         labels_to_remove.update(
                             lb for lb in labels if lb.startswith("state/")
                         )
-                        if v.constraint_name == "scanned_forbids_state":
-                            labels_to_remove.add("orchestra-scanned")
+                    elif v.constraint_name == "scanned_forbids_state":
+                        labels_to_remove.add("orchestra-scanned")
                     elif v.constraint_name == "scanned_governed_no_assignee":
                         labels_to_remove.update(
                             {"orchestra-scanned", "orchestra-governed"}
@@ -661,7 +668,7 @@ class CheckService(CheckRemote):
                     )
                     fixed_count += 1
                 except subprocess.CalledProcessError as exc:
-                    logger.bind(domain="check").warning(
+                    logger.bind(domain="check").error(
                         f"Failed to fix label constraints on #{number}: "
                         f"{exc.stderr}"
                     )

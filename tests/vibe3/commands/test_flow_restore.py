@@ -37,7 +37,7 @@ def test_restore_aborted_flow_without_tombstone(
     mock_client.get_flow_state_include_deleted.return_value = mock_flow
 
     # Execute restore command
-    result = runner.invoke(flow_app, ["restore", "task/issue-789"])
+    result = runner.invoke(flow_app, ["restore", "task/issue-789", "--yes"])
 
     # Should succeed
     assert result.exit_code == 0
@@ -66,7 +66,7 @@ def test_restore_soft_deleted_flow(mock_client_class, mock_resolve_branch) -> No
     mock_client.get_flow_state_include_deleted.return_value = mock_flow
 
     # Execute restore command
-    result = runner.invoke(flow_app, ["restore", "task/issue-123"])
+    result = runner.invoke(flow_app, ["restore", "task/issue-123", "--yes"])
 
     # Should succeed
     assert result.exit_code == 0
@@ -126,3 +126,55 @@ def test_restore_nonexistent_flow(mock_client_class, mock_resolve_branch) -> Non
 
     # Verify restore_flow was NOT called
     mock_client.restore_flow.assert_not_called()
+
+
+@patch("vibe3.commands.flow_manage.typer.confirm")
+@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.clients.SQLiteClient")
+def test_restore_requires_confirmation_without_yes(
+    mock_client_class, mock_resolve_branch, mock_confirm
+) -> None:
+    """Restore should not mutate without confirmation when --yes is omitted."""
+    mock_resolve_branch.return_value = "task/issue-123"
+    mock_confirm.return_value = False
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get_flow_state_include_deleted.return_value = {
+        "branch": "task/issue-123",
+        "flow_slug": "issue_123",
+        "flow_status": "aborted",
+        "deleted_at": "2024-01-01 00:00:00",
+    }
+
+    result = runner.invoke(flow_app, ["restore", "task/issue-123"])
+
+    assert result.exit_code == 0
+    assert "Restore aborted" in result.output
+    mock_confirm.assert_called_once()
+    mock_client.restore_flow.assert_not_called()
+
+
+@patch("vibe3.commands.flow_manage.typer.confirm")
+@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.clients.SQLiteClient")
+def test_restore_confirmation_allows_restore(
+    mock_client_class, mock_resolve_branch, mock_confirm
+) -> None:
+    """Interactive confirmation should allow restore without --yes."""
+    mock_resolve_branch.return_value = "task/issue-123"
+    mock_confirm.return_value = True
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get_flow_state_include_deleted.return_value = {
+        "branch": "task/issue-123",
+        "flow_slug": "issue_123",
+        "flow_status": "aborted",
+        "deleted_at": "2024-01-01 00:00:00",
+    }
+
+    result = runner.invoke(flow_app, ["restore", "task/issue-123"])
+
+    assert result.exit_code == 0
+    assert "restored successfully" in result.output
+    mock_confirm.assert_called_once()
+    mock_client.restore_flow.assert_called_once_with("task/issue-123")
