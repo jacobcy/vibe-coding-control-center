@@ -97,12 +97,14 @@ def is_dependency_satisfied(
     config: "OrchestraConfig",
     dep_issue_number: int,
 ) -> bool:
-    from vibe3.services.shared.dependency_resolution import DependencyResolutionService
+    from vibe3.services.pr import get_merged_pr_for_issue
+    from vibe3.services.shared import DependencyResolutionService
 
     resolution = DependencyResolutionService.is_dependency_resolved(
         dep_issue_number,
         github_client=github,
         repo=config.repo,
+        check_merged_pr_fn=get_merged_pr_for_issue,
     )
     return resolution.resolved
 

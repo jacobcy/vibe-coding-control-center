@@ -374,14 +374,14 @@ class TaskResumeCandidates:
         if not isinstance(blocked_by_issue, int) or blocked_by_issue <= 0:
             return None
 
-        from vibe3.services.shared.dependency_resolution import (
-            DependencyResolutionService,
-        )
+        from vibe3.services.pr import get_merged_pr_for_issue
+        from vibe3.services.shared import DependencyResolutionService
 
         resolution = DependencyResolutionService.is_dependency_resolved(
             blocked_by_issue,
             github_client=self._github_client,
             repo=repo,
+            check_merged_pr_fn=get_merged_pr_for_issue,
         )
         if not resolution.resolved:
             return (

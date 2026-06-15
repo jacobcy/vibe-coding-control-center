@@ -390,9 +390,8 @@ class CheckService(CheckRemote):
             # ---- read-only dependency check ----
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
                 from vibe3.services.orchestra.coordination import CoordinationResolver
-                from vibe3.services.shared.dependency_resolution import (
-                    DependencyResolutionService,
-                )
+                from vibe3.services.pr import get_merged_pr_for_issue
+                from vibe3.services.shared import DependencyResolutionService
 
                 resolver = CoordinationResolver(store=self.store)
                 truth = resolver.resolve_coordination(branch, task_issue)
@@ -404,6 +403,7 @@ class CheckService(CheckRemote):
                             dep,
                             github_client=self.github_client,
                             repo=None,  # current CheckService doesn't carry repo
+                            check_merged_pr_fn=get_merged_pr_for_issue,
                         )
                         if not resolution.resolved:
                             unresolved.append(dep)

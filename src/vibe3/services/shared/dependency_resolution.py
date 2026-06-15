@@ -9,8 +9,9 @@ dependency issues are resolved across all code paths:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -39,6 +40,9 @@ class DependencyResolutionService:
         *,
         github_client: "GitHubClient",
         repo: str | None = None,
+        check_merged_pr_fn: (
+            Callable[[int, str | None], dict[str, Any] | None] | None
+        ) = None,
     ) -> DependencyResolution:
         """Check if a dependency issue is resolved.
 
@@ -51,6 +55,8 @@ class DependencyResolutionService:
             issue_number: GitHub issue number
             github_client: GitHub client for API calls
             repo: Optional repository (owner/repo format)
+            check_merged_pr_fn: Optional callback to check for merged PR.
+                Takes (issue_number, repo) and returns PR dict or None.
 
         Returns:
             DependencyResolution with resolution status and evidence
@@ -118,35 +124,30 @@ class DependencyResolutionService:
             )
 
         # Step 3: Check for merged PR
-        try:
-            from vibe3.services.pr.status_checker import has_merged_pr_for_issue
+        if check_merged_pr_fn is not None:
+            try:
+                pr_data = check_merged_pr_fn(issue_number, repo)
+                if pr_data:
+                    pr_number = pr_data.get("number") if pr_data else None
 
-            merged_pr = has_merged_pr_for_issue(issue_number, repo)
-            if merged_pr:
-                # Get PR number if available
-                from vibe3.services.pr.status_checker import get_merged_pr_for_issue
-
-                pr_data = get_merged_pr_for_issue(issue_number, repo)
-                pr_number = pr_data.get("number") if pr_data else None
-
-                return DependencyResolution(
-                    resolved=True,
+                    return DependencyResolution(
+                        resolved=True,
+                        issue_number=issue_number,
+                        github_state=github_state,
+                        labels=labels,
+                        merged_pr_number=pr_number,
+                        reason=(
+                            f"Dependency #{issue_number} has merged PR #{pr_number}"
+                            if pr_number
+                            else f"Dependency #{issue_number} has merged PR"
+                        ),
+                    )
+            except Exception as e:
+                logger.bind(
+                    domain="dependency_resolution",
                     issue_number=issue_number,
-                    github_state=github_state,
-                    labels=labels,
-                    merged_pr_number=pr_number,
-                    reason=(
-                        f"Dependency #{issue_number} has merged PR #{pr_number}"
-                        if pr_number
-                        else f"Dependency #{issue_number} has merged PR"
-                    ),
-                )
-        except Exception as e:
-            logger.bind(
-                domain="dependency_resolution",
-                issue_number=issue_number,
-                error=str(e),
-            ).warning(f"Failed to check merged PR for #{issue_number}")
+                    error=str(e),
+                ).warning(f"Failed to check merged PR for #{issue_number}")
 
         # Step 4: Issue is unresolved
         return DependencyResolution(

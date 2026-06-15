@@ -1,6 +1,6 @@
 """Unit tests for DependencyResolutionService."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -21,19 +21,15 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        with patch(
-            "vibe3.services.pr.status_checker.has_merged_pr_for_issue",
-            return_value=False,
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123, github_client=github_client, repo=None
-            )
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            123, github_client=github_client, repo=None
+        )
 
         assert resolution.resolved is True
         assert resolution.issue_number == 123
         assert resolution.github_state == "CLOSED"
         assert resolution.merged_pr_number is None
-        assert "CLOSED" in resolution.reason
+        assert "CLOSED" in (resolution.reason or "")
 
     def test_not_resolved_when_issue_open_no_pr(self) -> None:
         """Dependency is not resolved when issue is OPEN without merged PR."""
@@ -43,19 +39,18 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        with patch(
-            "vibe3.services.pr.status_checker.has_merged_pr_for_issue",
-            return_value=False,
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123, github_client=github_client, repo=None
-            )
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            123,
+            github_client=github_client,
+            repo=None,
+            check_merged_pr_fn=lambda n, r: None,
+        )
 
         assert resolution.resolved is False
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
         assert resolution.merged_pr_number is None
-        assert "OPEN" in resolution.reason
+        assert "OPEN" in (resolution.reason or "")
 
     def test_resolved_when_issue_open_with_merged_pr(self) -> None:
         """Dependency is resolved when issue has a merged PR."""
@@ -65,23 +60,18 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        with patch(
-            "vibe3.services.pr.status_checker.has_merged_pr_for_issue",
-            return_value=True,
-        ):
-            with patch(
-                "vibe3.services.pr.status_checker.get_merged_pr_for_issue",
-                return_value={"number": 42},
-            ):
-                resolution = DependencyResolutionService.is_dependency_resolved(
-                    123, github_client=github_client, repo=None
-                )
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            123,
+            github_client=github_client,
+            repo=None,
+            check_merged_pr_fn=lambda n, r: {"number": 42},
+        )
 
         assert resolution.resolved is True
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
         assert resolution.merged_pr_number == 42
-        assert "#42" in resolution.reason
+        assert "#42" in (resolution.reason or "")
 
     def test_not_resolved_when_network_error(self) -> None:
         """Dependency is not resolved when GitHub API returns network_error."""
@@ -133,13 +123,15 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        with patch(
-            "vibe3.services.pr.status_checker.has_merged_pr_for_issue",
-            side_effect=RuntimeError("API error"),
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123, github_client=github_client, repo=None
-            )
+        def _failing_check(_n: int, _r: str | None) -> dict | None:
+            raise RuntimeError("API error")
+
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            123,
+            github_client=github_client,
+            repo=None,
+            check_merged_pr_fn=_failing_check,
+        )
 
         assert resolution.resolved is False
         assert resolution.issue_number == 123
@@ -156,13 +148,12 @@ class TestDependencyResolutionService:
             ],
         }
 
-        with patch(
-            "vibe3.services.pr.status_checker.has_merged_pr_for_issue",
-            return_value=False,
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123, github_client=github_client, repo=None
-            )
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            123,
+            github_client=github_client,
+            repo=None,
+            check_merged_pr_fn=lambda _n, _r: None,
+        )
 
         assert resolution.labels == ("bug", "priority")
 
