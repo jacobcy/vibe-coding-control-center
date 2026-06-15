@@ -46,8 +46,8 @@
 git diff <base>...HEAD --stat
 
 # 2. 查看 plan 声明的 Scope Boundary
-# （通过 handoff show 读取 plan_ref）
-uv run python src/vibe3/cli.py handoff show <plan_ref> --branch <branch>
+# （通过 handoff show @plan 读取）
+uv run python src/vibe3/cli.py handoff show @plan --branch <branch>
 ```
 
 **Scope 审查检查清单**：
@@ -173,10 +173,10 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 如果 flow 中有 `report_ref`，读取 executor 的执行报告：
 
 ```bash
-uv run python src/vibe3/cli.py handoff show <report_ref>
+uv run python src/vibe3/cli.py handoff show @report
 ```
 
-使用 `handoff show` 而非直接读文件路径，以正确处理跨 worktree 路径解析。
+使用 `handoff show @report`（而非直接读文件路径），以正确处理跨 worktree 路径解析。
 
 ### 7. 跨层一致性检查（命名/文档/API 变更）
 

@@ -30,12 +30,15 @@ def build_run_task_section(task_text: str | None) -> str:
     """Build execution task section."""
     ref_access_guidance = (
         "## Reference Access\n\n"
-        "- Treat `plan_ref`, `report_ref`, and `audit_ref` as handoff refs.\n"
-        "- Read those refs via `uv run python src/vibe3/cli.py handoff show <ref>`.\n"
-        "- Do not call file-reading tools directly on those ref paths, "
+        "- Read handoff refs via stable aliases (not raw paths):\n"
+        "  - `uv run python src/vibe3/cli.py handoff show @plan` — plan content\n"
+        "  - `uv run python src/vibe3/cli.py handoff show @report` — execution report\n"
+        "  - `uv run python src/vibe3/cli.py handoff show @audit` — review findings\n"
+        "  - `uv run python src/vibe3/cli.py handoff show @indicate`"
+        " — manager directives\n"
+        "  - Run `vibe3 handoff show --help` for full target reference.\n"
+        "- Do not call file-reading tools directly on ref paths, "
         "even if they look local.\n"
-        "- This unified reader works for both shared handoff artifacts "
-        "and current worktree files.\n"
     )
     if task_text:
         return f"{ref_access_guidance}\n## Execution Task\n{task_text}"

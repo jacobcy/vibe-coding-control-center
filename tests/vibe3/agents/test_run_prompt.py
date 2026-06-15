@@ -65,7 +65,7 @@ def test_build_run_prompt_body_instructs_ref_reads_via_handoff_show(
 
     context = build_run_prompt_body(str(plan_file), config)
 
-    assert "handoff show <ref>" in context
+    assert "handoff show @plan" in context
     assert "Do not call file-reading tools directly" in context
 
 
@@ -153,7 +153,7 @@ def test_build_run_prompt_body_includes_plan_requirements_verification(
 
     # Verify instruction to extract requirements from plan
     assert "Extract ALL verification requirements" in context
-    assert "handoff show <plan_ref>" in context
+    assert "handoff show @plan" in context
 
     # Verify instruction to form checklist
     assert "Requirements Checklist" in context or "checklist" in context.lower()
@@ -171,3 +171,23 @@ def test_build_run_prompt_body_includes_deviation_declaration(tmp_path: Path) ->
     assert "Deviation Declaration" in context
     assert "❌" in context
     assert "DO NOT claim" in context or "report accuracy failure" in context
+
+
+def test_run_config_loads_publish_task_from_prompts_yaml() -> None:
+    """publish_task must round-trip from prompts.yaml into RunConfig.
+
+    Regression test for #2900.
+    """
+    config = VibeConfig.get_defaults()
+
+    assert config.run.publish_task
+    assert "MANDATORY EXIT STEP" in config.run.publish_task
+
+
+def test_publish_exit_contract_section_contains_mandatory_exit_step() -> None:
+    config = VibeConfig.get_defaults()
+
+    section = build_run_task_section(config.run.publish_task)
+
+    assert "MANDATORY EXIT STEP" in section
+    assert "state/merge-ready" in section

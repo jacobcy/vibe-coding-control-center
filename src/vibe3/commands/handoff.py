@@ -11,8 +11,16 @@ app = typer.Typer(
 Handoff files record agent decisions, plans, and findings.
 Use handoff commands to view and manage agent communication.
 
+Stable aliases (preferred):
+  @plan     Flow plan ref          @report   Flow report ref
+  @audit    Flow audit ref         @indicate Manager directives
+  @spec     Flow spec ref          @current  Current handoff file
+
 Examples:
   vibe3 handoff show @plan         # Show plan for current flow
+  vibe3 handoff show @report       # Show execution report
+  vibe3 handoff show @audit        # Show review findings
+  vibe3 handoff show @indicate     # Show manager directives
   vibe3 handoff show @current      # Show current handoff file
   vibe3 handoff status             # Show handoff chain for current flow
   vibe3 handoff append "Update"    # Add a handoff record

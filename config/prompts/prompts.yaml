@@ -542,7 +542,7 @@ run:
 
     #### Step-by-Step Verification Process
 
-    1. **Re-read the plan**: Run `uv run python src/vibe3/cli.py handoff show <plan_ref>` to extract ALL verification requirements.
+    1. **Re-read the plan**: Run `uv run python src/vibe3/cli.py handoff show @plan` to extract ALL verification requirements.
 
     2. **Extract ALL verification requirements** from the plan:
        - Find all lines starting with "Verification:" or "验证："
@@ -629,10 +629,10 @@ run:
     Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
 
     ## Read Authoritative Refs via CLI
-    Read refs via `handoff show` command (NOT direct file path to avoid permission errors):
-    - `uv run python src/vibe3/cli.py handoff show <plan_ref>` — current plan
-    - `uv run python src/vibe3/cli.py handoff show <report_ref>` — latest execution report
-    - `uv run python src/vibe3/cli.py handoff show <audit_ref>` — review findings
+    Read refs via `handoff show` with stable aliases (NOT raw paths to avoid permission errors):
+    - `uv run python src/vibe3/cli.py handoff show @plan` — current plan
+    - `uv run python src/vibe3/cli.py handoff show @report` — latest execution report
+    - `uv run python src/vibe3/cli.py handoff show @audit` — review findings
 
     Read the audit feedback carefully and fix the cited problems first.
     Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
@@ -761,7 +761,7 @@ plan:
     Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
 
     ## Read Authoritative Refs via CLI
-    Read `plan_ref` via: `uv run python src/vibe3/cli.py handoff show <plan_ref>`
+    Read `plan_ref` via stable alias: `uv run python src/vibe3/cli.py handoff show @plan`
 
     Revise the plan in place based on the latest feedback and current repository state.
     You must still follow the same output format and final state transition contract as a normal planning round.
@@ -869,9 +869,9 @@ review:
     Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
 
     ## Read Authoritative Refs via CLI
-    Read refs via `handoff show` command (NOT direct file path to avoid permission errors):
-    - `uv run python src/vibe3/cli.py handoff show <report_ref>` — latest implementation report
-    - `uv run python src/vibe3/cli.py handoff show <audit_ref>` — previous audit if exists
+    Read refs via `handoff show` with stable aliases (NOT raw paths to avoid permission errors):
+    - `uv run python src/vibe3/cli.py handoff show @report` — latest implementation report
+    - `uv run python src/vibe3/cli.py handoff show @audit` — previous audit if exists
 
     Keep scope focused on verifying whether the previously raised concerns are now resolved.
     You must still follow the same output format and final state transition contract as a normal review.
