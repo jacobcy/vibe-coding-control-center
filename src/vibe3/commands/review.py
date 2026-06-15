@@ -320,6 +320,11 @@ def base(
     )
 
     # Publish ManualReviewIntent event (handler will execute)
+    # TODO(#2920): migrate base subcommand to publish_and_wait() pattern
+    # Currently uses legacy domain_publish() + get_pending_result(),
+    # while the handler already supports returning ReviewRunResult directly.
+    # Blocked by: base subcommand's sync_result display logic differs from
+    # _review_branch_impl (uses _emit_review_result vs inline display).
     domain_publish(
         ManualReviewIntent(
             issue_number=issue_number,

@@ -1,6 +1,9 @@
 """Common utilities for command layer."""
 
+from __future__ import annotations
+
 import os
+from typing import Any
 
 import typer
 
@@ -67,3 +70,20 @@ def run_full_check_shortcut() -> None:
             f"Warning: vibe3 check incomplete before status: {result.summary}",
             err=True,
         )
+
+
+def _handle_codeagent_result(result: Any, label: str) -> None:
+    """Display CodeagentResult and exit with error if execution failed.
+
+    Shared helper for plan/run commands that use publish_and_wait pattern.
+    """
+    if result:
+        from rich.console import Console
+
+        from vibe3.ui import display_codeagent_result
+
+        console = Console()
+        display_codeagent_result(console, result, label)
+
+        if not result.success:
+            raise typer.Exit(1)

@@ -17,7 +17,7 @@ from vibe3.commands.command_options import (
     load_config_and_validate_model,
     validate_show_prompt_dependency,
 )
-from vibe3.commands.common import enable_method_trace
+from vibe3.commands.common import _handle_codeagent_result, enable_method_trace
 from vibe3.roles import (
     resolve_spec_plan_input,
 )
@@ -112,17 +112,7 @@ def _plan_for_branch(
     )
 
     # Display result
-    if result:
-        from rich.console import Console
-
-        from vibe3.ui import display_codeagent_result
-
-        console = Console()
-        display_codeagent_result(console, result, "Plan")
-
-        # Exit with error code if execution failed
-        if not result.success:
-            raise typer.Exit(1)
+    _handle_codeagent_result(result, "Plan")
 
 
 def _plan_spec_impl(
@@ -254,17 +244,7 @@ def _plan_spec_impl(
     )
 
     # Display result
-    if result:
-        from rich.console import Console
-
-        from vibe3.ui import display_codeagent_result
-
-        console = Console()
-        display_codeagent_result(console, result, "Plan")
-
-        # Exit with error code if execution failed
-        if not result.success:
-            raise typer.Exit(1)
+    _handle_codeagent_result(result, "Plan")
 
 
 @app.callback(invoke_without_command=True)
