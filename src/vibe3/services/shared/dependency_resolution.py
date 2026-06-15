@@ -25,7 +25,6 @@ class DependencyResolution:
     resolved: bool
     issue_number: int
     github_state: str | None = None  # "OPEN" | "CLOSED" | None
-    labels: tuple[str, ...] = ()  # GitHub labels
     merged_pr_number: int | None = None  # PR evidence when merged
     reason: str | None = None  # Human-readable summary for logs/skip messages
 
@@ -55,11 +54,11 @@ class DependencyResolutionService:
         Returns:
             DependencyResolution with resolution status and evidence
         """
-        from vibe3.clients import GITHUB_DEFAULT_VIEW_FIELDS
+        from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
 
-        # Step 1: Fetch issue state and labels
+        # Step 1: Fetch issue state
         issue_data = github_client.view_issue(
-            issue_number, repo=repo, fields=list(GITHUB_DEFAULT_VIEW_FIELDS)
+            issue_number, repo=repo, fields=list(GITHUB_FIELDS_STATE_ONLY)
         )
 
         # Handle error cases (fail-safe)
@@ -73,7 +72,6 @@ class DependencyResolutionService:
                 resolved=False,
                 issue_number=issue_number,
                 github_state=None,
-                labels=(),
                 reason=(
                     f"Dependency #{issue_number} could not be verified "
                     f"(network error or not found)"
@@ -90,22 +88,11 @@ class DependencyResolutionService:
                 resolved=False,
                 issue_number=issue_number,
                 github_state=None,
-                labels=(),
                 reason=f"Dependency #{issue_number} returned unexpected result",
             )
 
-        # Extract state and labels
+        # Extract state
         github_state = issue_data.get("state")
-        raw_labels = issue_data.get("labels", [])
-        labels: tuple[str, ...] = ()
-
-        # Normalize labels to tuple of strings
-        if isinstance(raw_labels, list):
-            labels = tuple(
-                lbl.get("name", "") if isinstance(lbl, dict) else str(lbl)
-                for lbl in raw_labels
-                if isinstance(lbl, (dict, str))
-            )
 
         # Step 2: Check if issue is closed
         if github_state == "CLOSED":
@@ -113,7 +100,6 @@ class DependencyResolutionService:
                 resolved=True,
                 issue_number=issue_number,
                 github_state=github_state,
-                labels=labels,
                 reason=f"Dependency #{issue_number} is CLOSED",
             )
 
@@ -129,7 +115,6 @@ class DependencyResolutionService:
                     resolved=True,
                     issue_number=issue_number,
                     github_state=github_state,
-                    labels=labels,
                     merged_pr_number=pr_number,
                     reason=(
                         f"Dependency #{issue_number} has merged PR #{pr_number}"
@@ -149,6 +134,5 @@ class DependencyResolutionService:
             resolved=False,
             issue_number=issue_number,
             github_state=github_state,
-            labels=labels,
             reason=f"Dependency #{issue_number} is still {github_state or 'unknown'}",
         )

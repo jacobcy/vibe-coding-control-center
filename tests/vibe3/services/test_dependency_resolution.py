@@ -18,7 +18,6 @@ class TestDependencyResolutionService:
         github_client = MagicMock()
         github_client.view_issue.return_value = {
             "state": "CLOSED",
-            "labels": [],
         }
 
         resolution = DependencyResolutionService.is_dependency_resolved(
@@ -143,29 +142,6 @@ class TestDependencyResolutionService:
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
 
-    def test_labels_extracted_correctly(self) -> None:
-        """Labels are extracted and normalized from GitHub response."""
-        github_client = MagicMock()
-        github_client.view_issue.return_value = {
-            "state": "OPEN",
-            "labels": [
-                {"name": "bug"},
-                {"name": "priority"},
-            ],
-        }
-
-        with patch(
-            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
-            return_value=None,
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123,
-                github_client=github_client,
-                repo=None,
-            )
-
-        assert resolution.labels == ("bug", "priority")
-
 
 class TestDependencyResolution:
     """Tests for DependencyResolution dataclass."""
@@ -187,6 +163,5 @@ class TestDependencyResolution:
             issue_number=123,
         )
         assert resolution.github_state is None
-        assert resolution.labels == ()
         assert resolution.merged_pr_number is None
         assert resolution.reason is None
