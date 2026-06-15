@@ -77,7 +77,7 @@ class QualifyGateService:
         self._blocked_label = self._convention.state_label(
             self._convention.blocked_label
         )
-        self._coordination_resolver = CoordinationResolver(store=store)  # type: ignore[misc]
+        self._coordination_resolver = CoordinationResolver(store=store)
 
     def run_qualify_gate(
         self,
