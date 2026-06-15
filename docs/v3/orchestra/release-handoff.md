@@ -21,7 +21,7 @@ Orchestra 采用**主动轮询 + 被动 webhook 混合架构**：
 - `orchestra.enabled: true`
 - `orchestra.assignee_dispatch.enabled: true`
 - `orchestra.pr_review_dispatch.enabled: true`
-- `orchestra.manager_usernames` 包含 `vibe-manager-agent`
+- `orchestra.manager_usernames` 包含目标管理账号（例如 `vibe-manager-agent`）
 - `orchestra.webhook_secret`: GitHub webhook 签名密钥
 
 ## 2. 发布前检查
@@ -52,7 +52,7 @@ Orchestra 采用**主动轮询 + 被动 webhook 混合架构**：
 uv run python src/vibe3/cli.py serve start -v --dry-run --port 8080
 ```
 
-创建并指派 issue 给 `vibe-manager-agent`，预期行为：
+创建并指派 issue 给 `manager_usernames` 中的账号，预期行为：
 - tick 周期触发后，coordinator 收集 ready issues
 - 日志包含 `dispatch intent: manager for #<n>`
 - dry-run 模式下跳过实际执行
