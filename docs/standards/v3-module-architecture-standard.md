@@ -122,12 +122,107 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 ## 4. 依赖规则 (Dependency Rules)
 
 - **禁止循环依赖**：严禁 A -> B -> A 的引用链。若出现，必须将共用部分提取至 `models` 或更低层级。
-- **单向可见性**：上层模块对下层模块有直接可见性，下层模块对上层模块应保持“盲态”。若需跨层通信，必须通过 `Event Bus` (Domain Event) 或 `Abstract Interfaces`。
+- **单向可见性**：上层模块对下层模块有直接可见性，下层模块对上层模块应保持”盲态”。若需跨层通信，必须通过 `Event Bus` (Domain Event) 或 `Abstract Interfaces`。
 - **显式导入优于隐式重导出**：
   - 在核心逻辑模块（如 `execution`, `domain`）中，优先使用 `from vibe3.xxx.yyy import ZZZ`。
   - 避免在 `__init__.py` 中进行大范围的 `import *`。
 
-## 5. 公共接口设计规范 (Public Interface)
+## 5. Aggregator Import Policy
+
+Package aggregators (barrel modules like `vibe3.services`, `vibe3.exceptions`, `vibe3.config`) use lazy `__getattr__` exports for convenience and backward compatibility. The public API remains the contract: all cross-module imports MUST go through the target package's `__init__` per [modularity-standards.md](../../.claude/rules/modularity-standards.md).
+
+### 5.1 When Barrel Imports Are Appropriate
+
+**Recommended**: High-level orchestration code (L1-L3) that consumes many symbols from a package and benefits from the convenience surface.
+
+Example:
+```python
+# Good: High-level orchestration importing many services
+from vibe3.services import (
+    FlowOrchestratorService,
+    IssueFlowService,
+    TaskOrchestratorService,
+)
+```
+
+**Rationale**: The `vibe3.services` barrel is explicitly designed as the aggregator for service-layer consumers. It provides a stable convenience surface for orchestration code.
+
+### 5.2 When to Be Cautious
+
+Low-level modules (L6 infrastructure: `clients/`, `utils/`, `adapters/`) should be careful about depending on barrels that re-export from higher layers. This is a **layer discipline** concern, not a type-safety concern:
+
+- An L6 `clients/` module importing from `vibe3.services` barrel creates an upward dependency on L3 orchestration code — this violates layer blindness.
+- An L6 module importing exception **types** (defined directly in `exceptions/__init__.py`) from `vibe3.exceptions` is legitimate — exception types are L6 infrastructure.
+- An L6 module importing lazy **functions** (like `classify_error_hybrid`) from `vibe3.exceptions` barrel creates a dependency on the lazy-export graph — assess whether this dependency belongs at L6.
+
+**If a low-level module genuinely needs a capability currently accessed through a barrel**: resolve through proper architectural channels — dependency injection, protocol extraction, callback registration, ownership move, or enhancing the typed public API. Never resolve by bypassing the public API with deep imports.
+
+### 5.3 How TYPE_CHECKING Ensures Mypy Safety
+
+The lazy `__getattr__` pattern is paired with `TYPE_CHECKING` blocks to give mypy full type information:
+
+```python
+# vibe3/exceptions/__init__.py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.exceptions.error_classification import (
+        classify_error_hybrid,
+        get_error_handling_contract,
+    )
+
+_LAZY_IMPORTS = {
+    “classify_error_hybrid”: “vibe3.exceptions.error_classification”,
+}
+
+def __getattr__(name: str) -> object:
+    if name in _LAZY_IMPORTS:
+        module = importlib.import_module(_LAZY_IMPORTS[name])
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(...)
+```
+
+**How it works**:
+- At runtime: `__getattr__` lazily imports and returns the actual function/class.
+- At type-check time: mypy sees the `TYPE_CHECKING` block and resolves full type information. The `__getattr__` body is not executed by mypy.
+
+When mypy has proper project context (`uv run mypy src/vibe3`), TYPE_CHECKING blocks provide correct type information for all barrel exports. If mypy returns `Any` for project functions, check `ignore_missing_imports` configuration — files outside the project tree lack the context mypy needs to resolve TYPE_CHECKING imports.
+
+### 5.4 Enforced Import Boundaries
+
+The following boundaries are enforced by automated tests as layer-discipline guards:
+
+1. **`src/vibe3/clients/**` must not import from `vibe3.services` barrel**
+   - Enforced by: `test_clients_no_services_import`
+   - Rationale: L6 infrastructure must not depend on L3 orchestration barrels.
+
+2. **`src/vibe3/clients/**` imports from `vibe3.exceptions` barrel are tracked**
+   - Enforced by: `test_clients_no_exceptions_import`
+   - Rationale: L6 clients may legitimately depend on exception types (defined directly in `__init__.py`). Lazy function imports from the barrel are flagged for review. This is a **baseline tracking gate**, not a hard block — increases require justification.
+
+3. **Barrel import baselines are tracked project-wide**
+   - `vibe3.exceptions`: Baseline 161 (tracked by `test_barrel_import_tracking.py`)
+   - `vibe3.config`: Baseline 140 (tracked by `test_barrel_import_tracking.py`)
+   - Rationale: Risk/trend observation. Increases trigger xfail warnings and require justification. This is NOT a migration plan to replace barrel imports with deep imports.
+
+Violations of rule #1 cause immediate test failure.
+Increases in baselines #2 and #3 trigger xfail warnings and require justification.
+
+### 5.5 Resolving Import Boundary Issues Correctly
+
+When a module's dependency on a barrel creates a genuine architectural problem (upward dependency, import cycle risk, excessive coupling), resolve through:
+
+1. **Dependency Injection**: Pass the capability as a parameter rather than importing it.
+2. **Protocol Extraction**: Define a `Protocol` in a shared low-level module; the barrel re-exports implement it.
+3. **Callback Registration**: Register handlers at startup rather than importing them at call sites.
+4. **Ownership Move**: Move the needed symbol to a lower-level module that both sides can legitimately depend on.
+5. **Enhance Typed Public API**: Add missing TYPE_CHECKING imports or `.pyi` stubs if type information is incomplete.
+
+**Never** resolve by replacing a barrel import with a deep import (`from vibe3.xxx.yyy import ZZZ`) — this violates [modularity-standards.md](../../.claude/rules/modularity-standards.md) and breaks the public API contract.
+
+## 6. 公共接口设计规范 (Public Interface)
 
 - **接口收敛**：
   - 模块应通过 `__init__.py` 显式定义其公开接口。
@@ -139,7 +234,7 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
   - Client 结尾：负责外部通信。
   - Model 结尾：纯数据结构。
 
-## 6. 模块大小控制 (LOC Governance)
+## 7. 模块大小控制 (LOC Governance)
 
 本标准严格继承并执行 [loc-governance.md](loc-governance.md)：
 
@@ -148,7 +243,7 @@ Vibe 3.0 核心包 `src/vibe3` 由以下 22 个核心子模块构成：
 - **超限审查**：若必须超过阈值（如核心编排逻辑），需在 `config/v3/loc_limits.yaml` 中登记异常并注明 Reason。
 - **职责单一原则 (SRP)**：一个文件（或子模块）仅应有一个变更理由。当 LOC 接近 300 行且包含多个逻辑轴向时，必须进行拆分。
 
-## 7. 与其他标准的关系
+## 8. 与其他标准的关系
 
 - 整体架构愿景：见 [architecture-convergence-standard.md](v3/architecture-convergence-standard.md)
 - 详细 LOC 限制：见 [loc-governance.md](loc-governance.md)

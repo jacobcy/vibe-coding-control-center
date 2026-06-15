@@ -77,3 +77,79 @@ class TestClientsModularity:
                 + "\n\nclients module should not depend on the services layer. "
                 "Pass service callbacks into clients instead."
             )
+
+    def test_clients_no_exceptions_import(self) -> None:
+        """Track clients/ imports from vibe3.exceptions barrel.
+
+        L6 clients/ may legitimately depend on exception TYPES (GitError,
+        GitHubError, etc.) defined directly in exceptions/__init__.py — these
+        are L6 infrastructure. Lazy FUNCTION imports (classify_error_hybrid,
+        get_error_handling_contract) through the barrel warrant review for
+        dependency direction but are valid public API usage.
+
+        This is a baseline tracking gate, not a hard block. Increases over
+        the baseline require justification. Do NOT resolve by replacing barrel
+        imports with deep imports — public API is the contract.
+        """
+        import ast
+
+        clients_path = Path("src/vibe3/clients")
+
+        if not clients_path.exists():
+            pytest.skip("clients module not found")
+
+        # Use AST parsing to count barrel imports
+        imports_found = []
+        for py_file in clients_path.rglob("*.py"):
+            if "__pycache__" in str(py_file):
+                continue
+
+            try:
+                tree = ast.parse(py_file.read_text())
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ImportFrom):
+                        module = node.module or ""
+                        if module == "vibe3.exceptions":
+                            imported_names = ", ".join(
+                                alias.name for alias in node.names
+                            )
+                            imports_found.append(
+                                {
+                                    "file": str(py_file.relative_to(clients_path)),
+                                    "line": node.lineno,
+                                    "import": f"from {module} import {imported_names}",
+                                }
+                            )
+            except SyntaxError:
+                continue
+
+        # Baseline: 15 imports (as of issue #2848)
+        # Most are exception TYPE imports (GitError, GitHubError, etc.)
+        # defined directly in exceptions/__init__.py — legitimate L6 deps.
+        # A few are lazy FUNCTION imports (classify_error_hybrid,
+        # get_error_handling_contract) — valid public API usage, flagged
+        # for dependency direction awareness.
+        baseline = 15
+
+        if imports_found:
+            print(
+                f"\n⚠️  Found {len(imports_found)} "
+                f"exceptions barrel imports in clients/:"
+            )
+            for v in imports_found[:10]:
+                print(f"   {v['file']}:{v['line']} - {v['import']}")
+            if len(imports_found) > 10:
+                print(f"   ... and {len(imports_found) - 10} more")
+
+        # Hard gate: prevent growth beyond baseline
+        assert len(imports_found) <= baseline, (
+            f"Exceptions barrel imports in clients/ increased: "
+            f"expected <= {baseline}, found {len(imports_found)}"
+        )
+
+        # Expected state: baseline imports remain (tracked by issue #2848)
+        if imports_found:
+            pytest.xfail(
+                f"Baseline: {len(imports_found)} exceptions barrel imports in clients/ "
+                f"(issue #2848)"
+            )
