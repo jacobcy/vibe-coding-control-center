@@ -30,9 +30,6 @@ GITHUB_DEFAULT_VIEW_FIELDS: Final[tuple[str, ...]] = GITHUB_FIELDS_ISSUE_META + 
 # Default fields for list_issues — excludes body (expensive) and url
 GITHUB_DEFAULT_LIST_FIELDS: Final[tuple[str, ...]] = GITHUB_FIELDS_ISSUE_META
 
-# Minimal field sets for specific operations
-GITHUB_FIELDS_STATE_ONLY: Final[tuple[str, ...]] = ("state",)
-GITHUB_FIELDS_TITLE_ONLY: Final[tuple[str, ...]] = ("title",)
 
 # Fields for operations that need body and comments
 GITHUB_FIELDS_BODY_COMMENTS: Final[tuple[str, ...]] = ("body", "comments")

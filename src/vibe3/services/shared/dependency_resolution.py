@@ -54,12 +54,8 @@ class DependencyResolutionService:
         Returns:
             DependencyResolution with resolution status and evidence
         """
-        from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
-
         # Step 1: Fetch issue state
-        issue_data = github_client.view_issue(
-            issue_number, repo=repo, fields=list(GITHUB_FIELDS_STATE_ONLY)
-        )
+        issue_data = github_client.view_issue(issue_number, repo=repo, fields=["state"])
 
         # Handle error cases (fail-safe)
         if issue_data is None or issue_data == "network_error":
