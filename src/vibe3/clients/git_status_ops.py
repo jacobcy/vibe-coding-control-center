@@ -157,6 +157,27 @@ def get_untracked_files(run: Callable[[list[str]], str]) -> list[str]:
     return [f for f in output.splitlines() if f.strip()]
 
 
+def get_tracked_files(
+    run: Callable[[list[str]], str], pathspec: str | None = None
+) -> list[str]:
+    """Get all tracked files from git, optionally filtered by pathspec.
+
+    Naturally respects .gitignore since git ls-files only returns tracked files.
+
+    Args:
+        run: Git command runner function
+        pathspec: Optional pathspec filter (e.g. "src/vibe3/**/*.py")
+
+    Returns:
+        List of tracked file paths relative to repo root
+    """
+    args = ["ls-files"]
+    if pathspec:
+        args.extend(["--", pathspec])
+    output = run(args)
+    return [f for f in output.splitlines() if f.strip()]
+
+
 def _get_commit_files(
     run: Callable[[list[str]], str], sha: str, pathspec: str | None = None
 ) -> list[str]:

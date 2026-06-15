@@ -41,6 +41,9 @@ from vibe3.clients.git_status_ops import (
     get_numstat as _get_numstat,
 )
 from vibe3.clients.git_status_ops import (
+    get_tracked_files as _get_tracked_files,
+)
+from vibe3.clients.git_status_ops import (
     get_untracked_files as _get_untracked_files,
 )
 from vibe3.clients.git_status_ops import (
@@ -313,6 +316,17 @@ class GitClient:
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""
         return _get_untracked_files(self._run)
+
+    def get_tracked_files(self, pathspec: str | None = None) -> list[str]:
+        """Get all tracked files from git, optionally filtered by pathspec.
+
+        Args:
+            pathspec: Optional pathspec filter (e.g. "src/vibe3/**/*.py")
+
+        Returns:
+            List of tracked file paths relative to repo root
+        """
+        return _get_tracked_files(self._run, pathspec=pathspec)
 
     def has_uncommitted_changes(self) -> bool:
         """Check if working directory is dirty."""
