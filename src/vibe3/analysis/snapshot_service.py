@@ -474,6 +474,12 @@ def find_snapshot_by_branch(
         logger.warning("DB snapshot lookup failed, falling back to filesystem")
 
     # Fallback path: filesystem scan + auto-register (migration safety)
+    #
+    # Migration Note (Issue #2845):
+    # - DB is primary source; filesystem fallback ensures zero data loss
+    # - Existing snapshots are lazily registered on first access
+    # - No manual migration required; auto-registration is idempotent
+    # - Filesystem remains authoritative if DB registration fails
     if not candidates:
         sanitized_branch = normalized_branch.replace("/", "-")
         pattern = str(snapshot_dir / f"*_{sanitized_branch}_*.json")
@@ -488,7 +494,7 @@ def find_snapshot_by_branch(
             )
         if not snapshots:
             return None
-        # Register found snapshots for future DB lookups
+        # Auto-register found snapshots for future DB lookups (idempotent operation)
         _register_snapshots_in_db(snapshots, snapshot_dir)
         candidates = snapshots
 
@@ -585,9 +591,15 @@ def _load_snapshots_for_branch(
 def _register_snapshots_in_db(
     snapshots: list[dict[str, str]], snapshot_dir: Path
 ) -> None:
-    """Register filesystem-found snapshots in DB for future queries."""
+    """Register filesystem-found snapshots in DB for future queries.
+
+    This is an idempotent operation: INSERT OR REPLACE ensures that
+    re-registering existing snapshots is safe and simply overwrites
+    the existing registry entry with the same data.
+    """
     try:
         client = SQLiteClient()
+        registered_count = 0
         for snap in snapshots:
             sid = snap.get("id", "")
             if not sid:
@@ -601,6 +613,13 @@ def _register_snapshots_in_db(
                 created_at=snap.get("created_at", ""),
                 file_path=file_path,
             )
+            registered_count += 1
+        if registered_count > 0:
+            logger.bind(
+                domain="snapshot",
+                action="auto_register",
+                count=registered_count,
+            ).info("Auto-registered snapshots from filesystem fallback")
     except Exception:
         logger.warning("Failed to register fallback snapshots in DB (non-fatal)")
 
