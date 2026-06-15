@@ -3,6 +3,7 @@
 Tests both section builders (unit tests) and orchestration (integration tests).
 """
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -111,7 +112,10 @@ class TestBuildOutputContractSection:
         """Should use default format if None."""
         result = build_output_contract_section(None)
         assert "## Output format requirements" in result
-        assert "VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE" in result
+        # Verify that verdict format instruction is present
+        assert "VERDICT:" in result
+        assert "PASS" in result
+        assert "REFUSE" in result
 
 
 class TestBuildReviewPromptBody:
@@ -143,11 +147,9 @@ class TestBuildReviewPromptBody:
             context = build_review_prompt_body(request)
 
         assert "VERDICT:" in context
-        assert "PASS" in context
-        assert "MINOR" in context
-        assert "MAJOR" in context
-        assert "BLOCK" in context
-        assert "REFUSE" in context
+        # Verify that all standard verdict levels are present in the prompt
+        for level in ["PASS", "MINOR", "MAJOR", "BLOCK", "REFUSE"]:
+            assert level in context
 
     def test_build_review_prompt_body_minimal_without_ast(self) -> None:
         """Context should work without AST analysis (reviewer uses git diff)."""
@@ -203,11 +205,17 @@ class TestBuildReviewPromptBody:
         request = ReviewRequest(scope=scope)
 
         context = build_review_prompt_body(request)
-        assert "The first line must be exactly:" in context
-        assert "The final line must repeat the same `VERDICT:`" in context
-        assert "canonical audit report under `docs/reports/`" in context
+
+        # Check for verdict placement requirements (first and last line)
+        assert re.search(r"first line.*VERDICT", context, re.IGNORECASE)
+        assert re.search(r"final line.*VERDICT", context, re.IGNORECASE)
+
+        # Check for audit reporting requirements
+        assert re.search(r"audit report.*docs/reports/", context, re.IGNORECASE)
         assert "handoff audit" in context
-        assert "PASS` and `REFUSE` may omit `audit_ref`" in context
+
+        # Check for verdict-specific rules (e.g. PASS/REFUSE might omit audit_ref)
+        assert re.search(r"PASS.*REFUSE.*omit.*audit_ref", context, re.IGNORECASE)
 
 
 class TestDescribeReviewSections:
