@@ -122,6 +122,7 @@ intake 只做二元决策：**接受（分配 assignee）** 或 **跳过（打 s
 - `roadmap/rfc`、`roadmap/epic`（**唯一例外**：Level 0 机械阻塞时 intake 直接打 `roadmap/rfc` 路由该 issue；其余 rfc 判断属 pool）
 - `roadmap/p0`、`roadmap/p1`、`roadmap/p2`
 - `priority/*`
+- `orchestra-governed`
 
 ### 不要误判为需要跳过的情况
 - 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
@@ -254,7 +255,7 @@ Allowed:
 - `labels.write`: allowed（routing 标签）：
   - 跳过时设 `orchestra-scanned`
   - **唯一 `roadmap/*` 例外**：Level 0（`.claude/`/`.codex/`）机械阻塞 skip 时，**直接打 `roadmap/rfc`**（路由确定性硬阻塞，使其命中 task-status Rule 1 被 /vibe-task surface）
-  - 除该例外外，**禁止**设置 `roadmap/*`、`priority/*` 标签（由 assignee-pool 或 roadmap decider 决策执行）
+  - 除该例外外，**禁止**设置 `roadmap/*`、`priority/*`、`orchestra-governed` 标签（由 assignee-pool 或 roadmap decider 决策执行）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
 - `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）
