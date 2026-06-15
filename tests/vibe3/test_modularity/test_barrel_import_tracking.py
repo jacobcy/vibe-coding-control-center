@@ -60,7 +60,7 @@ def test_exceptions_barrel_import_count() -> None:
     """Track barrel imports from vibe3.exceptions across src/ and tests/.
 
     Goal: Prevent growth of exceptions barrel imports.
-    Baseline: 45 call sites (as of issue #2848).
+    Baseline: 159 call sites (as of issue #2848).
 
     Most barrel imports are for exception TYPES (GitError, GitHubError, etc.)
     which are defined directly in exceptions/__init__.py and safe for mypy.
@@ -104,7 +104,7 @@ def test_config_barrel_import_count() -> None:
     """Track barrel imports from vibe3.config across src/ and tests/.
 
     Goal: Prevent growth of config barrel imports.
-    Baseline: 32 call sites (as of issue #2848).
+    Baseline: 140 call sites (as of issue #2848).
 
     The config barrel uses lazy __getattr__ for re-exports, which is safe
     when importing TYPES (ConventionResolver, OrchestraConfig) but can
