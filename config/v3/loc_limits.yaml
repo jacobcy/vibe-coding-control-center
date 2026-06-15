@@ -74,8 +74,8 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
       - path: "src/vibe3/commands/snapshot.py"
-        limit: 410
-        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）"
+        limit: 440
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
