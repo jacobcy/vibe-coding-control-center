@@ -35,18 +35,21 @@ def _publish_and_wait_governance_event(
     Returns:
         ExecutionLaunchResult from handler, or None if no result
     """
-    from typing import cast
-
-    from vibe3.domain.events.governance import GovernanceScanStarted
-    from vibe3.models.event_bus import publish_and_wait
+    from vibe3.domain import GovernanceScanStarted
+    from vibe3.models import ExecutionLaunchResult, publish_and_wait
 
     event = GovernanceScanStarted(
         tick_count=tick_count,
         execution_count=0,
         actor="cli:scan-governance",
     )
-    result = publish_and_wait(event)
-    return cast(ExecutionLaunchResult | None, result)
+    result = publish_and_wait(event)  # type: ignore[operator]
+    # Type narrowing: publish_and_wait returns Any | None,
+    # but we know handlers return ExecutionLaunchResult | None
+    if result is None:
+        return None
+    assert isinstance(result, ExecutionLaunchResult)
+    return result
 
 
 def _run_governance_scan(

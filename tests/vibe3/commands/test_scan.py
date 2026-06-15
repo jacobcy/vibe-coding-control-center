@@ -65,13 +65,20 @@ class TestGovernanceScan:
 
     def test_governance_scan_publishes_event(self):
         """Governance scan publishes GovernanceScanStarted event."""
-        with patch("vibe3.domain.publish") as mock_publish:
+        with patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait:
             from vibe3.commands.scan import _run_governance_scan
-            from vibe3.domain.events.governance import GovernanceScanStarted
+            from vibe3.domain import GovernanceScanStarted
+            from vibe3.models import ExecutionLaunchResult
+
+            mock_publish_and_wait.return_value = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="governance-123",
+                log_path="/tmp/events.log",
+            )
 
             _run_governance_scan(no_async=True)
-            mock_publish.assert_called_once()
-            event = mock_publish.call_args.args[0]
+            mock_publish_and_wait.assert_called_once()
+            event = mock_publish_and_wait.call_args.args[0]
             assert isinstance(event, GovernanceScanStarted)
             assert event.actor == "cli:scan-governance"
             assert event.tick_count == 0
@@ -114,20 +121,26 @@ class TestCombinedScan:
 class TestScanIntegration:
     def test_governance_scan_registers_handlers(self):
         """Governance scan publishes event, not direct dispatch."""
-        with patch("vibe3.domain.publish") as mock_publish:
+        with patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait:
             from vibe3.commands.scan import _run_governance_scan
-            from vibe3.domain.events.governance import GovernanceScanStarted
+            from vibe3.domain import GovernanceScanStarted
+            from vibe3.models import ExecutionLaunchResult
+
+            mock_publish_and_wait.return_value = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="governance-123",
+            )
 
             _run_governance_scan(no_async=True)
-            mock_publish.assert_called_once()
-            event = mock_publish.call_args.args[0]
+            mock_publish_and_wait.assert_called_once()
+            event = mock_publish_and_wait.call_args.args[0]
             assert isinstance(event, GovernanceScanStarted)
 
     def test_supervisor_scan_publishes_events(self):
         """Supervisor scan publishes SupervisorIssueIdentified events."""
         with (
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.domain.publish") as mock_publish,
+            patch("vibe3.domain.publisher.publish") as mock_publish,
         ):
             mock_fetch.return_value = (
                 1,
@@ -141,7 +154,7 @@ class TestScanIntegration:
             )
 
             from vibe3.commands.scan import _run_supervisor_scan
-            from vibe3.models.domain_events import SupervisorIssueIdentified
+            from vibe3.domain import SupervisorIssueIdentified
 
             _run_supervisor_scan()
             mock_fetch.assert_called_once()
@@ -155,13 +168,19 @@ class TestScanIntegration:
 class TestFailedGateBlocking:
     def test_governance_scan_ignores_failed_gate(self):
         """Manual governance scan ignores FailedGate (publishes event directly)."""
-        with patch("vibe3.domain.publish") as mock_publish:
+        with patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait:
             from vibe3.commands.scan import _run_governance_scan
-            from vibe3.domain.events.governance import GovernanceScanStarted
+            from vibe3.domain import GovernanceScanStarted
+            from vibe3.models import ExecutionLaunchResult
+
+            mock_publish_and_wait.return_value = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="governance-123",
+            )
 
             _run_governance_scan(no_async=True)
-            mock_publish.assert_called_once()
-            event = mock_publish.call_args.args[0]
+            mock_publish_and_wait.assert_called_once()
+            event = mock_publish_and_wait.call_args.args[0]
             assert isinstance(event, GovernanceScanStarted)
 
     def test_supervisor_scan_ignores_failed_gate(self):
@@ -183,18 +202,24 @@ class TestFailedGateBlocking:
     async def test_combined_scan_ignores_failed_gate(self):
         """Combined scan bypasses FailedGate (publishes events directly)."""
         with (
-            patch("vibe3.domain.publish") as mock_publish,
+            patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
         ):
             mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_combined_scan_async
-            from vibe3.domain.events.governance import GovernanceScanStarted
+            from vibe3.domain import GovernanceScanStarted
+            from vibe3.models import ExecutionLaunchResult
+
+            mock_publish_and_wait.return_value = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="governance-123",
+            )
 
             await _run_combined_scan_async()
-            # Governance event published
-            assert mock_publish.call_count >= 1
-            governance_event = mock_publish.call_args_list[0].args[0]
+            # Governance event published via publish_and_wait
+            assert mock_publish_and_wait.call_count >= 1
+            governance_event = mock_publish_and_wait.call_args.args[0]
             assert isinstance(governance_event, GovernanceScanStarted)
             mock_fetch.assert_called_once()
 
@@ -300,14 +325,20 @@ class TestCombinedScanDryRun:
 def test_scan_governance_does_not_call_roles_dispatch():
     """Verify governance scan does not call dispatch_governance_execution."""
     with (
-        patch("vibe3.domain.publish") as mock_publish,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
         patch("vibe3.roles.dispatch_governance_execution") as mock_dispatch,
     ):
         from vibe3.commands.scan import _run_governance_scan
+        from vibe3.models import ExecutionLaunchResult
+
+        mock_publish_and_wait.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="governance-123",
+        )
 
         _run_governance_scan()
-        # Event published
-        mock_publish.assert_called_once()
+        # Event published via publish_and_wait
+        mock_publish_and_wait.assert_called_once()
         # Direct dispatch NOT called
         mock_dispatch.assert_not_called()
 
@@ -316,7 +347,7 @@ def test_scan_supervisor_does_not_call_roles_dispatch():
     """Verify supervisor scan does not call dispatch_supervisor_execution."""
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.domain.publish") as mock_publish,
+        patch("vibe3.domain.publisher.publish") as mock_publish,
         patch("vibe3.roles.dispatch_supervisor_execution") as mock_dispatch,
     ):
         mock_fetch.return_value = (
