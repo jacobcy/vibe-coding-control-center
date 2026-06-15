@@ -447,7 +447,6 @@ class CodeagentExecutionService:
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.services.shared import record_error
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.
@@ -464,18 +463,6 @@ class CodeagentExecutionService:
                 error_message = (
                     f"{error_message}\n\n[agent metadata] {metadata_summary}"
                 )
-
-            # Use store-specific instance to ensure consistency with FailedGate
-            # Record error with severity from contract
-            record_error(
-                error_code=error_code,
-                error_message=error_message,
-                store=ctx.store,
-                tick_id=command.tick_id,
-                issue_number=command.issue_number,
-                branch=command.branch,
-                severity=error_contract.severity,
-            )
 
             # Build abort message
             abort_msg = (
