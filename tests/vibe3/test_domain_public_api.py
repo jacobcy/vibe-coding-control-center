@@ -21,28 +21,28 @@ def test_models_all_contains_transition_constants() -> None:
 
 def test_services_blocked_state_service_importable() -> None:
     """Test that BlockedStateService is importable from services."""
-    from vibe3.services import BlockedStateService
+    from vibe3.services.flow import BlockedStateService
 
     assert BlockedStateService is not None
 
 
 def test_services_flow_cleanup_service_importable() -> None:
     """Test that FlowCleanupService is importable from services."""
-    from vibe3.services import FlowCleanupService
+    from vibe3.services.flow import FlowCleanupService
 
     assert FlowCleanupService is not None
 
 
 def test_services_task_resume_operations_importable() -> None:
     """Test that TaskResumeOperations is importable from services."""
-    from vibe3.services import TaskResumeOperations
+    from vibe3.services.task import TaskResumeOperations
 
     assert TaskResumeOperations is not None
 
 
 def test_services_error_helpers_importable() -> None:
     """Test that error helper functions are importable from services."""
-    from vibe3.services import has_recent_specific_error, record_error
+    from vibe3.services.shared import has_recent_specific_error, record_error
 
     assert callable(has_recent_specific_error)
     assert callable(record_error)
@@ -50,13 +50,15 @@ def test_services_error_helpers_importable() -> None:
 
 def test_services_all_contains_new_symbols() -> None:
     """Test that __all__ contains newly exported symbols."""
-    from vibe3.services import __all__
+    import vibe3.services
 
-    assert "BlockedStateService" in __all__
-    assert "FlowCleanupService" in __all__
-    assert "TaskResumeOperations" in __all__
-    assert "has_recent_specific_error" in __all__
-    assert "record_error" in __all__
+    root_barrel_all = vibe3.services.__all__
+
+    assert "BlockedStateService" in root_barrel_all
+    assert "FlowCleanupService" in root_barrel_all
+    assert "TaskResumeOperations" in root_barrel_all
+    assert "has_recent_specific_error" in root_barrel_all
+    assert "record_error" in root_barrel_all
 
 
 def test_execution_resolve_async_cli_project_root_importable() -> None:

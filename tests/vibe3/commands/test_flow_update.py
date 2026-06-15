@@ -150,7 +150,7 @@ def test_flow_update_blocks_when_branch_has_live_runtime_session(
     registry.get_truly_live_sessions_for_branch.return_value = [{"id": 1}]
 
     with patch(
-        "vibe3.services.resolve_branch_arg",
+        "vibe3.services.shared.branches.resolve_branch_arg",
         return_value="task/issue-123",
     ):
         result = runner.invoke(flow_app, ["update"])

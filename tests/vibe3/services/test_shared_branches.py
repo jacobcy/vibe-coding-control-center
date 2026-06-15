@@ -61,7 +61,7 @@ class TestResolveBranchAndIssue:
     def test_none_returns_current_branch_with_issue(self):
         """测试：None 输入返回当前分支和正确的 issue number"""
         with (
-            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -79,7 +79,7 @@ class TestResolveBranchAndIssue:
     def test_digit_arg_returns_canonical_with_issue(self):
         """测试：纯数字输入返回 canonical branch 和 issue number"""
         with (
-            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -97,7 +97,7 @@ class TestResolveBranchAndIssue:
     def test_branch_name_with_issue(self):
         """测试：分支名输入返回原值和解析出的 issue number"""
         with (
-            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -115,7 +115,7 @@ class TestResolveBranchAndIssue:
     def test_invalid_name_no_issue(self):
         """测试：无效分支名返回原值和 None issue number"""
         with (
-            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,
@@ -133,7 +133,7 @@ class TestResolveBranchAndIssue:
     def test_return_type_is_tuple(self):
         """测试：返回值类型为 tuple，且元素类型正确"""
         with (
-            patch("vibe3.services.resolve_branch_arg") as mock_resolve,
+            patch("vibe3.services.shared.branches.resolve_branch_arg") as mock_resolve,
             patch(
                 "vibe3.config.convention_resolver.get_convention"
             ) as mock_get_convention,

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 from vibe3.clients import SQLiteClient
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.models import IssueState
-from vibe3.services import BlockedStateService
+from vibe3.services.flow import BlockedStateService
 
 
 def test_resume_resets_single_step_limit_counter(tmp_path):

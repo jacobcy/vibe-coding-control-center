@@ -13,7 +13,7 @@ from vibe3.orchestra.global_dispatch_coordinator import (
 )
 from vibe3.orchestra.queue_operations import select_ready_issues_from_collected_issues
 from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
-from vibe3.services import should_skip_from_queue
+from vibe3.services.shared import should_skip_from_queue
 
 
 @pytest.fixture

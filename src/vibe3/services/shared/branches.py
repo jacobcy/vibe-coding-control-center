@@ -63,12 +63,9 @@ def resolve_branch_and_issue(
     Returns:
         Tuple of (resolved_branch_name, issue_number or None)
     """
-    # Import through public API for test patch compatibility
-    # (cross-module import allows patching "vibe3.services.resolve_branch_arg")
     from vibe3.config import get_convention
-    from vibe3.services import resolve_branch_arg as resolve_via_public_api
 
-    branch = resolve_via_public_api(branch_arg, flow_service=flow_service)
+    branch = resolve_branch_arg(branch_arg, flow_service=flow_service)
     convention = get_convention().branch
     issue_number = convention.parse_issue_number(branch)
     return branch, issue_number
