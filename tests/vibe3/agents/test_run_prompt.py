@@ -171,3 +171,23 @@ def test_build_run_prompt_body_includes_deviation_declaration(tmp_path: Path) ->
     assert "Deviation Declaration" in context
     assert "❌" in context
     assert "DO NOT claim" in context or "report accuracy failure" in context
+
+
+def test_run_config_loads_publish_task_from_prompts_yaml() -> None:
+    """publish_task must round-trip from prompts.yaml into RunConfig.
+
+    Regression test for #2900.
+    """
+    config = VibeConfig.get_defaults()
+
+    assert config.run.publish_task
+    assert "MANDATORY EXIT STEP" in config.run.publish_task
+
+
+def test_publish_exit_contract_section_contains_mandatory_exit_step() -> None:
+    config = VibeConfig.get_defaults()
+
+    section = build_run_task_section(config.run.publish_task)
+
+    assert "MANDATORY EXIT STEP" in section
+    assert "state/merge-ready" in section
