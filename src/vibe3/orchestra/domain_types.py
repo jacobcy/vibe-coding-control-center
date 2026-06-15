@@ -136,6 +136,14 @@ class CheckServiceProtocol(Protocol):
         """
         ...
 
+    def enforce_label_constraints_remote(self) -> int:
+        """Scan remote open issues for label constraint violations and auto-fix.
+
+        Returns:
+            Number of issues with violations fixed.
+        """
+        ...
+
 
 class FlowServiceProtocol(Protocol):
     """Protocol for flow service lifecycle operations."""

@@ -432,6 +432,7 @@ def restore_flow(
     branch_opt: Annotated[
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     trace: TraceOption = False,
     min_ms: TraceMinMsOption = None,
 ) -> None:

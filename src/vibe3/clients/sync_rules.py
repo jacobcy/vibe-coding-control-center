@@ -123,6 +123,13 @@ class LocalSyncRules(BaseModel):
         default_factory=SyncRule,
         description="Sync remote state/blocked label to local flow status",
     )
+    label_constraint_enforcement: SyncRule = Field(
+        default_factory=SyncRule,
+        description=(
+            "Enforce data-driven label constraints "
+            "(no assignee state/*, scanned+state conflict, etc.)"
+        ),
+    )
 
 
 class SyncRulesConfig(BaseModel):
