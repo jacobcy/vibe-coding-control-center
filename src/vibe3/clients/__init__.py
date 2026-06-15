@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from vibe3.clients.github_field_constants import (
         GITHUB_DEFAULT_VIEW_FIELDS,
         GITHUB_FIELDS_BODY_COMMENTS,
-        GITHUB_FIELDS_STATE_ONLY,
-        GITHUB_FIELDS_TITLE_ONLY,
     )
     from vibe3.clients.github_issues_ops import parse_blocked_by, parse_linked_issues
     from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
@@ -70,8 +68,6 @@ _LAZY_IMPORTS = {
     "FlowStatePort": "vibe3.clients.protocols.flow",
     "GITHUB_DEFAULT_VIEW_FIELDS": "vibe3.clients.github_field_constants",
     "GITHUB_FIELDS_BODY_COMMENTS": "vibe3.clients.github_field_constants",
-    "GITHUB_FIELDS_STATE_ONLY": "vibe3.clients.github_field_constants",
-    "GITHUB_FIELDS_TITLE_ONLY": "vibe3.clients.github_field_constants",
     "GhIssueLabelPort": "vibe3.clients.github_labels",
     "GitClient": "vibe3.clients.git_client",
     "GitClientProtocol": "vibe3.clients.git_client",
@@ -140,8 +136,6 @@ __all__ = [
     "FlowStatePort",
     "GITHUB_DEFAULT_VIEW_FIELDS",
     "GITHUB_FIELDS_BODY_COMMENTS",
-    "GITHUB_FIELDS_STATE_ONLY",
-    "GITHUB_FIELDS_TITLE_ONLY",
     "GhIssueLabelPort",
     "GitClient",
     "GitClientProtocol",
