@@ -6,8 +6,6 @@ scene rebuild belongs to FlowRebuildUsecase.
 
 from __future__ import annotations
 
-import json
-import subprocess
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
@@ -160,11 +158,13 @@ class TaskResumeCandidates:
         label_service: LabelService,
         flow_service: "FlowQueryProtocol",
         issue_flow_service: IssueFlowService,
+        github_client: GitHubClient | None = None,
     ) -> None:
         self.status_service = status_service
         self.label_service = label_service
         self._flow_service = flow_service
         self.issue_flow_service = issue_flow_service
+        self._github_client = github_client or GitHubClient()
 
     def merge_explicit_issue_candidates(
         self,
@@ -349,23 +349,23 @@ class TaskResumeCandidates:
                 )
 
             # Check blocked_by_issue dependency
-            dep_check = self._check_blocked_by_dependency(issue_number)
+            dep_check = self._check_blocked_by_dependency(issue_number, repo)
             if dep_check is not None:
                 return dep_check
         elif resume_kind == "confirm":
-            dep_check = self._check_blocked_by_dependency(issue_number)
+            dep_check = self._check_blocked_by_dependency(issue_number, repo)
             if dep_check is not None:
                 return dep_check
 
         return True, None
 
     def _check_blocked_by_dependency(
-        self, issue_number: int
+        self, issue_number: int, repo: str | None
     ) -> tuple[bool, str] | None:
         """Check if blocked_by dependency is satisfied.
 
         Returns None if no blocking dependency or dep is satisfied.
-        Returns (False, reason) if dep is still open.
+        Returns (False, reason) if dep is still open or cannot be verified.
         """
         flow_dict = self._flow_service.get_flow_for_issue(issue_number)
         if not flow_dict:
@@ -373,43 +373,22 @@ class TaskResumeCandidates:
         blocked_by_issue = flow_dict.get("blocked_by_issue")
         if not isinstance(blocked_by_issue, int) or blocked_by_issue <= 0:
             return None
-        try:
-            result = subprocess.run(
-                ["gh", "issue", "view", str(blocked_by_issue), "--json", "state"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                if data.get("state") != "CLOSED":
-                    return (
-                        False,
-                        f"task 不满足 resume 条件，所依赖的 "
-                        f"task #{blocked_by_issue} 尚未关闭",
-                    )
-            else:
-                logger.bind(
-                    domain="resume",
-                    issue_number=issue_number,
-                    blocked_by_issue=blocked_by_issue,
-                ).warning(
-                    f"Failed to check dependency issue #{blocked_by_issue} "
-                    f"state, allowing resume"
-                )
-        except (
-            subprocess.TimeoutExpired,
-            json.JSONDecodeError,
-            FileNotFoundError,
-        ) as e:
-            logger.bind(
-                domain="resume",
-                issue_number=issue_number,
-                blocked_by_issue=blocked_by_issue,
-                error=str(e),
-            ).warning(
-                f"Error checking dependency issue #{blocked_by_issue}, "
-                f"allowing resume"
+
+        from vibe3.services.shared.dependency_resolution import (
+            DependencyResolutionService,
+        )
+
+        resolution = DependencyResolutionService.is_dependency_resolved(
+            blocked_by_issue,
+            github_client=self._github_client,
+            repo=repo,
+        )
+        if not resolution.resolved:
+            return (
+                False,
+                f"task 不满足 resume 条件，所依赖的 "
+                f"task #{blocked_by_issue} 尚未关闭 "
+                f"(state={resolution.github_state or 'unknown'})",
             )
         return None
 
@@ -468,6 +447,7 @@ class TaskResumeUsecase:
                 label_service=self.label_service,
                 flow_service=self._flow_service,
                 issue_flow_service=self.issue_flow_service,
+                github_client=self.github_client,
             )
         return self._candidates
 

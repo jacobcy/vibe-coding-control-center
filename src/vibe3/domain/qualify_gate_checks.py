@@ -97,16 +97,14 @@ def is_dependency_satisfied(
     config: "OrchestraConfig",
     dep_issue_number: int,
 ) -> bool:
-    from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
+    from vibe3.services.shared.dependency_resolution import DependencyResolutionService
 
-    payload = github.view_issue(
+    resolution = DependencyResolutionService.is_dependency_resolved(
         dep_issue_number,
+        github_client=github,
         repo=config.repo,
-        fields=list(GITHUB_FIELDS_STATE_ONLY),  # type: ignore[call-overload]
     )
-    if not isinstance(payload, dict):
-        return False
-    return payload.get("state") == "closed"
+    return resolution.resolved
 
 
 def check_dependencies(

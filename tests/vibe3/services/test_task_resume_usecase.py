@@ -1,7 +1,7 @@
 """Tests for task resume usecase error reporting."""
 
 import inspect
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task import TaskResumeUsecase
@@ -102,17 +102,18 @@ def test_verify_rejects_when_blocked_by_dependency_still_open() -> None:
         "blocked_by_issue": 999
     }
 
-    # Mock gh CLI to return OPEN state
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout='{"state": "OPEN"}', stderr=""
-        )
-        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
-            123, "blocked", None
-        )
+    # Mock GitHub client to return OPEN state
+    usecase.candidates._github_client.view_issue.return_value = {
+        "state": "OPEN",
+        "labels": [],
+    }
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
 
     assert can_resume is False
-    assert reason == "task 不满足 resume 条件，所依赖的 task #999 尚未关闭"
+    assert "task #999 尚未关闭" in reason
+    assert "(state=OPEN)" in reason
 
 
 def test_verify_allows_when_blocked_by_dependency_closed() -> None:
@@ -123,14 +124,14 @@ def test_verify_allows_when_blocked_by_dependency_closed() -> None:
         "blocked_by_issue": 999
     }
 
-    # Mock gh CLI to return CLOSED state
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout='{"state": "CLOSED"}', stderr=""
-        )
-        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
-            123, "blocked", None
-        )
+    # Mock GitHub client to return CLOSED state
+    usecase.candidates._github_client.view_issue.return_value = {
+        "state": "CLOSED",
+        "labels": [],
+    }
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
 
     assert can_resume is True
     assert reason is None
@@ -162,23 +163,20 @@ def test_verify_skips_check_when_blocked_by_issue_empty() -> None:
     assert reason is None
 
 
-def test_verify_allows_when_gh_command_fails() -> None:
-    """Test that resume is allowed (fail open) when gh command fails."""
+def test_verify_refuses_when_gh_command_fails() -> None:
+    """Test that resume is refused (fail-safe) when GitHub API fails."""
     usecase = _make_usecase()
     usecase.label_service.get_state.return_value = MagicMock(value="blocked")
     usecase.candidates._flow_service.get_flow_for_issue.return_value = {
         "blocked_by_issue": 999
     }
 
-    # Mock gh CLI to fail (non-zero return code)
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=1, stdout="", stderr="error: issue not found"
-        )
-        can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
-            123, "blocked", None
-        )
+    # Mock GitHub client to fail (return None for not found)
+    usecase.candidates._github_client.view_issue.return_value = None
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
 
-    # Should fail open: allow resume despite gh failure
-    assert can_resume is True
-    assert reason is None
+    # Should fail-safe: refuse resume when cannot verify dependency
+    assert can_resume is False
+    assert "task #999" in reason

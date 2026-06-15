@@ -11,6 +11,7 @@ Public API Contract:
   Branch resolution
 - is_human_comment: Comment detection
 - FlowContextCacheService: Context caching
+- DependencyResolution, DependencyResolutionService: Dependency resolution
 - record_dispatch_failure_if_unexpected, log_dispatch_error,
   has_recent_specific_error, record_error: Error utilities
 - emit_issue_failed: Event emission
@@ -51,6 +52,10 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.comment import is_human_comment
     from vibe3.services.shared.context_cache import FlowContextCacheService
+    from vibe3.services.shared.dependency_resolution import (
+        DependencyResolution,
+        DependencyResolutionService,
+    )
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
         log_dispatch_error,
@@ -98,6 +103,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ArtifactParser",
+    "DependencyResolution",
+    "DependencyResolutionService",
     "FlowContextCacheService",
     "GitPathProtocol",
     "LabelService",
@@ -149,6 +156,8 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     "ArtifactParser": "vibe3.services.shared.artifacts",
+    "DependencyResolution": "vibe3.services.shared.dependency_resolution",
+    "DependencyResolutionService": "vibe3.services.shared.dependency_resolution",
     "FlowContextCacheService": "vibe3.services.shared.context_cache",
     "GitPathProtocol": "vibe3.services.shared.paths",
     "LabelService": "vibe3.services.shared.label_service",
