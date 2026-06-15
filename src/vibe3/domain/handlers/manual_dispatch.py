@@ -38,11 +38,6 @@ def get_pending_result(key: str) -> Any | None:
     return _pending_results.pop(key, None)
 
 
-def _store_pending_error(key: str, exc: Exception) -> None:
-    """Store a handler error for the originating CLI command to report."""
-    _pending_results[key] = exc
-
-
 @register_handler("ManualPlanIntent")
 def handle_manual_plan_intent(event: ManualPlanIntent, /) -> CodeagentResult | None:
     """Handle ManualPlanIntent event by delegating to execute_spec_plan functions.
@@ -336,5 +331,15 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 fresh_session=event.fresh_session,
             )
             # Return result indicating async dispatch
-            # Note: tmux/log info not available from run_issue_role_async
+            # LIMITATION: run_issue_role_async() returns None (doesn't provide
+            # tmux/log info). This means users only see "Review dispatched
+            # (async mode)" without session details. This is acceptable because:
+            # 1. Branch review async is uncommon (typically done sync or via
+            #    base review)
+            # 2. The async dispatch already echoes tmux/log via typer inside
+            #    run_issue_role_async
+            # 3. Adding return value would require refactoring
+            #    run_issue_role_async
+            # TODO: Consider refactoring run_issue_role_async to return
+            # ExecutionLaunchResult
             return ReviewRunResult("ASYNC", None, event.issue_number)
