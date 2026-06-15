@@ -26,6 +26,10 @@ if TYPE_CHECKING:
         normalize_labels,
     )
     from vibe3.clients.merged_pr_cache import MergedPRCache
+    from vibe3.clients.pr_status_checker import (
+        get_merged_pr_for_issue,
+        has_merged_pr_for_issue,
+    )
     from vibe3.clients.protocols.backend import BackendProtocol
     from vibe3.clients.protocols.flow import FlowReader, FlowStatePort
     from vibe3.clients.protocols.git import GitPathProtocol
@@ -78,6 +82,8 @@ _LAZY_IMPORTS = {
     "LabelAnomaly": "vibe3.clients.label_utils",
     "LocalSyncRules": "vibe3.clients.sync_rules",
     "MergedPRCache": "vibe3.clients.merged_pr_cache",
+    "get_merged_pr_for_issue": "vibe3.clients.pr_status_checker",
+    "has_merged_pr_for_issue": "vibe3.clients.pr_status_checker",
     "RecentPRCache": "vibe3.clients.recent_pr_cache",
     "RemoteSyncRules": "vibe3.clients.sync_rules",
     "SerenaClient": "vibe3.clients.serena_client",
@@ -165,6 +171,8 @@ __all__ = [
     "load_sync_rules",
     "normalize_assignees",
     "normalize_labels",
+    "get_merged_pr_for_issue",
+    "has_merged_pr_for_issue",
     "parse_blocked_by",
     "parse_linked_issues",
     "prune_worktrees",

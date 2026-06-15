@@ -7,7 +7,6 @@ Public API Contract:
 - Analysis functions: analyze_critical_files, build_pr_analysis, etc.
 - Resolution functions: resolve_command_branch, resolve_branch_from_pr
 - Verdict functions: passes_review, blocks_merge, requires_audit_ref
-- Status functions: has_merged_pr_for_issue, get_merged_pr_for_issue
 
 All exports are part of the public API.
 """
@@ -43,10 +42,6 @@ if TYPE_CHECKING:
     from vibe3.services.pr.review import PRReviewBriefingService
     from vibe3.services.pr.scoring import PRScoringError
     from vibe3.services.pr.service import PRService
-    from vibe3.services.pr.status_checker import (
-        get_merged_pr_for_issue,
-        has_merged_pr_for_issue,
-    )
     from vibe3.services.pr.utils import (
         build_pr_body,
         check_upstream_conflicts,
@@ -85,12 +80,10 @@ __all__ = [
     "determine_risk_level",
     "filter_critical_files",
     "generate_score_report",
-    "get_merged_pr_for_issue",
     "get_metadata_from_flow",
     "get_pr_changed_files",
     "get_pr_commit_count",
     "get_recent_commits",
-    "has_merged_pr_for_issue",
     "passes_review",
     "requires_audit_ref",
     "resolve_branch_from_pr",
@@ -123,12 +116,10 @@ _SYMBOL_MODULES = {
     "determine_risk_level": "vibe3.analysis",
     "filter_critical_files": "vibe3.services.pr.analysis",
     "generate_score_report": "vibe3.analysis",
-    "get_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "get_metadata_from_flow": "vibe3.services.pr.utils",
     "get_pr_changed_files": "vibe3.services.pr.analysis",
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
-    "has_merged_pr_for_issue": "vibe3.services.pr.status_checker",
     "passes_review": "vibe3.services.pr.verdict_policy",
     "requires_audit_ref": "vibe3.services.pr.verdict_policy",
     "resolve_branch_from_pr": "vibe3.services.pr.resolver",

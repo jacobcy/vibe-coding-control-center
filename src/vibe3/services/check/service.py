@@ -390,26 +390,28 @@ class CheckService(CheckRemote):
             # ---- read-only dependency check ----
             if task_issue and flow_status not in self.INACTIVE_FLOW_STATUSES:
                 from vibe3.services.orchestra.coordination import CoordinationResolver
+                from vibe3.services.shared import DependencyResolutionService
 
                 resolver = CoordinationResolver(store=self.store)
                 truth = resolver.resolve_coordination(branch, task_issue)
                 if truth.dependencies:
-                    from vibe3.clients import GITHUB_FIELDS_STATE_ONLY
-
                     unresolved = []
+                    unresolved_details = []
                     for dep in truth.dependencies:
-                        dep_issue = self.github_client.view_issue(
-                            dep, fields=list(GITHUB_FIELDS_STATE_ONLY)
-                        )  # type: ignore[call-overload]
-                        if (
-                            not isinstance(dep_issue, dict)
-                            or dep_issue.get("state") != "closed"
-                        ):
+                        resolution = DependencyResolutionService.is_dependency_resolved(
+                            dep,
+                            github_client=self.github_client,
+                            repo=None,  # current CheckService doesn't carry repo
+                        )
+                        if not resolution.resolved:
                             unresolved.append(dep)
+                            unresolved_details.append(
+                                f"#{resolution.issue_number} "
+                                f"(state={resolution.github_state or 'unknown'})"
+                            )
                     if unresolved:
                         warnings.append(
-                            f"Unresolved dependencies: "
-                            f"{', '.join(f'#{d}' for d in unresolved)}"
+                            f"Unresolved dependencies: {', '.join(unresolved_details)}"
                         )
 
             is_valid = len(issues) == 0

@@ -399,7 +399,7 @@ class TestIsDependencySatisfied:
 
     def test_issue_closed(self, qualify_gate_service, mock_github):
         """Closed issue should satisfy dependency."""
-        mock_github.view_issue.return_value = {"state": "closed"}
+        mock_github.view_issue.return_value = {"state": "CLOSED"}
 
         result = qualify_gate_service._is_dependency_satisfied(456)
 
@@ -407,7 +407,7 @@ class TestIsDependencySatisfied:
 
     def test_issue_open(self, qualify_gate_service, mock_github):
         """Open issue should not satisfy dependency."""
-        mock_github.view_issue.return_value = {"state": "open"}
+        mock_github.view_issue.return_value = {"state": "OPEN"}
 
         result = qualify_gate_service._is_dependency_satisfied(456)
 
