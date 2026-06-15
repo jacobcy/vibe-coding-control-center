@@ -437,3 +437,118 @@ def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
         result3 = pr_service.get_pr(pr_number=123)
         assert result3.number == 123
         assert gh_instance.get_pr.call_count == 2
+
+
+class TestBuildPrBody:
+    """Tests for build_pr_body utility function."""
+
+    def test_appends_change_summary_when_metadata_has_branch(self) -> None:
+        """Should append change summary when metadata has branch."""
+        from vibe3.models import PRMetadata
+        from vibe3.services.pr.utils import build_pr_body
+
+        metadata = PRMetadata(branch="feature-branch")
+        mock_diff_summary = MagicMock()
+        mock_diff_summary.files_added = 2
+        mock_diff_summary.files_removed = 1
+        mock_diff_summary.files_modified = 3
+        mock_diff_summary.total_loc_delta = 150
+        mock_diff_summary.total_functions_delta = 5
+        mock_diff_summary.dependencies_added = 2
+        mock_diff_summary.dependencies_removed = 1
+
+        with patch(
+            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
+            return_value=mock_diff_summary,
+        ):
+            result = build_pr_body("Original body", metadata)
+
+        assert "## Change Summary" in result
+        assert "| Files |" in result
+        assert "| LOC |" in result
+        assert "Original body" in result
+
+    def test_no_change_summary_when_metadata_is_none(self) -> None:
+        """Should not append change summary when metadata is None."""
+        from vibe3.services.pr.utils import build_pr_body
+
+        result = build_pr_body("Original body", None)
+
+        assert "## Change Summary" not in result
+        assert result == "Original body"
+
+    def test_no_change_summary_when_metadata_has_no_branch(self) -> None:
+        """Should not append change summary when metadata has no branch."""
+        from vibe3.models import PRMetadata
+        from vibe3.services.pr.utils import build_pr_body
+
+        metadata = PRMetadata(branch=None)
+        result = build_pr_body("Original body", metadata)
+
+        assert "## Change Summary" not in result
+
+    def test_graceful_degradation_when_diff_summary_fails(self) -> None:
+        """Should not break PR body when diff summary fails."""
+        from vibe3.models import PRMetadata
+        from vibe3.services.pr.utils import build_pr_body
+
+        # Metadata without contributors to isolate change summary behavior
+        metadata = PRMetadata(
+            branch="feature-branch",
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
+
+        with patch(
+            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
+            side_effect=Exception("Error"),
+        ):
+            result = build_pr_body("Original body", metadata)
+
+        assert "## Change Summary" not in result
+        # Without contributors and diff summary, should return just the body
+        assert "Original body" in result
+
+
+class TestFormatDiffSummary:
+    """Tests for _format_diff_summary utility function."""
+
+    def test_formats_basic_summary(self) -> None:
+        """Should format basic summary with files and LOC."""
+        from vibe3.models import DiffSummary
+        from vibe3.services.pr.utils import _format_diff_summary
+
+        summary = DiffSummary(
+            files_added=2,
+            files_removed=1,
+            files_modified=3,
+            total_loc_delta=150,
+        )
+
+        result = _format_diff_summary(summary)
+
+        assert "## Change Summary" in result
+        assert "+2 added" in result
+        assert "-1 removed" in result
+        assert "~3 modified" in result
+        assert "| LOC | +150 |" in result
+
+    def test_includes_functions_and_dependencies(self) -> None:
+        """Should include functions and dependencies when present."""
+        from vibe3.models import DiffSummary
+        from vibe3.services.pr.utils import _format_diff_summary
+
+        summary = DiffSummary(
+            files_added=1,
+            total_loc_delta=100,
+            total_functions_delta=5,
+            dependencies_added=2,
+            dependencies_removed=1,
+        )
+
+        result = _format_diff_summary(summary)
+
+        assert "| Functions | +5 |" in result
+        assert "| Dependencies | +2, -1 |" in result

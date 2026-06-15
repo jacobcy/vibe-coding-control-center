@@ -358,16 +358,31 @@ def diff(
             current_branch = git.get_current_branch()
             baseline_snapshot = snapshot_service.load_branch_baseline(current_branch)
             if not baseline_snapshot:
-                typer.echo(
-                    f"No baseline found for current branch '{current_branch}'.\n"
-                    "Either:\n"
-                    "  - Create a branch baseline: vibe3 snapshot save --as-baseline\n"
-                    "  - Specify a baseline snapshot ID: vibe3 snapshot diff <id>\n"
-                    "  - Create a baseline by completing the flow "
-                    "(PR merge/auto-complete)\n",
-                    err=True,
-                )
-                raise typer.Exit(1)
+                # Fallback: use git diff when no baseline exists
+                from vibe3.analysis import get_diff_summary
+
+                summary = get_diff_summary(current_branch)
+                if json_out:
+                    typer.echo(summary.model_dump_json(indent=2))
+                else:
+                    typer.echo("=== Structure Diff (fallback) ===")
+                    typer.echo("  No baseline snapshot found, using git diff")
+                    typer.echo(f"  Branch: {current_branch}")
+                    typer.echo("\n  Summary:")
+                    typer.echo(f"    Files changed: {summary.files_modified}")
+                    typer.echo(f"    LOC delta: {summary.total_loc_delta:+d}")
+                    if summary.total_functions_delta:
+                        typer.echo(f"    Functions: {summary.total_functions_delta:+d}")
+                    if summary.dependencies_added or summary.dependencies_removed:
+                        typer.echo(
+                            f"    Dependencies: +{summary.dependencies_added} "
+                            f"-{summary.dependencies_removed}"
+                        )
+                    typer.echo(
+                        "\n  Tip: Run 'vibe3 snapshot save --as-baseline' to enable "
+                        "full structural diff"
+                    )
+                raise typer.Exit(0)
         elif baseline == "latest":
             # Load latest snapshot
             baseline_snapshot = snapshot_service.load_snapshot(None)

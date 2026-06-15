@@ -4,7 +4,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, SQLiteClient, parse_linked_issues
 from vibe3.exceptions import GitError, UserError
-from vibe3.models import IssueLink, PRMetadata
+from vibe3.models import DiffSummary, IssueLink, PRMetadata
 
 
 def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | None:
@@ -89,6 +89,7 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
       native issue-PR linkage (unless already present).
     - If flow_state contains non-placeholder actors, appends a Contributors
       section with normalized, deduplicated signatures.
+    - Appends a change summary section derived from snapshot diff or git diff.
     """
     if not metadata:
         return body
@@ -97,10 +98,26 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
 
     contributors = metadata.contributors
     if not contributors:
-        return linked_section + body
+        result = linked_section + body
+    else:
+        signature = (
+            "\n\n---\n\n" + "## Contributors\n\n" + ", ".join(contributors) + "\n"
+        )
+        result = linked_section + body + signature
 
-    signature = "\n\n---\n\n" + "## Contributors\n\n" + ", ".join(contributors) + "\n"
-    return linked_section + body + signature
+    # Append change summary
+    if metadata.branch:
+        try:
+            from vibe3.analysis import get_diff_summary
+
+            diff_summary = get_diff_summary(metadata.branch)
+            result += "\n\n---\n\n" + _format_diff_summary(diff_summary)
+        except Exception:
+            logger.bind(domain="pr", branch=metadata.branch).warning(
+                "Failed to get diff summary, skipping change summary section"
+            )
+
+    return result
 
 
 def check_upstream_conflicts(
@@ -142,3 +159,40 @@ def check_upstream_conflicts(
             f"  2. Resolve any conflicts\n"
             f"  3. Re-run vibe3 pr {action}"
         )
+
+
+def _format_diff_summary(summary: DiffSummary) -> str:
+    """Render DiffSummary as a Markdown table."""
+    lines = [
+        "## Change Summary",
+        "",
+        "### Structure Changes",
+        "| Category | Change |",
+        "|----------|--------|",
+    ]
+
+    files_parts = []
+    if summary.files_added:
+        files_parts.append(f"+{summary.files_added} added")
+    if summary.files_removed:
+        files_parts.append(f"-{summary.files_removed} removed")
+    if summary.files_modified:
+        files_parts.append(f"~{summary.files_modified} modified")
+    lines.append(f"| Files | {', '.join(files_parts) if files_parts else '0'} |")
+    lines.append(f"| LOC | {summary.total_loc_delta:+d} |")
+
+    if (
+        summary.total_functions_delta
+        or summary.dependencies_added
+        or summary.dependencies_removed
+    ):
+        lines.append(f"| Functions | {summary.total_functions_delta:+d} |")
+        dep_parts = []
+        if summary.dependencies_added:
+            dep_parts.append(f"+{summary.dependencies_added}")
+        if summary.dependencies_removed:
+            dep_parts.append(f"-{summary.dependencies_removed}")
+        if dep_parts:
+            lines.append(f"| Dependencies | {', '.join(dep_parts)} |")
+
+    return "\n".join(lines)

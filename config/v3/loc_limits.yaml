@@ -44,8 +44,8 @@ code_limits:
 
       # Clients 聚合 —— 允许 450-560
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 560
-        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、17+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup"
+        limit: 570
+        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化"
       - path: "src/vibe3/clients/git_client.py"
         limit: 560
         reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330），新增 get_remote_url() 支持 ConventionResolver 重构（Issue #2346）"
@@ -77,8 +77,8 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
       - path: "src/vibe3/commands/snapshot.py"
-        limit: 440
-        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）"
+        limit: 460
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
@@ -343,8 +343,8 @@ code_limits:
         limit: 480
         reason: "Event rules 引擎完整测试集，覆盖规则加载（5 个）、模板展开（4 个）、规则评估（5 个）、action handler 构建（3 个）、9 个 action handler 单元测试（9 个）、config↔code 一致性验证（1 个）等 30 个测试，按测试类组织内聚度高，拆分降低可读性"
       - path: "tests/vibe3/services/test_pr_service.py"
-        limit: 450
-        reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
+        limit: 600
+        reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，新增 build_pr_body diff summary 测试（135行）验证 change summary 自动追加、fallback chain、contributors 签名顺序，与 PRService fixture 紧密耦合，拆分收益低；Issue #2831 新增 8 个 build_pr_body 测试覆盖 diff summary 集成（+135 行）"
       - path: "tests/vibe3/commands/test_task_status_human_collab.py"
         limit: 420
         reason: "Task status dashboard special sections 测试集，覆盖 governed anomaly、server label resolution、compute effective server running、remote tasks、human collaboration flows (dev/issue-N) 等场景，共享 mock setup，拆分收益低"

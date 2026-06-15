@@ -18,6 +18,7 @@ class SQLiteSnapshotRepo(_HasConnection):
         commit_hash: str | None,
         created_at: str,
         file_path: str,
+        baseline_for: str | None = None,
     ) -> None:
         conn = self._get_connection()
         with conn:
@@ -25,9 +26,17 @@ class SQLiteSnapshotRepo(_HasConnection):
             cursor.execute(
                 "INSERT OR REPLACE INTO snapshot_registry "
                 "(snapshot_id, branch, commit_short, commit_hash, "
-                "created_at, file_path) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (snapshot_id, branch, commit_short, commit_hash, created_at, file_path),
+                "created_at, file_path, baseline_for) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    snapshot_id,
+                    branch,
+                    commit_short,
+                    commit_hash,
+                    created_at,
+                    file_path,
+                    baseline_for,
+                ),
             )
         logger.bind(
             external="sqlite",
