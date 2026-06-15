@@ -1,6 +1,6 @@
 """Unit tests for DependencyResolutionService."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -39,12 +39,15 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        resolution = DependencyResolutionService.is_dependency_resolved(
-            123,
-            github_client=github_client,
-            repo=None,
-            check_merged_pr_fn=lambda n, r: None,
-        )
+        with patch(
+            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
+            return_value=None,
+        ):
+            resolution = DependencyResolutionService.is_dependency_resolved(
+                123,
+                github_client=github_client,
+                repo=None,
+            )
 
         assert resolution.resolved is False
         assert resolution.issue_number == 123
@@ -60,12 +63,15 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        resolution = DependencyResolutionService.is_dependency_resolved(
-            123,
-            github_client=github_client,
-            repo=None,
-            check_merged_pr_fn=lambda n, r: {"number": 42},
-        )
+        with patch(
+            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
+            return_value={"number": 42},
+        ):
+            resolution = DependencyResolutionService.is_dependency_resolved(
+                123,
+                github_client=github_client,
+                repo=None,
+            )
 
         assert resolution.resolved is True
         assert resolution.issue_number == 123
@@ -123,15 +129,15 @@ class TestDependencyResolutionService:
             "labels": [],
         }
 
-        def _failing_check(_n: int, _r: str | None) -> dict | None:
-            raise RuntimeError("API error")
-
-        resolution = DependencyResolutionService.is_dependency_resolved(
-            123,
-            github_client=github_client,
-            repo=None,
-            check_merged_pr_fn=_failing_check,
-        )
+        with patch(
+            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
+            side_effect=RuntimeError("API error"),
+        ):
+            resolution = DependencyResolutionService.is_dependency_resolved(
+                123,
+                github_client=github_client,
+                repo=None,
+            )
 
         assert resolution.resolved is False
         assert resolution.issue_number == 123
@@ -148,12 +154,15 @@ class TestDependencyResolutionService:
             ],
         }
 
-        resolution = DependencyResolutionService.is_dependency_resolved(
-            123,
-            github_client=github_client,
-            repo=None,
-            check_merged_pr_fn=lambda _n, _r: None,
-        )
+        with patch(
+            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
+            return_value=None,
+        ):
+            resolution = DependencyResolutionService.is_dependency_resolved(
+                123,
+                github_client=github_client,
+                repo=None,
+            )
 
         assert resolution.labels == ("bug", "priority")
 

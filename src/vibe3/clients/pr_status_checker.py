@@ -6,6 +6,9 @@ is complete: checking if there's a merged PR.
 Do NOT rely on:
 - state/done labels (can be manually added/removed)
 - local flow records (are cache, not source of truth)
+
+This module lives in vibe3.clients because it only depends on client-layer
+dependencies (GitHubClient, MergedPRCache, GitClient) and stdlib.
 """
 
 from pathlib import Path
@@ -13,8 +16,18 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients import GitHubClient, MergedPRCache
-from vibe3.services.shared.paths import get_git_common_dir
+from vibe3.clients import GitClient, GitHubClient, MergedPRCache
+
+
+def _resolve_repo_path() -> Path:
+    """Resolve the repository root path for cache operations."""
+    try:
+        git_common_dir = GitClient().get_git_common_dir()
+        if git_common_dir:
+            return Path(git_common_dir).parent
+    except (OSError, ValueError):
+        pass
+    return Path.cwd()
 
 
 def get_merged_pr_for_issue(
@@ -38,18 +51,9 @@ def get_merged_pr_for_issue(
         >>> if pr:
         ...     print(f"Issue #123 has merged PR #{pr['number']}")
     """
-    # Step 1: Resolve repo path for cache
-    try:
-        git_common_dir = get_git_common_dir()
-        if git_common_dir:
-            repo_path = Path(git_common_dir).parent
-        else:
-            # Fallback to cwd if git common dir unavailable
-            repo_path = Path.cwd()
-    except Exception:
-        repo_path = Path.cwd()
+    repo_path = _resolve_repo_path()
 
-    # Step 2: Check cache first
+    # Step 1: Check cache first
     cache = MergedPRCache(repo_path)
     cached_pr = cache.get_merged_pr_for_issue(issue_number)
     if cached_pr:
@@ -61,7 +65,7 @@ def get_merged_pr_for_issue(
         ).debug("Found merged PR for issue in cache")
         return cached_pr
 
-    # Step 3: Cache miss - sync cache with latest merged PRs
+    # Step 2: Cache miss - sync cache with latest merged PRs
     github_client = GitHubClient()
     logger.bind(
         domain="pr_status",
@@ -69,9 +73,7 @@ def get_merged_pr_for_issue(
     ).debug("Cache miss, syncing cache")
 
     try:
-        from vibe3.services.shared.errors import record_error
-
-        cache.sync(github_client, limit=200, error_recorder=record_error)
+        cache.sync(github_client, limit=200)
 
         cached_pr = cache.get_merged_pr_for_issue(issue_number)
         if cached_pr:
@@ -89,29 +91,12 @@ def get_merged_pr_for_issue(
         return None
 
     except Exception as exc:
-        from vibe3.exceptions import classify_error_hybrid
-        from vibe3.services.shared.errors import record_error
-
-        error_code = classify_error_hybrid(exc)
-        error_message = (
-            f"Failed to check merged PR status for issue #{issue_number}: {exc}"
-        )
-
-        try:
-            record_error(
-                error_code=error_code,
-                error_message=error_message,
-                tick_id=0,
-                issue_number=issue_number,
-            )
-        except Exception as record_exc:
-            logger.bind(
-                domain="pr_status",
-                issue_number=issue_number,
-                error=str(exc),
-                record_error=str(record_exc),
-                exc_info=True,
-            ).warning("Failed to record merged PR status error")
+        logger.bind(
+            domain="pr_status",
+            issue_number=issue_number,
+            error=str(exc),
+            exc_info=True,
+        ).warning(f"Failed to check merged PR status for issue #{issue_number}")
         return None
 
 
