@@ -446,7 +446,7 @@ class TestVersionHashComputation:
 
     def test_policy_hash_aggregates_all_policy_files(self, tmp_path) -> None:
         """Policy hash should aggregate all policy files."""
-        from vibe3.services import policy_loader
+        from vibe3.services.shared import policy_loader
         from vibe3.utils import compute_hash_from_loader
 
         policy_dir = tmp_path / ".vibe" / "governance" / "policies"
@@ -462,7 +462,7 @@ class TestVersionHashComputation:
 
     def test_material_hash_aggregates_all_material_files(self, tmp_path) -> None:
         """Material hash should aggregate all material files."""
-        from vibe3.services import material_loader
+        from vibe3.services.shared import material_loader
         from vibe3.utils import compute_hash_from_loader
 
         material_dir = tmp_path / ".vibe" / "governance" / "materials"
@@ -478,7 +478,7 @@ class TestVersionHashComputation:
 
     def test_hash_none_when_directory_missing(self, tmp_path) -> None:
         """Hash should return None when directory is missing."""
-        from vibe3.services import material_loader, policy_loader
+        from vibe3.services.shared import material_loader, policy_loader
         from vibe3.utils import compute_hash_from_loader
 
         policy_hash = compute_hash_from_loader(policy_loader, tmp_path / "nonexistent")
@@ -491,7 +491,7 @@ class TestVersionHashComputation:
 
     def test_hash_changes_when_file_changes(self, tmp_path) -> None:
         """Hash should change when file content changes."""
-        from vibe3.services import policy_loader
+        from vibe3.services.shared import policy_loader
         from vibe3.utils import compute_hash_from_loader
 
         policy_dir = tmp_path / ".vibe" / "governance" / "policies"
