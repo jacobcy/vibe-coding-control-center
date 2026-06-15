@@ -19,6 +19,7 @@ from vibe3.domain.events.flow_lifecycle import (
     ReviewerDispatchIntent,
 )
 from vibe3.domain.handler_registry import register_handler
+from vibe3.exceptions import UserError
 from vibe3.models import ExecutionRequest
 from vibe3.services.issue import load_issue_info
 
@@ -186,10 +187,16 @@ def handle_planner_dispatch_intent(event: PlannerDispatchIntent, /) -> None:
             tick_id=event.tick_id,
         )
     except Exception as exc:
-        logger.bind(
-            domain="planner_handler",
-            issue_number=event.issue_number,
-        ).exception(f"Planner dispatch failed: {exc}")
+        if isinstance(exc, UserError):
+            logger.bind(
+                domain="planner_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Planner dispatch failed: {exc}")
+        else:
+            logger.bind(
+                domain="planner_handler",
+                issue_number=event.issue_number,
+            ).exception(f"Planner dispatch failed: {exc}")
         # Propagate exception to event system for proper handling
         raise
 
@@ -239,10 +246,16 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent, /) -> None:
             tick_id=event.tick_id,
         )
     except Exception as exc:
-        logger.bind(
-            domain="executor_handler",
-            issue_number=event.issue_number,
-        ).exception(f"Executor dispatch failed: {exc}")
+        if isinstance(exc, UserError):
+            logger.bind(
+                domain="executor_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Executor dispatch failed: {exc}")
+        else:
+            logger.bind(
+                domain="executor_handler",
+                issue_number=event.issue_number,
+            ).exception(f"Executor dispatch failed: {exc}")
         # Propagate exception to event system for proper handling
         raise
 
@@ -286,9 +299,15 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent, /) -> None:
             tick_id=event.tick_id,
         )
     except Exception as exc:
-        logger.bind(
-            domain="reviewer_handler",
-            issue_number=event.issue_number,
-        ).exception(f"Reviewer dispatch failed: {exc}")
+        if isinstance(exc, UserError):
+            logger.bind(
+                domain="reviewer_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Reviewer dispatch failed: {exc}")
+        else:
+            logger.bind(
+                domain="reviewer_handler",
+                issue_number=event.issue_number,
+            ).exception(f"Reviewer dispatch failed: {exc}")
         # Propagate exception to event system for proper handling
         raise
