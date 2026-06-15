@@ -16,6 +16,7 @@ from vibe3.config import load_orchestra_config
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import IssueInfo
+from vibe3.models.execution_request import ExecutionLaunchResult
 from vibe3.services.shared import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 @register_handler("SupervisorIssueIdentified")
 def handle_supervisor_issue_identified(
     event: SupervisorIssueIdentified, /, coordinator: ExecutionCoordinator | None = None
-) -> None:
+) -> ExecutionLaunchResult | None:
     """Dispatch supervisor apply via CLI self-invocation."""
     from vibe3.execution import build_issue_async_cli_request
     from vibe3.observability import append_orchestra_event
@@ -37,7 +38,7 @@ def handle_supervisor_issue_identified(
             domain="supervisor_handler",
             issue_number=event.issue_number,
         ).info("Dry run: skipping supervisor apply dispatch")
-        return
+        return None
 
     append_orchestra_event(
         "supervisor",
@@ -80,6 +81,20 @@ def handle_supervisor_issue_identified(
                     branch=f"issue-{event.issue_number}",
                     dispatch_source="automatic",
                 )
+                # Append orchestra events for observability
+                if result and result.launched:
+                    append_orchestra_event(
+                        "supervisor",
+                        f"dispatched #{event.issue_number} "
+                        f"session={result.tmux_session}",
+                    )
+                elif result:
+                    append_orchestra_event(
+                        "supervisor",
+                        f"supervisor dispatch skipped: issue=#{event.issue_number} "
+                        f"reason={result.reason}",
+                    )
+                return result
             except Exception as exc:
                 record_dispatch_failure_if_unexpected(
                     role="supervisor",
@@ -92,7 +107,7 @@ def handle_supervisor_issue_identified(
                     domain="supervisor_handler",
                     issue_number=event.issue_number,
                 ).exception(f"Supervisor apply dispatch failed: {exc}")
-                return
+                return None
     else:
         try:
             result = coordinator.dispatch_execution(request)
@@ -103,6 +118,20 @@ def handle_supervisor_issue_identified(
                 branch=f"issue-{event.issue_number}",
                 dispatch_source="automatic",
             )
+            # Append orchestra events for observability
+            if result and result.launched:
+                append_orchestra_event(
+                    "supervisor",
+                    f"dispatched #{event.issue_number} "
+                    f"session={result.tmux_session}",
+                )
+            elif result:
+                append_orchestra_event(
+                    "supervisor",
+                    f"supervisor dispatch skipped: issue=#{event.issue_number} "
+                    f"reason={result.reason}",
+                )
+            return result
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
                 role="supervisor",
@@ -115,16 +144,4 @@ def handle_supervisor_issue_identified(
                 domain="supervisor_handler",
                 issue_number=event.issue_number,
             ).exception(f"Supervisor apply dispatch failed: {exc}")
-            return
-
-    if result and result.launched:
-        append_orchestra_event(
-            "supervisor",
-            f"dispatched #{event.issue_number} " f"session={result.tmux_session}",
-        )
-    elif result:
-        append_orchestra_event(
-            "supervisor",
-            f"supervisor dispatch skipped: issue=#{event.issue_number} "
-            f"reason={result.reason}",
-        )
+            return None

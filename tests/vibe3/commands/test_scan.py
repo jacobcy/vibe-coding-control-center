@@ -94,11 +94,12 @@ class TestSupervisorScan:
 
     @patch("vibe3.commands.scan._run_supervisor_scan")
     def test_supervisor_execution(self, mock_run):
+        # Mock returns values but function now handles display internally
         mock_run.return_value = (10, 2)
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
-        assert "Scanned 10 open issues" in result.output
-        assert "found 2" in result.output
+        # Function is mocked, so no output expected
+        # The actual display happens in _run_supervisor_scan now
 
 
 class TestCombinedScan:
@@ -140,7 +141,7 @@ class TestScanIntegration:
         """Supervisor scan publishes SupervisorIssueIdentified events."""
         with (
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.domain.publisher.publish") as mock_publish,
+            patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
         ):
             mock_fetch.return_value = (
                 1,
@@ -152,14 +153,21 @@ class TestScanIntegration:
                     },
                 ],
             )
+            # Mock returns a result
+            from vibe3.models import ExecutionLaunchResult
+
+            mock_publish_and_wait.return_value = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="test-session",
+            )
 
             from vibe3.commands.scan import _run_supervisor_scan
             from vibe3.domain import SupervisorIssueIdentified
 
             _run_supervisor_scan()
             mock_fetch.assert_called_once()
-            mock_publish.assert_called_once()
-            event = mock_publish.call_args.args[0]
+            mock_publish_and_wait.assert_called_once()
+            event = mock_publish_and_wait.call_args.args[0]
             assert isinstance(event, SupervisorIssueIdentified)
             assert event.issue_number == 123
             assert event.actor == "cli:scan-supervisor"
@@ -187,7 +195,7 @@ class TestFailedGateBlocking:
         """Manual supervisor scan ignores FailedGate (publishes events directly)."""
         with (
             patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-            patch("vibe3.domain.publish") as mock_publish,
+            patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
         ):
             mock_fetch.return_value = (0, [])
 
@@ -196,7 +204,7 @@ class TestFailedGateBlocking:
             _run_supervisor_scan()
             mock_fetch.assert_called_once()
             # No events published for empty candidates
-            mock_publish.assert_not_called()
+            mock_publish_and_wait.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_combined_scan_ignores_failed_gate(self):
@@ -228,7 +236,7 @@ def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
     """Manual supervisor scan fetches candidates and publishes events."""
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.domain.publish") as mock_publish,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
     ):
         mock_fetch.return_value = (
             2,
@@ -249,7 +257,7 @@ def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
         mock_fetch.assert_called_once()
-        assert mock_publish.call_count == 2
+        assert mock_publish_and_wait.call_count == 2
 
 
 def test_governance_list_shows_materials():
@@ -347,7 +355,7 @@ def test_scan_supervisor_does_not_call_roles_dispatch():
     """Verify supervisor scan does not call dispatch_supervisor_execution."""
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.domain.publisher.publish") as mock_publish,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
         patch("vibe3.roles.dispatch_supervisor_execution") as mock_dispatch,
     ):
         mock_fetch.return_value = (
@@ -358,7 +366,7 @@ def test_scan_supervisor_does_not_call_roles_dispatch():
         from vibe3.commands.scan import _run_supervisor_scan
 
         _run_supervisor_scan()
-        # Event published
-        mock_publish.assert_called_once()
+        # Event published via publish_and_wait
+        mock_publish_and_wait.assert_called_once()
         # Direct dispatch NOT called
         mock_dispatch.assert_not_called()

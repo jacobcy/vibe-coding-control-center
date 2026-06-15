@@ -91,20 +91,25 @@ def _run_governance_scan(
         )
 
 
-def _publish_supervisor_events(
+def _publish_and_wait_supervisor_events(
     candidates: list[dict],
-) -> None:
-    """Publish SupervisorIssueIdentified events for each candidate.
+) -> list[ExecutionLaunchResult | None]:
+    """Publish SupervisorIssueIdentified events and wait for results.
 
     Args:
         candidates: List of issue candidate dicts with 'number' and 'title' fields
 
-    Note:
-        supervisor_file is left empty and resolved by the domain handler,
-        which allows manual scans to use the same resolution logic as heartbeat scans.
-    """
-    from vibe3.domain import SupervisorIssueIdentified, publish
+    Returns:
+        List of ExecutionLaunchResult from handlers, one per candidate.
+        None entries for candidates where handler returned None.
 
+    Note:
+        supervisor_file is left empty and resolved by the domain handler.
+    """
+    from vibe3.domain import SupervisorIssueIdentified
+    from vibe3.models import ExecutionLaunchResult, publish_and_wait
+
+    results: list[ExecutionLaunchResult | None] = []
     for candidate in candidates:
         event = SupervisorIssueIdentified(
             issue_number=candidate["number"],
@@ -112,7 +117,12 @@ def _publish_supervisor_events(
             supervisor_file="",  # Resolved by handler
             actor="cli:scan-supervisor",
         )
-        publish(event)
+        result = publish_and_wait(event)  # type: ignore[operator]
+        if result is None or not isinstance(result, ExecutionLaunchResult):
+            results.append(None)
+        else:
+            results.append(result)
+    return results
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
@@ -164,9 +174,27 @@ def _run_supervisor_scan() -> tuple[int, int]:
     total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     matched_count = len(candidates)
 
-    # Publish events for each candidate
+    # Display enhanced output
+    typer.echo("Supervisor scan completed")
+    typer.echo(f"Scanned: {total_scanned} open issues")
+    typer.echo(f"Found: {matched_count} issue(s) requiring supervisor attention")
+
+    # Publish events and display results
     if candidates:
-        _publish_supervisor_events(candidates)
+        typer.echo("\nCandidates:")
+        for c in candidates:
+            labels_str = ", ".join(c.get("labels", []))
+            typer.echo(f"- #{c['number']}: {c['title']}")
+            typer.echo(f"  Labels: {labels_str}")
+
+        results = _publish_and_wait_supervisor_events(candidates)
+        launched = [
+            r.tmux_session for r in results if r and r.launched and r.tmux_session
+        ]
+        if launched:
+            typer.echo("\nExecution:")
+            for session in launched:
+                typer.echo(f"Dispatched to: {session}")
 
     return total_scanned, matched_count
 
@@ -315,19 +343,7 @@ def supervisor(
         return
 
     # Manual supervisor scan: direct dispatch without facade
-    total_scanned, matched_count = _run_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
+    _run_supervisor_scan()
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
@@ -350,20 +366,8 @@ async def _run_combined_scan_async() -> None:
     else:
         logger.bind(domain="orchestra").info("Governance scan completed (no result)")
 
-    # Supervisor: publish events
-    total_scanned, matched_count = _run_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
+    # Supervisor: publish events and display results
+    _run_supervisor_scan()
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
