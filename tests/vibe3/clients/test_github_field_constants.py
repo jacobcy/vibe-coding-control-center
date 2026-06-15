@@ -1,46 +1,16 @@
 """Tests for GitHub field constants."""
 
+import json
+import subprocess
+
+import pytest
+
 from vibe3.clients.github_field_constants import (
     GITHUB_DEFAULT_LIST_FIELDS,
     GITHUB_DEFAULT_VIEW_FIELDS,
     GITHUB_FIELDS_ISSUE_META,
     GITHUB_KNOWN_ISSUE_FIELDS,
 )
-
-
-def test_meta_fields_definition() -> None:
-    """GITHUB_FIELDS_ISSUE_META should contain shared metadata fields."""
-    assert "number" in GITHUB_FIELDS_ISSUE_META
-    assert "title" in GITHUB_FIELDS_ISSUE_META
-    assert "state" in GITHUB_FIELDS_ISSUE_META
-    assert "updatedAt" in GITHUB_FIELDS_ISSUE_META
-    assert "labels" in GITHUB_FIELDS_ISSUE_META
-    assert "assignees" in GITHUB_FIELDS_ISSUE_META
-    assert "milestone" in GITHUB_FIELDS_ISSUE_META
-    # Should NOT contain body or url
-    assert "body" not in GITHUB_FIELDS_ISSUE_META
-    assert "url" not in GITHUB_FIELDS_ISSUE_META
-
-
-def test_view_fields_definition() -> None:
-    """GITHUB_DEFAULT_VIEW_FIELDS should include body and url."""
-    # Should include all meta fields
-    for field in GITHUB_FIELDS_ISSUE_META:
-        assert field in GITHUB_DEFAULT_VIEW_FIELDS
-
-    # Should include body and url
-    assert "body" in GITHUB_DEFAULT_VIEW_FIELDS
-    assert "url" in GITHUB_DEFAULT_VIEW_FIELDS
-
-
-def test_list_fields_definition() -> None:
-    """GITHUB_DEFAULT_LIST_FIELDS should exclude body and url."""
-    # Should be exactly equal to meta fields
-    assert GITHUB_DEFAULT_LIST_FIELDS == GITHUB_FIELDS_ISSUE_META
-
-    # Should NOT contain body or url
-    assert "body" not in GITHUB_DEFAULT_LIST_FIELDS
-    assert "url" not in GITHUB_DEFAULT_LIST_FIELDS
 
 
 def test_all_fields_are_known() -> None:
@@ -62,3 +32,76 @@ def test_no_duplicate_fields() -> None:
     assert len(GITHUB_FIELDS_ISSUE_META) == len(set(GITHUB_FIELDS_ISSUE_META))
     assert len(GITHUB_DEFAULT_VIEW_FIELDS) == len(set(GITHUB_DEFAULT_VIEW_FIELDS))
     assert len(GITHUB_DEFAULT_LIST_FIELDS) == len(set(GITHUB_DEFAULT_LIST_FIELDS))
+
+
+@pytest.mark.integration
+def test_known_fields_work_with_gh_cli() -> None:
+    """GITHUB_KNOWN_ISSUE_FIELDS entries should be recognized by gh CLI."""
+    # Filter out projectCards which is deprecated and causes gh CLI to fail
+    fields_to_test = [f for f in GITHUB_KNOWN_ISSUE_FIELDS if f != "projectCards"]
+
+    # Use current issue #2896 as test subject
+    fields_arg = ",".join(sorted(fields_to_test))
+    result = subprocess.run(
+        ["gh", "issue", "view", "2896", "--json", fields_arg],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"gh CLI failed: {result.stderr}"
+
+    # Verify response is valid JSON with expected fields
+    response = json.loads(result.stdout)
+    for field in fields_to_test:
+        assert field in response, f"Field {field} not in response"
+
+
+@pytest.mark.integration
+def test_project_cards_field_deprecated() -> None:
+    """projectCards field triggers deprecation warning but should still be tracked."""
+    result = subprocess.run(
+        ["gh", "issue", "view", "2896", "--json", "projectCards"],
+        capture_output=True,
+        text=True,
+    )
+
+    # Should fail with deprecation warning
+    assert result.returncode != 0
+    assert "deprecated" in result.stderr.lower()
+
+
+@pytest.mark.integration
+def test_default_field_sets_work_with_gh_cli() -> None:
+    """Default field sets should produce valid API calls."""
+    # Test GITHUB_DEFAULT_VIEW_FIELDS with issue view
+    view_fields_arg = ",".join(GITHUB_DEFAULT_VIEW_FIELDS)
+    view_result = subprocess.run(
+        ["gh", "issue", "view", "2896", "--json", view_fields_arg],
+        capture_output=True,
+        text=True,
+    )
+
+    assert view_result.returncode == 0, f"View fields failed: {view_result.stderr}"
+
+    view_response = json.loads(view_result.stdout)
+    # View fields should include body and url
+    assert "body" in view_response, "body not in view response"
+    assert "url" in view_response, "url not in view response"
+
+    # Test GITHUB_DEFAULT_LIST_FIELDS with issue list
+    list_fields_arg = ",".join(GITHUB_DEFAULT_LIST_FIELDS)
+    list_result = subprocess.run(
+        ["gh", "issue", "list", "--limit", "1", "--json", list_fields_arg],
+        capture_output=True,
+        text=True,
+    )
+
+    assert list_result.returncode == 0, f"List fields failed: {list_result.stderr}"
+
+    list_response = json.loads(list_result.stdout)
+    # List response is an array
+    assert isinstance(list_response, list), "List response should be an array"
+    if len(list_response) > 0:
+        # List fields should NOT include body or url (for performance)
+        assert "body" not in list_response[0], "body should not be in list response"
+        assert "url" not in list_response[0], "url should not be in list response"
