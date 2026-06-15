@@ -125,6 +125,9 @@ code_limits:
       - path: "src/vibe3/analysis/snapshot_service.py"
         limit: 760
         reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析、非代码文件追踪（review_scope 路径扩展）、语言检测、build_snapshot_diff（从 agents 层迁移，Issue #2827）、DB-backed lookup（Issue #2845，替换 filesystem-glob 为 SQLite 索引查询）等紧密耦合逻辑；Issue #2810 RFC 扩展了非 Python 文件追踪能力；Issue #2827 将 build_snapshot_diff 从 agents.review_pipeline_helpers 迁移至此，消除冗余包装层；Issue #2845 新增 DB-backed lookup 逻辑与迁移文档（+44 行，含 fallback path、auto-register、idempotent upsert），提升上限以容纳后续扩展"
+      - path: "src/vibe3/analysis/serena_service.py"
+        limit: 430
+        reason: "Serena 符号级代码分析服务聚合，包含 analyze_file/analyze_files/analyze_changes/scan_dead_code 等核心分析流程、文件缓存管理、AST 缓存共享机制（#2886 优化冗余文件 I/O）等紧密耦合逻辑；职责单一（代码分析编排）但方法较多，拆分会破坏分析流程完整性"
       - path: "src/vibe3/services/shared/status_query.py"
         limit: 480
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"

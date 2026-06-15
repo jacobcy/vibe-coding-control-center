@@ -71,18 +71,20 @@ def is_private(symbol_name: str) -> bool:
     return bool(re.match(PRIVATE_PATTERN, symbol_name))
 
 
-def get_router_functions(file_path: str) -> set[str]:
+def get_router_functions(file_path: str, tree: ast.Module | None = None) -> set[str]:
     """Extract all FastAPI router-decorated function names from a file.
 
     Args:
         file_path: Relative file path
+        tree: Optional pre-parsed AST module. If None, file will be read and parsed.
 
     Returns:
         Set of function names that have @router.post/get/put/delete decorators
     """
     try:
-        source = Path(file_path).read_text(encoding="utf-8")
-        tree = ast.parse(source)
+        if tree is None:
+            source = Path(file_path).read_text(encoding="utf-8")
+            tree = ast.parse(source)
         result: set[str] = set()
 
         for node in ast.walk(tree):
