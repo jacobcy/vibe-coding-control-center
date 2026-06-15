@@ -198,7 +198,6 @@ class FlowServiceProtocol(Protocol):
         blocked_by_issue: int | None = None,
         actor: str | None = None,
         repo: str | None = None,
-        event_type: str = "flow_blocked",
     ) -> None:
         """Mark flow as blocked.
 
@@ -208,7 +207,6 @@ class FlowServiceProtocol(Protocol):
             blocked_by_issue: Dependency issue number
             actor: Actor performing the block
             repo: Repository (defaults to current repo)
-            event_type: Event type for timeline
         """
         ...
 

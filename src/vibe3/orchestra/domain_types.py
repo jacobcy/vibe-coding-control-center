@@ -155,7 +155,6 @@ class FlowServiceProtocol(Protocol):
         blocked_by_issue: int | None = None,
         actor: str | None = None,
         repo: str | None = None,
-        event_type: str = "flow_blocked",
     ) -> None:
         """Mark flow as blocked."""
         ...
