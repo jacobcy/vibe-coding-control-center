@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     )
     from vibe3.services.issue.flow import IssueFlowService
     from vibe3.services.issue.title_cache import IssueTitleCacheService
+    from vibe3.services.orchestra.cleanup import ExpiredResourceCleanupService
     from vibe3.services.orchestra.coordination import CoordinationResolver
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
@@ -160,6 +161,7 @@ __all__ = [
     "CheckService",
     "CoordinationResolver",
     "ErrorTrackingService",
+    "ExpiredResourceCleanupService",
     "FlowCategory",
     "FlowCleanupService",
     "FlowOrchestratorService",
@@ -266,6 +268,7 @@ _SYMBOL_MODULES = {
     "CheckService": "vibe3.services.check.service",
     "CoordinationResolver": "vibe3.services.orchestra.coordination",
     "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
+    "ExpiredResourceCleanupService": "vibe3.services.orchestra.cleanup",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
     "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
