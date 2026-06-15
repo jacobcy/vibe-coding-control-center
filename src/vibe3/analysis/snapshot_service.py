@@ -9,7 +9,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.analysis import dag_service, structure_service
-from vibe3.clients import GitClient
+from vibe3.clients import GitClient, SQLiteClient
 from vibe3.exceptions import VibeError
 from vibe3.models import (
     DependencyEdge,
@@ -317,6 +317,20 @@ def save_snapshot(snapshot: StructureSnapshot) -> Path:
         filepath.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
         latest_link.write_text(str(filepath), encoding="utf-8")
 
+        # Register in snapshot_registry for DB-backed lookup
+        try:
+            client = SQLiteClient()
+            client.upsert_snapshot_registry(
+                snapshot_id=snapshot.snapshot_id,
+                branch=snapshot.branch,
+                commit_short=snapshot.commit_short,
+                commit_hash=snapshot.commit,
+                created_at=snapshot.created_at,
+                file_path=str(filepath),
+            )
+        except Exception:
+            logger.warning("Failed to register snapshot in DB (non-fatal)")
+
         log.bind(path=str(filepath)).success("Snapshot saved")
         return filepath
     except Exception as e:
@@ -436,52 +450,71 @@ def find_snapshot_by_branch(
     if not snapshot_dir.exists():
         return None
 
-    # Normalize branch name for comparison
     normalized_branch = branch.replace("origin/", "")
-    sanitized_branch = normalized_branch.replace("/", "-")
+    candidates: list[dict[str, str]] = []
 
-    # Stage 1: Glob pre-filter using branch name in filename
-    pattern = str(snapshot_dir / f"*_{sanitized_branch}_*.json")
-    candidate_paths = set(glob_mod.glob(pattern))
+    # Primary path: DB-backed index query
+    try:
+        client = SQLiteClient()
+        db_results = client.find_snapshots_by_branch(branch)
+        # Normalize DB results to use 'id' and 'commit' keys for compatibility
+        candidates = [
+            {
+                "id": r["snapshot_id"],
+                "commit": r.get("commit_hash") or "",
+                **{
+                    k: v
+                    for k, v in r.items()
+                    if k not in ("snapshot_id", "commit_hash")
+                },
+            }
+            for r in db_results
+        ]
+    except Exception:
+        logger.warning("DB snapshot lookup failed, falling back to filesystem")
 
-    # Stage 2: Load and verify branch field for narrowed candidates
-    snapshots = _load_snapshots_for_branch(candidate_paths, normalized_branch, branch)
-
-    # Fallback: the glob pre-filter assumes snapshot filenames embed the
-    # branch name (see StructureSnapshot.generate_id). If no candidate
-    # matched, scan remaining files to catch snapshots saved under other
-    # naming conventions rather than silently returning None.
-    if not snapshots:
-        all_paths = {str(p) for p in snapshot_dir.glob("*.json")}
+    # Fallback path: filesystem scan + auto-register (migration safety)
+    #
+    # Migration Note (Issue #2845):
+    # - DB is primary source; filesystem fallback ensures zero data loss
+    # - Existing snapshots are lazily registered on first access
+    # - No manual migration required; auto-registration is idempotent
+    # - Filesystem remains authoritative if DB registration fails
+    if not candidates:
+        sanitized_branch = normalized_branch.replace("/", "-")
+        pattern = str(snapshot_dir / f"*_{sanitized_branch}_*.json")
+        candidate_paths = set(glob_mod.glob(pattern))
         snapshots = _load_snapshots_for_branch(
-            all_paths - candidate_paths, normalized_branch, branch
+            candidate_paths, normalized_branch, branch
         )
+        if not snapshots:
+            all_paths = {str(p) for p in snapshot_dir.glob("*.json")}
+            snapshots = _load_snapshots_for_branch(
+                all_paths - candidate_paths, normalized_branch, branch
+            )
+        if not snapshots:
+            return None
+        # Auto-register found snapshots for future DB lookups (idempotent operation)
+        _register_snapshots_in_db(snapshots, snapshot_dir)
+        candidates = snapshots
 
-    if not snapshots:
-        return None
-
-    # If current_branch is provided, find snapshot closest to merge-base
+    # Merge-base selection (unchanged logic)
     if current_branch:
         try:
             git = GitClient()
             merge_base = git.get_merge_base(branch, current_branch)
             merge_base_short = merge_base[:7] if merge_base else None
-
-            # Find snapshot with commit closest to merge-base
-            for snap in snapshots:
-                if snap["commit"][:7] == merge_base_short:
+            for snap in candidates:
+                if (snap.get("commit") or "")[:7] == merge_base_short:
                     return load_snapshot(snap["id"])
-
-            # If no exact match, fall back to most recent
             logger.warning(
                 f"No snapshot for merge-base {merge_base_short}, using most recent"
             )
         except Exception as e:
             logger.warning(f"Failed to get merge-base: {e}, using most recent")
 
-    # Sort by created_at descending and return the most recent
-    snapshots.sort(key=lambda x: x["created_at"], reverse=True)
-    return load_snapshot(snapshots[0]["id"])
+    candidates.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return load_snapshot(candidates[0]["id"])
 
 
 _METADATA_FIELDS = ("snapshot_id", "created_at", "branch", "commit", "baseline_for")
@@ -555,6 +588,42 @@ def _load_snapshots_for_branch(
     return snapshots
 
 
+def _register_snapshots_in_db(
+    snapshots: list[dict[str, str]], snapshot_dir: Path
+) -> None:
+    """Register filesystem-found snapshots in DB for future queries.
+
+    This is an idempotent operation: INSERT OR REPLACE ensures that
+    re-registering existing snapshots is safe and simply overwrites
+    the existing registry entry with the same data.
+    """
+    try:
+        client = SQLiteClient()
+        registered_count = 0
+        for snap in snapshots:
+            sid = snap.get("id", "")
+            if not sid:
+                continue
+            file_path = str(snapshot_dir / f"{sid}.json")
+            client.upsert_snapshot_registry(
+                snapshot_id=sid,
+                branch=snap.get("branch", ""),
+                commit_short=(snap.get("commit", "") or "")[:7],
+                commit_hash=snap.get("commit"),
+                created_at=snap.get("created_at", ""),
+                file_path=file_path,
+            )
+            registered_count += 1
+        if registered_count > 0:
+            logger.bind(
+                domain="snapshot",
+                action="auto_register",
+                count=registered_count,
+            ).info("Auto-registered snapshots from filesystem fallback")
+    except Exception:
+        logger.warning("Failed to register fallback snapshots in DB (non-fatal)")
+
+
 def save_branch_baseline(branch: str, force: bool = False) -> Path | None:
     """Build current snapshot and save as baseline for the specified branch.
 
@@ -588,6 +657,20 @@ def save_branch_baseline(branch: str, force: bool = False) -> Path | None:
             return filepath
 
         filepath.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+
+        # Register in snapshot_registry for DB-backed lookup
+        try:
+            client = SQLiteClient()
+            client.upsert_snapshot_registry(
+                snapshot_id=snapshot.snapshot_id,
+                branch=snapshot.branch,
+                commit_short=snapshot.commit_short,
+                commit_hash=snapshot.commit,
+                created_at=snapshot.created_at,
+                file_path=str(filepath),
+            )
+        except Exception:
+            logger.warning("Failed to register baseline in DB (non-fatal)")
 
         log.bind(path=str(filepath)).success("Branch baseline saved")
         return filepath

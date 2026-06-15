@@ -27,11 +27,18 @@ Subcommands:
 For single-file analysis → use:
   vibe3 inspect              (real-time file & change analysis)
 
+Database Backend (Issue #2845):
+  - Snapshot registry stored in SQLite (DB-backed index)
+  - Lazy migration: tables created on first access
+  - Filesystem remains authoritative source
+  - Auto-registration on first snapshot save/load
+
 Examples:
   vibe3 snapshot save --as-baseline    # Save as branch baseline
   vibe3 snapshot diff                  # Compare with branch baseline
   vibe3 snapshot diff latest           # Compare with latest snapshot
-  vibe3 snapshot show --branch main    # Show baseline for 'main' branch""",
+  vibe3 snapshot show --branch main    # Show baseline for 'main' branch
+  vibe3 snapshot diff --json           # JSON output for CI/CD""",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -311,10 +318,32 @@ def diff(
     current branch. This gives the net structural change since the last
     flow completion (PR merge or auto-complete).
 
+    Output Interpretation:
+        Files: +N -M ~K       (added/removed/modified file count)
+        Modules: +N -M ~K     (module-level grouping changes)
+        Dependencies: +N -M   (import relationship changes)
+        LOC delta: ±N         (net lines of code changed)
+        Functions: ±N         (new/removed function count)
+        Warnings:             (module growth alerts, architecture quality checks)
+
+    Architecture Analysis:
+        Unlike git diff (line-level changes), snapshot diff provides:
+        - Module-level aggregation and trends
+        - Dependency graph evolution
+        - LOC distribution across modules
+        - Architecture health warnings
+
     Examples:
         vibe3 snapshot diff                  # Compare with current branch baseline
         vibe3 snapshot diff <snapshot-id>    # Compare with specific snapshot
         vibe3 snapshot diff latest           # Compare with latest snapshot
+        vibe3 snapshot diff --json           # JSON output for CI/CD integration
+
+    Use Cases:
+        - PR impact analysis: Understand architectural changes
+        - Architecture review: Detect module bloat early
+        - Quality gates: Set LOC/module limits in CI
+        - Dependency tracking: Monitor coupling growth
     """
     from vibe3.clients import GitClient
 

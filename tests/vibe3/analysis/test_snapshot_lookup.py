@@ -6,6 +6,15 @@ from pathlib import Path
 import pytest
 
 from vibe3.analysis.snapshot_service import find_snapshot_by_branch
+from vibe3.clients.sqlite_client import SQLiteClient
+
+
+@pytest.fixture
+def snapshot_db(tmp_path: Path) -> SQLiteClient:
+    """Create an isolated DB with snapshot registry entries."""
+    db_path = str(tmp_path / "test_handoff.db")
+    client = SQLiteClient(db_path=db_path)
+    return client
 
 
 def test_find_snapshot_by_branch_main(
@@ -187,3 +196,100 @@ def test_find_snapshot_by_branch_fallback_for_nonconforming_filename(
 
     assert result is not None
     assert result.snapshot_id == "flow-1-main-abc1234-2026-03-19T09-00-00"
+
+
+def test_find_snapshot_by_branch_db_backed(
+    snapshot_dir: Path, snapshot_db: SQLiteClient, monkeypatch: pytest.MonkeyPatch
+):
+    """Test DB-backed lookup returns correct snapshot when DB has entry."""
+    from vibe3.analysis import snapshot_service
+
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    # Create a factory function that returns the test client
+    def get_test_client():
+        return snapshot_db
+
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", get_test_client)
+
+    # Register a snapshot in DB that's different from the file-based ones
+    snapshot_db.upsert_snapshot_registry(
+        snapshot_id="2026-03-24T10-00-00_main_zzz9999",
+        branch="main",
+        commit_short="zzz9999",
+        commit_hash="zzz9999",
+        created_at="2026-03-24T10:00:00",
+        file_path=str(snapshot_dir / "2026-03-24T10-00-00_main_zzz9999.json"),
+    )
+
+    # Create the actual file so load_snapshot can read it
+    snapshot_data = {
+        "snapshot_id": "2026-03-24T10-00-00_main_zzz9999",
+        "branch": "main",
+        "commit": "zzz9999",
+        "commit_short": "zzz9999",
+        "created_at": "2026-03-24T10:00:00",
+        "root": "src/vibe3",
+        "files": [],
+        "modules": [],
+        "dependencies": [],
+        "metrics": {},
+    }
+    (snapshot_dir / "2026-03-24T10-00-00_main_zzz9999.json").write_text(
+        json.dumps(snapshot_data)
+    )
+
+    result = find_snapshot_by_branch("main")
+
+    # Should return the DB-registered snapshot (most recent)
+    assert result is not None
+    assert result.branch == "main"
+    assert result.snapshot_id == "2026-03-24T10-00-00_main_zzz9999"
+
+
+def test_find_snapshot_by_branch_fallback_when_db_empty(
+    snapshot_dir: Path, snapshot_db: SQLiteClient, monkeypatch: pytest.MonkeyPatch
+):
+    """Fallback to filesystem works when DB has no entries."""
+    from vibe3.analysis import snapshot_service
+
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    def get_test_client():
+        return snapshot_db
+
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", get_test_client)
+
+    # No DB entries — should fall back to filesystem scan
+    result = find_snapshot_by_branch("main")
+
+    assert result is not None
+    assert result.branch == "main"
+
+
+def test_find_snapshot_by_branch_db_failure_fallback(
+    snapshot_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Filesystem fallback kicks in when DB query raises exception."""
+    from vibe3.analysis import snapshot_service
+
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    # Make SQLiteClient raise an exception
+    class FailClient:
+        def find_snapshots_by_branch(self, branch, limit=20):
+            raise RuntimeError("DB unavailable")
+
+        def upsert_snapshot_registry(self, **kwargs):
+            pass
+
+    def get_fail_client():
+        return FailClient()
+
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", get_fail_client)
+
+    # Should still work via filesystem fallback
+    result = find_snapshot_by_branch("main")
+
+    assert result is not None
+    assert result.branch == "main"

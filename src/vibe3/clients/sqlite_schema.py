@@ -168,6 +168,22 @@ _CREATE_ORCHESTRA_QUEUE = """
     )
 """
 
+_CREATE_SNAPSHOT_REGISTRY = """
+    CREATE TABLE IF NOT EXISTS snapshot_registry (
+        snapshot_id TEXT PRIMARY KEY,
+        branch TEXT NOT NULL,
+        commit_short TEXT NOT NULL,
+        commit_hash TEXT,
+        created_at TEXT NOT NULL,
+        file_path TEXT NOT NULL
+    )
+"""
+
+_CREATE_SNAPSHOT_REGISTRY_INDEXES = """
+    CREATE INDEX IF NOT EXISTS idx_snapshot_registry_branch
+        ON snapshot_registry(branch, created_at DESC)
+"""
+
 _CREATE_TRANSITION_HISTORY = """
     CREATE TABLE IF NOT EXISTS transition_history (
         branch TEXT NOT NULL,
@@ -402,6 +418,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
     cursor.execute(_CREATE_FAILED_GATE_STATE)
     cursor.execute(_CREATE_ORCHESTRA_QUEUE)
+    cursor.execute(_CREATE_SNAPSHOT_REGISTRY)
+    for stmt in _CREATE_SNAPSHOT_REGISTRY_INDEXES.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
     cursor.execute(_CREATE_TRANSITION_HISTORY)
     for stmt in _CREATE_TRANSITION_HISTORY_INDEXES.strip().split(";"):
         stmt = stmt.strip()
@@ -524,7 +545,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Increment this when adding new migrations that need to run on existing DBs
     cursor.execute(
         "INSERT OR REPLACE INTO schema_meta (key, value) "
-        "VALUES ('migration_version', '3')"
+        "VALUES ('migration_version', '4')"
     )
     conn.commit()
     logger.bind(external="sqlite", operation="init_schema").debug(
