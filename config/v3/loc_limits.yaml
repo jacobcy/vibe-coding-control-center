@@ -24,8 +24,11 @@ code_limits:
         limit: 610
         reason: "PR 生命周期聚合；PR #2777 新增 recent_pr_cache path-like guard，兼容 GitClient mock 返回 pathlib.Path，同时避免 MagicMock 路径泄漏"
       - path: "src/vibe3/services/check/service.py"
-        limit: 560
-        reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器，新增规则只需在 rule_checks.py 添加函数"
+        limit: 680
+        reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器；#2912 新增 enforce_label_constraints_remote 方法（+116 行）实现远程 issue 标签约束扫描"
+      - path: "src/vibe3/services/check/rule_checks.py"
+        limit: 500
+        reason: "Check 规则实现文件，含 12 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）实现标签约束自动修复"
 
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层
