@@ -271,7 +271,7 @@ Spec 不变量 → Code 实现 → Audit 确认
        ↓
 ┌──────────────┐
 │  Gate 0      │ → 智能调度：选择 OpenSpec 或 Superpower
-│  Dispatcher  │    记录到 task.md
+│  Dispatcher  │    记录到 SQLite/handoff artifacts
 └──────────────┘
        │
        ↓

@@ -37,7 +37,7 @@ Introduce dispatch-time loaders for governance materials and policies, satisfyin
 - Graceful degradation: missing directories, invalid YAML, non-dict YAML
 - Hash stability and determinism
 - File type filtering and ordering
-- Manager username resolution matches `vibe3 status` output
+- Manager username resolution matches `vibe3 status` output (Compatibility mode; `vibe3 task status` is preferred for V3 tasks)
 
 Closes #2166
 
