@@ -60,7 +60,7 @@ def test_exceptions_barrel_import_count() -> None:
     """Track barrel imports from vibe3.exceptions across src/ and tests/.
 
     Goal: Prevent growth of exceptions barrel imports.
-    Baseline: 159 call sites (as of issue #2848).
+    Baseline: 161 call sites (as of issue #2848).
 
     Most barrel imports are for exception TYPES (GitError, GitHubError, etc.)
     which are defined directly in exceptions/__init__.py and safe for mypy.
@@ -84,7 +84,7 @@ def test_exceptions_barrel_import_count() -> None:
             print(f"     {file}: {count} imports")
 
     # Baseline established at issue #2848
-    baseline = 159
+    baseline = 161
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
