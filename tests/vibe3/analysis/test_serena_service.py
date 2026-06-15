@@ -274,6 +274,125 @@ class TestAnalyzeFilesSkipped:
         assert result == ["alpha", "beta"]
 
 
+class TestAnalyzeSymbol:
+    """analyze_symbol 测试."""
+
+    @pytest.fixture
+    def mock_client(self) -> MagicMock:
+        return MagicMock()
+
+    def test_normal_reference_extraction(self, mock_client: MagicMock) -> None:
+        """测试正常提取引用。"""
+        mock_client.find_references.return_value = [
+            {
+                "relative_path": "src/caller.py",
+                "body_location": {"start_line": 10},
+                "kind": "call",
+                "content_around_reference": "foo()",
+            }
+        ]
+        service = SerenaService(client=mock_client)
+        result = service.analyze_symbol("foo", "src/def.py")
+
+        assert result["symbol"] == "foo"
+        assert result["defined_in"] == "src/def.py"
+        assert result["type"] == "function"
+        assert result["reference_count"] == 1
+        assert result["references"][0]["file"] == "src/caller.py"
+        assert result["references"][0]["line"] == 10
+        assert result["references"][0]["kind"] == "call"
+        assert result["references"][0]["context"] == "foo()"
+
+    def test_empty_result_handling(self, mock_client: MagicMock) -> None:
+        """测试无引用情况。"""
+        mock_client.find_references.return_value = []
+        service = SerenaService(client=mock_client)
+
+        with patch("vibe3.analysis.serena_service._is_cli_file", return_value=False):
+            result = service.analyze_symbol("foo", "src/def.py")
+
+        assert result["reference_count"] == 0
+        assert result["type"] == "function"
+        assert result["references"] == []
+
+    def test_serena_error_handling(self, mock_client: MagicMock) -> None:
+        """测试 SerenaError 异常处理。"""
+        mock_client.find_references.side_effect = SerenaError(
+            "find_references", "timeout"
+        )
+        service = SerenaService(client=mock_client)
+
+        with pytest.raises(SerenaError) as excinfo:
+            service.analyze_symbol("foo", "src/def.py")
+        assert "timeout" in str(excinfo.value)
+
+    def test_generic_exception_wrapped(self, mock_client: MagicMock) -> None:
+        """测试普通异常被包装为 SerenaError。"""
+        mock_client.find_references.side_effect = ValueError("unexpected")
+        service = SerenaService(client=mock_client)
+
+        with pytest.raises(SerenaError) as excinfo:
+            service.analyze_symbol("foo", "src/def.py")
+        assert "analyze_symbol(foo)" in str(excinfo.value)
+        assert "unexpected" in str(excinfo.value)
+
+    def test_cli_command_detection(self, mock_client: MagicMock) -> None:
+        """测试 CLI 命令检测逻辑。"""
+        mock_client.find_references.return_value = []
+        service = SerenaService(client=mock_client)
+
+        with patch("vibe3.analysis.serena_service._is_cli_file", return_value=True):
+            result = service.analyze_symbol("main", "bin/vibe")
+
+        assert result["reference_count"] == 0
+        assert result["type"] == "cli_command"
+
+    def test_multiple_references_extraction(self, mock_client: MagicMock) -> None:
+        """测试多个引用的提取。"""
+        mock_client.find_references.return_value = [
+            {
+                "relative_path": "src/caller1.py",
+                "body_location": {"start_line": 10},
+                "kind": "call",
+                "content_around_reference": "foo()",
+            },
+            {
+                "relative_path": "src/caller2.py",
+                "body_location": {"start_line": 25},
+                "kind": "import",
+                "content_around_reference": "from bar import foo",
+            },
+            {
+                "relative_path": "src/caller3.py",
+                "body_location": {"start_line": 42},
+                "kind": "reference",
+                "content_around_reference": "obj.foo",
+            },
+        ]
+        service = SerenaService(client=mock_client)
+        result = service.analyze_symbol("foo", "src/def.py")
+
+        assert result["reference_count"] == 3
+        assert result["type"] == "function"
+        assert len(result["references"]) == 3
+
+        # 验证每个引用的字段提取正确
+        assert result["references"][0]["file"] == "src/caller1.py"
+        assert result["references"][0]["line"] == 10
+        assert result["references"][0]["kind"] == "call"
+        assert result["references"][0]["context"] == "foo()"
+
+        assert result["references"][1]["file"] == "src/caller2.py"
+        assert result["references"][1]["line"] == 25
+        assert result["references"][1]["kind"] == "import"
+        assert result["references"][1]["context"] == "from bar import foo"
+
+        assert result["references"][2]["file"] == "src/caller3.py"
+        assert result["references"][2]["line"] == 42
+        assert result["references"][2]["kind"] == "reference"
+        assert result["references"][2]["context"] == "obj.foo"
+
+
 class TestIsCliFile:
     """_is_cli_file caching tests."""
 
