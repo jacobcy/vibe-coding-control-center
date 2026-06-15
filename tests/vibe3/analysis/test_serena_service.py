@@ -448,16 +448,16 @@ class TestScanDeadCode:
         self, mock_client: MagicMock
     ) -> None:
         """Test that line and loc are populated from body_location."""
-        # Mock Path.glob to return only one test file
+        mock_git = MagicMock()
+        mock_git.get_tracked_files.return_value = ["src/vibe3/test.py"]
+
+        service = SerenaService(client=mock_client, git_client=mock_git)
+
         with patch("vibe3.analysis.serena_service.Path") as mock_path:
             mock_root = MagicMock()
             mock_root.exists.return_value = True
-            mock_file = MagicMock()
-            mock_file.__str__ = lambda self: "src/vibe3/test.py"
-            mock_root.glob.return_value = [mock_file]
             mock_path.return_value = mock_root
 
-            service = SerenaService(client=mock_client)
             report = service.scan_dead_code()
 
             # Should have one finding
@@ -477,16 +477,16 @@ class TestScanDeadCode:
         # Return empty references (dead code)
         client.find_references.return_value = []
 
-        # Mock Path.glob to return only one test file
+        mock_git = MagicMock()
+        mock_git.get_tracked_files.return_value = ["src/vibe3/test.py"]
+
+        service = SerenaService(client=client, git_client=mock_git)
+
         with patch("vibe3.analysis.serena_service.Path") as mock_path:
             mock_root = MagicMock()
             mock_root.exists.return_value = True
-            mock_file = MagicMock()
-            mock_file.__str__ = lambda self: "src/vibe3/test.py"
-            mock_root.glob.return_value = [mock_file]
             mock_path.return_value = mock_root
 
-            service = SerenaService(client=client)
             report = service.scan_dead_code()
 
             # Should have one finding
@@ -508,16 +508,16 @@ class TestScanDeadCode:
         }
         client.find_references.return_value = []
 
-        # Mock Path.glob to return only one test file
+        mock_git = MagicMock()
+        mock_git.get_tracked_files.return_value = ["src/vibe3/test.py"]
+
+        service = SerenaService(client=client, git_client=mock_git)
+
         with patch("vibe3.analysis.serena_service.Path") as mock_path:
             mock_root = MagicMock()
             mock_root.exists.return_value = True
-            mock_file = MagicMock()
-            mock_file.__str__ = lambda self: "src/vibe3/test.py"
-            mock_root.glob.return_value = [mock_file]
             mock_path.return_value = mock_root
 
-            service = SerenaService(client=client)
             report = service.scan_dead_code()
 
             assert len(report.findings) == 1
@@ -537,16 +537,16 @@ class TestScanDeadCode:
         }
         client.find_references.return_value = []
 
-        # Mock Path.glob to return only one test file
+        mock_git = MagicMock()
+        mock_git.get_tracked_files.return_value = ["src/vibe3/test.py"]
+
+        service = SerenaService(client=client, git_client=mock_git)
+
         with patch("vibe3.analysis.serena_service.Path") as mock_path:
             mock_root = MagicMock()
             mock_root.exists.return_value = True
-            mock_file = MagicMock()
-            mock_file.__str__ = lambda self: "src/vibe3/test.py"
-            mock_root.glob.return_value = [mock_file]
             mock_path.return_value = mock_root
 
-            service = SerenaService(client=client)
             report = service.scan_dead_code()
 
             assert len(report.findings) == 1

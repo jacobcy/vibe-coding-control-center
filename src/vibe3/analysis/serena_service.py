@@ -304,7 +304,8 @@ class SerenaService:
             if not root_path.exists():
                 raise SerenaError("scan_dead_code", f"Root directory not found: {root}")
 
-            python_files = sorted(root_path.glob("**/*.py"))
+            tracked = self.git_client.get_tracked_files(pathspec=f"{root}/**/*.py")
+            python_files = sorted(tracked)
 
             log.bind(file_count=len(python_files)).debug("Found Python files")
 
@@ -318,8 +319,8 @@ class SerenaService:
             total_dead = 0
             total_excluded = 0
 
-            for file_path in python_files:
-                relative_file = str(file_path)
+            for relative_file in python_files:
+                file_path = Path(relative_file)
 
                 try:
                     # Parse once; share AST with _is_cli_file and get_router_functions
