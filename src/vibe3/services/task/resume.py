@@ -214,29 +214,19 @@ class TaskResumeCandidates:
         if current_state is None or current_state == IssueState.DONE:
             return None
 
-        # 只处理 blocked 状态
-        if current_state != IssueState.BLOCKED:
-            logger.bind(
-                domain="task",
-                action="resume_candidate_skip",
-                issue_number=issue_number,
-                current_state=current_state,
-            ).warning(
-                f"Issue #{issue_number} is not blocked (state={current_state}), "
-                "task resume only handles blocked issues. "
-                "Use 'vibe3 flow rebuild' for explicit rebuild."
-            )
-            return None
-
         # 查找关联的 flow（可能不存在）
         flow = self.find_resume_flow(issue_number, flows, stale_flows)
 
-        # blocked 状态统一使用 resume_kind="blocked"
+        if current_state == IssueState.BLOCKED:
+            resume_kind = "blocked"
+        else:
+            resume_kind = "confirm"
+
         return {
             "number": issue_number,
             "title": "",
             "state": current_state,
-            "resume_kind": "blocked",
+            "resume_kind": resume_kind,
             "flow": flow,
         }
 
@@ -359,72 +349,69 @@ class TaskResumeCandidates:
                 )
 
             # Check blocked_by_issue dependency
-            flow_dict = self._flow_service.get_flow_for_issue(issue_number)
-            if flow_dict:
-                blocked_by_issue = flow_dict.get("blocked_by_issue")
-                if isinstance(blocked_by_issue, int) and blocked_by_issue > 0:
-                    # Query the dependency issue state via gh CLI
-                    try:
-                        result = subprocess.run(
-                            [
-                                "gh",
-                                "issue",
-                                "view",
-                                str(blocked_by_issue),
-                                "--json",
-                                "state",
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=10,
-                        )
-                        if result.returncode == 0:
-                            data = json.loads(result.stdout)
-                            if data.get("state") != "CLOSED":
-                                return (
-                                    False,
-                                    f"task 不满足 resume 条件，所依赖的 "
-                                    f"task #{blocked_by_issue} 尚未关闭",
-                                )
-                        else:
-                            # gh command failed, log warning but continue (fail open)
-                            logger.bind(
-                                domain="resume",
-                                issue_number=issue_number,
-                                blocked_by_issue=blocked_by_issue,
-                            ).warning(
-                                f"Failed to check dependency issue #{blocked_by_issue} "
-                                f"state, allowing resume"
-                            )
-                    except (
-                        subprocess.TimeoutExpired,
-                        json.JSONDecodeError,
-                        FileNotFoundError,
-                    ) as e:
-                        # Fail open: if gh is not available or times out, allow resume
-                        logger.bind(
-                            domain="resume",
-                            issue_number=issue_number,
-                            blocked_by_issue=blocked_by_issue,
-                            error=str(e),
-                        ).warning(
-                            f"Error checking dependency issue #{blocked_by_issue}, "
-                            f"allowing resume"
-                        )
+            dep_check = self._check_blocked_by_dependency(issue_number)
+            if dep_check is not None:
+                return dep_check
+        elif resume_kind == "confirm":
+            dep_check = self._check_blocked_by_dependency(issue_number)
+            if dep_check is not None:
+                return dep_check
 
-            return True, None
-        elif resume_kind == "aborted":
-            # Aborted flows can be resumed from READY or HANDOFF states
-            # The flow_status=aborted check is done in fetch_resume_candidates
-            # Here we verify the issue is in a valid state for resumption
-            if current_state.value not in ("ready", "handoff"):
-                return (
-                    False,
-                    f"Issue #{issue_number} is not in expected state for {resume_kind}",
+        return True, None
+
+    def _check_blocked_by_dependency(
+        self, issue_number: int
+    ) -> tuple[bool, str] | None:
+        """Check if blocked_by dependency is satisfied.
+
+        Returns None if no blocking dependency or dep is satisfied.
+        Returns (False, reason) if dep is still open.
+        """
+        flow_dict = self._flow_service.get_flow_for_issue(issue_number)
+        if not flow_dict:
+            return None
+        blocked_by_issue = flow_dict.get("blocked_by_issue")
+        if not isinstance(blocked_by_issue, int) or blocked_by_issue <= 0:
+            return None
+        try:
+            result = subprocess.run(
+                ["gh", "issue", "view", str(blocked_by_issue), "--json", "state"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                if data.get("state") != "CLOSED":
+                    return (
+                        False,
+                        f"task 不满足 resume 条件，所依赖的 "
+                        f"task #{blocked_by_issue} 尚未关闭",
+                    )
+            else:
+                logger.bind(
+                    domain="resume",
+                    issue_number=issue_number,
+                    blocked_by_issue=blocked_by_issue,
+                ).warning(
+                    f"Failed to check dependency issue #{blocked_by_issue} "
+                    f"state, allowing resume"
                 )
-            return True, None
-
-        return False, None
+        except (
+            subprocess.TimeoutExpired,
+            json.JSONDecodeError,
+            FileNotFoundError,
+        ) as e:
+            logger.bind(
+                domain="resume",
+                issue_number=issue_number,
+                blocked_by_issue=blocked_by_issue,
+                error=str(e),
+            ).warning(
+                f"Error checking dependency issue #{blocked_by_issue}, "
+                f"allowing resume"
+            )
+        return None
 
 
 def _format_resume_failure_reason(exc: Exception) -> str:

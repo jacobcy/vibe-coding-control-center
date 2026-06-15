@@ -97,6 +97,18 @@ async def execute_periodic_check(
             f"Orchestra-scanned cleanup failed: {exc}"
         )
 
+    # Phase 2b: Enforce label constraints on remote issues
+    try:
+        fixed = await asyncio.to_thread(check_service.enforce_label_constraints_remote)
+        if fixed > 0:
+            logger.bind(domain="orchestra", action="periodic_check").info(
+                f"Fixed label constraint violations on {fixed} remote issues"
+            )
+    except Exception as exc:
+        logger.bind(domain="orchestra", action="periodic_check").warning(
+            f"Remote label constraint enforcement failed: {exc}"
+        )
+
     # Phase 3: Expired resource cleanup (if enabled)
     await execute_expired_resource_cleanup(
         config, tick_number, cleanup_service=cleanup_service

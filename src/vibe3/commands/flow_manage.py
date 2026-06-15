@@ -432,6 +432,7 @@ def restore_flow(
     branch_opt: Annotated[
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     trace: TraceOption = False,
     min_ms: TraceMinMsOption = None,
 ) -> None:
@@ -465,6 +466,12 @@ def restore_flow(
 
     if not is_deleted and not is_aborted:
         console.print(f"[yellow]Flow '{target_branch}' is already active[/]")
+        raise typer.Exit(0)
+
+    if not yes and not typer.confirm(
+        f"Restore flow '{target_branch}' to active state?", default=False
+    ):
+        console.print("[yellow]Restore aborted[/]")
         raise typer.Exit(0)
 
     # Restore the flow

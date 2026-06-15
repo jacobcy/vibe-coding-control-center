@@ -216,6 +216,8 @@ def rule_missing_branch_cleanup(ctx: CheckContext, svc: Any) -> CheckResult | No
         return None
     if not ctx.branch_missing:
         return None
+    if ctx.flow_status == "blocked":
+        return None
 
     from vibe3.services.check.service import CheckResult
 
@@ -375,6 +377,99 @@ def rule_missing_state_label_recovery(
         return None
 
 
+def rule_label_constraint_enforcement(
+    ctx: CheckContext, svc: Any
+) -> CheckResult | None:
+    """Enforce data-driven label constraints."""
+    if not svc._sync_rules.local.label_constraint_enforcement.enabled:
+        return None
+    if not (ctx.task_issue and ctx.issue_labels_loaded and ctx.issue_payload):
+        return None
+
+    from vibe3.services.check.label_constraints import check_constraints
+
+    assignees = ctx.issue_payload.get("assignees", [])
+    assignee = (
+        assignees[0].get("login") if isinstance(assignees, list) and assignees else None
+    )
+
+    violations = check_constraints(
+        labels=set(ctx.issue_labels),
+        assignee=assignee,
+    )
+
+    if not violations:
+        return None
+
+    labels_to_remove: set[str] = set()
+    for v in violations:
+        if v.constraint_name == "single_state_label":
+            from vibe3.services.shared.labels import get_highest_priority_state
+
+            state_labels = [lb for lb in ctx.issue_labels if lb.startswith("state/")]
+            keep = get_highest_priority_state(state_labels)
+            if keep:
+                labels_to_remove.update(lb for lb in state_labels if lb != keep)
+        elif v.constraint_name in (
+            "no_state_without_assignee",
+            "ready_requires_assignee",
+        ):
+            labels_to_remove.update(
+                lb for lb in ctx.issue_labels if lb.startswith("state/")
+            )
+        elif v.constraint_name == "scanned_forbids_state":
+            labels_to_remove.add("orchestra-scanned")
+        elif v.constraint_name == "scanned_governed_no_assignee":
+            labels_to_remove.update({"orchestra-scanned", "orchestra-governed"})
+
+    if not labels_to_remove:
+        return None
+
+    import subprocess
+    import time
+
+    try:
+        from vibe3.config import load_orchestra_config
+
+        config = load_orchestra_config()
+        for lb in sorted(labels_to_remove):
+            cmd = [
+                "gh",
+                "issue",
+                "edit",
+                str(ctx.task_issue),
+                "--remove-label",
+                lb,
+            ]
+            if config.repo:
+                cmd.extend(["--repo", config.repo])
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            time.sleep(0.3)
+
+        from vibe3.services.check.service import CheckResult
+
+        return CheckResult(
+            is_valid=True,
+            branch=ctx.branch,
+            issues=[],
+            warnings=[
+                f"Issue #{ctx.task_issue}: fixed {len(violations)} label "
+                f"constraint violations "
+                f"({', '.join(v.constraint_name for v in violations)}), "
+                f"removed: {sorted(labels_to_remove)}"
+            ],
+        )
+    except (subprocess.CalledProcessError, RuntimeError) as exc:
+        message = f"Label constraint auto-fix failed: {exc}"
+        logger.bind(domain="check", branch=ctx.branch, issue=ctx.task_issue).error(
+            message
+        )
+        return None
+    except Exception as exc:
+        ctx.issues.append(f"Label constraint auto-fix failed: {exc}")
+        return None
+
+
 # Ordered list of rules executed in _check_branch (priority order)
 RULES = [
     rule_pr_terminal_state,
@@ -387,4 +482,5 @@ RULES = [
     rule_empty_ready_cleanup,
     rule_flow_consistency_recovery,
     rule_missing_state_label_recovery,
+    rule_label_constraint_enforcement,
 ]

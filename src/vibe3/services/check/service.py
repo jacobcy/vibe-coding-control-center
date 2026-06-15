@@ -553,3 +553,124 @@ class CheckService(CheckRemote):
             )
 
         return cleaned_count
+
+    def enforce_label_constraints_remote(self) -> int:
+        """Scan remote open issues for label constraint violations and auto-fix.
+
+        This complements the per-flow constraint check
+        (rule_label_constraint_enforcement) by scanning
+        issues that have no local flow scene.
+
+        Returns:
+            Number of issues with violations fixed.
+        """
+        if not self._sync_rules.local.label_constraint_enforcement.enabled:
+            return 0
+
+        import subprocess
+        import time
+
+        from vibe3.config import load_orchestra_config
+        from vibe3.services.check.label_constraints import check_constraints
+        from vibe3.services.shared.labels import normalize_labels
+
+        config = load_orchestra_config()
+        fixed_count = 0
+
+        label_filters = ("orchestra-scanned",) + tuple(
+            state.to_label() for state in IssueState
+        )
+        seen_numbers: set[int] = set()
+
+        for label_filter in label_filters:
+            try:
+                raw_issues = self.github_client.list_issues(
+                    limit=100,
+                    state="open",
+                    label=label_filter,
+                    repo=config.repo,
+                )
+            except Exception as exc:
+                logger.bind(domain="check", label_filter=label_filter).error(
+                    f"Failed to list issues for label constraint enforcement: {exc}"
+                )
+                continue
+
+            for issue in raw_issues:
+                number = issue.get("number")
+                if not isinstance(number, int):
+                    continue
+                if number in seen_numbers:
+                    continue
+                seen_numbers.add(number)
+
+                labels = normalize_labels(issue.get("labels", []))
+                assignees = issue.get("assignees", [])
+                assignee = (
+                    assignees[0].get("login")
+                    if isinstance(assignees, list) and assignees
+                    else None
+                )
+
+                violations = check_constraints(labels=set(labels), assignee=assignee)
+                if not violations:
+                    continue
+
+                labels_to_remove: set[str] = set()
+                for v in violations:
+                    if v.constraint_name == "single_state_label":
+                        from vibe3.services.shared.labels import (
+                            get_highest_priority_state,
+                        )
+
+                        state_labels = [lb for lb in labels if lb.startswith("state/")]
+                        keep = get_highest_priority_state(state_labels)
+                        if keep:
+                            labels_to_remove.update(
+                                lb for lb in state_labels if lb != keep
+                            )
+                    elif v.constraint_name in (
+                        "no_state_without_assignee",
+                        "ready_requires_assignee",
+                    ):
+                        labels_to_remove.update(
+                            lb for lb in labels if lb.startswith("state/")
+                        )
+                    elif v.constraint_name == "scanned_forbids_state":
+                        labels_to_remove.add("orchestra-scanned")
+                    elif v.constraint_name == "scanned_governed_no_assignee":
+                        labels_to_remove.update(
+                            {"orchestra-scanned", "orchestra-governed"}
+                        )
+
+                if not labels_to_remove:
+                    continue
+
+                try:
+                    for lb in sorted(labels_to_remove):
+                        cmd = [
+                            "gh",
+                            "issue",
+                            "edit",
+                            str(number),
+                            "--remove-label",
+                            lb,
+                        ]
+                        if config.repo:
+                            cmd.extend(["--repo", config.repo])
+                        subprocess.run(cmd, capture_output=True, text=True, check=True)
+                        time.sleep(0.3)
+
+                    logger.bind(domain="check").info(
+                        f"Fixed {len(violations)} label constraint violations "
+                        f"on remote issue #{number}: "
+                        f"removed {sorted(labels_to_remove)}"
+                    )
+                    fixed_count += 1
+                except subprocess.CalledProcessError as exc:
+                    logger.bind(domain="check").error(
+                        f"Failed to fix label constraints on #{number}: "
+                        f"{exc.stderr}"
+                    )
+
+        return fixed_count

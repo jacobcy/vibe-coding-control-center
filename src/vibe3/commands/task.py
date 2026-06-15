@@ -387,10 +387,12 @@ def resume(
     }
     effective_label = ""
     if label is not None:
-        if label == "auto":
+        # Accept full label names (state/ready) or short names (ready)
+        normalized = label[6:] if label.startswith("state/") else label
+        if normalized == "auto":
             effective_label = ""
-        elif label in valid_states:
-            effective_label = label
+        elif normalized in valid_states:
+            effective_label = normalized
         else:
             typer.echo(
                 f"Error: Invalid state '{label}'. "

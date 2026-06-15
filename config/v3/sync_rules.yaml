@@ -68,3 +68,7 @@ local:
   blocked_label_sync:
     enabled: true
     description: "Sync remote state/blocked label to local flow status"
+
+  label_constraint_enforcement:
+    enabled: true
+    description: "Enforce data-driven label constraints"
