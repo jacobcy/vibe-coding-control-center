@@ -19,9 +19,28 @@ if TYPE_CHECKING:
     from vibe3.models import DeadCodeReport
 
 
+# AST cache for sharing pre-parsed ASTs between scan_dead_code and _is_cli_file.
+# Populated before calling analyze_file to avoid redundant file I/O.
+_ast_cache: dict[str, ast.Module] = {}
+
+
+def _has_typer_import_from_ast(tree: ast.Module) -> bool:
+    """Check if AST contains a typer import."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name == "typer" for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] == "typer":
+                return True
+    return False
+
+
 @functools.lru_cache(maxsize=None)
 def _is_cli_file(file_path: str) -> bool:
     """Check if file is a CLI module with Typer commands."""
+    if file_path in _ast_cache:
+        return _has_typer_import_from_ast(_ast_cache[file_path])
     try:
         with open(file_path, "r") as f:
             content = f.read()
@@ -289,6 +308,9 @@ class SerenaService:
 
             log.bind(file_count=len(python_files)).debug("Found Python files")
 
+            # Clear AST cache to avoid unbounded growth across multiple scans
+            _ast_cache.clear()
+
             # Scan each file
             findings: list[DeadCodeFinding] = []
             excluded: list[str] = []
@@ -300,10 +322,11 @@ class SerenaService:
                 relative_file = str(file_path)
 
                 try:
-                    # Parse file once, share with get_router_functions
+                    # Parse once; share AST with _is_cli_file and get_router_functions
                     try:
                         source_text = file_path.read_text(encoding="utf-8")
                         file_tree = ast.parse(source_text)
+                        _ast_cache[relative_file] = file_tree
                     except Exception:
                         file_tree = None
 
