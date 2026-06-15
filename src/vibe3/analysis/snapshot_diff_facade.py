@@ -15,13 +15,8 @@ def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
 
     1. Snapshot diff: if baseline exists → full structural comparison
     2. Git numstat: no baseline → per-file LOC + file counts
-    3. Name-only: extreme fallback → file count only
-
-    The caller determines how to render the result (Markdown table,
-    CLI text, etc.). Fields unavailable in a fallback level are left
-    at their default (0/NULL).
+    3. Empty summary: extreme fallback → file count only
     """
-    # Level 1: Full snapshot diff
     baseline = load_branch_baseline(branch)
     if baseline is not None:
         current = build_snapshot()
@@ -30,7 +25,6 @@ def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
         structure_diff = compute_diff(baseline, current)
         return structure_diff.summary
 
-    # Level 2: Git diff --numstat + --name-status
     try:
         git = GitClient()
         return _diff_via_git(git, branch, base_branch)
@@ -45,54 +39,34 @@ def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
 
 
 def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
-    """Build DiffSummary from git diff output (fallback when no baseline).
+    """Build DiffSummary from git numstat (fallback when no baseline).
 
-    Uses GitClient.get_numstat() public API (which resolves merge-base
-    internally) for LOC counting.  --name-status has no public equivalent
-    on GitClient so it goes through _run() directly.
+    Uses GitClient.get_numstat() which resolves merge-base internally.
+    File counts come from numstat line count (all counted as "modified"
+    since A/M/D classification requires a separate --name-status call
+    that GitClient has no public API for).
     """
     source = BranchSource(branch=branch, base=base_branch)
-    added = removed = modified = 0
     loc_delta = 0
+    file_count = 0
 
-    # Get file statuses via --name-status
-    try:
-        name_status_output = git._run(
-            ["diff", "--name-status", f"{base_branch}...{branch}"]
-        )
-        if name_status_output:
-            for line in name_status_output.splitlines():
-                if line.startswith("A\t"):
-                    added += 1
-                elif line.startswith("D\t"):
-                    removed += 1
-                elif line.startswith("M\t"):
-                    modified += 1
-                elif len(line) > 0 and line[0] in "RC":
-                    if line[0] == "R":
-                        modified += 1
-                    else:  # Copy
-                        added += 1
-    except Exception as e:
-        logger.bind(
-            domain="snapshot",
-            action="git_name_status",
-            branch=branch,
-        ).warning(f"Failed to get git name-status: {e}")
-
-    # Get Loc via public GitClient API (handles merge-base internally)
     try:
         numstat_output = git.get_numstat(source)
         if numstat_output:
             for line in numstat_output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
                 parts = line.split("\t")
-                if len(parts) >= 3:
-                    try:
-                        a = int(parts[0]) if parts[0] != "-" else 0
-                        r = int(parts[1]) if parts[1] != "-" else 0
-                        loc_delta += a - r
-                    except ValueError:
-                        pass
+                if len(parts) < 3:
+                    continue
+                file_count += 1
+                try:
+                    a = int(parts[0]) if parts[0] != "-" else 0
+                    r = int(parts[1]) if parts[1] != "-" else 0
+                    loc_delta += a - r
+                except ValueError:
+                    pass
     except Exception as e:
         logger.bind(
             domain="snapshot",
@@ -101,8 +75,6 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
         ).warning(f"Failed to get git numstat: {e}")
 
     return DiffSummary(
-        files_added=added,
-        files_removed=removed,
-        files_modified=modified,
+        files_modified=file_count,
         total_loc_delta=loc_delta,
     )

@@ -458,7 +458,7 @@ class TestBuildPrBody:
         mock_diff_summary.dependencies_removed = 1
 
         with patch(
-            "vibe3.services.pr.utils._get_diff_summary_for_pr",
+            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
             return_value=mock_diff_summary,
         ):
             result = build_pr_body("Original body", metadata)
@@ -502,8 +502,8 @@ class TestBuildPrBody:
         )
 
         with patch(
-            "vibe3.services.pr.utils._get_diff_summary_for_pr",
-            return_value=None,
+            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
+            side_effect=Exception("Error"),
         ):
             result = build_pr_body("Original body", metadata)
 
@@ -552,34 +552,3 @@ class TestFormatDiffSummary:
 
         assert "| Functions | +5 |" in result
         assert "| Dependencies | +2, -1 |" in result
-
-
-class TestGetDiffSummaryForPr:
-    """Tests for _get_diff_summary_for_pr utility function."""
-
-    def test_returns_diff_summary_on_success(self) -> None:
-        """Should return DiffSummary when get_diff_summary succeeds."""
-        from vibe3.models import DiffSummary
-        from vibe3.services.pr.utils import _get_diff_summary_for_pr
-
-        mock_summary = DiffSummary(files_added=5)
-
-        with patch(
-            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
-            return_value=mock_summary,
-        ):
-            result = _get_diff_summary_for_pr("feature-branch")
-
-        assert result == mock_summary
-
-    def test_returns_none_on_exception(self) -> None:
-        """Should return None when get_diff_summary fails."""
-        from vibe3.services.pr.utils import _get_diff_summary_for_pr
-
-        with patch(
-            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
-            side_effect=Exception("Error"),
-        ):
-            result = _get_diff_summary_for_pr("feature-branch")
-
-        assert result is None

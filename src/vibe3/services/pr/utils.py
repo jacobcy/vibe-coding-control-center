@@ -107,9 +107,15 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
 
     # Append change summary
     if metadata.branch:
-        diff_summary = _get_diff_summary_for_pr(metadata.branch)
-        if diff_summary is not None:
+        try:
+            from vibe3.analysis import get_diff_summary
+
+            diff_summary = get_diff_summary(metadata.branch)
             result += "\n\n---\n\n" + _format_diff_summary(diff_summary)
+        except Exception:
+            logger.bind(domain="pr", branch=metadata.branch).warning(
+                "Failed to get diff summary, skipping change summary section"
+            )
 
     return result
 
@@ -153,22 +159,6 @@ def check_upstream_conflicts(
             f"  2. Resolve any conflicts\n"
             f"  3. Re-run vibe3 pr {action}"
         )
-
-
-def _get_diff_summary_for_pr(branch: str) -> DiffSummary | None:
-    """Wrap get_diff_summary() to handle errors gracefully.
-
-    Non-blocking for PR creation.
-    """
-    try:
-        from vibe3.analysis import get_diff_summary
-
-        return get_diff_summary(branch)
-    except Exception:
-        logger.bind(domain="pr", branch=branch).warning(
-            "Failed to get diff summary, skipping change summary section"
-        )
-        return None
 
 
 def _format_diff_summary(summary: DiffSummary) -> str:
