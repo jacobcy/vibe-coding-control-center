@@ -381,3 +381,26 @@ class TestCollectLabelAnomalies:
         )
         rules = [a.rule for a in result]
         assert "multi_state" not in rules
+
+    def test_governed_missing_state_non_manager_issue(self) -> None:
+        """governed_missing_state fires even for non-manager issues."""
+        result = collect_label_anomalies(
+            ["orchestra-governed"],
+            issue_number=1,
+            has_local_flow=True,
+            is_manager_issue=False,  # non-manager
+        )
+        assert len(result) == 1
+        assert "governed_missing_state" in result[0].rule
+        assert result[0].added == ["state/ready"]
+
+    def test_governed_missing_state_skipped_on_roadmap_non_manager(self) -> None:
+        """roadmap labels still suppress governed_missing_state rule for non-manager."""
+        for roadmap_label in ("roadmap/rfc", "roadmap/epic"):
+            result = collect_label_anomalies(
+                ["orchestra-governed", roadmap_label],
+                issue_number=1,
+                has_local_flow=True,
+                is_manager_issue=False,
+            )
+            assert result == []

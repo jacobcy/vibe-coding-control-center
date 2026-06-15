@@ -106,3 +106,17 @@ class TestLabelUtilsSyncRules:
 
         assert len(anomalies) == 1
         assert "roadmap_conflict" in anomalies[0].rule
+
+    def test_governed_missing_state_with_disabled_rule(self) -> None:
+        """Disabling governed_missing_state skips it regardless of is_manager_issue."""
+        config = SyncRulesConfig(
+            remote=RemoteSyncRules(governed_missing_state=SyncRule(enabled=False))
+        )
+        anomalies = collect_label_anomalies(
+            ["orchestra-governed"],
+            issue_number=1,
+            has_local_flow=True,
+            is_manager_issue=False,
+            rules=config,
+        )
+        assert len(anomalies) == 0

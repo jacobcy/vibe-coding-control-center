@@ -203,9 +203,9 @@ def collect_label_anomalies(
                     added.append("state/ready")
                     rules_found.append("orphan_execution")
 
-    # Rule 4: governed issue missing its terminal state (manager issues only)
+    # Rule 4: governed issue missing its terminal state
     if rules is None or rules.remote.governed_missing_state.enabled:
-        if is_manager_issue and has_orchestra_governed(labels):
+        if has_orchestra_governed(labels):
             has_state = bool(get_state_labels(labels))
             has_roadmap = has_roadmap_label(labels)
             if not has_state and not has_roadmap:

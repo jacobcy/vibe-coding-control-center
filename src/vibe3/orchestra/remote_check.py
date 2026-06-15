@@ -88,6 +88,13 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
             rules=sync_rules,
         )
         anomalies.extend(found)
+        # Log matched anomalies with issue context
+        for found_anomaly in found:
+            if "governed_missing_state" in found_anomaly.rule:
+                logger.bind(domain="orchestra", action="remote_check", issue=num).info(
+                    "governed_missing_state: adding state/ready",
+                    labels=labels,
+                )
         if not dry_run and found:
             for a in found:
                 for lb in a.removed:
