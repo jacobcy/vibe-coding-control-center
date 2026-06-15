@@ -32,6 +32,32 @@
 如果计划中的内容看似"很简单"或"只改一个文件"，仍然禁止执行。
 简单性不是越权的理由。
 
+## 反模式：禁止规划代码层补偿
+
+**Agent 行为错误必须通过修 prompt material 来修复，禁止在代码层写死检查规则或自动修复逻辑进行补偿。**
+
+### 识别标准
+
+issue 满足任一条件即为代码层补偿反模式：
+
+- 问题真源是 agent 读了 prompt material 后执行了错误动作，但 issue 提议修改代码而非修 material
+- 提议在代码中写死检查规则来检测/修复"agent 可能犯的错误"
+- 提议代码自动修复标签不一致、状态不一致等问题，而不追溯为什么 agent 会产生不一致
+
+### 正确方向
+
+- 如果 issue 描述的是 agent 行为错误 → plan 中标注"建议先修 prompt material"，拒绝规划代码改动
+- 代码层只做**观测和记录**（如结构化日志、统计输出），不做自动补偿
+- 自动修复仅限已有明确规则的标签冲突（如 `roadmap_conflict`、`multi_state`），这些规则本身就是治理材料的一部分
+
+### 错误示例
+
+```
+❌ Issue: "agent 给非 manager issue 打了 orchestra-governed 但没有 state 标签"
+   → 错误 Plan: "修改 collect_label_anomalies 自动补 state/ready"
+   → 正确 Plan: "检查并修复 agent prompt material 中的标签使用约定"
+```
+
 ## 共用前提
 
 - 公共硬规则、handoff 约束和工具使用顺序在这里同样适用。

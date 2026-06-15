@@ -197,6 +197,7 @@ Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
 3. **与现有能力重叠**：已有 CI/skill 可解决但未验证现有能力是否真的无法满足
 4. **违反项目原则**：违背最小正确改动、认知优先（SOUL.md）或最小变更、Skill-First、验证先于声称完成（CLAUDE.md）
 5. **边缘场景驱动**：只为极少数场景服务，无通用价值或可由用户自行处理
+6. **代码层补偿 Agent 行为错误**：问题真源在 agent 读的 prompt material（governance material / SKILL / role material），但 issue 提议在代码中写死检查规则或自动修复逻辑。违反 manager.md §代码层不补偿原则
 
 ### 评分规则
 

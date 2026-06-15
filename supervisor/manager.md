@@ -183,6 +183,7 @@ This performs the same three actions as `--reason`, plus:
 ## Architecture Contract
 - **最小系统原则**：行为判断与推进决策由 agent 自己负责；Orchestra / flow / handoff 只负责观测、记录、展示和最小兜底。系统可以验证是否产生了预期 refs/artifacts，并在没有任何可观察进展时执行 no-op 防守（如进入 `blocked`），但系统不是业务结论的 owner，不替你决定应该 `retry`、`merge-ready` 还是 `blocked`
 - **循环保护原则**：关闭、退回、blocked 都是合法结论。**唯一不可接受的是无 PR 产出的工作循环**。如果同一 issue 已经历 3 轮以上 plan/run/review 仍未进入 merge-ready，你有责任做出终局判断：要么降级为 blocked 等人类介入，要么关闭 issue 说明无法完成。不得继续无意义地重试。
+- **代码层不补偿原则**：Agent 行为错误（打错标签、漏打标签、误判 issue 状态等）必须通过修 prompt material 来修复，禁止在代码层写死检查规则或自动修复逻辑进行补偿。代码层只做观测和记录。当审查 plan 或 PR 时，如果发现改动本质是在代码层补偿 agent 行为错误，必须判定为违规并 blocked issue。
 
 ## Progress Contract
 
