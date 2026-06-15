@@ -340,7 +340,9 @@ def test_plan_sync_handler_failure_exits_nonzero(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["--branch", "42", "--no-async"])
 
     assert result.exit_code == 1
-    assert "Error: plan boom" in result.output
+    # New structured output format
+    assert "✗ Failed" in result.output
+    assert "plan boom" in result.output
 
 
 def test_plan_show_prompt_propagates(monkeypatch) -> None:
@@ -444,9 +446,9 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
 
     result = runner.invoke(plan_app, ["--branch", "42"])
     assert result.exit_code == 0
-    # Should display tmux and log info
-    assert "tmux session: vibe3-planner-issue-42" in result.output
-    assert "log: /path/to/log.md" in result.output
+    # Should display tmux and log info (new capitalized format)
+    assert "Tmux session: vibe3-planner-issue-42" in result.output
+    assert "Log path: /path/to/log.md" in result.output
 
 
 def test_plan_agent_option_propagates(monkeypatch) -> None:

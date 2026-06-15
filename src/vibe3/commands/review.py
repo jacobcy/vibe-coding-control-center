@@ -90,9 +90,8 @@ def _review_branch_impl(
         enable_method_trace()
 
     # Register EDA event handlers for review command
-    from vibe3.domain import publish as domain_publish
     from vibe3.domain import register_event_handlers
-    from vibe3.models import ManualReviewIntent
+    from vibe3.models import ManualReviewIntent, publish_and_wait
 
     register_event_handlers()
 
@@ -116,8 +115,8 @@ def _review_branch_impl(
         )
         raise typer.Exit(1)
 
-    # Publish ManualReviewIntent event (handler will execute)
-    domain_publish(
+    # Publish ManualReviewIntent event and wait for result
+    result = publish_and_wait(
         ManualReviewIntent(
             issue_number=issue_number,
             branch=branch,
@@ -131,6 +130,14 @@ def _review_branch_impl(
             fresh_session=fresh_session,
         )
     )
+
+    # Display result
+    if result is None:
+        typer.echo("Review dispatched (async mode)")
+    elif result.verdict in {"ASYNC", "DRY_RUN"}:
+        pass  # already handled
+    else:
+        _emit_review_result(result.verdict, result.handoff_file)
 
 
 @app.callback(invoke_without_command=True)

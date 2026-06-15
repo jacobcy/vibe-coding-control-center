@@ -135,11 +135,12 @@ class TestManualPlanIntentErrorPaths:
             "vibe3.config.load_config_for_role",
             side_effect=RuntimeError("config boom"),
         ):
-            handle_manual_plan_intent(event)
+            result = handle_manual_plan_intent(event)
 
-        result = get_pending_result("plan")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "config boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "config boom" in result.stderr
 
     def test_missing_request_stores_error_result(self) -> None:
         event = ManualPlanIntent(
@@ -150,11 +151,12 @@ class TestManualPlanIntentErrorPaths:
         )
 
         with patch("vibe3.config.load_config_for_role", return_value=object()):
-            handle_manual_plan_intent(event)
+            result = handle_manual_plan_intent(event)
 
-        result = get_pending_result("plan")
-        assert isinstance(result, ValueError)
-        assert str(result) == "ManualPlanIntent missing request"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "missing request" in result.stderr
 
 
 class TestManualRunIntentErrorPaths:
@@ -175,11 +177,12 @@ class TestManualRunIntentErrorPaths:
             "vibe3.config.load_config_for_role",
             side_effect=RuntimeError("config boom"),
         ):
-            handle_manual_run_intent(event)
+            result = handle_manual_run_intent(event)
 
-        result = get_pending_result("run")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "config boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "config boom" in result.stderr
 
     def test_execution_exception_stores_error_result(self) -> None:
         event = ManualRunIntent(
@@ -196,8 +199,9 @@ class TestManualRunIntentErrorPaths:
                 side_effect=RuntimeError("run boom"),
             ),
         ):
-            handle_manual_run_intent(event)
+            result = handle_manual_run_intent(event)
 
-        result = get_pending_result("run")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "run boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "run boom" in result.stderr

@@ -54,6 +54,7 @@ if TYPE_CHECKING:
         PublishHook,
         get_publisher,
         publish,
+        publish_and_wait,
         subscribe,
     )
     from vibe3.models.execution_handle import AsyncExecutionHandle
