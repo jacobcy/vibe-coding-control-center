@@ -12,15 +12,12 @@ class TestGetDiffSummary:
         """When baseline exists, should compute full snapshot diff."""
         from vibe3.analysis.snapshot_diff_facade import get_diff_summary
 
-        # Mock baseline snapshot
         mock_baseline = MagicMock(spec=StructureSnapshot)
         mock_baseline.snapshot_id = "baseline-123"
 
-        # Mock current snapshot
         mock_current = MagicMock(spec=StructureSnapshot)
         mock_current.snapshot_id = "current-456"
 
-        # Mock diff result
         mock_diff_summary = DiffSummary(
             files_added=2,
             files_removed=1,
@@ -57,12 +54,13 @@ class TestGetDiffSummary:
             "vibe3.analysis.snapshot_diff_facade.load_branch_baseline",
             return_value=None,
         ):
-            # Mock GitClient
             mock_git = MagicMock()
-            mock_git._run.side_effect = [
-                "A\tnew_file.py\nM\tmodified_file.py\nD\tdeleted_file.py",
-                "10\t5\tnew_file.py\n20\t10\tmodified_file.py\n-\t-\tdeleted_file.py",
-            ]
+            mock_git._run.return_value = (
+                "A\tnew_file.py\nM\tmodified_file.py\nD\tdeleted_file.py"
+            )
+            mock_git.get_numstat.return_value = (
+                "10\t5\tnew_file.py\n20\t10\tmodified_file.py\n-\t-\tdeleted_file.py"
+            )
 
             with patch(
                 "vibe3.analysis.snapshot_diff_facade.GitClient",
@@ -96,14 +94,11 @@ class TestGetDiffSummary:
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = [
-            "R100\told_name.py\tnew_name.py\nA\tnew_file.py",
-            "10\t5\tnew_name.py\n10\t5\tnew_file.py",
-        ]
+        mock_git._run.return_value = "R100\told_name.py\tnew_name.py\nA\tnew_file.py"
+        mock_git.get_numstat.return_value = "10\t5\tnew_name.py\n10\t5\tnew_file.py"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
-        # Rename should count as modified
         assert result.files_modified >= 1
         assert result.files_added == 1
 
@@ -112,14 +107,11 @@ class TestGetDiffSummary:
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = [
-            "C100\toriginal.py\tcopy.py\nM\tmodified.py",
-            "10\t5\tcopy.py\n20\t10\tmodified.py",
-        ]
+        mock_git._run.return_value = "C100\toriginal.py\tcopy.py\nM\tmodified.py"
+        mock_git.get_numstat.return_value = "10\t5\tcopy.py\n20\t10\tmodified.py"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
-        # Copy should count as added
         assert result.files_added >= 1
         assert result.files_modified == 1
 
@@ -132,10 +124,10 @@ class TestDiffViaGit:
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = [
-            "A\tfile1.py\nA\tfile2.py\nM\tfile3.py\nD\tfile4.py",
-            "",
-        ]
+        mock_git._run.return_value = (
+            "A\tfile1.py\nA\tfile2.py\nM\tfile3.py\nD\tfile4.py"
+        )
+        mock_git.get_numstat.return_value = ""
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
@@ -148,10 +140,10 @@ class TestDiffViaGit:
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = [
-            "",
-            "10\t5\tfile1.py\n20\t-\tfile2.py\n-\t10\tfile3.py",
-        ]
+        mock_git._run.return_value = ""
+        mock_git.get_numstat.return_value = (
+            "10\t5\tfile1.py\n20\t-\tfile2.py\n-\t10\tfile3.py"
+        )
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
@@ -163,10 +155,8 @@ class TestDiffViaGit:
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = [
-            "M\tbinary.png",
-            "-\t-\tbinary.png",
-        ]
+        mock_git._run.return_value = "M\tbinary.png"
+        mock_git.get_numstat.return_value = "-\t-\tbinary.png"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 

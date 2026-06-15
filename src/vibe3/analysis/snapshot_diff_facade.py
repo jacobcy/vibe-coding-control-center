@@ -7,7 +7,7 @@ from vibe3.analysis.snapshot_service import (
     load_branch_baseline,
 )
 from vibe3.clients import GitClient
-from vibe3.models import DiffSummary
+from vibe3.models import BranchSource, DiffSummary
 
 
 def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
@@ -45,7 +45,13 @@ def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
 
 
 def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
-    """Build DiffSummary from git diff output (fallback when no baseline)."""
+    """Build DiffSummary from git diff output (fallback when no baseline).
+
+    Uses GitClient.get_numstat() public API (which resolves merge-base
+    internally) for LOC counting.  --name-status has no public equivalent
+    on GitClient so it goes through _run() directly.
+    """
+    source = BranchSource(branch=branch, base=base_branch)
     added = removed = modified = 0
     loc_delta = 0
 
@@ -63,8 +69,6 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
                 elif line.startswith("M\t"):
                     modified += 1
                 elif len(line) > 0 and line[0] in "RC":
-                    # Handle Rename (R) and Copy (C)
-                    # Format: R100\told\tnew or C100\told\tnew
                     if line[0] == "R":
                         modified += 1
                     else:  # Copy
@@ -76,9 +80,9 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
             branch=branch,
         ).warning(f"Failed to get git name-status: {e}")
 
-    # Get Loc via --numstat
+    # Get Loc via public GitClient API (handles merge-base internally)
     try:
-        numstat_output = git._run(["diff", "--numstat", f"{base_branch}...{branch}"])
+        numstat_output = git.get_numstat(source)
         if numstat_output:
             for line in numstat_output.splitlines():
                 parts = line.split("\t")
