@@ -65,7 +65,7 @@ def test_build_run_prompt_body_instructs_ref_reads_via_handoff_show(
 
     context = build_run_prompt_body(str(plan_file), config)
 
-    assert "handoff show <ref>" in context
+    assert "handoff show @plan" in context
     assert "Do not call file-reading tools directly" in context
 
 
@@ -153,7 +153,7 @@ def test_build_run_prompt_body_includes_plan_requirements_verification(
 
     # Verify instruction to extract requirements from plan
     assert "Extract ALL verification requirements" in context
-    assert "handoff show <plan_ref>" in context
+    assert "handoff show @plan" in context
 
     # Verify instruction to form checklist
     assert "Requirements Checklist" in context or "checklist" in context.lower()

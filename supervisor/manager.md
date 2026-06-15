@@ -317,21 +317,29 @@ uv run python src/vibe3/cli.py task show <target-branch> --comments
 
 > ⚠️ **禁止直接使用 Read 工具读取文件路径**（如 plan_ref、report_ref、audit_ref）。
 > 直接访问 `.git/vibe3/handoff/` 或 `.agent/plans/` 等路径极易触发权限错误。
+>
+> **优先使用 stable alias（推荐）**，先运行 `vibe3 handoff show --help` 了解完整用法：
 
 **必须使用 `handoff show` 命令**：
 
 ```bash
-# 读取 plan_ref（例如：docs/plans/xxx.md）
-uv run python src/vibe3/cli.py handoff show docs/plans/xxx.md --branch <branch>
+# 读取 plan_ref —— 推荐使用 stable alias
+uv run python src/vibe3/cli.py handoff show @plan
 
-# 读取 report_ref（例如：docs/reports/xxx.md）
-uv run python src/vibe3/cli.py handoff show docs/reports/xxx.md --branch <branch>
+# 读取 report_ref —— 推荐使用 stable alias
+uv run python src/vibe3/cli.py handoff show @report
 
-# 读取 audit_ref（例如：docs/audits/xxx.md）
-uv run python src/vibe3/cli.py handoff show docs/audits/xxx.md --branch <branch>
+# 读取 audit_ref —— 推荐使用 stable alias
+uv run python src/vibe3/cli.py handoff show @audit
 
-# 读取共享 artifact（例如：@task-xxx/run-yyy.md）
+# 读取 indicate_ref —— manager 发给下游的指令
+uv run python src/vibe3/cli.py handoff show @indicate
+
+# 读取共享 artifact
 uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
+
+# 读取当前 handoff
+uv run python src/vibe3/cli.py handoff show @current
 ```
 
 不要：

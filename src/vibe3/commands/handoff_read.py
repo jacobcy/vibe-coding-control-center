@@ -63,24 +63,28 @@ Usage: vibe3 handoff show <target> [--branch <branch>]
 
 Show a handoff artifact by target reference.
 
-Target formats:
+Stable aliases (preferred — resolve from flow state, more robust than raw paths):
+  @plan              Flow plan ref
+  @report            Flow report ref
+  @audit             Flow audit ref
+  @indicate          Manager indicate ref (directives to downstream agents)
+  @spec              Flow spec ref
+
+Other target formats:
   @vibe/<path>       Vibe3 installation materials (governance docs, prompts, skills)
   @key               Shared artifact key (e.g. @task-476/run-1.md)
-  @plan              Flow plan ref (resolved from flow_state.plan_ref)
-  @report            Flow report ref (resolved from flow_state.report_ref)
-  @audit             Flow audit ref (resolved from flow_state.audit_ref)
   relative/path      Canonical worktree ref; defaults to current worktree,
                      use --branch for strict resolution
   /abs/path          Absolute filesystem path (debug fallback)
 
 Examples:
-  vibe3 handoff show @vibe/supervisor/apply.md
-  vibe3 handoff show @vibe/prompts/vibe-commit.md --vibe-dir /path/to/vibe3
-  vibe3 handoff show @task-476/run-1.md
   vibe3 handoff show @plan --branch task/issue-822
   vibe3 handoff show @plan
-  vibe3 handoff show --branch task/issue-476 docs/reports/audit.md
-  vibe3 handoff show /abs/path/to/artifact.md
+  vibe3 handoff show @report
+  vibe3 handoff show @audit
+  vibe3 handoff show @indicate
+  vibe3 handoff show @vibe/supervisor/apply.md
+  vibe3 handoff show @task-476/run-1.md
 
 See also:
   vibe3 handoff status          Show current flow handoff chain
@@ -99,7 +103,10 @@ def show(
     target: Annotated[
         str | None,
         typer.Argument(
-            help="Handoff target: @vibe/<path>, @key, relative/path, or /abs/path"
+            help=(
+                "Handoff target: @plan, @report, @audit, @indicate, "
+                "@spec, @key, @vibe/<path>, relative/path, or /abs/path"
+            )
         ),
     ] = None,
     branch: Annotated[
