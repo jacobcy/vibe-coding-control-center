@@ -115,11 +115,11 @@ gh issue view <dependency-number> --json state,stateReason
 - 如：涉及核心基础设施、需要大量人类对齐、边界不明确等
 
 **Level 1-3 框架**：
-- Level 1：边界明确（改动范围清晰）
-- Level 2：验收清晰（有明确的验收标准）
-- Level 3：依赖就绪（无阻塞依赖）
+- Level 1：基础条件（问题边界明确、验收口径清楚、依赖关系简单）
+- Level 2：架构一致性（依赖的模块/API 仍存在、未废弃、架构未变更）
+- Level 3：生命周期检查（未过时、非重复、依赖就绪）
 
-详细依据：`@vibe/supervisor/governance/roadmap-intake.md`
+详细依据：`@vibe/supervisor/governance/roadmap-intake.md`、`supervisor/roadmap-common.md` §三级审查框架
 
 ## What It Produces
 
@@ -136,7 +136,7 @@ gh issue view <dependency-number> --json state,stateReason
 - 不负责 task registry 或 task 数据质量审计
 - 不负责 runtime 绑定修复
 - 不负责 roadmap 规划或版本目标
-- 不负责 GitHub issue intake、模板补全或查重
+- 不直接执行 intake 判断（通过 `vibe3 scan governance --role roadmap-intake` 委托给 governance agent）
 - 不负责单个 flow 的 plan / run / review
 - 不负责决定单个 issue 一定要先 plan、run、review 还是直接人工操作
 - 不负责把 `state/*` label 当作启动执行的主驱动
