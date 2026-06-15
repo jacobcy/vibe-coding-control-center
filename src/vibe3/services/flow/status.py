@@ -75,6 +75,7 @@ class FlowStatusService:
         reason: str,
         event_type: str,
         action: str,
+        record_event: bool = True,
     ) -> None:
         """Generic method to mark flow status and record event."""
         logger.bind(
@@ -83,12 +84,13 @@ class FlowStatusService:
             branch=branch,
         ).info(f"{action}: {reason}")
         self.store.update_flow_state(branch, flow_status=status)
-        self.store.add_event(
-            branch,
-            event_type,
-            "system",
-            f"Flow auto-{status}: {reason}",
-        )
+        if record_event:
+            self.store.add_event(
+                branch,
+                event_type,
+                "system",
+                f"Flow auto-{status}: {reason}",
+            )
 
     @staticmethod
     def is_task_branch(branch: str) -> bool:
@@ -124,7 +126,12 @@ class FlowStatusService:
             logger.warning(f"Failed to save branch baseline on auto-complete: {e}")
 
         self.mark_flow_status(
-            branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
+            branch,
+            "done",
+            reason,
+            "flow_auto_completed",
+            "auto_complete_flow",
+            record_event=False,
         )
 
         # Fetch task issue once for both event publish and close logic
