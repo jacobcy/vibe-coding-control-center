@@ -337,7 +337,7 @@ CREATE TABLE flow_events (
 2. GitHub `issue / PR / Project`
 3. SQLite handoff store
 4. 共享 `current.md`
-5. `.agent/context/task.md` 本地草稿（可选）
+5. `.agent/context/task.md` (已废弃，仅作极端兼容)
 6. `.agent/plans/` / `.agent/reports/` 文档存在性
 
 解释约束：

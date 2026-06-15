@@ -61,6 +61,7 @@ Handoff 的核心作用是传递 Agent、Skill 或 Session 之间的短期上下
 - `vibe3` Python CLI 提供的实时状态事实。
 - SQLite handoff store (`.git/vibe3/handoff.db`)。
 - 当前 `git` 现场事实。
+- 严禁依赖 `.agent/context/task.md` 作为跨 session 或跨 skill 的真源（该文件已废弃）。
 
 ## 3. Priority Order (优先级顺序)
 
@@ -153,7 +154,7 @@ V2 到 V3 handoff 系统的关键变化：
 
 | 方面 | V2 (Shell) | V3 (Python) |
 |------|------------|-------------|
-| 存储 | `.agent/context/task.md` | SQLite + Markdown buffer |
+| 存储 | `.agent/context/task.md` (已废弃) | SQLite + Markdown buffer |
 | 路径 | `.git/vibe/` | `.git/vibe3/` |
 | 命令 | `vibe2 flow` (Legacy/Deprecated) | `vibe3` Python CLI |
 | 主键 | worktree name | branch name |

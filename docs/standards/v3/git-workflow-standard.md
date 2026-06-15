@@ -322,7 +322,7 @@ closeout 约束：
   - 负责合并后的收口编排
   - 通过 `gh issue close` 等动作完成 task / issue / flow handoff
 
-`.agent/context/task.md`（如存在）只作为 skill 之间的短期 handoff 记录，不是共享真源。V3 优先使用 `handoff` 命令与 SQLite 存储。
+V3 统一使用 `handoff` 命令与 SQLite 存储作为共享真源。`.agent/context/task.md` 已废弃，仅在极少数遗留场景作为本地临时草稿，不得依赖其作为状态传递媒介。
 
 ## 9. Branch Protection
 
