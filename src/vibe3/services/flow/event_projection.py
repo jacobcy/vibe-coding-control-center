@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models import DomainEvent, FlowCompleted, PRMerged
+from vibe3.models import DomainEvent, FlowBlocked, FlowCompleted, PRMerged
 
 if TYPE_CHECKING:
     from vibe3.models import PublishHook
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 # Declarative mapping from DomainEvent types to flow_events.event_type strings.
 # Events not in this table are not projected.
 PROJECTION_TABLE: dict[type[DomainEvent], str] = {
+    FlowBlocked: "flow_blocked",
     FlowCompleted: "flow_completed",
     PRMerged: "pr_merged",
 }
@@ -58,10 +59,13 @@ def project_domain_event(event: DomainEvent) -> bool:
 
     # Build detail from key event fields
     # For FlowCompleted, include completed_state
+    # For FlowBlocked, include blocked_reason
     # For PRMerged, include pr_number and merged_by
     detail_parts = []
     if hasattr(event, "completed_state"):
         detail_parts.append(f"completed_state={event.completed_state}")
+    if hasattr(event, "blocked_reason"):
+        detail_parts.append(f"blocked_reason={event.blocked_reason}")
     if hasattr(event, "issue_number"):
         detail_parts.append(f"issue_number={event.issue_number}")
     if hasattr(event, "pr_number"):

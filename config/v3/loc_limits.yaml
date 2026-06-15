@@ -140,6 +140,9 @@ code_limits:
       - path: "src/vibe3/services/flow/cleanup.py"
         limit: 420
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤（migrated from flow_cleanup_service.py to flow/ subpackage, Issue #2107）"
+      - path: "src/vibe3/services/flow/blocked_state_service.py"
+        limit: 450
+        reason: "Blocked state 统一管理服务，协调 issue body/database/labels 三个数据源的状态一致性；包含 block_state_only、unblock_state_only、block_flow 等核心方法，以及 consistency checking 和 repair 逻辑；Issue #2839 新增 block_flow 方法支持 FlowBlocked domain event projection（+30 行）"
       - path: "src/vibe3/services/check/cleanup.py"
         limit: 610
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）；迁移至 check/ 子包（Issue #2584）"

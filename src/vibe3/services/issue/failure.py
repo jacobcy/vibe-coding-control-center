@@ -99,7 +99,6 @@ def mark_issue(
             reason=reason,
             actor=actor,
             repo=repo,
-            event_type="flow_blocked",
         )
 
 

@@ -56,6 +56,85 @@ class BlockedStateService:
     # Public API: Write Operations
     # ========================================================================
 
+    def block_state_only(
+        self,
+        branch: str,
+        reason: str | None = None,
+        blocked_by_issue: int | None = None,
+        actor: str = "system",
+        issue_number: int | None = None,
+    ) -> None:
+        """Set blocked state in body, database, and labels without timeline event.
+
+        This method is used by block_flow() when the timeline event is written
+        through the domain event projection hook instead of directly.
+
+        Args:
+            branch: Git branch to mark as blocked
+            reason: Human-readable reason for blocking
+            blocked_by_issue: Issue number causing the block (optional)
+            actor: Who initiated the block (default: "system")
+            issue_number: Issue to label as BLOCKED (optional)
+        """
+        if reason is not None and blocked_by_issue is not None:
+            raise ValueError(
+                "blocked_reason and blocked_by_issue are mutually exclusive"
+            )
+
+        if issue_number:
+            try:
+                self._io.write_body_projection(
+                    issue_number=issue_number,
+                    reason=reason,
+                    blocked_by_issue=blocked_by_issue,
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain="blocked_state",
+                    action="block_state_only",
+                    branch=branch,
+                ).error(f"Failed to write issue body projection: {exc}")
+                raise
+
+        if self.store:
+            try:
+                self._io.write_database_cache(
+                    branch=branch,
+                    reason=reason,
+                    blocked_by_issue=blocked_by_issue,
+                    actor=actor,
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain="blocked_state",
+                    action="block_state_only",
+                    branch=branch,
+                ).warning(f"Failed to write database cache: {exc}")
+
+        if issue_number:
+            try:
+                result = self._io.write_label_state(
+                    issue_number=issue_number,
+                    target_state=IssueState.BLOCKED,
+                    actor=actor,
+                )
+                if result == "blocked":
+                    logger.bind(
+                        domain="blocked_state",
+                        action="block_state_only",
+                        branch=branch,
+                        issue_number=issue_number,
+                    ).warning(
+                        "Label state machine blocked transition to BLOCKED; "
+                        "label may be out of sync with body/DB"
+                    )
+            except Exception as exc:
+                logger.bind(
+                    domain="blocked_state",
+                    action="block_state_only",
+                    branch=branch,
+                ).warning(f"Failed to write label state: {exc}")
+
     def block(
         self,
         branch: str,
@@ -83,65 +162,16 @@ class BlockedStateService:
             issue_number: Issue to label as BLOCKED (optional)
             event_type: Timeline event type (default: "flow_blocked")
         """
-        if reason is not None and blocked_by_issue is not None:
-            raise ValueError(
-                "blocked_reason and blocked_by_issue are mutually exclusive"
-            )
+        # Delegate to block_state_only for state updates
+        self.block_state_only(
+            branch=branch,
+            reason=reason,
+            blocked_by_issue=blocked_by_issue,
+            actor=actor,
+            issue_number=issue_number,
+        )
 
-        if issue_number:
-            try:
-                self._io.write_body_projection(
-                    issue_number=issue_number,
-                    reason=reason,
-                    blocked_by_issue=blocked_by_issue,
-                )
-            except Exception as exc:
-                logger.bind(
-                    domain="blocked_state",
-                    action="block",
-                    branch=branch,
-                ).error(f"Failed to write issue body projection: {exc}")
-                raise
-
-        if self.store:
-            try:
-                self._io.write_database_cache(
-                    branch=branch,
-                    reason=reason,
-                    blocked_by_issue=blocked_by_issue,
-                    actor=actor,
-                )
-            except Exception as exc:
-                logger.bind(
-                    domain="blocked_state",
-                    action="block",
-                    branch=branch,
-                ).warning(f"Failed to write database cache: {exc}")
-
-        if issue_number:
-            try:
-                result = self._io.write_label_state(
-                    issue_number=issue_number,
-                    target_state=IssueState.BLOCKED,
-                    actor=actor,
-                )
-                if result == "blocked":
-                    logger.bind(
-                        domain="blocked_state",
-                        action="block",
-                        branch=branch,
-                        issue_number=issue_number,
-                    ).warning(
-                        "Label state machine blocked transition to BLOCKED; "
-                        "label may be out of sync with body/DB"
-                    )
-            except Exception as exc:
-                logger.bind(
-                    domain="blocked_state",
-                    action="block",
-                    branch=branch,
-                ).warning(f"Failed to write label state: {exc}")
-
+        # Write timeline event
         if self.store and issue_number:
             try:
                 timeline = FlowTimelineService(store=self.store)
