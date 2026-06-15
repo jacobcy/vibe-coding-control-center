@@ -157,33 +157,56 @@ function verdictBadge(v) {
   return `<span class="badge ${cls}">${escapeHtml(v.verdict || 'N/A')}</span>`;
 }
 
-function renderIssues(issues, title) {
-  if (!issues || issues.length === 0) return '';
+// Field labels for table headers
+const FIELD_LABELS = {
+  queue_rank: '#',
+  number: 'Issue',
+  title: 'Title',
+  state: 'State',
+  roadmap: 'Road',
+  assignee: 'Assignee',
+  verdict: 'Verdict',
+  blocked_reason: 'Blocked Reason'
+};
 
-  let html = `<div class="section"><div class="section-title">${escapeHtml(title)} (${issues.length})</div>
-  <table><thead><tr>
-    <th>#</th><th>Issue</th><th>Title</th><th>State</th>
-    <th>Road</th><th>Assignee</th><th>Verdict</th>
-  </tr></thead><tbody>`;
-
-  issues.forEach(e => {
+// Field renderers - functions that return HTML for each field
+const FIELD_RENDERERS = {
+  queue_rank: (e) => `<td class="rank">${e.queue_rank || '-'}</td>`,
+  number: (e) => {
     const issueNum = e.number;
     const issueCell = issueNum
       ? `<a href="${BASE_URL}/issues/${issueNum}" target="_blank">#${issueNum}</a>`
       : '-';
-    const refs = [e.plan_ref, e.report_ref, e.audit_ref].filter(Boolean).map(r =>
-      `<a class="ref-link" href="${BASE_URL}/blob/main/${escapeHtml(r)}" target="_blank">${escapeHtml(r.split('/').pop())}</a>`
-    ).join(' ');
+    return `<td class="issue-num">${issueCell}</td>`;
+  },
+  title: (e) => `<td class="issue-title" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</td>`,
+  state: (e) => `<td>${stateBadge(e.state)}</td>`,
+  roadmap: (e) => `<td>${roadBadge(e.roadmap)}</td>`,
+  assignee: (e) => `<td style="color:var(--text-dim);font-size:12px">${escapeHtml(e.assignee || '-')}</td>`,
+  verdict: (e) => `<td>${verdictBadge(e.verdict)}</td>`,
+  blocked_reason: (e) => `<td style="color:var(--text-dim);font-size:12px">${escapeHtml(e.blocked_reason || '-')}</td>`
+};
 
-    html += `<tr>
-      <td class="rank">${e.queue_rank || '-'}</td>
-      <td class="issue-num">${issueCell}</td>
-      <td class="issue-title" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</td>
-      <td>${stateBadge(e.state)}</td>
-      <td>${roadBadge(e.roadmap)}</td>
-      <td style="color:var(--text-dim);font-size:12px">${escapeHtml(e.assignee || '-')}</td>
-      <td>${verdictBadge(e.verdict)}</td>
-    </tr>`;
+// Per-section field configuration
+const BLOCK_CONFIG = {
+  'default': ['queue_rank', 'number', 'title', 'state', 'roadmap', 'assignee', 'verdict'],
+  'blocked': ['queue_rank', 'number', 'title', 'state', 'blocked_reason', 'roadmap'],
+  'waiting-for-pool': ['queue_rank', 'number', 'title', 'assignee', 'roadmap'],
+  'roadmap-item': ['number', 'title', 'roadmap']
+};
+
+function renderIssues(issues, title, blockType = 'default') {
+  if (!issues || issues.length === 0) return '';
+
+  const fields = BLOCK_CONFIG[blockType] || BLOCK_CONFIG['default'];
+  const headerCells = fields.map(f => `<th>${FIELD_LABELS[f]}</th>`).join('');
+
+  let html = `<div class="section"><div class="section-title">${escapeHtml(title)} (${issues.length})</div>
+  <table><thead><tr>${headerCells}</tr></thead><tbody>`;
+
+  issues.forEach(e => {
+    const cells = fields.map(f => FIELD_RENDERERS[f](e)).join('');
+    html += `<tr>${cells}</tr>`;
   });
 
   html += '</tbody></table></div>';
@@ -219,57 +242,57 @@ async function load() {
 
     // Assignee Intake
     if (buckets['assignee-intake'] && buckets['assignee-intake'].length > 0) {
-      html += renderIssues(buckets['assignee-intake'], 'Assignee Intake');
+      html += renderIssues(buckets['assignee-intake'], 'Assignee Intake', 'default');
     }
 
     // Ready Queue
     if (buckets['ready-queue'] && buckets['ready-queue'].length > 0) {
-      html += renderIssues(buckets['ready-queue'], 'Ready Queue');
+      html += renderIssues(buckets['ready-queue'], 'Ready Queue', 'default');
     }
 
     // Ready Anomaly
     if (buckets['ready-anomaly'] && buckets['ready-anomaly'].length > 0) {
-      html += renderIssues(buckets['ready-anomaly'], 'Ready Anomaly');
+      html += renderIssues(buckets['ready-anomaly'], 'Ready Anomaly', 'default');
     }
 
     // Active Anomaly
     if (buckets['active-anomaly'] && buckets['active-anomaly'].length > 0) {
-      html += renderIssues(buckets['active-anomaly'], 'Active Anomaly');
+      html += renderIssues(buckets['active-anomaly'], 'Active Anomaly', 'default');
     }
 
     // Other
     if (buckets['other'] && buckets['other'].length > 0) {
-      html += renderIssues(buckets['other'], 'Other');
+      html += renderIssues(buckets['other'], 'Other', 'default');
     }
 
     // Blocked items
     if (d.classified_issues.blocked_items && d.classified_issues.blocked_items.length > 0) {
-      html += renderIssues(d.classified_issues.blocked_items, 'Blocked');
+      html += renderIssues(d.classified_issues.blocked_items, 'Blocked', 'blocked');
     }
 
     // Remote items
     if (d.classified_issues.remote_items && d.classified_issues.remote_items.length > 0) {
-      html += renderIssues(d.classified_issues.remote_items, 'Remote');
+      html += renderIssues(d.classified_issues.remote_items, 'Remote', 'default');
     }
 
     // Waiting for pool
     if (d.classified_issues.waiting_for_pool_items && d.classified_issues.waiting_for_pool_items.length > 0) {
-      html += renderIssues(d.classified_issues.waiting_for_pool_items, 'Waiting for Pool');
+      html += renderIssues(d.classified_issues.waiting_for_pool_items, 'Waiting for Pool', 'waiting-for-pool');
     }
 
     // Supervisor items
     if (d.classified_issues.supervisor_items && d.classified_issues.supervisor_items.length > 0) {
-      html += renderIssues(d.classified_issues.supervisor_items, 'Supervisor');
+      html += renderIssues(d.classified_issues.supervisor_items, 'Supervisor', 'default');
     }
 
     // RFC items
     if (d.classified_issues.roadmap_rfc_items && d.classified_issues.roadmap_rfc_items.length > 0) {
-      html += renderIssues(d.classified_issues.roadmap_rfc_items, 'Roadmap RFC');
+      html += renderIssues(d.classified_issues.roadmap_rfc_items, 'Roadmap RFC', 'roadmap-item');
     }
 
     // Epic items
     if (d.classified_issues.roadmap_epic_items && d.classified_issues.roadmap_epic_items.length > 0) {
-      html += renderIssues(d.classified_issues.roadmap_epic_items, 'Roadmap Epic');
+      html += renderIssues(d.classified_issues.roadmap_epic_items, 'Roadmap Epic', 'roadmap-item');
     }
 
     if (!html) {

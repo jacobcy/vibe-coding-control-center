@@ -75,3 +75,32 @@ def test_open_issue_numbers_includes_missing_state():
     ]
     result = classify_task_issues_for_rendering(issues, _make_config())
     assert result["open_issue_numbers"] == {1}
+
+
+def test_blocked_issues_not_in_other_bucket():
+    """BLOCKED issues must not appear in bucketed_items['other']."""
+    issues = [
+        _issue(1, IssueState.BLOCKED.value, labels=[]),
+        _issue(2, IssueState.IN_PROGRESS.value, labels=[]),
+    ]
+    result = classify_task_issues_for_rendering(issues, _make_config())
+    # BLOCKED issues should not be in the 'other' bucket
+    other_items = result["bucketed_items"].get("other", [])
+    other_numbers = {item["number"] for item in other_items}
+    assert 1 not in other_numbers, "BLOCKED issue #1 should not be in 'other' bucket"
+    # Non-blocked issue should be processed normally
+    assert 2 in result["open_issue_numbers"]
+
+
+def test_blocked_items_contains_blocked_issues():
+    """BLOCKED issues must appear in blocked_items."""
+    issues = [
+        _issue(1, IssueState.BLOCKED.value, labels=[]),
+        _issue(2, IssueState.IN_PROGRESS.value, labels=[]),
+    ]
+    result = classify_task_issues_for_rendering(issues, _make_config())
+    blocked_numbers = {item["number"] for item in result["blocked_items"]}
+    assert 1 in blocked_numbers, "BLOCKED issue #1 should be in blocked_items"
+    assert (
+        2 not in blocked_numbers
+    ), "Non-blocked issue #2 should not be in blocked_items"

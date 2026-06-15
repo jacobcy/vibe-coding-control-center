@@ -266,6 +266,9 @@ def classify_task_issues_for_rendering(
         state = cast(IssueState | None, item["state"])
         if state == IssueState.DONE:
             continue
+        # Blocked issues have dedicated section, skip bucketing
+        if state == IssueState.BLOCKED:
+            continue
 
         bucket = classify_task_status(
             state,
@@ -337,6 +340,7 @@ def _issue_to_dict(item: dict[str, object]) -> dict[str, Any]:
         "report_ref": flow.report_ref if flow else None,
         "audit_ref": flow.audit_ref if flow else None,
         "blocked_by": cast(tuple[int, ...] | None, item.get("blocked_by")),
+        "blocked_reason": cast(str | None, item.get("blocked_reason")),
         "priority": cast(int | None, item.get("priority")),
         "roadmap": cast(str | None, item.get("roadmap")),
         "remote": cast(bool, item.get("remote", False)),
