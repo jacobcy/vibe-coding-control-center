@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import functools
 from datetime import datetime, timezone
 from pathlib import Path
@@ -299,13 +300,20 @@ class SerenaService:
                 relative_file = str(file_path)
 
                 try:
+                    # Parse file once, share with get_router_functions
+                    try:
+                        source_text = file_path.read_text(encoding="utf-8")
+                        file_tree = ast.parse(source_text)
+                    except Exception:
+                        file_tree = None
+
                     # Analyze file symbols
                     file_result = self.analyze_file(relative_file)
                     symbols = file_result.get("symbols", [])
                     total_symbols += len(symbols)
 
-                    # Get router-decorated functions for this file (single parse)
-                    router_funcs = get_router_functions(relative_file)
+                    # Get router-decorated functions for this file
+                    router_funcs = get_router_functions(relative_file, tree=file_tree)
 
                     # Check each symbol
                     for sym in symbols:

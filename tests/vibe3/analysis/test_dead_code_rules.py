@@ -241,3 +241,32 @@ async def publish_event(request: dict) -> dict:
         confidence = classify_confidence("publish_event", 0, False, router_funcs)
         assert confidence == "excluded"
         Path(file_path).unlink()
+
+    def test_with_pre_parsed_ast(self):
+        """Test get_router_functions with pre-parsed AST."""
+        import ast
+
+        source = """
+from fastapi import APIRouter
+router = APIRouter()
+@router.post("/events")
+async def publish_event(request: dict) -> dict:
+    return {"status": "ok"}
+"""
+        tree = ast.parse(source)
+        result = get_router_functions("/fake/path.py", tree=tree)
+        assert "publish_event" in result
+
+    def test_pre_parsed_ast_empty(self):
+        """Test pre-parsed AST with no router decorators."""
+        import ast
+
+        source = "def regular(): pass"
+        tree = ast.parse(source)
+        result = get_router_functions("/fake/path.py", tree=tree)
+        assert result == set()
+
+    def test_pre_parsed_ast_malformed(self):
+        """Test pre-parsed AST with non-AST tree falls back gracefully."""
+        result = get_router_functions("/nonexistent.py", tree=None)
+        assert result == set()
