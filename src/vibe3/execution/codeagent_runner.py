@@ -189,7 +189,12 @@ class CodeagentExecutionService:
         try:
             return Path(GitClient().get_worktree_root())
         except Exception:
-            return Path.cwd()
+            fallback = Path.cwd()
+            logger.bind(domain="codeagent").warning(
+                f"Failed to resolve worktree root via git, "
+                f"falling back to process cwd: {fallback}"
+            )
+            return fallback
 
     def _prepare_sync_context(self, command: CodeagentCommand) -> SyncExecutionContext:
         """Prepare execution context before agent run."""
