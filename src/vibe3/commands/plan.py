@@ -17,7 +17,7 @@ from vibe3.commands.command_options import (
     load_config_and_validate_model,
     validate_show_prompt_dependency,
 )
-from vibe3.commands.common import enable_method_trace
+from vibe3.commands.common import _handle_codeagent_result, enable_method_trace
 from vibe3.roles import (
     resolve_spec_plan_input,
 )
@@ -38,16 +38,6 @@ BranchOption = Annotated[
 ]
 
 
-def _raise_pending_plan_error() -> None:
-    """Convert handler-side plan errors into CLI failures."""
-    from vibe3.domain import get_pending_result
-
-    result = get_pending_result("plan")
-    if isinstance(result, Exception):
-        typer.echo(f"Error: {result}", err=True)
-        raise typer.Exit(1)
-
-
 def _plan_for_branch(
     branch: str,
     trace: bool,
@@ -64,12 +54,10 @@ def _plan_for_branch(
         enable_method_trace()
 
     # Register EDA event handlers for plan command
-    from vibe3.domain import get_pending_result, register_event_handlers
-    from vibe3.domain import publish as domain_publish
-    from vibe3.models import ManualPlanIntent
+    from vibe3.domain import register_event_handlers
+    from vibe3.models import ManualPlanIntent, publish_and_wait
 
     register_event_handlers()
-    get_pending_result("plan")
 
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("plan", agent, backend, model)
@@ -107,8 +95,8 @@ def _plan_for_branch(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # Publish ManualPlanIntent event (handler will execute)
-    domain_publish(
+    # Publish ManualPlanIntent event and wait for result
+    result = publish_and_wait(
         ManualPlanIntent(
             issue_number=issue_number,
             branch=branch,
@@ -122,7 +110,9 @@ def _plan_for_branch(
             fresh_session=fresh_session,
         )
     )
-    _raise_pending_plan_error()
+
+    # Display result
+    _handle_codeagent_result(result, "Plan")
 
 
 def _plan_spec_impl(
@@ -142,12 +132,10 @@ def _plan_spec_impl(
         enable_method_trace()
 
     # Register EDA event handlers for plan command
-    from vibe3.domain import get_pending_result, register_event_handlers
-    from vibe3.domain import publish as domain_publish
-    from vibe3.models import ManualPlanIntent
+    from vibe3.domain import register_event_handlers
+    from vibe3.models import ManualPlanIntent, publish_and_wait
 
     register_event_handlers()
-    get_pending_result("plan")
 
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("plan", agent, backend, model)
@@ -239,8 +227,8 @@ def _plan_spec_impl(
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # Publish ManualPlanIntent event (handler will execute)
-    domain_publish(
+    # Publish ManualPlanIntent event and wait for result
+    result = publish_and_wait(
         ManualPlanIntent(
             issue_number=issue_number,
             branch=branch,
@@ -254,7 +242,9 @@ def _plan_spec_impl(
             fresh_session=fresh_session,
         )
     )
-    _raise_pending_plan_error()
+
+    # Display result
+    _handle_codeagent_result(result, "Plan")
 
 
 @app.callback(invoke_without_command=True)

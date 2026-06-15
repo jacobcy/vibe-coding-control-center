@@ -68,6 +68,7 @@ if TYPE_CHECKING:
         EventPublisher,
         get_publisher,
         publish,
+        publish_and_wait,
         subscribe,
     )
     from vibe3.domain.qualify_gate import QualifyGateService

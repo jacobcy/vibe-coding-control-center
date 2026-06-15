@@ -18,7 +18,7 @@ from vibe3.commands.command_options import (
     load_config_and_validate_model,
     validate_show_prompt_dependency,
 )
-from vibe3.commands.common import enable_method_trace
+from vibe3.commands.common import _handle_codeagent_result, enable_method_trace
 from vibe3.exceptions import UserError
 from vibe3.roles import (
     ensure_plan_file_exists,
@@ -42,16 +42,6 @@ BranchOption = Annotated[
     str | None,
     typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
 ]
-
-
-def _raise_pending_run_error() -> None:
-    """Convert handler-side run errors into CLI failures."""
-    from vibe3.domain import get_pending_result
-
-    result = get_pending_result("run")
-    if isinstance(result, Exception):
-        typer.echo(f"Error: {result}", err=True)
-        raise typer.Exit(1)
 
 
 def run_command(
@@ -93,14 +83,10 @@ def run_command(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for run command (may publish events)
-    from vibe3.domain import get_pending_result, register_event_handlers
-    from vibe3.domain import publish as domain_publish
+    from vibe3.domain import register_event_handlers
+    from vibe3.models import ManualRunIntent, publish_and_wait
 
     register_event_handlers()
-    get_pending_result("run")
-
-    # Import new event type
-    from vibe3.models import ManualRunIntent
 
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("run", agent, backend, model)
@@ -136,8 +122,8 @@ def run_command(
         summary = resolve_run_mode(
             flow_service, target_branch, instructions, None, skill
         )
-        # Publish ManualRunIntent event (handler will execute)
-        domain_publish(
+        # Publish ManualRunIntent event and wait for result
+        result = publish_and_wait(
             ManualRunIntent(
                 issue_number=issue_number,
                 branch=target_branch,
@@ -157,7 +143,9 @@ def run_command(
                 publish=publish,
             )
         )
-        _raise_pending_run_error()
+
+        # Display result
+        _handle_codeagent_result(result, "Run")
         return
 
     # Resolve plan parameter using shared @-resolution channel
@@ -210,8 +198,8 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    # Publish ManualRunIntent event (handler will execute)
-    domain_publish(
+    # Publish ManualRunIntent event and wait for result
+    result = publish_and_wait(
         ManualRunIntent(
             issue_number=issue_number,
             branch=target_branch,
@@ -231,7 +219,9 @@ def run_command(
             publish=publish,
         )
     )
-    _raise_pending_run_error()
+
+    # Display result
+    _handle_codeagent_result(result, "Run")
 
 
 @app.callback(invoke_without_command=True)

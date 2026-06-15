@@ -135,11 +135,12 @@ class TestManualPlanIntentErrorPaths:
             "vibe3.config.load_config_for_role",
             side_effect=RuntimeError("config boom"),
         ):
-            handle_manual_plan_intent(event)
+            result = handle_manual_plan_intent(event)
 
-        result = get_pending_result("plan")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "config boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "config boom" in result.stderr
 
     def test_missing_request_stores_error_result(self) -> None:
         event = ManualPlanIntent(
@@ -150,11 +151,12 @@ class TestManualPlanIntentErrorPaths:
         )
 
         with patch("vibe3.config.load_config_for_role", return_value=object()):
-            handle_manual_plan_intent(event)
+            result = handle_manual_plan_intent(event)
 
-        result = get_pending_result("plan")
-        assert isinstance(result, ValueError)
-        assert str(result) == "ManualPlanIntent missing request"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "missing request" in result.stderr
 
 
 class TestManualRunIntentErrorPaths:
@@ -175,11 +177,12 @@ class TestManualRunIntentErrorPaths:
             "vibe3.config.load_config_for_role",
             side_effect=RuntimeError("config boom"),
         ):
-            handle_manual_run_intent(event)
+            result = handle_manual_run_intent(event)
 
-        result = get_pending_result("run")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "config boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "config boom" in result.stderr
 
     def test_execution_exception_stores_error_result(self) -> None:
         event = ManualRunIntent(
@@ -196,8 +199,89 @@ class TestManualRunIntentErrorPaths:
                 side_effect=RuntimeError("run boom"),
             ),
         ):
-            handle_manual_run_intent(event)
+            result = handle_manual_run_intent(event)
 
-        result = get_pending_result("run")
-        assert isinstance(result, RuntimeError)
-        assert str(result) == "run boom"
+        # Handler now returns CodeagentResult with success=False
+        assert result is not None
+        assert not result.success
+        assert "run boom" in result.stderr
+
+
+class TestManualPlanIntentSuccessPaths:
+    """Success paths must return CodeagentResult with success=True."""
+
+    def test_sync_returns_success_result(self) -> None:
+        """Handler returns successful CodeagentResult on sync execution."""
+        from vibe3.agents import CodeagentResult
+        from vibe3.models.plan import PlanRequest, PlanScope
+
+        mock_result = CodeagentResult(success=True, handoff_file="plan.md")
+        mock_scope = PlanScope(kind="spec", description="test specification")
+        mock_request = PlanRequest(scope=mock_scope, task_guidance="test task")
+
+        event = ManualPlanIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            request=mock_request,
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.roles.execute_spec_plan_sync", return_value=mock_result),
+        ):
+            result = handle_manual_plan_intent(event)
+
+        assert result is not None
+        assert result.success
+        assert result.handoff_file == "plan.md"
+
+
+class TestManualRunIntentSuccessPaths:
+    """Success paths must return CodeagentResult with success=True."""
+
+    def test_returns_success_result(self) -> None:
+        """Handler returns successful CodeagentResult on execution."""
+        from vibe3.agents import CodeagentResult
+
+        mock_result = CodeagentResult(success=True, handoff_file="run.md")
+
+        event = ManualRunIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            instructions="do work",
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.roles.execute_manual_run", return_value=mock_result),
+        ):
+            result = handle_manual_run_intent(event)
+
+        assert result is not None
+        assert result.success
+        assert result.handoff_file == "run.md"
+
+
+class TestManualReviewIntentBranchSuccessPaths:
+    """Branch review success paths must return ReviewRunResult."""
+
+    def test_branch_sync_returns_success_result(self) -> None:
+        """Handler returns ReviewRunResult with verdict OK on branch review."""
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.execution.run_issue_role_sync"),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "OK"
+        assert result.issue_number == 42

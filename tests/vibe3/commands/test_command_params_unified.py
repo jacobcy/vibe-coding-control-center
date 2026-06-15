@@ -303,7 +303,9 @@ def test_run_sync_handler_failure_exits_nonzero(
     result = runner.invoke(run_app, ["--no-async", "test instructions"])
 
     assert result.exit_code == 1
-    assert "Error: run boom" in result.output
+    # New structured output format
+    assert "✗ Failed" in result.output
+    assert "run boom" in result.output
 
 
 def test_review_base_dry_run_returns_dry_run_verdict(
