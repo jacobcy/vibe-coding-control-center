@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
@@ -25,6 +25,32 @@ if TYPE_CHECKING:
     from vibe3.config import OrchestraConfig
     from vibe3.environment import SessionRegistryService
     from vibe3.services.orchestra import OrchestraStatusService
+
+
+def _resolve_governance_backend_model(
+    config: OrchestraConfig,
+) -> tuple[Optional[str], Optional[str]]:
+    """Resolve effective backend and model for governance execution.
+
+    Priority:
+    1. Explicit config.governance.backend / config.governance.model
+    2. Repo-local models.json agent preset for 'vibe-governance'
+
+    Args:
+        config: OrchestraConfig instance with governance settings
+
+    Returns:
+        Tuple of (backend, model), either may be None if not configured
+    """
+    backend = config.governance.backend
+    model = config.governance.model
+    if backend is None and model is None:
+        from vibe3.config import resolve_repo_agent_preset
+
+        resolved = resolve_repo_agent_preset("vibe-governance")
+        if resolved:
+            backend, model = resolved
+    return backend, model
 
 
 @dataclass(frozen=True)
@@ -195,6 +221,12 @@ def handle_governance_scan_started(
                 reason=str(exc),
                 reason_code="handler_exception",
             )
+
+    # Enrich result with backend/model for display
+    if result and result.launched:
+        resolved_backend, resolved_model = _resolve_governance_backend_model(config)
+        result.backend = resolved_backend
+        result.model = resolved_model
 
     if result and result.launched:
         append_governance_event(

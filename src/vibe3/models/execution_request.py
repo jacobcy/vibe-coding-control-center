@@ -45,3 +45,5 @@ class ExecutionLaunchResult:
     stdout: Optional[str] = None  # Only populated for sync mode
     reason: Optional[str] = None
     reason_code: Optional[str] = None
+    backend: Optional[str] = None  # Agent backend name
+    model: Optional[str] = None  # Agent model name

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         read_models_json,
         repo_models_json_path,
         resolve_effective_agent_options,
+        resolve_repo_agent_preset,
         resolve_repo_agent_preset_name,
     )
     from vibe3.config.branch_convention import BranchConvention
@@ -144,6 +145,7 @@ __all__ = [
     "reload_config",
     "repo_models_json_path",
     "resolve_effective_agent_options",
+    "resolve_repo_agent_preset",
     "resolve_repo_agent_preset_name",
 ]
 
@@ -209,6 +211,7 @@ _SYMBOL_MODULES = {
     "reload_config": "vibe3.config.loader",
     "repo_models_json_path": "vibe3.config.agent_preset",
     "resolve_effective_agent_options": "vibe3.config.agent_preset",
+    "resolve_repo_agent_preset": "vibe3.config.agent_preset",
     "resolve_repo_agent_preset_name": "vibe3.config.agent_preset",
 }
 

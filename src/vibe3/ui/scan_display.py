@@ -159,6 +159,10 @@ def display_execution_result(console: Console, result: "ExecutionLaunchResult") 
 
     if result.launched:
         console.print("[green]✓ Launched successfully[/green]")
+        if result.backend:
+            console.print(f"[cyan]Backend:[/cyan] {result.backend}")
+        if result.model:
+            console.print(f"[cyan]Model:[/cyan] {result.model}")
         if result.tmux_session:
             console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
         if result.log_path:
