@@ -58,6 +58,23 @@ if TYPE_CHECKING:
 MAX_INTENTS_PER_TICK = 10
 
 
+def _is_executor_shutdown_error(exc: RuntimeError) -> bool:
+    """Check if a RuntimeError indicates executor shutdown.
+
+    In CPython 3.12, ThreadPoolExecutor.submit() raises RuntimeError with
+    message "cannot schedule new futures after shutdown" after shutdown()
+    is called. This helper detects such errors for graceful degradation.
+
+    Args:
+        exc: The RuntimeError to check
+
+    Returns:
+        True if the error indicates executor shutdown, False otherwise
+    """
+    msg = str(exc).lower()
+    return "shutdown" in msg or "cannot schedule" in msg
+
+
 class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
 
@@ -322,20 +339,55 @@ class GlobalDispatchCoordinator:
         Exception Handling:
             API failures within _collect_open_issues (GitHub errors, network
             issues) return an empty list (fail-safe). Infrastructure failures
-            (executor shutdown, thread pool exhaustion) propagate to the caller.
+            (executor shutdown, thread pool exhaustion) are also handled
+            gracefully by returning an empty list with logging and orchestra
+            events, allowing the dispatch tick to continue without permanent
+            failure.
 
-            This differs from pre-refactor behavior where all exceptions were
-            caught. Failing fast on infrastructure errors is more appropriate
-            than silently returning an empty queue, as such failures indicate
-            system-level problems that should be surfaced immediately.
+            This ensures system resilience: even if the executor becomes
+            unavailable, the coordinator can continue operating and will
+            recover automatically when the executor is restored.
 
         Returns:
             List of QueueEntry objects ready for dispatch
         """
-        collected_issues = await asyncio.get_running_loop().run_in_executor(
-            self._executor,
-            self._collect_open_issues,
-        )
+        try:
+            collected_issues = await asyncio.get_running_loop().run_in_executor(
+                self._executor,
+                self._collect_open_issues,
+            )
+        except RuntimeError as exc:
+            if _is_executor_shutdown_error(exc):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: executor shutdown during "
+                    f"frozen queue collection: {exc}",
+                )
+                logger.bind(domain="global_dispatch").error(
+                    f"_collect_frozen_queue executor unavailable: {exc}"
+                )
+                return []
+            raise
+        except asyncio.CancelledError:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: cancelled during frozen queue collection",
+            )
+            logger.bind(domain="global_dispatch").warning(
+                "_collect_frozen_queue cancelled"
+            )
+            return []
+        except Exception as exc:
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: unexpected infrastructure error "
+                f"during frozen queue collection: {exc}",
+            )
+            logger.bind(domain="global_dispatch").error(
+                f"_collect_frozen_queue unexpected error: {exc}"
+            )
+            return []
+
         queue = self._build_queue_from_issues(collected_issues)
         self._requalify_blocked_issues(collected_issues)
         return queue
