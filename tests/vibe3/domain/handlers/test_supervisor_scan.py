@@ -35,7 +35,7 @@ class TestSupervisorScanHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_supervisor_issue_identified(
+        result = handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
                 issue_number=42,
                 issue_title="Test governance issue",
@@ -43,6 +43,9 @@ class TestSupervisorScanHandler:
             )
         )
 
+        assert result is not None
+        assert result.launched is True
+        assert result.tmux_session == "vibe3-supervisor-42"
         mock_coordinator.dispatch_execution.assert_called_once()
         # Verify CLI self-invocation command structure
         call_args = mock_coordinator.dispatch_execution.call_args.args[0]
@@ -66,13 +69,14 @@ class TestSupervisorScanHandler:
         mock_config = MagicMock(dry_run=True)
         mock_from_settings.return_value = mock_config
 
-        handle_supervisor_issue_identified(
+        result = handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
                 issue_number=42,
                 issue_title="Test governance issue",
                 supervisor_file="supervisor.md",
             )
         )
+        assert result is None
 
     @patch("vibe3.domain.handlers.supervisor_scan.get_store")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -97,7 +101,7 @@ class TestSupervisorScanHandler:
             log_path="/tmp/sup.log",
         )
 
-        handle_supervisor_issue_identified(
+        result = handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
                 issue_number=42,
                 issue_title="Test governance issue",
@@ -106,6 +110,9 @@ class TestSupervisorScanHandler:
             coordinator=injected_coordinator,
         )
 
+        assert result is not None
+        assert result.launched is True
+        assert result.tmux_session == "vibe3-supervisor-42"
         injected_coordinator.dispatch_execution.assert_called_once()
         mock_coordinator_cls.assert_not_called()
         mock_get_store.assert_not_called()
@@ -134,7 +141,7 @@ class TestSupervisorScanHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_supervisor_issue_identified(
+        result = handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
                 issue_number=42,
                 issue_title="Test governance issue",
@@ -142,6 +149,9 @@ class TestSupervisorScanHandler:
             )
         )
 
+        assert result is not None
+        assert result.launched is False
+        assert result.reason == "capacity full"
         mock_coordinator.dispatch_execution.assert_called_once()
 
     @patch("vibe3.observability.orchestra_log.append_orchestra_event")
@@ -168,7 +178,7 @@ class TestSupervisorScanHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_supervisor_issue_identified(
+        result = handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
                 issue_number=42,
                 issue_title="Test governance issue",
@@ -176,4 +186,5 @@ class TestSupervisorScanHandler:
             )
         )
 
+        assert result is None
         mock_coordinator.dispatch_execution.assert_called_once()
