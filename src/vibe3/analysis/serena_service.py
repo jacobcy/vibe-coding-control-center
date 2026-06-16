@@ -294,6 +294,7 @@ class SerenaService:
         from vibe3.analysis.dead_code_rules import (
             get_router_functions,
             is_dead_code,
+            is_exception_class,
         )
         from vibe3.models import DeadCodeFinding, DeadCodeReport
 
@@ -341,29 +342,6 @@ class SerenaService:
                     # Get router-decorated functions for this file
                     router_funcs = get_router_functions(relative_file, tree=file_tree)
 
-                    # Detect exception classes in this file
-                    exception_symbols: set[str] = set()
-                    if file_tree is not None:
-                        for node in ast.walk(file_tree):
-                            if isinstance(node, ast.ClassDef):
-                                for base in node.bases:
-                                    if isinstance(base, ast.Name):
-                                        if base.id in (
-                                            "Exception",
-                                            "BaseException",
-                                            "VibeError",
-                                        ) or base.id.endswith("Error"):
-                                            exception_symbols.add(node.name)
-                                            break
-                                    elif isinstance(base, ast.Attribute):
-                                        if base.attr in (
-                                            "Exception",
-                                            "BaseException",
-                                            "VibeError",
-                                        ) or base.attr.endswith("Error"):
-                                            exception_symbols.add(node.name)
-                                            break
-
                     # Check each symbol
                     for sym in symbols:
                         sym_name = sym.get("name", "")
@@ -373,8 +351,10 @@ class SerenaService:
                         # Determine if CLI command
                         is_cli_command = sym_type == "cli_command"
 
-                        # Check if exception class
-                        is_exception = sym_name in exception_symbols
+                        # Check if exception class using is_exception_class function
+                        is_exception = sym_type == "class" and is_exception_class(
+                            relative_file, file_tree, sym_name
+                        )
 
                         # Apply dead code rules
                         is_dead, reason, confidence = is_dead_code(

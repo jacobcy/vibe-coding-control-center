@@ -593,24 +593,40 @@ class TestScanDeadCode:
                 assert report.excluded_count > 0
                 assert any("tested_func" in e for e in report.excluded)
 
-    def test_exception_class_detection(self) -> None:
-        """Test that exception classes are detected and get medium confidence."""
+    def test_exception_class_detection_works(self) -> None:
+        """Test exception classes are detected and get medium confidence."""
         client = MagicMock()
-        # Return a function with 0 refs (will be a finding)
+
+        # Mock Serena to return both function and class symbols
         client.get_symbols_overview.return_value = {
-            "kind": 12,  # FunctionDef
-            "name_path": "unused_func",
-            "body_location": {"start_line": 10, "end_line": 25},
+            "Function": [
+                {
+                    "name_path": "unused_func",
+                    "body_location": {"start_line": 1, "end_line": 5},
+                }
+            ],
+            "Class": [
+                {
+                    "name_path": "CustomError",
+                    "body_location": {"start_line": 10, "end_line": 12},
+                },
+                {
+                    "name_path": "RegularClass",
+                    "body_location": {"start_line": 15, "end_line": 20},
+                },
+            ],
         }
-        client.find_references.return_value = []
+        client.find_references.return_value = []  # 0 refs for all symbols
 
         mock_git = MagicMock()
 
         # Create temp file with exception class
         with tempfile.TemporaryDirectory() as tmpdir:
-            source_file = Path(tmpdir) / "errors.py"
+            source_file = Path(tmpdir) / "module.py"
             source_file.write_text(
-                "class CustomError(Exception): pass\n\ndef unused_func(): pass\n"
+                "class CustomError(Exception): pass\n"
+                "class RegularClass: pass\n"
+                "def unused_func(): pass\n"
             )
 
             # Source files include our temp file; test files return empty
@@ -622,13 +638,30 @@ class TestScanDeadCode:
 
             service = SerenaService(client=client, git_client=mock_git)
 
-            # Don't mock Path - let it read real file for AST parsing
             report = service.scan_dead_code()
 
-            # Should have one finding: unused_func
-            # Note: Current implementation only analyzes functions, not classes,
-            # so we only get the function finding. Exception class detection
-            # works at AST level but analyze_file extracts only functions.
-            assert len(report.findings) == 1
-            finding = report.findings[0]
-            assert finding.symbol == "unused_func"
+            # Should have 3 findings:
+            # unused_func (high), CustomError (medium), RegularClass (high)
+            assert len(report.findings) == 3
+
+            # Find CustomError finding
+            custom_error_finding = next(
+                (f for f in report.findings if f.symbol == "CustomError"), None
+            )
+            assert custom_error_finding is not None
+            assert custom_error_finding.confidence == "medium"
+            assert "exception class" in custom_error_finding.reason
+
+            # Find RegularClass finding
+            regular_class_finding = next(
+                (f for f in report.findings if f.symbol == "RegularClass"), None
+            )
+            assert regular_class_finding is not None
+            assert regular_class_finding.confidence == "high"
+
+            # Find unused_func finding
+            unused_func_finding = next(
+                (f for f in report.findings if f.symbol == "unused_func"), None
+            )
+            assert unused_func_finding is not None
+            assert unused_func_finding.confidence == "high"

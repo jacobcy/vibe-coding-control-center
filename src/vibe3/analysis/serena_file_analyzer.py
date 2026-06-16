@@ -8,6 +8,8 @@ from loguru import logger
 
 from vibe3.clients import (
     count_references,
+    extract_class_locations,
+    extract_class_names,
     extract_function_locations,
     extract_function_names,
 )
@@ -44,7 +46,8 @@ def analyze_file(
         # Check if this is a CLI file
         is_cli_file = is_cli_file_func(relative_file)
 
-        locations = extract_function_locations(overview)
+        # Extract functions
+        func_locations = extract_function_locations(overview)
 
         for func_name in extract_function_names(overview):
             # Fail-fast: 立即抛出异常，不允许部分失败
@@ -56,11 +59,30 @@ def analyze_file(
                 "cli_command" if is_cli_file and ref_count == 0 else "function"
             )
 
-            loc_info = locations.get(func_name, {})
+            loc_info = func_locations.get(func_name, {})
             symbols.append(
                 {
                     "name": func_name,
                     "type": symbol_type,
+                    "references": ref_count,
+                    "start_line": loc_info.get("start_line", 0),
+                    "end_line": loc_info.get("end_line", 0),
+                }
+            )
+
+        # Extract classes
+        class_locations = extract_class_locations(overview)
+
+        for class_name in extract_class_names(overview):
+            # Fail-fast: 立即抛出异常，不允许部分失败
+            refs = client.find_references(class_name, relative_file)
+            ref_count = count_references(refs)
+
+            loc_info = class_locations.get(class_name, {})
+            symbols.append(
+                {
+                    "name": class_name,
+                    "type": "class",
                     "references": ref_count,
                     "start_line": loc_info.get("start_line", 0),
                     "end_line": loc_info.get("end_line", 0),
