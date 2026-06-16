@@ -93,11 +93,10 @@ class TestBuildReviewTaskSection:
 
         assert "handoff audit" in result
 
-    def test_uses_default_task_if_none(self) -> None:
-        """Should use default task if None."""
+    def test_returns_empty_if_none(self) -> None:
+        """Should return empty string if None."""
         result = build_review_task_section(None)
-        assert "## Review Task" in result
-        assert "git diff" in result
+        assert result == ""
 
 
 class TestBuildOutputContractSection:
@@ -108,14 +107,10 @@ class TestBuildOutputContractSection:
         result = build_output_contract_section("Custom format instructions")
         assert result == "## Output format requirements\nCustom format instructions"
 
-    def test_uses_default_format_if_none(self) -> None:
-        """Should use default format if None."""
+    def test_returns_empty_if_none(self) -> None:
+        """Should return empty string if None."""
         result = build_output_contract_section(None)
-        assert "## Output format requirements" in result
-        # Verify that verdict format instruction is present
-        assert "VERDICT:" in result
-        assert "PASS" in result
-        assert "REFUSE" in result
+        assert result == ""
 
 
 class TestBuildReviewPromptBody:
