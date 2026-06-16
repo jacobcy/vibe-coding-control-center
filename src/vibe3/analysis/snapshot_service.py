@@ -450,8 +450,15 @@ def list_snapshots(
 
     # Auto-register found snapshots in DB for future queries
     if snapshots:
-        # Use appropriate directory for registration
-        _register_snapshots_in_db(snapshots, snapshot_dir)
+        # Separate snapshots by directory for correct file_path registration
+        regular_snapshots = [s for s in snapshots if not s.get("baseline_for")]
+        baseline_snapshots = [s for s in snapshots if s.get("baseline_for")]
+
+        if regular_snapshots:
+            _register_snapshots_in_db(regular_snapshots, snapshot_dir)
+        if baseline_snapshots:
+            baseline_dir = _get_baseline_dir()
+            _register_snapshots_in_db(baseline_snapshots, baseline_dir)
 
     # Filter out None ids (shouldn't happen, but type-safe)
     return [sid for s in snapshots if (sid := s.get("id"))]
