@@ -4,6 +4,7 @@ import json
 from typing import Annotated
 
 import typer
+from loguru import logger
 
 from vibe3.analysis import compute_diff, snapshot_service
 from vibe3.commands.common import enable_method_trace
@@ -401,6 +402,11 @@ def diff(
             threshold = config.review_scope.module_growth_threshold
         except Exception:
             threshold = DEFAULT_MODULE_GROWTH_THRESHOLD
+            logger.warning(
+                "Failed to load module_growth_threshold from config, "
+                "falling back to default {}",
+                threshold,
+            )
 
         result = compute_diff(baseline_snapshot, current_snapshot, threshold)
 
