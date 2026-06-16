@@ -272,10 +272,6 @@ def build_snapshot(root: str | None = None) -> StructureSnapshot:
             total_functions=total_functions,
             python_files=total_files,
             shell_files=0,
-            avg_file_loc=total_loc / total_files if total_files > 0 else 0.0,
-            avg_functions_per_file=(
-                total_functions / total_files if total_files > 0 else 0.0
-            ),
         )
 
         snapshot = StructureSnapshot(
