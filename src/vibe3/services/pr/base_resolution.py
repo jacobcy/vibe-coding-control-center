@@ -143,8 +143,20 @@ class BaseResolutionUsecase:
     def _try_get_pr_base(self, branch: str) -> str | None:
         """Try to get base branch from open PR for given branch.
 
-        Returns None if no PR found or PR fetch fails.
-        This is a best-effort fallback for review worktrees.
+        This is a fallback for PR review worktrees that lack flow state.
+        When a PR review worktree is created manually (e.g., via wtnew),
+        it doesn't have a creation_source in flow metadata. This method
+        attempts to infer the correct base from the existing PR.
+
+        This ensures `inspect base` works correctly in review worktrees
+        even when flow metadata is missing.
+
+        Returns None if:
+        - No PR found for the branch
+        - PR fetch fails (network, auth, etc.)
+        - PR has no base_branch
+
+        This is a best-effort fallback, not critical path.
         """
         try:
             pr_info = self.github_client.get_pr(branch=branch)
@@ -154,9 +166,15 @@ class BaseResolutionUsecase:
                 if not base.startswith("origin/"):
                     base = f"origin/{base}"
                 return base
-        except Exception:
-            # Best-effort: ignore errors
-            pass
+        except Exception as e:
+            # Defense-in-depth: get_pr normally returns None on errors,
+            # but catch any unexpected exceptions to prevent breaking
+            # the base resolution flow. Log for debugging.
+            import logging
+
+            logging.getLogger(__name__).debug(
+                f"PR base fallback failed for {branch}: {e}"
+            )
         return None
 
     def collect_branch_material(

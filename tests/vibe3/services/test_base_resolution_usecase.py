@@ -194,3 +194,132 @@ def test_resolve_review_base_prefers_creation_source() -> None:
     assert resolved.base_branch == "origin/main"
     assert resolved.auto_detected is False
     parent_finder.assert_not_called()
+
+
+def test_try_get_pr_base_returns_base_when_pr_exists() -> None:
+    """Should return PR base when branch has open PR."""
+    github_client = MagicMock()
+    pr_response = MagicMock()
+    pr_response.base_branch = "develop"
+    github_client.get_pr.return_value = pr_response
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/review-branch")
+
+    assert result == "origin/develop"
+    github_client.get_pr.assert_called_once_with(branch="task/review-branch")
+
+
+def test_try_get_pr_base_prefixes_origin_if_missing() -> None:
+    """Should prefix base with origin/ if not already present."""
+    github_client = MagicMock()
+    pr_response = MagicMock()
+    pr_response.base_branch = "develop"
+    github_client.get_pr.return_value = pr_response
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/branch")
+
+    assert result == "origin/develop"
+
+
+def test_try_get_pr_base_preserves_origin_prefix() -> None:
+    """Should not double-prefix if base already has origin/."""
+    github_client = MagicMock()
+    pr_response = MagicMock()
+    pr_response.base_branch = "origin/develop"
+    github_client.get_pr.return_value = pr_response
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/branch")
+
+    assert result == "origin/develop"
+
+
+def test_try_get_pr_base_returns_none_when_no_pr() -> None:
+    """Should return None when no PR found for branch."""
+    github_client = MagicMock()
+    github_client.get_pr.return_value = None
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/no-pr-branch")
+
+    assert result is None
+
+
+def test_try_get_pr_base_returns_none_when_pr_has_no_base() -> None:
+    """Should return None when PR response lacks base_branch."""
+    github_client = MagicMock()
+    pr_response = MagicMock()
+    pr_response.base_branch = None
+    github_client.get_pr.return_value = pr_response
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/branch")
+
+    assert result is None
+
+
+def test_try_get_pr_base_handles_exceptions_gracefully() -> None:
+    """Should return None on any exception (network, auth, etc.)."""
+    github_client = MagicMock()
+    github_client.get_pr.side_effect = Exception("Network error")
+
+    usecase = BaseResolutionUsecase(github_client=github_client)
+
+    result = usecase._try_get_pr_base("task/branch")
+
+    assert result is None
+
+
+def test_resolve_base_falls_back_to_pr_base_when_no_creation_source() -> None:
+    """When creation_source missing, should try PR base before parent detection."""
+    github_client = MagicMock()
+    pr_response = MagicMock()
+    pr_response.base_branch = "develop"
+    github_client.get_pr.return_value = pr_response
+
+    parent_finder = MagicMock(return_value="feature/wrong-parent")
+    usecase = BaseResolutionUsecase(
+        parent_branch_finder=parent_finder,
+        github_client=github_client,
+    )
+
+    resolved = usecase.resolve_base(
+        requested_base=None,
+        current_branch="task/review-branch",
+        default_policy="parent",
+        creation_source=None,
+    )
+
+    # Should use PR base, not parent_finder
+    assert resolved.base_branch == "origin/develop"
+    assert resolved.auto_detected is False
+    parent_finder.assert_not_called()
+
+
+def test_resolve_base_falls_back_to_parent_when_pr_base_fails() -> None:
+    """When PR base lookup fails, should fall back to parent detection."""
+    github_client = MagicMock()
+    github_client.get_pr.return_value = None
+
+    usecase = BaseResolutionUsecase(
+        parent_branch_finder=lambda branch: "feature/parent",
+        github_client=github_client,
+    )
+
+    resolved = usecase.resolve_base(
+        requested_base=None,
+        current_branch="task/branch",
+        default_policy="parent",
+        creation_source=None,
+    )
+
+    # Should fall back to parent detection
+    assert resolved.base_branch == "feature/parent"
+    assert resolved.auto_detected is True
