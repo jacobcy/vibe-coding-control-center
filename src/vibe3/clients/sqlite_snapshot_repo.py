@@ -77,34 +77,18 @@ class SQLiteSnapshotRepo(_HasConnection):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Build query based on whether to include baselines
-        # Use parameterized queries for consistency with other methods
-        if limit is not None:
-            if include_baselines:
-                cursor.execute(
-                    "SELECT snapshot_id, created_at FROM snapshot_registry "
-                    "ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
-                )
-            else:
-                cursor.execute(
-                    "SELECT snapshot_id, created_at FROM snapshot_registry "
-                    "WHERE baseline_for IS NULL "
-                    "ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
-                )
-        else:
-            if include_baselines:
-                cursor.execute(
-                    "SELECT snapshot_id, created_at FROM snapshot_registry "
-                    "ORDER BY created_at DESC"
-                )
-            else:
-                cursor.execute(
-                    "SELECT snapshot_id, created_at FROM snapshot_registry "
-                    "WHERE baseline_for IS NULL "
-                    "ORDER BY created_at DESC"
-                )
+        query = "SELECT snapshot_id, created_at FROM snapshot_registry"
+        params: tuple = ()
 
+        if not include_baselines:
+            query += " WHERE baseline_for IS NULL"
+
+        query += " ORDER BY created_at DESC"
+
+        if limit is not None:
+            query += " LIMIT ?"
+            params = (limit,)
+
+        cursor.execute(query, params)
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]

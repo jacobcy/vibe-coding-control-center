@@ -538,3 +538,6 @@ def test_list_snapshots_db_empty_fallsback(
 
     result = snapshot_service.list_snapshots()
     assert result == ["snapshot-fs-0", "snapshot-fs-1", "snapshot-fs-2"]
+
+    # Verify auto-registration was called for each snapshot
+    assert mock_client.upsert_snapshot_registry.call_count == 3
