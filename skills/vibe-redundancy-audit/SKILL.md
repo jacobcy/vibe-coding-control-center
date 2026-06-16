@@ -75,10 +75,8 @@ uv run python src/vibe3/cli.py <subcommand>
 
 - `vibe3 inspect base --json`
   - 识别当前分支相对 base 的核心改动面、公开入口触达范围和 changed symbols。
-- `vibe3 inspect commit <sha> --json`
-  - 识别某次提交引入的结构波及面和关键符号变化。
 - `vibe3 inspect files <file> --json`
-  - 识别文件形状：LOC、函数数、导入关系、是否存在“迁移后仍很重”的模块。
+  - 识别文件形状：LOC、函数数、导入关系、是否存在”迁移后仍很重”的模块。
 - `vibe3 inspect symbols <file>:<symbol> --json`
   - 验证具体符号的真实调用面，确认兼容入口、helper、旧路径是否仍被实际引用。
 - `vibe3 snapshot show <file> --json`
@@ -86,9 +84,9 @@ uv run python src/vibe3/cli.py <subcommand>
 
 补充说明：
 
-- `inspect files` / `snapshot show` 适合发现“形状异常”和“分层仍过厚”的嫌疑点。
+- `inspect files` / `snapshot show` 适合发现”形状异常”和”分层仍过厚”的嫌疑点。
 - `inspect symbols` 更适合作为二次验证器，而不是唯一发现器。
-- `inspect base` / `inspect commit` 用来回答“这次重构是否同时新增新路径但未回收旧路径”。
+- `inspect base` 用来回答”这次重构是否同时新增新路径但未回收旧路径”。
 
 ## 触发时机
 
@@ -99,7 +97,7 @@ uv run python src/vibe3/cli.py <subcommand>
 
 ## 审查流程
 
-1. 先用 `inspect base` 或 `inspect commit` 锁定本次改动范围与重点文件。
+1. 先用 `inspect base` 锁定本次改动范围与重点文件。
 2. 对重点文件运行 `inspect files` 或 `structure show`，识别以下信号：
    - 文件仍然过胖
    - 子命令/函数数量仍过多

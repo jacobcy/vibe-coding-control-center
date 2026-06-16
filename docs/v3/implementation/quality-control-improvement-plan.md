@@ -382,7 +382,7 @@ EOF
 
 # 3. 风险评分判断（快速，<2s）
 echo "  → Risk assessment..."
-RISK_LEVEL=$(uv run python -m vibe3 inspect commit HEAD --json | \
+RISK_LEVEL=$(uv run python -m vibe3 inspect base --json | \
              python3 -c "import json,sys; print(json.load(sys.stdin).get('score',{}).get('level','LOW'))")
 
 if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
