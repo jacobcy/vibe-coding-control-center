@@ -541,3 +541,43 @@ def test_list_snapshots_db_empty_fallsback(
 
     # Verify auto-registration was called for each snapshot
     assert mock_client.upsert_snapshot_registry.call_count == 3
+
+
+def test_get_git_common_dir_cached_reuses_cached_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that _get_git_common_dir_cached caches the git common dir.
+
+    Verifies that multiple calls reuse the cached value and GitClient
+    is only instantiated once.
+    """
+    from vibe3.analysis import snapshot_service
+
+    # Clear the module-level cache before test
+    monkeypatch.setattr(snapshot_service, "_git_common_dir", None)
+
+    call_count = 0
+
+    def fake_get_git_common_dir() -> str:
+        nonlocal call_count
+        call_count += 1
+        return "/fake/git/common/dir"
+
+    fake_git = MagicMock()
+    fake_git.get_git_common_dir = fake_get_git_common_dir
+    monkeypatch.setattr(snapshot_service, "GitClient", lambda: fake_git)
+
+    # First call should invoke GitClient
+    result1 = snapshot_service._get_git_common_dir_cached()
+    assert call_count == 1
+    assert result1 == Path("/fake/git/common/dir")
+
+    # Second call should use cached value
+    result2 = snapshot_service._get_git_common_dir_cached()
+    assert call_count == 1  # No additional call
+    assert result2 == result1
+
+    # Third call should still use cached value
+    result3 = snapshot_service._get_git_common_dir_cached()
+    assert call_count == 1  # Still only one call
+    assert result3 == result1

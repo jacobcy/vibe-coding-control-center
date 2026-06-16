@@ -71,11 +71,27 @@ SNAPSHOT_TAG_DIR_NAME = "vibe3/structure/baselines"
 LATEST_LINK_NAME = "vibe3/structure/latest.json"
 
 # Module-level cache for git common directory path
+#
+# Thread-safety: Assumed single-threaded execution per Vibe3 architecture.
+# In concurrent scenarios, multiple threads could race to initialize the cache,
+# but this is benign (GitClient is stateless and git rev-parse is thread-safe).
+# Alternative: functools.lru_cache(maxsize=1) provides thread-safe caching,
+# but module-level global is chosen for clarity and zero overhead.
+#
+# Design rationale: Module-level global is preferred over lru_cache because:
+# 1. Simple single-value cache (no need for LRU eviction logic)
+# 2. Zero decorator overhead for a hot path (snapshot operations)
+# 3. Explicit None check is clearer than decorator magic
+# 4. Git common dir is invariant for process lifetime (no invalidation needed)
 _git_common_dir: Path | None = None
 
 
 def _get_git_common_dir_cached() -> Path:
-    """Get git common directory path with module-level caching."""
+    """Get git common directory path with module-level caching.
+
+    Returns the cached git common directory path, initializing on first call.
+    Thread-safe under Vibe3's single-threaded execution model.
+    """
     global _git_common_dir
     if _git_common_dir is None:
         git = GitClient()
