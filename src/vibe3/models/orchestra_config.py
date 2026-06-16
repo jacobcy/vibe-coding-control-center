@@ -179,6 +179,25 @@ class PeriodicCheckConfig(BaseModel):
     enable_remote_branch_cleanup: bool = True
 
 
+class QueueRefreshConfig(BaseModel):
+    """Configuration for scheduled queue refresh.
+
+    Controls the periodic full-queue refresh that triggers collection,
+    blocked requalification, and re-sorting. Decoupled from periodic_check
+    so each concern can be configured and evolved independently.
+    """
+
+    enabled: bool = True
+    interval_ticks: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Run scheduled queue refresh every N heartbeat ticks "
+            "(default 10, aligned with periodic_check default)"
+        ),
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -264,6 +283,7 @@ class OrchestraConfig(BaseModel):
         default_factory=SupervisorHandoffConfig
     )
     periodic_check: PeriodicCheckConfig = Field(default_factory=PeriodicCheckConfig)
+    queue_refresh: QueueRefreshConfig = Field(default_factory=QueueRefreshConfig)
     max_retry_budget: int = Field(
         default=3,
         ge=1,
@@ -283,6 +303,7 @@ __all__ = [
     "GovernanceConfig",
     "SupervisorHandoffConfig",
     "PeriodicCheckConfig",
+    "QueueRefreshConfig",
     "OrchestraConfig",
     "default_pid_file",
 ]

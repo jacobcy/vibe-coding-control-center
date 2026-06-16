@@ -25,8 +25,8 @@ def mock_coordinator(mock_get_manager_usernames) -> GlobalDispatchCoordinator:
     config.repo = "owner/repo"
     config.manager_usernames = ["manager-bot"]
     config.supervisor_handoff.issue_label = "supervisor"
-    config.periodic_check.enabled = True
-    config.periodic_check.interval_ticks = 10
+    config.queue_refresh.enabled = True
+    config.queue_refresh.interval_ticks = 10
     config.max_concurrent_flows = 10
 
     capacity = MagicMock()
@@ -371,8 +371,8 @@ class TestActionableTriggeredCollection:
         self, mock_coordinator
     ):
         """Periodic check ticks refresh queue before exhaustion."""
-        mock_coordinator._config.periodic_check.enabled = True
-        mock_coordinator._config.periodic_check.interval_ticks = 10
+        mock_coordinator._config.queue_refresh.enabled = True
+        mock_coordinator._config.queue_refresh.interval_ticks = 10
         mock_coordinator._frozen_queue = [
             QueueEntry(issue_number=1, collected_state="ready", waiting_state=None),
             QueueEntry(issue_number=2, collected_state="ready", waiting_state=None),

@@ -578,15 +578,15 @@ class GlobalDispatchCoordinator:
         Returns:
             True if the queue was refreshed.
         """
-        periodic_check = self._config.periodic_check
+        queue_refresh = self._config.queue_refresh
         if (
             tick_id > 0
-            and periodic_check.enabled
-            and tick_id % periodic_check.interval_ticks == 0
+            and queue_refresh.enabled
+            and tick_id % queue_refresh.interval_ticks == 0
         ):
-            logger.bind(domain="global_dispatch", trigger="scheduled_refresh").debug(
-                "Running scheduled full queue refresh"
-            )
+            logger.bind(
+                domain="global_dispatch", trigger="scheduled_queue_refresh"
+            ).debug("Running scheduled full queue refresh")
             fresh = await self._collect_frozen_queue()
             self._check_service.invalidate_pr_cache()
             self._dispatch_paused = bool(
