@@ -1,5 +1,7 @@
 """GitClient 单元测试."""
 
+import time
+from collections.abc import Generator
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -361,3 +363,99 @@ def test_pack_refs_all_calls_git_pack_refs(monkeypatch):
     monkeypatch.setattr(GitClient, "_run", mock_run)
     GitClient().pack_refs_all()
     assert captured["args"] == ["pack-refs", "--all"]
+
+
+class TestResolveBaseRef:
+    """_resolve_base_ref 测试."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_fetch_cache(self) -> Generator[None, None, None]:
+        """Clear module-level fetch cache before each test."""
+        from vibe3.clients.git_client import _fetch_cache
+
+        _fetch_cache.clear()
+        yield
+        _fetch_cache.clear()
+
+    def test_remote_qualified_ref_unchanged(self) -> None:
+        """Already qualified remote ref is returned unchanged."""
+        client = GitClient()
+        result = client._resolve_base_ref("origin/main")
+        assert result == "origin/main"
+
+    def test_local_ref_resolved_to_remote(self) -> None:
+        """Local 'main' is resolved to 'origin/main' with fetch."""
+        client = GitClient()
+        with patch.object(client, "fetch") as mock_fetch:
+            result = client._resolve_base_ref("main")
+
+        assert result == "origin/main"
+        mock_fetch.assert_called_once_with("origin", "main")
+
+    def test_cache_hit_within_ttl(self) -> None:
+        """Second call within TTL uses cache and skips fetch."""
+        client = GitClient()
+        with patch.object(client, "fetch") as mock_fetch:
+            client._resolve_base_ref("main")
+            assert mock_fetch.call_count == 1
+
+            # Second call with same base — should use cache
+            client._resolve_base_ref("main")
+            assert mock_fetch.call_count == 1  # No additional fetch
+
+    def test_cache_expired_refetches(self) -> None:
+        """After TTL expiry, cache is bypassed and refetch occurs."""
+        from vibe3.clients.git_client import _fetch_cache
+
+        client = GitClient()
+        with patch.object(client, "fetch") as mock_fetch:
+            client._resolve_base_ref("main")
+            assert mock_fetch.call_count == 1
+
+            # Advance time past TTL (300s) by manually tweaking cache entry
+            cache_key = "fetch:origin/main"
+            _fetch_cache[cache_key] = time.time() - 301  # Past TTL
+
+            client._resolve_base_ref("main")
+            assert mock_fetch.call_count == 2  # Refetched
+
+    def test_fetch_failure_returns_remote_ref(self) -> None:
+        """When fetch fails, _resolve_base_ref still returns remote ref."""
+        client = GitClient()
+        with patch.object(client, "fetch", side_effect=GitError("fetch", "failed")):
+            result = client._resolve_base_ref("main")
+
+        assert result == "origin/main"
+
+
+class TestResolveSource:
+    """_resolve_source 测试."""
+
+    def test_branch_source_base_resolved(self) -> None:
+        """BranchSource base is resolved to remote ref."""
+        client = GitClient()
+        with patch.object(client, "fetch"):
+            source = BranchSource(branch="feature/x", base="main")
+            resolved = client._resolve_source(source)
+
+        assert isinstance(resolved, BranchSource)
+        assert resolved.base == "origin/main"
+        assert resolved.branch == "feature/x"
+
+    def test_non_branch_source_returned_unchanged(self) -> None:
+        """Non-BranchSource (CommitSource, PRSource, UncommittedSource) not resolved."""
+        client = GitClient()
+
+        # CommitSource
+        cs = CommitSource(sha="abc123")
+        assert client._resolve_source(cs) is cs
+
+        # PRSource
+        mock_gh = MagicMock()
+        client_with_gh = GitClient(github_client=mock_gh)
+        ps = PRSource(pr_number=42)
+        assert client_with_gh._resolve_source(ps) is ps
+
+        # UncommittedSource
+        us = UncommittedSource()
+        assert client._resolve_source(us) is us

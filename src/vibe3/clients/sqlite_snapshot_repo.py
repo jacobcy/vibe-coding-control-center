@@ -59,3 +59,36 @@ class SQLiteSnapshotRepo(_HasConnection):
         )
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def list_snapshots_from_registry(
+        self, limit: int | None = 50, include_baselines: bool = False
+    ) -> list[dict[str, str]]:
+        """List snapshots from registry ordered by creation time (newest first).
+
+        Args:
+            limit: Maximum number of snapshots to return (default: 50).
+                   Set to None to return all snapshots.
+            include_baselines: If True, include baseline snapshots.
+                              If False, exclude snapshots with baseline_for set.
+
+        Returns:
+            List of dicts with snapshot_id and created_at keys.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT snapshot_id, created_at FROM snapshot_registry"
+        params: tuple = ()
+
+        if not include_baselines:
+            query += " WHERE baseline_for IS NULL"
+
+        query += " ORDER BY created_at DESC"
+
+        if limit is not None:
+            query += " LIMIT ?"
+            params = (limit,)
+
+        cursor.execute(query, params)
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]

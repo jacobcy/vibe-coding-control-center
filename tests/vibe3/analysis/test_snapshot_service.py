@@ -387,6 +387,12 @@ def test_list_snapshots_with_limit(
     snapshot_dir.mkdir(parents=True)
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+    # Mock SQLiteClient to force filesystem fallback
+    monkeypatch.setattr(
+        snapshot_service,
+        "SQLiteClient",
+        lambda: (_ for _ in ()).throw(Exception("Mock DB failure")),
+    )
 
     # Create 10 test snapshots with different timestamps
     for i in range(10):
@@ -431,6 +437,12 @@ def test_list_snapshots_limit_less_than_total(
     snapshot_dir.mkdir(parents=True)
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+    # Mock SQLiteClient to force filesystem fallback
+    monkeypatch.setattr(
+        snapshot_service,
+        "SQLiteClient",
+        lambda: (_ for _ in ()).throw(Exception("Mock DB failure")),
+    )
 
     # Create 60 snapshots
     for i in range(60):
@@ -456,3 +468,76 @@ def test_list_snapshots_limit_less_than_total(
     result_all = snapshot_service.list_snapshots(limit=None)
     assert len(result_all) == 60
     assert result == result_all[:50]
+
+
+def test_list_snapshots_from_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test list_snapshots uses DB query when available."""
+    from vibe3.analysis import snapshot_service
+
+    # Mock SQLiteClient to return controlled data
+    mock_client = MagicMock()
+    mock_client.list_snapshots_from_registry.return_value = [
+        {"snapshot_id": "snapshot-db-1", "created_at": "2026-06-15T10:00:00"},
+        {"snapshot_id": "snapshot-db-2", "created_at": "2026-06-14T10:00:00"},
+        {"snapshot_id": "snapshot-db-3", "created_at": "2026-06-13T10:00:00"},
+    ]
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", lambda: mock_client)
+
+    # Call with default parameters
+    result = snapshot_service.list_snapshots()
+    assert result == ["snapshot-db-1", "snapshot-db-2", "snapshot-db-3"]
+    mock_client.list_snapshots_from_registry.assert_called_once_with(50, False)
+
+    # Call with custom limit
+    mock_client.reset_mock()
+    result = snapshot_service.list_snapshots(limit=10)
+    assert result == ["snapshot-db-1", "snapshot-db-2", "snapshot-db-3"]
+    mock_client.list_snapshots_from_registry.assert_called_once_with(10, False)
+
+    # Call with include_baselines=True
+    mock_client.reset_mock()
+    result = snapshot_service.list_snapshots(include_baselines=True)
+    assert result == ["snapshot-db-1", "snapshot-db-2", "snapshot-db-3"]
+    mock_client.list_snapshots_from_registry.assert_called_once_with(50, True)
+
+
+def test_list_snapshots_db_empty_fallsback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test list_snapshots falls back to filesystem when DB returns empty list."""
+    from vibe3.analysis import snapshot_service
+
+    snapshot_dir = tmp_path / "vibe3" / "structure" / "snapshots"
+    snapshot_dir.mkdir(parents=True)
+
+    # Mock SQLiteClient to return empty list
+    mock_client = MagicMock()
+    mock_client.list_snapshots_from_registry.return_value = []
+    # Also mock upsert_snapshot_registry to avoid actual DB writes
+    mock_client.upsert_snapshot_registry = MagicMock()
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", lambda: mock_client)
+    monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
+
+    # Create filesystem snapshots
+    for i in range(3):
+        snapshot = {
+            "snapshot_id": f"snapshot-fs-{i}",
+            "branch": "main",
+            "commit": f"commit{i}",
+            "created_at": f"2026-06-{12-i:02d}T10:00:00",
+            "root": "src/vibe3",
+            "files": [],
+            "modules": [],
+            "dependencies": [],
+            "metrics": {},
+        }
+        filepath = snapshot_dir / f"snapshot-fs-{i}.json"
+        filepath.write_text(json.dumps(snapshot))
+
+    result = snapshot_service.list_snapshots()
+    assert result == ["snapshot-fs-0", "snapshot-fs-1", "snapshot-fs-2"]
+
+    # Verify auto-registration was called for each snapshot
+    assert mock_client.upsert_snapshot_registry.call_count == 3

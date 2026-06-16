@@ -379,6 +379,25 @@ def list_snapshots(
         List of snapshot IDs, sorted by creation time (newest first).
         Limited to `limit` entries if specified.
     """
+    # Primary path: DB-backed query
+    try:
+        client = SQLiteClient()
+        db_results = client.list_snapshots_from_registry(limit, include_baselines)
+        if db_results:
+            logger.bind(
+                domain="snapshot",
+                action="list_from_db",
+                count=len(db_results),
+            ).debug("Listed snapshots from DB registry")
+            return [r["snapshot_id"] for r in db_results]
+    except Exception as e:
+        logger.bind(
+            domain="snapshot",
+            action="list_fallback",
+            error=str(e),
+        ).warning("DB query failed, falling back to filesystem scan")
+
+    # Fallback path: Filesystem scan (existing logic)
     snapshots = []
 
     # Scan regular snapshots directory
@@ -394,6 +413,9 @@ def list_snapshots(
                 {
                     "id": meta.get("snapshot_id") or fp.stem,
                     "created_at": meta.get("created_at") or "",
+                    "branch": meta.get("branch") or "",
+                    "commit": meta.get("commit"),
+                    "baseline_for": meta.get("baseline_for"),
                 }
             )
 
@@ -409,17 +431,33 @@ def list_snapshots(
                     {
                         "id": meta.get("snapshot_id") or fp.stem,
                         "created_at": meta.get("created_at") or "",
+                        "branch": meta.get("branch") or "",
+                        "commit": meta.get("commit"),
+                        "baseline_for": meta.get("baseline_for"),
                     }
                 )
 
     # Sort by creation time (newest first)
-    snapshots.sort(key=lambda x: x["created_at"], reverse=True)
+    snapshots.sort(key=lambda x: x.get("created_at") or "", reverse=True)
 
     # Apply limit if specified
     if limit is not None:
         snapshots = snapshots[:limit]
 
-    return [s["id"] for s in snapshots]
+    # Auto-register found snapshots in DB for future queries
+    if snapshots:
+        # Separate snapshots by directory for correct file_path registration
+        regular_snapshots = [s for s in snapshots if not s.get("baseline_for")]
+        baseline_snapshots = [s for s in snapshots if s.get("baseline_for")]
+
+        if regular_snapshots:
+            _register_snapshots_in_db(regular_snapshots, snapshot_dir)
+        if baseline_snapshots:
+            baseline_dir = _get_baseline_dir()
+            _register_snapshots_in_db(baseline_snapshots, baseline_dir)
+
+    # Filter out None ids (shouldn't happen, but type-safe)
+    return [sid for s in snapshots if (sid := s.get("id"))]
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +529,7 @@ def find_snapshot_by_branch(
         if not snapshots:
             return None
         # Auto-register found snapshots for future DB lookups (idempotent operation)
-        _register_snapshots_in_db(snapshots, snapshot_dir)
+        _register_snapshots_in_db(snapshots, snapshot_dir)  # type: ignore[arg-type]
         candidates = snapshots
 
     # Merge-base selection (unchanged logic)
@@ -585,7 +623,7 @@ def _load_snapshots_for_branch(
 
 
 def _register_snapshots_in_db(
-    snapshots: list[dict[str, str]], snapshot_dir: Path
+    snapshots: list[dict[str, str | None]], snapshot_dir: Path
 ) -> None:
     """Register filesystem-found snapshots in DB for future queries.
 
@@ -603,11 +641,12 @@ def _register_snapshots_in_db(
             file_path = str(snapshot_dir / f"{sid}.json")
             client.upsert_snapshot_registry(
                 snapshot_id=sid,
-                branch=snap.get("branch", ""),
-                commit_short=(snap.get("commit", "") or "")[:7],
+                branch=snap.get("branch") or "",
+                commit_short=(snap.get("commit") or "")[:7],
                 commit_hash=snap.get("commit"),
-                created_at=snap.get("created_at", ""),
+                created_at=snap.get("created_at") or "",
                 file_path=file_path,
+                baseline_for=snap.get("baseline_for"),
             )
             registered_count += 1
         if registered_count > 0:
