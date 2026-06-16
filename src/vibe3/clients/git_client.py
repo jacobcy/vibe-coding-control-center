@@ -3,8 +3,11 @@
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
+
+from loguru import logger
 
 from vibe3.clients.git_branch_listing import get_all_branches_with_timestamps
 from vibe3.clients.git_branch_ops import (
@@ -159,6 +162,7 @@ class GitClient:
         self._pr_numstat_cache: dict[int, str] = {}
         self._git_common_dir: str | None = None
         self._worktree_list_cache: list[tuple[str, str]] | None = None
+        self._fetch_cache: dict[str, float] = {}
 
     def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
@@ -295,23 +299,75 @@ class GitClient:
         self, source: ChangeSource, pathspec: str | None = None
     ) -> list[str]:
         """统一接口：获取改动文件列表."""
+        resolved = self._resolve_source(source)
         return _get_changed_files(
-            self._run, source, self._github_client, pathspec=pathspec
+            self._run, resolved, self._github_client, pathspec=pathspec
         )
 
     def get_diff(self, source: ChangeSource) -> str:
         """统一接口：获取 diff 内容."""
-        return _get_diff(self._run, source, self._github_client, self._pr_diff_cache)
+        resolved = self._resolve_source(source)
+        return _get_diff(self._run, resolved, self._github_client, self._pr_diff_cache)
 
     def get_numstat(self, source: ChangeSource) -> str:
         """Get git diff --numstat output for a change source."""
+        resolved = self._resolve_source(source)
         return _get_numstat(
             self._run,
-            source,
+            resolved,
             self._github_client,
             self.get_merge_base,
             self._pr_numstat_cache,
         )
+
+    def _resolve_base_ref(
+        self, base: str, remote: str = "origin", ttl: int = 300
+    ) -> str:
+        """Resolve local base ref to remote ref, fetching with TTL cache.
+
+        Ensures the remote base branch is fresh before use, preventing
+        stale local branches from causing incorrect merge-base computation.
+
+        Args:
+            base: Local branch name (e.g. "main") or remote ref (e.g. "origin/main")
+            remote: Remote name
+            ttl: Cache TTL in seconds (default 300 = 5 minutes)
+
+        Returns:
+            Remote-qualified ref (e.g. "origin/main")
+        """
+        if base.startswith(f"{remote}/"):
+            return base
+
+        remote_ref = f"{remote}/{base}"
+        cache_key = f"fetch:{remote_ref}"
+        now = time.time()
+
+        if cache_key in self._fetch_cache:
+            if now - self._fetch_cache[cache_key] < ttl:
+                return remote_ref
+
+        try:
+            self.fetch(remote, base)
+            self._fetch_cache[cache_key] = now
+        except Exception:
+            logger.bind(
+                domain="git",
+                action="resolve_base_ref",
+                base=base,
+            ).warning("Failed to fetch remote base ref, using local")
+            # Fall through — use remote ref even if fetch failed
+            # (might be stale but better than potentially diverged local)
+
+        return remote_ref
+
+    def _resolve_source(self, source: ChangeSource) -> ChangeSource:
+        """Resolve BranchSource base to remote ref for accurate diffing."""
+        if isinstance(source, BranchSource):
+            resolved_base = self._resolve_base_ref(source.base)
+            if resolved_base != source.base:
+                return BranchSource(branch=source.branch, base=resolved_base)
+        return source
 
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""
