@@ -1,6 +1,6 @@
 ---
 name: vibe-rules
-description: Use when rules files change, when checking for duplicate or conflicting rules across ~/.claude/rules/common/, .claude/rules/, .agent/rules/, and CLAUDE.md, or when an agent has created new rules that may overlap with existing ones. Do not use for skill authoring or flow governance.
+description: Use when rules files change, when checking for duplicate or conflicting rules across ~/.claude/rules/common/, .claude/rules/, and CLAUDE.md, or when an agent has created new rules that may overlap with existing ones. Do not use for skill authoring or flow governance.
 ---
 
 # Vibe Rules - Rules 冲突检测与清理
@@ -22,9 +22,9 @@ tier_1_global:
 
 tier_2_project:
   path: .claude/rules/
-  description: 项目规则（可能由 agents 创建）
+  description: 项目规则（项目特定，长期有效）
   characteristics:
-    - 除非确有必要，否则应该清理
+    - 项目硬规则和实现标准
     - 覆盖全局规则
   priority: 中等
 
@@ -34,17 +34,8 @@ tier_3_claudemd:
   characteristics:
     - 项目级硬规则和上下文
     - 不应重复全局已规定的 rules
-    - 引用 .agent/rules/ 的权威来源
+    - 引用 .claude/rules/ 的权威来源
   priority: 最高
-
-tier_4_compressed:
-  path: .agent/rules/
-  description: 压缩规则（详细定义）
-  characteristics:
-    - 压缩 CLAUDE.md 不常驻的详细规则
-    - Agent 按需读取，通过引用
-    - 必须在 CLAUDE.md 中引用
-  priority: 详细定义层
 ```
 
 ## 使用方式
@@ -99,11 +90,8 @@ ls ~/.claude/rules/common/*.md 2>/dev/null
 # 项目规则
 ls .claude/rules/*.md 2>/dev/null
 
-# 项目压缩规则
-ls .agent/rules/*.md 2>/dev/null
-
 # CLAUDE.md 引用
-grep -E '\.agent/rules/.*\.md|\.claude/rules/.*\.md' CLAUDE.md
+grep -E '\.claude/rules/.*\.md' CLAUDE.md
 ```
 
 ### Step 2: 检测重复内容
@@ -135,10 +123,10 @@ comm -12 <(ls ~/.claude/rules/common/) <(ls .claude/rules/)
 ```bash
 # 对比 pyproject.toml 和 rules 中的配置
 grep "line-length" pyproject.toml
-grep "line-length" .agent/rules/python-standards.md
+grep "line-length" .claude/rules/python-standards.md
 
 grep "mypy" pyproject.toml
-grep "mypy" .agent/rules/python-standards.md
+grep "mypy" .claude/rules/python-standards.md
 ```
 
 ### Step 4: 分析必要性
@@ -154,19 +142,12 @@ grep "mypy" .agent/rules/python-standards.md
 
 - ✅ 保留：项目特定的扩展（如 Python 特定实践）
 - ❌ 删除：与全局完全相同的内容
-- ❌ 删除：与 .agent/rules/ 重复的内容
-
-#### 项目压缩规则（.agent/rules/）
-
-- ✅ 保留：详细的技术标准、架构定义
-- ✅ 必须在 CLAUDE.md 中引用
-- ❌ 删除：未引用的孤立规则
 
 #### CLAUDE.md
 
 - ✅ 保留：项目硬规则、最小不可协商规则
 - ❌ 删除：重复全局规则的内容
-- ✅ 必须引用 .agent/rules/ 作为详细定义
+- ✅ 必须引用 .claude/rules/ 作为详细定义
 
 ### Step 5: 生成清理建议
 
@@ -183,7 +164,6 @@ grep "mypy" .agent/rules/python-standards.md
 | -------- | ------ | ---- | ---------- |
 | 全局规则 | {n}    | {n}  | {n}        |
 | 项目规则 | {n}    | {n}  | {n}        |
-| 压缩规则 | {n}    | {n}  | {n}        |
 | **总计** | {n}    | {n}  | {n}        |
 
 ## 重复检测
@@ -198,13 +178,13 @@ grep "mypy" .agent/rules/python-standards.md
 
 | 项目文件                 | 重复源                           | 重复行数 | 建议               |
 | ------------------------ | -------------------------------- | -------- | ------------------ |
-| .claude/rules/testing.md | .agent/rules/python-standards.md | 39 行    | 删除，使用权威来源 |
+| .claude/rules/testing.md | .claude/rules/python-standards.md | 39 行    | 删除，使用权威来源 |
 
 ## 配置冲突
 
 ### ⚠️ mypy 配置不一致
 
-- `.agent/rules/python-standards.md`: `strict = true`
+- `.claude/rules/python-standards.md`: `strict = true`
 - `pyproject.toml`: 未设置 `strict`
 - **建议**: 在 pyproject.toml 中添加 `strict = true`
 
@@ -215,11 +195,6 @@ grep "mypy" .agent/rules/python-standards.md
 ```bash
 # 项目规则与全局重复
 rm .claude/rules/coding-style.md
-
-# 项目规则与压缩规则重复
-rm .claude/rules/testing.md
-rm .claude/rules/patterns.md
-rm .claude/rules/hooks.md
 ```
 ````
 
@@ -254,9 +229,8 @@ uv run ruff check src/
 **适用场景**：权威来源明确定义
 
 **操作**：
-1. 删除 `.claude/rules/` 中与 `.agent/rules/` 重复的文件
-2. 删除 `.claude/rules/` 中与全局完全相同的文件
-3. 保留项目特定的扩展（如 security.md）
+1. 删除 `.claude/rules/` 中与全局完全相同的文件
+2. 保留项目特定的扩展（如 security.md）
 
 **优点**：
 - 单一事实来源
@@ -274,7 +248,7 @@ paths: ["**/*.py"]
 ---
 # Python 编码提醒
 
-详见权威标准：[.agent/rules/python-standards.md](../../.agent/rules/python-standards.md)
+详见权威标准：[.claude/rules/python-standards.md](../../.claude/rules/python-standards.md)
 
 ## 快速检查清单
 - Python >= 3.10
@@ -304,7 +278,7 @@ paths: ["**/*.py"]
 
 # Python 项目特定要求
 
-> 扩展 [.agent/rules/python-standards.md](../../.agent/rules/python-standards.md)
+> 扩展 [.claude/rules/python-standards.md](../../.claude/rules/python-standards.md)
 
 ## 本项目特有
 
@@ -320,7 +294,6 @@ paths: ["**/*.py"]
 1. **保持分层清晰**
    - 全局规则：通用原则
    - 项目规则：特定扩展
-   - 压缩规则：详细定义
    - CLAUDE.md：硬规则 + 引用
 
 2. **单一事实来源**
@@ -342,7 +315,7 @@ paths: ["**/*.py"]
    - 不要复制粘贴全局规则
 
 2. **不要孤立规则**
-   - .agent/rules/ 必须在 CLAUDE.md 中引用
+   - .claude/rules/ 必须在 CLAUDE.md 中引用
    - 未引用的规则应删除
 
 3. **不要忽略冲突**
@@ -366,7 +339,7 @@ paths: ["**/*.py"]
       entry: /vibe-rules check
       language: system
       pass_filenames: false
-      files: \.claude/rules/|\.agent/rules/|CLAUDE\.md$
+      files: \.claude/rules/|CLAUDE\.md$
 ```
 
 ### 2. CI 检查
@@ -390,8 +363,8 @@ jobs:
           fi
 
           # 检查 CLAUDE.md 引用
-          if ! grep -q "\.agent/rules/python-standards\.md" CLAUDE.md; then
-            echo "❌ Missing reference to .agent/rules/python-standards.md"
+          if ! grep -q "\.claude/rules/python-standards\.md" CLAUDE.md; then
+            echo "❌ Missing reference to .claude/rules/python-standards.md"
             exit 1
           fi
 ```
@@ -430,14 +403,14 @@ jobs:
 3. 是否比现有规则更详细或更合适？
 4. 删除后是否会影响开发效率？
 
-### Q4: .agent/rules/ 和 .claude/rules/ 的区别？
+### Q4: .claude/rules/ 的作用？
 
 **答**：
 
-- `.agent/rules/`: 权威定义，详细标准，按需读取
-- `.claude/rules/`: 快速提醒，项目特定扩展，常驻上下文
+- `.claude/rules/`: 项目规则真源，长期有效的硬约束和实现标准
+- 已废弃：`.agent/rules/`（已迁移到 `.claude/rules/`）
 
-理想情况：`.claude/rules/` 只保留项目特定扩展，其他引用 `.agent/rules/`
+理想情况：`.claude/rules/` 只保留项目特定规则，全局规则使用 `~/.claude/rules/common/`
 
 ## 相关文档
 

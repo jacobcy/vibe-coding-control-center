@@ -11,7 +11,7 @@
 
 ## 与 rules 的区别
 
-- `.agent/rules/`：仓库长期规则、硬约束、实现标准
+- `.claude/rules/`：仓库长期规则、硬约束、实现标准
 - `supervisor/policies/`：按 mode 加载的标准运行时策略材料
 
 不要把仓库级规则继续写进 policy，也不要把 mode-specific 策略塞回 rules。
