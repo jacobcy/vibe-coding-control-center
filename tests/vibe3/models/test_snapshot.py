@@ -1,6 +1,60 @@
 """Tests for snapshot models."""
 
-from vibe3.models.snapshot import DiffSummary
+from vibe3.models.snapshot import DiffSummary, StructureMetrics
+
+
+def test_diff_summary_from_metrics():
+    """Test DiffSummary.from_metrics classmethod."""
+    baseline = StructureMetrics(
+        total_files=5,
+        total_loc=100,
+        total_functions=5,
+        python_files=4,
+        shell_files=1,
+    )
+
+    current = StructureMetrics(
+        total_files=10,
+        total_loc=350,
+        total_functions=17,
+        python_files=9,
+        shell_files=1,
+    )
+
+    result = DiffSummary.from_metrics(baseline, current)
+
+    # Should have only metric deltas populated
+    assert result.total_loc_delta == 250  # 350 - 100
+    assert result.total_functions_delta == 12  # 17 - 5
+
+    # All other fields should be 0 (default)
+    assert result.files_added == 0
+    assert result.files_removed == 0
+    assert result.files_modified == 0
+    assert result.modules_added == 0
+    assert result.modules_removed == 0
+    assert result.modules_modified == 0
+    assert result.dependencies_added == 0
+    assert result.dependencies_removed == 0
+
+
+def test_diff_summary_from_metrics_negative_delta():
+    """Test DiffSummary.from_metrics with code shrinkage (negative delta)."""
+    baseline = StructureMetrics(
+        total_files=10,
+        total_loc=350,
+        total_functions=17,
+    )
+    current = StructureMetrics(
+        total_files=5,
+        total_loc=100,
+        total_functions=5,
+    )
+
+    result = DiffSummary.from_metrics(baseline, current)
+
+    assert result.total_loc_delta == -250  # 100 - 350
+    assert result.total_functions_delta == -12  # 5 - 17
 
 
 def test_diff_summary_add():

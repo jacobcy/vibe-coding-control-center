@@ -3,7 +3,6 @@
 from vibe3.analysis.snapshot_diff import compute_diff
 from vibe3.models.snapshot import (
     DependencyEdge,
-    DiffSummary,
     FileSnapshot,
     ModuleSnapshot,
     StructureMetrics,
@@ -118,101 +117,6 @@ def test_compute_diff_merges_summaries():
     # LOC and function deltas
     assert diff.summary.total_loc_delta == 250  # 350 - 100 = 250
     assert diff.summary.total_functions_delta == 12  # 17 - 5 = 12
-
-
-def test_diff_summary_from_metrics():
-    """Test DiffSummary.from_metrics classmethod."""
-    baseline = StructureMetrics(
-        total_files=5,
-        total_loc=100,
-        total_functions=5,
-        python_files=4,
-        shell_files=1,
-    )
-
-    current = StructureMetrics(
-        total_files=10,
-        total_loc=350,
-        total_functions=17,
-        python_files=9,
-        shell_files=1,
-    )
-
-    result = DiffSummary.from_metrics(baseline, current)
-
-    # Should have only metric deltas populated
-    assert result.total_loc_delta == 250  # 350 - 100
-    assert result.total_functions_delta == 12  # 17 - 5
-
-    # All other fields should be 0 (default)
-    assert result.files_added == 0
-    assert result.files_removed == 0
-    assert result.files_modified == 0
-    assert result.modules_added == 0
-    assert result.modules_removed == 0
-    assert result.modules_modified == 0
-    assert result.dependencies_added == 0
-    assert result.dependencies_removed == 0
-
-
-def test_diff_summary_from_metrics_negative_delta():
-    """Test DiffSummary.from_metrics with code shrinkage (negative delta)."""
-    baseline = StructureMetrics(
-        total_files=10,
-        total_loc=350,
-        total_functions=17,
-    )
-    current = StructureMetrics(
-        total_files=5,
-        total_loc=100,
-        total_functions=5,
-    )
-
-    result = DiffSummary.from_metrics(baseline, current)
-
-    assert result.total_loc_delta == -250  # 100 - 350
-    assert result.total_functions_delta == -12  # 5 - 17
-
-
-def test_diff_summary_add():
-    """Test DiffSummary.__add__ sums all fields correctly."""
-    a = DiffSummary(
-        files_added=1,
-        files_removed=0,
-        files_modified=2,
-        modules_added=1,
-        modules_removed=0,
-        modules_modified=1,
-        dependencies_added=1,
-        dependencies_removed=0,
-        total_loc_delta=100,
-        total_functions_delta=10,
-    )
-    b = DiffSummary(
-        files_added=0,
-        files_removed=1,
-        files_modified=1,
-        modules_added=0,
-        modules_removed=1,
-        modules_modified=0,
-        dependencies_added=0,
-        dependencies_removed=1,
-        total_loc_delta=-30,
-        total_functions_delta=-3,
-    )
-
-    result = a + b
-
-    assert result.files_added == 1
-    assert result.files_removed == 1
-    assert result.files_modified == 3
-    assert result.modules_added == 1
-    assert result.modules_removed == 1
-    assert result.modules_modified == 1
-    assert result.dependencies_added == 1
-    assert result.dependencies_removed == 1
-    assert result.total_loc_delta == 70
-    assert result.total_functions_delta == 7
 
 
 def test_compute_diff_identical_snapshots():
