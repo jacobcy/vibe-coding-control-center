@@ -117,7 +117,7 @@ wtnew() {
     case "$1" in
       --actor)   actor="$2"; shift 2 ;;
       --actor=*) actor="${1#--actor=}"; shift ;;
-      -*)        vibe_die "Unknown flag: $1" ;;
+      -*)        vibe_die "Unknown flag: $1"; return 1 ;;
       *)
         if [[ -z "$branch" ]]; then branch="$1"
         elif [[ "$base" == "origin/main" ]]; then base="$1"
