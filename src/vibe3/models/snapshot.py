@@ -52,8 +52,6 @@ class StructureMetrics(BaseModel):
     total_functions: int = 0
     python_files: int = 0
     shell_files: int = 0
-    avg_file_loc: float = 0.0
-    avg_functions_per_file: float = 0.0
 
 
 class StructureSnapshot(BaseModel):
