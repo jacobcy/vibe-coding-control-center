@@ -126,11 +126,55 @@ def get_router_functions(file_path: str, tree: ast.Module | None = None) -> set[
         return set()
 
 
+def is_exception_class(
+    file_path: str, tree: ast.Module | None = None, symbol_name: str = ""
+) -> bool:
+    """Check if a class is an exception class (inherits from Exception).
+
+    Args:
+        file_path: Path to the file (used if tree is None)
+        tree: Optional pre-parsed AST module. If None, file will be read and parsed.
+        symbol_name: Name of the class to check
+
+    Returns:
+        True if the class inherits from Exception, BaseException, VibeError,
+        or ends with Error
+    """
+    try:
+        if tree is None:
+            source = Path(file_path).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == symbol_name:
+                # Check if any base is an exception type
+                for base in node.bases:
+                    # Direct name reference: Exception, BaseException, VibeError
+                    if isinstance(base, ast.Name):
+                        if base.id in ("Exception", "BaseException", "VibeError"):
+                            return True
+                        # Class names ending with "Error" are likely exceptions
+                        if base.id.endswith("Error"):
+                            return True
+                    # Attribute reference: some_module.Exception
+                    elif isinstance(base, ast.Attribute):
+                        if base.attr in ("Exception", "BaseException", "VibeError"):
+                            return True
+                        if base.attr.endswith("Error"):
+                            return True
+                return False
+        return False
+    except Exception:
+        return False
+
+
 def classify_confidence(
     symbol_name: str,
     ref_count: int,
     is_cli_command: bool = False,
     router_funcs: set[str] | None = None,
+    is_exception: bool = False,
+    used_in_tests: bool = False,
 ) -> Literal["high", "medium", "low", "excluded"]:
     """Classify the confidence level of a dead code finding.
 
@@ -139,6 +183,8 @@ def classify_confidence(
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
         router_funcs: Set of router-decorated function names (for exclusion check)
+        is_exception: Whether the symbol is an exception class
+        used_in_tests: Whether the symbol is referenced in test files
 
     Returns:
         Confidence level: "high", "medium", "low", or "excluded"
@@ -156,6 +202,15 @@ def classify_confidence(
         ).debug("Symbol has router decorator, excluded")
         return "excluded"
 
+    # Exclude symbols used in tests
+    if used_in_tests:
+        logger.bind(
+            domain="dead_code_rules",
+            action="classify_confidence",
+            symbol=symbol_name,
+        ).debug("Symbol referenced in tests, excluded")
+        return "excluded"
+
     # Only classify as dead if ref_count == 0
     if ref_count > 0:
         logger.bind(
@@ -165,6 +220,10 @@ def classify_confidence(
             ref_count=ref_count,
         ).debug("Symbol has references, not dead code")
         return "excluded"
+
+    # Exception classes with 0 refs get medium confidence (may be used dynamically)
+    if is_exception:
+        return "medium"
 
     # High confidence: regular functions with 0 refs
     if not is_private(symbol_name):
@@ -180,6 +239,8 @@ def is_dead_code(
     ref_count: int,
     is_cli_command: bool = False,
     router_funcs: set[str] | None = None,
+    is_exception: bool = False,
+    used_in_tests: bool = False,
 ) -> tuple[bool, str, Literal["high", "medium", "low", "excluded"]]:
     """Determine if a symbol is dead code.
 
@@ -188,12 +249,19 @@ def is_dead_code(
         ref_count: Number of references found
         is_cli_command: Whether the symbol is a CLI command
         router_funcs: Set of router-decorated function names (for exclusion check)
+        is_exception: Whether the symbol is an exception class
+        used_in_tests: Whether the symbol is referenced in test files
 
     Returns:
         Tuple of (is_dead: bool, reason: str, confidence: str)
     """
     confidence = classify_confidence(
-        symbol_name, ref_count, is_cli_command, router_funcs
+        symbol_name,
+        ref_count,
+        is_cli_command,
+        router_funcs,
+        is_exception,
+        used_in_tests,
     )
 
     if confidence == "excluded":
@@ -201,6 +269,8 @@ def is_dead_code(
             return False, "CLI command (invoked via CLI, not code)", confidence
         if router_funcs is not None and symbol_name in router_funcs:
             return False, "FastAPI endpoint (invoked via HTTP router)", confidence
+        if used_in_tests:
+            return False, "Referenced in test files", confidence
         if should_exclude(symbol_name):
             return False, "Excluded pattern (test/special method)", confidence
         return False, f"Has {ref_count} references", confidence
@@ -209,12 +279,16 @@ def is_dead_code(
         return True, "Unused function with 0 references (high confidence)", confidence
 
     if confidence == "medium":
+        if is_exception:
+            return (
+                True,
+                "Unused exception class with 0 references (medium confidence)",
+                confidence,
+            )
         return (
             True,
             "Unused private function with 0 references (medium confidence)",
             confidence,
         )
-
-    return False, "Not dead code", confidence
 
     return False, "Not dead code", confidence

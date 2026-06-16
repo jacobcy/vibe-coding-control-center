@@ -1,5 +1,6 @@
 """Tests for dead code detection rules."""
 
+import ast
 import tempfile
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from vibe3.analysis.dead_code_rules import (
     classify_confidence,
     get_router_functions,
     is_dead_code,
+    is_exception_class,
     is_private,
     should_exclude,
 )
@@ -64,6 +66,86 @@ class TestIsPrivate:
         assert is_private(func_name) is expected
 
 
+class TestIsExceptionClass:
+    """Test exception class detection."""
+
+    def test_exception_inheritance(self):
+        """Test detection of class inheriting from Exception."""
+        source = """
+class MyError(Exception):
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "MyError") is True
+
+    def test_base_exception_inheritance(self):
+        """Test detection of class inheriting from BaseException."""
+        source = """
+class MyCriticalError(BaseException):
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "MyCriticalError") is True
+
+    def test_vibe_error_inheritance(self):
+        """Test detection of class inheriting from VibeError."""
+        source = """
+class ContextBuilderError(VibeError):
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "ContextBuilderError") is True
+
+    def test_error_suffix_base_class(self):
+        """Test detection when base class name ends with Error."""
+        source = """
+class DerivedError(CustomError):
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "DerivedError") is True
+
+    def test_non_exception_class(self):
+        """Test that regular classes are not detected as exceptions."""
+        source = """
+class RegularClass:
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "RegularClass") is False
+
+    def test_class_not_found(self):
+        """Test that missing class returns False."""
+        source = """
+class SomeClass:
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "MissingClass") is False
+
+    def test_attribute_base_class(self):
+        """Test detection with attribute-style base class (e.g., errors.Exception)."""
+        source = """
+from some_module import errors
+
+class MyError(errors.Exception):
+    pass
+"""
+        tree = ast.parse(source)
+        assert is_exception_class("/fake/path.py", tree, "MyError") is True
+
+    def test_file_read_fallback(self):
+        """Test that function reads file when tree is None."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("class FileError(Exception): pass\n")
+            f.flush()
+            file_path = f.name
+
+        result = is_exception_class(file_path, None, "FileError")
+        assert result is True
+        Path(file_path).unlink()
+
+
 class TestClassifyConfidence:
     """Test confidence classification."""
 
@@ -94,6 +176,38 @@ class TestClassifyConfidence:
     ):
         """Test confidence levels for unused functions."""
         result = classify_confidence(func_name, ref_count)
+        assert result == expected
+
+    @pytest.mark.parametrize(
+        "func_name,ref_count,is_exception,expected",
+        [
+            pytest.param(
+                "SomeError", 0, True, "medium", id="exception_class_zero_refs"
+            ),
+            pytest.param(
+                "RegularClass", 0, False, "high", id="non_exception_zero_refs"
+            ),
+        ],
+    )
+    def test_classify_confidence_exception(
+        self, func_name: str, ref_count: int, is_exception: bool, expected: str
+    ):
+        """Test that exception classes get medium confidence."""
+        result = classify_confidence(func_name, ref_count, is_exception=is_exception)
+        assert result == expected
+
+    @pytest.mark.parametrize(
+        "func_name,ref_count,used_in_tests,expected",
+        [
+            pytest.param("tested_func", 0, True, "excluded", id="used_in_tests"),
+            pytest.param("unused_func", 0, False, "high", id="not_used_in_tests"),
+        ],
+    )
+    def test_classify_confidence_used_in_tests(
+        self, func_name: str, ref_count: int, used_in_tests: bool, expected: str
+    ):
+        """Test that symbols used in tests are excluded."""
+        result = classify_confidence(func_name, ref_count, used_in_tests=used_in_tests)
         assert result == expected
 
 
@@ -146,6 +260,78 @@ class TestIsDeadCode:
         is_dead, reason, _ = is_dead_code(func_name, ref_count)
         assert is_dead is True
         assert expected_confidence in reason
+
+    @pytest.mark.parametrize(
+        "func_name,ref_count,is_exception,expected_is_dead,reason_contains",
+        [
+            pytest.param(
+                "SomeError",
+                0,
+                True,
+                True,
+                "exception class",
+                id="exception_class_zero_refs",
+            ),
+            pytest.param(
+                "RegularClass",
+                0,
+                False,
+                True,
+                "high confidence",
+                id="non_exception_class_zero_refs",
+            ),
+        ],
+    )
+    def test_exception_class_dead_code(
+        self,
+        func_name: str,
+        ref_count: int,
+        is_exception: bool,
+        expected_is_dead: bool,
+        reason_contains: str,
+    ):
+        """Test exception class detection in dead code."""
+        is_dead, reason, _ = is_dead_code(
+            func_name, ref_count, is_exception=is_exception
+        )
+        assert is_dead is expected_is_dead
+        assert reason_contains in reason
+
+    @pytest.mark.parametrize(
+        "func_name,ref_count,used_in_tests,expected_is_dead,reason_contains",
+        [
+            pytest.param(
+                "tested_func",
+                0,
+                True,
+                False,
+                "Referenced in test files",
+                id="used_in_tests",
+            ),
+            pytest.param(
+                "unused_func",
+                0,
+                False,
+                True,
+                "high confidence",
+                id="not_used_in_tests",
+            ),
+        ],
+    )
+    def test_used_in_tests(
+        self,
+        func_name: str,
+        ref_count: int,
+        used_in_tests: bool,
+        expected_is_dead: bool,
+        reason_contains: str,
+    ):
+        """Test that symbols used in tests are not flagged as dead."""
+        is_dead, reason, _ = is_dead_code(
+            func_name, ref_count, used_in_tests=used_in_tests
+        )
+        assert is_dead is expected_is_dead
+        assert reason_contains in reason
 
 
 class TestGetRouterFunctions:
