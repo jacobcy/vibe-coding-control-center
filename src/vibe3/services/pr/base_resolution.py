@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Callable, Literal
 
-from vibe3.clients import GitClient, GitClientProtocol
+from vibe3.clients import GitClient, GitClientProtocol, GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models import BranchSource
 from vibe3.utils import find_parent_branch, is_branch_merged_to_main
@@ -38,9 +38,11 @@ class BaseResolutionUsecase:
         self,
         parent_branch_finder: Callable[[str | None], str | None] = find_parent_branch,
         git_client: GitClientProtocol | None = None,
+        github_client: GitHubClient | None = None,
     ) -> None:
         self.parent_branch_finder = parent_branch_finder
         self.git_client = git_client or GitClient()
+        self.github_client = github_client or GitHubClient()
 
     @staticmethod
     def resolve_pr_create_base(requested_base: str | None) -> str:
@@ -105,12 +107,21 @@ class BaseResolutionUsecase:
         If creation_source is provided, it takes precedence over parent detection.
         This ensures we use the static branch creation source rather than
         dynamically calculated topology.
+
+        If no creation_source but branch has an open PR, use PR base as fallback.
+        This handles PR review worktrees that lack flow state.
         """
         token = (requested_base or default_policy).strip()
 
         # Prefer creation_source over dynamic parent detection
         if token == "parent" and creation_source:
             return ResolvedBase(base_branch=creation_source, auto_detected=False)
+
+        # Fallback: Try PR base for review worktrees without flow state
+        if token == "parent" and not creation_source:
+            pr_base = self._try_get_pr_base(current_branch)
+            if pr_base:
+                return ResolvedBase(base_branch=pr_base, auto_detected=False)
 
         if token == "parent":
             inferred = self.parent_branch_finder(current_branch)
@@ -128,6 +139,25 @@ class BaseResolutionUsecase:
         if token == "main":
             return ResolvedBase(base_branch=MAIN_BRANCH_REF, auto_detected=False)
         return ResolvedBase(base_branch=token, auto_detected=False)
+
+    def _try_get_pr_base(self, branch: str) -> str | None:
+        """Try to get base branch from open PR for given branch.
+
+        Returns None if no PR found or PR fetch fails.
+        This is a best-effort fallback for review worktrees.
+        """
+        try:
+            pr_info = self.github_client.get_pr(branch=branch)
+            if pr_info and pr_info.base_branch:
+                # Prefix with origin/ if not already
+                base = pr_info.base_branch
+                if not base.startswith("origin/"):
+                    base = f"origin/{base}"
+                return base
+        except Exception:
+            # Best-effort: ignore errors
+            pass
+        return None
 
     def collect_branch_material(
         self,
