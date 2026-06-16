@@ -319,6 +319,16 @@ class GlobalDispatchCoordinator:
 
         See _build_queue_from_issues for ordering semantics.
 
+        Exception Handling:
+            API failures within _collect_open_issues (GitHub errors, network
+            issues) return an empty list (fail-safe). Infrastructure failures
+            (executor shutdown, thread pool exhaustion) propagate to the caller.
+
+            This differs from pre-refactor behavior where all exceptions were
+            caught. Failing fast on infrastructure errors is more appropriate
+            than silently returning an empty queue, as such failures indicate
+            system-level problems that should be surfaced immediately.
+
         Returns:
             List of QueueEntry objects ready for dispatch
         """
