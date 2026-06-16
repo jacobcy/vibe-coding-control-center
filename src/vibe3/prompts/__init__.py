@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         make_context_builder,
     )
     from vibe3.prompts.exceptions import (
+        ContextBuilderError,
         MissingVariableError,
         PromptAssemblyError,
         ProviderNotFoundError,
@@ -72,6 +73,7 @@ _LAZY_IMPORTS = {
     "PromptAssembler": "vibe3.prompts.assembler",
     "PromptContextBuilder": "vibe3.prompts.context_builder",
     "make_context_builder": "vibe3.prompts.context_builder",
+    "ContextBuilderError": "vibe3.prompts.exceptions",
     "MissingVariableError": "vibe3.prompts.exceptions",
     "PromptAssemblyError": "vibe3.prompts.exceptions",
     "ProviderNotFoundError": "vibe3.prompts.exceptions",
@@ -142,6 +144,7 @@ __all__ = [
     # Provider
     "ProviderRegistry",
     # Exceptions
+    "ContextBuilderError",
     "PromptAssemblyError",
     "MissingVariableError",
     "ProviderNotFoundError",

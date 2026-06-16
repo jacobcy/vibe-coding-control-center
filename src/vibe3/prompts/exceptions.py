@@ -42,3 +42,10 @@ class ProviderNotFoundError(PromptAssemblyError):
     def __init__(self, provider: str) -> None:
         self.provider = provider
         super().__init__(f"Prompt provider not registered: '{provider}'")
+
+
+class ContextBuilderError(VibeError):
+    """Prompt context build failed (non-recoverable by default)."""
+
+    def __init__(self, details: str) -> None:
+        super().__init__(f"Context build failed: {details}", recoverable=False)

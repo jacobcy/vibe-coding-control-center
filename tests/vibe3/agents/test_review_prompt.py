@@ -10,26 +10,26 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.agents.review_prompt import (
-    ContextBuilderError,
-    build_ast_analysis_section,
-    build_output_contract_section,
-    build_policy_section,
+    _build_ast_analysis_section,
+    _build_output_contract_section,
+    _build_policy_section,
+    _build_review_task_section,
     build_review_prompt_body,
-    build_review_task_section,
     describe_review_sections,
 )
 from vibe3.models import ReviewRequest, ReviewScope
+from vibe3.prompts.exceptions import ContextBuilderError
 
 
 class TestBuildPolicySection:
-    """Tests for build_policy_section (unit test)."""
+    """Tests for _build_policy_section (unit test)."""
 
     def test_reads_policy_file(self, tmp_path: Path) -> None:
         """Should read policy from file."""
         policy_file = tmp_path / "policy.md"
         policy_file.write_text("# Review Policy\n\nFocus on correctness.")
 
-        result = build_policy_section(str(policy_file))
+        result = _build_policy_section(str(policy_file))
 
         assert "# Review Policy" in result
         assert "Focus on correctness" in result
@@ -37,21 +37,21 @@ class TestBuildPolicySection:
     def test_raises_on_missing_file(self) -> None:
         """Should raise ContextBuilderError if file not found."""
         with pytest.raises(ContextBuilderError, match="Cannot read policy"):
-            build_policy_section("/nonexistent/policy.md")
+            _build_policy_section("/nonexistent/policy.md")
 
 
 class TestBuildAstAnalysisSection:
-    """Tests for build_ast_analysis_section (unit test)."""
+    """Tests for _build_ast_analysis_section (unit test)."""
 
     def test_returns_none_if_no_data(self) -> None:
         """Should return None if no symbols or DAG provided."""
-        result = build_ast_analysis_section(None, None)
+        result = _build_ast_analysis_section(None, None)
         assert result is None
 
     def test_formats_changed_symbols(self) -> None:
         """Should format changed symbols as JSON."""
         symbols = {"src/foo.py": ["func1", "func2"]}
-        result = build_ast_analysis_section(symbols, None)
+        result = _build_ast_analysis_section(symbols, None)
 
         assert result is not None
         assert "## AST Analysis" in result
@@ -61,7 +61,7 @@ class TestBuildAstAnalysisSection:
     def test_formats_symbol_dag(self) -> None:
         """Should format symbol DAG as JSON."""
         dag = {"func1": ["caller1", "caller2"]}
-        result = build_ast_analysis_section(None, dag)
+        result = _build_ast_analysis_section(None, dag)
 
         assert result is not None
         assert "Function Call Chain" in result
@@ -71,23 +71,23 @@ class TestBuildAstAnalysisSection:
         """Should format both symbols and DAG."""
         symbols = {"src/foo.py": ["func1"]}
         dag = {"func1": ["caller1"]}
-        result = build_ast_analysis_section(symbols, dag)
+        result = _build_ast_analysis_section(symbols, dag)
 
         assert "Changed Functions" in result
         assert "Function Call Chain" in result
 
 
 class TestBuildReviewTaskSection:
-    """Tests for build_review_task_section (unit test)."""
+    """Tests for _build_review_task_section (unit test)."""
 
     def test_uses_custom_task(self) -> None:
         """Should use custom task text."""
-        result = build_review_task_section("Focus on security")
+        result = _build_review_task_section("Focus on security")
         assert "## Review Task" in result
         assert "Focus on security" in result
 
     def test_task_section_can_carry_audit_ref_guidance(self) -> None:
-        result = build_review_task_section(
+        result = _build_review_task_section(
             "If you write a fuller audit note, register it with handoff audit."
         )
 
@@ -95,21 +95,21 @@ class TestBuildReviewTaskSection:
 
     def test_returns_empty_if_none(self) -> None:
         """Should return empty string if None."""
-        result = build_review_task_section(None)
+        result = _build_review_task_section(None)
         assert result == ""
 
 
 class TestBuildOutputContractSection:
-    """Tests for build_output_contract_section (unit test)."""
+    """Tests for _build_output_contract_section (unit test)."""
 
     def test_uses_custom_format(self) -> None:
         """Should use custom output format."""
-        result = build_output_contract_section("Custom format instructions")
+        result = _build_output_contract_section("Custom format instructions")
         assert result == "## Output format requirements\nCustom format instructions"
 
     def test_returns_empty_if_none(self) -> None:
         """Should return empty string if None."""
-        result = build_output_contract_section(None)
+        result = _build_output_contract_section(None)
         assert result == ""
 
 
