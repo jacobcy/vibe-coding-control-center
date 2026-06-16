@@ -100,6 +100,12 @@ def test_list_snapshots_excludes_baselines_by_default(
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
     monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+    # Mock SQLiteClient to force filesystem fallback
+    monkeypatch.setattr(
+        snapshot_service,
+        "SQLiteClient",
+        lambda: (_ for _ in ()).throw(Exception("Mock DB failure")),
+    )
 
     # Create a regular snapshot in snapshots directory
     regular = {
@@ -135,6 +141,43 @@ def test_list_snapshots_excludes_baselines_by_default(
     result = snapshot_service.list_snapshots(include_baselines=True)
     assert "regular-1" in result
     assert "baseline-main-1" in result
+
+
+def test_list_snapshots_from_db_with_baselines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test list_snapshots DB path handles baseline filtering correctly."""
+    from vibe3.analysis import snapshot_service
+
+    # Mock SQLiteClient to return data with baseline_for
+    mock_client = MagicMock()
+
+    # When include_baselines=False, only return non-baseline snapshots
+    mock_client.list_snapshots_from_registry.side_effect = lambda limit, include: (
+        [
+            {"snapshot_id": "regular-1", "created_at": "2026-06-15T10:00:00"},
+            {"snapshot_id": "regular-2", "created_at": "2026-06-14T10:00:00"},
+        ]
+        if not include
+        else [
+            {"snapshot_id": "regular-1", "created_at": "2026-06-15T10:00:00"},
+            {"snapshot_id": "regular-2", "created_at": "2026-06-14T10:00:00"},
+            {"snapshot_id": "baseline-main-1", "created_at": "2026-06-13T10:00:00"},
+        ]
+    )
+
+    monkeypatch.setattr(snapshot_service, "SQLiteClient", lambda: mock_client)
+
+    # Test exclude baselines (default)
+    result = snapshot_service.list_snapshots()
+    assert result == ["regular-1", "regular-2"]
+    mock_client.list_snapshots_from_registry.assert_called_once_with(50, False)
+
+    # Test include baselines
+    mock_client.reset_mock()
+    result = snapshot_service.list_snapshots(include_baselines=True)
+    assert result == ["regular-1", "regular-2", "baseline-main-1"]
+    mock_client.list_snapshots_from_registry.assert_called_once_with(50, True)
 
 
 def test_save_branch_baseline_creates_baseline_for_diff(
