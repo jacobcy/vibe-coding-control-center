@@ -195,7 +195,7 @@ class PRWriteMixin:
 
         try:
             subprocess.run(
-                ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"],
+                ["gh", "pr", "merge", str(pr_number), "--squash"],
                 capture_output=True,
                 text=True,
                 check=True,
