@@ -27,7 +27,7 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
-- `vibe3 task status` — 全局任务面板与 Flow 状态总览 (推荐)
+- `vibe3 task status` — 全局任务面板与 Flow 状态总览 (推荐，包含 assignee issue 总览)
 - `vibe3 status` — [Compatibility] 全局状态兼容入口
 - `vibe3 flow show` / `rebuild` / `bind` — Flow 现场管理
 - `vibe3 task show` / `intake` / `resume` — 任务生命周期管理
@@ -40,7 +40,7 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 
 ```bash
 # 1. 查看 V3 运行时与任务状态 (这是 Agent 的首选入口)
-vibe3 task status      # 全局任务面板
+vibe3 task status      # 全局任务面板（推荐）
 vibe3 status           # [Compatibility] 兼容入口
 vibe3 snapshot show    # 查看项目健康度仪表盘
 
@@ -77,7 +77,7 @@ vibe keys check  # (需 source ~/.zshrc)
 - `/vibe-onboard` 负责引导用户检查和配置工具、Claude plugins、keys，并介绍项目与下一步
 - `vibe skills check` / `/vibe-skills-manager` 负责把 skills 体系梳理清楚，避免 codeagent-wrapper 缺少必要能力
 - `~/.vibe/keys.env` 由 `config/keys.template.env` 初始化而来，按需手动编辑
-- 如果在安装、初始化或使用过程中遇到任何问题，欢迎向项目开发者提交 issue 说明现场与复现步骤
+- 如果在安装、初始化或使用过程中遇到任何问题，欢迎向项目开发者提交 GitHub issue 说明现场与复现步骤
 - skills 体系建议：
   - Superpowers：Claude 用官方 plugin；其他 agent 用 `npx skills`
   - OpenSpec：项目内初始化，按需启用
@@ -103,7 +103,7 @@ git checkout -b feature/example
 # 注册当前现场
 uv run python src/vibe3/cli.py flow update
 
-# 绑定 issue
+# 绑定 GitHub issue
 uv run python src/vibe3/cli.py flow bind 123
 
 # 查看当前现场
@@ -115,7 +115,7 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 ## 架构边界
 
-### Tier 3 (Cognitive/Governance): Policies, rules, supervisor
+### Tier 3 (Cognitive / Governance Layer): Policies, rules, supervisor
 
 - `SOUL.md`, `CLAUDE.md`, `STRUCTURE.md`
 - `supervisor/`
@@ -153,7 +153,7 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - `exceptions/`: 统一异常层级
 - `models/`: 领域数据模型（Flow, Handoff, Task, PR, Verdict 等 Pydantic 模型）
 - `observability/`: 日志、链路追踪、审计
-- `orchestra/`: 多 issue / 多 flow 的事实观察、排队与调度入口
+- `orchestra/`: 多 GitHub issue / 多 flow 的事实观察、排队与调度入口
 - `prompts/`: prompt 组装与 provenance
 - `roles/`: 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/`: heartbeat、event bus、executor
@@ -164,7 +164,7 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 ## 关键原则
 
-- assignee 是 orchestration 启动事实源
+- assignee issue 是 orchestration 启动事实源
 - `state/*` label 只反映 flow 实际状态，不做主驱动
 - branch / worktree 清理能力属于 manager 模块，但何时清理由 agent / skill 判断
 - 常驻 server 和定时巡检只是运行模式差异，不改变模块职责

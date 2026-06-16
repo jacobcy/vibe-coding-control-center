@@ -315,7 +315,7 @@ Vibe3 后续收敛的核心不是继续增加抽象，而是收回主控权。
 **Completed:**
 - FlowManager migrated from `orchestra/flow_dispatch.py` to `domain/flow_manager.py`
 - GlobalDispatchCoordinator migrated from `orchestra/global_dispatch_coordinator.py` to `domain/dispatch_coordinator.py`
-- FailedGate migrated from `orchestra/failed_gate.py` to `domain/failed_gate.py`
+- FailedGate migrated from `orchestra/FailedGate.py` to `domain/FailedGate.py`
 - FlowManagerProtocol migrated to `domain/protocols/flow_protocols.py`
 - DispatchProtocols created in `domain/protocols/dispatch_protocols.py`
 - Orchestra layer now contains adapter shells for backward compatibility

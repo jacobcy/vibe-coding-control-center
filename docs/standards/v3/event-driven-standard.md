@@ -648,7 +648,7 @@ LabelService().transition(
 - 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
 - 材料来源：`supervisor/governance/*.md`
 - `assignee-pool governance`：观察当前 assignee issue pool
-- `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool；不处理 discussion / refactor / big feature
+- `roadmap governance`：扫描 broader GitHub issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool；不处理 discussion / refactor / big feature
 - `cron governance`：周期性派发过时文档治理 supervisor issue；当前固定一批最多 5 个文档
 - governance 不进入主代码实现链；动作限于观察、最小 routing、派单。对应 **Tier 3 (Cognitive Layer)**。
 
