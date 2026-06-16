@@ -14,7 +14,7 @@
 |------|------|---------|--------|
 | **Human-Mirror 架构** | [docs/standards/v3/human-mirror-architecture-philosophy.md](standards/v3/human-mirror-architecture-philosophy.md) | 核心设计哲学：系统操作 = 人类操作 | ⭐⭐⭐ 权威 |
 | **事件驱动架构** | [docs/standards/v3/event-driven-standard.md](standards/v3/event-driven-standard.md) | 事件发布/订阅机制、处理器注册、向后兼容 | ⭐⭐⭐  权威 |
-| **Worktree Runtime** | [docs/standards/v3/worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md) | 执行层级（L0-L4）、worktree 生命周期管理、runtime session | ⭐⭐⭐ 权威 |
+| **Worktree Runtime** | [docs/standards/v3/worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md) | 执行层级（L1-L4）、worktree 生命周期管理、runtime session | ⭐⭐⭐ 权威 |
 | **Orchestra Runtime** | [docs/standards/v3/orchestra-runtime-standard.md](standards/v3/orchestra-runtime-standard.md) | Driver/Tick/Async Child 架构、调度主循环 | ⭐⭐⭐ 权威 |
 | **State Sync** | [docs/standards/v3/command-standard.md](standards/v3/command-standard.md) | Flow 状态机、状态转换规则 | ⭐⭐⭐ 权威 |
 
@@ -165,7 +165,7 @@ def register_dispatch_handlers() -> None:
    - [worktree-lifecycle-standard.md](standards/v3/worktree-lifecycle-standard.md)
 
 2. **关键检查点**：
-   - ✅ 确认执行层级（L0-L4）
+   - ✅ 确认执行层级（L1-L4）
    - ✅ 确认 worktree 语义（临时 vs 持久）
    - ✅ 确认隔离边界（是否需要 `--worktree` 标志）
 

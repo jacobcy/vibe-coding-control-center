@@ -155,7 +155,7 @@ related_docs:
 
 - `active`
 - `blocked`
-- `done"
+- `done`
 - `stale`
 - `aborted`
 
@@ -181,8 +181,8 @@ related_docs:
 
 允许的实体关系如下：
 
-- GitHub issue 与 flow：多对多（一个 issue 可在不同 flow 中作为 task，一个 flow 可关联多个 issue role）。
-- GitHub issue 与 task：多对多（task 是 execution bridge，issue 是外部真源）。
+- GitHub issue 与 flow：多对多（一个 `assignee issue` 或 `supervisor issue` 可在不同 flow 中作为 `task issue`）。
+- GitHub issue 与 task：多对多（`task` 是 execution bridge，issue 是外部真源）。
 - milestone 与 GitHub issue：一对多（规划层与执行源的关联）。
 - flow 与 task：一对多。
 - PR 与 task：一对一。
@@ -191,8 +191,10 @@ related_docs:
 补充约束：
 
 - 用户主视角主链是 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done`。
-- 旧桥接链 `GitHub issue -> roadmap item -> task -> flow` 已退役。当前治理直接作用于 GitHub issue 分配。
+- 旧桥接链 `GitHub issue -> roadmap item -> task -> flow` 已退役。当前治理直接作用于 `assignee issue` 的分配。
 - `roadmap item` 概念仅保留在规划层参考中。
+- `task issue` 特指 vibe3 视角下作为 flow 主执行目标的 `assignee issue`。
+- `verdict` 是对任务执行结果的最终判定（PASS/MAJOR/BLOCK/UNKNOWN）。
 - `ready` / `blocked` / `blockers` 若存在，应作为派生视图而非共享真源持久化字段。
 - GitHub 官方字段与 Vibe 扩展字段必须可双向同步。
 - task 只允许绑定一个主 PR。
