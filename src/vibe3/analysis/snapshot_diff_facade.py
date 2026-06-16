@@ -8,9 +8,14 @@ from vibe3.analysis.snapshot_service import (
 )
 from vibe3.clients import GitClient
 from vibe3.models import BranchSource, DiffSummary
+from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
-def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
+def get_diff_summary(
+    branch: str,
+    base_branch: str = "main",
+    module_growth_threshold: int | None = None,
+) -> DiffSummary:
     """Return a DiffSummary with fallback chain.
 
     1. Snapshot diff: if baseline exists → full structural comparison
@@ -22,7 +27,12 @@ def get_diff_summary(branch: str, base_branch: str = "main") -> DiffSummary:
         current = build_snapshot()
         from vibe3.analysis.snapshot_diff import compute_diff
 
-        structure_diff = compute_diff(baseline, current)
+        threshold = (
+            module_growth_threshold
+            if module_growth_threshold is not None
+            else DEFAULT_MODULE_GROWTH_THRESHOLD
+        )
+        structure_diff = compute_diff(baseline, current, threshold)
         return structure_diff.summary
 
     try:

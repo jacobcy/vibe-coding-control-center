@@ -53,6 +53,14 @@ ALL_CODEX_WARNINGS: Final[tuple[str, ...]] = (
 CODEAGENT_STDIN_MODE_THRESHOLD: Final[int] = 800
 
 # =============================================================================
+# Analysis Thresholds
+# =============================================================================
+
+# Default threshold for module growth warnings
+# Modules growing by more than this number of lines trigger a warning
+DEFAULT_MODULE_GROWTH_THRESHOLD: Final[int] = 100
+
+# =============================================================================
 # Git Maintenance
 # =============================================================================
 

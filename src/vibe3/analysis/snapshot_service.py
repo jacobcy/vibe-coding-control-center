@@ -718,12 +718,15 @@ def load_branch_baseline(branch: str) -> StructureSnapshot | None:
 
 
 def build_snapshot_diff(
-    base_branch: str = "main", current_branch: str | None = None
+    base_branch: str = "main",
+    current_branch: str | None = None,
+    module_growth_threshold: int | None = None,
 ) -> StructureDiff | None:
     """Build snapshot diff for review context."""
     # Local import to avoid circular dependency:
     # snapshot_diff.py imports SnapshotError from snapshot_service
     from vibe3.analysis.snapshot_diff import compute_diff
+    from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
 
     log = logger.bind(domain="review", action="build_snapshot_diff")
     structure_diff: StructureDiff | None = None
@@ -740,7 +743,12 @@ def build_snapshot_diff(
         current = build_snapshot()
 
         log.info("Computing structure diff")
-        structure_diff = compute_diff(baseline, current)
+        threshold = (
+            module_growth_threshold
+            if module_growth_threshold is not None
+            else DEFAULT_MODULE_GROWTH_THRESHOLD
+        )
+        structure_diff = compute_diff(baseline, current, threshold)
         log.bind(
             files_changed=structure_diff.summary.files_added
             + structure_diff.summary.files_removed

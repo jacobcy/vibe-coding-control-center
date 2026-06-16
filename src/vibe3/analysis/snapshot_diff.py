@@ -14,6 +14,7 @@ from vibe3.models import (
     StructureDiff,
     StructureSnapshot,
 )
+from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
 def _diff_files(
@@ -81,7 +82,9 @@ def _diff_files(
 
 
 def _diff_modules(
-    baseline: StructureSnapshot, current: StructureSnapshot
+    baseline: StructureSnapshot,
+    current: StructureSnapshot,
+    module_growth_threshold: int = DEFAULT_MODULE_GROWTH_THRESHOLD,
 ) -> tuple[list[ModuleChange], DiffSummary, list[DiffWarning]]:
     """Compute module-level differences between snapshots."""
     baseline_modules = {m.module: m for m in baseline.modules}
@@ -143,14 +146,7 @@ def _diff_modules(
             summary.modules_modified += 1
 
             growth = cm.total_loc - bm.total_loc
-            threshold = 100  # fallback default
-            try:
-                from vibe3.config import get_config
-
-                threshold = get_config().review_scope.module_growth_threshold
-            except Exception:
-                pass
-            if growth > threshold:
+            if growth > module_growth_threshold:
                 warnings.append(
                     DiffWarning(
                         type="module_growth",
@@ -197,13 +193,16 @@ def _diff_dependencies(
 
 
 def compute_diff(
-    baseline: StructureSnapshot, current: StructureSnapshot
+    baseline: StructureSnapshot,
+    current: StructureSnapshot,
+    module_growth_threshold: int = DEFAULT_MODULE_GROWTH_THRESHOLD,
 ) -> StructureDiff:
     """Compute difference between two snapshots.
 
     Args:
         baseline: Baseline snapshot (earlier state)
         current: Current snapshot (later state)
+        module_growth_threshold: Threshold for module growth warnings (default: 100)
 
     Returns:
         StructureDiff with all changes
@@ -221,7 +220,9 @@ def compute_diff(
 
     try:
         file_changes, file_summary = _diff_files(baseline, current)
-        module_changes, module_summary, warnings = _diff_modules(baseline, current)
+        module_changes, module_summary, warnings = _diff_modules(
+            baseline, current, module_growth_threshold
+        )
         dep_changes, dep_summary = _diff_dependencies(baseline, current)
 
         # Aggregate all sub-summaries including global metrics via __add__
