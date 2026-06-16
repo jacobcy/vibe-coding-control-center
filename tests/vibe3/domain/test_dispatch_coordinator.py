@@ -1,6 +1,10 @@
 """Test GlobalDispatchCoordinator migration to domain layer."""
 
+import asyncio
 import inspect
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 def test_dispatch_coordinator_importable_from_domain():
@@ -74,3 +78,209 @@ def test_dispatch_coordinator_uses_domain_protocols():
     # Verify GlobalDispatchCoordinator type annotations reference domain protocols
     # (This is implicitly verified by successful import and type checking)
     assert GlobalDispatchCoordinator is not None
+
+
+@pytest.mark.asyncio
+async def test_collect_frozen_queue_executor_shutdown_returns_empty():
+    """Verify _collect_frozen_queue returns [] on executor shutdown RuntimeError."""
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock run_in_executor to raise shutdown RuntimeError
+    with patch.object(
+        asyncio,
+        "get_running_loop",
+        return_value=MagicMock(
+            run_in_executor=AsyncMock(
+                side_effect=RuntimeError("cannot schedule new futures after shutdown")
+            )
+        ),
+    ):
+        result = await coordinator._collect_frozen_queue()
+
+    # Should return empty list, not raise
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_collect_frozen_queue_re_raises_other_runtime_error():
+    """Verify _collect_frozen_queue re-raises non-shutdown RuntimeError."""
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock run_in_executor to raise other RuntimeError
+    with patch.object(
+        asyncio,
+        "get_running_loop",
+        return_value=MagicMock(
+            run_in_executor=AsyncMock(
+                side_effect=RuntimeError("some other runtime issue")
+            )
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="some other runtime issue"):
+            await coordinator._collect_frozen_queue()
+
+
+@pytest.mark.asyncio
+async def test_collect_frozen_queue_cancelled_error_returns_empty():
+    """Verify _collect_frozen_queue returns [] on asyncio.CancelledError."""
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock run_in_executor to raise CancelledError
+    with patch.object(
+        asyncio,
+        "get_running_loop",
+        return_value=MagicMock(
+            run_in_executor=AsyncMock(side_effect=asyncio.CancelledError())
+        ),
+    ):
+        result = await coordinator._collect_frozen_queue()
+
+    # Should return empty list, not raise
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_collect_frozen_queue_unexpected_exception_returns_empty():
+    """Verify _collect_frozen_queue returns [] on unexpected Exception."""
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock run_in_executor to raise unexpected Exception
+    with patch.object(
+        asyncio,
+        "get_running_loop",
+        return_value=MagicMock(
+            run_in_executor=AsyncMock(side_effect=Exception("unexpected error"))
+        ),
+    ):
+        result = await coordinator._collect_frozen_queue()
+
+    # Should return empty list, not raise
+    assert result == []
