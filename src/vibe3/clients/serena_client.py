@@ -16,6 +16,7 @@ if str(lib_path) not in sys.path:
 
 
 FUNCTION_KIND = 12
+CLASS_KIND = 5
 
 
 def extract_function_names(payload: dict[str, Union[str, int, list]]) -> list[str]:
@@ -89,6 +90,105 @@ def extract_function_locations(
             functions = node.get("Function")
             if isinstance(functions, list):
                 for item in functions:
+                    if isinstance(item, dict):
+                        nested_name = item.get("name_path") or item.get("name")
+                        if (
+                            isinstance(nested_name, str)
+                            and nested_name not in locations
+                        ):
+                            nested_body: Any = item.get("body_location", {})
+                            if isinstance(nested_body, dict):
+                                locations[nested_name] = {
+                                    "start_line": nested_body.get("start_line", 0),
+                                    "end_line": nested_body.get("end_line", 0),
+                                }
+                            else:
+                                locations[nested_name] = {
+                                    "start_line": 0,
+                                    "end_line": 0,
+                                }
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+    return locations
+
+
+def extract_class_names(payload: dict[str, Union[str, int, list]]) -> list[str]:
+    """Extract class names from Serena symbol overview.
+
+    Args:
+        payload: Serena symbol overview payload
+
+    Returns:
+        List of unique class names
+    """
+    names: list[str] = []
+
+    def walk(node: dict[str, Union[str, int, list]] | list) -> None:
+        if isinstance(node, dict):
+            if node.get("kind") == CLASS_KIND:
+                name = node.get("name_path") or node.get("name")
+                if isinstance(name, str):
+                    names.append(name)
+            classes = node.get("Class")
+            if isinstance(classes, list):
+                for item in classes:
+                    if isinstance(item, str):
+                        names.append(item)
+                    elif isinstance(item, dict):
+                        nested_name = item.get("name_path") or item.get("name")
+                        if isinstance(nested_name, str):
+                            names.append(nested_name)
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+
+    # Unique preserving order
+    seen: set[str] = set()
+    result: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
+def extract_class_locations(
+    payload: dict[str, Union[str, int, list]],
+) -> dict[str, dict[str, int]]:
+    """Extract class names with line locations from Serena symbol overview.
+
+    Returns:
+        Dict mapping class name to {"start_line": int, "end_line": int}
+    """
+    locations: dict[str, dict[str, int]] = {}
+
+    def walk(node: dict[str, Union[str, int, list]] | list) -> None:
+        if isinstance(node, dict):
+            if node.get("kind") == CLASS_KIND:
+                name = node.get("name_path") or node.get("name")
+                if isinstance(name, str) and name not in locations:
+                    body: Any = node.get("body_location", {})
+                    if isinstance(body, dict):
+                        locations[name] = {
+                            "start_line": body.get("start_line", 0),
+                            "end_line": body.get("end_line", 0),
+                        }
+                    else:
+                        locations[name] = {"start_line": 0, "end_line": 0}
+            classes = node.get("Class")
+            if isinstance(classes, list):
+                for item in classes:
                     if isinstance(item, dict):
                         nested_name = item.get("name_path") or item.get("name")
                         if (

@@ -83,7 +83,9 @@ class TestInspectYamlOutput:
         args = YAML_ARGS.get(subcommand, [])
         result = runner.invoke(app, ["inspect", subcommand, *args, "--yaml"])
         assert result.exit_code == 0, f"inspect {subcommand} --yaml failed"
-        data = yaml.safe_load(result.output)
+        # Use stdout only (stderr contains log messages)
+        clean_output = _strip_ansi(result.stdout)
+        data = yaml.safe_load(clean_output)
         assert isinstance(data, dict), f"inspect {subcommand} YAML is not a dict"
 
 

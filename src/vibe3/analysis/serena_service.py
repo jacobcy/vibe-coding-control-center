@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import functools
+import pathlib
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
@@ -292,6 +294,7 @@ class SerenaService:
         from vibe3.analysis.dead_code_rules import (
             get_router_functions,
             is_dead_code,
+            is_exception_class,
         )
         from vibe3.models import DeadCodeFinding, DeadCodeReport
 
@@ -348,9 +351,19 @@ class SerenaService:
                         # Determine if CLI command
                         is_cli_command = sym_type == "cli_command"
 
+                        # Check if exception class using is_exception_class function
+                        is_exception = sym_type == "class" and is_exception_class(
+                            relative_file, file_tree, sym_name
+                        )
+
                         # Apply dead code rules
                         is_dead, reason, confidence = is_dead_code(
-                            sym_name, ref_count, is_cli_command, router_funcs
+                            sym_name,
+                            ref_count,
+                            is_cli_command,
+                            router_funcs,
+                            is_exception,
+                            used_in_tests=False,  # Will update after test scan
                         )
 
                         if is_dead:
@@ -389,6 +402,37 @@ class SerenaService:
                         "Failed to analyze file, skipping"
                     )
                     continue
+
+            # Test-reference enrichment: check findings against test files
+            if findings:
+                test_files = sorted(
+                    self.git_client.get_tracked_files(pathspec="tests/**/*.py")
+                )
+
+                def _is_referenced_in_tests(symbol_name: str) -> bool:
+                    """Quick check if symbol appears in any test file."""
+                    # Use pathlib.Path directly to avoid mock interference
+                    real_path = pathlib.Path
+                    for tf in test_files:
+                        try:
+                            content = real_path(tf).read_text(encoding="utf-8")
+                            if re.search(rf"\b{re.escape(symbol_name)}\b", content):
+                                return True
+                        except Exception:
+                            continue
+                    return False
+
+                # Filter out findings that are referenced in tests
+                filtered_findings: list[DeadCodeFinding] = []
+                for finding in findings:
+                    if _is_referenced_in_tests(finding.symbol):
+                        excluded.append(f"{finding.file}:{finding.symbol}")
+                        total_excluded += 1
+                        total_dead -= 1
+                    else:
+                        filtered_findings.append(finding)
+
+                findings = filtered_findings
 
             report = DeadCodeReport(
                 total_symbols=total_symbols,
