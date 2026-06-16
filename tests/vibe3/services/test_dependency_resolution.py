@@ -27,8 +27,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is True
         assert resolution.issue_number == 123
         assert resolution.github_state == "CLOSED"
-        assert resolution.merged_pr_number is None
-        assert "CLOSED" in (resolution.reason or "")
 
     def test_not_resolved_when_issue_open_no_pr(self) -> None:
         """Dependency is not resolved when issue is OPEN without merged PR."""
@@ -51,8 +49,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is False
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
-        assert resolution.merged_pr_number is None
-        assert "OPEN" in (resolution.reason or "")
 
     def test_resolved_when_issue_open_with_merged_pr(self) -> None:
         """Dependency is resolved when issue has a merged PR."""
@@ -75,8 +71,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is True
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
-        assert resolution.merged_pr_number == 42
-        assert "#42" in (resolution.reason or "")
 
     def test_not_resolved_when_network_error(self) -> None:
         """Dependency is not resolved when GitHub API returns network_error."""
@@ -90,7 +84,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is False
         assert resolution.issue_number == 123
         assert resolution.github_state is None
-        assert "could not be verified" in resolution.reason
 
     def test_not_resolved_when_issue_not_found(self) -> None:
         """Dependency is not resolved when issue is not found (None)."""
@@ -104,7 +97,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is False
         assert resolution.issue_number == 123
         assert resolution.github_state is None
-        assert "could not be verified" in resolution.reason
 
     def test_not_resolved_when_view_issue_unexpected_result(self) -> None:
         """Dependency is not resolved when view_issue returns unexpected type."""
@@ -118,7 +110,6 @@ class TestDependencyResolutionService:
         assert resolution.resolved is False
         assert resolution.issue_number == 123
         assert resolution.github_state is None
-        assert "unexpected result" in resolution.reason
 
     def test_not_resolved_when_merged_pr_check_fails(self) -> None:
         """Dependency is not resolved when merged PR check raises exception."""
@@ -163,5 +154,3 @@ class TestDependencyResolution:
             issue_number=123,
         )
         assert resolution.github_state is None
-        assert resolution.merged_pr_number is None
-        assert resolution.reason is None

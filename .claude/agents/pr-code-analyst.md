@@ -186,9 +186,6 @@ gh pr view <number> --json title,body
 # 分支级风险和变更符号
 uv run python src/vibe3/cli.py inspect base --json
 
-# 提交级影响
-uv run python src/vibe3/cli.py inspect commit <sha>
-
 # 符号级引用
 uv run python src/vibe3/cli.py inspect symbols <file>
 uv run python src/vibe3/cli.py inspect symbols <file>:<symbol>

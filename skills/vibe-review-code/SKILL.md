@@ -121,9 +121,6 @@ uv run python src/vibe3/cli.py inspect base --json
 # Project-level structure change vs branch baseline, when a baseline exists
 uv run python src/vibe3/cli.py snapshot diff --quiet
 
-# Commit-level impact when reviewing specific commits
-uv run python src/vibe3/cli.py inspect commit <sha> --json
-
 # Symbol usage and Python file structure
 uv run python src/vibe3/cli.py inspect symbols <file>
 uv run python src/vibe3/cli.py inspect symbols <file>:<symbol>

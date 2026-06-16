@@ -25,8 +25,7 @@
 
 ```bash
 vibe3 inspect base        # 分析当前分支与 base 的差异
-vibe3 inspect commit SHA  # 分析单个提交
-vibe3 inspect pr NUMBER   # 分析 PR 改动
+vibe3 inspect uncommit    # 分析未提交的改动
 ```
 
 ### 消费方

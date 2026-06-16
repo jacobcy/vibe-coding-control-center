@@ -51,13 +51,10 @@ Tier 1: ~/.claude/rules/common/ (全局规则)
   ↓ 适用所有项目，外部导入，项目不应重复
 
 Tier 2: .claude/rules/ (项目规则)
-  ↓ 可能由 agents 创建，需评估必要性
+  ↓ 项目特定规则，长期有效
 
 Tier 3: CLAUDE.md (项目最高标准)
-  ↓ 不应重复全局规则，引用 .agent/rules/
-
-Tier 4: .agent/rules/ (压缩规则)
-  → 通过引用方式，agent 按需读取
+  ↓ 不应重复全局规则，引用 .claude/rules/
 ```
 
 ## 当前检测结果
@@ -71,13 +68,13 @@ Tier 4: .agent/rules/ (压缩规则)
    - `patterns.md` (全局 + 项目)
 
 2. **内容重复**：
-   - `.claude/rules/coding-style.md` 与 `.agent/rules/python-standards.md` (83% 重合)
-   - `.claude/rules/testing.md` 与 `.agent/rules/python-standards.md` (100% 重合)
-   - `.claude/rules/patterns.md` 与 `.agent/rules/python-standards.md` (100% 重合)
-   - `.claude/rules/hooks.md` 与 `.agent/rules/python-standards.md` (100% 重合)
+   - `.claude/rules/coding-style.md` 与 `.claude/rules/python-standards.md` (83% 重合)
+   - `.claude/rules/testing.md` 与 `.claude/rules/python-standards.md` (100% 重合)
+   - `.claude/rules/patterns.md` 与 `.claude/rules/python-standards.md` (100% 重合)
+   - `.claude/rules/hooks.md` 与 `.claude/rules/python-standards.md` (100% 重合)
 
 3. **未引用规则**：
-   - `.agent/rules/kiro-integration.md` 未在 CLAUDE.md 中引用
+   - `.claude/rules/kiro-integration.md` 未在 CLAUDE.md 中引用
 
 4. **配置冲突**：
    - rules 要求 `mypy --strict`，但 pyproject.toml 未配置
@@ -87,7 +84,7 @@ Tier 4: .agent/rules/ (压缩规则)
 #### 删除重复文件（推荐）
 
 ```bash
-# 这些文件与 .agent/rules/python-standards.md 高度重复
+# 这些文件与 .claude/rules/python-standards.md 高度重复
 rm .claude/rules/coding-style.md
 rm .claude/rules/testing.md
 rm .claude/rules/patterns.md
@@ -108,7 +105,7 @@ disallow_untyped_defs = true
 
 #### 清理未引用规则
 
-评估 `.agent/rules/kiro-integration.md` 是否需要，如果需要则在 CLAUDE.md 中添加引用。
+评估 `.claude/rules/kiro-integration.md` 是否需要，如果需要则在 CLAUDE.md 中添加引用。
 
 ## Token 节省估算
 
@@ -133,7 +130,7 @@ disallow_untyped_defs = true
       entry: ./skills/vibe-rules/vibe-rules.sh check
       language: system
       pass_filenames: false
-      files: \.claude/rules/|\.agent/rules/|CLAUDE\.md$
+      files: \.claude/rules/|CLAUDE\.md$
 ```
 
 ### 2. 定期检查

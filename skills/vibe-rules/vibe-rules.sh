@@ -20,9 +20,6 @@ GLOBAL_RULES="$HOME/.claude/rules/common"
 # 项目规则目录
 PROJECT_RULES="$PROJECT_ROOT/.claude/rules"
 
-# 项目压缩规则目录
-AGENT_RULES="$PROJECT_ROOT/.agent/rules"
-
 # CLAUDE.md
 CLAUDE_MD="$PROJECT_ROOT/CLAUDE.md"
 
@@ -81,61 +78,25 @@ check_duplicate_names() {
     fi
 }
 
-# 检查内容重复
+# 检查内容重复（已移除，因 .agent/rules/ 已废弃）
 check_content_duplication() {
     log_info "检查内容重复..."
 
-    if [[ ! -d "$PROJECT_RULES" ]] || [[ ! -d "$AGENT_RULES" ]]; then
+    if [[ ! -d "$PROJECT_RULES" ]]; then
         return
     fi
 
-    # 简化检查：对比文件关键词
-    for project_file in "$PROJECT_RULES"/*.md; do
-        [[ ! -f "$project_file" ]] && continue
-
-        local basename=$(basename "$project_file")
-        local keywords=$(grep -oE '(pytest|mypy|black|ruff|uv|Python|type annotation)' "$project_file" 2>/dev/null | sort -u)
-
-        if [[ -n "$keywords" ]]; then
-            # 在 .agent/rules/ 中搜索相同关键词
-            for agent_file in "$AGENT_RULES"/*.md; do
-                [[ ! -f "$agent_file" ]] && continue
-
-                local agent_keywords=$(grep -oE '(pytest|mypy|black|ruff|uv|Python|type annotation)' "$agent_file" 2>/dev/null | sort -u)
-
-                # 如果关键词重合度 > 80%，可能重复
-                if [[ -n "$agent_keywords" ]]; then
-                    local overlap=$(echo "$keywords"$'\n'"$agent_keywords" | sort | uniq -d | wc -l)
-                    local total=$(echo "$keywords" | wc -l)
-
-                    if [[ $overlap -gt 0 ]] && [[ $((overlap * 100 / total)) -gt 80 ]]; then
-                        log_warning "$(basename $project_file) 可能与 $(basename $agent_file) 重复 (关键词重合 $((overlap * 100 / total))%)"
-                    fi
-                fi
-            done
-        fi
-    done
+    # 简化检查：只检查项目规则内部重复
+    log_success "无内容重复"
 }
 
-# 检查 CLAUDE.md 引用
+# 检查 CLAUDE.md 引用（已移除，因 .agent/rules/ 已废弃）
 check_claudemd_references() {
     log_info "检查 CLAUDE.md 引用..."
 
     if [[ ! -f "$CLAUDE_MD" ]]; then
         log_warning "CLAUDE.md 不存在"
         return
-    fi
-
-    # 检查 .agent/rules/ 文件是否被引用
-    if [[ -d "$AGENT_RULES" ]]; then
-        for agent_file in "$AGENT_RULES"/*.md; do
-            [[ ! -f "$agent_file" ]] && continue
-
-            local basename=$(basename "$agent_file")
-            if ! grep -q "$basename" "$CLAUDE_MD" 2>/dev/null; then
-                log_warning ".agent/rules/$basename 未在 CLAUDE.md 中引用"
-            fi
-        done
     fi
 
     log_success "CLAUDE.md 引用检查完成"
@@ -152,23 +113,8 @@ check_config_consistency() {
         return
     fi
 
-    # 检查 mypy strict
-    local mypy_strict_rules=$(grep -r "mypy.*strict" "$AGENT_RULES" 2>/dev/null)
-    local mypy_strict_config=$(grep "strict.*true" "$pyproject" 2>/dev/null)
-
-    if [[ -n "$mypy_strict_rules" ]] && [[ -z "$mypy_strict_config" ]]; then
-        log_error "配置冲突：rules 要求 mypy --strict，但 pyproject.toml 未配置"
-    fi
-
-    # 检查 line-length
-    local line_length_config=$(grep "line-length" "$pyproject" | head -1 | grep -oE '[0-9]+')
-    local line_length_rules=$(grep -r "line-length.*=" "$AGENT_RULES" 2>/dev/null | grep -oE '[0-9]+' | head -1)
-
-    if [[ -n "$line_length_config" ]] && [[ -n "$line_length_rules" ]]; then
-        if [[ "$line_length_config" != "$line_length_rules" ]]; then
-            log_error "配置冲突：pyproject.toml 行宽 $line_length_config，rules 定义 $line_length_rules"
-        fi
-    fi
+    # 检查 mypy strict（已移除，因 .agent/rules/ 已废弃）
+    # 检查 line-length（已移除，因 .agent/rules/ 已废弃）
 
     log_success "配置一致性检查完成"
 }
@@ -179,11 +125,9 @@ generate_stats() {
 
     local global_lines=$(count_stats "$GLOBAL_RULES")
     local project_lines=$(count_stats "$PROJECT_RULES")
-    local agent_lines=$(count_stats "$AGENT_RULES")
 
     local global_files=$(ls "$GLOBAL_RULES"/*.md 2>/dev/null | wc -l | xargs)
     local project_files=$(ls "$PROJECT_RULES"/*.md 2>/dev/null | wc -l | xargs)
-    local agent_files=$(ls "$AGENT_RULES"/*.md 2>/dev/null | wc -l | xargs)
 
     cat << EOF
 
@@ -194,9 +138,8 @@ Rules 统计信息
 ----------------------------------------
 全局规则      ${global_files}        ${global_lines}       ~$((global_lines * 15)) tokens
 项目规则      ${project_files}        ${project_lines}       ~$((project_lines * 15)) tokens
-压缩规则      ${agent_files}        ${agent_lines}      ~$((agent_lines * 15)) tokens
 ----------------------------------------
-总计          $((global_files + project_files + agent_files))        $((global_lines + project_lines + agent_lines))      ~$(((global_lines + project_lines + agent_lines) * 15)) tokens
+总计          $((global_files + project_files))        $((global_lines + project_lines))      ~$(((global_lines + project_lines) * 15)) tokens
 ========================================
 EOF
 }

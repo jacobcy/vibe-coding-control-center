@@ -25,8 +25,6 @@ class DependencyResolution:
     resolved: bool
     issue_number: int
     github_state: str | None = None  # "OPEN" | "CLOSED" | None
-    merged_pr_number: int | None = None  # PR evidence when merged
-    reason: str | None = None  # Human-readable summary for logs/skip messages
 
 
 class DependencyResolutionService:
@@ -68,10 +66,6 @@ class DependencyResolutionService:
                 resolved=False,
                 issue_number=issue_number,
                 github_state=None,
-                reason=(
-                    f"Dependency #{issue_number} could not be verified "
-                    f"(network error or not found)"
-                ),
             )
 
         if not isinstance(issue_data, dict):
@@ -84,7 +78,6 @@ class DependencyResolutionService:
                 resolved=False,
                 issue_number=issue_number,
                 github_state=None,
-                reason=f"Dependency #{issue_number} returned unexpected result",
             )
 
         # Extract state
@@ -96,7 +89,6 @@ class DependencyResolutionService:
                 resolved=True,
                 issue_number=issue_number,
                 github_state=github_state,
-                reason=f"Dependency #{issue_number} is CLOSED",
             )
 
         # Step 3: Check for merged PR
@@ -105,18 +97,10 @@ class DependencyResolutionService:
 
             pr_data = get_merged_pr_for_issue(issue_number, repo)
             if pr_data:
-                pr_number = pr_data.get("number") if pr_data else None
-
                 return DependencyResolution(
                     resolved=True,
                     issue_number=issue_number,
                     github_state=github_state,
-                    merged_pr_number=pr_number,
-                    reason=(
-                        f"Dependency #{issue_number} has merged PR #{pr_number}"
-                        if pr_number
-                        else f"Dependency #{issue_number} has merged PR"
-                    ),
                 )
         except Exception as e:
             logger.bind(
@@ -130,5 +114,4 @@ class DependencyResolutionService:
             resolved=False,
             issue_number=issue_number,
             github_state=github_state,
-            reason=f"Dependency #{issue_number} is still {github_state or 'unknown'}",
         )

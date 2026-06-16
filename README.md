@@ -175,7 +175,8 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - `bin/`, `lib/`: V2 Shell 入口与实现
 - `src/vibe3/`: V3 Python 主系统
 - `skills/`: repo-local Vibe skills
-- `.agent/`: rules、workflows、上下文
+- `.claude/`: 项目规则（长期规则、硬约束、实现标准）
+- `.agent/`: workflows、上下文
 - `docs/`: 规范、计划、报告和参考文档
 - `tests/`: V2 bats 与 V3 pytest 测试
 
