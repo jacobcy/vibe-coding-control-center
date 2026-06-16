@@ -70,15 +70,25 @@ SNAPSHOT_DIR_NAME = "vibe3/structure/snapshots"
 SNAPSHOT_TAG_DIR_NAME = "vibe3/structure/baselines"
 LATEST_LINK_NAME = "vibe3/structure/latest.json"
 
+# Module-level cache for git common directory path
+_git_common_dir: Path | None = None
+
+
+def _get_git_common_dir_cached() -> Path:
+    """Get git common directory path with module-level caching."""
+    global _git_common_dir
+    if _git_common_dir is None:
+        git = GitClient()
+        _git_common_dir = Path(git.get_git_common_dir())
+    return _git_common_dir
+
 
 def _get_snapshot_dir() -> Path:
-    git = GitClient()
-    return Path(git.get_git_common_dir()) / SNAPSHOT_DIR_NAME
+    return _get_git_common_dir_cached() / SNAPSHOT_DIR_NAME
 
 
 def _get_latest_link_path() -> Path:
-    git = GitClient()
-    return Path(git.get_git_common_dir()) / LATEST_LINK_NAME
+    return _get_git_common_dir_cached() / LATEST_LINK_NAME
 
 
 def _ensure_snapshot_dir() -> None:
@@ -86,8 +96,7 @@ def _ensure_snapshot_dir() -> None:
 
 
 def _get_baseline_dir() -> Path:
-    git = GitClient()
-    return Path(git.get_git_common_dir()) / SNAPSHOT_TAG_DIR_NAME
+    return _get_git_common_dir_cached() / SNAPSHOT_TAG_DIR_NAME
 
 
 def _ensure_baseline_dir() -> None:
