@@ -304,13 +304,6 @@ def governance(
 
     _run_governance_scan(material_override=role, no_async=no_async)
 
-    # User feedback: confirm event published and handler registered
-    typer.echo(
-        "Governance scan event published. Check tmux session for execution status."
-    )
-    if no_async:
-        typer.echo("Governance scan completed")
-
 
 @app.command()
 def supervisor(

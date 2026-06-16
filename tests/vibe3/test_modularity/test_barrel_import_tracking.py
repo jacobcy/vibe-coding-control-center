@@ -136,8 +136,9 @@ def test_config_barrel_import_count() -> None:
         for file, count in sorted_files[:10]:
             print(f"     {file}: {count} imports")
 
-    # Baseline established at issue #2848; updated for #2912 (+2), #2938 (+1)
-    baseline = 143
+    # Baseline established at issue #2848
+    # Updated for #2912 (+2), #2938 (+1), #2939 (+1)
+    baseline = 144
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (

@@ -1,10 +1,12 @@
 """Tests for scan display UI functions."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from rich.console import Console
 
+from vibe3.models import ExecutionLaunchResult
 from vibe3.ui.scan_display import (
+    display_execution_result,
     display_governance_dry_run,
     display_material_list,
     display_supervisor_dry_run,
@@ -118,3 +120,42 @@ class TestDisplayMaterialList:
                 or "empty" in printed_text.lower()
                 or len([]) == 0
             )
+
+
+class TestDisplayExecutionResult:
+    """Tests for execution result display."""
+
+    def test_display_execution_result_shows_backend_and_model(self):
+        """display_execution_result shows backend/model when present."""
+        console = MagicMock()
+        result = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-governance-20260615-123456-t0",
+            log_path="/tmp/gov.log",
+            backend="claude",
+            model="sonnet",
+        )
+        display_execution_result(console, result)
+        # Verify backend and model were printed
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Backend:" in c and "claude" in c for c in calls)
+        assert any("Model:" in c and "sonnet" in c for c in calls)
+        assert any("Tmux session:" in c for c in calls)
+        assert any("Log path:" in c for c in calls)
+
+    def test_display_execution_result_handles_missing_backend_model(self):
+        """display_execution_result handles missing backend/model gracefully."""
+        console = MagicMock()
+        result = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-governance-20260615-123456-t0",
+            log_path="/tmp/gov.log",
+        )
+        display_execution_result(console, result)
+        # Should not crash, and should still show tmux/log
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Tmux session:" in c for c in calls)
+        assert any("Log path:" in c for c in calls)
+        # Should not have Backend/Model labels
+        assert not any("Backend:" in c for c in calls)
+        assert not any("Model:" in c for c in calls)

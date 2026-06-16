@@ -60,7 +60,6 @@ class TestGovernanceScan:
     def test_governance_execution(self, mock_run):
         result = runner.invoke(app, ["scan", "governance", "--no-async"])
         assert result.exit_code == 0
-        assert "Governance scan completed" in result.output
         mock_run.assert_called_once_with(material_override=None, no_async=True)
 
     def test_governance_scan_publishes_event(self):
