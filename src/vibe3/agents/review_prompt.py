@@ -100,77 +100,37 @@ def build_ast_analysis_section(
 def build_review_task_section(task_text: str | None) -> str:
     """Build review task section.
 
-    Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig,
-    or default.
+    Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig.
 
     Args:
         task_text: Task text from config (optional)
 
     Returns:
-        Review task section
+        Review task section, or empty string if task_text is empty/None
     """
     if task_text:
         return f"## Review Task\n{task_text}"
 
-    # Default: findings-first task guidance
-    return """## Review Task
-
-**Prioritize**: correctness → regression risk → API breaks → missing tests
-
-**Focus on**:
-- Run `git diff <base>...HEAD` to see file changes
-- Review only changed code, not the entire codebase
-- Use AST analysis to understand function-level impact
-- Give findings first, then verdict with brief rationale
-- Verdict meaning: PASS/REFUSE may omit `audit_ref`; MINOR means merge is
-  acceptable with follow-up; MAJOR/BLOCK require fixes and `audit_ref`
-
-**Skip**:
-- Generic architecture commentary unrelated to this diff
-- Praise/description paragraphs
-- Style suggestions unless they affect correctness"""
+    logger.warning("build_review_task_section: task_text is empty or None")
+    return ""
 
 
 def build_output_contract_section(output_format: str | None) -> str:
     """Build output contract section.
 
-    Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig,
-    or default.
+    Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig.
 
     Args:
         output_format: Output format text from config (optional)
 
     Returns:
-        Output format section
+        Output format section, or empty string if output_format is empty/None
     """
     if output_format:
         return f"## Output format requirements\n{output_format}"
 
-    # Default: findings-first output format
-    return """## Output format requirements
-
-**FINDINGS FIRST — No praise, no generic commentary.**
-
-The first line must be exactly:
-VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE
-
-If findings exist, list them concisely:
-path/to/file.py:42 [BLOCK] <specific issue with code evidence>
-path/to/file.py:100 [MAJOR] <specific issue with code evidence>
-
-Then provide a brief rationale (1-2 sentences):
-- PASS: "Why no blocking/major issue was found for this diff"
-- MINOR: "Summary of the accepted follow-up issue"
-- MAJOR: "Summary of what should be addressed before merge"
-- BLOCK: "Summary of critical issues that must be fixed"
-- REFUSE: "Why a normal review verdict cannot be provided"
-
-The final line must repeat the same VERDICT.
-
-**DO NOT**:
-- Write lengthy summary before findings
-- Include "Strength" / "Positive" / "Praise" paragraphs
-- Give generic architecture commentary unrelated to the diff"""
+    logger.warning("build_output_contract_section: output_format is empty or None")
+    return ""
 
 
 def _review_variant(mode: ReviewPromptMode, context_mode: PromptContextMode) -> str:
