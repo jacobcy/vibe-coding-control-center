@@ -9,6 +9,7 @@ from vibe3.models import ExecutionLaunchResult
 class TestSupervisorScanHandler:
     """supervisor_scan handler dispatches supervisor apply via CLI self-invocation."""
 
+    @patch("vibe3.config.resolve_repo_agent_preset")
     @patch("vibe3.observability.orchestra_log.append_orchestra_event")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -19,6 +20,7 @@ class TestSupervisorScanHandler:
         mock_coordinator_cls: MagicMock,
         mock_sqlite_cls: MagicMock,
         mock_append_event: MagicMock,
+        mock_preset: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -26,6 +28,8 @@ class TestSupervisorScanHandler:
 
         mock_config = MagicMock(dry_run=False)
         mock_from_settings.return_value = mock_config
+
+        mock_preset.return_value = ("openai", "gpt-4")
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -46,6 +50,9 @@ class TestSupervisorScanHandler:
         assert result is not None
         assert result.launched is True
         assert result.tmux_session == "vibe3-supervisor-42"
+        assert result.log_path == "/tmp/sup.log"
+        assert result.backend == "openai"
+        assert result.model == "gpt-4"
         mock_coordinator.dispatch_execution.assert_called_once()
         # Verify CLI self-invocation command structure
         call_args = mock_coordinator.dispatch_execution.call_args.args[0]
@@ -78,6 +85,7 @@ class TestSupervisorScanHandler:
         )
         assert result is None
 
+    @patch("vibe3.config.resolve_repo_agent_preset")
     @patch("vibe3.domain.handlers.supervisor_scan.get_store")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
@@ -86,6 +94,7 @@ class TestSupervisorScanHandler:
         mock_from_settings: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_get_store: MagicMock,
+        mock_preset: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -93,6 +102,8 @@ class TestSupervisorScanHandler:
 
         mock_config = MagicMock(dry_run=False)
         mock_from_settings.return_value = mock_config
+
+        mock_preset.return_value = ("anthropic", "claude-3")
 
         injected_coordinator = MagicMock()
         injected_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -113,6 +124,9 @@ class TestSupervisorScanHandler:
         assert result is not None
         assert result.launched is True
         assert result.tmux_session == "vibe3-supervisor-42"
+        assert result.log_path == "/tmp/sup.log"
+        assert result.backend == "anthropic"
+        assert result.model == "claude-3"
         injected_coordinator.dispatch_execution.assert_called_once()
         mock_coordinator_cls.assert_not_called()
         mock_get_store.assert_not_called()

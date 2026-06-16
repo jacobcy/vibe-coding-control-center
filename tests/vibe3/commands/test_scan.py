@@ -411,6 +411,7 @@ def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
 
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
+        assert mock_publish_and_wait.call_count == 2
         assert "Candidates:" in result.output
         assert "#123: Issue A" in result.output
         assert "#456: Issue B" in result.output
