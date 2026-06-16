@@ -4,9 +4,7 @@ Public API:
 - ``build_review_prompt_body(request, config)`` - assemble review prompt body
 - ``make_review_context_builder(request, config)`` - PromptContextBuilder
 
-Section builders remain available for direct composition:
-- build_policy_section, build_ast_analysis_section
-- build_review_task_section, build_output_contract_section
+Use ``PromptManifest`` and ``PromptContextBuilder`` for custom prompt assembly.
 """
 
 from __future__ import annotations
@@ -20,7 +18,6 @@ from loguru import logger
 from vibe3.analysis import build_snapshot_diff_section
 from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
-from vibe3.exceptions import VibeError
 from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (
     PromptContextBuilder,
@@ -30,18 +27,12 @@ from vibe3.prompts import (
     make_context_builder,
     resolve_common_rules_path,
 )
+from vibe3.prompts.exceptions import ContextBuilderError
 
 ReviewPromptMode = Literal["first", "retry"]
 
 
-class ContextBuilderError(VibeError):
-    """Context build failed."""
-
-    def __init__(self, details: str) -> None:
-        super().__init__(f"Context build failed: {details}", recoverable=False)
-
-
-def build_policy_section(policy_path: str) -> str:
+def _build_policy_section(policy_path: str) -> str:
     """Build policy section from file.
 
     Source: config/v3/settings.yaml (review.policy_file)
@@ -64,7 +55,7 @@ def build_policy_section(policy_path: str) -> str:
         raise ContextBuilderError(f"Cannot read policy: {e}") from e
 
 
-def build_ast_analysis_section(
+def _build_ast_analysis_section(
     changed_symbols: dict[str, list[str]] | None,
     symbol_dag: dict[str, list[str]] | None,
 ) -> str | None:
@@ -97,7 +88,7 @@ def build_ast_analysis_section(
     return "## AST Analysis\n" + "\n\n".join(ast_parts)
 
 
-def build_review_task_section(task_text: str | None) -> str:
+def _build_review_task_section(task_text: str | None) -> str:
     """Build review task section.
 
     Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig.
@@ -115,7 +106,7 @@ def build_review_task_section(task_text: str | None) -> str:
     return ""
 
 
-def build_output_contract_section(output_format: str | None) -> str:
+def _build_output_contract_section(output_format: str | None) -> str:
     """Build output contract section.
 
     Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig.
@@ -160,7 +151,7 @@ def _build_review_prompt_providers(
         return getattr(config.review, "retry_task", None)
 
     def review_exit_contract() -> str:
-        return build_review_task_section(config.review.review_task)
+        return _build_review_task_section(config.review.review_task)
 
     resolver = get_resolver()
 
@@ -170,7 +161,7 @@ def _build_review_prompt_providers(
             if config.review.policy_file is not None
             else resolver.get_policy_path("review")
         )
-        return build_policy_section(policy_path) if policy_path else ""
+        return _build_policy_section(policy_path) if policy_path else ""
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(
@@ -183,10 +174,10 @@ def _build_review_prompt_providers(
         "review.snapshot_diff": lambda: build_snapshot_diff_section(
             request.structure_diff
         ),
-        "review.ast_analysis": lambda: build_ast_analysis_section(
+        "review.ast_analysis": lambda: _build_ast_analysis_section(
             request.changed_symbols, request.symbol_dag
         ),
-        "review.output_format": lambda: build_output_contract_section(
+        "review.output_format": lambda: _build_output_contract_section(
             config.review.output_format
         ),
         "review.retry_task": review_retry_task,

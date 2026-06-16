@@ -3,8 +3,6 @@
 Public API:
 - ``build_plan_prompt_body(request, config)`` - assemble the full plan prompt string
 - ``make_plan_context_builder(request, config)`` - PromptContextBuilder (via assembler)
-
-Section builders (build_plan_policy_section, etc.) remain available for direct use.
 """
 
 from __future__ import annotations
@@ -16,7 +14,6 @@ from loguru import logger
 
 from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
-from vibe3.exceptions import VibeError
 from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
@@ -30,14 +27,7 @@ from vibe3.prompts import (
 PlanPromptMode = Literal["first", "retry"]
 
 
-class PlanContextBuilderError(VibeError):
-    """Plan context build failed."""
-
-    def __init__(self, details: str) -> None:
-        super().__init__(f"Plan context build failed: {details}", recoverable=False)
-
-
-def build_plan_policy_section(policy_path: str | None) -> str | None:
+def _build_plan_policy_section(policy_path: str | None) -> str | None:
     """Build plan policy section from file."""
     if not policy_path:
         return None
@@ -58,7 +48,7 @@ def build_plan_policy_section(policy_path: str | None) -> str | None:
         return None
 
 
-def build_plan_task_section(
+def _build_plan_task_section(
     request: PlanRequest,
     task_text: str | None,
 ) -> str:
@@ -99,7 +89,7 @@ def build_plan_task_section(
     return section
 
 
-def build_plan_output_contract_section(output_format: str | None) -> str:
+def _build_plan_output_contract_section(output_format: str | None) -> str:
     """Build plan output contract section."""
     if output_format:
         return f"## Output format requirements\n{output_format}"
@@ -167,14 +157,14 @@ def _build_plan_prompt_providers(
             else resolver.get_policy_path("plan")
         )
         if policy_path:
-            return build_plan_policy_section(policy_path)
+            return _build_plan_policy_section(policy_path)
         return None
 
     def plan_output_format() -> str:
         output_format = (
             getattr(plan_config, "output_format", None) if plan_config else None
         )
-        return build_plan_output_contract_section(output_format)
+        return _build_plan_output_contract_section(output_format)
 
     def plan_retry_task() -> str | None:
         return getattr(plan_config, "retry_task", None) if plan_config else None
@@ -183,7 +173,7 @@ def _build_plan_prompt_providers(
         plan_task_text = (
             getattr(plan_config, "plan_task", None) if plan_config else None
         )
-        return build_plan_task_section(task_request, plan_task_text)
+        return _build_plan_task_section(task_request, plan_task_text)
 
     def common_rules_section() -> str | None:
         return build_tools_guide_section(

@@ -1,9 +1,9 @@
 """Tests for issue/spec-aware plan context building."""
 
 from vibe3.agents.plan_prompt import (
-    build_plan_output_contract_section,
+    _build_plan_output_contract_section,
+    _build_plan_task_section,
     build_plan_prompt_body,
-    build_plan_task_section,
 )
 from vibe3.models import PlanRequest, PlanScope
 
@@ -31,7 +31,7 @@ def test_build_plan_prompt_body_requires_canonical_plan_and_handoff() -> None:
 
 
 def test_build_plan_output_contract_section_keeps_output_contract_only() -> None:
-    result = build_plan_output_contract_section("Use exactly this format")
+    result = _build_plan_output_contract_section("Use exactly this format")
 
     assert result == "## Output format requirements\nUse exactly this format"
 
@@ -39,7 +39,7 @@ def test_build_plan_output_contract_section_keeps_output_contract_only() -> None
 def test_build_plan_task_section_can_carry_ref_guidance() -> None:
     request = PlanRequest(scope=PlanScope.for_task(42))
 
-    result = build_plan_task_section(
+    result = _build_plan_task_section(
         request,
         "Write the canonical plan under docs/plans/ and run handoff plan.",
     )
