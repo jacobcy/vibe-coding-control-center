@@ -52,6 +52,9 @@ code_limits:
       - path: "src/vibe3/clients/github_pr_read_ops.py"
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
+      - path: "src/vibe3/clients/github_issues_ops.py"
+        limit: 450
+        reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
         limit: 600
         reason: |
