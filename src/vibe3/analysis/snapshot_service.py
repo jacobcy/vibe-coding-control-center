@@ -726,7 +726,7 @@ def build_snapshot_diff(
     # Local import to avoid circular dependency:
     # snapshot_diff.py imports SnapshotError from snapshot_service
     from vibe3.analysis.snapshot_diff import compute_diff
-    from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
+    from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
     log = logger.bind(domain="review", action="build_snapshot_diff")
     structure_diff: StructureDiff | None = None

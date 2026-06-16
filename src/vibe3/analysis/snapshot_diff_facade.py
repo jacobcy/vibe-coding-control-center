@@ -8,7 +8,7 @@ from vibe3.analysis.snapshot_service import (
 )
 from vibe3.clients import GitClient
 from vibe3.models import BranchSource, DiffSummary
-from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
+from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
 def get_diff_summary(

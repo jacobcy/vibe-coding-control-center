@@ -14,7 +14,7 @@ from vibe3.models import (
     StructureDiff,
     StructureSnapshot,
 )
-from vibe3.utils.constants import DEFAULT_MODULE_GROWTH_THRESHOLD
+from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
 def _diff_files(
