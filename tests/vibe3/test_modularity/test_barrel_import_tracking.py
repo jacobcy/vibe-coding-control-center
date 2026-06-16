@@ -137,8 +137,8 @@ def test_config_barrel_import_count() -> None:
             print(f"     {file}: {count} imports")
 
     # Baseline established at issue #2848
-    # Updated for #2912 (+2 imports), #2939 (+1 import)
-    baseline = 143
+    # Updated for #2912 (+2), #2938 (+1), #2939 (+1)
+    baseline = 144
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (

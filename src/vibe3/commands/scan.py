@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from loguru import logger
@@ -25,16 +25,7 @@ app = typer.Typer(
 def _publish_and_wait_governance_event(
     material_override: str | None = None, tick_count: int = 0
 ) -> ExecutionLaunchResult | None:
-    """Publish GovernanceScanStarted event and wait for handler result.
-
-    Args:
-        material_override: Optional governance role (not used in event,
-            preserved for future tick-based material rotation support)
-        tick_count: Tick count for the scan (default 0 for manual scans)
-
-    Returns:
-        ExecutionLaunchResult from handler, or None if no result
-    """
+    """Publish GovernanceScanStarted event and wait for handler result."""
     from vibe3.domain import GovernanceScanStarted
     from vibe3.models import ExecutionLaunchResult, publish_and_wait
 
@@ -44,8 +35,6 @@ def _publish_and_wait_governance_event(
         actor="cli:scan-governance",
     )
     result = publish_and_wait(event)  # type: ignore[operator]
-    # Type narrowing: publish_and_wait returns Any | None,
-    # but we know handlers return ExecutionLaunchResult | None
     if result is None:
         return None
     assert isinstance(result, ExecutionLaunchResult)
@@ -55,17 +44,7 @@ def _publish_and_wait_governance_event(
 def _run_governance_scan(
     material_override: str | None = None, no_async: bool = False
 ) -> None:
-    """Execute governance scan once via event bus.
-
-    Publishes GovernanceScanStarted event, which triggers the domain handler
-    to dispatch via ExecutionCoordinator (async tmux).
-
-    Args:
-        material_override: Optional governance role (not used in event,
-            preserved for future tick-based material rotation support)
-        no_async: Deprecated flag (logs warning, always uses async dispatch
-            via event bus)
-    """
+    """Execute governance scan once via event bus."""
     from rich.console import Console
 
     from vibe3.domain import register_event_handlers
@@ -91,20 +70,26 @@ def _run_governance_scan(
         )
 
 
-def _publish_supervisor_events(
-    candidates: list[dict],
-) -> None:
-    """Publish SupervisorIssueIdentified events for each candidate.
+def _publish_and_wait_supervisor_events(
+    candidates: list[dict[str, Any]],
+) -> list[ExecutionLaunchResult | None]:
+    """Publish SupervisorIssueIdentified events and wait for results.
 
     Args:
         candidates: List of issue candidate dicts with 'number' and 'title' fields
 
-    Note:
-        supervisor_file is left empty and resolved by the domain handler,
-        which allows manual scans to use the same resolution logic as heartbeat scans.
-    """
-    from vibe3.domain import SupervisorIssueIdentified, publish
+    Returns:
+        List of ExecutionLaunchResult from handlers, one per candidate.
+        None entries for candidates where handler returned None.
 
+    Note:
+        supervisor_file is left empty and resolved by the domain handler.
+        Backend/model information is populated by the handler from agent preset.
+    """
+    from vibe3.domain import SupervisorIssueIdentified
+    from vibe3.models import ExecutionLaunchResult, publish_and_wait
+
+    results: list[ExecutionLaunchResult | None] = []
     for candidate in candidates:
         event = SupervisorIssueIdentified(
             issue_number=candidate["number"],
@@ -112,7 +97,12 @@ def _publish_supervisor_events(
             supervisor_file="",  # Resolved by handler
             actor="cli:scan-supervisor",
         )
-        publish(event)
+        result = publish_and_wait(event)  # type: ignore[operator]
+        if result is None or not isinstance(result, ExecutionLaunchResult):
+            results.append(None)
+        else:
+            results.append(result)
+    return results
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
@@ -141,32 +131,64 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
     )
 
 
+def _display_supervisor_candidates(candidates: list[dict[str, Any]]) -> None:
+    """Display supervisor candidates with status."""
+    typer.echo("\nCandidates:")
+    for c in candidates:
+        labels_str = ", ".join(c.get("labels", []))
+        status = "Ready for supervisor apply"
+        if "state/blocked" in c.get("labels", []):
+            status = "Blocked"
+        elif "state/done" in c.get("labels", []):
+            status = "Completed"
+        typer.echo(f"- #{c['number']}: {c['title']}")
+        typer.echo(f"  Labels: {labels_str}")
+        typer.echo(f"  Status: {status}")
+
+
+def _display_execution_results(
+    results: list[ExecutionLaunchResult | None],
+) -> None:
+    """Display execution dispatch results."""
+    launched = [
+        (r.backend, r.model, r.tmux_session)
+        for r in results
+        if r and r.launched and r.tmux_session
+    ]
+    if launched:
+        typer.echo("\nExecution:")
+        for backend, model, session in launched:
+            if backend:
+                typer.echo(f"Backend: {backend}")
+            if model:
+                typer.echo(f"Model: {model}")
+            typer.echo(f"Dispatched to: {session}")
+
+
 def _run_supervisor_scan() -> tuple[int, int]:
     """Execute supervisor scan once via event bus.
-
-    Fetches supervisor candidates and publishes SupervisorIssueIdentified events
-    for each candidate, which triggers the domain handler to dispatch.
 
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
-    # Register event handlers before publishing (required for standalone scan)
     from vibe3.domain import register_event_handlers
-
-    register_event_handlers()
-
     from vibe3.roles import fetch_supervisor_candidates
 
+    register_event_handlers()
     config = load_orchestra_config()
     github = GitHubClient()
 
-    # Fetch candidates
     total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     matched_count = len(candidates)
 
-    # Publish events for each candidate
+    typer.echo("Supervisor scan completed")
+    typer.echo(f"Scanned: {total_scanned} open issues")
+    typer.echo(f"Found: {matched_count} issue(s) requiring supervisor attention")
+
     if candidates:
-        _publish_supervisor_events(candidates)
+        _display_supervisor_candidates(candidates)
+        results = _publish_and_wait_supervisor_events(candidates)
+        _display_execution_results(results)
 
     return total_scanned, matched_count
 
@@ -308,19 +330,7 @@ def supervisor(
         return
 
     # Manual supervisor scan: direct dispatch without facade
-    total_scanned, matched_count = _run_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
+    _run_supervisor_scan()
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
@@ -343,20 +353,8 @@ async def _run_combined_scan_async() -> None:
     else:
         logger.bind(domain="orchestra").info("Governance scan completed (no result)")
 
-    # Supervisor: publish events
-    total_scanned, matched_count = _run_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
+    # Supervisor: publish events and display results
+    _run_supervisor_scan()
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
