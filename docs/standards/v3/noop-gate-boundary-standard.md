@@ -31,7 +31,7 @@ related_docs:
 本文档的目标不是描述理想架构，而是给当前调试中的 agent 一个稳定提醒：
 **如果系统再次把业务状态推进写回代码层，极易重新引入死循环。**
 
-运行时错误等级、`failed_gate` 触发条件、warning 展示规则，
+运行时错误等级、`FailedGate` 触发条件、warning 展示规则，
 统一由
 [vibe3-error-severity-and-blocking-standard.md](../vibe3-error-severity-and-blocking-standard.md)
 定义；本文档只定义 no-op / block 的业务边界，不定义系统可用性等级。
@@ -350,12 +350,12 @@ ref 验证只在统一 worker 执行壳中执行，该路径：
 - 实现三分支 no-op gate 逻辑
 - domain event handler 只做日志记录，不做业务判断
 
-### 7.5 Qualify Gate 与自动对齐
+### 7.5 QualifyGate 与自动对齐
 
 在 Agent 启动前的 Qualify 阶段，系统利用 `BlockedStateService` 执行自动对齐：
 
 - **Truth-First 对齐**: 调用 `sync_cache_from_truth()` 强制本地数据库缓存与远程 Issue Body (Truth) 同步。这解决了“远程已手动解封但本地仍显示阻塞”的问题。
-- **Auto-Resume 判断**: 如果 Truth 显示已解封，Qualify Gate 将自动清除本地阻塞状态并允许 dispatch，不再需要人工执行 `vibe3 task resume`。
+- **Auto-Resume 判断**: 如果 Truth 显示已解封，QualifyGate 将自动清除本地阻塞状态并允许 dispatch，不再需要人工执行 `vibe3 task resume`。
 - **一致性地图 (Consistency Map)**: 校验 Database、Body、Label 是否满足预定义的一致性矩阵。若检测到严重背离（如 Body 阻塞但 Label 正常），将触发告警并拒绝 dispatch 以保护环境。
 
 ### 7.6 已删除的旧抽象，不得恢复

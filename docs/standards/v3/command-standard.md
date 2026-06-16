@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Vibe Team
 created: 2026-03-24
-last_updated: 2026-06-02
+last_updated: 2026-06-07
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -50,7 +50,7 @@ related_docs:
 默认原则：
 
 - branch 生命周期优先直接使用 `git`
-- issue / PR / project 的远端事实读取与写入优先直接使用 `gh`
+- GitHub issue / PR / project 的远端事实读取与写入优先直接使用 `gh`
 - 本地 SQLite 只保存最小运行时绑定事实，不持久化远端展示字段
 
 ## 1. 范围
@@ -73,12 +73,12 @@ related_docs:
 
 - Git branch、GitHub issue、GitHub PR、GitHub Project 是外部事实真源
 - `flow_state.branch` 是本地 execution scene 的锚点
-- `flow_issue_links` 是 issue 与 flow 关系的本地最小真源
+- `flow_issue_links` 是 GitHub issue 与 flow 关系的本地最小真源
 - `handoff` 与 `events` 是本地协作增强，不替代远端业务事实
 
 禁止：
 
-- 将远端 issue / PR / project 展示字段长期落地为本地真源
+- 将远端 GitHub issue / PR / project 展示字段长期落地为本地真源
 - 用本地缓存覆盖 `git` / `gh` 已确认的远端事实
 - 通过查询命令隐式扩张本地状态
 
@@ -102,9 +102,9 @@ related_docs:
 `vibe3 task` 组用于管理 execution record：
 
 - `show`：查看当前或指定 task 的 execution scene 摘要
-- `status`：项目级总览入口，汇总活跃 flow、orchestra 状态与 worktree 上下文
-- `intake`：将 issue 分解/纳入本地管理
-- `resume`：恢复 blocked issues 到 ready 状态
+- `status`：项目级总览入口，汇总活跃 flow、orchestra 状态与 worktree 上下文（推荐，包含 assignee issue 总览）
+- `intake`：将 GitHub issue 分解/纳入本地管理
+- `resume`：恢复 blocked issues 到 ready 状态，并触达 QualifyGate 评估
 
 ### 3.3 `vibe3 status` [Compatibility]
 
@@ -129,7 +129,7 @@ related_docs:
 - 暴露缺失或冲突事实
 - 做最小、显式的审计补充
 
-`check` 不是 branch / PR / issue 生命周期包装器。
+`check` 不是 branch / PR / GitHub issue 生命周期包装器。
 
 ### 3.6 `vibe3 serve`
 
@@ -158,7 +158,7 @@ related_docs:
 
 ### 4.2 `flow bind`
 
-`flow bind` 是 issue 与 flow 关系的唯一公共写入口。
+`flow bind` 是 GitHub issue 与 flow 关系的唯一公共写入口。
 
 现行契约：
 
@@ -167,7 +167,7 @@ related_docs:
 - `--branch` 只允许绑定到已注册、非保护的 flow 分支
 - role 只允许 `task` / `related` / `dependency`
 
-`flow bind` 只写入本地关系事实，不应扩张为远端 issue 管理包装器。
+`flow bind` 只写入本地关系事实，不应扩张为远端 GitHub issue 管理包装器。
 
 ### 4.3 `flow blocked`
 
@@ -200,7 +200,7 @@ related_docs:
 |------|---------|-----------|------|
 | `vibe3 serve status` | Runtime DomainEvent 层 | Event bus、handler health、FailedGate、recent orchestration activity | 运行时健康状态、错误诊断 |
 | `vibe3 flow show` | FlowEvent 层 | Flow timeline (audit projection events) | Flow 生命周期审计、人类可读时间线 |
-| `vibe3 task status` | Task Pool 聚合 | Flow/issue/orchestra/worktree summary (not event log) | 项目级总览、容量管理 |
+| `vibe3 task status` | Task Pool 聚合 | Flow/GitHub issue/orchestra/worktree summary (not event log) | 项目级总览、容量管理 |
 
 **使用原则**：
 
@@ -216,17 +216,17 @@ related_docs:
 
 它负责：
 
-- flow / issue / orchestra / worktree 的联合总览
+- flow / GitHub issue / orchestra / worktree 的联合总览
 
 它不负责：
 
-- 远端 issue 详情查询
+- 远端 GitHub issue 详情查询
 - 远端 PR 详情查询
-- 远端 issue / PR 写操作
+- 远端 GitHub issue / PR 写操作
 
 因此：
 
-- 查看 issue 详情、评论、搜索：优先使用 `gh issue`
+- 查看 GitHub issue 详情、评论、搜索：优先使用 `gh issue`
 - 查看 PR 详情、检查项、评论：优先使用 `gh pr`
 
 ## 6. `handoff` 与 `events`
@@ -243,7 +243,7 @@ related_docs:
 
 - 充当业务真源
 - 替代 GitHub issue / PR 的远端事实
-- 决定 branch / PR / issue 生命周期
+- 决定 branch / PR / GitHub issue 生命周期
 
 ## 7. 现行参数规范
 
@@ -298,7 +298,8 @@ vibe3 task resume [<issue>] [--branch <branch>] [--blocked] [--label auto|ready|
 约束：
 
 - 省略 `--label` 等价于 `--label auto`。
-- `task resume` 只恢复 blocked 状态，不删除 worktree、branch 或 flow record。
+- `task resume` 只恢复 blocked 状态，并清除该 flow 关联的 `blocked_reason`，使其通过 QualifyGate。
+- `task resume` 不删除 worktree、branch 或 flow record。
 - destructive rebuild 必须使用 `vibe3 flow rebuild <issue>`。
 
 ### 7.5 `flow rebuild`
@@ -335,7 +336,7 @@ vibe3 status [--all] [--format json]
 禁止：
 
 - 用 `flow` 描述 branch 创建 / 切换 / 合并 / 删除
-- 用 `flow` 描述 issue / PR 的常规远端写操作
+- 用 `flow` 描述 GitHub issue / PR 的常规远端写操作
 - 让 `task` 重新膨胀成独立公共顶层 CLI
 - 让旧命令面继续以 Active / approved 形式承载现行语义
 - 用本地 sync / mirror 替代 `gh` 的直接读取与写入

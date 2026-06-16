@@ -1,3 +1,23 @@
+---
+document_type: standard
+title: Vibe3 Orchestra Runtime Standard
+status: approved
+scope: orchestra-runtime
+authority:
+  - orchestra-service
+  - heartbeat-tick
+  - async-child-session
+  - governance-semantics
+  - state-trigger-semantics
+author: Vibe Team
+created: 2026-04-12
+last_updated: 2026-06-07
+related_docs:
+  - ../glossary.md
+  - command-standard.md
+  - error-severity-and-blocking-standard.md
+---
+
 # Vibe3 Orchestra Runtime Standard
 
 状态：Active
@@ -13,7 +33,7 @@
 - `manager / plan / run / review` 状态触发
 - `tmux session`
 
-运行时错误等级、`failed_gate`、warning 与 blocked 的区别，
+运行时错误等级、`FailedGate`、warning 与 blocked 的区别，
 以
 [error-severity-and-blocking-standard.md](./error-severity-and-blocking-standard.md)
 为准；本文档聚焦 driver/tick/dispatch 运行层级。
@@ -79,9 +99,9 @@ heartbeat tick 是 driver 进程内部的一次轮询循环。
 
 例如：
 
-- **Governance (Tier 3)**: `cron-supervisor` (识别), `roadmap-intake` (审查)
-- **Governance Execution (Tier 3)**: `supervisor-apply` (执行治理 issue)
-- **Development (Tier 2)**: `manager`, `plan`, `run`, `review` (主开发链)
+- **Governance (Tier 3)**: `cron-supervisor` (识别), `roadmap-intake` (审查)。对应 **Level 1** (无 Worktree)。
+- **Governance Execution (Tier 3)**: `supervisor-apply` (执行治理 issue)。对应 **Level 2** (临时 Worktree)。
+- **Development (Tier 2)**: `manager`, `plan`, `run`, `review` (主开发链)。对应 **Level 3** (持久 Worktree)。
 
 这些 child session 才是实际调用 codeagent 的执行壳。
 
@@ -168,12 +188,12 @@ governance 是一个**周期性治理与审查任务组**。
 - **`roadmap-intake`**: 审查 `state/ready` issue，执行架构一致性检查，晋升为 `state/handoff`。
 
 此外，还支持**手动 Assignee Pool 管理**：
-- 人类可以直接将 issue 指派给配置中的 manager assignee（如 `vibe-manager-agent`）。
+- 人类可以直接将 GitHub issue 指派给配置中的 manager assignee（如 `vibe-manager-agent`）。
 - `roadmap-intake` 会识别这类已分配的 issue 并将其自然纳入 assignee issue pool，不再重复扫描。
 
 它们共同负责：
 
-- 查看全局 issue / flow / scene 事实
+- 查看全局 GitHub issue / flow / scene 事实
 - 判定哪些 issue 可以进入可执行状态
 - 维护仓库健康度
 
@@ -227,7 +247,7 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 
 ### 5.2 谁决定 issue 进入 ready
 
-决定哪些 issue 进入 `state/ready`，不属于 state trigger。
+决定哪些 GitHub issue 进入 `state/ready`，不属于 state trigger。
 
 这应由：
 
@@ -296,7 +316,7 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 - 或多个 service 的正常注册日志
 
 2. **重复启动**
-- 同一 issue / 同一 governance task 在已有 live tmux session 时又被重复 dispatch
+- 同一 GitHub issue / 同一 governance task 在已有 live tmux session 时又被重复 dispatch
 
 判定原则：
 
@@ -321,10 +341,16 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 Orchestra 运行时识别以下 `flow_status` 枚举（真源见 `src/vibe3/models/flow.py`）：
 
 - **`active`**：flow 正常执行中，准备就绪或正在处理。
-- **`blocked`**：flow 被阻塞。包括手动标记阻塞和依赖项（`dependency`）未满足导致的自动化阻塞。
+- **`blocked`**：flow 被阻塞。包括手动标记阻塞和依赖项（`dependency`）未满足导致的自动化阻塞。属于 **BLOCK 系统**。
 - **`done`**：flow 执行完成且 PR 已合并。
 - **`stale`**：flow 长期未活动或被标记为休眠，通常由 governance 机制识别。
 - **`aborted`**：flow 被人工或自动中止（如 PR 关闭未合并）。
+
+**ERROR 与 BLOCK 的正交关系**：
+
+- **`FailedGate` (ERROR System)**：指执行过程中发生了基础设施错误或异常。它记录在 `error_log` 中，影响派发决策，但**不直接**改变 `flow_status`。
+- **`blocked` (BLOCK System)**：指 Flow 的逻辑状态处于暂停。
+- **`QualifyGate`**：每轮 heartbeat 检查 `blocked` flow 是否满足解封条件。
 
 **状态迁移要求**：
 - 任何状态迁移必须发布对应的领域事件。
@@ -341,5 +367,3 @@ Orchestra 运行时识别以下 `flow_status` 枚举（真源见 `src/vibe3/mode
 - `领域事件 (Domain Events)` = Agent 执行生命周期的真源，负责驱动状态转换与副作用
 - `ready` 的判定来源于 governance / supervisor / 人工治理
 - `state trigger` 只消费已有状态
-
-如果实现偏离上述定义，应先修 runtime 语义，再讨论 prompt 行为。

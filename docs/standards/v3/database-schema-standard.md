@@ -110,12 +110,12 @@ CREATE TABLE error_log (
 );
 ```
 
-### 1.5 `failed_gate_state`
+### 1.5 `FailedGate_state`
 
 记录 FailedGate 的熔断状态。
 
 ```sql
-CREATE TABLE failed_gate_state (
+CREATE TABLE FailedGate_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),   -- 单行记录约束
     is_active INTEGER NOT NULL DEFAULT 0,    -- 是否激活熔断
     reason TEXT,                             -- 激活原因

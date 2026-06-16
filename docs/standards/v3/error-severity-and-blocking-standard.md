@@ -4,7 +4,7 @@ title: Vibe3 Error Severity and Blocking Standard
 status: active
 scope: orchestra-runtime
 authority:
-  - failed-gate
+  - FailedGate
   - error-tracking
   - codeagent-execution
 author: GPT-5 Codex
@@ -31,7 +31,7 @@ It exists to prevent the system from mixing these different concepts:
 
 This standard is authoritative for:
 
-- `failed_gate`
+- `FailedGate`
 - runtime error tracking
 - codeagent execution classification
 - warning visibility in `serve status` and flow timeline
@@ -77,8 +77,8 @@ Examples:
 
 **Triple-State Synchronization:**
 Blocked states are managed across three data sources to ensure consistency and visibility:
-1. **Issue Body (Truth):** Authoritative remote state stored in the managed section of the GitHub issue body.
-2. **Issue Label (Signal):** Visual indicator of the blocked state.
+1. **GitHub Issue Body (Truth):** Authoritative remote state stored in the managed section of the GitHub issue body.
+2. **GitHub Issue Label (Signal):** Visual indicator of the blocked state.
 3. **Database (Cache):** Local performance optimization of the remote state.
 
 These sources are kept in sync by the `BlockedStateService`.
@@ -93,7 +93,7 @@ Properties:
 
 - continued dispatch is unsafe or pointless
 - manual intervention is required
-- `failed_gate` activates immediately
+- `FailedGate` activates immediately
 
 Examples:
 
@@ -108,8 +108,8 @@ Use `ERROR` when infrastructure is unstable but not yet proven globally unavaila
 Properties:
 
 - may affect one run or several runs
-- counts toward failed-gate threshold if configured
-- repeated occurrences within the window can activate `failed_gate`
+- counts toward FailedGate threshold if configured
+- repeated occurrences within the window can activate `FailedGate`
 
 Examples:
 
@@ -128,7 +128,7 @@ Properties:
 
 - must be recorded
 - must be visible in status and timeline
-- must not activate `failed_gate`
+- must not activate `FailedGate`
 - must not, by themselves, imply `mark_issue(action="fail")`
 
 Examples:
@@ -176,7 +176,7 @@ All transitions into or out of a `blocked` state must use the `BlockedStateServi
 
 - **Atomic Writes:** Updates issue body projection, labels, and local database cache in a single logical operation.
 - **Truth Resolution:** Uses the issue body as the authoritative truth, with fallback to the database cache.
-- **Synchronization:** The `Qualify Gate` uses this service to align the local cache with the remote truth before starting execution.
+- **Synchronization:** The `QualifyGate` uses this service to align the local cache with the remote truth before starting execution.
 
 ## 5. Handling Contract
 
@@ -200,7 +200,7 @@ Forbidden examples:
 
 ## 6. Failed Gate Rules
 
-`failed_gate` exists to protect the system from continued dispatch during
+`FailedGate` exists to protect the system from continued dispatch during
 configuration failure or infrastructure instability.
 
 It may activate only for:
@@ -224,7 +224,7 @@ Required behavior:
 - persist them
 - surface them in `serve status`
 - emit timeline evidence when relevant
-- keep them out of failed-gate threshold counters
+- keep them out of FailedGate threshold counters
 
 Warnings are allowed to coexist with a blocked flow.
 In that case:
@@ -289,8 +289,8 @@ The UI wording must avoid implying that every `blocked` flow is an infrastructur
 
 When reviewing code against this standard, verify:
 
-- `failed_gate` only reacts to `CRITICAL` and thresholded `ERROR`
-- warning-only records never contribute to failed-gate thresholding
+- `FailedGate` only reacts to `CRITICAL` and thresholded `ERROR`
+- warning-only records never contribute to FailedGate thresholding
 - `blocked` is rendered and logged as a workflow state
 - no-op and no-output are not presented as root-cause infrastructure failures
 - every runtime code is resolved by explicit registry metadata rather than prefix inference
