@@ -343,11 +343,48 @@ gh issue edit <number> --add-label "roadmap-reviewed"
 **场景 C: 版本结束**
 - 确认下一版本目标，重新评估待分类 Issue，更新 roadmap 状态标签
 
-### Step X: Intake 判断 `[Agent]`
+### Step X: Intake 判断 `[人类确认]` ⚠️
+
+**强制约束**：
+- 每次只处理一个 issue，**禁止批量处理**
+- 发布 `[roadmap decision]` comment 前，**必须进行代码级深度分析**（禁止只汇报 issue 标题）
+- 必须等待人类明确回复"通过"、"执行"、"下一个"等确认词后，才能发布 comment 和执行 intake
+
+**代码验证流程**（参照 #2926 示例）：
+```
+1. Read: 读取 issue 提及的代码文件（完整上下文）
+2. Grep: 检查相关依赖（数据库 schema、配置项、调用链）
+3. Analyze: 给出技术分析（代码位置、改动范围、风险评估、ROI）
+4. Recommend: 给出明确的可行性判断 + 建议
+5. Ask: 等待人类确认
+```
+
+**违规示例**：
+```
+❌ 错误：只汇报 issue 标题 + 问"是否可以执行"
+❌ 错误：连续处理 #2926、#2927、#2928 而不等待人类确认
+❌ 错误：直接发布 comment + intake 而不先汇报分析结果
+❌ 错误：用户说"下一个"时理解为"执行下一个并发布"，而不是"汇报下一个分析"
+```
+
+**正确示例**（#2926）：
+```
+✅ 正确：
+用户: "我们看下现有issue，哪些成熟可以执行了"
+→ 我: 
+   - 读取 snapshot_service.py:370-426 实际代码
+   - 检查 SQLiteClient 是否有 list_snapshots 方法
+   - 检查 snapshot_registry 表结构和索引
+   - 检查所有写入路径（save_snapshot、save_branch_baseline、auto-register）
+   - 给出完整评估报告（问题确认、数据库能力、改动方案、风险评估、ROI）
+   - 明确结论："可行性：完全可行，建议加 state/ready"
+→ 用户: "通过"
+→ 我: 发布 comment + intake #2926
+```
 
 对新进入的 issue 运行三级审查（Level 1/2/3，见 roadmap-common.md）后，选择：
 
-**场景 A: 适合自动化推进**（通过全部三级审查）
+**场景 A: 适合自动化推进**（通过全部三级审查）`[人类确认]`
 
 先根据 issue 内容判断是否为简单任务：
 
@@ -358,6 +395,7 @@ gh issue edit <number> --add-label "roadmap-reviewed"
 
 满足时，路由到 supervisor/apply 快速通道（复用 assignee-pool Step 2.5 的判断标准）：
 ```bash
+# ⚠️ 先汇报方案，等待人类确认后再执行以下命令
 # 移除旧 state 标签（如有），添加 supervisor 路由标签
 gh issue edit <number> --add-label "supervisor,state/handoff"
 gh issue comment <number> --body "[roadmap decision] simple task → supervisor/apply: <判断依据>."
@@ -366,14 +404,16 @@ gh issue edit <number> --add-label "roadmap-reviewed"
 
 不满足时，走完整 manager intake 路径：
 ```bash
+# ⚠️ 先汇报方案，等待人类确认后再执行以下命令
 # 使用 vibe3 命令，确保三源同步
 vibe3 task intake <number>
 gh issue comment <number> --body "[roadmap decision] Intake completed (scope=<bugfix|feature|refactor>)."
 gh issue edit <number> --add-label "roadmap-reviewed"
 ```
 
-**场景 B: 需要人类讨论** `[人类确认]`（目标不明确/架构方向未定/scope 过大无法判断拆分）
+**场景 B: 需要人类讨论**（目标不明确/架构方向未定/scope 过大无法判断拆分）`[人类确认]`
 ```bash
+# 汇报方案后，等待人类确认再执行
 gh issue comment <number> --body "[roadmap decision] rfc: <具体原因>."
 gh issue edit <number> --add-label "roadmap/rfc"
 # 不打 roadmap-reviewed，不分配 assignee
@@ -381,8 +421,9 @@ gh issue edit <number> --add-label "roadmap/rfc"
 
 **架构级 rfc 判据**（见 `docs/decisions/_template.md` 和 ADR 结晶条件）：如果 rfc 满足"跨任务/跨模块架构选型 + 有真实权衡 + 期望长期有效"，不要只要求后续实现 PR 顺手写 ADR；应推动一个小型 ADR PR（只含 ADR 文件、INDEX 更新和必要的最小链接更新），并在决策 comment 中写明 `ADR PR: <url>`。非架构级 rfc 维持现有流程不变。
 
-**场景 C: 建议关闭**（Level 2/3 不通过：依赖已移除/API 废弃/重复）`[Agent]`
+**场景 C: 建议关闭**（Level 2/3 不通过：依赖已移除/API 废弃/重复）`[人类确认]`
 ```bash
+# 汇报方案后，等待人类确认再执行
 gh issue comment <number> --body "[roadmap decision] close: <关闭原因>."
 gh issue edit <number> --add-label "roadmap-reviewed"
 # 建议人类关闭 issue（不自动关闭）
@@ -432,6 +473,8 @@ RFC (需讨论)
 | 不检查 issue body 中的已有 `[governance suggest]` 就写 decision | 覆盖已有分层决策 | Step 0.2 先列出所有未消化的 suggest |
 | proceed/unblock 后不移除 `orchestra-scanned` | issue 被永久跳过（#2381 教训） | Step 0.7 检查并移除 orchestra-scanned |
 | 对 state/done 但 OPEN 的 issue 只看标签不验证代码 | 标签和实际代码状态可能不一致 | Step 0.5 类型 B: `git log` + `inspect files` |
+| **批量处理 issue 而不逐个汇报** | 违反 `[人类确认]` 约束（#2926-2928 教训） | Step X: 每次只处理一个，汇报后等待确认 |
+| **发布 comment 前不等待人类确认** | 同上 | 汇报分析结果 → 等待"通过"/"执行" → 发布 comment |
 
 ## 与其他 Skills 的区别
 
