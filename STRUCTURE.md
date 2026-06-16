@@ -34,8 +34,8 @@ Vibe Center 包含**两个并行实现**：
 
 V3 采用 3-Tier 顶层架构，定义系统的战略职责边界：
 
-- **Tier 3 (Cognitive / Governance Layer)**: 负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划。
-- **Tier 2 (Skill Layer)**: 负责 Flow 状态机、任务编排、Agent 执行 (Plan/Run/Review)。
+- **Tier 3 (Cognitive / Governance Layer)**: 负责全局策略、规则、`supervisor issue` 治理、Issue 分检与 Roadmap 规划。强调基于任务的编排。
+- **Tier 2 (Skill Layer)**: 负责 Flow 状态机、任务编排、`assignee issue` 执行 (Plan/Run/Review)。
 - **Tier 1 (Shell Layer)**: 提供原子级能力访问、状态读取、环境原语与项目信息检索。
 
 ### 执行等级 (Execution Levels)

@@ -99,7 +99,7 @@ related_docs:
 命令语义对应：
 
 - `show`：查看单个 flow 的当前或历史详情
-- `status`：只看未关闭 flow 大盘
+- `status`：只看未关闭 flow 大盘 (推荐使用 `vibe3 task status`)
 - `list`：看所有 flow，包括已关闭历史
 
 ## 3.1 Single-Target Governance (强约束)
