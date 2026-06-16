@@ -172,7 +172,7 @@ class TestBuildReviewPromptBody:
             scope = ReviewScope.for_base("main")
             request = ReviewRequest(scope=scope)
 
-            with pytest.raises(Exception):  # ContextBuilderError
+            with pytest.raises(ContextBuilderError):  # ContextBuilderError
                 build_review_prompt_body(request)
 
     def test_build_review_prompt_body_hides_internal_prompt_wiring(self) -> None:
