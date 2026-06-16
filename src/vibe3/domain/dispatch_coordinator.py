@@ -211,15 +211,17 @@ class GlobalDispatchCoordinator:
             )
         )
 
-    async def _collect_frozen_queue(self) -> list[QueueEntry]:
-        """Collect a new frozen queue only when the current one is empty."""
-        queue: list[QueueEntry] = []
-        seen_issue_numbers: set[int] = set()
+    def _collect_open_issues(self) -> list[IssueInfo]:
+        """Phase 1: Single open-issue collection pass.
+
+        One GitHub API call via IssueCollectionService.
+        Returns empty list on failure (fail-safe).
+
+        Note: This method is synchronous and intended to be run in an executor
+        to avoid blocking the async event loop.
+        """
         try:
-            collected_issues = await asyncio.get_running_loop().run_in_executor(
-                self._executor,
-                self._issue_collector_factory().collect_open_issues,
-            )
+            return self._issue_collector_factory().collect_open_issues()
         except Exception as exc:
             append_orchestra_event(
                 "dispatcher",
@@ -228,7 +230,32 @@ class GlobalDispatchCoordinator:
             logger.bind(domain="global_dispatch").error(
                 f"collect_open_issues failed: {exc}"
             )
-            collected_issues = []
+            return []
+
+    def _build_queue_from_issues(
+        self, collected_issues: list[IssueInfo]
+    ) -> list[QueueEntry]:
+        """Phase 2: Filter and order candidates with state-first ordering.
+
+        Iterates through state groups in priority order:
+        REVIEW → MERGE_READY → IN_PROGRESS → CLAIMED → HANDOFF → READY
+
+        Within each state group, issues are ordered by:
+        milestone → roadmap rank → priority → issue number
+
+        This ordering ensures that:
+        - Issues in "hot" states (REVIEW, MERGE_READY) are processed first
+        - In-progress work is prioritized over new work
+        - Within each state, higher-priority issues come first
+
+        Args:
+            collected_issues: List of issues from open-issue collection
+
+        Returns:
+            List of QueueEntry objects in state-first order
+        """
+        queue: list[QueueEntry] = []
+        seen_issue_numbers: set[int] = set()
 
         for state in (
             IssueState.REVIEW,
@@ -273,7 +300,6 @@ class GlobalDispatchCoordinator:
                     "select_ready_issues_from_collected_issues failed for "
                     f"{state.value}: {exc}"
                 )
-        self._requalify_blocked_issues(collected_issues)
 
         if queue:
             append_orchestra_event(
@@ -281,6 +307,27 @@ class GlobalDispatchCoordinator:
                 f"GlobalDispatchCoordinator: queue collection complete, "
                 f"total={len(queue)} issues",
             )
+        return queue
+
+    async def _collect_frozen_queue(self) -> list[QueueEntry]:
+        """Full frozen queue collection with explicit phases.
+
+        Phases:
+          1. Collect — Single open-issue pass via IssueCollectionService
+          2. Filter & Order — State-group iteration with state-first ordering
+          3. Re-qualify — Blocked issue dependency requalification
+
+        See _build_queue_from_issues for ordering semantics.
+
+        Returns:
+            List of QueueEntry objects ready for dispatch
+        """
+        collected_issues = await asyncio.get_running_loop().run_in_executor(
+            self._executor,
+            self._collect_open_issues,
+        )
+        queue = self._build_queue_from_issues(collected_issues)
+        self._requalify_blocked_issues(collected_issues)
         return queue
 
     def _requalify_blocked_issues(self, collected_issues: list[IssueInfo]) -> None:
@@ -293,6 +340,13 @@ class GlobalDispatchCoordinator:
         label transition and event logging when an issue becomes
         resumable; the relabeled issue is then picked up normally on the
         next collection cycle.
+
+        Dependency Resolution Routing:
+            qualify_blocked_issue → is_dependency_satisfied →
+            DependencyResolutionService.is_dependency_resolved()
+
+        This centralized routing ensures consistent dependency checking
+        across all code paths (dispatch, resume, consistency checks).
         """
         for issue in collected_issues:
             if issue.state != IssueState.BLOCKED:
