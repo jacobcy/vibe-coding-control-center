@@ -369,3 +369,56 @@ def test_scan_supervisor_does_not_call_roles_dispatch():
         mock_publish_and_wait.assert_called_once()
         # Direct dispatch NOT called
         mock_dispatch.assert_not_called()
+
+
+def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
+    """Manual supervisor scan shows candidate list and execution info."""
+    with (
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
+    ):
+        mock_fetch.return_value = (
+            2,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+                {
+                    "number": 456,
+                    "title": "Issue B",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
+        from vibe3.models import ExecutionLaunchResult
+
+        mock_publish_and_wait.side_effect = [
+            ExecutionLaunchResult(
+                launched=True,
+                tmux_session="vibe3-supervisor-123",
+                backend="openai",
+                model="gpt-4",
+            ),
+            ExecutionLaunchResult(
+                launched=True,
+                tmux_session="vibe3-supervisor-456",
+                backend="anthropic",
+                model="claude-3",
+            ),
+        ]
+
+        result = runner.invoke(app, ["scan", "supervisor"])
+        assert result.exit_code == 0
+        assert mock_publish_and_wait.call_count == 2
+        assert "Candidates:" in result.output
+        assert "#123: Issue A" in result.output
+        assert "#456: Issue B" in result.output
+        assert "Execution:" in result.output
+        assert "Backend: openai" in result.output
+        assert "Model: gpt-4" in result.output
+        assert "Dispatched to: vibe3-supervisor-123" in result.output
+        assert "Backend: anthropic" in result.output
+        assert "Model: claude-3" in result.output
+        assert "Dispatched to: vibe3-supervisor-456" in result.output
