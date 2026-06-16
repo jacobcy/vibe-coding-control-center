@@ -28,6 +28,7 @@ def handle_supervisor_issue_identified(
     event: SupervisorIssueIdentified, /, coordinator: ExecutionCoordinator | None = None
 ) -> ExecutionLaunchResult | None:
     """Dispatch supervisor apply via CLI self-invocation."""
+    from vibe3.config.agent_preset import resolve_repo_agent_preset
     from vibe3.execution import build_issue_async_cli_request
     from vibe3.observability import append_orchestra_event
     from vibe3.roles import SUPERVISOR_APPLY_ROLE
@@ -66,6 +67,9 @@ def handle_supervisor_issue_identified(
         worktree_requirement=SUPERVISOR_APPLY_ROLE.worktree,
     )
 
+    # Resolve backend/model for supervisor role
+    backend, model = resolve_repo_agent_preset("supervisor") or (None, None)
+
     if coordinator is None:
         from vibe3.execution import ExecutionCoordinator
 
@@ -74,6 +78,10 @@ def handle_supervisor_issue_identified(
 
             try:
                 result = coordinator.dispatch_execution(request)
+                # Add backend/model to result
+                if result:
+                    result.backend = backend
+                    result.model = model
                 record_dispatch_failure_if_unexpected(
                     result=result,
                     role="supervisor",
@@ -111,6 +119,10 @@ def handle_supervisor_issue_identified(
     else:
         try:
             result = coordinator.dispatch_execution(request)
+            # Add backend/model to result
+            if result:
+                result.backend = backend
+                result.model = model
             record_dispatch_failure_if_unexpected(
                 result=result,
                 role="supervisor",

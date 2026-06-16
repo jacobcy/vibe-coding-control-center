@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from loguru import logger
@@ -92,7 +92,7 @@ def _run_governance_scan(
 
 
 def _publish_and_wait_supervisor_events(
-    candidates: list[dict],
+    candidates: list[dict[str, Any]],
 ) -> list[ExecutionLaunchResult | None]:
     """Publish SupervisorIssueIdentified events and wait for results.
 
@@ -105,6 +105,7 @@ def _publish_and_wait_supervisor_events(
 
     Note:
         supervisor_file is left empty and resolved by the domain handler.
+        Backend/model information is populated by the handler from agent preset.
     """
     from vibe3.domain import SupervisorIssueIdentified
     from vibe3.models import ExecutionLaunchResult, publish_and_wait
@@ -184,16 +185,30 @@ def _run_supervisor_scan() -> tuple[int, int]:
         typer.echo("\nCandidates:")
         for c in candidates:
             labels_str = ", ".join(c.get("labels", []))
+            # Determine status from labels or simple heuristics
+            status = "Ready for supervisor apply"
+            if "state/blocked" in c.get("labels", []):
+                status = "Blocked"
+            elif "state/done" in c.get("labels", []):
+                status = "Completed"
+
             typer.echo(f"- #{c['number']}: {c['title']}")
             typer.echo(f"  Labels: {labels_str}")
+            typer.echo(f"  Status: {status}")
 
         results = _publish_and_wait_supervisor_events(candidates)
         launched = [
-            r.tmux_session for r in results if r and r.launched and r.tmux_session
+            (r.backend, r.model, r.tmux_session)
+            for r in results
+            if r and r.launched and r.tmux_session
         ]
         if launched:
             typer.echo("\nExecution:")
-            for session in launched:
+            for backend, model, session in launched:
+                if backend:
+                    typer.echo(f"Backend: {backend}")
+                if model:
+                    typer.echo(f"Model: {model}")
                 typer.echo(f"Dispatched to: {session}")
 
     return total_scanned, matched_count

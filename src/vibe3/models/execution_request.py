@@ -45,3 +45,5 @@ class ExecutionLaunchResult:
     stdout: Optional[str] = None  # Only populated for sync mode
     reason: Optional[str] = None
     reason_code: Optional[str] = None
+    backend: Optional[str] = None  # Backend used for execution
+    model: Optional[str] = None  # Model used for execution
