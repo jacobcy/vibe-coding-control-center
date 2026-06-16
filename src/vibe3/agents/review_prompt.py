@@ -20,6 +20,7 @@ from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (
+    ContextBuilderError,
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
@@ -27,7 +28,6 @@ from vibe3.prompts import (
     make_context_builder,
     resolve_common_rules_path,
 )
-from vibe3.prompts.exceptions import ContextBuilderError
 
 ReviewPromptMode = Literal["first", "retry"]
 
