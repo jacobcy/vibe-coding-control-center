@@ -143,7 +143,14 @@ def _diff_modules(
             summary.modules_modified += 1
 
             growth = cm.total_loc - bm.total_loc
-            if growth > 100:
+            threshold = 100  # fallback default
+            try:
+                from vibe3.config import get_config
+
+                threshold = get_config().review_scope.module_growth_threshold
+            except Exception:
+                pass
+            if growth > threshold:
                 warnings.append(
                     DiffWarning(
                         type="module_growth",
