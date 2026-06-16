@@ -37,58 +37,47 @@ _KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_ISSUE_FIELDS)
 _PR_KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_PR_FIELDS)
 
 
-def _validate_issue_fields(fields: list[str]) -> None:
-    """Validate that all field names are known GitHub issue API fields.
+def _validate_fields(
+    fields: list[str],
+    known_set: frozenset[str],
+    label: str,
+) -> None:
+    """Validate that all field names are known GitHub API fields.
 
     Raises ValueError with typo suggestions for unknown fields.
 
     Args:
         fields: List of field names to validate
+        known_set: Set of known valid field names
+        label: Human-readable label for error messages ('issue' or 'PR')
 
     Raises:
         ValueError: If any unknown fields are found, with suggestions for typos
     """
-    invalid = [f for f in fields if f not in _KNOWN_FIELDS_SET]
+    invalid = [f for f in fields if f not in known_set]
     if not invalid:
         return
     suggestions = []
     for f in invalid:
-        matches = difflib.get_close_matches(f, _KNOWN_FIELDS_SET, n=1, cutoff=0.6)
+        matches = difflib.get_close_matches(f, known_set, n=1, cutoff=0.6)
         if matches:
             suggestions.append(f"'{f}' (did you mean '{matches[0]}'?)")
         else:
             suggestions.append(f"'{f}'")
     raise ValueError(
-        f"Unknown GitHub issue field(s): {', '.join(suggestions)}. "
-        f"Known fields: {', '.join(sorted(_KNOWN_FIELDS_SET))}"
+        f"Unknown GitHub {label} field(s): {', '.join(suggestions)}. "
+        f"Known fields: {', '.join(sorted(known_set))}"
     )
+
+
+def _validate_issue_fields(fields: list[str]) -> None:
+    """Validate that all field names are known GitHub issue API fields."""
+    _validate_fields(fields, _KNOWN_FIELDS_SET, "issue")
 
 
 def _validate_pr_fields(fields: list[str]) -> None:
-    """Validate that all field names are known GitHub PR API fields.
-
-    Raises ValueError with typo suggestions for unknown fields.
-
-    Args:
-        fields: List of field names to validate
-
-    Raises:
-        ValueError: If any unknown fields are found, with suggestions for typos
-    """
-    invalid = [f for f in fields if f not in _PR_KNOWN_FIELDS_SET]
-    if not invalid:
-        return
-    suggestions = []
-    for f in invalid:
-        matches = difflib.get_close_matches(f, _PR_KNOWN_FIELDS_SET, n=1, cutoff=0.6)
-        if matches:
-            suggestions.append(f"'{f}' (did you mean '{matches[0]}'?)")
-        else:
-            suggestions.append(f"'{f}'")
-    raise ValueError(
-        f"Unknown GitHub PR field(s): {', '.join(suggestions)}. "
-        f"Known fields: {', '.join(sorted(_PR_KNOWN_FIELDS_SET))}"
-    )
+    """Validate that all field names are known GitHub PR API fields."""
+    _validate_fields(fields, _PR_KNOWN_FIELDS_SET, "PR")
 
 
 def parse_blocked_by(body: str) -> list[int]:
