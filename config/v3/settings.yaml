@@ -100,6 +100,11 @@ review_scope:
     - ".claude/rules/"       # 项目规则
     - "config/"              # 配置真源
 
+  # Module growth warning threshold in lines of code
+  # When a module grows by more than this amount between snapshots,
+  # a module_growth warning is generated in the diff output.
+  module_growth_threshold: 100
+
 # 质量标准
 quality:
   test_coverage:

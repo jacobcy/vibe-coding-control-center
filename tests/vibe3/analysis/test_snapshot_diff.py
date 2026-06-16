@@ -272,3 +272,128 @@ def test_compute_diff_identical_snapshots():
     assert len(diff.file_changes) == 0
     assert len(diff.module_changes) == 0
     assert len(diff.dependency_changes) == 0
+
+
+def test_module_growth_warning_threshold():
+    """Test that module_growth warnings respect the configured threshold."""
+    baseline = StructureSnapshot(
+        snapshot_id="base",
+        branch="main",
+        commit="a" * 13,
+        commit_short="a" * 7,
+        created_at="2026-01-01T00:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=100,
+                total_functions=5,
+                files=["s.py"],
+            )
+        ],
+        dependencies=[],
+        metrics=StructureMetrics(total_files=1, total_loc=100, total_functions=5),
+    )
+    current = StructureSnapshot(
+        snapshot_id="cur",
+        branch="feature",
+        commit="b" * 13,
+        commit_short="b" * 7,
+        created_at="2026-01-02T00:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=201,
+                total_functions=5,
+                files=["s.py"],
+            )
+        ],
+        dependencies=[],
+        metrics=StructureMetrics(total_files=1, total_loc=201, total_functions=5),
+    )
+    diff = compute_diff(baseline, current)
+    warnings = [w for w in diff.warnings if w.type == "module_growth"]
+    assert len(warnings) == 1  # 201 - 100 = 101 > 100
+
+
+def test_module_growth_warning_threshold_boundary():
+    """Test module_growth warnings at threshold boundaries."""
+    # Growth = 100 (at threshold, should NOT warn: > not >=)
+    baseline = StructureSnapshot(
+        snapshot_id="base",
+        branch="main",
+        commit="a" * 13,
+        commit_short="a" * 7,
+        created_at="2026-01-01T00:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=100,
+                total_functions=5,
+                files=["s.py"],
+            )
+        ],
+        dependencies=[],
+        metrics=StructureMetrics(total_files=1, total_loc=100, total_functions=5),
+    )
+
+    # Test at threshold (100) - should NOT warn
+    current_at = StructureSnapshot(
+        snapshot_id="cur",
+        branch="feature",
+        commit="b" * 13,
+        commit_short="b" * 7,
+        created_at="2026-01-02T00:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=200,  # 200 - 100 = 100
+                total_functions=5,
+                files=["s.py"],
+            )
+        ],
+        dependencies=[],
+        metrics=StructureMetrics(total_files=1, total_loc=200, total_functions=5),
+    )
+    diff_at = compute_diff(baseline, current_at)
+    warnings_at = [w for w in diff_at.warnings if w.type == "module_growth"]
+    assert len(warnings_at) == 0  # growth=100, NOT > 100
+
+    # Test above threshold (101) - should warn
+    current_above = StructureSnapshot(
+        snapshot_id="cur",
+        branch="feature",
+        commit="c" * 13,
+        commit_short="c" * 7,
+        created_at="2026-01-03T00:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[
+            ModuleSnapshot(
+                module="services",
+                file_count=1,
+                total_loc=201,  # 201 - 100 = 101
+                total_functions=5,
+                files=["s.py"],
+            )
+        ],
+        dependencies=[],
+        metrics=StructureMetrics(total_files=1, total_loc=201, total_functions=5),
+    )
+    diff_above = compute_diff(baseline, current_above)
+    warnings_above = [w for w in diff_above.warnings if w.type == "module_growth"]
+    assert len(warnings_above) == 1  # growth=101 > 100
+    assert warnings_above[0].module == "services"
+    assert warnings_above[0].details["old_loc"] == 100
+    assert warnings_above[0].details["new_loc"] == 201

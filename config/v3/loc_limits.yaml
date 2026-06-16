@@ -77,8 +77,8 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
       - path: "src/vibe3/commands/snapshot.py"
-        limit: 460
-        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要"
+        limit: 500
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要；PR #2945 code review follow-up 新增 config fallback 日志（+5 行）"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
@@ -123,8 +123,8 @@ code_limits:
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
       - path: "src/vibe3/analysis/snapshot_service.py"
-        limit: 760
-        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析、非代码文件追踪（review_scope 路径扩展）、语言检测、build_snapshot_diff（从 agents 层迁移，Issue #2827）、DB-backed lookup（Issue #2845，替换 filesystem-glob 为 SQLite 索引查询）等紧密耦合逻辑；Issue #2810 RFC 扩展了非 Python 文件追踪能力；Issue #2827 将 build_snapshot_diff 从 agents.review_pipeline_helpers 迁移至此，消除冗余包装层；Issue #2845 新增 DB-backed lookup 逻辑与迁移文档（+44 行，含 fallback path、auto-register、idempotent upsert），提升上限以容纳后续扩展"
+        limit: 763
+        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析、非代码文件追踪（review_scope 路径扩展）、语言检测、build_snapshot_diff（从 agents 层迁移，Issue #2827）、DB-backed lookup（Issue #2845，替换 filesystem-glob 为 SQLite 索引查询）等紧密耦合逻辑；Issue #2810 RFC 扩展了非 Python 文件追踪能力；Issue #2827 将 build_snapshot_diff 从 agents.review_pipeline_helpers 迁移至此，消除冗余包装层；Issue #2845 新增 DB-backed lookup 逻辑与迁移文档（+44 行，含 fallback path、auto-register、idempotent upsert），提升上限以容纳后续扩展；PR #2945 新增 module_growth_threshold 参数传递（+3 行）"
       - path: "src/vibe3/analysis/serena_service.py"
         limit: 430
         reason: "Serena 符号级代码分析服务聚合，包含 analyze_file/analyze_files/analyze_changes/scan_dead_code 等核心分析流程、文件缓存管理、AST 缓存共享机制（#2886 优化冗余文件 I/O）等紧密耦合逻辑；职责单一（代码分析编排）但方法较多，拆分会破坏分析流程完整性"

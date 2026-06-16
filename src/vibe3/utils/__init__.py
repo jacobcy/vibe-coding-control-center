@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
         CODEAGENT_STDIN_MODE_THRESHOLD,
+        DEFAULT_MODULE_GROWTH_THRESHOLD,
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,
@@ -80,6 +81,7 @@ _LAZY_IMPORTS = {
     "CODEAGENT_STDIN_MODE_THRESHOLD": "vibe3.utils.constants",
     "CODEAGENT_WRAPPER_ANYWHERE_RE": "vibe3.utils.error_message_cleaner",
     "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
+    "DEFAULT_MODULE_GROWTH_THRESHOLD": "vibe3.utils.constants",
     "EVENT_REQUIRED_REF_MISSING": "vibe3.utils.constants",
     "EVENT_STATE_TRANSITIONED": "vibe3.utils.constants",
     "EVENT_STATE_UNCHANGED": "vibe3.utils.constants",
@@ -144,6 +146,7 @@ __all__ = [
     "CODEAGENT_STDIN_MODE_THRESHOLD",
     "CODEAGENT_WRAPPER_ANYWHERE_RE",
     "CODEAGENT_WRAPPER_RE",
+    "DEFAULT_MODULE_GROWTH_THRESHOLD",
     "EVENT_REQUIRED_REF_MISSING",
     "EVENT_STATE_TRANSITIONED",
     "EVENT_STATE_UNCHANGED",

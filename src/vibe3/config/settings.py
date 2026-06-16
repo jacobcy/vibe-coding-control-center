@@ -213,6 +213,11 @@ class ReviewScopeConfig(BaseModel):
 
     critical_paths: list[str] = Field(default_factory=list)
     public_api_paths: list[str] = Field(default_factory=list)
+    module_growth_threshold: int = Field(
+        default=100,
+        ge=1,
+        description="Module growth warning threshold in LOC (default: 100)",
+    )
 
 
 class AgentConfig(BaseModel):

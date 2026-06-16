@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.analysis import SnapshotError, build_snapshot_diff
+from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
 @patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")
@@ -35,7 +36,9 @@ def test_build_snapshot_diff_success(mock_find, mock_build, mock_compute):
     assert result == mock_diff
     mock_find.assert_called_once_with("main", "feature")
     mock_build.assert_called_once()
-    mock_compute.assert_called_once_with(mock_baseline, mock_current)
+    mock_compute.assert_called_once_with(
+        mock_baseline, mock_current, DEFAULT_MODULE_GROWTH_THRESHOLD
+    )
 
 
 @patch("vibe3.analysis.snapshot_service.find_snapshot_by_branch")

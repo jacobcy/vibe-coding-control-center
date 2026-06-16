@@ -4,9 +4,12 @@ import json
 from typing import Annotated
 
 import typer
+from loguru import logger
 
 from vibe3.analysis import compute_diff, snapshot_service
 from vibe3.commands.common import enable_method_trace
+from vibe3.config import get_config
+from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 app = typer.Typer(
     name="snapshot",
@@ -392,7 +395,20 @@ def diff(
 
         # Build current snapshot
         current_snapshot = snapshot_service.build_snapshot()
-        result = compute_diff(baseline_snapshot, current_snapshot)
+
+        # Read module growth threshold from config
+        try:
+            config = get_config()
+            threshold = config.review_scope.module_growth_threshold
+        except Exception:
+            threshold = DEFAULT_MODULE_GROWTH_THRESHOLD
+            logger.warning(
+                "Failed to load module_growth_threshold from config, "
+                "falling back to default {}",
+                threshold,
+            )
+
+        result = compute_diff(baseline_snapshot, current_snapshot, threshold)
 
         if json_out:
             typer.echo(result.model_dump_json(indent=2))
