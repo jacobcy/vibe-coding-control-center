@@ -394,3 +394,359 @@ class TestTriggerLogging:
 
         # Should remain paused (paused_blocked_check executed)
         assert coordinator._dispatch_paused is True
+
+
+class TestQueueResortExisting:
+    """Tests for _queue_resort_existing trigger."""
+
+    def test_preserves_waiting_entries(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+        install_issue_loader,
+    ) -> None:
+        """Entries with waiting_state set retain their order and are not re-sorted."""
+        _ = make_issue(1)
+        _ = make_issue(2)
+        capacity = make_capacity(remaining=10)
+
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.IN_PROGRESS,
+                2: IssueState.READY,
+            },
+        )
+
+        # Pre-populate queue with waiting entries
+        coordinator._frozen_queue = [
+            QueueEntry(
+                issue_number=1,
+                collected_state="in-progress",
+                waiting_state="in-progress",
+            ),
+            QueueEntry(issue_number=2, collected_state="ready", waiting_state="ready"),
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # Waiting entries should be preserved in order
+        assert len(coordinator._frozen_queue) == 2
+        assert coordinator._frozen_queue[0].issue_number == 1
+        assert coordinator._frozen_queue[0].waiting_state == "in-progress"
+        assert coordinator._frozen_queue[1].issue_number == 2
+        assert coordinator._frozen_queue[1].waiting_state == "ready"
+
+    def test_reorders_by_priority_change(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Non-waiting entries are re-sorted when priority label changes."""
+        from vibe3.models import IssueInfo
+
+        capacity = make_capacity(remaining=10)
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        # Mock issue loader with different priorities
+        def loader(issue_number: int) -> IssueInfo | None:
+            if issue_number == 1:
+                return IssueInfo(
+                    number=1,
+                    title="Low priority",
+                    state=IssueState.READY,
+                    labels=["state/ready", "priority/low"],  # priority 3
+                    assignees=["manager-bot"],
+                )
+            elif issue_number == 2:
+                return IssueInfo(
+                    number=2,
+                    title="High priority",
+                    state=IssueState.READY,
+                    labels=["state/ready", "priority/high"],  # priority 7
+                    assignees=["manager-bot"],
+                )
+            return None
+
+        coordinator._load_issue = loader
+
+        # Pre-populate queue with low priority first
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+            QueueEntry(issue_number=2, collected_state="ready"),
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # High priority should come first after resort
+        assert len(coordinator._frozen_queue) == 2
+        assert coordinator._frozen_queue[0].issue_number == 2  # high priority
+        assert coordinator._frozen_queue[1].issue_number == 1  # low priority
+
+    def test_removes_done_issue(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+        install_issue_loader,
+    ) -> None:
+        """Entry referencing a DONE issue is removed."""
+        _ = make_issue(1)
+        _ = make_issue(2)
+        capacity = make_capacity(remaining=10)
+
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.DONE,
+                2: IssueState.READY,
+            },
+        )
+
+        # Pre-populate queue
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="done"),
+            QueueEntry(issue_number=2, collected_state="ready"),
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # DONE issue should be removed
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].issue_number == 2
+
+    def test_removes_missing_issue(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+        install_issue_loader,
+    ) -> None:
+        """Entry whose issue _load_issue returns None is removed."""
+        _ = make_issue(1)
+        _ = make_issue(2)
+        capacity = make_capacity(remaining=10)
+
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        install_issue_loader(
+            coordinator,
+            {
+                1: None,  # Missing issue
+                2: IssueState.READY,
+            },
+        )
+
+        # Pre-populate queue
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+            QueueEntry(issue_number=2, collected_state="ready"),
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # Missing issue should be removed
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].issue_number == 2
+
+    def test_removes_supervisor_issue(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Entry whose issue has supervisor label is removed."""
+        from vibe3.models import IssueInfo
+
+        capacity = make_capacity(remaining=10)
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        # Mock issue loader with supervisor-labeled issue
+        def loader(issue_number: int) -> IssueInfo | None:
+            if issue_number == 1:
+                return IssueInfo(
+                    number=1,
+                    title="Supervisor issue",
+                    state=IssueState.READY,
+                    labels=["state/ready", "supervisor"],  # supervisor label
+                    assignees=["manager-bot"],
+                )
+            elif issue_number == 2:
+                return IssueInfo(
+                    number=2,
+                    title="Normal issue",
+                    state=IssueState.READY,
+                    labels=["state/ready"],
+                    assignees=["manager-bot"],
+                )
+            return None
+
+        coordinator._load_issue = loader
+
+        # Pre-populate queue
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+            QueueEntry(issue_number=2, collected_state="ready"),
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # Supervisor issue should be removed
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].issue_number == 2
+
+    def test_empty_queue_noop(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Empty queue produces no error."""
+        capacity = make_capacity(remaining=10)
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        coordinator._frozen_queue = []
+
+        # Should not raise
+        coordinator._queue_resort_existing()
+
+        assert coordinator._frozen_queue == []
+
+    def test_no_full_collection_call(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+        install_issue_loader,
+    ) -> None:
+        """Resort does not call _collect_open_issues."""
+        from unittest.mock import MagicMock
+
+        _ = make_issue(1)
+        capacity = make_capacity(remaining=10)
+
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        install_issue_loader(coordinator, {1: IssueState.READY})
+
+        # Track if _collect_open_issues is called
+        original_collect = coordinator._collect_open_issues
+        coordinator._collect_open_issues = MagicMock(side_effect=original_collect)
+
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready")
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # _collect_open_issues should NOT be called
+        coordinator._collect_open_issues.assert_not_called()
+
+    def test_updates_collected_state(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Reloaded issue state is reflected in entry's collected_state."""
+        from vibe3.models import IssueInfo
+
+        capacity = make_capacity(remaining=10)
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        # Mock issue loader with updated state
+        def loader(issue_number: int) -> IssueInfo | None:
+            if issue_number == 1:
+                return IssueInfo(
+                    number=1,
+                    title="Changed state",
+                    state=IssueState.IN_PROGRESS,  # State changed from READY
+                    labels=["state/in-progress"],
+                    assignees=["manager-bot"],
+                )
+            return None
+
+        coordinator._load_issue = loader
+
+        # Pre-populate with stale collected_state
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready")
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # collected_state should be updated
+        assert coordinator._frozen_queue[0].collected_state == "in-progress"
+
+    def test_mixed_waiting_and_nonwaiting(
+        self,
+        make_issue,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Waiting entries stay at front; non-waiting sorted after."""
+        from vibe3.models import IssueInfo
+
+        capacity = make_capacity(remaining=10)
+        coordinator = make_coordinator(
+            "manager", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        # Mock issue loader
+        def loader(issue_number: int) -> IssueInfo | None:
+            priorities = {
+                1: "priority/low",  # priority 3
+                2: "priority/high",  # priority 7
+                3: "priority/medium",  # priority 5
+            }
+            return IssueInfo(
+                number=issue_number,
+                title=f"Issue {issue_number}",
+                state=IssueState.READY,
+                labels=["state/ready", priorities.get(issue_number, "")],
+                assignees=["manager-bot"],
+            )
+
+        coordinator._load_issue = loader
+
+        # Pre-populate with waiting first, then unsorted non-waiting
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready", waiting_state="ready"),
+            QueueEntry(issue_number=2, collected_state="ready", waiting_state="ready"),
+            QueueEntry(issue_number=3, collected_state="ready"),  # medium
+            # duplicate, but for test
+            QueueEntry(issue_number=1, collected_state="ready"),  # low
+        ]
+
+        coordinator._queue_resort_existing()
+
+        # Waiting entries first, then sorted non-waiting
+        assert len(coordinator._frozen_queue) == 4
+        # Waiting entries preserved
+        assert coordinator._frozen_queue[0].issue_number == 1
+        assert coordinator._frozen_queue[0].waiting_state == "ready"
+        assert coordinator._frozen_queue[1].issue_number == 2
+        assert coordinator._frozen_queue[1].waiting_state == "ready"
+        # Non-waiting sorted (issue 1 again with low priority, then issue 3 with medium)
+        assert coordinator._frozen_queue[2].issue_number == 3  # medium
+        assert coordinator._frozen_queue[3].issue_number == 1  # low

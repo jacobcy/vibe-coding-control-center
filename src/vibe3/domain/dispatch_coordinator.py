@@ -48,6 +48,11 @@ from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
 from vibe3.services.issue import IssueCollectionService
 from vibe3.services.shared import clean_old_state_labels, should_skip_from_queue
+from vibe3.utils.queue_ordering import (
+    resolve_milestone_rank,
+    resolve_priority,
+    resolve_roadmap_rank,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
@@ -688,6 +693,109 @@ class GlobalDispatchCoordinator:
         if self._frozen_queue is None:
             self._frozen_queue = []
 
+    def _queue_resort_existing(self) -> None:
+        """Re-sort existing queue entries without full collection.
+
+        Lightweight queue maintenance that avoids GitHub API calls by
+        using only local issue reloads. Removes stale entries, preserves
+        waiting_state, and re-sorts non-waiting entries.
+        """
+        if not self._frozen_queue:
+            return
+
+        logger.bind(domain="global_dispatch", trigger="resort_existing").debug(
+            "Re-sorting existing queue entries"
+        )
+
+        waiting: list[QueueEntry] = []
+        eligible: list[QueueEntry] = []
+        eligible_issues: list[IssueInfo] = []
+
+        for entry in self._frozen_queue:
+            issue = self._load_issue(entry.issue_number)
+
+            # Removal: missing issue
+            if issue is None:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue during resort (issue not found)",
+                )
+                continue
+
+            # Removal: terminal state
+            if issue.state == IssueState.DONE:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue during resort (state terminal: done)",
+                )
+                continue
+
+            # Removal: supervisor / non-manager pool
+            if issue.state != IssueState.BLOCKED and should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=get_manager_usernames(self._config),
+                require_manager_assignee=True,
+            ):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue during resort (supervisor or assignee check)",
+                )
+                continue
+
+            # Refresh collected state from live issue data
+            if issue.state:
+                entry.collected_state = issue.state.value
+
+            if entry.waiting_state is not None:
+                waiting.append(entry)
+            else:
+                eligible.append(entry)
+                eligible_issues.append(issue)
+
+        # Re-sort non-waiting entries using existing ordering semantics
+        if eligible:
+            state_order = {
+                IssueState.REVIEW: 0,
+                IssueState.MERGE_READY: 1,
+                IssueState.IN_PROGRESS: 2,
+                IssueState.CLAIMED: 3,
+                IssueState.HANDOFF: 4,
+                IssueState.READY: 5,
+            }
+
+            def _key(item: tuple[QueueEntry, IssueInfo]) -> tuple:
+                e, issue = item
+                s = (
+                    IssueState(e.collected_state)
+                    if e.collected_state
+                    else IssueState.READY
+                )
+                sp = state_order.get(s, 99)
+                md = (
+                    {"title": issue.milestone, "number": 0} if issue.milestone else None
+                )
+                mr, _ = resolve_milestone_rank(md)
+                rr, _ = resolve_roadmap_rank(issue.labels)
+                p = resolve_priority(issue.labels)
+                return (sp, mr, rr, -p, issue.number)
+
+            pairs = list(zip(eligible, eligible_issues))
+            pairs.sort(key=_key)
+            eligible = [e for e, _ in pairs]
+
+        self._frozen_queue = waiting + eligible
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: resort existing complete, "
+            f"total={len(self._frozen_queue)} issues "
+            f"(waiting={len(waiting)}, sorted={len(eligible)})",
+        )
+
     async def _queue_scheduled_refresh(self, tick_id: int) -> bool:
         """Run scheduled full queue refresh if tick matches interval.
 
@@ -778,6 +886,9 @@ class GlobalDispatchCoordinator:
 
         # Step 2: Promote state-changed entries
         self._queue_promote_progressed()
+
+        # Step 2.5: Re-sort existing entries without full collection
+        self._queue_resort_existing()
 
         # Step 2.5: Periodic remote check (before collection)
         if (
