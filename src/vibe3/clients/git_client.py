@@ -91,6 +91,11 @@ from vibe3.models import (
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
 
+# Module-level fetch cache shared across GitClient instances.
+# Ensures TTL-based fetch deduplication is effective even when
+# callers create short-lived GitClient instances per operation.
+_fetch_cache: dict[str, float] = {}
+
 
 def find_repo_root() -> Path:
     """Resolve the main repository root deterministically.
@@ -162,7 +167,6 @@ class GitClient:
         self._pr_numstat_cache: dict[int, str] = {}
         self._git_common_dir: str | None = None
         self._worktree_list_cache: list[tuple[str, str]] | None = None
-        self._fetch_cache: dict[str, float] = {}
 
     def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
@@ -343,18 +347,19 @@ class GitClient:
         cache_key = f"fetch:{remote_ref}"
         now = time.time()
 
-        if cache_key in self._fetch_cache:
-            if now - self._fetch_cache[cache_key] < ttl:
+        if cache_key in _fetch_cache:
+            if now - _fetch_cache[cache_key] < ttl:
                 return remote_ref
 
         try:
             self.fetch(remote, base)
-            self._fetch_cache[cache_key] = now
-        except Exception:
+            _fetch_cache[cache_key] = now
+        except Exception as e:
             logger.bind(
                 domain="git",
                 action="resolve_base_ref",
                 base=base,
+                error=str(e),
             ).warning("Failed to fetch remote base ref, using local")
             # Fall through — use remote ref even if fetch failed
             # (might be stale but better than potentially diverged local)
