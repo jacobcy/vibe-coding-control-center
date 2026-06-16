@@ -78,8 +78,8 @@ class TestQueueScheduledRefresh:
         )
 
         # Set interval_ticks = 10
-        coordinator._config.periodic_check.enabled = True
-        coordinator._config.periodic_check.interval_ticks = 10
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 10
 
         # Pre-populate queue to avoid queue_exhausted trigger
         coordinator._frozen_queue = [
@@ -125,8 +125,8 @@ class TestQueueScheduledRefresh:
         )
 
         # Disable periodic check
-        coordinator._config.periodic_check.enabled = False
-        coordinator._config.periodic_check.interval_ticks = 10
+        coordinator._config.queue_refresh.enabled = False
+        coordinator._config.queue_refresh.interval_ticks = 10
 
         # Pre-populate queue to avoid queue_exhausted trigger
         coordinator._frozen_queue = [
@@ -223,8 +223,8 @@ class TestQueueExhaustedRefresh:
         )
 
         # Set up scheduled refresh to fire
-        coordinator._config.periodic_check.enabled = True
-        coordinator._config.periodic_check.interval_ticks = 10
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 10
 
         # Mock collection
         collect_count = []

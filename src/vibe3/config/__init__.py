@@ -40,7 +40,11 @@ if TYPE_CHECKING:
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.config.orchestra_config import OrchestraConfig, PeriodicCheckConfig
+    from vibe3.config.orchestra_config import (
+        OrchestraConfig,
+        PeriodicCheckConfig,
+        QueueRefreshConfig,
+    )
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.config.profile_config import ProfileConfig
     from vibe3.config.profile_convention import LabelsConvention, ProfileConvention
@@ -105,6 +109,7 @@ __all__ = [
     "ProfileConfig",
     "ProfileConvention",
     "QualityConfig",
+    "QueueRefreshConfig",
     "REVIEWER_GATE_CONFIG",
     "ROLE_CONFIG_SECTIONS",
     "SUPERVISOR_APPLY_GATE_CONFIG",
@@ -170,6 +175,7 @@ _SYMBOL_MODULES = {
     "ProfileConvention": "vibe3.config.profile_convention",
     "PRScoringConfig": "vibe3.config.settings",
     "QualityConfig": "vibe3.config.settings",
+    "QueueRefreshConfig": "vibe3.config.orchestra_config",
     "REVIEWER_GATE_CONFIG": "vibe3.config.role_gates",
     "ROLE_CONFIG_SECTIONS": "vibe3.config.cli_overrides",
     "SUPERVISOR_APPLY_GATE_CONFIG": "vibe3.config.role_gates",
