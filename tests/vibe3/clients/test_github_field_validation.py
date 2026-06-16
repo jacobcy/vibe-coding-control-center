@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.github_issues_ops import _validate_issue_fields
+from vibe3.clients.github_issues_ops import _validate_issue_fields, _validate_pr_fields
 
 
 class TestFieldValidation:
@@ -100,3 +100,45 @@ class TestFieldValidation:
         result = IssuesMixin.view_issue(mock_instance, 123)
         # The function will return empty dict due to mock, but no ValueError
         assert isinstance(result, dict)
+
+
+class TestPRFieldValidation:
+    """Tests for _validate_pr_fields function."""
+
+    def test_validate_known_pr_fields_pass(self) -> None:
+        """A representative set of known valid PR fields should pass validation."""
+        _validate_pr_fields(["number", "headRefName", "body", "mergedAt"])
+
+    def test_validate_empty_pr_fields_pass(self) -> None:
+        """Empty list should pass validation (edge case)."""
+        # This should not raise any exception
+        _validate_pr_fields([])
+
+    def test_validate_pr_typo_detected_with_suggestion(self) -> None:
+        """Typo 'headRefNme' should raise ValueError suggesting 'headRefName'."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["headRefNme"])
+
+        error_msg = str(exc_info.value)
+        assert "Unknown GitHub PR field(s)" in error_msg
+        assert "'headRefNme'" in error_msg
+        assert "'headRefName'" in error_msg
+        assert "did you mean" in error_msg
+
+    def test_validate_multiple_invalid_pr_fields(self) -> None:
+        """Multiple invalid PR fields should all be listed in error."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["bad1", "bad2"])
+
+        error_msg = str(exc_info.value)
+        assert "'bad1'" in error_msg
+        assert "'bad2'" in error_msg
+
+    def test_validate_mixed_valid_invalid_pr_fields(self) -> None:
+        """Mixed valid/invalid PR fields should raise error for invalid only."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["number", "bad"])
+
+        error_msg = str(exc_info.value)
+        assert "'bad'" in error_msg
+        assert "'number'" not in error_msg  # Valid field should not be listed
