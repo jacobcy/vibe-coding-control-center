@@ -14,7 +14,7 @@ document_type: index
 | [ADR-0002](0002-protocol-based-di.md) | Protocol-based Dependency Injection | accepted | 2026-06-04 | - | - | docs/standards/v3/architecture-convergence-standard.md |
 | [ADR-0003](0003-runtime-loading-contract.md) | 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界 | accepted | 2026-06-09 | - | - | docs/standards/v3/runtime-loading-contract.md（待写） |
 | [ADR-0004](0004-domain-flow-event-boundary.md) | DomainEvent 与 FlowEvent 分层边界及投影关系 | accepted | 2026-06-12 | - | - | docs/standards/v3/event-driven-standard.md |
-| [ADR-0005](0005-prompt-policy-skill-audit-evidence-model.md) | Prompt/Policy/Skill 审计证据模型 | proposed | 2026-06-17 | - | - | docs/standards/v3/database-schema-standard.md |
+| [ADR-0005](0005-prompt-policy-skill-audit-evidence-model.md) | Prompt/Policy/Skill 审计证据模型 | proposed | 2026-06-17 | - | - | docs/standards/v3/audit-evidence-model-standard.md |
 | ADR-XXXX | 3-Tier Layering 演进路径 | backlog | - | - | - | （待补写） |
 | ADR-XXXX | Orchestra 编排机制 | backlog | - | - | - | （待补写） |
 

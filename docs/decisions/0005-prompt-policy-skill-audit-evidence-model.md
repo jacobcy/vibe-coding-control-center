@@ -7,6 +7,7 @@ date: 2026-06-17
 supersedes: null
 superseded_by: null
 related_docs:
+  - docs/standards/v3/audit-evidence-model-standard.md
   - docs/standards/v3/database-schema-standard.md
   - docs/standards/v3/event-driven-standard.md
   - docs/standards/v3/skill-standard.md
@@ -108,6 +109,7 @@ claude-mem 纳入审计模型，但只作为 `memory_signal` 类补充来源。m
 - [Issue #2952](https://github.com/jacobcy/vibe-coding-control-center/issues/2952) — 失败聚类与根因映射报告
 - [Issue #2953](https://github.com/jacobcy/vibe-coding-control-center/issues/2953) — suggestion 到 decision/反哺机制
 - [Issue #2954](https://github.com/jacobcy/vibe-coding-control-center/issues/2954) — 改进效果评估与二次迭代机制
+- [docs/standards/v3/audit-evidence-model-standard.md](../standards/v3/audit-evidence-model-standard.md) — 审计证据 bundle schema 与来源可信度标准
 - [docs/standards/v3/database-schema-standard.md](../standards/v3/database-schema-standard.md) — SQLite schema 标准
 - [docs/standards/v3/event-driven-standard.md](../standards/v3/event-driven-standard.md) — runtime event 与 projection 标准
 - [supervisor/roadmap-common.md](../../supervisor/roadmap-common.md) — governance suggest / roadmap decision 语义边界
