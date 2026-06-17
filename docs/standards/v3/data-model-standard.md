@@ -19,6 +19,7 @@ related_docs:
   - docs/standards/glossary.md
   - docs/standards/v3/command-standard.md
   - docs/standards/v3/database-schema-standard.md
+  - docs/standards/v3/audit-evidence-model-standard.md
 ---
 
 # 共享数据模型标准
@@ -45,6 +46,11 @@ related_docs:
    - GitHub Issues：GitHub issue 真源，作为执行驱动的核心。
    - GitHub Projects：作为 **Roadmap 规划参考**，不作为执行层真源。
    - GitHub Pull Requests：PR 真源
+
+3. **审计证据模型**
+   - Prompt/Policy/Skill 审计使用 evidence bundle 作为 raw evidence 的稳定输入面。
+   - 该模型不取代 `flow_state`、`flow_events`、GitHub 或 git 真源，只记录可追溯的审计输入与可信度。
+   - 具体 schema 见 [audit-evidence-model-standard.md](audit-evidence-model-standard.md)。
 
 ## 2. Canonical Tables
 
