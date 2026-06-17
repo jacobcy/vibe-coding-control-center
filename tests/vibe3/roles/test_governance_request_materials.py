@@ -102,12 +102,14 @@ class TestGovernanceMaterials:
 
         assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
 
-    def test_assignee_pool_material_defines_pre_pool_decider_boundary(self):
-        """assignee-pool should decide before manager execution starts."""
+    def test_assignee_pool_material_defines_pool_decider_boundary(self):
+        """assignee-pool should act as pool decider with triage responsibility."""
         content = Path("supervisor/governance/assignee-pool.md").read_text()
-        assert "入池前/池内准入 decider" in content
-        assert "manager 是入池后的执行 decider" in content
-        assert "低置信度" in content
+        # Core triage responsibility
+        assert "入池决策者" in content
+        assert "分流决策" in content
+        # Five exit paths
+        assert "入池执行" in content
         assert "roadmap/rfc" in content
 
     def test_assignee_pool_epic_close_does_not_loop_on_suggest(self):
