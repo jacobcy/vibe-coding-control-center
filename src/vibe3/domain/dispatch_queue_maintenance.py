@@ -270,6 +270,18 @@ class DispatchQueueMaintenanceService:
     ) -> tuple[list[QueueEntry], bool]:
         """Rebuild queue when actionable candidates are exhausted after dispatch.
 
+        1. Trigger a full collection (which includes blocked-issue dependency
+           check) via _collect_frozen_queue_fn.
+        2. Merge fresh entries into the existing queue.  The merge function
+           _merge_queue_fn keeps old entries with waiting_state for the same
+           issue_numbers, so genuinely *new* work stays actionable
+           (waiting_state=None) while duplicates of already-waiting entries do
+           not.
+        3. After the merge, check whether any entry in the merged queue is
+           still actionable (waiting_state is None *and* collected_state !=
+           'blocked').  If none are, the pool is truly exhausted — return
+           dispatch_paused=True.
+
         Returns:
             Tuple of (new_frozen_queue, new_dispatch_paused).
         """
