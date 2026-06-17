@@ -21,6 +21,24 @@ from vibe3.models import (
     StructureSnapshot,
 )
 
+__all__: list[str] = [
+    # Exceptions
+    "SnapshotError",
+    "SnapshotNotFoundError",
+    # Constants
+    "SNAPSHOT_DIR_NAME",
+    "SNAPSHOT_TAG_DIR_NAME",
+    "LATEST_LINK_NAME",
+    # Core operations
+    "build_snapshot",
+    "save_snapshot",
+    "load_snapshot",
+    "list_snapshots",
+    "find_snapshot_by_branch",
+    # Diff operations
+    "build_snapshot_diff",
+]
+
 _EXCLUDED_DIRS = frozenset(
     {
         ".git",
@@ -684,97 +702,14 @@ def _register_snapshots_in_db(
         logger.warning("Failed to register fallback snapshots in DB (non-fatal)")
 
 
-def save_branch_baseline(branch: str, force: bool = False) -> Path | None:
-    """Build current snapshot and save as baseline for the specified branch.
+# Re-export baseline functions from snapshot_baseline.py
+# (Maintain backward compatibility for callers importing from snapshot_service)
+from vibe3.analysis.snapshot_baseline import (  # noqa: E402, F401
+    load_branch_baseline,
+    save_branch_baseline,
+)
 
-    This function is called when a flow completes (PR merge or auto-complete).
-    It builds a fresh snapshot and saves it with baseline_for tag.
-
-    Args:
-        branch: Branch name to save baseline for
-        force: Force overwrite existing baseline (default: False)
-
-    Returns:
-        Path to saved baseline, or None if build failed
-    """
-    log = logger.bind(domain="snapshot", action="save_baseline", branch=branch)
-    log.info("Saving branch baseline")
-
-    try:
-        snapshot = build_snapshot()
-        snapshot.baseline_for = branch
-
-        _ensure_baseline_dir()
-        baseline_dir = _get_baseline_dir()
-
-        # Sanitize branch name for filename safety
-        safe_branch = branch.replace("/", "-")
-        filename = f"baseline_{safe_branch}.json"
-        filepath = baseline_dir / filename
-
-        if filepath.exists() and not force:
-            log.info("Baseline already exists, skipping (idempotent)")
-            return filepath
-
-        filepath.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
-
-        # Register in snapshot_registry for DB-backed lookup
-        try:
-            client = SQLiteClient()
-            client.upsert_snapshot_registry(
-                snapshot_id=snapshot.snapshot_id,
-                branch=snapshot.branch,
-                commit_short=snapshot.commit_short,
-                commit_hash=snapshot.commit,
-                created_at=snapshot.created_at,
-                file_path=str(filepath),
-                baseline_for=branch,
-            )
-        except Exception:
-            logger.warning("Failed to register baseline in DB (non-fatal)")
-
-        log.bind(path=str(filepath)).success("Branch baseline saved")
-        return filepath
-
-    except Exception as e:
-        logger.warning(f"Failed to save branch baseline: {e}")
-        return None
-
-
-def load_branch_baseline(branch: str) -> StructureSnapshot | None:
-    """Load the most recent baseline snapshot for a branch.
-
-    Args:
-        branch: Branch name to load baseline for
-
-    Returns:
-        StructureSnapshot for the branch baseline, or None if not found
-    """
-    log = logger.bind(domain="snapshot", action="load_baseline", branch=branch)
-    log.info("Loading branch baseline")
-
-    try:
-        baseline_dir = _get_baseline_dir()
-        if not baseline_dir.exists():
-            return None
-
-        # Sanitize branch name for filename safety
-        safe_branch = branch.replace("/", "-")
-        filename = f"baseline_{safe_branch}.json"
-        filepath = baseline_dir / filename
-
-        if not filepath.exists():
-            return None
-
-        data = json.loads(filepath.read_text(encoding="utf-8"))
-        snapshot = StructureSnapshot.model_validate(data)
-
-        log.success("Branch baseline loaded")
-        return snapshot
-
-    except Exception as e:
-        logger.warning(f"Failed to load branch baseline: {e}")
-        return None
+__all__.extend(["save_branch_baseline", "load_branch_baseline"])
 
 
 def build_snapshot_diff(
