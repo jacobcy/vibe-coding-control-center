@@ -28,21 +28,29 @@ Governance 分为两层，加上上层的 roadmap 审查，共三层。每层有
 ### 架构流程
 
 ```
-broader repo --> Layer 1: roadmap-intake (入口层)
+broader repo --> Layer 1: roadmap-intake (入口层 - 形式审查)
                     扫描范围: 无 assignee 的 issue
                     过滤: 无 orchestra-scanned（自闭环）
                           + 无 roadmap/rfc / roadmap/epic
                     注意: no-assignee + orchestra-governed 不能被当作可信跳过条件
-                    接受 -> 分配 assignee -> 流入 Layer 2
+                    三维审查:
+                      维度1: 非 Task 识别（无明确交付目标）
+                      维度2: 过时检查（引用的模块/API 已移除）
+                      维度3: 反模式评分（>=2 分跳过）
+                    通过 -> 分配 assignee -> 流入 Layer 2
                     跳过 -> 打 orchestra-scanned -> 不再看
                           |
                           v
-                 Layer 2: assignee-pool (入池前/池内准入决策层)
+                 Layer 2: assignee-pool (入池决策层 - 分流决策)
                     扫描范围: 分配给本机 manager 的 issue
                     过滤: 无 orchestra-governed
                     例外: roadmap/epic 收口检查每次独立扫描，不受 governed 过滤
-                    高置信度决策(close/split/rfc/epic/ready/resume) -> 直接执行/打闭环标签
-                    低置信度 -> roadmap/rfc 交人类
+                    三级审查(Level 1-3) + 分流决策:
+                      入池执行 -> state/ready
+                      需要 RFC -> roadmap/rfc
+                      需要拆分 -> roadmap/epic
+                      终局关闭 -> close
+                      恢复执行 -> resume
                           |
                           v
                  Layer 3: vibe-roadmap (上层审查/纠偏层)
@@ -55,8 +63,8 @@ broader repo --> Layer 1: roadmap-intake (入口层)
 
 | 角色 | 文件 | Marker | 职责 | 标签 |
 |------|------|--------|------|------|
-| **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest][roadmap-intake]` | 入口观察者：扫描 broader repo，决定是否纳入 pool | 跳过时打 `orchestra-scanned` |
-| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest][assignee-pool]` / `[governance decide][assignee-pool]` | 入池前/池内准入 decider：对本机 manager pool 中 issue 做 rfc/epic/ready/close 决策 | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
+| **roadmap-intake** | supervisor/governance/roadmap-intake.md | `[governance suggest][roadmap-intake]` | 入口观察者（形式审查）：三维审查（非Task/过时/反模式），决定是否分配 assignee | 跳过时打 `orchestra-scanned` |
+| **assignee-pool** | supervisor/governance/assignee-pool.md | `[governance suggest][assignee-pool]` / `[governance decide][assignee-pool]` | 入池决策者（分流决策）：三级审查 + 五出口分流（入池/RFC/epic/close/resume） | 决策后打 `orchestra-governed`，高置信度 close 直接终局 |
 | **vibe-roadmap** | skills/vibe-roadmap/SKILL.md | `[roadmap decision]` | 上层审查者：审查 governance 决策，纠正和补全 | 审查后打 `roadmap-reviewed` |
 | **vibe-task** | skills/vibe-task/SKILL.md | 无（human-facing，不写 marker） | 人机协作规划辅助：帮助人类处理 blocked/RFC/epic issues，整理依赖关系说明，pre-flow 阶段仅写 issue body 自然语言 | 不操作 `state/*` 标签，不写 managed section |
 
@@ -164,6 +172,10 @@ Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
 
 ## 三级审查框架
 
+> **适用范围**：本框架适用于 **assignee-pool 层**（入池决策层）。
+>
+> **Intake 层**使用**三维审查**（非Task/过时/反模式），详见 [roadmap-intake.md](governance/roadmap-intake.md)。
+
 ### Level 1: 基础条件
 
 - 问题边界明确、验收口径清楚、无需额外产品讨论
@@ -201,19 +213,20 @@ Step 0 搜索 -> 过滤掉有 roadmap/rfc 的 issue（等待人类决策）
 
 ### 评分规则
 
-- 满足 **任意 2 条及以上** 即判定为反模式
+- **Intake 层**：满足 **任意 2 条及以上** 即判定为反模式并跳过（打 `orchestra-scanned`）
+- **Pool 层**：评分 >= 3 可直接 close；评分 = 2 打 `roadmap/rfc` 交人类决策
 - 每条特征需给出具体证据（如：缺少痛点描述的具体缺失项、违反原则的具体条款）
 - 典型案例：#1757（高复杂度低 ROI + 违反最小变更原则）
 
 ### 各层处理方式
 
-#### Intake 层（入口层）
+#### Intake 层（入口层 - 形式审查）
 
 - **动作**：skip + 打 `orchestra-scanned`
-- **suggest 内容**：注明反模式原因及评分项（如："反模式：满足 #2 高复杂度低 ROI、#5 边缘场景驱动"）
-- **边界**：intake 不执行 close，只做 skip 并注明原因，由 pool/roadmap 后续决策
+- **suggest 内容**：注明反模式评分和命中的特征（如："反模式评分：2 分（特征 1：无明确痛点、特征 4：违反项目原则），跳过"）
+- **边界**：intake 只做形式审查，0-1 分通过交给 pool 判断，>= 2 分跳过
 
-#### Pool 层（入池前/池内决策层）
+#### Pool 层（入池决策层 - 分流决策）
 
 - **高置信度**（评分 >= 3 或证据充分）：直接 close + 打 `orchestra-governed`
 - **低置信度**（评分 = 2 或证据不足）：打 `roadmap/rfc` 交人类或 roadmap 决策
@@ -275,19 +288,38 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 
 ## 各层职责边界
 
-### Roadmap Intake（入口层）
+### Roadmap Intake（入口层 - 形式审查）
+
+**核心职责**：形式审查，不做深度内容判断
+1. **非 Task 识别**：剔除纯讨论、提问、无明确交付目标的 issue
+2. **过时检查**：识别引用的模块/API 已移除、基础不存在的 issue
+3. **反模式识别**：识别违反项目原则（SOUL.md、CLAUDE.md）的 issue
 
 **决策范围**：**只决定 accept（分配 assignee）或 skip（打 scanned）**
+
+**不做以下判断**（交给 pool 层）：
+- ❌ 架构方向是否正确
+- ❌ 是否需要 RFC/epic
+- ❌ 优先级评估
+- ❌ 依赖解除后的深度决策
+
 **检查**：生命周期、依赖、API、模块（含 Level 0：`.claude/`/`.codex/` 目录机械检查）
 **输出**：`[governance suggest][roadmap-intake]` 建议纳入或跳过，附带原因
 **标签**：不设 `roadmap/*`、`priority/*` 标签。**唯一例外**——Level 0 机械阻塞 skip 时直接打 `roadmap/rfc`：这是路由一个确定性硬阻塞（diff 是否碰 `.claude/`/`.codex/`，yes/no 机械可判），不是 intake 自称 decider。理由：Level 0 issue 无 assignee，pool 永远扫不到；只有 intake 打 `roadmap/rfc` 才能命中 task-status Rule 1 被 `/vibe-task` surface（否则落入 Rule 4 永久隐藏）。
 **边界**：intake 不自称 decider；除 Level 0 机械例外外，跳过原因写在 suggest 中，由 pool 或 roadmap 做进一步决策
 
-### Assignee Pool（池内决策层）
+### Assignee Pool（入池决策层 - 分流决策）
+
+**核心职责**：入池决策与分流（五出口）
+1. **入池执行**：state/ready
+2. **需要 RFC**：roadmap/rfc
+3. **需要拆分**：roadmap/epic
+4. **终局关闭**：close
+5. **恢复执行**：resume
 
 **决策范围**：`roadmap/*`(rfc/epic/p0/p1/p2)、`priority/*`、close（明确冲突/重复/已完成）、`roadmap/rfc`（低置信度或不确定）、resume（明确可恢复）、split（清晰分界）
 **标签**：普通决策完成后打 `orchestra-governed`；completed epic 直接 close，不依赖 `orchestra-governed` 防重复
-**边界**：pool 是入池前/池内准入 decider；manager 是入池后的执行 decider。pool 不把低置信度判断交给 manager 循环复核，而是 `roadmap/rfc` 交人类。
+**边界**：pool 是入池决策 decider；manager 是入池后的执行 decider。pool 不把低置信度判断交给 manager 循环复核，而是 `roadmap/rfc` 交人类。
 
 ### Vibe Roadmap（审查纠正层）
 
