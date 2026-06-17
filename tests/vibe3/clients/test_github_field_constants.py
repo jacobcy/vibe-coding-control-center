@@ -10,6 +10,8 @@ from vibe3.clients.github_field_constants import (
     GITHUB_DEFAULT_VIEW_FIELDS,
     GITHUB_FIELDS_ISSUE_META,
     GITHUB_KNOWN_ISSUE_FIELDS,
+    GITHUB_KNOWN_PR_FIELDS,
+    GITHUB_PR_LIST_MERGED_FIELDS,
 )
 
 
@@ -105,3 +107,47 @@ def test_default_field_sets_work_with_gh_cli() -> None:
         # List fields should NOT include body or url (for performance)
         assert "body" not in list_response[0], "body should not be in list response"
         assert "url" not in list_response[0], "url should not be in list response"
+
+
+def test_all_pr_fields_are_known() -> None:
+    """All defined PR fields should be in GITHUB_KNOWN_PR_FIELDS."""
+    known_set = set(GITHUB_KNOWN_PR_FIELDS)
+
+    for field in GITHUB_PR_LIST_MERGED_FIELDS:
+        assert field in known_set, f"PR field {field} not in known PR fields"
+
+
+def test_pr_list_merged_fields() -> None:
+    """GITHUB_PR_LIST_MERGED_FIELDS should have correct structure."""
+    assert GITHUB_PR_LIST_MERGED_FIELDS == (
+        "number",
+        "headRefName",
+        "body",
+        "mergedAt",
+    )
+    assert len(GITHUB_PR_LIST_MERGED_FIELDS) == 4
+
+
+@pytest.mark.integration
+def test_known_pr_fields_work_with_gh_cli() -> None:
+    """GITHUB_KNOWN_PR_FIELDS entries should be recognized by gh CLI."""
+    # Filter out projectCards which is deprecated and causes gh CLI to fail
+    fields_to_test = [f for f in GITHUB_KNOWN_PR_FIELDS if f != "projectCards"]
+
+    # Use all fields at once to verify they're all valid
+    fields_arg = ",".join(sorted(fields_to_test))
+    result = subprocess.run(
+        ["gh", "pr", "list", "--limit", "1", "--json", fields_arg],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"gh CLI failed: {result.stderr}"
+
+    # Verify response is valid JSON
+    response = json.loads(result.stdout)
+    assert isinstance(response, list), "PR list response should be an array"
+    # If there are PRs, verify fields are present
+    if len(response) > 0:
+        for field in fields_to_test:
+            assert field in response[0], f"PR field {field} not in response"

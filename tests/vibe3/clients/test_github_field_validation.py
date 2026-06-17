@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.github_issues_ops import _validate_issue_fields
+from vibe3.clients.github_issues_ops import _validate_issue_fields, _validate_pr_fields
 
 
 class TestFieldValidation:
@@ -100,3 +100,110 @@ class TestFieldValidation:
         result = IssuesMixin.view_issue(mock_instance, 123)
         # The function will return empty dict due to mock, but no ValueError
         assert isinstance(result, dict)
+
+
+class TestPRFieldValidation:
+    """Tests for _validate_pr_fields function."""
+
+    def test_validate_known_pr_fields_pass(self) -> None:
+        """A representative set of known valid PR fields should pass validation."""
+        _validate_pr_fields(["number", "headRefName", "body", "mergedAt"])
+
+    def test_validate_empty_pr_fields_pass(self) -> None:
+        """Empty list should pass validation (edge case)."""
+        # This should not raise any exception
+        _validate_pr_fields([])
+
+    def test_validate_pr_typo_detected_with_suggestion(self) -> None:
+        """Typo 'headRefNme' should raise ValueError suggesting 'headRefName'."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["headRefNme"])
+
+        error_msg = str(exc_info.value)
+        assert "Unknown GitHub PR field(s)" in error_msg
+        assert "'headRefNme'" in error_msg
+        assert "'headRefName'" in error_msg
+        assert "did you mean" in error_msg
+
+    def test_validate_multiple_invalid_pr_fields(self) -> None:
+        """Multiple invalid PR fields should all be listed in error."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["bad1", "bad2"])
+
+        error_msg = str(exc_info.value)
+        assert "'bad1'" in error_msg
+        assert "'bad2'" in error_msg
+
+    def test_validate_mixed_valid_invalid_pr_fields(self) -> None:
+        """Mixed valid/invalid PR fields should raise error for invalid only."""
+        with pytest.raises(ValueError) as exc_info:
+            _validate_pr_fields(["number", "bad"])
+
+        error_msg = str(exc_info.value)
+        assert "'bad'" in error_msg
+        assert "'number'" not in error_msg  # Valid field should not be listed
+
+    def test_list_merged_prs_validates_fields(self) -> None:
+        """list_merged_prs should call validation for invalid fields."""
+        import vibe3.clients.github_field_constants as const_mod
+        import vibe3.clients.github_issues_ops as ops_mod
+        from vibe3.clients.github_field_constants import GITHUB_PR_LIST_MERGED_FIELDS
+        from vibe3.clients.github_issues_ops import IssuesMixin
+
+        mock_instance = MagicMock(spec=IssuesMixin)
+        mock_instance._run_gh_command = MagicMock(
+            return_value=MagicMock(returncode=0, stdout="[]", stderr="")
+        )
+
+        original_fields = GITHUB_PR_LIST_MERGED_FIELDS
+        try:
+            const_mod.GITHUB_PR_LIST_MERGED_FIELDS = (
+                "number",
+                "headRefName",
+                "invalid_field",
+            )
+            ops_mod.GITHUB_PR_LIST_MERGED_FIELDS = (
+                const_mod.GITHUB_PR_LIST_MERGED_FIELDS
+            )
+
+            with pytest.raises(ValueError) as exc_info:
+                IssuesMixin.list_merged_prs(mock_instance)
+
+            error_msg = str(exc_info.value)
+            assert "invalid_field" in error_msg
+        finally:
+            const_mod.GITHUB_PR_LIST_MERGED_FIELDS = original_fields
+            ops_mod.GITHUB_PR_LIST_MERGED_FIELDS = original_fields
+
+    def test_list_merged_prs_skips_validation_with_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """list_merged_prs skips validation when VIBE_SKIP_FIELD_VALIDATION set."""
+        import vibe3.clients.github_field_constants as const_mod
+        import vibe3.clients.github_issues_ops as ops_mod
+        from vibe3.clients.github_field_constants import GITHUB_PR_LIST_MERGED_FIELDS
+        from vibe3.clients.github_issues_ops import IssuesMixin
+
+        monkeypatch.setenv("VIBE_SKIP_FIELD_VALIDATION", "1")
+
+        mock_instance = MagicMock(spec=IssuesMixin)
+        mock_instance._run_gh_command = MagicMock(
+            return_value=MagicMock(returncode=0, stdout="[]", stderr="")
+        )
+
+        original_fields = GITHUB_PR_LIST_MERGED_FIELDS
+        try:
+            const_mod.GITHUB_PR_LIST_MERGED_FIELDS = (
+                "number",
+                "headRefName",
+                "invalid_field",
+            )
+            ops_mod.GITHUB_PR_LIST_MERGED_FIELDS = (
+                const_mod.GITHUB_PR_LIST_MERGED_FIELDS
+            )
+
+            result = IssuesMixin.list_merged_prs(mock_instance)
+            assert isinstance(result, list)
+        finally:
+            const_mod.GITHUB_PR_LIST_MERGED_FIELDS = original_fields
+            ops_mod.GITHUB_PR_LIST_MERGED_FIELDS = original_fields

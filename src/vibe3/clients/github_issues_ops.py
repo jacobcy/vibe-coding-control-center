@@ -11,7 +11,12 @@ from loguru import logger
 from vibe3.clients.github_field_constants import (
     GITHUB_DEFAULT_LIST_FIELDS,
     GITHUB_DEFAULT_VIEW_FIELDS,
+    GITHUB_FIELDS_BODY,
+    GITHUB_FIELDS_COMMENTS,
+    GITHUB_FIELDS_ISSUE_NUMBER_TITLE,
     GITHUB_KNOWN_ISSUE_FIELDS,
+    GITHUB_KNOWN_PR_FIELDS,
+    GITHUB_PR_LIST_MERGED_FIELDS,
 )
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 
@@ -29,33 +34,50 @@ _BLOCKED_BY_RE = re.compile(
 
 # Pre-computed set for O(1) field validation lookups
 _KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_ISSUE_FIELDS)
+_PR_KNOWN_FIELDS_SET: frozenset[str] = frozenset(GITHUB_KNOWN_PR_FIELDS)
 
 
-def _validate_issue_fields(fields: list[str]) -> None:
-    """Validate that all field names are known GitHub issue API fields.
+def _validate_fields(
+    fields: list[str],
+    known_set: frozenset[str],
+    label: str,
+) -> None:
+    """Validate that all field names are known GitHub API fields.
 
     Raises ValueError with typo suggestions for unknown fields.
 
     Args:
         fields: List of field names to validate
+        known_set: Set of known valid field names
+        label: Human-readable label for error messages ('issue' or 'PR')
 
     Raises:
         ValueError: If any unknown fields are found, with suggestions for typos
     """
-    invalid = [f for f in fields if f not in _KNOWN_FIELDS_SET]
+    invalid = [f for f in fields if f not in known_set]
     if not invalid:
         return
     suggestions = []
     for f in invalid:
-        matches = difflib.get_close_matches(f, _KNOWN_FIELDS_SET, n=1, cutoff=0.6)
+        matches = difflib.get_close_matches(f, known_set, n=1, cutoff=0.6)
         if matches:
             suggestions.append(f"'{f}' (did you mean '{matches[0]}'?)")
         else:
             suggestions.append(f"'{f}'")
     raise ValueError(
-        f"Unknown GitHub issue field(s): {', '.join(suggestions)}. "
-        f"Known fields: {', '.join(sorted(_KNOWN_FIELDS_SET))}"
+        f"Unknown GitHub {label} field(s): {', '.join(suggestions)}. "
+        f"Known fields: {', '.join(sorted(known_set))}"
     )
+
+
+def _validate_issue_fields(fields: list[str]) -> None:
+    """Validate that all field names are known GitHub issue API fields."""
+    _validate_fields(fields, _KNOWN_FIELDS_SET, "issue")
+
+
+def _validate_pr_fields(fields: list[str]) -> None:
+    """Validate that all field names are known GitHub PR API fields."""
+    _validate_fields(fields, _PR_KNOWN_FIELDS_SET, "PR")
 
 
 def parse_blocked_by(body: str) -> list[int]:
@@ -122,6 +144,10 @@ class IssuesMixin(IssueAdminMixin):
             limit=limit,
         ).debug("Calling GitHub API: list merged PRs")
 
+        # Validate PR fields if validation is not skipped
+        if not os.environ.get("VIBE_SKIP_FIELD_VALIDATION"):
+            _validate_pr_fields(list(GITHUB_PR_LIST_MERGED_FIELDS))
+
         # Use large explicit limit for "fetch all" case instead of omitting flag
         # (gh defaults to 30 when --limit is absent, does NOT auto-paginate)
         effective_limit = limit if limit is not None else 5000
@@ -135,7 +161,7 @@ class IssuesMixin(IssueAdminMixin):
             "--limit",
             str(effective_limit),
             "--json",
-            "number,headRefName,body,mergedAt",
+            ",".join(GITHUB_PR_LIST_MERGED_FIELDS),
         ]
 
         result = self._run_gh_command(cmd)
@@ -235,7 +261,7 @@ class IssuesMixin(IssueAdminMixin):
                 state="all",
                 repo=repo,
                 search=search_terms,
-                fields=["number", "title"],
+                fields=list(GITHUB_FIELDS_ISSUE_NUMBER_TITLE),
             )
         except Exception as e:
             logger.bind(
@@ -352,7 +378,9 @@ class IssuesMixin(IssueAdminMixin):
         Returns:
             Issue body text, or None if not found
         """
-        result = self.view_issue(issue_number, repo=repo, fields=["body"])
+        result = self.view_issue(
+            issue_number, repo=repo, fields=list(GITHUB_FIELDS_BODY)
+        )
         if isinstance(result, dict):
             return cast(str | None, result.get("body", ""))
         return None
@@ -369,7 +397,9 @@ class IssuesMixin(IssueAdminMixin):
         Returns:
             List of comment dicts with keys: id, body, author, etc.
         """
-        result = self.view_issue(issue_number, repo=repo, fields=["comments"])
+        result = self.view_issue(
+            issue_number, repo=repo, fields=list(GITHUB_FIELDS_COMMENTS)
+        )
         if isinstance(result, dict):
             return cast(list[dict[str, Any]], result.get("comments", []))
         return []
