@@ -30,6 +30,9 @@ from vibe3.domain.dispatch_preflight import (
     DispatchPreflightDecision,
     DispatchPreflightService,
 )
+from vibe3.domain.dispatch_queue_maintenance import (
+    DispatchQueueMaintenanceService,
+)
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
     CheckServiceProtocol,
@@ -185,6 +188,21 @@ class GlobalDispatchCoordinator:
             structural_check=lambda issue: self._check_dispatch_health(issue),
         )
 
+        self._queue_maintenance = DispatchQueueMaintenanceService(
+            config=config,
+            queue_persistence=queue_persistence,
+            load_issue=issue_loader,
+            check_service=lambda: self._check_service,
+            supervisor_label=config.supervisor_handoff.issue_label,
+            has_actionable=lambda: self._has_actionable_entries(),
+            has_pending_blocked=lambda: self._has_pending_blocked_entries(),
+            has_qualifiable_blocked=lambda: self._has_qualifiable_blocked_entries(),
+            merge_queue_fn=lambda existing, fresh: self._merge_queue(existing, fresh),
+            should_collect_fn=lambda count: self._should_collect_after_dispatch(count),
+            collect_frozen_queue_fn=lambda: self._collect_frozen_queue(),
+            emit_event=_emit,
+        )
+
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
         # coordinate() as the single queue-lifecycle owner)
@@ -198,11 +216,6 @@ class GlobalDispatchCoordinator:
         """Get the set of issue numbers currently in the frozen queue."""
         self._queue_persistence.frozen_queue = self._frozen_queue
         return self._queue_persistence.get_queued_issue_numbers()
-
-    def _sync_queue_persistence_issue_loader(self) -> None:
-        """Keep queue persistence aligned with the coordinator issue loader."""
-        if hasattr(self._queue_persistence, "load_issue"):
-            self._queue_persistence.load_issue = self._load_issue
 
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
@@ -656,113 +669,6 @@ class GlobalDispatchCoordinator:
 
         return dispatched_count
 
-    def _queue_startup_restore(self) -> None:
-        """Restore queue from persistence on cold start."""
-        if self._frozen_queue is None:
-            logger.bind(domain="global_dispatch", trigger="startup_restore").debug(
-                "Restoring queue from persistence"
-            )
-            self._queue_persistence.frozen_queue = None
-            self._sync_queue_persistence_issue_loader()
-            restored = self._queue_persistence.restore()
-            self._frozen_queue = restored if restored is not None else []
-            self._queue_persistence.frozen_queue = self._frozen_queue
-            # Invalidate PR cache on restore to ensure fresh PR state
-            self._check_service.invalidate_pr_cache()
-
-    def _queue_promote_progressed(self) -> None:
-        """Promote state-changed entries to front; remove terminal entries."""
-        logger.bind(domain="global_dispatch", trigger="promote_progressed").debug(
-            "Promoting progressed entries"
-        )
-        self._queue_persistence.frozen_queue = self._frozen_queue
-        self._sync_queue_persistence_issue_loader()
-        cleared_all = self._queue_persistence.promote()
-        if cleared_all:
-            # Invalidate PR cache when queue is cleared
-            self._check_service.invalidate_pr_cache()
-        self._frozen_queue = self._queue_persistence.frozen_queue
-
-        # Normalize after promotion: promote() may set
-        # frozen_queue = None when all entries are removed
-        if self._frozen_queue is None:
-            self._frozen_queue = []
-
-    async def _queue_scheduled_refresh(self, tick_id: int) -> bool:
-        """Run scheduled full queue refresh if tick matches interval.
-
-        Returns:
-            True if the queue was refreshed.
-        """
-        queue_refresh = self._config.queue_refresh
-        if (
-            tick_id > 0
-            and queue_refresh.enabled
-            and tick_id % queue_refresh.interval_ticks == 0
-        ):
-            logger.bind(
-                domain="global_dispatch", trigger="scheduled_queue_refresh"
-            ).debug("Running scheduled full queue refresh")
-            fresh = await self._collect_frozen_queue()
-            self._check_service.invalidate_pr_cache()
-            self._dispatch_paused = bool(
-                fresh and all(entry.collected_state == "blocked" for entry in fresh)
-            )
-            self._frozen_queue = fresh
-            return True
-        return False
-
-    def _queue_paused_blocked_check(self) -> bool:
-        """Check paused state and re-qualify blocked entries.
-
-        Returns:
-            True if paused with only non-qualifiable blocked entries remaining.
-        """
-        logger.bind(domain="global_dispatch", trigger="paused_blocked_check").debug(
-            "Checking paused state and blocked entries"
-        )
-        if self._dispatch_paused:
-            if self._has_actionable_entries():
-                self._dispatch_paused = False
-            elif self._has_pending_blocked_entries():
-                if self._has_qualifiable_blocked_entries():
-                    # A blocked entry can be dispatched now — unpause to let it through
-                    self._dispatch_paused = False
-                else:
-                    return True
-        return False
-
-    async def _queue_exhausted_refresh(
-        self, dispatched_count: int, queue_refreshed: bool
-    ) -> None:
-        """Rebuild queue when actionable candidates are exhausted after dispatch."""
-        need_collect = not queue_refreshed and self._should_collect_after_dispatch(
-            dispatched_count
-        )
-        if need_collect:
-            logger.bind(domain="global_dispatch", trigger="queue_exhausted").debug(
-                "Queue exhausted after dispatch, rebuilding for next tick"
-            )
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: queue exhausted after dispatch, "
-                "rebuilding for next tick",
-            )
-            fresh = await self._collect_frozen_queue()
-            # Invalidate PR cache after fresh collection
-            self._check_service.invalidate_pr_cache()
-            if fresh and all(entry.collected_state == "blocked" for entry in fresh):
-                self._dispatch_paused = True
-                self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
-                append_orchestra_event(
-                    "dispatcher",
-                    "GlobalDispatchCoordinator: dispatch paused "
-                    "(rebuild found only blocked issues)",
-                )
-            else:
-                self._dispatch_paused = False
-                self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
-
     async def coordinate(self, tick_id: int = 0) -> None:
         """Run one heartbeat tick against the frozen queue.
 
@@ -779,6 +685,9 @@ class GlobalDispatchCoordinator:
         # Step 2: Promote state-changed entries
         self._queue_promote_progressed()
 
+        # Step 2.5: Re-sort existing entries without full collection
+        self._queue_resort_existing()
+
         # Step 2.5: Periodic remote check (before collection)
         if (
             self._remote_check_runner
@@ -791,14 +700,19 @@ class GlobalDispatchCoordinator:
                     f"Remote check failed: {exc}"
                 )
             finally:
-                # Always update tick to prevent repeated attempts on failure
                 self._last_remote_check_tick = tick_id
 
         # Step 3: Periodic full refresh
-        queue_refreshed = await self._queue_scheduled_refresh(tick_id)
+        queue_refreshed, self._frozen_queue, self._dispatch_paused = (
+            await self._queue_maintenance.scheduled_refresh(
+                tick_id, self._frozen_queue or [], self._dispatch_paused
+            )
+        )
 
         # Step 4: Paused mode blocked re-qualification
-        paused_with_pending_blocked = self._queue_paused_blocked_check()
+        self._dispatch_paused, paused_with_pending_blocked = (
+            self._queue_maintenance.paused_blocked_check(self._dispatch_paused)
+        )
 
         # Step 5: Dispatch actionable entries
         dispatched_count = self._dispatch_loop(tick_id)
@@ -818,7 +732,14 @@ class GlobalDispatchCoordinator:
             return
 
         # Step 8: Rebuild when candidates exhausted
-        await self._queue_exhausted_refresh(dispatched_count, queue_refreshed)
+        self._frozen_queue, self._dispatch_paused = (
+            await self._queue_maintenance.exhausted_refresh(
+                dispatched_count,
+                queue_refreshed,
+                self._frozen_queue or [],
+                self._dispatch_paused,
+            )
+        )
 
     def is_dispatch_paused(self) -> bool:
         """Check if dispatch is paused due to exhausted pool.
@@ -827,3 +748,22 @@ class GlobalDispatchCoordinator:
             True if dispatch is paused (only blocked issues in queue)
         """
         return self._dispatch_paused
+
+    # Shim methods: delegate to DispatchQueueMaintenanceService for
+    # backward compatibility with existing tests that call these directly.
+
+    def _queue_startup_restore(self) -> None:
+        self._queue_maintenance._load_issue = self._load_issue  # type: ignore[union-attr]
+        self._frozen_queue = self._queue_maintenance.startup_restore(self._frozen_queue)
+
+    def _queue_promote_progressed(self) -> None:
+        self._queue_maintenance._load_issue = self._load_issue  # type: ignore[union-attr]
+        self._frozen_queue = self._queue_maintenance.promote_progressed(
+            self._frozen_queue or []
+        )
+
+    def _queue_resort_existing(self) -> None:
+        self._queue_maintenance._load_issue = self._load_issue  # type: ignore[union-attr]
+        self._frozen_queue = self._queue_maintenance.resort_existing(
+            self._frozen_queue or []
+        )

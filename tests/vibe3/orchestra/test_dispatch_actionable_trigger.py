@@ -295,6 +295,9 @@ class TestActionableTriggeredCollection:
         # Mock promote to return entries unchanged
         mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
 
+        # Mock _queue_resort_existing (part of coordinate flow)
+        mock_coordinator._queue_resort_existing = MagicMock()
+
         # Mock dispatch loop to return 0 (no dispatches)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
@@ -351,6 +354,10 @@ class TestActionableTriggeredCollection:
         ]
 
         mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+
+        # Mock _queue_resort_existing (part of coordinate flow)
+        mock_coordinator._queue_resort_existing = MagicMock()
+
         mock_coordinator._dispatch_loop = MagicMock(return_value=1)
 
         # Mock _collect_frozen_queue to track if it gets called
@@ -409,6 +416,10 @@ class TestActionableTriggeredCollection:
         ]
 
         mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+
+        # Mock _queue_resort_existing (part of coordinate flow)
+        mock_coordinator._queue_resort_existing = MagicMock()
+
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
         # Mock collect to return fresh entries (including new issue 2)

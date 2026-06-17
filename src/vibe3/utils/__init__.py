@@ -63,6 +63,7 @@ if TYPE_CHECKING:
         get_vibe3_log_dir,
     )
     from vibe3.utils.queue_ordering import (
+        resolve_milestone_rank,
         resolve_priority,
         resolve_roadmap_rank,
         sort_ready_issues,
@@ -112,6 +113,7 @@ _LAZY_IMPORTS = {
     "OrchestraInstanceInfo": "vibe3.utils.orchestra_instance",
     "parse_issue_number": "vibe3.utils.issue_ref",
     "read_instance_info": "vibe3.utils.orchestra_instance",
+    "resolve_milestone_rank": "vibe3.utils.queue_ordering",
     "resolve_priority": "vibe3.utils.queue_ordering",
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
     "sanitize_prompt_for_display": "vibe3.utils.codeagent_helpers",
@@ -179,6 +181,7 @@ __all__ = [
     "OrchestraInstanceInfo",
     "parse_issue_number",
     "read_instance_info",
+    "resolve_milestone_rank",
     "resolve_priority",
     "resolve_roadmap_rank",
     "sanitize_prompt_for_display",
