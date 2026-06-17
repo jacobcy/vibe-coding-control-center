@@ -56,14 +56,21 @@ teardown() {
     [ -f "$TEST_HOME/.vibe/lib/test_lib.sh" ]
 }
 
-@test "vibe update preserves config/keys.env" {
+@test "vibe update syncs config/keys.env from source to target" {
+    # Create old keys.env in target (should be overwritten)
+    echo "API_KEY=old_value" > "$TEST_HOME/.vibe/config/keys.env"
+
+    # Create new keys.env in source (should overwrite target)
+    echo "API_KEY=new_value" > "$TEST_REPO/config/keys.env"
+
     # Run update
     run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run'
     [ "$status" -eq 0 ]
 
-    # Check keys.env preserved
+    # Check keys.env was overwritten from source
     [ -f "$TEST_HOME/.vibe/config/keys.env" ]
-    grep -q "API_KEY=test123" "$TEST_HOME/.vibe/config/keys.env"
+    grep -q "API_KEY=new_value" "$TEST_HOME/.vibe/config/keys.env"
+    ! grep -q "API_KEY=old_value" "$TEST_HOME/.vibe/config/keys.env"
 }
 
 @test "vibe update --dry-run does not modify files" {

@@ -8,8 +8,10 @@ set -euo pipefail
 source "${0:A:h}/config.sh"
 source "${0:A:h}/install_utils.sh"
 
+readonly ORCHESTRA_SESSION="vibe3-orchestra-serve"
+
 vibe_update() {
-    local command="${1:-help}"
+    local command="${1:--}"
     shift 2>/dev/null || true
 
     case "$command" in
@@ -17,6 +19,13 @@ vibe_update() {
             _usage
             ;;
         run)
+            _update_run "$@"
+            ;;
+        -*)
+            # Options passed directly: vibe update -n -v
+            _update_run "$command" "$@"
+            ;;
+        "")
             _update_run "$@"
             ;;
         *)
@@ -30,12 +39,13 @@ vibe_update() {
 _usage() {
     echo "${BOLD}vibe update${NC} - Global distribution sync"
     echo ""
-    echo "Usage: ${CYAN}vibe update run${NC} [options]"
+    echo "Usage: ${CYAN}vibe update${NC} [options]"
     echo ""
     echo "Synchronizes Vibe distribution from current repo to ${CYAN}~/.vibe${NC}:"
     echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills, supervisor"
     echo "  • Cleans: stale files not in source"
-    echo "  • Preserves: config/keys.env, settings.yaml"
+    echo "  • Preserves: settings.yaml"
+    echo "  • keys.env is now synced and auto-loaded"
     echo "  • Idempotent: safe to run multiple times"
     echo ""
     echo "Options:"
@@ -46,7 +56,7 @@ _usage() {
     echo "Effect semantics:"
     echo "  • Repo-local V2/V3 changes → immediate effect in current worktree"
     echo "  • Global changes → run ${CYAN}vibe update${NC}"
-    echo "  • Loader/alias changes → ${CYAN}source ~/.zshrc${NC} or restart shell"
+    echo "  • keys.env changes → auto-loaded into current shell, restart serve for new tasks"
     exit 0
 }
 
@@ -114,6 +124,13 @@ _update_run() {
 
     log_success "Pre-flight checks passed"
 
+    # Capture pre-sync keys.env checksum to detect actual changes
+    local keys_file="$INSTALL_DIR/config/keys.env"
+    local old_keys_checksum=""
+    if [[ -f "$keys_file" ]]; then
+        old_keys_checksum="$(sha1sum "$keys_file" 2>/dev/null || shasum "$keys_file" 2>/dev/null || echo "")"
+    fi
+
     # Sync core components
     for dir in bin lib lib3 config scripts src skills supervisor .agent; do
         _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
@@ -156,18 +173,75 @@ _update_run() {
     # Sanity check: verify critical runtime assets
     _check_runtime_assets "$INSTALL_DIR" || true
 
+    # Re-source keys.env into current shell so changes take effect immediately
+    if [[ -f "$keys_file" ]] && [[ "$dry_run" != "true" ]]; then
+        log_step "Loading updated keys.env into current environment"
+        _vibe_load_keys "$keys_file"
+        log_success "keys.env loaded"
+
+        # If running inside tmux, inject env vars into the current session
+        # so new panes inherit them and current pane gets immediate effect
+        if command -v tmux >/dev/null 2>&1 && [[ -n "${TMUX:-}" ]]; then
+            local current_session
+            current_session="$(tmux display-message -p '#S' 2>/dev/null || true)"
+            if [[ -n "$current_session" ]]; then
+                log_step "Injecting keys.env into tmux session: $current_session"
+                local injected=0
+                while IFS='=' read -r key value; do
+                    [[ "$key" =~ ^[[:space:]]*# ]] && continue
+                    [[ -z "$key" ]] && continue
+                    value="${value#\"}" ; value="${value%\"}"
+                    value="${value#\'}" ; value="${value%\'}"
+                    tmux set-environment -t "$current_session" "$key" "$value" 2>/dev/null
+                    injected=$((injected + 1))
+                done < "$keys_file"
+                log_success "Injected $injected vars into tmux session"
+
+                # Also export in current pane for immediate effect
+                local current_pane
+                current_pane="$(tmux display-message -p '#P' 2>/dev/null || true)"
+                if [[ -n "$current_pane" ]]; then
+                    tmux send-keys -t "$current_pane" \
+                        "echo 'keys.env updated - run: source <(vibe keys export) or reopen terminal'" C-m 2>/dev/null || true
+                fi
+            fi
+        fi
+
+        # Check if keys.env changed and orchestra serve is running → offer restart
+        local new_keys_checksum=""
+        new_keys_checksum="$(sha1sum "$keys_file" 2>/dev/null || shasum "$keys_file" 2>/dev/null || echo "")"
+        if [[ "$old_keys_checksum" != "$new_keys_checksum" ]] && command -v tmux >/dev/null 2>&1 && tmux has-session -t "$ORCHESTRA_SESSION" 2>/dev/null; then
+            echo ""
+            log_warn "orchestra serve 正在运行 (session: $ORCHESTRA_SESSION)"
+            echo "  keys.env 有变更，需要重启 serve 才能对新派发的任务生效"
+            if confirm_action "是否立即重启 orchestra serve？"; then
+                log_step "重启 orchestra serve..."
+                if "$SOURCE_ROOT/bin/vibe3" serve stop; then
+                    sleep 1
+                    "$SOURCE_ROOT/bin/vibe3" serve start
+                    log_success "orchestra serve 已重启"
+                else
+                    log_warn "停止 orchestra serve 失败，请手动重启"
+                fi
+            else
+                echo "  💡 请稍后手动运行: vibe3 serve stop && vibe3 serve start"
+            fi
+        fi
+    fi
+
     log_success "Global update complete!"
     echo ""
     echo "${BOLD}What changed:${NC}"
     echo "  • V2/V3 core components synced to ${CYAN}~/.vibe${NC}"
     echo "  • Stale files cleaned up"
-    echo "  • User configs preserved (keys.env, settings.yaml)"
+    echo "  • keys.env synced and loaded into current environment"
     echo ""
     echo "${BOLD}Effect semantics:${NC}"
     echo "  • Shell loader changes → ${CYAN}source ~/.zshrc${NC}"
     echo "  • Python dependencies → synced via ${CYAN}uv sync${NC}"
     echo "  • Python code changes → effective immediately (local src resolution)"
     echo "  • Alias changes → ${CYAN}vibe alias${NC} or restart shell"
+    echo "  • keys.env changes → loaded now, restart serve for new tasks"
     echo ""
     echo "${BOLD}Next steps:${NC}"
     echo "  • Run ${CYAN}vibe doctor${NC} to verify environment"
@@ -232,20 +306,16 @@ _sync_component() {
 
     mkdir -p "$dst_dir"
 
-    # Special handling for config/ to preserve keys.env
+    # Special handling for config/ to preserve keys.env during cleanup only
     if [[ "$component_name" == "config" ]]; then
-        # Sync everything except keys.env
         for item in "$src_dir"/*; do
             local name=$(basename "$item")
-            if [[ "$name" == "keys.env" ]]; then
-                continue
-            fi
             cp -R "$item" "$dst_dir/" 2>/dev/null || {
                 log_error "Failed to sync: $component_name/$name"
                 return 1
             }
         done
-        log_info "Synced: $component_name (preserved keys.env)"
+        log_info "Synced: $component_name"
         return 0
     fi
 

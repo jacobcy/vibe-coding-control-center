@@ -11,8 +11,6 @@ from typing import Any, Final
 
 from loguru import logger
 
-from vibe3.utils.constants import CODEAGENT_STDIN_MODE_THRESHOLD
-
 # Known backend-internal error patterns with suggested fixes
 KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
     (
@@ -30,8 +28,7 @@ KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
     (
         "completed without agent_message output",
         "No agent output",
-        "Backend completed but produced no output. This often indicates prompt size "
-        "issue (stdin mode threshold ~800 chars). Try: 1) Check prompt-recipes.yaml "
+        "Backend completed but produced no output. Try: 1) Check prompt-recipes.yaml "
         "for large kind:file sources, 2) Use kind:literal + Read instruction instead, "
         "3) Use a different model",
     ),
@@ -43,32 +40,6 @@ def diagnose_backend_error(output: str) -> str | None:
     for pattern, title, suggestion in KNOWN_BACKEND_ERROR_PATTERNS:
         if pattern in output:
             return f"[{title}] {suggestion}"
-    return None
-
-
-def diagnose_prompt_size_issue(prompt_len: int, backend: str, model: str) -> str | None:
-    """Diagnose if prompt size exceeds stdin-mode threshold.
-
-    codeagent-wrapper enters stdin mode when prompt exceeds ~800 chars
-    (CODEAGENT_STDIN_MODE_THRESHOLD), which can cause parsing failures.
-    Returns diagnostic message if size exceeds threshold, None otherwise.
-
-    Args:
-        prompt_len: Length of the prompt in characters
-        backend: Backend name (e.g., "openai", "anthropic")
-        model: Model name (e.g., "claude-3-5-sonnet")
-
-    Returns:
-        Diagnostic message if prompt exceeds threshold, None otherwise
-    """
-    if prompt_len > CODEAGENT_STDIN_MODE_THRESHOLD:
-        return (
-            f"Prompt size ({prompt_len} chars) exceeds stdin-mode threshold "
-            f"({CODEAGENT_STDIN_MODE_THRESHOLD} chars) for {backend}/{model}. "
-            f"This may cause codeagent-wrapper to enter stdin mode and fail silently. "
-            f"Consider using kind:literal + Read instruction in prompt-recipes.yaml "
-            f"instead of kind:file for large files."
-        )
     return None
 
 

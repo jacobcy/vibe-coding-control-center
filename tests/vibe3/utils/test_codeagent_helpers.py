@@ -1,10 +1,6 @@
 """Tests for vibe3.utils.codeagent_helpers."""
 
-from vibe3.utils.codeagent_helpers import (
-    CODEAGENT_STDIN_MODE_THRESHOLD,
-    diagnose_prompt_size_issue,
-    sanitize_prompt_for_display,
-)
+from vibe3.utils.codeagent_helpers import sanitize_prompt_for_display
 
 
 class TestSanitizePromptForDisplay:
@@ -179,42 +175,3 @@ api_key = "sk-proj-xyz789abc456def012ghi345jkl678mno901"
         text4 = "Auth: Bearer short"
         result4 = sanitize_prompt_for_display(text4)
         assert result4 == text4  # Should pass through unchanged
-
-
-class TestDiagnosePromptSizeIssue:
-    """Test suite for diagnose_prompt_size_issue function."""
-
-    def test_returns_none_below_threshold(self) -> None:
-        """Should return None when prompt is below threshold."""
-        result = diagnose_prompt_size_issue(799, "test", "test")
-        assert result is None
-
-    def test_returns_none_at_threshold(self) -> None:
-        """Should return None at threshold (boundary value, > not >=)."""
-        result = diagnose_prompt_size_issue(800, "test", "test")
-        assert result is None
-
-    def test_returns_diagnostic_above_threshold(self) -> None:
-        """Should return diagnostic string when prompt exceeds threshold."""
-        result = diagnose_prompt_size_issue(801, "test", "test")
-        assert result is not None
-        assert isinstance(result, str)
-
-    def test_diagnostic_contains_prompt_len(self) -> None:
-        """Diagnostic should include the prompt length."""
-        result = diagnose_prompt_size_issue(1200, "test", "test")
-        assert result is not None
-        assert "1200" in result
-
-    def test_diagnostic_contains_backend_and_model(self) -> None:
-        """Diagnostic should include backend and model names."""
-        result = diagnose_prompt_size_issue(900, "openai", "gpt-4")
-        assert result is not None
-        assert "openai" in result
-        assert "gpt-4" in result
-
-    def test_diagnostic_contains_threshold_value(self) -> None:
-        """Diagnostic should include the threshold value."""
-        result = diagnose_prompt_size_issue(900, "test", "test")
-        assert result is not None
-        assert str(CODEAGENT_STDIN_MODE_THRESHOLD) in result

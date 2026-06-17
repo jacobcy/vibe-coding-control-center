@@ -30,9 +30,7 @@ from vibe3.config import (
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models import AgentOptions, AgentResult
 from vibe3.utils import (
-    CODEAGENT_STDIN_MODE_THRESHOLD,
     diagnose_backend_error,
-    diagnose_prompt_size_issue,
     sanitize_prompt_for_display,
     sanitize_task_shell_meta,
     stream_reader,
@@ -285,8 +283,7 @@ class CodeagentBackend:
             "Executing codeagent-wrapper: "
             f"backend={effective_options.backend or 'default'}, "
             f"model={effective_options.model or 'default'}, "
-            f"prompt_length={diagnostic_prompt_length} chars, "
-            f"stdin_mode_threshold={CODEAGENT_STDIN_MODE_THRESHOLD} chars"
+            f"prompt_length={diagnostic_prompt_length} chars"
         )
 
         try:
@@ -379,17 +376,6 @@ class CodeagentBackend:
                 )
                 if diagnosis:
                     error_msg += f"\n\n{diagnosis}"
-
-                # Only check prompt size for "no agent_message output" case
-                # to avoid misleading diagnostics
-                if "completed without agent_message output" in combined_output:
-                    prompt_size_diagnostic = diagnose_prompt_size_issue(
-                        diagnostic_prompt_length,
-                        effective_options.backend or "default",
-                        effective_options.model or "default",
-                    )
-                    if prompt_size_diagnostic:
-                        error_msg += f"\n\n{prompt_size_diagnostic}"
 
                 # Build metadata for structured error info
                 metadata = {
