@@ -285,15 +285,22 @@ class DispatchQueueMaintenanceService:
             )
             fresh = await self._collect_frozen_queue_fn()
             self._invalidate_pr_cache()
-            if fresh and all(entry.collected_state == "blocked" for entry in fresh):
-                new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
+            new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
+
+            # After merge, check if ANY entry is still actionable.
+            # Merge preserves old entries with waiting_state for same issue_numbers,
+            # so if all fresh entries are duplicates of existing waiting entries,
+            # the merged queue will have zero actionable entries -> pause.
+            has_actionable = any(
+                entry.waiting_state is None and entry.collected_state != "blocked"
+                for entry in new_frozen_queue
+            )
+            if not has_actionable:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "
-                    "(rebuild found only blocked issues)",
+                    "(no actionable entries after collection and blocked check)",
                 )
                 return new_frozen_queue, True
-            else:
-                new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
-                return new_frozen_queue, False
+            return new_frozen_queue, False
         return frozen_queue, dispatch_paused
