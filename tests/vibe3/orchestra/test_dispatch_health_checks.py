@@ -481,8 +481,13 @@ class TestPreDispatchHealthChecks:
         assert result is True, "Health check should fail open on transient errors"
 
     def test_health_check_skips_block_for_terminal_states(self) -> None:
-        """When flow is in terminal state (aborted/done/stale/review),
-        health check should skip dispatch without calling block_flow."""
+        """When flow is in terminal state (done/stale/review),
+        health check should skip dispatch without calling block_flow.
+
+        Note: "aborted" is NOT treated as terminal here - it returns True
+        to allow flow_manager.create_flow_for_issue() to handle recovery
+        (rebuild if branch missing). See flow_manager.py lines 221-232.
+        """
         from vibe3.orchestra.global_dispatch_coordinator import (
             GlobalDispatchCoordinator,
         )
@@ -514,19 +519,19 @@ class TestPreDispatchHealthChecks:
 
         issue = IssueInfo(
             number=1629,
-            title="Aborted issue",
-            state=IssueState.CLAIMED,
-            labels=["state/claimed"],
+            title="Done issue",
+            state=IssueState.DONE,
+            labels=["state/done"],
             github_state="CLOSED",
         )
 
         # Mock _flow_context to return a branch
         coordinator._flow_context = MagicMock(return_value=("task/issue-1629", None))
 
-        # Mock flow state as aborted (terminal)
+        # Mock flow state as done (terminal)
         store.get_flow_state.return_value = {
             "branch": "task/issue-1629",
-            "flow_status": "aborted",
+            "flow_status": "done",
         }
 
         # Mock CheckService to return invalid (would normally block)
@@ -545,6 +550,62 @@ class TestPreDispatchHealthChecks:
 
         # Assert - block_flow should NOT be called for terminal states
         mock_flow_blocker.block_flow.assert_not_called()
+
+    def test_health_check_allows_aborted_for_recovery(self) -> None:
+        """Aborted flow returns True to let flow_manager handle recovery.
+
+        flow_manager.create_flow_for_issue() has logic at lines 221-232
+        to rebuild the flow if the branch is missing.
+        """
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        # Setup
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        # Create mock dependencies
+        mock_deps = _make_mock_coordinator_dependencies()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+            **mock_deps,
+        )
+
+        issue = IssueInfo(
+            number=2871,
+            title="Aborted issue needing recovery",
+            state=IssueState.READY,
+            labels=["state/ready", "orchestra-governed"],
+            github_state="OPEN",
+        )
+
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-2871", None))
+
+        # Mock flow state as aborted
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-2871",
+            "flow_status": "aborted",
+        }
+
+        result = coordinator._check_dispatch_health(issue)
+
+        # Assert - should return True for aborted to allow flow_manager recovery
+        assert result is True, "Aborted should return True for flow_manager recovery"
 
     def test_health_check_handles_block_flow_failure(self) -> None:
         """When block_flow raises, health check should log and return False."""
