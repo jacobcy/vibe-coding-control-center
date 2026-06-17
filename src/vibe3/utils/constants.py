@@ -45,14 +45,6 @@ ALL_CODEX_WARNINGS: Final[tuple[str, ...]] = (
 )
 
 # =============================================================================
-# Codeagent Thresholds
-# =============================================================================
-
-# Stdin-mode threshold for codeagent-wrapper
-# Prompts exceeding this length may trigger stdin mode and fail silently
-CODEAGENT_STDIN_MODE_THRESHOLD: Final[int] = 800
-
-# =============================================================================
 # Analysis Thresholds
 # =============================================================================
 

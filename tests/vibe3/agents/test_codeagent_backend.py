@@ -452,7 +452,7 @@ class TestCodeagentBackend:
             with pytest.raises(AgentExecutionError) as exc_info:
                 backend.run(raw_prompt, AgentOptions(agent="vibe-reviewer"))
 
-        assert "Prompt size" in str(exc_info.value)
+        # Verify metadata contains correct prompt length
         assert exc_info.value.metadata is not None
         assert exc_info.value.metadata["prompt_length"] == str(len(assembled_prompt))
 

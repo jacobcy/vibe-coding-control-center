@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from vibe3.utils.branch_utils import find_parent_branch, is_branch_merged_to_main
     from vibe3.utils.codeagent_helpers import (
         diagnose_backend_error,
-        diagnose_prompt_size_issue,
         sanitize_prompt_for_display,
         sanitize_task_shell_meta,
         stream_reader,
@@ -22,7 +21,6 @@ if TYPE_CHECKING:
     )
     from vibe3.utils.constants import (
         AUTOMATED_MARKERS,
-        CODEAGENT_STDIN_MODE_THRESHOLD,
         DEFAULT_MODULE_GROWTH_THRESHOLD,
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
@@ -78,7 +76,6 @@ if TYPE_CHECKING:
 # Lazy imports
 _LAZY_IMPORTS = {
     "AUTOMATED_MARKERS": "vibe3.utils.constants",
-    "CODEAGENT_STDIN_MODE_THRESHOLD": "vibe3.utils.constants",
     "CODEAGENT_WRAPPER_ANYWHERE_RE": "vibe3.utils.error_message_cleaner",
     "CODEAGENT_WRAPPER_RE": "vibe3.utils.error_message_cleaner",
     "DEFAULT_MODULE_GROWTH_THRESHOLD": "vibe3.utils.constants",
@@ -91,7 +88,6 @@ _LAZY_IMPORTS = {
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
-    "diagnose_prompt_size_issue": "vibe3.utils.codeagent_helpers",
     "find_parent_branch": "vibe3.utils.branch_utils",
     "is_branch_merged_to_main": "vibe3.utils.branch_utils",
     "format_age_aware_time": "vibe3.utils.time_format",
@@ -143,7 +139,6 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "AUTOMATED_MARKERS",
-    "CODEAGENT_STDIN_MODE_THRESHOLD",
     "CODEAGENT_WRAPPER_ANYWHERE_RE",
     "CODEAGENT_WRAPPER_RE",
     "DEFAULT_MODULE_GROWTH_THRESHOLD",
@@ -160,7 +155,6 @@ __all__ = [
     "compute_governance_hash",
     "compute_hash_from_loader",
     "diagnose_backend_error",
-    "diagnose_prompt_size_issue",
     "find_parent_branch",
     "is_branch_merged_to_main",
     "format_age_aware_time",
