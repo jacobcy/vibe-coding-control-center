@@ -124,6 +124,13 @@ _update_run() {
 
     log_success "Pre-flight checks passed"
 
+    # Capture pre-sync keys.env checksum to detect actual changes
+    local keys_file="$INSTALL_DIR/config/keys.env"
+    local old_keys_checksum=""
+    if [[ -f "$keys_file" ]]; then
+        old_keys_checksum="$(sha1sum "$keys_file" 2>/dev/null || shasum "$keys_file" 2>/dev/null || echo "")"
+    fi
+
     # Sync core components
     for dir in bin lib lib3 config scripts src skills supervisor .agent; do
         _sync_component "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir" "$dir" || {
@@ -167,8 +174,7 @@ _update_run() {
     _check_runtime_assets "$INSTALL_DIR" || true
 
     # Re-source keys.env into current shell so changes take effect immediately
-    local keys_file="$INSTALL_DIR/config/keys.env"
-    if [[ -f "$keys_file" ]]; then
+    if [[ -f "$keys_file" ]] && [[ "$dry_run" != "true" ]]; then
         log_step "Loading updated keys.env into current environment"
         _vibe_load_keys "$keys_file"
         log_success "keys.env loaded"
@@ -200,24 +206,26 @@ _update_run() {
                 fi
             fi
         fi
-    fi
 
-    # Check if orchestra serve is running and offer restart
-    if command -v tmux >/dev/null 2>&1 && tmux has-session -t "$ORCHESTRA_SESSION" 2>/dev/null; then
-        echo ""
-        log_warn "orchestra serve 正在运行 (session: $ORCHESTRA_SESSION)"
-        echo "  keys.env 变更需要重启 serve 才能对新派发的任务生效"
-        if confirm_action "是否立即重启 orchestra serve？"; then
-            log_step "重启 orchestra serve..."
-            if "$SOURCE_ROOT/bin/vibe3" serve stop; then
-                sleep 1
-                "$SOURCE_ROOT/bin/vibe3" serve start
-                log_success "orchestra serve 已重启"
+        # Check if keys.env changed and orchestra serve is running → offer restart
+        local new_keys_checksum=""
+        new_keys_checksum="$(sha1sum "$keys_file" 2>/dev/null || shasum "$keys_file" 2>/dev/null || echo "")"
+        if [[ "$old_keys_checksum" != "$new_keys_checksum" ]] && command -v tmux >/dev/null 2>&1 && tmux has-session -t "$ORCHESTRA_SESSION" 2>/dev/null; then
+            echo ""
+            log_warn "orchestra serve 正在运行 (session: $ORCHESTRA_SESSION)"
+            echo "  keys.env 有变更，需要重启 serve 才能对新派发的任务生效"
+            if confirm_action "是否立即重启 orchestra serve？"; then
+                log_step "重启 orchestra serve..."
+                if "$SOURCE_ROOT/bin/vibe3" serve stop; then
+                    sleep 1
+                    "$SOURCE_ROOT/bin/vibe3" serve start
+                    log_success "orchestra serve 已重启"
+                else
+                    log_warn "停止 orchestra serve 失败，请手动重启"
+                fi
             else
-                log_warn "停止 orchestra serve 失败，请手动重启"
+                echo "  💡 请稍后手动运行: vibe3 serve stop && vibe3 serve start"
             fi
-        else
-            echo "  💡 请稍后手动运行: vibe3 serve stop && vibe3 serve start"
         fi
     fi
 
