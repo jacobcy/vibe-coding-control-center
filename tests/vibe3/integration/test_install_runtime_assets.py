@@ -56,7 +56,8 @@ def test_install_sanity_check_uses_runtime_assets_canonical_path() -> None:
     """Verify install/update sanity check follows the runtime_assets module move."""
     install_utils = Path("lib/install_utils.sh").read_text(encoding="utf-8")
 
-    assert "src/vibe3/utils/runtime_assets.py" in install_utils
+    assert "src/vibe3/clients/runtime_assets.py" in install_utils
+    assert "src/vibe3/utils/runtime_assets.py" not in install_utils
     assert "src/vibe3/environment/runtime_assets.py" not in install_utils
 
 
