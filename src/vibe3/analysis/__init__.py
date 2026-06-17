@@ -60,6 +60,12 @@ if TYPE_CHECKING:
     )
     from vibe3.analysis.serena_service import SerenaService
 
+    # Snapshot baseline operations
+    from vibe3.analysis.snapshot_baseline import (
+        load_branch_baseline,
+        save_branch_baseline,
+    )
+
     # Snapshot diff
     from vibe3.analysis.snapshot_diff import compute_diff
 
@@ -115,6 +121,8 @@ _LAZY_IMPORTS = {
     "build_snapshot": "vibe3.analysis.snapshot_service",
     "build_snapshot_diff": "vibe3.analysis.snapshot_service",
     "find_snapshot_by_branch": "vibe3.analysis.snapshot_service",
+    "save_branch_baseline": "vibe3.analysis.snapshot_baseline",
+    "load_branch_baseline": "vibe3.analysis.snapshot_baseline",
     "build_snapshot_diff_section": "vibe3.analysis.snapshot_diff_section",
     "snapshot_service": "vibe3.analysis.snapshot_service",
     "structure_service": "vibe3.analysis.structure_service",
@@ -176,6 +184,8 @@ __all__ = [
     "build_snapshot",
     "build_snapshot_diff",
     "find_snapshot_by_branch",
+    "save_branch_baseline",
+    "load_branch_baseline",
     "build_snapshot_diff_section",
     "snapshot_service",
     "structure_service",
