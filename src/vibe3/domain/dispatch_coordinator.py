@@ -48,7 +48,7 @@ from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
 from vibe3.services.issue import IssueCollectionService
 from vibe3.services.shared import clean_old_state_labels, should_skip_from_queue
-from vibe3.utils.queue_ordering import (
+from vibe3.utils import (
     resolve_milestone_rank,
     resolve_priority,
     resolve_roadmap_rank,
