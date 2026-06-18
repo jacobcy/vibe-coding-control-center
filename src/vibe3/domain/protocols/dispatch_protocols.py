@@ -234,22 +234,3 @@ class LabelDispatchCallable(Protocol):
             DispatchIntent event object
         """
         ...
-
-
-class TriggerableRoleDefinitionProtocol(Protocol):
-    """Protocol for TriggerableRoleDefinition used by services.label_utils."""
-
-    @property
-    def trigger_name(self) -> str:
-        """Trigger name for this role (e.g., 'manager', 'plan', 'run')."""
-        ...
-
-    @property
-    def trigger_state(self) -> "IssueState":
-        """Issue state that triggers this role (e.g., IssueState.READY)."""
-        ...
-
-    @property
-    def dispatch_predicate(self) -> Callable[[dict[str, object], bool], bool]:
-        """Predicate to determine if role should dispatch."""
-        ...

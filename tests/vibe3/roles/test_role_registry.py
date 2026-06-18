@@ -74,26 +74,3 @@ class TestBuildLabelDispatchEvent:
         assert event.trigger_state == IssueState.REVIEW.value
         # Reviewer-specific context is NOT on the dispatch intent
         assert not hasattr(event, "report_ref")
-
-
-class TestDispatchPredicates:
-    """Tests for role dispatch predicates."""
-
-    def test_planner_dispatch_predicate_ignores_plan_ref(self) -> None:
-        assert PLANNER_ROLE.dispatch_predicate({}, False) is True
-        assert PLANNER_ROLE.dispatch_predicate({"plan_ref": "plan.md"}, False) is True
-        assert PLANNER_ROLE.dispatch_predicate({}, True) is False
-
-    def test_executor_dispatch_predicate_ignores_report_ref(self) -> None:
-        assert EXECUTOR_ROLE.dispatch_predicate({}, False) is True
-        assert (
-            EXECUTOR_ROLE.dispatch_predicate({"report_ref": "report.md"}, False) is True
-        )
-        assert EXECUTOR_ROLE.dispatch_predicate({}, True) is False
-
-    def test_reviewer_dispatch_predicate_ignores_audit_ref(self) -> None:
-        assert REVIEWER_ROLE.dispatch_predicate({}, False) is True
-        assert (
-            REVIEWER_ROLE.dispatch_predicate({"audit_ref": "audit.md"}, False) is True
-        )
-        assert REVIEWER_ROLE.dispatch_predicate({}, True) is False

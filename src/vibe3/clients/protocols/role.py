@@ -8,7 +8,7 @@ This is a read-only interface, appropriate for L6 clients layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from vibe3.models import IssueState
@@ -25,11 +25,6 @@ class TriggerableRoleDefinitionProtocol(Protocol):
     @property
     def trigger_state(self) -> "IssueState":
         """Issue state that triggers this role (e.g., IssueState.READY)."""
-        ...
-
-    @property
-    def dispatch_predicate(self) -> Callable[[dict[str, object], bool], bool]:
-        """Predicate to determine if role should dispatch."""
         ...
 
 
