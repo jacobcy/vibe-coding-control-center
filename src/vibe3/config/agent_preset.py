@@ -137,7 +137,23 @@ def resolve_repo_agent_preset(
     Returns:
         (backend, model) when repo-local mapping exists, otherwise None.
     """
-    # 1. Check env var override first
+    data = read_models_json(repo_models_json_path())
+    agents = data.get("agents")
+
+    backend = None
+    model = None
+
+    if isinstance(agents, dict):
+        resolved = _resolve_agent_entry(agents, agent_name)
+        if resolved is not None:
+            _, raw = resolved
+            backend = raw.get("backend")
+            model = raw.get("model")
+            if backend is not None and not isinstance(backend, str):
+                backend = None
+            if model is not None and not isinstance(model, str):
+                model = None
+
     role = agent_name.replace("vibe-", "").upper()
     env_backend = os.environ.get(f"VIBE_BACKEND_{role}")
     env_model = os.environ.get(f"VIBE_MODEL_{role}")
@@ -145,28 +161,11 @@ def resolve_repo_agent_preset(
         logger.bind(
             domain="codeagent_config",
             agent=agent_name,
-            backend=env_backend,
-            model=env_model,
+            backend=env_backend or backend,
+            model=env_model or model,
         ).debug("Using env var override for agent preset")
-        return (env_backend or None, env_model or None)
-
-    # 2. Fall back to models.json
-    data = read_models_json(repo_models_json_path())
-    agents = data.get("agents")
-    if not isinstance(agents, dict):
-        return None
-
-    resolved = _resolve_agent_entry(agents, agent_name)
-    if resolved is None:
-        return None
-    _, raw = resolved
-
-    backend = raw.get("backend")
-    model = raw.get("model")
-    if backend is not None and not isinstance(backend, str):
-        backend = None
-    if model is not None and not isinstance(model, str):
-        model = None
+        backend = env_backend or backend
+        model = env_model or model
     if backend is None and model is None:
         return None
     return backend, model

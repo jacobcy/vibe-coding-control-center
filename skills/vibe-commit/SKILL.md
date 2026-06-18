@@ -9,26 +9,13 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 ---
 
-## 核心职责
+## 职责边界
 
 **核心职责**：
 
-- 分组提交代码
-- 处理 commit message（利用已有的 git hooks 自动格式化）
-- 根据策略创建 PR：
-  - 单个 PR
-  - 并行 PR（多个 worktree）
-  - 串行 PR（stacked PR）
-
-## 停止点
-
-PR 创建后停止，输出：
-
-- ✅ commit 已推送
-- ✅ PR 已创建
-- **下一步**：运行 `/vibe-integrate` 检查 CI / review 并推进合并
-
-## 必读文档
+- 分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `uv run python src/vibe3/cli.py pr create`
+- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接做收口动作；收口统一交给 `/vibe-done`
+- 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
 
 - `docs/standards/v3/git-workflow-standard.md` — 提交流程核心规范
 - `docs/standards/v3/command-standard.md` — 命令用法规范
@@ -85,18 +72,12 @@ PR 创建后停止，输出：
   │   ├─ commit 只服务一个交付目标
   │   └─ uv run python src/vibe3/cli.py pr create --base <ref>
   │
-  └─ Step 9: 写入 handoff 并停止
-      ├─ vibe3 handoff append
-      └─ 停止，等待用户确认后运行 /vibe-integrate
+  └─ Step 9: 记录完成状态
+      ├─ vibe3 flow show（检查当前 flow）
+      └─ vibe3 handoff append（记录完成）
 ```
 
 只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
-
-## 核心边界
-
-- 允许：分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `uv run python src/vibe3/cli.py pr create`
-- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接做收口动作；收口统一交给 `/vibe-done`
-- 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
 
 ## Workflow
 
@@ -474,26 +455,28 @@ gh pr edit <pr-number> --add-label "type/feature"
 gh pr comment <pr-number> --body "@codex review"
 ```
 
-### Step 10: 写入 handoff 并停止
+### Step 10: 记录完成状态
 
-PR 创建成功后，当前 task 进入 `open + had_pr` 状态，skill 在此停止。
+PR 创建成功后，记录完成状态：
 
-**此阶段**：
+1. **检查当前 flow 状态**：
+   ```bash
+   uv run python src/vibe3/cli.py flow show
+   ```
+   若有活跃 flow，记录完成交接；若无 flow，跳过 handoff 记录。
 
+2. **写入 handoff（如果存在 flow）**：
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind note
+   ```
+
+若用户问"下一步是什么"，回答：
+> 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。
+
+**注意事项**：
 - 允许：进入 `/vibe-integrate` 检查 review、CI、merge 阻塞
 - 不允许：直接进入 `/vibe-done`
 - 不允许：把当前 task 当作下一个新目标继续开发
-
-若用户问"下一步是什么"，回答：
-
-> 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。
-
-**写入 handoff**：
-
-```bash
-# actor 使用 agent 自身的 backend/model，若不确定则留空
-uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind note
-```
 
 ## Restrictions
 

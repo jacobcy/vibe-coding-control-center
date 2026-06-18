@@ -51,6 +51,7 @@ class DispatchQueueMaintenanceService:
         has_actionable: Callable[[], bool],
         has_pending_blocked: Callable[[], bool],
         has_qualifiable_blocked: Callable[[], bool],
+        has_dispatchable_entries: Callable[[list[QueueEntry]], bool],
         merge_queue_fn: Callable[
             [list[QueueEntry], list[QueueEntry]], list[QueueEntry]
         ],
@@ -66,6 +67,7 @@ class DispatchQueueMaintenanceService:
         self._has_actionable = has_actionable
         self._has_pending_blocked = has_pending_blocked
         self._has_qualifiable_blocked = has_qualifiable_blocked
+        self._has_dispatchable_entries = has_dispatchable_entries
         self._merge_queue_fn = merge_queue_fn
         self._should_collect_fn = should_collect_fn
         self._collect_frozen_queue_fn = collect_frozen_queue_fn
@@ -313,15 +315,12 @@ class DispatchQueueMaintenanceService:
             self._invalidate_pr_cache()
             new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
 
-            # After merge, check if ANY entry is still actionable.
+            # After merge, check if ANY entry is still dispatchable.
             # Merge preserves old entries with waiting_state for same issue_numbers,
-            # so if all fresh entries are duplicates of existing waiting entries,
-            # the merged queue will have zero actionable entries -> pause.
-            has_actionable = any(
-                entry.waiting_state is None and entry.collected_state != "blocked"
-                for entry in new_frozen_queue
-            )
-            if not has_actionable and not unpaused_for_qualifiable_blocked:
+            # so if all fresh entries are duplicates of existing waiting entries
+            # or fail preflight, the merged queue should remain paused.
+            has_dispatchable = self._has_dispatchable_entries(new_frozen_queue)
+            if not has_dispatchable and not unpaused_for_qualifiable_blocked:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "

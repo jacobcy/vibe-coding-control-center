@@ -8,6 +8,7 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
+from vibe3.clients import SQLiteClient
 from vibe3.config import load_orchestra_config
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
@@ -51,6 +52,7 @@ class ServeStatusService:
         self._display_log_path()
         self._display_config()
         self._display_recent_activity()
+        self._display_runtime_jobs()
         self._display_failed_gate()
         self._display_error_tracking()
 
@@ -197,6 +199,71 @@ class ServeStatusService:
             )
         else:
             self.console.print("[green]  State: OPEN (normal operation)[/green]")
+        self.console.print()
+
+    def _display_runtime_jobs(self) -> None:
+        """Display launched role sessions from durable runtime_session state."""
+        import importlib
+
+        module = importlib.import_module("vibe3.execution.job_monitor_service")
+        job_svc = module.JobMonitorService(store=SQLiteClient())
+        snapshot = job_svc.snapshot()
+
+        self.console.print(
+            "[bold]Runtime Jobs[/] "
+            "[dim](launched role sessions; dispatcher decisions are above)[/]"
+        )
+
+        if not snapshot.active_jobs and not snapshot.recent_jobs:
+            self.console.print("  No runtime jobs recorded")
+            self.console.print()
+            return
+
+        if snapshot.active_jobs:
+            table = Table(title="Running / Queued", show_lines=True)
+            table.add_column("Role", style="magenta", width=8)
+            table.add_column("Status", style="green", width=8)
+            table.add_column("Target", style="yellow", width=12)
+            table.add_column("Started", style="dim", width=12)
+            table.add_column("Log", style="dim", width=20)
+
+            for job in snapshot.active_jobs:
+                table.add_row(
+                    _job_role_display(job),
+                    _job_status_display(job).upper(),
+                    _job_target_display(job),
+                    format_age_aware_time(job.started_at) if job.started_at else "-",
+                    _job_log_display(job),
+                )
+            self.console.print(table)
+
+        if snapshot.recent_jobs:
+            table = Table(title="Recent Sessions", show_lines=True)
+            table.add_column("Role", style="magenta", width=8)
+            table.add_column("Status", style="yellow", width=9)
+            table.add_column("Target", style="yellow", width=12)
+            table.add_column("Ended", style="dim", width=12)
+            table.add_column("Log", style="dim", width=20)
+
+            for job in snapshot.recent_jobs:
+                table.add_row(
+                    _job_role_display(job),
+                    _job_status_display(job).upper(),
+                    _job_target_display(job),
+                    (
+                        format_age_aware_time(job.completed_at)
+                        if job.completed_at
+                        else "-"
+                    ),
+                    _job_log_display(job),
+                )
+            self.console.print(table)
+
+        self.console.print(
+            f"  Summary: {snapshot.running_count} running, "
+            f"{snapshot.completed_count} completed, "
+            f"{snapshot.failed_count} failed"
+        )
         self.console.print()
 
     def _display_error_tracking(self) -> None:
@@ -398,7 +465,12 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
     }
 
     # Job monitoring
-    job_svc = job_monitor_service()
+    if getattr(job_monitor_service, "__module__", "") == (
+        "vibe3.execution.job_monitor_service"
+    ):
+        job_svc = job_monitor_service(store=SQLiteClient())
+    else:
+        job_svc = job_monitor_service()
     jobs_snapshot = job_svc.snapshot()
 
     jobs = {
@@ -419,3 +491,34 @@ def fetch_serve_status_data(config: OrchestraConfig) -> dict[str, Any]:
         "error_tracking": error_tracking,
         "jobs": jobs,
     }
+
+
+def _job_status_display(job: Any) -> str:
+    """Return the most specific status available for a job row."""
+    return str(job.runtime_status or job.status.value)
+
+
+def _job_target_display(job: Any) -> str:
+    """Return compact target label for a job row."""
+    if job.issue_number > 0:
+        return f"#{job.issue_number}"
+    return str(job.branch or "-")
+
+
+def _job_role_display(job: Any) -> str:
+    """Return role label, preserving runtime role when encoded in session name."""
+    parts = str(job.actor_id).split("-")
+    if len(parts) >= 2 and parts[0] == "vibe3":
+        return parts[1]
+    return str(job.job_type.value)
+
+
+def _job_log_display(job: Any) -> str:
+    """Return compact log path for a runtime job."""
+    log_path = getattr(job, "log_path", None)
+    if not log_path:
+        return "-"
+    parts = str(log_path).split("/")
+    if len(parts) >= 2:
+        return "/".join(parts[-2:])
+    return str(log_path)

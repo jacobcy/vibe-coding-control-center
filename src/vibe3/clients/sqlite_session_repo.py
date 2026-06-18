@@ -161,6 +161,36 @@ class SQLiteSessionRepo(_HasConnection):
         ).debug("Listed live runtime sessions")
         return rows
 
+    def list_recent_runtime_sessions(
+        self,
+        *,
+        limit: int = 10,
+        role: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List recent terminal runtime sessions for status surfaces."""
+        terminal_statuses = ("done", "failed", "stopped", "orphaned", "aborted")
+        params: list[Any] = list(terminal_statuses)
+        placeholders = ", ".join(["?"] * len(terminal_statuses))
+        query = f"SELECT * FROM runtime_session WHERE status IN ({placeholders})"
+        if role is not None:
+            query += " AND role = ?"
+            params.append(role)
+        query += " ORDER BY COALESCE(ended_at, updated_at, created_at) DESC LIMIT ?"
+        params.append(limit)
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="list_recent_runtime_sessions",
+            role=role,
+            limit=limit,
+            count=len(rows),
+        ).debug("Listed recent runtime sessions")
+        return rows
+
     def list_live_sessions_by_worktree(
         self, worktree_path: str
     ) -> list[dict[str, Any]]:
