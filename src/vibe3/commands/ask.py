@@ -1,7 +1,5 @@
 """Ask command for project knowledge queries."""
 
-import re
-
 import typer
 from loguru import logger
 from rich.console import Console
@@ -16,6 +14,7 @@ from vibe3.prompts import (
     PromptVariableSource,
     VariableSourceKind,
 )
+from vibe3.utils import sanitize_prompt_for_display
 
 app = typer.Typer(
     name="ask",
@@ -34,21 +33,6 @@ FORBIDDEN_PATTERNS = [
     "execute:",
     "rm -rf",
 ]
-
-
-def _sanitize_output(text: str) -> str:
-    """Sanitize output to redact sensitive information."""
-    patterns = [
-        (r'api[_-]?key["\s]*[:=]["\s]*\S+', "[REDACTED]"),
-        (r'token["\s]*[:=]["\s]*\S+', "[REDACTED]"),
-        (r'password["\s]*[:=]["\s]*\S+', "[REDACTED]"),
-    ]
-
-    sanitized = text
-    for pattern, replacement in patterns:
-        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
-
-    return sanitized
 
 
 @app.callback()
@@ -128,7 +112,7 @@ def ask(
         # Execute via CodeagentBackend
         backend = CodeagentBackend()
 
-        sanitized_question = _sanitize_output(question)
+        sanitized_question = sanitize_prompt_for_display(question)
         logger.bind(domain="ask").info(
             f"Executing question: {sanitized_question[:50]}... "
             f"(agent={agent_options.agent})"
@@ -156,7 +140,7 @@ def ask(
         )
 
         # Sanitize and display output
-        sanitized_output = _sanitize_output(result.stdout or "")
+        sanitized_output = sanitize_prompt_for_display(result.stdout or "")
 
         console.print()
         console.print(
@@ -170,6 +154,6 @@ def ask(
 
     except Exception as exc:
         logger.bind(domain="ask").error(f"Failed to execute ask: {exc}")
-        error_msg = _sanitize_output(str(exc))
+        error_msg = sanitize_prompt_for_display(str(exc))
         console.print(f"[red]Error: Failed to answer question: {error_msg}[/red]")
         raise typer.Exit(1)
