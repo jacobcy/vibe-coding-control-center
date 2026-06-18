@@ -208,3 +208,19 @@ class TestDiffViaGit:
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
         assert result == DiffSummary()
+
+    def test_double_failure_returns_empty_summary(self) -> None:
+        """When both git ops fail, should return empty DiffSummary."""
+        from vibe3.analysis.snapshot_diff_facade import _diff_via_git
+
+        mock_git = MagicMock()
+        mock_git.get_numstat.side_effect = Exception("Numstat error")
+        mock_git.get_name_status.side_effect = Exception("Name-status error")
+
+        result = _diff_via_git(mock_git, "feature-branch", "main")
+
+        # Should return empty summary without UnboundLocalError
+        assert result.files_added == 0
+        assert result.files_removed == 0
+        assert result.files_modified == 0
+        assert result.total_loc_delta == 0

@@ -59,6 +59,7 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
     files_added = 0
     files_removed = 0
     files_modified = 0
+    numstat_output = ""
 
     # Get LOC delta from numstat
     try:
