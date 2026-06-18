@@ -107,10 +107,7 @@ def classify_changed_files(
     )
 
 
-def count_changed_lines(
-    diff_text: str,
-    code_paths: Sequence[str] | None = None,
-) -> int:
+def count_changed_lines(diff_text: str) -> int:
     """Count changed (+/-) lines from a git diff string."""
     changed_lines = 0
     current_file: str | None = None
@@ -122,11 +119,6 @@ def count_changed_lines(
             continue
 
         if not current_file:
-            continue
-
-        if code_paths and not any(
-            current_file.startswith(path.rstrip("/")) for path in code_paths
-        ):
             continue
 
         if (

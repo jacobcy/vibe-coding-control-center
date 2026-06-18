@@ -81,6 +81,7 @@ def get_diff(
     source: ChangeSource,
     github_client: "GitHubClient | None" = None,
     pr_diff_cache: dict[int, str] | None = None,
+    pathspec: list[str] | None = None,
 ) -> str:
     """统一接口：获取 diff 内容.
 
@@ -89,6 +90,7 @@ def get_diff(
         source: 改动源（PR/Commit/Branch/Uncommitted）
         github_client: 可选的 GitHubClient 实例，用于处理 PR 相关操作
         pr_diff_cache: 可选的 PR diff 缓存字典
+        pathspec: 可选的路径过滤列表（如 ['src/', 'bin/']）
 
     Returns:
         diff 文本
@@ -100,19 +102,28 @@ def get_diff(
     log.info("Getting diff")
 
     if source.type == ChangeSourceType.UNCOMMITTED:
-        diff = run(["diff", "HEAD"])
+        args = ["diff", "HEAD"]
+        if pathspec:
+            args.extend(["--"] + pathspec)
+        diff = run(args)
     elif source.type == ChangeSourceType.COMMIT:
         if not isinstance(source, CommitSource):
             raise SystemError(
                 f"Type mismatch: expected CommitSource, got {type(source).__name__}"
             )
-        diff = run(["show", source.sha, "--stat"])
+        args = ["show", source.sha, "--stat"]
+        if pathspec:
+            args.extend(["--"] + pathspec)
+        diff = run(args)
     elif source.type == ChangeSourceType.BRANCH:
         if not isinstance(source, BranchSource):
             raise SystemError(
                 f"Type mismatch: expected BranchSource, got {type(source).__name__}"
             )
-        diff = run(["diff", f"{source.base}...{source.branch}"])
+        args = ["diff", f"{source.base}...{source.branch}"]
+        if pathspec:
+            args.extend(["--"] + pathspec)
+        diff = run(args)
     elif source.type == ChangeSourceType.PR:
         if not isinstance(source, PRSource):
             raise SystemError(
@@ -129,6 +140,8 @@ def get_diff(
             diff = github_client.get_pr_diff(source.pr_number)
             if pr_diff_cache is not None:
                 pr_diff_cache[source.pr_number] = diff
+        if pathspec:
+            diff = _filter_unified_diff_by_paths(diff, pathspec)
     else:
         raise GitError("get_diff", f"Unknown source type: {source.type}")
 
@@ -307,3 +320,31 @@ def get_numstat(
 
     log.bind(output_len=len(output)).success("Got numstat")
     return output
+
+
+def _filter_unified_diff_by_paths(diff_text: str, paths: list[str]) -> str:
+    """Filter unified diff text to include only files matching given path prefixes.
+
+    Args:
+        diff_text: Unified diff text
+        paths: List of path prefixes to filter (e.g., ['src/', 'bin/vibe'])
+
+    Returns:
+        Filtered diff text containing only matching file sections
+    """
+    result_lines: list[str] = []
+    current_file: str | None = None
+    in_matching_file = False
+
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            parts = line.split()
+            current_file = parts[2][2:] if len(parts) >= 4 else None
+            in_matching_file = current_file is not None and any(
+                current_file.startswith(path.rstrip("/")) for path in paths
+            )
+
+        if in_matching_file:
+            result_lines.append(line)
+
+    return "\n".join(result_lines)
