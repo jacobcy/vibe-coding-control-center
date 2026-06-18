@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from vibe3.models import CheckResult
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.check.service import CheckResult
 
 
 def make_health_coordinator(

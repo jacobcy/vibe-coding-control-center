@@ -2,11 +2,13 @@
 
 from typing import TYPE_CHECKING, Callable, Protocol
 
+# Re-export CheckServiceProtocol from runtime (canonical location)
+from vibe3.runtime import CheckServiceProtocol
+
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-    from vibe3.services.check import CheckResult
 
     from .flow_protocols import FlowManagerProtocol
 
@@ -141,53 +143,6 @@ class CapacityServiceProtocol(Protocol):
         ...
 
 
-class CheckServiceProtocol(Protocol):
-    """Protocol for health check service operations."""
-
-    def verify_current_flow(self) -> "CheckResult":
-        """Verify current branch flow consistency."""
-        ...
-
-    def verify_branch(self, branch: str) -> "CheckResult":
-        """Verify branch flow consistency.
-
-        Args:
-            branch: Branch name to verify
-
-        Returns:
-            CheckResult with validation status and issues/warnings
-        """
-        ...
-
-    def verify_all_flows(
-        self,
-        status: str | list[str] | None = "active",
-        on_progress: Callable[[int, int, str], None] | None = None,
-    ) -> list["CheckResult"]:
-        """Run consistency checks for flows in the store."""
-        ...
-
-    def invalidate_pr_cache(self) -> None:
-        """Invalidate PR cache to force refresh on next check."""
-        ...
-
-    def clean_orchestra_scanned_with_assignee(self) -> int:
-        """Remove orchestra-scanned label from issues with assignee.
-
-        Returns:
-            Number of issues cleaned.
-        """
-        ...
-
-    def enforce_label_constraints_remote(self) -> int:
-        """Scan remote open issues for label constraint violations and auto-fix.
-
-        Returns:
-            Number of issues with violations fixed.
-        """
-        ...
-
-
 class FlowServiceProtocol(Protocol):
     """Protocol for flow service lifecycle operations."""
 
@@ -234,3 +189,16 @@ class LabelDispatchCallable(Protocol):
             DispatchIntent event object
         """
         ...
+
+
+__all__ = [
+    "CheckServiceProtocol",
+    "IssueCollectionServiceProtocol",
+    "QueuePersistenceServiceProtocol",
+    "IssueLoaderProtocol",
+    "FlowContextResolverProtocol",
+    "QueueSelectorProtocol",
+    "CapacityServiceProtocol",
+    "FlowServiceProtocol",
+    "LabelDispatchCallable",
+]

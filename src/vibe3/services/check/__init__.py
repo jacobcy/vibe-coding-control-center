@@ -28,7 +28,7 @@ __all__ = [
 
 _SYMBOL_MODULES = {
     "CheckService": "vibe3.services.check.service",
-    "CheckResult": "vibe3.services.check.service",
+    "CheckResult": "vibe3.models.check_result",
     "CheckCleanupService": "vibe3.services.check.cleanup",
     "CheckPRService": "vibe3.services.check.pr_service",
     "InitResult": "vibe3.services.check.remote",
