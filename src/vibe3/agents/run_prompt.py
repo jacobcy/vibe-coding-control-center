@@ -175,6 +175,7 @@ def build_run_prompt_body(
     audit_file: str | None = None,
     mode: RunPromptMode = "coding",
     context_mode: PromptContextMode = "bootstrap",
+    prompts_path: Path | None = None,
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
@@ -186,6 +187,8 @@ def build_run_prompt_body(
             implementation path; ``retry`` is a focused repair path.
         context_mode: ``resume`` means an existing session is available, so use
             the minimal retry prompt instead of re-sending bootstrap context.
+        prompts_path: Optional custom path to prompts.yaml. When provided,
+            loads the prompt-recipes.yaml from the same directory.
 
     Returns:
         Assembled prompt body string.
@@ -206,7 +209,11 @@ def build_run_prompt_body(
             raise FileNotFoundError(f"Plan file not found: {plan_file}")
         plan_content = Path(plan_file).read_text(encoding="utf-8")
 
-    body = PromptManifest.load_default().render_sections(
+    if prompts_path is not None:
+        manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+    else:
+        manifest = PromptManifest.load_default()
+    body = manifest.render_sections(
         recipe_key="run.plan",
         variant_key=_run_plan_variant(mode, context_mode),
         providers=_build_run_prompt_providers(config, plan_content),
@@ -235,7 +242,7 @@ def make_run_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
         body_fn=lambda: build_run_prompt_body(
-            plan_file, cfg, audit_file, mode, context_mode
+            plan_file, cfg, audit_file, mode, context_mode, prompts_path
         ),
         prompts_path=prompts_path,
     )
@@ -254,7 +261,11 @@ def make_skill_context_builder(
     cfg = config or VibeConfig.get_defaults()
 
     def build() -> str:
-        return PromptManifest.load_default().render_sections(
+        if prompts_path is not None:
+            manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+        else:
+            manifest = PromptManifest.load_default()
+        return manifest.render_sections(
             recipe_key="run.skill",
             variant_key="default",
             providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
@@ -282,7 +293,11 @@ def make_publish_context_builder(
     cfg = config or VibeConfig.get_defaults()
 
     def build() -> str:
-        return PromptManifest.load_default().render_sections(
+        if prompts_path is not None:
+            manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+        else:
+            manifest = PromptManifest.load_default()
+        return manifest.render_sections(
             recipe_key="run.publish",
             variant_key="default",
             providers=_build_run_prompt_providers(cfg, skill_content=skill_content),

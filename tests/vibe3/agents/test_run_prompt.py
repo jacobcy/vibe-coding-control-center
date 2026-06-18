@@ -191,3 +191,46 @@ def test_publish_exit_contract_section_contains_mandatory_exit_step() -> None:
 
     assert "MANDATORY EXIT STEP" in section
     assert "state/merge-ready" in section
+
+
+def test_build_run_prompt_body_loads_custom_recipe(tmp_path: Path) -> None:
+    """Should load custom prompt-recipes.yaml when prompts_path is provided."""
+    from unittest.mock import patch
+
+    # Create custom prompts.yaml (required by PromptAssembler)
+    prompts_yaml = tmp_path / "prompts.yaml"
+    prompts_yaml.write_text("run:\n  plan: '{run_prompt_body}'\n", encoding="utf-8")
+
+    # Create custom prompt-recipes.yaml with custom section key
+    recipes_yaml = tmp_path / "prompt-recipes.yaml"
+    recipes_yaml.write_text(
+        """recipes:
+  run.plan:
+    template_key: run.plan
+    description: Test recipe with custom section
+    variants:
+      coding.bootstrap:
+        sections:
+          - custom.test_marker
+""",
+        encoding="utf-8",
+    )
+
+    # Create a simple plan file
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    config = VibeConfig.get_defaults()
+
+    # Mock the provider to return a custom marker
+    with patch(
+        "vibe3.agents.run_prompt._build_run_prompt_providers",
+        return_value={"custom.test_marker": lambda: "CUSTOM_RECIPE_LOADED_MARKER"},
+    ):
+        # Build prompt with custom prompts_path
+        result = build_run_prompt_body(
+            str(plan_file), config, prompts_path=prompts_yaml
+        )
+
+    # Verify custom marker appears (proves custom recipe was loaded)
+    assert "CUSTOM_RECIPE_LOADED_MARKER" in result

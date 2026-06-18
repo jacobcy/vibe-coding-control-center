@@ -198,6 +198,7 @@ def build_plan_prompt_body(
     config: VibeConfig | None = None,
     mode: PlanPromptMode = "first",
     context_mode: PromptContextMode = "bootstrap",
+    prompts_path: Path | None = None,
 ) -> str:
     """Assemble the plan prompt body from policy, tools guide, task, and output format.
 
@@ -207,6 +208,8 @@ def build_plan_prompt_body(
         mode: Prompt mode. ``retry`` revises an existing plan.
         context_mode: ``resume`` means an existing session is available, so use
             the minimal retry prompt instead of re-sending policy/rules context.
+        prompts_path: Optional custom path to prompts.yaml. When provided,
+            loads the prompt-recipes.yaml from the same directory.
 
     Returns:
         Assembled plan prompt body string.
@@ -222,14 +225,16 @@ def build_plan_prompt_body(
     if config is None:
         config = VibeConfig.get_defaults()
 
-    body = PromptManifest.load_default().render_sections(
+    if prompts_path is not None:
+        manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+    else:
+        manifest = PromptManifest.load_default()
+    body = manifest.render_sections(
         recipe_key="plan.default",
         variant_key=_plan_variant(mode, context_mode),
         providers=_build_plan_prompt_providers(request, config, context_mode),
     )
-    log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
-        "Plan prompt body built"
-    )
+    log.bind(body_len=len(body)).success("Plan prompt body built")
     return body
 
 
@@ -247,6 +252,6 @@ def make_plan_context_builder(
     return make_context_builder(
         template_key="plan.default",
         body_provider_key="plan.context",
-        body_fn=lambda: build_plan_prompt_body(request, cfg),
+        body_fn=lambda: build_plan_prompt_body(request, cfg, prompts_path=prompts_path),
         prompts_path=prompts_path,
     )
