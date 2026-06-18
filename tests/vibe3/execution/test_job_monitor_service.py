@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -58,6 +59,60 @@ class TestJobMonitorService:
         assert snap.running_count == 0
         assert snap.completed_count == 0
         assert snap.failed_count == 0
+
+    def test_live_runtime_session_appears_in_active_jobs(self, tmp_path: Path) -> None:
+        """Live runtime_session rows appear when the monitor has a store."""
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+        store.create_runtime_session(
+            role="executor",
+            target_type="issue",
+            target_id="2981",
+            branch="task/issue-2981",
+            session_name="vibe3-executor-issue-2981",
+            status="running",
+            started_at="2026-06-18T09:43:25",
+        )
+
+        svc = JobMonitorService(store=store)
+        snap = svc.snapshot()
+
+        assert snap.running_count == 1
+        assert len(snap.active_jobs) == 1
+        job = snap.active_jobs[0]
+        assert job.actor_id == "vibe3-executor-issue-2981"
+        assert job.status == ActorStatus.RUNNING
+        assert job.job_type == JobType.DISPATCH
+        assert job.issue_number == 2981
+        assert job.branch == "task/issue-2981"
+
+    def test_recent_runtime_session_appears_in_recent_jobs(
+        self, tmp_path: Path
+    ) -> None:
+        """Terminal runtime_session rows appear in recent_jobs."""
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+        store.create_runtime_session(
+            role="manager",
+            target_type="issue",
+            target_id="2983",
+            branch="task/issue-2983",
+            session_name="vibe3-manager-issue-2983",
+            status="stopped",
+            started_at="2026-06-18T09:44:54",
+            ended_at="2026-06-18T09:45:12",
+            log_path="/tmp/logs/issues/issue-2983/manager.async.log",
+        )
+
+        svc = JobMonitorService(store=store)
+        snap = svc.snapshot()
+
+        assert snap.running_count == 0
+        assert len(snap.recent_jobs) == 1
+        job = snap.recent_jobs[0]
+        assert job.actor_id == "vibe3-manager-issue-2983"
+        assert job.runtime_status == "stopped"
+        assert job.status == ActorStatus.DEAD
+        assert job.issue_number == 2983
+        assert job.log_path == "/tmp/logs/issues/issue-2983/manager.async.log"
 
     def test_running_actor_appears_in_active_jobs(self) -> None:
         """RUNNING actors appear in active_jobs."""

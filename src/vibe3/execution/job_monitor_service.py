@@ -8,11 +8,12 @@ and web (/status) interfaces.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vibe3.execution.actor import ActorStatus, JobType
 
 if TYPE_CHECKING:
+    from vibe3.clients import SQLiteClient
     from vibe3.execution.actor import JobActor
 
 
@@ -28,6 +29,8 @@ class ActiveJob:
     started_at: str | None
     completed_at: str | None
     pid: int | None
+    runtime_status: str | None = None
+    log_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,8 +47,11 @@ class JobMonitorSnapshot:
 class JobMonitorService:
     """Service for querying actor-based job monitoring data."""
 
+    def __init__(self, store: SQLiteClient | None = None) -> None:
+        self._store = store
+
     def snapshot(self) -> JobMonitorSnapshot:
-        """Build a snapshot from the actor registry.
+        """Build a snapshot from the actor registry and optional runtime sessions.
 
         Returns:
             JobMonitorSnapshot with active jobs, recent completions,
@@ -61,15 +67,26 @@ class JobMonitorService:
         active_actors = registry.get_active_actors()
         recent_actors = registry.get_recent_actors()
 
-        active_jobs = tuple(_to_active_job(a) for a in active_actors)
+        active_jobs_list = [_to_active_job(a) for a in active_actors]
         recent_jobs = tuple(_to_active_job(a) for a in recent_actors)
 
-        running_count = sum(1 for a in active_actors if a.status == ActorStatus.RUNNING)
-        completed_count = sum(1 for a in recent_actors if a.status == ActorStatus.DONE)
+        active_jobs_list.extend(self._runtime_active_jobs(active_jobs_list))
+        active_jobs = tuple(active_jobs_list)
+        recent_jobs = tuple([*recent_jobs, *self._runtime_recent_jobs(recent_jobs)])
+
+        running_count = sum(
+            1 for job in active_jobs if job.status == ActorStatus.RUNNING
+        )
+        completed_count = sum(
+            1
+            for job in recent_jobs
+            if _job_status_value(job) in {ActorStatus.DONE.value, "done"}
+        )
         failed_count = sum(
             1
-            for a in recent_actors
-            if a.status in (ActorStatus.FAILED, ActorStatus.DEAD)
+            for job in recent_jobs
+            if _job_status_value(job)
+            in {ActorStatus.FAILED.value, ActorStatus.DEAD.value, "failed", "orphaned"}
         )
 
         return JobMonitorSnapshot(
@@ -79,6 +96,46 @@ class JobMonitorService:
             completed_count=completed_count,
             failed_count=failed_count,
         )
+
+    def _runtime_active_jobs(self, existing_jobs: list[ActiveJob]) -> list[ActiveJob]:
+        """Return live runtime_session rows not already represented by actors."""
+        if self._store is None:
+            return []
+
+        try:
+            sessions = self._store.list_live_runtime_sessions()
+        except Exception:
+            return []
+
+        existing_actor_ids = {job.actor_id for job in existing_jobs}
+        jobs: list[ActiveJob] = []
+        for session in sessions:
+            job = _session_to_active_job(session)
+            if job.actor_id in existing_actor_ids:
+                continue
+            jobs.append(job)
+        return jobs
+
+    def _runtime_recent_jobs(
+        self, existing_jobs: tuple[ActiveJob, ...]
+    ) -> list[ActiveJob]:
+        """Return recent terminal runtime_session rows not represented by actors."""
+        if self._store is None:
+            return []
+
+        try:
+            sessions = self._store.list_recent_runtime_sessions(limit=10)
+        except Exception:
+            return []
+
+        existing_actor_ids = {job.actor_id for job in existing_jobs}
+        jobs: list[ActiveJob] = []
+        for session in sessions:
+            job = _session_to_active_job(session)
+            if job.actor_id in existing_actor_ids:
+                continue
+            jobs.append(job)
+        return jobs
 
 
 def _to_active_job(actor: JobActor) -> ActiveJob:
@@ -99,4 +156,57 @@ def _to_active_job(actor: JobActor) -> ActiveJob:
         started_at=actor.started_at,
         completed_at=actor.completed_at,
         pid=actor.pid,
+        runtime_status=None,
+        log_path=None,
     )
+
+
+def _session_to_active_job(session: dict[str, Any]) -> ActiveJob:
+    """Convert a durable runtime_session row to an ActiveJob."""
+    role = str(session.get("role") or "")
+    status = _runtime_status_to_actor_status(str(session.get("status") or ""))
+    actor_id = str(session.get("session_name") or f"runtime-{session.get('id')}")
+
+    issue_number = 0
+    if session.get("target_type") == "issue":
+        try:
+            issue_number = int(str(session.get("target_id") or "0"))
+        except ValueError:
+            issue_number = 0
+
+    return ActiveJob(
+        actor_id=actor_id,
+        job_type=_role_to_job_type(role),
+        status=status,
+        issue_number=issue_number,
+        branch=str(session.get("branch") or ""),
+        started_at=session.get("started_at") or session.get("created_at"),
+        completed_at=session.get("ended_at"),
+        pid=None,
+        runtime_status=str(session.get("status") or ""),
+        log_path=session.get("log_path"),
+    )
+
+
+def _runtime_status_to_actor_status(status: str) -> ActorStatus:
+    if status == "running":
+        return ActorStatus.RUNNING
+    if status == "starting":
+        return ActorStatus.QUEUED
+    if status == "done":
+        return ActorStatus.DONE
+    if status == "failed":
+        return ActorStatus.FAILED
+    return ActorStatus.DEAD
+
+
+def _role_to_job_type(role: str) -> JobType:
+    if role in {"governance", "supervisor"}:
+        return JobType.GOVERNANCE
+    if role == "flow":
+        return JobType.FLOW
+    return JobType.DISPATCH
+
+
+def _job_status_value(job: ActiveJob) -> str:
+    return job.runtime_status or job.status.value

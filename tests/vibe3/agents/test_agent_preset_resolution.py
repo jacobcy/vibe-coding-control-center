@@ -128,6 +128,35 @@ class TestAgentPresetFallback:
         assert result.backend == "claude"
         assert result.model == "claude-opus-4-6"  # Override wins
 
+    def test_env_model_override_preserves_preset_backend(self, tmp_path: Path) -> None:
+        """Role model env override should not erase preset backend."""
+        repo_models = tmp_path / "config" / "models.json"
+        repo_models.parent.mkdir(parents=True)
+        repo_models.write_text(
+            json.dumps(
+                {
+                    "agents": {
+                        "vibe-manager": {
+                            "backend": "claude",
+                            "model": "haiku",
+                        }
+                    }
+                }
+            )
+        )
+
+        with (
+            patch(
+                "vibe3.config.agent_preset.repo_models_json_path",
+                return_value=repo_models,
+            ),
+            patch.dict("os.environ", {"VIBE_MODEL_MANAGER": "sonnet"}, clear=False),
+        ):
+            result = resolve_effective_agent_options(AgentOptions(agent="vibe-manager"))
+
+        assert result.backend == "claude"
+        assert result.model == "sonnet"
+
     def test_agent_preset_backend_only(self, tmp_path: Path) -> None:
         """Agent preset with backend only should resolve correctly."""
         repo_models = tmp_path / "config" / "models.json"

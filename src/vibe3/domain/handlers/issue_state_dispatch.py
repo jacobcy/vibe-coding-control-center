@@ -15,7 +15,7 @@ from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
 from vibe3.models import IssueInfo, IssueState
 from vibe3.services.issue import block_manager_noop_issue
-from vibe3.services.shared import record_dispatch_failure_if_unexpected
+from vibe3.services.shared import record_dispatch_failure_if_unexpected, record_error
 
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentBackend
@@ -179,6 +179,13 @@ def handle_manager_dispatch_intent(
             return
 
         if request is None:
+            record_error(
+                error_code="E_DISPATCH_FAILURE",
+                error_message="automatic manager dispatch failed [request_none]",
+                tick_id=event.tick_id,
+                issue_number=event.issue_number,
+                branch=event.branch,
+            )
             _block_for_noop("Failed to prepare role execution request")
             return
 

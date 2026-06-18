@@ -211,6 +211,32 @@ class TestQueueExhaustedRefresh:
 
         assert len(collect_count) == 1
 
+    @pytest.mark.asyncio
+    async def test_exhausted_refresh_stays_paused_when_fresh_entries_not_dispatchable(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Recollection should not reset exhaustion without dispatchable work."""
+        capacity = make_capacity(remaining=2)
+        coordinator = make_coordinator(
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+        coordinator._dispatch_paused = True
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready", waiting_state="ready"),
+        ]
+
+        async def mock_collect():
+            return [QueueEntry(issue_number=2, collected_state="handoff")]
+
+        coordinator._collect_frozen_queue = mock_collect
+        coordinator._has_dispatchable_entries = lambda _entries: False
+
+        await coordinator.coordinate(tick_id=6)
+
+        assert coordinator.is_dispatch_paused() is True
+
 
 class TestQueuePausedBlockedCheck:
     """Tests for _queue_paused_blocked_check trigger."""
