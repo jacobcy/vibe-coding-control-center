@@ -57,7 +57,7 @@ from vibe3.roles.review_helpers import (
 )
 from vibe3.services.flow import FlowService
 from vibe3.services.issue import fail_reviewer_issue
-from vibe3.services.shared import record_dispatch_failure_if_unexpected
+from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
 
 def validate_review_prerequisites(

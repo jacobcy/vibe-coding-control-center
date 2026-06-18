@@ -21,9 +21,8 @@ from vibe3.commands.common import _handle_codeagent_result, enable_method_trace
 from vibe3.roles import (
     resolve_spec_plan_input,
 )
-from vibe3.services.flow import FlowService
+from vibe3.services.flow import FlowService, resolve_branch_arg
 from vibe3.services.handoff import resolve_handoff_target
-from vibe3.services.shared import resolve_branch_arg
 
 app = typer.Typer(
     name="plan",

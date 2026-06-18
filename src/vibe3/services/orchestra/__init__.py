@@ -3,6 +3,8 @@
 Public API Contract:
 - FlowOrchestratorService: Main orchestration service
 - OrchestraStatusService, OrchestraSnapshot, IssueStatusEntry: Status management
+- ErrorTrackingService: Error tracking service
+- record_error, record_dispatch_failure_if_unexpected: Error recording wrappers
 - fetch_serve_status_data: Serve status utilities
 - get_manager_usernames, get_handoff_state_label: Config utilities
 
@@ -18,6 +20,10 @@ if TYPE_CHECKING:
     )
     from vibe3.services.orchestra.coordination import CoordinationResolver
     from vibe3.services.orchestra.error_projection import build_error_projection_hook
+    from vibe3.services.orchestra.error_recording import (
+        record_dispatch_failure_if_unexpected,
+        record_error,
+    )
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
     from vibe3.services.orchestra.serve_status import (
@@ -39,6 +45,9 @@ __all__ = [
     "get_handoff_state_label",
     # From error_projection
     "build_error_projection_hook",
+    # From error_recording
+    "record_error",
+    "record_dispatch_failure_if_unexpected",
     # From orchestrator
     "CoordinationResolver",
     "ErrorTrackingService",
@@ -61,6 +70,9 @@ _SYMBOL_MODULES = {
     "get_handoff_state_label": "vibe3.config",
     # From error_projection
     "build_error_projection_hook": "vibe3.services.orchestra.error_projection",
+    # From error_recording
+    "record_error": "vibe3.services.orchestra.error_recording",
+    "record_dispatch_failure_if_unexpected": "vibe3.services.orchestra.error_recording",
     # From orchestrator
     "CoordinationResolver": "vibe3.services.orchestra.coordination",
     "ErrorTrackingService": "vibe3.services.orchestra.error_tracking",
