@@ -480,9 +480,105 @@ def restore_flow(
     console.print(f"[dim]Run 'vibe flow show {target_branch}' to verify[/]")
 
 
+def check_integrity(
+    repair: Annotated[
+        bool,
+        typer.Option("--repair", help="Execute deletion of invalid rows"),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+    output_format: FormatOption = "table",
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
+) -> None:
+    """Check integrity of flow_issue_links table for invalid branch references.
+
+    Detects rows where branch matches protected branches or scene_base_ref.
+    Default is dry-run mode; use --repair to delete invalid rows.
+    """
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
+
+    from rich.table import Table
+
+    from vibe3.clients import SQLiteClient
+
+    store = SQLiteClient()
+
+    invalid_rows = store.list_invalid_branch_links()
+
+    if not invalid_rows:
+        console.print("[green]✓[/] No invalid branch links found")
+        raise typer.Exit(0)
+
+    if output_format in ("json", "yaml"):
+        output_data = invalid_rows
+        if output_format == "json":
+            typer.echo(json.dumps(output_data, indent=2, default=str))
+        else:
+            import yaml
+
+            typer.echo(
+                yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
+            )
+        raise typer.Exit(0)
+
+    table = Table(title=f"Invalid Branch Links ({len(invalid_rows)} found)")
+    table.add_column("Branch", style="red")
+    table.add_column("Issue #", style="yellow")
+    table.add_column("Role", style="cyan")
+    table.add_column("Created At", style="dim")
+
+    for row in invalid_rows:
+        table.add_row(
+            row.get("branch", "?"),
+            str(row.get("issue_number", "?")),
+            row.get("issue_role", "?"),
+            row.get("created_at", "?"),
+        )
+
+    console.print(table)
+
+    if not repair:
+        console.print(
+            f"\n[yellow]Found {len(invalid_rows)} invalid rows. "
+            f"Use --repair to delete them.[/]"
+        )
+        console.print("[dim]Proposed SQL for each row:[/]")
+        for row in invalid_rows:
+            console.print(
+                f"[dim]  DELETE FROM flow_issue_links WHERE branch = '{row['branch']}' "
+                f"AND issue_number = {row['issue_number']} "
+                f"AND issue_role = '{row['issue_role']}';[/]"
+            )
+        raise typer.Exit(0)
+
+    if not yes and not typer.confirm(
+        f"\nDelete {len(invalid_rows)} invalid rows?", default=False
+    ):
+        console.print("[yellow]Repair aborted[/]")
+        raise typer.Exit(0)
+
+    deleted_count = store.delete_invalid_branch_links(invalid_rows)
+    console.print(f"[green]✓[/] Deleted {deleted_count} invalid branch links")
+
+
 def register_manage_commands(app: typer.Typer) -> None:
     """Register flow management commands."""
     app.command(name="update")(update)
     app.command()(bind)
     app.command(name="list-deleted")(list_deleted)
     app.command(name="restore")(restore_flow)
+    app.command(name="check-integrity")(check_integrity)

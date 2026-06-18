@@ -568,3 +568,93 @@ class SQLiteFlowStateRepo(_HasConnection):
             dependents_count=len(dependents),
         ).debug("Retrieved flow dependents")
         return dependents
+
+    def list_invalid_branch_links(
+        self,
+        scene_base_ref: str | None = None,
+        protected_branches: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Scan flow_issue_links for rows matching protected/base branches.
+
+        Args:
+            scene_base_ref: Configured scene base ref (e.g., 'origin/main').
+                If None, loads from orchestra config.
+            protected_branches: List of protected branch names.
+                If None, loads from VibeConfig defaults.
+
+        Returns:
+            List of dicts with keys: branch, issue_number, issue_role, created_at.
+        """
+        from vibe3.config import VibeConfig, load_orchestra_config
+
+        if scene_base_ref is None:
+            scene_base_ref = load_orchestra_config().scene_base_ref
+        if protected_branches is None:
+            protected_branches = list(VibeConfig.get_defaults().flow.protected_branches)
+
+        def normalize_ref(ref: str) -> str:
+            return ref.replace("origin/", "") if ref.startswith("origin/") else ref
+
+        base_branch = normalize_ref(scene_base_ref)
+
+        invalid_branches: set[str] = set()
+        for protected in protected_branches:
+            invalid_branches.add(protected)
+            invalid_branches.add(f"origin/{protected}")
+        invalid_branches.add(base_branch)
+        invalid_branches.add(f"origin/{base_branch}")
+
+        if not invalid_branches:
+            return []
+
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in invalid_branches)
+        cursor.execute(
+            f"SELECT branch, issue_number, issue_role, created_at "
+            f"FROM flow_issue_links WHERE branch IN ({placeholders})",
+            tuple(invalid_branches),
+        )
+        rows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="list_invalid_branch_links",
+            count=len(rows),
+        ).debug("Scanned for invalid branch links")
+        return rows
+
+    def delete_invalid_branch_links(
+        self,
+        invalid_rows: list[dict[str, Any]],
+    ) -> int:
+        """Delete specific invalid rows from flow_issue_links.
+
+        Args:
+            invalid_rows: List of rows to delete (branch, issue_number, issue_role).
+
+        Returns:
+            Count of deleted rows.
+        """
+        if not invalid_rows:
+            return 0
+
+        conn = self._get_connection()
+        deleted_count = 0
+        with conn:
+            cursor = conn.cursor()
+            for row in invalid_rows:
+                cursor.execute(
+                    "DELETE FROM flow_issue_links "
+                    "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
+                    (row["branch"], row["issue_number"], row["issue_role"]),
+                )
+                if cursor.rowcount > 0:
+                    deleted_count += 1
+
+        logger.bind(
+            external="sqlite",
+            operation="delete_invalid_branch_links",
+            deleted_count=deleted_count,
+        ).info("Deleted invalid branch links")
+        return deleted_count

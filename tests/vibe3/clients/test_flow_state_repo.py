@@ -211,3 +211,224 @@ def test_get_branch_for_task_issue_returns_none_for_non_task_role() -> None:
 
         # Should return None because link is 'dependency' not 'task'
         assert result is None
+
+
+def test_list_invalid_branch_links_returns_empty_when_clean() -> None:
+    """Scan should return empty list when no invalid branch links."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state(
+            "task/issue-100", flow_slug="issue-100", flow_status="active"
+        )
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("task/issue-100", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="origin/main",
+            protected_branches=["main", "master", "develop"],
+        )
+
+        assert result == []
+
+
+def test_list_invalid_branch_links_detects_main() -> None:
+    """Scan should detect 'main' branch link."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("main", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="origin/develop",
+            protected_branches=["main"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["branch"] == "main"
+        assert result[0]["issue_number"] == 100
+        assert result[0]["issue_role"] == "task"
+
+
+def test_list_invalid_branch_links_detects_master() -> None:
+    """Scan should detect 'master' branch link."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("master", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="origin/main",
+            protected_branches=["master", "develop"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["branch"] == "master"
+
+
+def test_list_invalid_branch_links_detects_develop() -> None:
+    """Scan should detect 'develop' branch link."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("develop", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="origin/main",
+            protected_branches=["master", "develop"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["branch"] == "develop"
+
+
+def test_list_invalid_branch_links_detects_origin_main() -> None:
+    """Scan should detect 'origin/main' branch link."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("origin/main", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="origin/develop",
+            protected_branches=["main"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["branch"] == "origin/main"
+
+
+def test_list_invalid_branch_links_detects_scene_base_ref() -> None:
+    """Scan should detect configured scene_base_ref branch link."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("release/v1.0", 100, "task"),
+        )
+        conn.commit()
+
+        result = store.list_invalid_branch_links(
+            scene_base_ref="release/v1.0",
+            protected_branches=["main"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["branch"] == "release/v1.0"
+
+
+def test_delete_invalid_branch_links_removes_only_targeted() -> None:
+    """Delete should remove only specified rows, leave valid ones."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("main", 100, "task"),
+        )
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("task/issue-200", 200, "task"),
+        )
+        conn.commit()
+
+        invalid_rows = [{"branch": "main", "issue_number": 100, "issue_role": "task"}]
+        deleted_count = store.delete_invalid_branch_links(invalid_rows)
+
+        assert deleted_count == 1
+
+        cursor.execute("SELECT COUNT(*) FROM flow_issue_links WHERE branch = 'main'")
+        assert cursor.fetchone()[0] == 0
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_issue_links WHERE branch = 'task/issue-200'"
+        )
+        assert cursor.fetchone()[0] == 1
+
+
+def test_delete_invalid_branch_links_returns_delete_count() -> None:
+    """Delete method should return correct count of deleted rows."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("main", 100, "task"),
+        )
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("master", 200, "task"),
+        )
+        conn.commit()
+
+        invalid_rows = [
+            {"branch": "main", "issue_number": 100, "issue_role": "task"},
+            {"branch": "master", "issue_number": 200, "issue_role": "task"},
+        ]
+        deleted_count = store.delete_invalid_branch_links(invalid_rows)
+
+        assert deleted_count == 2
