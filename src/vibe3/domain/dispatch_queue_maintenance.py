@@ -11,9 +11,12 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from vibe3.config import get_manager_usernames
-from vibe3.domain.queue_dirty import clear_queue_dirty, is_queue_dirty
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-from vibe3.services.shared import should_skip_from_queue
+from vibe3.services.shared import (
+    clear_queue_dirty,
+    is_queue_dirty,
+    should_skip_from_queue,
+)
 from vibe3.utils import resolve_milestone_rank, resolve_priority, resolve_roadmap_rank
 
 if TYPE_CHECKING:
@@ -360,8 +363,15 @@ class DispatchQueueMaintenanceService:
             "GlobalDispatchCoordinator: queue dirty signal consumed",
         )
 
-        # Resort existing queue to pick up resumed issues
-        result = self.resort_existing(frozen_queue)
+        try:
+            # Resort existing queue to pick up resumed issues
+            result = self.resort_existing(frozen_queue)
+        except Exception:
+            logger.bind(
+                domain="global_dispatch",
+                trigger="queue_dirty_signal",
+            ).warning("Resort failed after dirty signal, returning unchanged queue")
+            return True, frozen_queue, dispatch_paused
 
         # Check if resort found any actionable entries
         has_actionable = any(
@@ -382,8 +392,18 @@ class DispatchQueueMaintenanceService:
                 "GlobalDispatchCoordinator: queue dirty signal: "
                 "full collection fallback (resort found no actionable entries)",
             )
-            result = await self._collect_frozen_queue_fn()
-            self._invalidate_pr_cache()
+            try:
+                result = await self._collect_frozen_queue_fn()
+                self._invalidate_pr_cache()
+            except Exception:
+                logger.bind(
+                    domain="global_dispatch",
+                    trigger="queue_dirty_signal",
+                ).warning(
+                    "Full collection failed after dirty signal, "
+                    "returning resort result"
+                )
+                return True, result, dispatch_paused
 
             # Check again if full collection found actionable entries
             has_actionable_after = any(

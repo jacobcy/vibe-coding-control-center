@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from vibe3.domain.queue_dirty import (
+from vibe3.services.shared import (
     clear_queue_dirty,
     is_queue_dirty,
     mark_queue_dirty,

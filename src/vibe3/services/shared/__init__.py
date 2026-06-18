@@ -87,6 +87,11 @@ if TYPE_CHECKING:
         resolve_ref_path,
         sanitize_event_detail_paths,
     )
+    from vibe3.services.shared.queue_dirty import (
+        clear_queue_dirty,
+        is_queue_dirty,
+        mark_queue_dirty,
+    )
     from vibe3.services.shared.roles import get_role_block_function
     from vibe3.services.shared.signatures import SignatureService
     from vibe3.services.shared.spec_ref import SpecRefInfo, SpecRefService
@@ -122,6 +127,7 @@ __all__ = [
     "check_ref_exists",
     "classify_dispatch_eligibility",
     "clean_old_state_labels",
+    "clear_queue_dirty",
     "emit_issue_failed",
     "ensure_task_issue_bound",
     "extract_role_from_actor",
@@ -137,7 +143,9 @@ __all__ = [
     "is_auto_task_branch",
     "is_dev_collab_branch",
     "is_human_comment",
+    "is_queue_dirty",
     "log_dispatch_error",
+    "mark_queue_dirty",
     "material_loader",
     "normalize_assignees",
     "normalize_labels",
@@ -175,6 +183,7 @@ _SYMBOL_MODULES = {
     "check_ref_exists": "vibe3.services.shared.paths",
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
+    "clear_queue_dirty": "vibe3.services.shared.queue_dirty",
     "emit_issue_failed": "vibe3.services.shared.events",
     "ensure_task_issue_bound": "vibe3.services.shared.binding_guard",
     "extract_role_from_actor": "vibe3.services.shared.actors",
@@ -190,7 +199,9 @@ _SYMBOL_MODULES = {
     "is_auto_task_branch": "vibe3.services.shared.status_query",
     "is_dev_collab_branch": "vibe3.services.shared.status_query",
     "is_human_comment": "vibe3.services.shared.comment",
+    "is_queue_dirty": "vibe3.services.shared.queue_dirty",
     "log_dispatch_error": "vibe3.services.shared.errors",
+    "mark_queue_dirty": "vibe3.services.shared.queue_dirty",
     "material_loader": "vibe3.services.shared.file_loader",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",

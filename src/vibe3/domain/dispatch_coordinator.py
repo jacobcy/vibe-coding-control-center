@@ -704,7 +704,7 @@ class GlobalDispatchCoordinator:
 
         # Step 2.6: Consume queue-dirty signal from external sources
         # (e.g., CLI task resume)
-        dirty_consumed, self._frozen_queue, self._dispatch_paused = (
+        _dirty_consumed, self._frozen_queue, self._dispatch_paused = (
             await self._queue_maintenance.consume_queue_dirty_signal(
                 self._frozen_queue or [],
                 dispatch_paused=self._dispatch_paused,

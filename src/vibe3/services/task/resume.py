@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 from loguru import logger
 
 from vibe3.clients import BackendProtocol, GitClient, GitHubClient
-from vibe3.domain.queue_dirty import mark_queue_dirty
 from vibe3.exceptions import UserError
 from vibe3.models import IssueState
 from vibe3.services.issue import IssueFlowService
+from vibe3.services.shared import mark_queue_dirty
 from vibe3.services.shared.label_service import LabelService
 from vibe3.services.shared.status_query import StatusQueryService
 
