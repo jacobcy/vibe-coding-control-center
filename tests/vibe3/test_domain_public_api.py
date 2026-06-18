@@ -42,7 +42,8 @@ def test_services_task_resume_operations_importable() -> None:
 
 def test_services_error_helpers_importable() -> None:
     """Test that error helper functions are importable from services."""
-    from vibe3.services.shared import has_recent_specific_error, record_error
+    from vibe3.services.orchestra import record_error
+    from vibe3.services.shared import has_recent_specific_error
 
     assert callable(has_recent_specific_error)
     assert callable(record_error)
