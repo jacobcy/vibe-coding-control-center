@@ -63,7 +63,7 @@ def ask(
 
     Uses the 'orchestra-explorer' agent preset from config/v3/models.json:
     - backend: claude
-    - model: sonnet
+    - model: haiku
     - timeout: 180 seconds (hardcoded for Q&A)
 
     Examples:
@@ -119,7 +119,7 @@ def ask(
         prompt = render_result.rendered_text
 
         # Use orchestra-explorer agent preset from models.json
-        # This will use claude backend with sonnet model
+        # This will use claude backend with haiku model
         agent_options = AgentOptions(
             agent="orchestra-explorer",
             timeout_seconds=180,  # 3 minutes for Q&A
