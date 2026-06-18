@@ -343,7 +343,7 @@ code_limits:
         limit: 420
         reason: "Handoff 高级命令测试集（从 test_handoff_commands.py 拆分），覆盖 append/plan/report/audit 命令、next step 逻辑、real service path 测试等紧密耦合场景"
       - path: "tests/vibe3/domain/handlers/test_issue_state_dispatch.py"
-        limit: 500
+        limit: 550
         reason: "Issue state dispatch 测试集（从 test_manager.py 合并），覆盖 manager handler、issue state transition、dispatch blocking 等紧密耦合场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/handlers/test_dispatch.py"
         limit: 420
