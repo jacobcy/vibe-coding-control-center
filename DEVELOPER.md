@@ -78,7 +78,11 @@ uv run pytest tests/vibe3
 
 如果需要理解命令、数据模型、技能或 handoff 的正式边界，优先阅读 `docs/standards/v3/` 下的标准文档。
 
-**术语对齐**: 本项目严格区分 `assignee issue` (Manager 链处理对象)、`supervisor issue` (治理链处理对象)、`task issue` (Flow 关联角色) 和 `verdict` (执行裁决)。详细定义见 [glossary.md](docs/standards/glossary.md)。
+**术语对齐**: 本项目严格区分 `assignee issue` (Manager 链处理对象) 与 `supervisor issue` (治理链处理对象)。
+- **assignee issue**: 进入执行池，由 Manager 主链 (Plan/Run/Review) 负责推进，通常涉及业务代码实现，运行在 L3 持久 worktree。
+- **supervisor issue**: 显式治理任务，由 `supervisor/apply` 负责闭环，仅限文档治理或测试修补，运行在 L2 临时 worktree。
+详细定义见 [glossary.md](docs/standards/glossary.md)。
+
 
 ---
 

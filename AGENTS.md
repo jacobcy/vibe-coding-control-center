@@ -44,7 +44,7 @@ Follow this reading order. Each document is the authority for its domain:
 5. **[docs/standards/glossary.md](docs/standards/glossary.md)** — Project terminology
 6. **[docs/decisions/INDEX.md](docs/decisions/INDEX.md)** — Architecture Decision Records
 7. **[docs/standards/action-verbs.md](docs/standards/action-verbs.md)** — Action verb definitions
-8. **[.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)** — AI rules (Legacy: .agent/rules/)
+8. **[.claude/rules/coding-standards.md](.claude/rules/coding-standards.md)** — AI rules (Canonical Source)
 9. **[docs/README.md](docs/README.md)** — Documentation structure
 
 ## 🔄 Key Workflows (工作流)
@@ -89,7 +89,7 @@ This project has **two parallel implementations**:
 - **V3 Hub**: `lib3/` (V3 Python 核心包装器与仓库重定向)
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, context**: `.agent/`
-- **Rules**: `.claude/rules/` (Moved from `.agent/rules/`)
+- **Rules**: `.claude/rules/` (Canonical Truth)
 - **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
 
 ## 🚀 Quick Start
