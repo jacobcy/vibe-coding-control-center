@@ -48,7 +48,7 @@ def test_classify_changed_files_splits_existing_and_deleted(tmp_path) -> None:
     assert "docs/README.md" in scope.other_files
 
 
-def test_count_changed_lines_supports_optional_path_filter() -> None:
+def test_count_changed_lines_counts_diff_lines() -> None:
     diff_text = "\n".join(
         [
             "diff --git a/src/vibe3/services/foo.py b/src/vibe3/services/foo.py",
@@ -64,7 +64,6 @@ def test_count_changed_lines_supports_optional_path_filter() -> None:
     )
 
     assert count_changed_lines(diff_text) == 3
-    assert count_changed_lines(diff_text, code_paths=["src/"]) == 2
 
 
 def test_is_v3_test_file_excludes_init_py() -> None:

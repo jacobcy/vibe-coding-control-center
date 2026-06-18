@@ -62,7 +62,7 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
 def count_changed_lines_in_code_paths(git: GitClient, source: ChangeSource) -> int:
     """Count changed lines only in configured code paths."""
     code_paths = _code_paths()
-    return count_changed_lines(git.get_diff(source), code_paths=code_paths)
+    return count_changed_lines(git.get_diff(source, pathspec=code_paths))
 
 
 def _merge_symbol_map(

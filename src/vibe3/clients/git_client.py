@@ -145,7 +145,9 @@ class GitClientProtocol(Protocol):
         self, source: ChangeSource, pathspec: str | None = None
     ) -> list[str]: ...
 
-    def get_diff(self, source: ChangeSource) -> str: ...
+    def get_diff(
+        self, source: ChangeSource, pathspec: list[str] | None = None
+    ) -> str: ...
 
 
 class GitClient:
@@ -308,10 +310,12 @@ class GitClient:
             self._run, resolved, self._github_client, pathspec=pathspec
         )
 
-    def get_diff(self, source: ChangeSource) -> str:
+    def get_diff(self, source: ChangeSource, pathspec: list[str] | None = None) -> str:
         """统一接口：获取 diff 内容."""
         resolved = self._resolve_source(source)
-        return _get_diff(self._run, resolved, self._github_client, self._pr_diff_cache)
+        return _get_diff(
+            self._run, resolved, self._github_client, self._pr_diff_cache, pathspec
+        )
 
     def get_numstat(self, source: ChangeSource) -> str:
         """Get git diff --numstat output for a change source."""
