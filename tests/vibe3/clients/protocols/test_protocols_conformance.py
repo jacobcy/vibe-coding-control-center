@@ -74,85 +74,85 @@ class TestProtocolStructuralTyping:
         """Test TriggerableRoleDefinitionProtocol is a Protocol."""
         from vibe3.clients.protocols.role import TriggerableRoleDefinitionProtocol
 
-        assert issubclass(TriggerableRoleDefinitionProtocol, Protocol)
+        assert issubclass(TriggerableRoleDefinitionProtocol, Protocol)  # type: ignore[arg-type]
 
     def test_backend_protocol_is_protocol(self) -> None:
         """Test BackendProtocol is a Protocol."""
         from vibe3.clients.protocols.backend import BackendProtocol
 
-        assert issubclass(BackendProtocol, Protocol)
+        assert issubclass(BackendProtocol, Protocol)  # type: ignore[arg-type]
 
     def test_flow_reader_is_protocol(self) -> None:
         """Test FlowReader is a Protocol."""
         from vibe3.clients.protocols.flow import FlowReader
 
-        assert issubclass(FlowReader, Protocol)
+        assert issubclass(FlowReader, Protocol)  # type: ignore[arg-type]
 
     def test_flow_state_port_is_protocol(self) -> None:
         """Test FlowStatePort is a Protocol."""
         from vibe3.clients.protocols.flow import FlowStatePort
 
-        assert issubclass(FlowStatePort, Protocol)
+        assert issubclass(FlowStatePort, Protocol)  # type: ignore[arg-type]
 
     def test_git_path_protocol_is_protocol(self) -> None:
         """Test GitPathProtocol is a Protocol."""
         from vibe3.clients.protocols.git import GitPathProtocol
 
-        assert issubclass(GitPathProtocol, Protocol)
+        assert issubclass(GitPathProtocol, Protocol)  # type: ignore[arg-type]
 
     def test_github_auth_port_is_protocol(self) -> None:
         """Test GitHubAuthPort is a Protocol."""
         from vibe3.clients.protocols.github import GitHubAuthPort
 
-        assert issubclass(GitHubAuthPort, Protocol)
+        assert issubclass(GitHubAuthPort, Protocol)  # type: ignore[arg-type]
 
     def test_pr_read_port_is_protocol(self) -> None:
         """Test PRReadPort is a Protocol."""
         from vibe3.clients.protocols.github import PRReadPort
 
-        assert issubclass(PRReadPort, Protocol)
+        assert issubclass(PRReadPort, Protocol)  # type: ignore[arg-type]
 
     def test_pr_write_port_is_protocol(self) -> None:
         """Test PRWritePort is a Protocol."""
         from vibe3.clients.protocols.github import PRWritePort
 
-        assert issubclass(PRWritePort, Protocol)
+        assert issubclass(PRWritePort, Protocol)  # type: ignore[arg-type]
 
     def test_pr_diff_port_is_protocol(self) -> None:
         """Test PRDiffPort is a Protocol."""
         from vibe3.clients.protocols.github import PRDiffPort
 
-        assert issubclass(PRDiffPort, Protocol)
+        assert issubclass(PRDiffPort, Protocol)  # type: ignore[arg-type]
 
     def test_pr_comment_port_is_protocol(self) -> None:
         """Test PRCommentPort is a Protocol."""
         from vibe3.clients.protocols.github import PRCommentPort
 
-        assert issubclass(PRCommentPort, Protocol)
+        assert issubclass(PRCommentPort, Protocol)  # type: ignore[arg-type]
 
     def test_issue_read_port_is_protocol(self) -> None:
         """Test IssueReadPort is a Protocol."""
         from vibe3.clients.protocols.github import IssueReadPort
 
-        assert issubclass(IssueReadPort, Protocol)
+        assert issubclass(IssueReadPort, Protocol)  # type: ignore[arg-type]
 
     def test_issue_write_port_is_protocol(self) -> None:
         """Test IssueWritePort is a Protocol."""
         from vibe3.clients.protocols.github import IssueWritePort
 
-        assert issubclass(IssueWritePort, Protocol)
+        assert issubclass(IssueWritePort, Protocol)  # type: ignore[arg-type]
 
     def test_github_client_protocol_is_protocol(self) -> None:
         """Test GitHubClientProtocol is a Protocol."""
         from vibe3.clients.protocols.github import GitHubClientProtocol
 
-        assert issubclass(GitHubClientProtocol, Protocol)
+        assert issubclass(GitHubClientProtocol, Protocol)  # type: ignore[arg-type]
 
     def test_base_resolver_is_protocol(self) -> None:
         """Test BaseResolver is a Protocol."""
         from vibe3.clients.protocols.pr import BaseResolver
 
-        assert issubclass(BaseResolver, Protocol)
+        assert issubclass(BaseResolver, Protocol)  # type: ignore[arg-type]
 
 
 class TestProtocolAllIntegrity:
