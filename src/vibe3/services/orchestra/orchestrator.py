@@ -372,7 +372,7 @@ class FlowOrchestratorService:
                         branch=branch,
                         issue=issue_number,
                     ).warning(
-                        f"Git ref lock conflict "
+                        f"Git transient error "
                         f"(attempt {attempt + 1}/{MAX_FETCH_RETRIES}): {e}"
                     )
                     self.git.pack_refs_all()
