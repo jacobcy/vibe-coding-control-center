@@ -45,10 +45,8 @@ def ask(
     This spawns an orchestra-explorer agent to answer questions about code structure,
     documentation, conventions, and other static project knowledge.
 
-    Uses the 'orchestra-explorer' agent preset from config/v3/models.json:
-    - backend: claude
-    - model: sonnet
-    - timeout: 180 seconds (hardcoded for Q&A)
+    The agent preset is defined in config/v3/models.json and can be configured
+    via environment variables.
 
     Examples:
         vibe3 ask "What is the structure of src/vibe3/?"
@@ -103,7 +101,6 @@ def ask(
         prompt = render_result.rendered_text
 
         # Use orchestra-explorer agent preset from models.json
-        # This will use claude backend with sonnet model
         agent_options = AgentOptions(
             agent="orchestra-explorer",
             timeout_seconds=180,  # 3 minutes for Q&A
