@@ -8,7 +8,7 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.config import load_orchestra_config
 from vibe3.models import OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
@@ -203,9 +203,10 @@ class ServeStatusService:
 
     def _display_runtime_jobs(self) -> None:
         """Display launched role sessions from durable runtime_session state."""
-        from vibe3.execution import JobMonitorService
+        import importlib
 
-        job_svc = JobMonitorService(store=SQLiteClient())
+        module = importlib.import_module("vibe3.execution.job_monitor_service")
+        job_svc = module.JobMonitorService(store=SQLiteClient())
         snapshot = job_svc.snapshot()
 
         self.console.print(

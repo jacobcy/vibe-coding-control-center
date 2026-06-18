@@ -139,20 +139,21 @@ def resolve_repo_agent_preset(
     """
     data = read_models_json(repo_models_json_path())
     agents = data.get("agents")
-    if not isinstance(agents, dict):
-        return None
 
-    resolved = _resolve_agent_entry(agents, agent_name)
-    if resolved is None:
-        return None
-    _, raw = resolved
+    backend = None
+    model = None
 
-    backend = raw.get("backend")
-    model = raw.get("model")
-    if backend is not None and not isinstance(backend, str):
-        backend = None
-    if model is not None and not isinstance(model, str):
-        model = None
+    if isinstance(agents, dict):
+        resolved = _resolve_agent_entry(agents, agent_name)
+        if resolved is not None:
+            _, raw = resolved
+            backend = raw.get("backend")
+            model = raw.get("model")
+            if backend is not None and not isinstance(backend, str):
+                backend = None
+            if model is not None and not isinstance(model, str):
+                model = None
+
     role = agent_name.replace("vibe-", "").upper()
     env_backend = os.environ.get(f"VIBE_BACKEND_{role}")
     env_model = os.environ.get(f"VIBE_MODEL_{role}")
