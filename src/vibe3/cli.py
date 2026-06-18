@@ -23,6 +23,7 @@ from rich import box as _box  # noqa: E402
 
 from vibe3.commands import (  # noqa: E402
     ask,
+    audit,
     check,
     flow,
     handoff,
@@ -108,6 +109,7 @@ app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
 app.add_typer(mcp.app, name="mcp")
 app.add_typer(ask.app, name="ask")
+app.add_typer(audit.app, name="audit")
 
 
 @app.command(name="status", hidden=True)
