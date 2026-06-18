@@ -5,9 +5,7 @@ Implements evidence collection from flow store, GitHub, and git for audit purpos
 
 import hashlib
 import re
-import socket
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -16,17 +14,19 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.audit_evidence import (
-    CollectionContext,
     EvidenceBundle,
-    EvidenceSummary,
     FlowRef,
     GitHubRef,
     GitRef,
-    PrimarySubject,
-    RepoInfo,
-    SourceRefs,
-    TimeWindow,
-    Trust,
+)
+from vibe3.services.audit.bundle_builder import (
+    build_collection_context,
+    build_primary_subject,
+    build_repo_info,
+    build_source_refs,
+    build_summary,
+    build_trust,
+    generate_bundle_id,
 )
 
 
@@ -415,16 +415,7 @@ class AuditEvidenceCollector:
                 limitations.append(f"GitHub PR collection failed: {str(e)}")
                 logger.warning(f"GitHub PR evidence collection failed: {e}")
 
-        # Build collection context
-        time_window_obj = TimeWindow()
-        if time_window:
-            time_window_obj = TimeWindow(
-                start=time_window[0].isoformat(),
-                end=time_window[1].isoformat(),
-            )
-
         # Get source metadata
-        source_machine = socket.gethostname()
         source_db = getattr(self.sqlite, "db_path", None)
         try:
             source_commit = self.git.get_current_commit()
@@ -432,65 +423,16 @@ class AuditEvidenceCollector:
             source_commit = None
             limitations.append(f"Git commit resolution failed: {str(e)}")
 
-        collection_context = CollectionContext(
-            mode=mode,  # type: ignore
-            source_machine=source_machine,
-            source_db=source_db,
-            source_commit=source_commit,
-            time_window=time_window_obj,
+        # Build bundle components
+        collection_context = build_collection_context(
+            mode, source_db, source_commit, time_window
         )
-
-        # Build primary subject
-        primary_subject = PrimarySubject(
-            issue_number=issue_number,
-            branch=branch,
-            pr_number=None,
-        )
-
-        # Build source refs
-        source_refs = SourceRefs(
-            github=github_refs,
-            flow=flow_refs,
-            handoff=[],  # Would need separate handoff collection logic
-            git=git_refs,
-            prompt=[],
-            skill=[],
-            memory=[],
-        )
-
-        # Build repo info
-        repo_info = RepoInfo(
-            owner="owner",  # Would need to parse from repo string or git remote
-            name="repo",
-            local_root=str(Path.cwd()),
-        )
-
-        # Build summary (simplified; real impl would analyze flow state)
-        symptom = f"Evidence collected for {mode} mode"
-        evidence_text = (
-            f"Flow refs: {len(flow_refs)}, "
-            f"GitHub refs: {len(github_refs)}, "
-            f"Git refs: {len(git_refs)}"
-        )
-        summary = EvidenceSummary(
-            symptom=symptom,
-            evidence_text=evidence_text,
-            candidate_failure_patterns=[],
-        )
-
-        # Build trust classification with error limitations
-        trust = Trust(
-            source_class="authoritative",
-            freshness="fresh",
-            confidence="medium" if not limitations else "weak",
-            limitations=limitations,
-        )
-
-        # Generate bundle ID
-        bundle_id_data = (
-            f"{mode}:{issue_number or ''}:{branch or ''}:{datetime.now().isoformat()}"
-        )
-        bundle_id = hashlib.sha256(bundle_id_data.encode()).hexdigest()[:16]
+        primary_subject = build_primary_subject(issue_number, branch)
+        source_refs = build_source_refs(github_refs, flow_refs, git_refs)
+        repo_info = build_repo_info()
+        summary = build_summary(mode, flow_refs, github_refs, git_refs)
+        trust = build_trust(limitations)
+        bundle_id = generate_bundle_id(mode, issue_number, branch)
 
         # Assemble bundle
         bundle = EvidenceBundle(
@@ -506,57 +448,3 @@ class AuditEvidenceCollector:
 
         logger.info(f"Assembled evidence bundle: {bundle_id}")
         return bundle
-
-    def format_bundle_json(self, bundle: EvidenceBundle) -> str:
-        """Format bundle as JSON string.
-
-        Args:
-            bundle: Evidence bundle to format
-
-        Returns:
-            JSON string representation
-        """
-        return bundle.model_dump_json(indent=2)
-
-    def format_bundle_summary(self, bundle: EvidenceBundle) -> str:
-        """Format bundle as human-readable summary.
-
-        Args:
-            bundle: Evidence bundle to format
-
-        Returns:
-            Human-readable text summary
-        """
-        lines = [
-            f"Evidence Bundle: {bundle.id}",
-            f"Schema Version: {bundle.schema_version}",
-            f"Created: {bundle.created_at}",
-            f"Mode: {bundle.collection_context.mode}",
-            "",
-            "Primary Subject:",
-            f"  Issue: {bundle.primary_subject.issue_number or 'N/A'}",
-            f"  Branch: {bundle.primary_subject.branch or 'N/A'}",
-            f"  PR: {bundle.primary_subject.pr_number or 'N/A'}",
-            "",
-            "Source References:",
-            f"  GitHub: {len(bundle.source_refs.github)}",
-            f"  Flow: {len(bundle.source_refs.flow)}",
-            f"  Handoff: {len(bundle.source_refs.handoff)}",
-            f"  Git: {len(bundle.source_refs.git)}",
-            "",
-            "Summary:",
-            f"  Symptom: {bundle.summary.symptom}",
-            f"  Evidence: {bundle.summary.evidence_text}",
-            "",
-            "Trust:",
-            f"  Class: {bundle.trust.source_class}",
-            f"  Freshness: {bundle.trust.freshness}",
-            f"  Confidence: {bundle.trust.confidence}",
-        ]
-
-        if bundle.trust.limitations:
-            lines.append("  Limitations:")
-            for limitation in bundle.trust.limitations:
-                lines.append(f"    - {limitation}")
-
-        return "\n".join(lines)

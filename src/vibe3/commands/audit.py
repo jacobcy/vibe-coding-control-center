@@ -14,6 +14,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.audit.collector import AuditEvidenceCollector
+from vibe3.services.audit.formatter import format_bundle_json, format_bundle_summary
 
 app = typer.Typer(
     name="audit",
@@ -145,9 +146,9 @@ def bundle(
 
     # Format output
     if format.lower() == "json":
-        output_text = collector.format_bundle_json(bundle)
+        output_text = format_bundle_json(bundle)
     else:
-        output_text = collector.format_bundle_summary(bundle)
+        output_text = format_bundle_summary(bundle)
 
     # Output to file or stdout
     if output:

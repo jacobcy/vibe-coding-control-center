@@ -44,6 +44,9 @@ code_limits:
       - path: "src/vibe3/services/handoff/service.py"
         limit: 650
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
+      - path: "src/vibe3/services/audit/collector.py"
+        limit: 500
+        reason: "Audit 证据采集核心服务，内聚度高；包含 flow events、GitHub issue/PR/comments、git commits/diffs 四类数据源的采集方法，每类方法职责单一、逻辑内聚；assemble_bundle 方法整合多源数据并构建完整 EvidenceBundle；已提取 formatter.py 和 bundle_builder.py 辅助模块（Issue #2948）"
 
       # Clients 聚合 —— 允许 450-560
       - path: "src/vibe3/clients/git_status_ops.py"

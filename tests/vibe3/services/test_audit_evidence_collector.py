@@ -8,6 +8,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.audit.collector import AuditEvidenceCollector
+from vibe3.services.audit.formatter import format_bundle_json, format_bundle_summary
 
 
 @pytest.fixture
@@ -354,7 +355,7 @@ class TestFormatBundle:
         mock_git_client._run.return_value = ""
 
         bundle = collector.assemble_bundle(mode="issue", issue_number=123)
-        json_output = collector.format_bundle_json(bundle)
+        json_output = format_bundle_json(bundle)
 
         # Should be valid JSON
         import json
@@ -386,7 +387,7 @@ class TestFormatBundle:
         mock_git_client._run.return_value = ""
 
         bundle = collector.assemble_bundle(mode="issue", issue_number=123)
-        summary = collector.format_bundle_summary(bundle)
+        summary = format_bundle_summary(bundle)
 
         # Should contain key fields
         assert bundle.id in summary

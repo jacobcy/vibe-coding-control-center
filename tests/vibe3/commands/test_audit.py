@@ -68,7 +68,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"id": "test-bundle-id"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -77,6 +76,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"id": "test-bundle-id"}',
             ),
         ):
             result = runner.invoke(main_app, ["audit", "bundle", "--issue", "123"])
@@ -102,7 +105,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"id": "test-bundle-id"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -111,6 +113,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"id": "test-bundle-id"}',
             ),
         ):
             result = runner.invoke(
@@ -138,7 +144,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"test": "json"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -147,6 +152,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"test": "json"}',
             ),
         ):
             result = runner.invoke(
@@ -185,9 +194,6 @@ class TestAuditBundleCommand:
         mock_bundle.trust.confidence = "medium"
         mock_bundle.trust.limitations = []
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_summary.return_value = (
-            "Evidence Bundle: test-bundle-id"
-        )
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -196,6 +202,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_summary",
+                return_value="Evidence Bundle: test-bundle-id",
             ),
         ):
             result = runner.invoke(
@@ -221,7 +231,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"test": "json"}'
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "bundle.json"
@@ -237,6 +246,10 @@ class TestAuditBundleCommand:
                 patch(
                     "vibe3.commands.audit.AuditEvidenceCollector",
                     return_value=mock_collector,
+                ),
+                patch(
+                    "vibe3.commands.audit.format_bundle_json",
+                    return_value='{"test": "json"}',
                 ),
             ):
                 result = runner.invoke(
@@ -265,7 +278,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"test": "json"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -274,6 +286,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"test": "json"}',
             ),
         ):
             result = runner.invoke(main_app, ["audit", "bundle", "--issue", "123"])
@@ -301,7 +317,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"test": "json"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -311,13 +326,16 @@ class TestAuditBundleCommand:
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
             ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"test": "json"}',
+            ),
         ):
             result = runner.invoke(main_app, ["audit", "bundle", "--issue", "123"])
 
-        # Verify only read operations were called (assemble_bundle, format_bundle_json)
+        # Verify only read operations were called (assemble_bundle)
         assert result.exit_code == 0
         assert mock_collector.assemble_bundle.called
-        assert mock_collector.format_bundle_json.called
         # No write operations should be called
         assert not hasattr(mock_collector, "write") or not mock_collector.write.called
 
@@ -337,7 +355,6 @@ class TestAuditBundleCommand:
         mock_bundle.collection_context.source_commit = "abc123"
         mock_bundle.created_at = "2026-06-18T10:00:00"
         mock_collector.assemble_bundle.return_value = mock_bundle
-        mock_collector.format_bundle_json.return_value = '{"test": "json"}'
 
         with (
             patch("vibe3.commands.audit.SQLiteClient", return_value=mock_sqlite_client),
@@ -346,6 +363,10 @@ class TestAuditBundleCommand:
             patch(
                 "vibe3.commands.audit.AuditEvidenceCollector",
                 return_value=mock_collector,
+            ),
+            patch(
+                "vibe3.commands.audit.format_bundle_json",
+                return_value='{"test": "json"}',
             ),
         ):
             result = runner.invoke(
