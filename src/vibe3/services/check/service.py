@@ -16,7 +16,7 @@ from vibe3.clients import (
     load_sync_rules,
 )
 from vibe3.config import VibeConfig
-from vibe3.models import IssueState
+from vibe3.models import CheckResult, IssueState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
 from vibe3.services.check.remote import (
@@ -28,16 +28,6 @@ from vibe3.services.pr.service import PRService
 
 if TYPE_CHECKING:
     from vibe3.models import PRResponse
-
-
-@dataclass
-class CheckResult:
-    """Result of consistency check for a single branch."""
-
-    is_valid: bool
-    issues: list[str]
-    warnings: list[str] = field(default_factory=list)
-    branch: str = ""
 
 
 @dataclass
