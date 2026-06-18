@@ -67,6 +67,7 @@ For backward compatibility with V2 workflows, the following aliases are supporte
 | :--- | :--- | :--- |
 | `wtnew` | `vibe3 flow update` | Supplementary |
 | `vup` | `vibe3 flow update` | Supplementary |
+| `scripts/init.sh` | `vibe3 internal bootstrap` | Legacy |
 
 > **Recommendation**: Prefer `vibe3` native commands for all new development flows.
 
@@ -90,7 +91,7 @@ This project has **two parallel implementations**:
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, context**: `.agent/`
 - **Rules**: `.claude/rules/` (Canonical Truth)
-- **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
+- **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）。**严禁直接访问 `.git/vibe3/handoff/` 目录 (Worktree Handoff Restriction)，必须通过 `vibe3 handoff show @key` 等命令代理访问。**
 
 ## 🚀 Quick Start
 
@@ -101,18 +102,18 @@ This project has **two parallel implementations**:
 
 ## 🔁 Handoff 命令约定
 
-- `vibe3 handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
-- `vibe3 handoff show <artifact-path>`：读取共享 handoff artifact
+- `vibe3 handoff status`：查看当前 flow 的 handoff 链和最近记录
+- `vibe3 handoff show @key`：读取共享 handoff artifact（替代物理路径读取）
 - `vibe3 handoff append "内容"`：追加 handoff 记录，提供后续上下文
 - `vibe3 handoff verdict`：提交任务执行裁决（PASS/MAJOR/BLOCK/UNKNOWN）
 - `vibe3 handoff plan/report/indicate/audit/next`：记录特定阶段的责任链上下文
-- `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这调共享路径时，应通过 `handoff show <path>` 读取
 
 ## 架构层级 (Three-Tier Architecture)
 
-- **Tier 3 (Cognitive / Governance Layer)**: 认知与治理层。负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划。对应执行等级 L1/L2。核心命令：`serve`, `scan`, `check`, `mcp`。
-- **Tier 2 (Skill Layer)**: 技能/编排层。负责 Flow 状态机、任务编排、Agent 执行（Plan/Run/Review）。对应执行等级 L3。核心命令：`flow`, `task`, `run`, `plan`, `review`。
-- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。对应执行等级 L3/L4。核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`。
+- **Tier 3 (Cognitive / Governance Layer)**: 认知与治理层。负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划。对应执行等级 **L1/L2**。核心命令：`serve`, `scan`, `check`, `mcp`。
+- **Tier 2 (Skill Layer)**: 技能/编排层。负责 Flow 状态机、任务编排、Agent 执行 （Plan/Run/Review）。对应执行等级 **L3**。核心命令：`flow`, `task`, `run`, `plan`, `review`。
+- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。对应执行等级 **L3/L4**。核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`。
+
 
 ## 🤖 Protocol
 

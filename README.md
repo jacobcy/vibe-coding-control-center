@@ -40,18 +40,14 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 
 ```bash
 # 1. 查看 V3 运行时与任务状态 (这是 Agent 的首选入口)
-vibe3 task status      # 全局任务面板（推荐）
-vibe3 status           # [Compatibility] 兼容入口
-vibe3 snapshot show    # 查看项目健康度仪表盘
-
-vibe3 flow show        # 查看当前分支 Flow 详情
+vibe3 task status      # 全局任务面板（推荐，覆盖 Tier 3/2 概览）
+vibe3 snapshot show    # 查看项目健康度仪表盘 (Tier 1)
+vibe3 flow show        # 查看当前分支 Flow 详情 (Tier 2)
 ```
+
 # 2. 如果是首次使用或环境变更，执行初始化
 # 这会同步基础文件并初始化本地环境 (skills, hooks, etc.)
 vibe3 internal bootstrap
-
-# (Legacy) 也可以使用脚本初始化
-# zsh scripts/init.sh
 
 # 3. 如果需要全局安装 Vibe 工具链 (vibe2 shell aliases)
 zsh scripts/install.sh && source ~/.zshrc
@@ -69,10 +65,10 @@ vibe keys check  # (需 source ~/.zshrc)
 
 说明：
 
-- `scripts/install.sh` 负责全局安装与命令可用性，并会自动对当前项目补跑一次 `scripts/init.sh`
-- `scripts/init.sh` 负责当前项目 / worktree 的初始化（第三方 skills、OpenSpec、symlink、hooks、任务迁移等），不是安装脚本，而且可重复执行
-- `wtnew` 与 V3 worktree 创建路径也会自动补跑一次 `scripts/init.sh`
-- `vibe doctor` 负责工具与 Claude plugins 的事实检查
+- `vibe3 task status` 是 V3 时代的首选看板，它聚合了跨 worktree 的任务事实。
+- `vibe3 internal bootstrap` 负责当前项目 / worktree 的初始化（第三方 skills、OpenSpec、symlink、hooks、任务迁移等），可重复执行。
+- `scripts/install.sh` 负责全局安装与命令可用性。
+- `vibe doctor` 负责工具与 Claude plugins 的事实检查。
 - `vibe keys check` 负责认证 / key 来源检查
 - `/vibe-onboard` 负责引导用户检查和配置工具、Claude plugins、keys，并介绍项目与下一步
 - `vibe skills check` / `/vibe-skills-manager` 负责把 skills 体系梳理清楚，避免 codeagent-wrapper 缺少必要能力
@@ -113,32 +109,35 @@ uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py run --skill vibe-manager --async
 ```
 
-## 架构边界
+## 架构边界 (Three-Tier Architecture)
 
 ### Tier 3 (Cognitive / Governance Layer): Policies, rules, supervisor
+**Execution Level: L1 / L2**
 
 - `SOUL.md`, `CLAUDE.md`, `STRUCTURE.md`
 - `supervisor/`
 - `docs/standards/`
 - `.agent/`
 
-这一层定义宪法原则、规则、术语、流程边界和治理原则。
+这一层定义宪法原则、规则、术语、流程边界和治理原则。核心动作包括 `serve`, `scan`, `check`。
 
 ### Tier 2 (Skill Layer): Orchestration and context management
+**Execution Level: L3**
 
 - `skills/`
 - `.agent/workflows/`
 - `src/vibe3/orchestra/`, `src/vibe3/agents/`
 
-这一层负责理解上下文、决定下一步、编排能力调用顺序与上下文交换。
+这一层负责理解上下文、决定下一步、编排能力调用顺序与上下文交换。核心动作包括 `flow`, `task`, `run`, `plan`, `review`。
 
 ### Tier 1 (Shell Layer): Atomic capabilities and state access
+**Execution Level: L3 / L4**
 
 - V3: `src/vibe3/` (commands, models, services, clients)
 - V2: `bin/`, `lib/`, `config/`
 - `lib3/` (V3 Hub)
 
-这一层只提供原子能力与状态读写，不负责隐藏 workflow 或进行重型决策。
+这一层只提供原子能力与状态读写，不负责隐藏 workflow 或进行重型决策。核心动作包括 `handoff`, `inspect`, `pr`, `snapshot`, `ask`。
 
 ## V3 关键模块
 
