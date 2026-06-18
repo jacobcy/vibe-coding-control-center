@@ -41,17 +41,10 @@ class TriggerableRoleDefinition(RoleDefinition):
     Attributes:
         trigger_name: TriggerName used to identify this role in dispatch.
         trigger_state: IssueState label that activates this role.
-        dispatch_predicate: (flow_state, has_live_session) -> bool controlling
-            whether an issue should be dispatched for this role.
     """
 
     trigger_name: TriggerName  # type: ignore[override]
     trigger_state: IssueState  # type: ignore[override]
-    dispatch_predicate: Callable[[dict[str, object], bool], bool] = field(
-        default=lambda _flow, has_live: not has_live,
-        compare=False,
-        hash=False,
-    )
 
 
 @dataclass(frozen=True)
