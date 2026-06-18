@@ -47,8 +47,8 @@ class DispatchHealthService:
         Flow Status Handling:
             - done/stale/review: Terminal states, skip dispatch entirely.
             - aborted: NOT terminal — return True to allow flow_manager
-              recovery. flow_manager.create_flow_for_issue() checks if
-              branch exists (lines 221-232) and rebuilds if missing.
+              recovery. flow_manager.create_flow_for_issue() performs
+              branch-existence check and rebuilds the flow if missing.
               This unblocks issues stuck in OPEN + state/ready after
               flow abort without PR.
 
@@ -88,8 +88,8 @@ class DispatchHealthService:
             )
             return False
 
-        # Aborted flow: let flow_manager handle recovery (rebuild if branch missing)
-        # flow_manager.create_flow_for_issue() has the logic at lines 221-232
+        # Aborted flow: let flow_manager handle recovery (rebuild if branch missing).
+        # flow_manager.create_flow_for_issue() checks branch and rebuilds.
         if flow_status == "aborted":
             self._emit_event(
                 "dispatcher",

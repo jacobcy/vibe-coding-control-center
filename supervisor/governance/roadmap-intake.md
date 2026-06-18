@@ -235,7 +235,7 @@ Intake 只做形式审查，不做内容判断。
 - 是否需要 RFC → pool 决定
 - 是否是 epic → pool 决定
 - 优先级评估 → pool 决定
-- 是否过时 → pool 验证
+- 是否过时 → pool 验证（intake 只检查客观过时：文件/函数物理不存在；语义过时由 pool 判断）
 
 ### 默认原则
 
@@ -348,17 +348,9 @@ Supervisor issues:
 Why: ...
 ```
 
-### 默认原则
-
-- **架构检查优先于标签分类**：不只是看 bug/feature 标签，要看代码架构是否仍相关
-- **关闭优于等待**：明确过时的 issue 应关闭，不要留在 pool 中悬而不决
-- **调整优于拒绝**：有问题的 issue 建议调整内容，而不是保守等待
-- **无法判断时写 suggest**：目标、架构方向或拆分形态无法判断时，写 suggest 说明不确定，由 pool 或 roadmap 进一步决策。intake 不设 `roadmap/rfc` 标签。
-- **纳入优于空转**：如果当前 ready queue 很浅，且候选 issue 满足三级审查，不要因为“可能有别的实现写法”而空转
-
 ## Assignee Selection Rule
 
-当 issue 通过三级审查并决定纳入 assignee issue pool 时，使用 `vibe3 task intake <issue-number>` 分配 manager assignee。
+当 issue 通过三维审查并决定纳入 assignee issue pool 时，使用 `vibe3 task intake <issue-number>` 分配 manager assignee。
 
 **禁止使用**：
 - ❌ 仓库 owner（如 `jacobcy`、`alice`）
