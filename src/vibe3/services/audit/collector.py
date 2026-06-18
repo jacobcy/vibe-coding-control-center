@@ -4,6 +4,7 @@ Implements evidence collection from flow store, GitHub, and git for audit purpos
 """
 
 import hashlib
+import re
 import socket
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,19 @@ from vibe3.models.audit_evidence import (
     TimeWindow,
     Trust,
 )
+
+
+def _extract_author_login(author_field: Any) -> str | None:
+    """Extract login from GitHub API author field.
+
+    GitHub API returns nested objects like {"login": "username", ...}
+    This helper extracts the login string safely.
+    """
+    if isinstance(author_field, str):
+        return author_field
+    if isinstance(author_field, dict):
+        return author_field.get("login")
+    return None
 
 
 class AuditEvidenceCollector:
@@ -147,7 +161,9 @@ class AuditEvidenceCollector:
             kind="issue",
             number=issue_number,
             url=f"https://github.com/{repo or 'owner/repo'}/issues/{issue_number}",
-            author=issue.get("author") if isinstance(issue, dict) else None,
+            author=_extract_author_login(
+                issue.get("author") if isinstance(issue, dict) else None
+            ),
             created_at=issue.get("createdAt") if isinstance(issue, dict) else None,
             marker=None,
         )
@@ -161,18 +177,17 @@ class AuditEvidenceCollector:
             body = comment.get("body", "")
             marker = None
             if body:
-                # Extract marker from comment body (e.g., [manager], [plan], etc.)
-                lines = body.split("\n")
-                if lines:
-                    first_line = lines[0].strip()
-                    if first_line.startswith("[") and "]" in first_line:
-                        marker = first_line.split("]")[0] + "]"
+                # Extract first complete marker using regex
+                # Matches patterns like [manager], [plan], etc.
+                match = re.search(r"\[[\w-]+\]", body)
+                if match:
+                    marker = match.group(0)
 
             comment_ref = GitHubRef(
                 kind="issue_comment",
                 number=comment.get("id", 0),
                 url=comment.get("url", ""),
-                author=comment.get("author"),
+                author=_extract_author_login(comment.get("author")),
                 created_at=comment.get("createdAt"),
                 marker=marker,
             )
@@ -210,9 +225,20 @@ class AuditEvidenceCollector:
             pass
 
         for pr in prs:
-            # Handle PRResponse objects (dict-like access)
-            pr_dict: dict[str, Any] = pr if isinstance(pr, dict) else {}
-            pr_number_val = pr_dict.get("number")
+            # Handle PRResponse objects (use attribute access for Pydantic models)
+            # Try dict access first, fall back to attribute access
+            if isinstance(pr, dict):
+                pr_number_val = pr.get("number")
+                pr_url = pr.get("url", "")
+                pr_author = pr.get("author")
+                pr_created = pr.get("createdAt")
+            else:
+                # PRResponse is a Pydantic model - use attribute access
+                pr_number_val = getattr(pr, "number", None)
+                pr_url = getattr(pr, "url", "")
+                pr_author = getattr(pr, "author", None)
+                pr_created = getattr(pr, "created_at", None)
+
             if not pr_number_val or not isinstance(pr_number_val, int):
                 continue
 
@@ -220,17 +246,9 @@ class AuditEvidenceCollector:
             pr_ref = GitHubRef(
                 kind="pr",
                 number=pr_number_val,
-                url=str(pr_dict.get("url", "")),
-                author=(
-                    pr_dict.get("author")
-                    if isinstance(pr_dict.get("author"), str)
-                    else None
-                ),
-                created_at=(
-                    pr_dict.get("createdAt")
-                    if isinstance(pr_dict.get("createdAt"), str)
-                    else None
-                ),
+                url=str(pr_url),
+                author=_extract_author_login(pr_author),
+                created_at=pr_created if isinstance(pr_created, str) else None,
                 marker=None,
             )
             refs.append(pr_ref)
@@ -243,7 +261,7 @@ class AuditEvidenceCollector:
                         kind="pr_comment",
                         number=comment.get("id", 0),
                         url=comment.get("url", ""),
-                        author=comment.get("author"),
+                        author=_extract_author_login(comment.get("author")),
                         created_at=comment.get("createdAt"),
                         marker=None,
                     )
@@ -257,11 +275,12 @@ class AuditEvidenceCollector:
             try:
                 reviews = self.github.list_pr_reviews(pr_number_val)
                 for review in reviews:
+                    # Reviews use "user" field, not "author"
                     review_ref = GitHubRef(
                         kind="review",
                         number=review.get("id", 0),
                         url=review.get("url", ""),
-                        author=review.get("author"),
+                        author=_extract_author_login(review.get("user")),
                         created_at=review.get("submittedAt"),
                         marker=None,
                     )
@@ -292,12 +311,18 @@ class AuditEvidenceCollector:
         """
         refs: list[GitRef] = []
 
-        # Get commit subjects between base and branch
+        # Get commits between base and branch using git log
         try:
-            commits = self.git.get_commit_subjects(base_ref, branch)
+            # Use git log to get SHA and subject
+            log_output = self.git._run(
+                ["log", f"{base_ref}..{branch}", "--oneline", "--format=%H %s"]
+            )
+            commit_lines = [
+                line.strip() for line in log_output.splitlines() if line.strip()
+            ]
 
             # Create GitRef for commit range
-            if commits:
+            if commit_lines:
                 git_ref = GitRef(
                     kind="diff_range",
                     ref=f"{base_ref}..{branch}",
@@ -310,17 +335,20 @@ class AuditEvidenceCollector:
                 refs.append(git_ref)
 
             # Create GitRef for individual commits
-            for commit_subject in commits[:50]:  # Limit to first 50 commits
-                commit_ref = GitRef(
-                    kind="commit",
-                    ref=commit_subject,  # Simplified; real impl would use SHA
-                    base_ref=None,
-                    head_ref=None,
-                    author=None,
-                    committed_at=None,
-                    files_changed=[],
-                )
-                refs.append(commit_ref)
+            for line in commit_lines[:50]:  # Limit to first 50 commits
+                parts = line.split(maxsplit=1)
+                if len(parts) >= 1:
+                    sha = parts[0]
+                    commit_ref = GitRef(
+                        kind="commit",
+                        ref=sha,  # Use SHA, not subject
+                        base_ref=None,
+                        head_ref=None,
+                        author=None,
+                        committed_at=None,
+                        files_changed=[],
+                    )
+                    refs.append(commit_ref)
 
         except Exception as e:
             logger.warning(f"Could not retrieve git commits for {branch}: {e}")
@@ -349,24 +377,43 @@ class AuditEvidenceCollector:
         Returns:
             Complete EvidenceBundle ready for JSON output
         """
-        # Collect evidence from all sources
+        # Collect evidence from all sources, capturing errors
         flow_refs = []
         github_refs = []
         git_refs = []
+        limitations: list[str] = []
 
         if branch:
-            flow_refs = self.collect_flow_evidence(branch)
-            git_refs = self.collect_git_evidence(branch, time_window=time_window)
+            try:
+                flow_refs = self.collect_flow_evidence(branch)
+            except Exception as e:
+                limitations.append(f"Flow collection failed: {str(e)}")
+                logger.warning(f"Flow evidence collection failed: {e}")
+
+            try:
+                git_refs = self.collect_git_evidence(branch, time_window=time_window)
+            except Exception as e:
+                limitations.append(f"Git collection failed: {str(e)}")
+                logger.warning(f"Git evidence collection failed: {e}")
 
         if issue_number:
-            github_refs.extend(
-                self.collect_github_issue_evidence(issue_number, repo=repo)
-            )
+            try:
+                github_refs.extend(
+                    self.collect_github_issue_evidence(issue_number, repo=repo)
+                )
+            except Exception as e:
+                limitations.append(f"GitHub issue collection failed: {str(e)}")
+                logger.warning(f"GitHub issue evidence collection failed: {e}")
+
             # Try to find PRs for the issue
-            pr_refs = self.collect_github_pr_evidence(
-                branch=branch, issue_number=issue_number, repo=repo
-            )
-            github_refs.extend(pr_refs)
+            try:
+                pr_refs = self.collect_github_pr_evidence(
+                    branch=branch, issue_number=issue_number, repo=repo
+                )
+                github_refs.extend(pr_refs)
+            except Exception as e:
+                limitations.append(f"GitHub PR collection failed: {str(e)}")
+                logger.warning(f"GitHub PR evidence collection failed: {e}")
 
         # Build collection context
         time_window_obj = TimeWindow()
@@ -379,7 +426,11 @@ class AuditEvidenceCollector:
         # Get source metadata
         source_machine = socket.gethostname()
         source_db = getattr(self.sqlite, "db_path", None)
-        source_commit = self.git.get_current_commit()
+        try:
+            source_commit = self.git.get_current_commit()
+        except Exception as e:
+            source_commit = None
+            limitations.append(f"Git commit resolution failed: {str(e)}")
 
         collection_context = CollectionContext(
             mode=mode,  # type: ignore
@@ -427,12 +478,12 @@ class AuditEvidenceCollector:
             candidate_failure_patterns=[],
         )
 
-        # Build trust classification
+        # Build trust classification with error limitations
         trust = Trust(
             source_class="authoritative",
             freshness="fresh",
-            confidence="medium",
-            limitations=[],
+            confidence="medium" if not limitations else "weak",
+            limitations=limitations,
         )
 
         # Generate bundle ID

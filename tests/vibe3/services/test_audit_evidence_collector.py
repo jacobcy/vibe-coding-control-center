@@ -102,27 +102,27 @@ class TestCollectGithubIssueEvidence:
         self, collector: AuditEvidenceCollector, mock_github_client: MagicMock
     ) -> None:
         """Should extract markers from comments."""
-        # Setup mocks
+        # Setup mocks - use nested author objects like real GitHub API
         mock_github_client.view_issue.return_value = {
             "number": 123,
             "title": "Test Issue",
             "body": "Test body",
             "state": "open",
-            "author": "user",
+            "author": {"login": "user"},
             "createdAt": "2026-06-18T08:00:00",
         }
         mock_github_client.list_issue_comments.return_value = [
             {
                 "id": 456,
                 "body": "[manager] Moving to in-progress",
-                "author": "manager-bot",
+                "author": {"login": "manager-bot"},
                 "createdAt": "2026-06-18T09:00:00",
                 "url": "https://github.com/owner/repo/issues/123#issuecomment-456",
             },
             {
                 "id": 789,
                 "body": "[plan] Implementation plan submitted",
-                "author": "planner-bot",
+                "author": {"login": "planner-bot"},
                 "createdAt": "2026-06-18T10:00:00",
                 "url": "https://github.com/owner/repo/issues/123#issuecomment-789",
             },
@@ -134,7 +134,9 @@ class TestCollectGithubIssueEvidence:
         # Verify
         assert len(refs) == 3  # 1 issue + 2 comments
         assert refs[0].kind == "issue"
+        assert refs[0].author == "user"
         assert refs[1].kind == "issue_comment"
+        assert refs[1].author == "manager-bot"
         assert refs[1].marker == "[manager]"
         assert refs[2].marker == "[plan]"
 
@@ -156,19 +158,20 @@ class TestCollectGithubPrEvidence:
         self, collector: AuditEvidenceCollector, mock_github_client: MagicMock
     ) -> None:
         """Should collect PR state, comments, and reviews."""
-        # Setup mocks
-        mock_github_client.list_prs_for_branch.return_value = [
-            {
-                "number": 456,
-                "url": "https://github.com/owner/repo/pull/456",
-                "author": "developer",
-                "createdAt": "2026-06-18T10:00:00",
-            }
-        ]
+        # Setup mocks - PRResponse objects use attribute access
+        from vibe3.models import PRResponse
+
+        mock_pr = MagicMock(spec=PRResponse)
+        mock_pr.number = 456
+        mock_pr.url = "https://github.com/owner/repo/pull/456"
+        mock_pr.author = {"login": "developer"}
+        mock_pr.created_at = "2026-06-18T10:00:00"
+
+        mock_github_client.list_prs_for_branch.return_value = [mock_pr]
         mock_github_client.list_pr_comments.return_value = [
             {
                 "id": 111,
-                "author": "reviewer",
+                "author": {"login": "reviewer"},
                 "createdAt": "2026-06-18T11:00:00",
                 "url": "https://github.com/owner/repo/pull/456#issuecomment-111",
             }
@@ -176,7 +179,7 @@ class TestCollectGithubPrEvidence:
         mock_github_client.list_pr_reviews.return_value = [
             {
                 "id": 222,
-                "author": "reviewer",
+                "user": {"login": "reviewer"},
                 "submittedAt": "2026-06-18T11:30:00",
                 "url": "https://github.com/owner/repo/pull/456#pullrequestreview-222",
             }
@@ -190,8 +193,11 @@ class TestCollectGithubPrEvidence:
         # Verify
         assert len(refs) == 3  # 1 PR + 1 comment + 1 review
         assert refs[0].kind == "pr"
+        assert refs[0].author == "developer"
         assert refs[1].kind == "pr_comment"
+        assert refs[1].author == "reviewer"
         assert refs[2].kind == "review"
+        assert refs[2].author == "reviewer"
 
     def test_collect_github_pr_evidence_no_prs(
         self, collector: AuditEvidenceCollector, mock_github_client: MagicMock
@@ -211,11 +217,12 @@ class TestCollectGitEvidence:
         self, collector: AuditEvidenceCollector, mock_git_client: MagicMock
     ) -> None:
         """Should collect commit subjects and create GitRef objects."""
-        mock_git_client.get_commit_subjects.return_value = [
-            "feat(core): add new feature",
-            "fix(bug): resolve issue",
-            "test: add unit tests",
-        ]
+        # Mock git log output with SHA and subject
+        mock_git_client._run.return_value = (
+            "abc123 feat(core): add new feature\n"
+            "def456 fix(bug): resolve issue\n"
+            "789xyz test: add unit tests"
+        )
 
         refs = collector.collect_git_evidence("task/issue-123", base_ref="origin/main")
 
@@ -224,12 +231,13 @@ class TestCollectGitEvidence:
         assert refs[0].base_ref == "origin/main"
         assert refs[0].head_ref == "task/issue-123"
         assert refs[1].kind == "commit"
+        assert refs[1].ref == "abc123"  # SHA, not subject
 
     def test_collect_git_evidence_empty_branch(
         self, collector: AuditEvidenceCollector, mock_git_client: MagicMock
     ) -> None:
         """Should handle empty commit history gracefully."""
-        mock_git_client.get_commit_subjects.return_value = []
+        mock_git_client._run.return_value = ""
 
         refs = collector.collect_git_evidence("task/issue-123")
 
@@ -264,14 +272,15 @@ class TestAssembleBundle:
             "title": "Test",
             "body": "Body",
             "state": "open",
-            "author": "user",
+            "author": {"login": "user"},
             "createdAt": "2026-06-18T08:00:00",
         }
         mock_github_client.list_issue_comments.return_value = []
         mock_github_client.list_prs_for_branch.return_value = []
 
         mock_git_client.get_current_commit.return_value = "abc123"
-        mock_git_client.get_commit_subjects.return_value = []
+        # Mock the _run method for git log
+        mock_git_client._run.return_value = ""
 
         # Execute
         bundle = collector.assemble_bundle(
@@ -304,13 +313,13 @@ class TestAssembleBundle:
             "title": "Test",
             "body": "Body",
             "state": "open",
-            "author": "user",
+            "author": {"login": "user"},
             "createdAt": "2026-06-18T08:00:00",
         }
         mock_github_client.list_issue_comments.return_value = []
         mock_github_client.list_prs_for_branch.return_value = []
         mock_git_client.get_current_commit.return_value = "abc123"
-        mock_git_client.get_commit_subjects.return_value = []
+        mock_git_client._run.return_value = ""
 
         bundle = collector.assemble_bundle(mode="issue", issue_number=123)
 
@@ -336,13 +345,13 @@ class TestFormatBundle:
             "title": "Test",
             "body": "Body",
             "state": "open",
-            "author": "user",
+            "author": {"login": "user"},
             "createdAt": "2026-06-18T08:00:00",
         }
         mock_github_client.list_issue_comments.return_value = []
         mock_github_client.list_prs_for_branch.return_value = []
         mock_git_client.get_current_commit.return_value = "abc123"
-        mock_git_client.get_commit_subjects.return_value = []
+        mock_git_client._run.return_value = ""
 
         bundle = collector.assemble_bundle(mode="issue", issue_number=123)
         json_output = collector.format_bundle_json(bundle)
@@ -368,13 +377,13 @@ class TestFormatBundle:
             "title": "Test",
             "body": "Body",
             "state": "open",
-            "author": "user",
+            "author": {"login": "user"},
             "createdAt": "2026-06-18T08:00:00",
         }
         mock_github_client.list_issue_comments.return_value = []
         mock_github_client.list_prs_for_branch.return_value = []
         mock_git_client.get_current_commit.return_value = "abc123"
-        mock_git_client.get_commit_subjects.return_value = []
+        mock_git_client._run.return_value = ""
 
         bundle = collector.assemble_bundle(mode="issue", issue_number=123)
         summary = collector.format_bundle_summary(bundle)
