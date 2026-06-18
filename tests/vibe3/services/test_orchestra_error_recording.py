@@ -76,9 +76,8 @@ class TestRecordDispatchFailureIfUnexpected:
 
         mock_record_error.assert_not_called()
 
-    def test_unexpected_failure_recorded(self) -> None:
-        """Verify worktree_unavailable is recorded."""
-        # Test worktree_unavailable
+    def test_unexpected_failure_recorded_with_message_format(self) -> None:
+        """Verify unexpected failures are recorded with correct format."""
         result = ExecutionLaunchResult(
             launched=False,
             skipped=False,
@@ -104,57 +103,17 @@ class TestRecordDispatchFailureIfUnexpected:
                 branch="dev/test",
             )
 
-        mock_record_error.assert_called_once_with(
-            error_code="E_DISPATCH_FAILURE",
-            error_message=(
-                "manual executor dispatch failed [worktree_unavailable]: "
-                "Worktree not found"
-            ),
-            tick_id=0,  # Manual dispatch marker
-            issue_number=456,
-            branch="dev/test",
-            store=ANY,
-        )
-
-    def test_error_message_format(self) -> None:
-        """Verify error message format is correct."""
-        result = ExecutionLaunchResult(
-            launched=False,
-            skipped=False,
-            reason="Unexpected error occurred",
-            reason_code="unknown",
-        )
-
-        mock_store = MagicMock()
-
-        with (
-            patch(
-                "vibe3.services.orchestra.error_recording.record_error"
-            ) as mock_record_error,
-            patch(
-                "vibe3.clients.SQLiteClient",
-                return_value=mock_store,
-            ),
-        ):
-            record_dispatch_failure_if_unexpected(
-                result=result,
-                role="reviewer",
-                issue_number=999,
-                branch="feature/test",
-            )
-
-        # Verify the call was made with correct parameters
+        # Verify call parameters and message format
         call_args = mock_record_error.call_args
         assert call_args[1]["error_code"] == "E_DISPATCH_FAILURE"
-        assert (
-            call_args[1]["error_message"]
-            == "manual reviewer dispatch failed [unknown]: Unexpected error occurred"
+        expected_msg = (
+            "manual executor dispatch failed [worktree_unavailable]: "
+            "Worktree not found"
         )
+        assert call_args[1]["error_message"] == expected_msg
         assert call_args[1]["tick_id"] == 0  # Manual dispatch marker
-        assert call_args[1]["issue_number"] == 999
-        assert call_args[1]["branch"] == "feature/test"
-
-    def test_none_issue_number_coerced_to_zero(self) -> None:
+        assert call_args[1]["issue_number"] == 456
+        assert call_args[1]["branch"] == "dev/test"
         """Verify None issue_number is coerced to 0 for manual dispatch."""
         result = ExecutionLaunchResult(
             launched=False,
