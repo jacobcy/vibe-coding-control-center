@@ -32,9 +32,9 @@
 ### 2.2 Setup（自动化环境准备）
 
 ```bash
-vibe3 internal bootstrap  # 现代 V3 推荐方式
+vibe3 internal bootstrap  # 现代 V3 推荐方式 (幂等，负责项目/worktree 初始化)
 # 或使用 legacy 脚本 (不再推荐)
-./scripts/init.sh
+# ./scripts/init.sh
 ```
 
 当你使用 `wtnew <branch>` (V3 推荐) 或由 V3 runtime 自动创建 worktree 时，`vibe3 internal bootstrap` 会自动运行。`bin/vibe flow start` 已被标记为 Legacy，V3 开发应优先使用 `wtnew` 或原生 `git worktree`。
@@ -50,14 +50,15 @@ vibe3 internal bootstrap  # 现代 V3 推荐方式
 uv tool install -e .
 ```
 
-如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `vibe3 internal bootstrap` 或 `./scripts/init.sh`。
+如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `vibe3 internal bootstrap`。
 
 ### 2.3 验证环境
 
 ```bash
 bin/vibe check       # 环境诊断（Legacy / V2）
-vibe3 check          # [Active] V3 Handoff 存储一致性与共享状态审计
+vibe3 task status    # [Active] 推荐：全局任务面板与 Flow 状态
 vibe3 snapshot show  # [Active] V3 项目健康度、指标与 LOC 限制度量
+vibe3 check          # [Active] V3 Handoff 存储一致性与共享状态审计
 bats tests/          # 运行 V2 测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
@@ -68,7 +69,6 @@ bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 V3 相关工作优先用 Python 入口 and V3 标准来校准语义。支持通过 `uv tool install -e .` 安装全局 `vibe3` 命令：
 
 ```bash
-vibe3 check
 vibe3 task status
 vibe3 flow show
 vibe3 flow update    # 注册/同步当前分支 flow

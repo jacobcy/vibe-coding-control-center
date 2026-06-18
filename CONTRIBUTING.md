@@ -12,9 +12,9 @@
 
 ## V3 开发工作流
 
-- **状态观察优先**：在进行任何操作前，优先使用 `vibe3 task status` 查看全局任务面板，或使用 `vibe3 flow show` 观察当前 flow 现场。
+- **状态观察优先**：在进行任何操作前，优先使用 `vibe3 task status` 查看全局任务面板（推荐，这是 V3 的唯一真源观察点），或使用 `vibe3 flow show` 观察当前 flow 现场。
 - **命令校准**：默认先用 `vibe3 check`、`status`、`handoff show` 等命令校准状态。
-- **权限安全**：严禁直接读写 `.git/vibe3/handoff/` 目录；所有 handoff 操作必须通过 `vibe3 handoff` 系列命令。
+- **权限安全（Worktree Handoff Restriction）**：严禁直接读写 `.git/vibe3/handoff/` 目录；所有 handoff 操作必须通过 `vibe3 handoff` 系列命令。该路径在 worktree 中会触发权限拒绝，必须通过 CLI 代理访问。
 - **验证义务**：Python 运行时与共享状态相关改动，优先执行 `uv run pytest tests/vibe3` 进行验证。
 - **兼容性**：Shell 兼容层只在需要维护 `bin/`、`lib/`、`config/` 时再跑 Bats / shellcheck。
 - **文档真源**：涉及 V3 语义或工作流的文档更新，优先对齐 `docs/standards/v3/` 与 `CLAUDE.md`。
