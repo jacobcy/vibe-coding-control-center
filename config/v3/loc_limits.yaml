@@ -46,6 +46,9 @@ code_limits:
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
 
       # Clients 聚合 —— 允许 450-560
+      - path: "src/vibe3/clients/git_status_ops.py"
+        limit: 450
+        reason: "Git status operations infrastructure module，包含 get_changed_files/get_diff/get_numstat/get_name_status 等 4 个统一接口 + _filter_unified_diff_by_paths 辅助函数（PR #3019 pathspec filtering）+ _numstat_via_merge_base/_name_status_via_merge_base merge-base helpers（Issue #3009 A/M/D file classification）；职责单一（git diff/status operations）且遵循既定模式（get_numstat → get_name_status mirror），拆分收益低"
       - path: "src/vibe3/clients/sqlite_schema.py"
         limit: 570
         reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化"
