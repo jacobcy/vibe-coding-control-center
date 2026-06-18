@@ -12,6 +12,7 @@ from loguru import logger
 from vibe3.analysis import (
     PRDimensions,
     SerenaService,
+    count_changed_lines,
     dag_service,
     generate_score_report,
 )
@@ -52,13 +53,7 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
     )
 
     overall_dag = dag_service.expand_impacted_modules(all_changed_files)
-    changed_lines = sum(
-        1
-        for line in git.get_diff(PRSource(pr_number=pr_number)).splitlines()
-        if (line.startswith("+") or line.startswith("-"))
-        and not line.startswith("+++")
-        and not line.startswith("---")
-    )
+    changed_lines = count_changed_lines(git.get_diff(PRSource(pr_number=pr_number)))
 
     score = _calculate_risk_score(
         all_changed_files,
