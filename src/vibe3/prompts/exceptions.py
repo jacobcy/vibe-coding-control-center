@@ -44,6 +44,8 @@ class ProviderNotFoundError(PromptAssemblyError):
         super().__init__(f"Prompt provider not registered: '{provider}'")
 
 
+# Note: Inherits directly from VibeError (not PromptAssemblyError)
+# because context building failure is distinct from prompt assembly failure.
 class ContextBuilderError(VibeError):
     """Prompt context build failed (non-recoverable by default)."""
 
