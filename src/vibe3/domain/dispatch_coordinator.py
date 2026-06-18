@@ -710,9 +710,11 @@ class GlobalDispatchCoordinator:
         )
 
         # Step 4: Paused mode blocked re-qualification
-        self._dispatch_paused, paused_with_pending_blocked = (
-            self._queue_maintenance.paused_blocked_check(self._dispatch_paused)
-        )
+        (
+            self._dispatch_paused,
+            paused_with_pending_blocked,
+            unpaused_for_qualifiable_blocked,
+        ) = self._queue_maintenance.paused_blocked_check(self._dispatch_paused)
 
         # Step 5: Dispatch actionable entries
         dispatched_count = self._dispatch_loop(tick_id)
@@ -738,6 +740,7 @@ class GlobalDispatchCoordinator:
                 queue_refreshed,
                 self._frozen_queue or [],
                 self._dispatch_paused,
+                unpaused_for_qualifiable_blocked=unpaused_for_qualifiable_blocked,
             )
         )
 

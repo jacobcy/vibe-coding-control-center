@@ -449,11 +449,11 @@ Forbidden:
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
      ```bash
      # [supervisor-only] 仅用于 supervisor issue，内部 state 转换不走 vibe3 task 命令
-     gh issue edit <issue-number> --add-label “state/handoff” --remove-label “state/ready”
+     gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
      ```
    - 不通过：建议关闭，记录到 Actions
      ```bash
-     gh issue close <issue-number> --comment “关闭理由：<具体理由>”
+     gh issue close <issue-number> --comment "关闭理由：<具体理由>"
      ```
 10. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
     - 是因为候选确实都不满足三维审查

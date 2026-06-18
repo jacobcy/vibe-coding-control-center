@@ -125,19 +125,19 @@ Allowed:
      触发条件：当前 issue 已在 `state/blocked`
      - `blocked_reason` 明确为 `state unchanged`
      - `flow show` 能确认 authoritative ref 已存在
-     - 使用 `vibe3 task resume <number> --label auto --yes` 自动恢复到正确状态
+     - **允许执行唯一例外命令**：`vibe3 task resume <number> --label auto --yes`，自动恢复到正确状态
      - 恢复后必须写 `[governance decide][assignee-pool]` comment 说明决策依据和执行结果
 
 Forbidden:
 
 - `state/labels.write`: 除上面两项动作外，其他任何 `state/*` label 的修改都禁止（包括设置 `state/claimed`、`state/in-progress`、`state/blocked`、`state/done`）
-- `issue.resume`: 恢复 blocked 或 failed issue（这是人类专属动作，通过 `vibe3 task resume`）
+- `issue.resume`: 除上述 `state unchanged` + authoritative ref 的唯一补偿动作外，恢复 blocked 或 failed issue 是人类专属动作
 - `issue.close`: 仅允许高置信度场景（见 `suggest_close()` 函数说明），其他情况禁止
 - `code.write`: 任何形式的代码修改
 - `flow.create`: 创建或修改 flow
 - `assignee.write`: 修改 issue assignee
 - `runtime.modify`: 终止 session、杀死进程、修改运行时状态
-- 直接执行 `vibe3 task resume`、`vibe3 run`、`vibe3 plan` 等执行命令
+- 除上述唯一补偿动作外，禁止直接执行 `vibe3 task resume`、`vibe3 run`、`vibe3 plan` 等执行命令
 - 对单个 issue 的 plan / run / review 做任何操作
 
 规则：

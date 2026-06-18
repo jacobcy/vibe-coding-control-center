@@ -243,23 +243,27 @@ class DispatchQueueMaintenanceService:
     def paused_blocked_check(
         self,
         dispatch_paused: bool,
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """Check paused state and re-qualify blocked entries.
 
         Returns:
-            Tuple of (new_dispatch_paused, paused_with_pending_blocked).
+            Tuple of (
+                new_dispatch_paused,
+                paused_with_pending_blocked,
+                unpaused_for_qualifiable_blocked,
+            ).
         """
         logger.bind(domain="global_dispatch", trigger="paused_blocked_check").debug(
             "Checking paused state and blocked entries"
         )
         if dispatch_paused:
             if self._has_actionable():
-                return False, False
+                return False, False, False
             if self._has_pending_blocked():
                 if self._has_qualifiable_blocked():
-                    return False, False
-                return True, True
-        return dispatch_paused, False
+                    return False, False, True
+                return True, True, False
+        return dispatch_paused, False, False
 
     async def exhausted_refresh(
         self,
@@ -267,6 +271,8 @@ class DispatchQueueMaintenanceService:
         queue_refreshed: bool,
         frozen_queue: list[QueueEntry],
         dispatch_paused: bool,
+        *,
+        unpaused_for_qualifiable_blocked: bool = False,
     ) -> tuple[list[QueueEntry], bool]:
         """Rebuild queue when actionable candidates are exhausted after dispatch.
 
@@ -281,6 +287,10 @@ class DispatchQueueMaintenanceService:
            still actionable (waiting_state is None *and* collected_state !=
            'blocked').  If none are, the pool is truly exhausted — return
            dispatch_paused=True.
+
+           Exception: when this tick just re-qualified a blocked entry, the
+           collection may have changed remote state after building the fresh
+           queue. Keep dispatch unpaused so the next tick can observe it.
 
         Returns:
             Tuple of (new_frozen_queue, new_dispatch_paused).
@@ -307,7 +317,7 @@ class DispatchQueueMaintenanceService:
                 entry.waiting_state is None and entry.collected_state != "blocked"
                 for entry in new_frozen_queue
             )
-            if not has_actionable:
+            if not has_actionable and not unpaused_for_qualifiable_blocked:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "
