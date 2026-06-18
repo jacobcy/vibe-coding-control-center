@@ -47,7 +47,7 @@ class TestGetDiffSummary:
         assert result.total_loc_delta == 150
 
     def test_level2_git_diff_when_no_baseline(self) -> None:
-        """When no baseline exists, should fall back to git numstat."""
+        """When no baseline exists, should fall back to git numstat + name-status."""
         from vibe3.analysis.snapshot_diff_facade import get_diff_summary
 
         with patch(
@@ -58,6 +58,9 @@ class TestGetDiffSummary:
             mock_git.get_numstat.return_value = (
                 "10\t5\tnew_file.py\n20\t10\tmodified_file.py\n-\t-\tbinary.png"
             )
+            mock_git.get_name_status.return_value = (
+                "A\tnew_file.py\nM\tmodified_file.py\nM\tbinary.png"
+            )
 
             with patch(
                 "vibe3.analysis.snapshot_diff_facade.GitClient",
@@ -65,8 +68,8 @@ class TestGetDiffSummary:
             ):
                 result = get_diff_summary("feature-branch", "main")
 
-        assert result.files_modified == 3
-        assert result.files_added == 0  # fallback can't distinguish A/M/D
+        assert result.files_added == 1  # new_file.py
+        assert result.files_modified == 2  # modified_file.py + binary.png
         assert result.files_removed == 0
         assert result.total_loc_delta == 15  # (10-5)+(20-10)+(0-0) = 15
 
@@ -88,22 +91,68 @@ class TestGetDiffSummary:
 
 
 class TestDiffViaGit:
-    """Tests for _diff_via_git numstat parsing."""
+    """Tests for _diff_via_git numstat + name-status parsing."""
 
-    def test_counts_all_files_as_modified(self) -> None:
-        """Should count all numstat lines as modified files."""
+    def test_classifies_files_by_name_status(self) -> None:
+        """Should classify files as A/M/D based on name-status output."""
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
         mock_git.get_numstat.return_value = (
             "10\t5\tfile1.py\n20\t0\tfile2.py\n0\t10\tfile3.py"
         )
+        mock_git.get_name_status.return_value = "A\tfile1.py\nM\tfile2.py\nD\tfile3.py"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
-        assert result.files_modified == 3
+        assert result.files_added == 1  # file1.py
+        assert result.files_modified == 1  # file2.py
+        assert result.files_removed == 1  # file3.py
+
+    def test_handles_rename_status(self) -> None:
+        """Rename (R) should count as both added and removed."""
+        from vibe3.analysis.snapshot_diff_facade import _diff_via_git
+
+        mock_git = MagicMock()
+        mock_git.get_numstat.return_value = "0\t0\told.py\tnew.py"
+        mock_git.get_name_status.return_value = "R100\told.py\tnew.py"
+
+        result = _diff_via_git(mock_git, "feature-branch", "main")
+
+        assert result.files_added == 1
+        assert result.files_removed == 1
+        assert result.files_modified == 0
+
+    def test_handles_copy_status(self) -> None:
+        """Copy (C) should count as added only."""
+        from vibe3.analysis.snapshot_diff_facade import _diff_via_git
+
+        mock_git = MagicMock()
+        mock_git.get_numstat.return_value = "10\t0\tnew.py"
+        mock_git.get_name_status.return_value = "C100\told.py\tnew.py"
+
+        result = _diff_via_git(mock_git, "feature-branch", "main")
+
+        assert result.files_added == 1
+        assert result.files_removed == 0
+        assert result.files_modified == 0
+
+    def test_falls_back_to_all_modified_when_name_status_fails(self) -> None:
+        """Should fall back to all-modified when get_name_status fails."""
+        from vibe3.analysis.snapshot_diff_facade import _diff_via_git
+
+        mock_git = MagicMock()
+        mock_git.get_numstat.return_value = (
+            "10\t5\tfile1.py\n20\t0\tfile2.py\n0\t10\tfile3.py"
+        )
+        mock_git.get_name_status.side_effect = Exception("Git error")
+
+        result = _diff_via_git(mock_git, "feature-branch", "main")
+
+        # Fallback: all files counted as modified
         assert result.files_added == 0
         assert result.files_removed == 0
+        assert result.files_modified == 3
 
     def test_computes_loc_delta(self) -> None:
         """Should compute total LOC delta from numstat."""
@@ -113,6 +162,7 @@ class TestDiffViaGit:
         mock_git.get_numstat.return_value = (
             "10\t5\tfile1.py\n20\t-\tfile2.py\n-\t10\tfile3.py"
         )
+        mock_git.get_name_status.return_value = "M\tfile1.py\nA\tfile2.py\nD\tfile3.py"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
@@ -125,22 +175,26 @@ class TestDiffViaGit:
 
         mock_git = MagicMock()
         mock_git.get_numstat.return_value = "-\t-\tbinary.png"
+        mock_git.get_name_status.return_value = "A\tbinary.png"
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
         assert result.total_loc_delta == 0
-        assert result.files_modified == 1
+        assert result.files_added == 1
 
-    def test_handles_empty_numstat(self) -> None:
-        """Empty numstat should return zero counts."""
+    def test_handles_empty_output(self) -> None:
+        """Empty output should return zero counts."""
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
         mock_git.get_numstat.return_value = ""
+        mock_git.get_name_status.return_value = ""
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
         assert result.total_loc_delta == 0
+        assert result.files_added == 0
+        assert result.files_removed == 0
         assert result.files_modified == 0
 
     def test_numstat_failure_returns_empty_summary(self) -> None:
@@ -149,6 +203,7 @@ class TestDiffViaGit:
 
         mock_git = MagicMock()
         mock_git.get_numstat.side_effect = Exception("Git error")
+        mock_git.get_name_status.return_value = ""
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 

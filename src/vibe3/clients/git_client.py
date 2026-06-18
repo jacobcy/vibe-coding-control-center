@@ -41,6 +41,9 @@ from vibe3.clients.git_status_ops import (
     get_diff as _get_diff,
 )
 from vibe3.clients.git_status_ops import (
+    get_name_status as _get_name_status,
+)
+from vibe3.clients.git_status_ops import (
     get_numstat as _get_numstat,
 )
 from vibe3.clients.git_status_ops import (
@@ -167,6 +170,7 @@ class GitClient:
         self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
         self._pr_numstat_cache: dict[int, str] = {}
+        self._pr_name_status_cache: dict[int, str] = {}
         self._git_common_dir: str | None = None
         self._worktree_list_cache: list[tuple[str, str]] | None = None
 
@@ -326,6 +330,17 @@ class GitClient:
             self._github_client,
             self.get_merge_base,
             self._pr_numstat_cache,
+        )
+
+    def get_name_status(self, source: ChangeSource) -> str:
+        """Get git diff --name-status output for a change source."""
+        resolved = self._resolve_source(source)
+        return _get_name_status(
+            self._run,
+            resolved,
+            self._github_client,
+            self.get_merge_base,
+            self._pr_name_status_cache,
         )
 
     def _resolve_base_ref(

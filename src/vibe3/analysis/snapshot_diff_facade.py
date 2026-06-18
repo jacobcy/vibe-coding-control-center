@@ -49,17 +49,18 @@ def get_diff_summary(
 
 
 def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
-    """Build DiffSummary from git numstat (fallback when no baseline).
+    """Build DiffSummary from git numstat + name-status (fallback when no baseline).
 
-    Uses GitClient.get_numstat() which resolves merge-base internally.
-    File counts come from numstat line count (all counted as "modified"
-    since A/M/D classification requires a separate --name-status call
-    that GitClient has no public API for).
+    Uses GitClient.get_numstat() for LOC delta and get_name_status() for
+    A/M/D file classification. Falls back to all-modified on name-status failure.
     """
     source = BranchSource(branch=branch, base=base_branch)
     loc_delta = 0
-    file_count = 0
+    files_added = 0
+    files_removed = 0
+    files_modified = 0
 
+    # Get LOC delta from numstat
     try:
         numstat_output = git.get_numstat(source)
         if numstat_output:
@@ -70,7 +71,6 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
                 parts = line.split("\t")
                 if len(parts) < 3:
                     continue
-                file_count += 1
                 try:
                     a = int(parts[0]) if parts[0] != "-" else 0
                     r = int(parts[1]) if parts[1] != "-" else 0
@@ -84,7 +84,52 @@ def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
             branch=branch,
         ).warning(f"Failed to get git numstat: {e}")
 
+    # Get A/M/D classification from name-status
+    try:
+        name_status_output = git.get_name_status(source)
+        if name_status_output:
+            for line in name_status_output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("\t")
+                if len(parts) < 2:
+                    continue
+                status = parts[0]
+                # Status format: first char is the type, may have score (e.g., R100)
+                status_char = status[0]
+                if status_char == "A":
+                    files_added += 1
+                elif status_char == "D":
+                    files_removed += 1
+                elif status_char == "M":
+                    files_modified += 1
+                elif status_char == "R":
+                    # Rename counts as add + remove
+                    files_added += 1
+                    files_removed += 1
+                elif status_char == "C":
+                    # Copy counts as add
+                    files_added += 1
+    except Exception as e:
+        logger.bind(
+            domain="snapshot",
+            action="git_name_status",
+            branch=branch,
+        ).warning(f"Failed to get git name-status, falling back to all-modified: {e}")
+        # Fallback: count all files as modified based on numstat line count
+        file_count = 0
+        if numstat_output:
+            for line in numstat_output.splitlines():
+                if line.strip():
+                    file_count += 1
+        files_modified = file_count
+        files_added = 0
+        files_removed = 0
+
     return DiffSummary(
-        files_modified=file_count,
+        files_added=files_added,
+        files_removed=files_removed,
+        files_modified=files_modified,
         total_loc_delta=loc_delta,
     )
