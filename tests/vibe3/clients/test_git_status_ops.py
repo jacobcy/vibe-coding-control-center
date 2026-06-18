@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.clients.git_status_ops import (
+    _filter_unified_diff_by_paths,
     _numstat_via_merge_base,
     get_changed_files,
     get_numstat,
@@ -243,3 +244,48 @@ class TestGetChangedFilesPathspec:
 
         github_client.get_pr_files.assert_called_once_with(42)
         assert len(result) == 3
+
+
+class TestFilterUnifiedDiffByPaths:
+    """Test _filter_unified_diff_by_paths helper function."""
+
+    def test_filters_matching_files_only(self) -> None:
+        """Test that only files matching path prefixes are included."""
+        diff = """diff --git a/src/main.py b/src/main.py
+--- a/src/main.py
++++ b/src/main.py
+@@ -1 +1 @@
+-old
++new
+diff --git a/docs/README.md b/docs/README.md
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -1 +1 @@
+-doc
++updated"""
+        result = _filter_unified_diff_by_paths(diff, ["src/"])
+        assert "src/main.py" in result
+        assert "docs/README.md" not in result
+
+    def test_handles_empty_diff(self) -> None:
+        """Test that empty diff returns empty string."""
+        assert _filter_unified_diff_by_paths("", ["src/"]) == ""
+
+    def test_handles_multiple_path_prefixes(self) -> None:
+        """Test filtering with multiple path prefixes."""
+        diff = """diff --git a/src/a.py b/src/a.py
++a line
+diff --git a/bin/b.sh b/bin/b.sh
++b line
+diff --git a/lib/c.py b/lib/c.py
++c line"""
+        result = _filter_unified_diff_by_paths(diff, ["src/", "bin/"])
+        assert "src/a.py" in result
+        assert "bin/b.sh" in result
+        assert "lib/c.py" not in result
+
+    def test_handles_path_without_trailing_slash(self) -> None:
+        """Test that path prefix works without trailing slash."""
+        diff = "diff --git a/src/main.py b/src/main.py\n+new line"
+        result = _filter_unified_diff_by_paths(diff, ["src"])
+        assert "src/main.py" in result
