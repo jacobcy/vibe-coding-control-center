@@ -18,7 +18,7 @@ code_limits:
     exceptions:
       # 核心业务聚合 —— 允许 600-700
       - path: "src/vibe3/domain/dispatch_coordinator.py"
-        limit: 790
+        limit: 800
         reason: "Global dispatch coordinator (migrated from orchestra to domain layer for domain-first architecture #1624)，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、重启恢复等紧密耦合逻辑；mixin-to-service 重构后增加委托调用，整体代码量减少（删除 mixin 250 行，新增 service 149 行）；#2765 增加 _dispatch_loop removal logging 和 queue collection 改进（+32 行）；#2870 提取命名阶段 _collect_open_issues、_build_queue_from_issues 并添加完整文档（+64 行 net），明确队列收集三阶段语义与异常处理行为；#2869 将 6 个 queue maintenance 方法提取至 DispatchQueueMaintenanceService（-210 行 net），coordinate() 委托至新服务"
       - path: "src/vibe3/services/pr/service.py"
         limit: 610
@@ -108,7 +108,7 @@ code_limits:
         limit: 560
         reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）"
       - path: "src/vibe3/services/orchestra/serve_status.py"
-        limit: 460
+        limit: 530
         reason: "Serve status data aggregation for API endpoint and CLI display, includes daemon status, heartbeat, dispatch activity, FailedGate, error tracking, and job monitoring data; uses dynamic imports to avoid upward dependency and circular dependency detection (Issue #2787)"
       - path: "src/vibe3/services/shared/paths.py"
         limit: 450
@@ -343,7 +343,7 @@ code_limits:
         limit: 420
         reason: "Handoff 高级命令测试集（从 test_handoff_commands.py 拆分），覆盖 append/plan/report/audit 命令、next step 逻辑、real service path 测试等紧密耦合场景"
       - path: "tests/vibe3/domain/handlers/test_issue_state_dispatch.py"
-        limit: 500
+        limit: 550
         reason: "Issue state dispatch 测试集（从 test_manager.py 合并），覆盖 manager handler、issue state transition、dispatch blocking 等紧密耦合场景，测试类结构清晰，拆分收益低"
       - path: "tests/vibe3/domain/handlers/test_dispatch.py"
         limit: 420

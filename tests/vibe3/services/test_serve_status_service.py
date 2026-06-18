@@ -5,6 +5,38 @@ from unittest.mock import MagicMock, patch
 from vibe3.services.orchestra.serve_status import ServeStatusService
 
 
+def test_display_status_places_runtime_jobs_after_activity() -> None:
+    """Runtime Jobs should sit next to orchestration activity, not at the bottom."""
+    service = ServeStatusService(MagicMock())
+    calls: list[str] = []
+
+    service._display_daemon_status = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda *_: calls.append("daemon")
+    )
+    service._display_log_path = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("log")
+    )
+    service._display_config = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("config")
+    )
+    service._display_recent_activity = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("activity")
+    )
+    service._display_runtime_jobs = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("jobs")
+    )
+    service._display_failed_gate = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("gate")
+    )
+    service._display_error_tracking = MagicMock(  # type: ignore[method-assign]
+        side_effect=lambda: calls.append("errors")
+    )
+
+    service.display_status(pid=123, is_valid=True, tmux_exists=True)
+
+    assert calls == ["daemon", "log", "config", "activity", "jobs", "gate", "errors"]
+
+
 class TestCleanErrorMessage:
     """Test cases for _clean_error_message static method."""
 
@@ -350,6 +382,7 @@ class TestDisplayLogPath:
             patch.object(ServeStatusService, "_display_daemon_status"),
             patch.object(ServeStatusService, "_display_config"),
             patch.object(ServeStatusService, "_display_recent_activity"),
+            patch.object(ServeStatusService, "_display_runtime_jobs"),
             patch.object(ServeStatusService, "_display_failed_gate"),
             patch.object(ServeStatusService, "_display_error_tracking"),
         ):

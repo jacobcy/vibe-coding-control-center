@@ -197,6 +197,9 @@ class GlobalDispatchCoordinator:
             has_actionable=lambda: self._has_actionable_entries(),
             has_pending_blocked=lambda: self._has_pending_blocked_entries(),
             has_qualifiable_blocked=lambda: self._has_qualifiable_blocked_entries(),
+            has_dispatchable_entries=lambda entries: self._has_dispatchable_entries(
+                entries
+            ),
             merge_queue_fn=lambda existing, fresh: self._merge_queue(existing, fresh),
             should_collect_fn=lambda count: self._should_collect_after_dispatch(count),
             collect_frozen_queue_fn=lambda: self._collect_frozen_queue(),
@@ -506,6 +509,30 @@ class GlobalDispatchCoordinator:
                 if issue is None:
                     continue
                 if self._qualify_gate.qualify_blocked_issue(issue) is not None:
+                    return True
+        return False
+
+    def _has_dispatchable_entries(self, entries: list[QueueEntry]) -> bool:
+        """Whether entries contain work that can pass dispatch preflight."""
+        for entry in entries:
+            if entry.waiting_state is not None or entry.collected_state == "blocked":
+                continue
+
+            issue = self._load_issue(entry.issue_number)
+            if issue is None or issue.state is None or issue.state == IssueState.DONE:
+                continue
+
+            if issue.state != IssueState.BLOCKED and should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=get_manager_usernames(self._config),
+                require_manager_assignee=True,
+            ):
+                continue
+
+            preflight = self._run_dispatch_preflight(issue)
+            if preflight.allowed and preflight.target_state is not None:
+                if find_role_for_state(preflight.target_state) is not None:
                     return True
         return False
 

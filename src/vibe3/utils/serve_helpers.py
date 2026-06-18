@@ -56,10 +56,11 @@ def job_to_dict(job: Any) -> dict[str, Any]:
     return {
         "actor_id": job.actor_id,
         "job_type": job.job_type.value,
-        "status": job.status.value,
+        "status": job.runtime_status or job.status.value,
         "issue_number": job.issue_number,
         "branch": job.branch,
         "started_at": job.started_at,
         "completed_at": job.completed_at,
         "pid": job.pid,
+        "log_path": job.log_path,
     }

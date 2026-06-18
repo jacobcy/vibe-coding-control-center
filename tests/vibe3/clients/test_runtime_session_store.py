@@ -129,6 +129,44 @@ def test_list_live_runtime_sessions_filter_by_role(
     assert manager_sessions[0]["role"] == "manager"
 
 
+def test_list_recent_runtime_sessions_returns_terminal_sessions(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+    done_id = store.create_runtime_session(
+        role="manager",
+        target_type="issue",
+        target_id="500",
+        branch="task/issue-500",
+        session_name="vibe3-manager-issue-500",
+        status="done",
+        ended_at="2026-06-18T09:00:00",
+    )
+    stopped_id = store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="501",
+        branch="task/issue-501",
+        session_name="vibe3-executor-issue-501",
+        status="stopped",
+        ended_at="2026-06-18T09:01:00",
+    )
+    store.create_runtime_session(
+        role="planner",
+        target_type="issue",
+        target_id="502",
+        branch="task/issue-502",
+        session_name="vibe3-planner-issue-502",
+        status="running",
+    )
+
+    recent = store.list_recent_runtime_sessions(limit=5)
+    recent_ids = [session["id"] for session in recent]
+
+    assert recent_ids == [stopped_id, done_id]
+
+
 def test_runtime_session_all_fields(tmp_path: pytest.TempPathFactory) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
 

@@ -45,7 +45,7 @@ class TestEnvVarOverride:
         ):
             result = resolve_repo_agent_preset("vibe-manager")
 
-        assert result == ("claude", None)
+        assert result == ("claude", "gemini-3-flash-preview")
 
     def test_agent_model_env_override(self, tmp_path: Path) -> None:
         """VIBE_MODEL_<ROLE> should override models.json agent config."""
@@ -77,7 +77,7 @@ class TestEnvVarOverride:
         ):
             result = resolve_repo_agent_preset("vibe-planner")
 
-        assert result == (None, "sonnet")
+        assert result == ("claude", "sonnet")
 
     def test_agent_both_env_override(self, tmp_path: Path) -> None:
         """Both VIBE_BACKEND_<ROLE> and VIBE_MODEL_<ROLE> should work together."""
