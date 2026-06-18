@@ -288,3 +288,61 @@ class TestAskExecution:
         options = call_kwargs["options"]
         assert options.agent == "orchestra-explorer"
         assert options.timeout_seconds == 180
+
+    @patch("vibe3.commands.ask.CodeagentBackend")
+    @patch("vibe3.commands.ask.PromptAssembler.render")
+    @patch("vibe3.commands.ask.resolve_orchestra_repo_root")
+    def test_backend_stderr_only(self, mock_repo_root, mock_render, mock_backend_class):
+        """Backend returning stderr but no stdout should still succeed."""
+        # Setup mocks
+        mock_repo_root.return_value = Path("/test/repo")
+
+        mock_render_result = MagicMock()
+        mock_render_result.rendered_text = "Mock prompt"
+        mock_render.return_value = mock_render_result
+
+        mock_backend = MagicMock()
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+        mock_result.stderr = "Warning: something happened"
+        mock_backend.run.return_value = mock_result
+        mock_backend_class.return_value = mock_backend
+
+        # Execute
+        result = self.runner.invoke(app, ["Question?"])
+
+        # Should still succeed (exit_code 0) but display empty output
+        # stderr is not displayed, only stdout is sanitized and shown
+        assert result.exit_code == 0
+        # The output panel should be empty since stdout is empty
+        assert "Answer" in result.output  # Panel title still shows
+
+    @patch("vibe3.commands.ask.resolve_orchestra_repo_root")
+    def test_repo_root_resolution_failure(self, mock_repo_root):
+        """resolve_orchestra_repo_root failure should be handled gracefully."""
+        # Setup mock to raise exception
+        mock_repo_root.side_effect = Exception("Not in a git repository")
+
+        # Execute
+        result = self.runner.invoke(app, ["Question?"])
+
+        # Verify error handling
+        assert result.exit_code != 0
+        assert "Failed to answer question" in result.output
+        assert "Not in a git repository" in result.output
+
+    @patch("vibe3.commands.ask.PromptAssembler.render")
+    @patch("vibe3.commands.ask.resolve_orchestra_repo_root")
+    def test_prompt_assembly_failure(self, mock_repo_root, mock_render):
+        """PromptAssembler.render failure should be handled gracefully."""
+        # Setup mocks
+        mock_repo_root.return_value = Path("/test/repo")
+        mock_render.side_effect = Exception("Template not found: orchestra.explorer")
+
+        # Execute
+        result = self.runner.invoke(app, ["Question?"])
+
+        # Verify error handling
+        assert result.exit_code != 0
+        assert "Failed to answer question" in result.output
+        assert "Template not found" in result.output
