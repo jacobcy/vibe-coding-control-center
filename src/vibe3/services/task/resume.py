@@ -14,6 +14,7 @@ from vibe3.clients import BackendProtocol, GitClient, GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models import IssueState
 from vibe3.services.issue import IssueFlowService
+from vibe3.services.shared import mark_queue_dirty
 from vibe3.services.shared.label_service import LabelService
 from vibe3.services.shared.status_query import StatusQueryService
 
@@ -535,6 +536,9 @@ class TaskResumeUsecase:
             result["candidates"] = candidates
             return result
 
+        # Track if any issues were actually resumed
+        _any_resumed = False
+
         # Apply resume operations
         for candidate in candidates:
             issue_number = candidate.get("number")
@@ -580,6 +584,8 @@ class TaskResumeUsecase:
                     {"number": issue_number, "resume_kind": resume_kind}
                 )
 
+                _any_resumed = True
+
             except Exception as exc:
                 failure_reason = _format_resume_failure_reason(exc)
                 logger.bind(
@@ -595,5 +601,9 @@ class TaskResumeUsecase:
                         "reason": f"恢复操作失败: {failure_reason}",
                     }
                 )
+
+        # Signal the serve coordinator that the queue needs maintenance
+        if _any_resumed:
+            mark_queue_dirty()
 
         return result

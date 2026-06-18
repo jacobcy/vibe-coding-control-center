@@ -244,8 +244,10 @@ class TestQueueResortExisting:
 
         install_issue_loader(coordinator, {1: IssueState.READY})
 
-        original_collect = coordinator._collect_open_issues
-        coordinator._collect_open_issues = MagicMock(side_effect=original_collect)
+        original_collect = coordinator._queue_collection.collect_open_issues
+        coordinator._queue_collection.collect_open_issues = MagicMock(
+            side_effect=original_collect
+        )
 
         coordinator._frozen_queue = [
             QueueEntry(issue_number=1, collected_state="ready")
@@ -253,7 +255,7 @@ class TestQueueResortExisting:
 
         coordinator._queue_resort_existing()
 
-        coordinator._collect_open_issues.assert_not_called()
+        coordinator._queue_collection.collect_open_issues.assert_not_called()
 
     def test_updates_collected_state(
         self,

@@ -20,6 +20,9 @@ code_limits:
       - path: "src/vibe3/domain/dispatch_coordinator.py"
         limit: 800
         reason: "Global dispatch coordinator (migrated from orchestra to domain layer for domain-first architecture #1624)，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、重启恢复等紧密耦合逻辑；mixin-to-service 重构后增加委托调用，整体代码量减少（删除 mixin 250 行，新增 service 149 行）；#2765 增加 _dispatch_loop removal logging 和 queue collection 改进（+32 行）；#2870 提取命名阶段 _collect_open_issues、_build_queue_from_issues 并添加完整文档（+64 行 net），明确队列收集三阶段语义与异常处理行为；#2869 将 6 个 queue maintenance 方法提取至 DispatchQueueMaintenanceService（-210 行 net），coordinate() 委托至新服务"
+      - path: "src/vibe3/domain/dispatch_queue_maintenance.py"
+        limit: 450
+        reason: "Dispatch queue maintenance service，从 dispatch_coordinator.py 提取的 queue lifecycle 操作聚合（startup_restore/promote_progressed/resort_existing/scheduled_refresh/exhausted_refresh/consume_queue_dirty_signal），与 coordinator 紧密耦合不宜拆分"
       - path: "src/vibe3/services/pr/service.py"
         limit: 610
         reason: "PR 生命周期聚合；PR #2777 新增 recent_pr_cache path-like guard，兼容 GitClient mock 返回 pathlib.Path，同时避免 MagicMock 路径泄漏"

@@ -12,7 +12,11 @@ from loguru import logger
 
 from vibe3.config import get_manager_usernames
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
-from vibe3.services.shared import should_skip_from_queue
+from vibe3.services.shared import (
+    clear_queue_dirty,
+    is_queue_dirty,
+    should_skip_from_queue,
+)
 from vibe3.utils import resolve_milestone_rank, resolve_priority, resolve_roadmap_rank
 
 if TYPE_CHECKING:
@@ -325,3 +329,93 @@ class DispatchQueueMaintenanceService:
                 return new_frozen_queue, True
             return new_frozen_queue, False
         return frozen_queue, dispatch_paused
+
+    async def consume_queue_dirty_signal(
+        self,
+        frozen_queue: list[QueueEntry],
+        *,
+        dispatch_paused: bool = False,
+    ) -> tuple[bool, list[QueueEntry], bool]:
+        """Consume queue-dirty signal from external sources (e.g., CLI task resume).
+
+        If the signal marker exists:
+        1. Log with distinct trigger
+        2. Clear the signal
+        3. Emit orchestra event
+        4. Resort existing queue to pick up resumed issues
+        5. Fall back to full collection if resort finds no actionable entries
+
+        Returns:
+            Tuple of (signal_consumed, new_frozen_queue, new_dispatch_paused).
+        """
+        if not is_queue_dirty():
+            return False, frozen_queue, dispatch_paused
+
+        logger.bind(domain="global_dispatch", trigger="queue_dirty_signal").debug(
+            "Queue dirty signal detected, consuming"
+        )
+
+        clear_queue_dirty()
+
+        self._emit_event(
+            "dispatcher",
+            "GlobalDispatchCoordinator: queue dirty signal consumed",
+        )
+
+        try:
+            # Resort existing queue to pick up resumed issues
+            result = self.resort_existing(frozen_queue)
+        except Exception:
+            logger.bind(
+                domain="global_dispatch",
+                trigger="queue_dirty_signal",
+            ).warning("Resort failed after dirty signal, returning unchanged queue")
+            return True, frozen_queue, dispatch_paused
+
+        # Check if resort found any actionable entries
+        has_actionable = any(
+            entry.waiting_state is None and entry.collected_state != "blocked"
+            for entry in result
+        )
+
+        # If no actionable entries found, fall back to full collection
+        if not has_actionable:
+            logger.bind(
+                domain="global_dispatch",
+                trigger="queue_dirty_signal",
+            ).debug(
+                "Resort found no actionable entries, falling back to full collection"
+            )
+            self._emit_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue dirty signal: "
+                "full collection fallback (resort found no actionable entries)",
+            )
+            try:
+                result = await self._collect_frozen_queue_fn()
+                self._invalidate_pr_cache()
+            except Exception:
+                logger.bind(
+                    domain="global_dispatch",
+                    trigger="queue_dirty_signal",
+                ).warning(
+                    "Full collection failed after dirty signal, "
+                    "returning resort result"
+                )
+                return True, result, dispatch_paused
+
+            # Check again if full collection found actionable entries
+            has_actionable_after = any(
+                entry.waiting_state is None and entry.collected_state != "blocked"
+                for entry in result
+            )
+
+            if not has_actionable_after:
+                self._emit_event(
+                    "dispatcher",
+                    "GlobalDispatchCoordinator: dispatch paused "
+                    "(no actionable entries after queue dirty signal collection)",
+                )
+                return True, result, True
+
+        return True, result, dispatch_paused

@@ -180,3 +180,28 @@ def test_verify_refuses_when_gh_command_fails() -> None:
     # Should fail-safe: refuse resume when cannot verify dependency
     assert can_resume is False
     assert "task #999" in reason
+
+
+def test_successful_resume_marks_queue_dirty() -> None:
+    """Test that successful resume marks the queue as dirty."""
+    from unittest.mock import patch
+
+    usecase = _make_usecase()
+    candidate = {
+        "number": 431,
+        "title": "resume me",
+        "state": IssueState.BLOCKED,
+        "resume_kind": "blocked",
+        "flow": None,
+    }
+    usecase.status_service.fetch_resume_candidates.return_value = [candidate]
+    usecase.candidates.verify_issue_state_for_resume = MagicMock(
+        return_value=(True, None)
+    )
+    usecase.operations.reset_issue_to_ready = MagicMock()
+
+    with patch("vibe3.services.task.resume.mark_queue_dirty") as mock_mark:
+        result = usecase.resume_issues(dry_run=False)
+
+    assert result["resumed"] == [{"number": 431, "resume_kind": "blocked"}]
+    mock_mark.assert_called_once()

@@ -284,3 +284,56 @@ async def test_collect_frozen_queue_unexpected_exception_returns_empty():
 
     # Should return empty list, not raise
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_coordinate_consumes_queue_dirty_signal():
+    """Test that coordinator consumes queue dirty signal during coordinate()."""
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig, QueueEntry
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh.enabled = False
+    mock_capacity = MagicMock()
+    mock_capacity.get_capacity_status.return_value = {"remaining": 0}
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock consume_queue_dirty_signal to return (True, mock_queue, False)
+    mock_queue = [MagicMock(spec=QueueEntry)]
+    coordinator._queue_maintenance.consume_queue_dirty_signal = AsyncMock(
+        return_value=(True, mock_queue, False)
+    )
+
+    # Call coordinate
+    await coordinator.coordinate(tick_id=1)
+
+    # Verify consume_queue_dirty_signal was called
+    coordinator._queue_maintenance.consume_queue_dirty_signal.assert_called_once()
