@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.vibe3.pr_patch_constants import PR_SERVICE
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr.create import PRCreateUsecase
@@ -13,7 +14,7 @@ from vibe3.services.pr.service import PRService
 @pytest.fixture
 def mock_github_client():
     """Mock GitHub client."""
-    with patch("vibe3.services.pr.service.GitHubClient") as mock:
+    with patch(f"{PR_SERVICE}.GitHubClient") as mock:
         yield mock
 
 
@@ -419,7 +420,7 @@ def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
     clock = [0.0]
 
     with patch(
-        "vibe3.services.pr.service.time.monotonic",
+        f"{PR_SERVICE}.time.monotonic",
         side_effect=lambda: clock[0],
     ):
         # First call — populates cache at t=0

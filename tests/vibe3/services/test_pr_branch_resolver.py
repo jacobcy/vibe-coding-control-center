@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 from typer.testing import CliRunner
 
+from tests.vibe3.pr_patch_constants import PR_RESOLVER
 from vibe3.exceptions import UserError
 from vibe3.services.pr.resolver import (
     resolve_branch_from_pr,
@@ -93,9 +94,7 @@ class TestResolveCommandBranch:
         mock_flow_service.get_current_branch.return_value = "main"
 
         # Mock resolve_issue_branch_input
-        with patch(
-            "vibe3.services.pr.resolver.resolve_issue_branch_input"
-        ) as mock_resolve:
+        with patch(f"{PR_RESOLVER}.resolve_issue_branch_input") as mock_resolve:
             mock_resolve.return_value = "dev/issue-476"
 
             result = resolve_command_branch(
@@ -133,9 +132,7 @@ class TestResolveCommandBranch:
         """测试优先级：位置参数"""
         mock_flow_service = Mock()
 
-        with patch(
-            "vibe3.services.pr.resolver.resolve_issue_branch_input"
-        ) as mock_resolve:
+        with patch(f"{PR_RESOLVER}.resolve_issue_branch_input") as mock_resolve:
             mock_resolve.return_value = "task/issue-999"
 
             result = resolve_command_branch(

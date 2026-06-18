@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from tests.vibe3.pr_patch_constants import PR_SERVICE
 from vibe3.clients import SQLiteClient
 from vibe3.clients.recent_pr_cache import RecentPRCache
 from vibe3.models.pr import PRResponse, PRState
@@ -38,9 +39,9 @@ def test_create_pr_updates_cache_title() -> None:
         )
 
         with (
-            patch("vibe3.services.pr.service.GitHubClient") as mock_gh_class,
-            patch("vibe3.services.pr.service.GitClient") as mock_git_class,
-            patch("vibe3.services.pr.service.check_upstream_conflicts"),
+            patch(f"{PR_SERVICE}.GitHubClient") as mock_gh_class,
+            patch(f"{PR_SERVICE}.GitClient") as mock_git_class,
+            patch(f"{PR_SERVICE}.check_upstream_conflicts"),
         ):
             mock_gh = MagicMock()
             mock_gh.check_auth.return_value = True
@@ -105,11 +106,11 @@ def test_mark_ready_updates_cache_title() -> None:
         )
 
         with (
-            patch("vibe3.services.pr.service.GitHubClient") as mock_gh_class,
-            patch("vibe3.services.pr.service.GitClient") as mock_git_class,
-            patch("vibe3.services.pr.service.check_upstream_conflicts"),
+            patch(f"{PR_SERVICE}.GitHubClient") as mock_gh_class,
+            patch(f"{PR_SERVICE}.GitClient") as mock_git_class,
+            patch(f"{PR_SERVICE}.check_upstream_conflicts"),
             patch(
-                "vibe3.services.pr.service.SignatureService.resolve_for_branch",
+                f"{PR_SERVICE}.SignatureService.resolve_for_branch",
                 return_value="test-actor",
             ),
         ):
@@ -164,9 +165,9 @@ def test_pr_create_appends_handoff_update() -> None:
         )
 
         with (
-            patch("vibe3.services.pr.service.GitHubClient") as mock_gh_class,
-            patch("vibe3.services.pr.service.GitClient") as mock_git_class,
-            patch("vibe3.services.pr.service.check_upstream_conflicts"),
+            patch(f"{PR_SERVICE}.GitHubClient") as mock_gh_class,
+            patch(f"{PR_SERVICE}.GitClient") as mock_git_class,
+            patch(f"{PR_SERVICE}.check_upstream_conflicts"),
         ):
             mock_gh = MagicMock()
             mock_gh.check_auth.return_value = True
