@@ -5,57 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
-from vibe3.commands.ask import (
-    MAX_QUESTION_LENGTH,
-    _sanitize_output,
-    app,
-)
-
-
-class TestSanitizeOutput:
-    """Tests for _sanitize_output helper function."""
-
-    def test_sanitize_api_key(self):
-        """Verifies api_key=secret is redacted."""
-        text = "Configuration: api_key=secret123"
-        result = _sanitize_output(text)
-        assert result == "Configuration: [REDACTED]"
-        assert "secret123" not in result
-
-    def test_sanitize_token(self):
-        """Verifies token: abc123 is redacted."""
-        text = "Auth token: abc123"
-        result = _sanitize_output(text)
-        assert result == "Auth [REDACTED]"
-        assert "abc123" not in result
-
-    def test_sanitize_password(self):
-        """Verifies password = hunter2 is redacted."""
-        text = "User password = hunter2"
-        result = _sanitize_output(text)
-        assert result == "User [REDACTED]"
-        assert "hunter2" not in result
-
-    def test_sanitize_no_sensitive_data(self):
-        """Verifies clean text passes through unchanged."""
-        text = "This is a normal log message without sensitive data."
-        result = _sanitize_output(text)
-        assert result == text
-
-    def test_sanitize_case_insensitive(self):
-        """Verifies pattern matching is case-insensitive."""
-        text = "API_KEY=my_secret_key"
-        result = _sanitize_output(text)
-        assert result == "[REDACTED]"
-        assert "my_secret_key" not in result
-
-    def test_sanitize_multiple_patterns(self):
-        """Verifies multiple sensitive patterns in one string."""
-        text = "api_key=key1 and password=pass2"
-        result = _sanitize_output(text)
-        assert result == "[REDACTED] and [REDACTED]"
-        assert "key1" not in result
-        assert "pass2" not in result
+from vibe3.commands.ask import MAX_QUESTION_LENGTH, app
 
 
 class TestAskInputValidation:
@@ -224,7 +174,7 @@ class TestAskExecution:
         # Verify
         assert result.exit_code == 0
         assert "secret123" not in result.output
-        assert "[REDACTED]" in result.output
+        assert "***REDACTED***" in result.output
 
     @patch("vibe3.commands.ask.CodeagentBackend")
     @patch("vibe3.commands.ask.PromptAssembler")
