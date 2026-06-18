@@ -43,6 +43,17 @@ class DispatchHealthService:
 
         Delegates structural checks to CheckService, with terminal state
         and transient error handling inlined directly in this method.
+
+        Flow Status Handling:
+            - done/stale/review: Terminal states, skip dispatch entirely.
+            - aborted: NOT terminal — return True to allow flow_manager
+              recovery. flow_manager.create_flow_for_issue() performs
+              branch-existence check and rebuilds the flow if missing.
+              This unblocks issues stuck in OPEN + state/ready after
+              flow abort without PR.
+
+        Returns:
+            True if dispatch should proceed, False to skip.
         """
         branch, _ = self._flow_context(issue.number)
 
@@ -67,13 +78,25 @@ class DispatchHealthService:
         )
 
         # Terminal state: skip dispatch cleanly
-        if flow_status in ("done", "aborted", "stale", "review"):
+        # Exception: "aborted" needs recovery check by flow_manager
+        # (rebuild if branch missing)
+        if flow_status in ("done", "stale", "review"):
             self._emit_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: skipped #{issue.number} "
                 f"(flow is {flow_status})",
             )
             return False
+
+        # Aborted flow: let flow_manager handle recovery (rebuild if branch missing).
+        # flow_manager.create_flow_for_issue() checks branch and rebuilds.
+        if flow_status == "aborted":
+            self._emit_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: allowing aborted #{issue.number} "
+                f"for flow_manager recovery check",
+            )
+            return True
 
         if not result.is_valid:
             # Transient errors: fail-open

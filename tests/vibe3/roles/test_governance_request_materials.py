@@ -102,13 +102,27 @@ class TestGovernanceMaterials:
 
         assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
 
-    def test_assignee_pool_material_defines_pre_pool_decider_boundary(self):
-        """assignee-pool should decide before manager execution starts."""
+    def test_assignee_pool_material_defines_pool_decider_boundary(self):
+        """assignee-pool should act as pool decider with triage responsibility."""
         content = Path("supervisor/governance/assignee-pool.md").read_text()
-        assert "入池前/池内准入 decider" in content
-        assert "manager 是入池后的执行 decider" in content
-        assert "低置信度" in content
-        assert "roadmap/rfc" in content
+        # Core triage responsibility
+        assert "入池决策者" in content
+        assert "分流决策" in content
+        # Five exit paths
+        for expected in (
+            "入池执行",
+            "roadmap/rfc",
+            "roadmap/epic",
+            "终局关闭",
+            "恢复执行",
+        ):
+            assert expected in content
+
+    def test_roadmap_common_keeps_intake_out_of_dependency_decisions(self):
+        """roadmap-common should keep dependency/RFC routing in pool layer."""
+        content = Path("supervisor/roadmap-common.md").read_text()
+        assert "依赖解除后的深度决策" in content
+        assert "生命周期、依赖、API、模块" not in content
 
     def test_assignee_pool_epic_close_does_not_loop_on_suggest(self):
         """Completed epics should terminalize instead of repeating suggest/cleanup."""

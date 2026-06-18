@@ -243,23 +243,27 @@ class DispatchQueueMaintenanceService:
     def paused_blocked_check(
         self,
         dispatch_paused: bool,
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """Check paused state and re-qualify blocked entries.
 
         Returns:
-            Tuple of (new_dispatch_paused, paused_with_pending_blocked).
+            Tuple of (
+                new_dispatch_paused,
+                paused_with_pending_blocked,
+                unpaused_for_qualifiable_blocked,
+            ).
         """
         logger.bind(domain="global_dispatch", trigger="paused_blocked_check").debug(
             "Checking paused state and blocked entries"
         )
         if dispatch_paused:
             if self._has_actionable():
-                return False, False
+                return False, False, False
             if self._has_pending_blocked():
                 if self._has_qualifiable_blocked():
-                    return False, False
-                return True, True
-        return dispatch_paused, False
+                    return False, False, True
+                return True, True, False
+        return dispatch_paused, False, False
 
     async def exhausted_refresh(
         self,
@@ -267,8 +271,26 @@ class DispatchQueueMaintenanceService:
         queue_refreshed: bool,
         frozen_queue: list[QueueEntry],
         dispatch_paused: bool,
+        *,
+        unpaused_for_qualifiable_blocked: bool = False,
     ) -> tuple[list[QueueEntry], bool]:
         """Rebuild queue when actionable candidates are exhausted after dispatch.
+
+        1. Trigger a full collection (which includes blocked-issue dependency
+           check) via _collect_frozen_queue_fn.
+        2. Merge fresh entries into the existing queue.  The merge function
+           _merge_queue_fn keeps old entries with waiting_state for the same
+           issue_numbers, so genuinely *new* work stays actionable
+           (waiting_state=None) while duplicates of already-waiting entries do
+           not.
+        3. After the merge, check whether any entry in the merged queue is
+           still actionable (waiting_state is None *and* collected_state !=
+           'blocked').  If none are, the pool is truly exhausted — return
+           dispatch_paused=True.
+
+           Exception: when this tick just re-qualified a blocked entry, the
+           collection may have changed remote state after building the fresh
+           queue. Keep dispatch unpaused so the next tick can observe it.
 
         Returns:
             Tuple of (new_frozen_queue, new_dispatch_paused).
@@ -285,15 +307,22 @@ class DispatchQueueMaintenanceService:
             )
             fresh = await self._collect_frozen_queue_fn()
             self._invalidate_pr_cache()
-            if fresh and all(entry.collected_state == "blocked" for entry in fresh):
-                new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
+            new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
+
+            # After merge, check if ANY entry is still actionable.
+            # Merge preserves old entries with waiting_state for same issue_numbers,
+            # so if all fresh entries are duplicates of existing waiting entries,
+            # the merged queue will have zero actionable entries -> pause.
+            has_actionable = any(
+                entry.waiting_state is None and entry.collected_state != "blocked"
+                for entry in new_frozen_queue
+            )
+            if not has_actionable and not unpaused_for_qualifiable_blocked:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "
-                    "(rebuild found only blocked issues)",
+                    "(no actionable entries after collection and blocked check)",
                 )
                 return new_frozen_queue, True
-            else:
-                new_frozen_queue = self._merge_queue_fn(frozen_queue or [], fresh)
-                return new_frozen_queue, False
+            return new_frozen_queue, False
         return frozen_queue, dispatch_paused
