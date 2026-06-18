@@ -12,6 +12,9 @@ from __future__ import annotations
 TRANSIENT_GIT_ERROR_PATTERNS = (
     "cannot lock ref",  # Ref lock conflicts during concurrent operations
     "unable to update local ref",  # Remote update conflicts
+    "ssh: connect to host",  # SSH connection failures (timeout, refused, etc.)
+    "Could not read from remote repository",  # Git remote protocol failure
+    "Operation timed out",  # Network timeout (SSH and HTTPS)
 )
 
 

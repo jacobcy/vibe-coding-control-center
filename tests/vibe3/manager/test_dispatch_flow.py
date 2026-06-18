@@ -127,5 +127,11 @@ class TestTransientErrorLogging:
             "error: cannot lock ref 'refs/remotes/origin/main'"
         )
         assert is_transient_git_error("fatal: unable to update local ref")
+        # New: SSH/network transient errors
+        assert is_transient_git_error(
+            "ssh: connect to host github.com port 22: Operation timed out"
+        )
+        assert is_transient_git_error("fatal: Could not read from remote repository.")
+        # Verify non-git errors still classified correctly
         assert not is_transient_git_error("Database connection refused")
         assert not is_transient_git_error("Permission denied")
