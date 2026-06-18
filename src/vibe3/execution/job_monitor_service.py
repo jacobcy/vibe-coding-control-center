@@ -107,11 +107,11 @@ class JobMonitorService:
         except Exception:
             return []
 
-        existing_actor_ids = {job.actor_id for job in existing_jobs}
+        existing_job_keys = {_job_identity_key(job) for job in existing_jobs}
         jobs: list[ActiveJob] = []
         for session in sessions:
             job = _session_to_active_job(session)
-            if job.actor_id in existing_actor_ids:
+            if _job_identity_key(job) in existing_job_keys:
                 continue
             jobs.append(job)
         return jobs
@@ -128,11 +128,11 @@ class JobMonitorService:
         except Exception:
             return []
 
-        existing_actor_ids = {job.actor_id for job in existing_jobs}
+        existing_job_keys = {_job_identity_key(job) for job in existing_jobs}
         jobs: list[ActiveJob] = []
         for session in sessions:
             job = _session_to_active_job(session)
-            if job.actor_id in existing_actor_ids:
+            if _job_identity_key(job) in existing_job_keys:
                 continue
             jobs.append(job)
         return jobs
@@ -210,3 +210,8 @@ def _role_to_job_type(role: str) -> JobType:
 
 def _job_status_value(job: ActiveJob) -> str:
     return job.runtime_status or job.status.value
+
+
+def _job_identity_key(job: ActiveJob) -> tuple[JobType, int, str, str]:
+    """Stable key for merging actor and durable runtime views of the same job."""
+    return (job.job_type, job.issue_number, job.branch, _job_status_value(job))

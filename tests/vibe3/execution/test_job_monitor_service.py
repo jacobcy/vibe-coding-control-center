@@ -85,6 +85,30 @@ class TestJobMonitorService:
         assert job.issue_number == 2981
         assert job.branch == "task/issue-2981"
 
+    def test_live_runtime_session_does_not_duplicate_actor_job(
+        self, tmp_path: Path
+    ) -> None:
+        """Same live job in actor registry and runtime_session is counted once."""
+        registry = get_actor_registry()
+        _create_running_actor(registry, issue=2981, branch="task/issue-2981")
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+        store.create_runtime_session(
+            role="executor",
+            target_type="issue",
+            target_id="2981",
+            branch="task/issue-2981",
+            session_name="vibe3-executor-issue-2981",
+            status="running",
+            started_at="2026-06-18T09:43:25",
+        )
+
+        svc = JobMonitorService(store=store)
+        snap = svc.snapshot()
+
+        assert snap.running_count == 1
+        assert len(snap.active_jobs) == 1
+
     def test_recent_runtime_session_appears_in_recent_jobs(
         self, tmp_path: Path
     ) -> None:

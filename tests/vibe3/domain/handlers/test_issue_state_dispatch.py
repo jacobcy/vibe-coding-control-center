@@ -11,6 +11,7 @@ Tests cover:
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
+from vibe3.domain.handlers import issue_state_dispatch as dispatch_handler
 from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatch_intent
 from vibe3.models.orchestration import IssueState
 
@@ -306,16 +307,14 @@ class TestIssueStateDispatchHandler:
         mock_ctx.coordinator.dispatch_execution.assert_not_called()
         mock_block_issue.assert_called_once()
 
-    @patch("vibe3.domain.handlers.issue_state_dispatch.record_error")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
-    def test_request_none_records_dispatch_failure(
+    def test_request_none_does_not_record_dispatch_failure_twice(
         self,
         mock_config_cls: MagicMock,
         mock_block_issue: MagicMock,
-        mock_record_error: MagicMock,
     ) -> None:
-        """Request preparation failures should be visible in serve status."""
+        """Handler should not double-record build_manager_request None results."""
         mock_config = MagicMock()
         mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
@@ -342,13 +341,7 @@ class TestIssueStateDispatchHandler:
 
         mock_ctx.coordinator.dispatch_execution.assert_not_called()
         mock_block_issue.assert_called_once()
-        mock_record_error.assert_called_once_with(
-            error_code="E_DISPATCH_FAILURE",
-            error_message="automatic manager dispatch failed [request_none]",
-            tick_id=9,
-            issue_number=42,
-            branch="task/issue-42",
-        )
+        assert not hasattr(dispatch_handler, "record_error")
 
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_capacity_full_defers_without_blocking(
