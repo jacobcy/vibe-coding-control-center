@@ -76,6 +76,9 @@ def test_close_issue_success():
     with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.close_issue(1) is True
+        # Verify gh issue close was called with correct arguments
+        args = mock_run.call_args[0][0]
+        assert args[:4] == ["gh", "issue", "close", "1"]
 
 
 def test_remove_assignees_success():
@@ -109,6 +112,9 @@ def test_close_issue_failure_returns_false():
     with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1)
         assert client.close_issue(1) is False
+        # Verify gh issue close was still called
+        args = mock_run.call_args[0][0]
+        assert args[:4] == ["gh", "issue", "close", "1"]
 
 
 def test_add_comment_success():
@@ -116,6 +122,11 @@ def test_add_comment_success():
     with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert client.add_comment(1, "Nice") is True
+        # Verify gh issue comment was called with correct arguments
+        args = mock_run.call_args[0][0]
+        assert args[:4] == ["gh", "issue", "comment", "1"]
+        assert "--body" in args
+        assert "Nice" in args
 
 
 def test_add_comment_failure_returns_false():
@@ -123,6 +134,9 @@ def test_add_comment_failure_returns_false():
     with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1)
         assert client.add_comment(1, "Nice") is False
+        # Verify gh issue comment was still called
+        args = mock_run.call_args[0][0]
+        assert args[:4] == ["gh", "issue", "comment", "1"]
 
 
 def test_add_comment_passes_repo():
@@ -251,7 +265,13 @@ def test_create_issue_success(github_client: GitHubClient) -> None:
         )
 
         assert result == 42
-        mock_run.assert_called_once()
+        # Verify gh issue create was called with correct arguments
+        args = mock_run.call_args[0][0]
+        assert args[:3] == ["gh", "issue", "create"]
+        assert "--title" in args
+        assert "Test Issue" in args
+        assert "--body" in args
+        assert "Test body" in args
 
 
 def test_create_issue_with_labels(github_client: GitHubClient) -> None:
