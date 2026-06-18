@@ -453,7 +453,7 @@ coverage:
 ```bash
 # scripts/hooks/check-per-file-loc.sh
 IGNORE_FILES=(
-  "src/vibe3/clients/git_client.py"  # TODO: Continue refactoring into specialized clients (git_branch_ops, etc.)
+  "src/vibe3/clients/git_client.py"  # Specialized clients (git_branch_ops, git_status_ops, etc.) are active.
 )
 ```
 
