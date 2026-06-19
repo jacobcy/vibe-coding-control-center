@@ -39,20 +39,80 @@
 
 开始任何详细审查之前，**必须先确认变更范围与 issue scope 一致**。
 
-**快速 scope 检查**：
+#### 0a. 提取 plan 声明的文件路径
+
+从 plan 的「Changes」和「Implementation Steps」中提取所有显式声明的源文件路径。
+
+**提取方法**：
+- 读取 plan 的「Changes」部分，格式通常为：`file/path/one.py: Description`
+- 读取「Implementation Steps」中涉及的文件路径引用
+- 提取完整的文件路径（如 `src/vibe3/domain/queue_dirty.py`）
+
+**存储为计划声明路径列表**，用于后续交叉验证。
+
+#### 0b. 获取实际变更的文件路径
+
+使用三方合并 diff（merge-base diff）获取实际变更文件：
 
 ```bash
-# 1. 查看变更范围
-git diff <base>...HEAD --stat
-
-# 2. 查看 plan 声明的 Scope Boundary
-# （通过 handoff show @plan 读取）
-uv run python src/vibe3/cli.py handoff show @plan --branch <branch>
+# 获取所有实际变更的文件路径
+git diff main...HEAD --name-only
 ```
+
+**注意**：必须使用 `...`（三方合并 diff），而非 `..`（两点 diff），以避免将 main 分支的前进误判为当前 issue 的变更。
+
+#### 0c. 路径级交叉验证
+
+逐项对比实际变更路径与计划声明路径，检查以下三类不一致：
+
+**1. 位置偏差**
+- 文件名一致但路径不同
+- 示例：计划声明 `src/vibe3/domain/x.py`，实际放在 `src/vibe3/services/shared/x.py`
+- 严重级别：**MAJOR** — 文件位置与计划不符，可能影响模块职责划分
+
+**2. 新增文件超出 scope**
+- 实际变更中的文件未出现在计划声明的文件列表中
+- 需判断是否为合法间接变更（见下方判断标准）
+- 严重级别：视情况 **MAJOR** 或 **BLOCK**
+
+**3. 配置文件/间接文件遗漏**
+- `loc_limits.yaml`、`__init__.py` 等间接修改未在 plan scope 中声明
+- 需判断是否为必要的间接影响
+- 严重级别：通常 **MINOR**（需在 plan 中补充声明）
+
+#### 0d. 判断标准
+
+**以下情况不是 scope violation**：
+
+- ✅ **测试文件自动覆盖**：plan 声明了 `xxx.py`，实际还变更了 `test_xxx.py`
+  - 测试文件通常跟随源文件自动更新，无需显式声明
+
+- ✅ **配置模板/常量文件因符号引用自动更新**：
+  - 如 plan 声明了 service 文件，实际还修改了同目录 `__init__.py` 的 re-export
+  - 如新增了符号，实际还修改了 `__init__.py` 的导出列表
+  - 这些是必要的间接影响，允许超出 plan 声明范围
+
+**以下情况是 scope violation**：
+
+- ❌ **计划声明的源文件路径与实际创建/修改的源文件路径不一致**
+  - 文件位置偏差，且无合理理由
+  - 至少 **MAJOR**
+
+- ❌ **创建了计划未声明的新模块文件**
+  - 新增源代码文件未在 plan scope 中声明
+  - 至少 **MAJOR**，可能 **BLOCK**
+
+- ❌ **修改了与改动不相关的间接文件**
+  - 修改了与当前变更无直接依赖关系的配置或数据文件
+  - 至少 **MAJOR**
 
 **Scope 审查检查清单**：
 
-- [ ] 变更范围与 issue scope 一致
+- [ ] 已提取 plan 声明的文件路径列表
+- [ ] 已获取实际变更的文件路径（使用 `git diff main...HEAD --name-only`）
+- [ ] 已执行路径级交叉验证（对比计划路径 vs 实际路径）
+- [ ] 无位置偏差（文件路径与计划声明一致）
+- [ ] 无未授权的新增源代码文件
 - [ ] 无未授权的模块删除（对照 plan 的 Scope Boundary 禁止清单）
 - [ ] 无未授权的行为变更（错误处理、数据流、业务逻辑修改）
 - [ ] 无未授权的重构（内联、重命名超出 scope、合并模块）
@@ -60,6 +120,7 @@ uv run python src/vibe3/cli.py handoff show @plan --branch <branch>
 **如果发现 scope violation**：
 - 立即给出 **MAJOR** 或 **BLOCK** verdict
 - 在 finding 中指出具体超出 scope 的变更
+- 指出实际变更路径与计划声明路径的不一致
 - **不要继续审查细节**（scope violation 本身就是最严重的 finding）
 - 建议：回退超出 scope 的变更，或通过 manager 扩展 issue scope
 
