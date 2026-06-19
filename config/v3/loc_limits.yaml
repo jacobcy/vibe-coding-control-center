@@ -59,7 +59,7 @@ code_limits:
         limit: 450
         reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
-        limit: 600
+        limit: 670
         reason: |
           Repo 层职责内聚，包含：
           - 基础 CRUD 操作（10 个 get 方法）
@@ -71,16 +71,19 @@ code_limits:
           - UTC-aware datetime 写入（update_flow_state, add_issue_link）
           - Status 参数验证（get_flows_by_status 增加 VALID_FLOW_STATUSES 校验）
           - Bulk retrieval optimization（get_flow_state_bulk、get_flows_by_issues_bulk）
+          - Integrity check/repair（list_invalid_branch_links、delete_invalid_branch_links）
 
           拆分会破坏：
           - 数据访问层完整性
           - 查询一致性（所有方法都需过滤 deleted_at）
           - 事务原子性保证
           - Bulk optimization coherence（批量查询与单条查询语义一致性）
+          - Integrity scan/repair coherence（扫描与删除同一批数据）
 
           PR #2409 新增 status 验证逻辑，提升类型安全和 fail-fast 行为（+18 行）
           PR #2542 新增 bulk retrieval 方法，修复 N+1 查询模式，减少 100x 数据库查询（+62 行）
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
+          Issue #2035 新增 integrity check/repair 方法，支持历史数据修复（+82 行）
 
       - path: "src/vibe3/commands/snapshot.py"
         limit: 500
@@ -95,8 +98,8 @@ code_limits:
         limit: 560
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
       - path: "src/vibe3/commands/flow_manage.py"
-        limit: 500
-        reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持"
+        limit: 590
+        reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore/check-integrity 五个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持，新增 integrity check/repair 命令（dry-run + repair + confirm workflow）；Issue #2035 新增 check-integrity 命令（+102 行）"
       - path: "src/vibe3/commands/plan.py"
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
@@ -390,6 +393,9 @@ code_limits:
       - path: "tests/vibe3/services/test_issue_flow_service.py"
         limit: 500
         reason: "IssueFlowService 测试集，覆盖 convention injection、branch naming、flow lookup、resolve_best_flow 优先级逻辑与 protected branch guard 等紧密耦合场景；PR #2581 新增 8 个 resolve_best_flow 测试（优先级逻辑 5 个 + protected branch guard 3 个）从 297 行增至 465 行"
+      - path: "tests/vibe3/clients/test_flow_state_repo.py"
+        limit: 450
+        reason: "SQLite flow state repo 测试集（bulk operations），覆盖 bulk retrieval、branch-for-task-issue 查询等紧密耦合场景；Issue #2035 新增 integrity check/repair 测试（8 个测试方法，+188 行）验证无效分支链接检测与删除逻辑"
       - path: "tests/vibe3/clients/test_sqlite_flow_state_repo.py"
         limit: 450
         reason: "SQLite flow state repo 测试集，覆盖 flow CRUD、soft-delete、cascade delete、status validation、bulk retrieval optimization、restore flow deadlock fix 等紧密耦合场景，与 sqlite_flow_state_repo.py 源文件（limit 540）对应；Issue #2537 新增 test_restore_flow_resets_aborted_status 测试验证 aborted flow deadlock fix（+41 行）"
