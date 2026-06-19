@@ -2,9 +2,6 @@
 
 from typing import TYPE_CHECKING, Callable, Protocol
 
-# Re-export CheckServiceProtocol from runtime (canonical location)
-from vibe3.runtime import CheckServiceProtocol
-
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
     from vibe3.domain.qualify_gate import QualifyGateService
@@ -192,7 +189,6 @@ class LabelDispatchCallable(Protocol):
 
 
 __all__ = [
-    "CheckServiceProtocol",
     "IssueCollectionServiceProtocol",
     "QueuePersistenceServiceProtocol",
     "IssueLoaderProtocol",

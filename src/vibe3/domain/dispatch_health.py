@@ -7,11 +7,9 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.domain.protocols.dispatch_protocols import (
-    CheckServiceProtocol,
-    FlowServiceProtocol,
-)
+from vibe3.domain.protocols.dispatch_protocols import FlowServiceProtocol
 from vibe3.models import IssueInfo, IssueState
+from vibe3.runtime import CheckServiceProtocol
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
