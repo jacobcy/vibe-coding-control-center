@@ -134,6 +134,7 @@ def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> No
                 agent=None,
                 backend=None,
                 model=None,
+                prompts_path=None,
             )
 
     mock_publish_failure.assert_called_once_with(

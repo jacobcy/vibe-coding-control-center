@@ -72,6 +72,17 @@ class PromptManifest:
         return cls.load(_resolve_repo_path(DEFAULT_PROMPT_RECIPES_PATH))
 
     @classmethod
+    def load_for_prompts_path(cls, prompts_path: Path | None) -> "PromptManifest":
+        """Load manifest from custom prompts_path or fall back to default.
+
+        If prompts_path is provided, loads from ``prompts_path.parent /
+        "prompt-recipes.yaml"``. Otherwise returns the default manifest.
+        """
+        if prompts_path is not None:
+            return cls.load(prompts_path.parent / "prompt-recipes.yaml")
+        return cls.load_default()
+
+    @classmethod
     def load(cls, recipes_path: Path) -> "PromptManifest":
         """Load recipe YAML file.
 
@@ -221,7 +232,8 @@ class PromptManifest:
         recipe definition. Provider-rendered sections (no source override)
         will have source_kind=None.
 
-        For template-based recipes (no variants), returns empty list.
+        For template-based recipes (no variants), returns material_catalog
+        entries as section sources with FILE source_kind.
         """
         recipe_def = self.recipe(recipe_key)
 

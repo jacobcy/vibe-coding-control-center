@@ -101,6 +101,7 @@ def build_run_sync_request(
     dry_run: bool,
     show_prompt: bool,
     tick_id: int = 0,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     """Build the executor sync execution request."""
     store = SQLiteClient()
@@ -120,6 +121,7 @@ def build_run_sync_request(
     summary_sections = describe_run_plan_sections(
         meta.prompt_mode,  # type: ignore[arg-type]
         meta.context_mode,
+        prompts_path=prompts_path,
     )
     refs = dict(meta.refs)
     plan_ref = refs.get("plan_ref")
@@ -133,6 +135,7 @@ def build_run_sync_request(
             audit_file=audit_ref,
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.fallback_context_mode,
+            prompts_path=prompts_path,
         )()
 
     # Build prompt for provenance collection and request
@@ -142,6 +145,7 @@ def build_run_sync_request(
         audit_file=audit_ref,
         mode=meta.prompt_mode,  # type: ignore[arg-type]
         context_mode=meta.context_mode,
+        prompts_path=prompts_path,
     )()
 
     # Collect and write provenance for dry-run audit
@@ -149,7 +153,7 @@ def build_run_sync_request(
         # Determine variant_key: {mode}.{context_mode}
         variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
 
-        manifest = PromptManifest.load_default()
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
         provenance = collect_dry_run_provenance(
             manifest=manifest,
             recipe_key="run.plan",
