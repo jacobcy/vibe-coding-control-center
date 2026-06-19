@@ -122,11 +122,11 @@ def test_count_changed_lines_in_code_paths(
     mock_get_config.return_value.code_limits.code_paths.v3_python = ["src/vibe3/"]
     mock_count.return_value = 42
 
-    result = count_changed_lines_in_code_paths(mock_git, MagicMock())
+    source = MagicMock()
+    result = count_changed_lines_in_code_paths(mock_git, source)
 
-    mock_count.assert_called_once_with(
-        "diff content", code_paths=["lib/", "src/vibe3/"]
-    )
+    mock_git.get_diff.assert_called_once_with(source, pathspec=["lib/", "src/vibe3/"])
+    mock_count.assert_called_once_with("diff content")
     assert result == 42
 
 
