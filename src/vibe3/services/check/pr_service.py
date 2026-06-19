@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.models import PRState
 from vibe3.services.shared.labels import normalize_labels
+from vibe3.services.task import TaskService
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
@@ -181,9 +182,10 @@ class CheckPRService:
             return 0
 
         transferred = 0
+        task_svc = TaskService(store=self.store)
         for dep_branch in dependents:
             try:
-                self.store.add_issue_link(dep_branch, bridge_issue_number, "dependency")
+                task_svc.link_issue(dep_branch, bridge_issue_number, role="dependency")
                 transferred += 1
                 logger.bind(
                     domain="check",
