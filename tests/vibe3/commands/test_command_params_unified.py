@@ -52,7 +52,8 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     # Mock at both layers for EDA
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
@@ -88,7 +89,8 @@ def mock_run_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     monkeypatch.setattr("vibe3.commands.run.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.run.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.run.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.commands.run.validate_run_prerequisites",
@@ -121,7 +123,8 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_config = MagicMock()
 
     monkeypatch.setattr(
-        "vibe3.commands.review.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.review.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.commands.review.validate_review_prerequisites",
