@@ -99,6 +99,7 @@ class GitHubClientBase:
         *,
         timeout: int | None = None,
         pager: bool = False,
+        input_text: str | None = None,
     ) -> subprocess.CompletedProcess[str] | None:
         """Execute a gh CLI command with standard error handling.
 
@@ -106,6 +107,7 @@ class GitHubClientBase:
             cmd: Full command list (e.g. ["gh", "issue", "list", ...]).
             timeout: Seconds before timeout. Defaults to GH_API_TIMEOUT.
             pager: If True, inject GH_PAGER=cat into the subprocess env.
+            input_text: Text to pass to stdin (for --input - style commands).
 
         Returns:
             CompletedProcess on success.
@@ -113,6 +115,7 @@ class GitHubClientBase:
         """
         env = {**os.environ, "GH_PAGER": "cat"} if pager else None
         effective_timeout = timeout if timeout is not None else GH_API_TIMEOUT
+        stdin_input = subprocess.PIPE if input_text is not None else None
         try:
             return subprocess.run(
                 cmd,
@@ -120,6 +123,8 @@ class GitHubClientBase:
                 text=True,
                 timeout=effective_timeout,
                 env=env,
+                input=input_text,
+                stdin=stdin_input,
             )
         except subprocess.TimeoutExpired:
             logger.bind(external="github", cmd=" ".join(cmd[:3])).warning(
