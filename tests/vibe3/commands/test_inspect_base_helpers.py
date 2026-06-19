@@ -64,7 +64,7 @@ def test_validate_base_branch_resolved_via_remotes() -> None:
 
     # Should not raise
     validate_base_branch(mock_git, "develop")
-    assert mock_git._run.call_count >= 1
+    assert mock_git._run.call_count == 4
 
 
 def test_validate_base_branch_resolved_via_heads() -> None:
@@ -80,7 +80,7 @@ def test_validate_base_branch_resolved_via_heads() -> None:
 
     # Should not raise
     validate_base_branch(mock_git, "develop")
-    assert mock_git._run.call_count >= 1
+    assert mock_git._run.call_count == 2
 
 
 def test_validate_base_branch_resolved_via_remotes_no_origin() -> None:
@@ -96,7 +96,7 @@ def test_validate_base_branch_resolved_via_remotes_no_origin() -> None:
 
     # Should not raise
     validate_base_branch(mock_git, "upstream/main")
-    assert mock_git._run.call_count >= 1
+    assert mock_git._run.call_count == 3
 
 
 def test_validate_base_branch_not_found() -> None:
@@ -211,6 +211,7 @@ def test_build_json_output_empty_core_files(
     assert result["code_changed"] == 0  # No code files
     assert "impacted_modules" not in result  # No core files
     assert "changed_symbols" not in result  # No symbols
+    mock_dag.expand_impacted_modules.assert_not_called()
 
 
 @patch("vibe3.commands.inspect_base_helpers.get_config")
