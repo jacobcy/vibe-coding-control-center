@@ -42,6 +42,8 @@ from vibe3.models import (
     PlanSpecInput,
     WorktreeRequirement,
 )
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -241,11 +243,6 @@ def build_plan_sync_request(
 
     # Collect and write provenance for dry-run audit
     if dry_run:
-        from vibe3.execution.prompt_meta import build_prompt_meta
-        from vibe3.observability.orchestra_log import write_prompt_provenance
-        from vibe3.prompts import PromptManifest
-        from vibe3.prompts.provenance import collect_dry_run_provenance
-
         meta = build_prompt_meta(
             flow_state,
             ref_keys=("plan_ref",),

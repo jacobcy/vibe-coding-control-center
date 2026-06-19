@@ -14,7 +14,11 @@ from vibe3.clients import GitHubClient
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution import ExecutionRolePolicyService, resolve_orchestra_repo_root
 from vibe3.models import ExecutionRequest, OrchestraConfig
-from vibe3.observability import append_governance_event, governance_dry_run_dir
+from vibe3.observability import (
+    append_governance_event,
+    governance_dry_run_dir,
+    write_prompt_provenance,
+)
 from vibe3.prompts import (
     DEFAULT_PROMPTS_PATH,
     PromptAssembler,
@@ -26,6 +30,7 @@ from vibe3.prompts import (
     PromptVariableSource,
     ProviderRegistry,
     VariableSourceKind,
+    collect_dry_run_provenance,
 )
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
@@ -403,10 +408,6 @@ def build_governance_request(
         )
 
         # Collect and write provenance for audit
-        from vibe3.observability.orchestra_log import write_prompt_provenance
-        from vibe3.prompts import PromptManifest
-        from vibe3.prompts.provenance import collect_dry_run_provenance
-
         manifest = PromptManifest.load_default()
         recipe_def = manifest.recipe("governance.scan")
 

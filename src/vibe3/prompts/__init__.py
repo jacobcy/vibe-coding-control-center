@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         SectionSourceProvenance,
         VariableSourceKind,
     )
+    from vibe3.prompts.provenance import collect_dry_run_provenance
     from vibe3.prompts.provider_registry import ProviderRegistry
     from vibe3.prompts.sections import (
         build_tools_guide_section,
@@ -111,6 +112,7 @@ _LAZY_IMPORTS = {
     "PromptValidationResult": "vibe3.prompts.validation",
     "PromptValidationService": "vibe3.prompts.validation",
     "ValidationIssue": "vibe3.prompts.validation",
+    "collect_dry_run_provenance": "vibe3.prompts.provenance",
 }
 
 
@@ -171,4 +173,6 @@ __all__ = [
     # Section builders
     "build_tools_guide_section",
     "resolve_common_rules_path",
+    # Provenance
+    "collect_dry_run_provenance",
 ]

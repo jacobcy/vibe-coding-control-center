@@ -17,6 +17,8 @@ from vibe3.execution import (
     build_role_sync_request,
 )
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
@@ -144,10 +146,6 @@ def build_run_sync_request(
 
     # Collect and write provenance for dry-run audit
     if dry_run:
-        from vibe3.observability.orchestra_log import write_prompt_provenance
-        from vibe3.prompts import PromptManifest
-        from vibe3.prompts.provenance import collect_dry_run_provenance
-
         # Determine variant_key: {mode}.{context_mode}
         variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
 
