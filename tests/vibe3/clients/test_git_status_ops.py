@@ -6,8 +6,10 @@ import pytest
 
 from vibe3.clients.git_status_ops import (
     _filter_unified_diff_by_paths,
+    _name_status_via_merge_base,
     _numstat_via_merge_base,
     get_changed_files,
+    get_name_status,
     get_numstat,
 )
 from vibe3.exceptions import GitError, SystemError
@@ -161,6 +163,169 @@ class TestNumstatViaMergeBase:
         get_merge_base = MagicMock(return_value="ghij" + "0" * 36)
         with pytest.raises(SystemError, match="invalid SHA format"):
             _numstat_via_merge_base(run, get_merge_base, "feature", "main")
+
+
+class TestGetNameStatus:
+    """Test get_name_status function."""
+
+    def test_uncommitted_source_uses_head(self) -> None:
+        """Test uncommitted source uses 'git diff --name-status HEAD'."""
+        run = MagicMock(return_value="A\tsrc/new.py")
+        source = UncommittedSource()
+
+        result = get_name_status(run, source)
+
+        run.assert_called_once_with(["diff", "--name-status", "HEAD"])
+        assert result == "A\tsrc/new.py"
+
+    def test_commit_source_uses_sha_range(self) -> None:
+        """Test commit source uses 'git diff --name-status sha^ sha'."""
+        run = MagicMock(return_value="M\tsrc/main.py")
+        source = CommitSource(sha="abc123")
+
+        result = get_name_status(run, source)
+
+        run.assert_called_once_with(["diff", "--name-status", "abc123^", "abc123"])
+        assert result == "M\tsrc/main.py"
+
+    def test_branch_source_uses_merge_base(self) -> None:
+        """Test branch source uses merge-base correctly."""
+        run = MagicMock(return_value="A\tsrc/feature.py")
+        merge_base_sha = "a" * 40
+        get_merge_base = MagicMock(return_value=merge_base_sha)
+        source = BranchSource(branch="feature", base="main")
+
+        result = get_name_status(run, source, get_merge_base=get_merge_base)
+
+        get_merge_base.assert_called_once_with("feature", "main")
+        expected_args = ["diff", "--name-status", f"{merge_base_sha}...feature"]
+        run.assert_called_once_with(expected_args)
+        assert result == "A\tsrc/feature.py"
+
+    def test_branch_source_raises_without_merge_base_callable(self) -> None:
+        """Test branch source raises error when get_merge_base not provided."""
+        run = MagicMock()
+        source = BranchSource(branch="feature", base="main")
+
+        with pytest.raises(SystemError, match="get_merge_base callable required"):
+            get_name_status(run, source)
+
+    def test_pr_source_uses_github_client(self) -> None:
+        """Test PR source uses github_client.get_pr for ref resolution."""
+        run = MagicMock(return_value="M\tsrc/pr_file.py")
+        github_client = MagicMock()
+        pr_info = MagicMock()
+        pr_info.head_branch = "pr-branch"
+        pr_info.base_branch = "main"
+        github_client.get_pr.return_value = pr_info
+        merge_base_sha = "c" * 40
+        get_merge_base = MagicMock(return_value=merge_base_sha)
+        source = PRSource(pr_number=42)
+
+        result = get_name_status(
+            run, source, github_client=github_client, get_merge_base=get_merge_base
+        )
+
+        github_client.get_pr.assert_called_once_with(42)
+        get_merge_base.assert_called_once_with("pr-branch", "main")
+        expected_args = ["diff", "--name-status", f"{merge_base_sha}...pr-branch"]
+        run.assert_called_once_with(expected_args)
+        assert result == "M\tsrc/pr_file.py"
+
+    def test_pr_source_raises_without_github_client(self) -> None:
+        """Test PR source raises error when github_client not provided."""
+        run = MagicMock()
+        get_merge_base = MagicMock()
+        source = PRSource(pr_number=42)
+
+        with pytest.raises(GitError, match="PR source requires GitHubClient"):
+            get_name_status(run, source, get_merge_base=get_merge_base)
+
+    def test_pr_source_raises_without_merge_base_callable(self) -> None:
+        """Test PR source raises error when get_merge_base not provided."""
+        run = MagicMock()
+        github_client = MagicMock()
+        source = PRSource(pr_number=42)
+
+        with pytest.raises(SystemError, match="get_merge_base callable required"):
+            get_name_status(run, source, github_client=github_client)
+
+    def test_pr_source_raises_when_pr_not_found(self) -> None:
+        """Test PR source raises error when get_pr returns None."""
+        run = MagicMock()
+        github_client = MagicMock()
+        github_client.get_pr.return_value = None
+        get_merge_base = MagicMock()
+        source = PRSource(pr_number=999)
+
+        with pytest.raises(GitError, match="PR #999 not found"):
+            get_name_status(
+                run, source, github_client=github_client, get_merge_base=get_merge_base
+            )
+
+    def test_pr_source_uses_cache(self) -> None:
+        """Test PR source uses cache when available."""
+        run = MagicMock()
+        github_client = MagicMock()
+        get_merge_base = MagicMock()
+        source = PRSource(pr_number=42)
+        cache = {42: "A\tcached.py"}
+
+        result = get_name_status(
+            run,
+            source,
+            github_client=github_client,
+            get_merge_base=get_merge_base,
+            pr_name_status_cache=cache,
+        )
+
+        assert result == "A\tcached.py"
+        github_client.get_pr.assert_not_called()
+
+
+class TestNameStatusViaMergeBase:
+    """Test _name_status_via_merge_base helper function."""
+
+    def test_calls_merge_base_with_head_and_base(self) -> None:
+        """Test that get_merge_base is called with (head, base) arguments."""
+        run = MagicMock(return_value="A\tsrc/file.py")
+        get_merge_base = MagicMock(return_value="a" * 40)
+
+        result = _name_status_via_merge_base(run, get_merge_base, "feature", "main")
+
+        get_merge_base.assert_called_once_with("feature", "main")
+        assert result == "A\tsrc/file.py"
+
+    def test_calls_run_with_correct_diff_args(self) -> None:
+        """Test that run is called with correct diff --name-status arguments."""
+        run = MagicMock(return_value="M\tsrc/other.py")
+        get_merge_base = MagicMock(return_value="b" * 40)
+
+        result = _name_status_via_merge_base(run, get_merge_base, "branch", "main")
+
+        run.assert_called_once_with(["diff", "--name-status", "b" * 40 + "...branch"])
+        assert result == "M\tsrc/other.py"
+
+    def test_raises_on_empty_merge_base(self) -> None:
+        """Test that empty merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="")
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _name_status_via_merge_base(run, get_merge_base, "feature", "main")
+
+    def test_raises_on_wrong_length_merge_base(self) -> None:
+        """Test that non-40-char merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="abc123")
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _name_status_via_merge_base(run, get_merge_base, "feature", "main")
+
+    def test_raises_on_non_hex_merge_base(self) -> None:
+        """Test that non-hex merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="ghij" + "0" * 36)
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _name_status_via_merge_base(run, get_merge_base, "feature", "main")
 
 
 class TestGetChangedFilesPathspec:

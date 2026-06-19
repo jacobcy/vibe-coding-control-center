@@ -224,6 +224,19 @@ def _numstat_via_merge_base(
     return run(["diff", "--numstat", f"{merge_base}...{head}"])
 
 
+def _name_status_via_merge_base(
+    run: Callable[[list[str]], str],
+    get_merge_base: Callable[[str, str], str],
+    head: str,
+    base: str,
+) -> str:
+    """Get name-status via merge-base resolution."""
+    merge_base = get_merge_base(head, base)
+    if not re.match(r"^[a-f0-9]{40}$", merge_base):
+        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
+    return run(["diff", "--name-status", f"{merge_base}...{head}"])
+
+
 def has_uncommitted_changes(run: Callable[[list[str]], str]) -> bool:
     """Check if working directory is dirty.
 
@@ -348,3 +361,84 @@ def _filter_unified_diff_by_paths(diff_text: str, paths: list[str]) -> str:
             result_lines.append(line)
 
     return "\n".join(result_lines)
+
+
+def get_name_status(
+    run: Callable[[list[str]], str],
+    source: ChangeSource,
+    github_client: "GitHubClient | None" = None,
+    get_merge_base: Callable[[str, str], str] | None = None,
+    pr_name_status_cache: dict[int, str] | None = None,
+) -> str:
+    """Unified interface: get git diff --name-status output.
+
+    Args:
+        run: Git command runner function
+        source: Change source (PR/Commit/Branch/Uncommitted)
+        github_client: Optional GitHubClient for PR ref resolution
+        get_merge_base: Optional merge-base resolver callable
+        pr_name_status_cache: Optional PR name-status cache dict
+
+    Returns:
+        name-status output string (format: STATUS\\tfilepath)
+
+    Raises:
+        GitError: git command execution failed
+        SystemError: missing required callables
+            (e.g., get_merge_base for branch/PR sources)
+    """
+    log = logger.bind(domain="git", action="get_name_status", source_type=source.type)
+    log.info("Getting name-status")
+
+    if source.type == ChangeSourceType.UNCOMMITTED:
+        output = run(["diff", "--name-status", "HEAD"])
+    elif source.type == ChangeSourceType.COMMIT:
+        if not isinstance(source, CommitSource):
+            raise SystemError(
+                f"Type mismatch: expected CommitSource, got {type(source).__name__}"
+            )
+        output = run(["diff", "--name-status", f"{source.sha}^", source.sha])
+    elif source.type == ChangeSourceType.BRANCH:
+        if not isinstance(source, BranchSource):
+            raise SystemError(
+                f"Type mismatch: expected BranchSource, got {type(source).__name__}"
+            )
+        if not get_merge_base:
+            raise SystemError("get_merge_base callable required for BranchSource")
+        output = _name_status_via_merge_base(
+            run, get_merge_base, source.branch, source.base
+        )
+    elif source.type == ChangeSourceType.PR:
+        if not isinstance(source, PRSource):
+            raise SystemError(
+                f"Type mismatch: expected PRSource, got {type(source).__name__}"
+            )
+        if not github_client:
+            raise GitError(
+                "get_name_status",
+                "PR source requires GitHubClient injection",
+            )
+        if not get_merge_base:
+            raise SystemError("get_merge_base callable required for PRSource")
+        if (
+            pr_name_status_cache is not None
+            and source.pr_number in pr_name_status_cache
+        ):
+            output = pr_name_status_cache[source.pr_number]
+        else:
+            pr_info = github_client.get_pr(source.pr_number)
+            if not pr_info:
+                raise GitError(
+                    "get_name_status",
+                    f"PR #{source.pr_number} not found",
+                )
+            output = _name_status_via_merge_base(
+                run, get_merge_base, pr_info.head_branch, pr_info.base_branch
+            )
+            if pr_name_status_cache is not None:
+                pr_name_status_cache[source.pr_number] = output
+    else:
+        raise GitError("get_name_status", f"Unknown source type: {source.type}")
+
+    log.bind(output_len=len(output)).success("Got name-status")
+    return output
