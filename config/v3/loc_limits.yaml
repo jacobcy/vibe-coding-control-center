@@ -253,6 +253,9 @@ code_limits:
         reason: "Check PR 状态服务聚合，包含 PR 状态查询、closed 状态检测、terminal 状态判断、bridge issue 创建工作流（5个辅助函数 + idempotency 检查）、label 继承、GitHub API 失败保护（network/auth/timeout）、retry-safe cleanup 逻辑、dependency transfer（PR closed 时将依赖从旧 issue 转移到 bridge issue）、PRMerged event publishing（flow lifecycle tracking）等紧密耦合功能，替代 rebuild 逻辑避免 check-rebuild 循环（#1895）；Issue #2380 新增 _transfer_dependencies 方法支持依赖转移（+35 行）；Issue #2598 新增 PRMerged domain event publish 支持 flow lifecycle tracking（+15 行）；迁移至 check/ 子包（Issue #2584）；PR #2667 移除 _handle_open_pr_flow 方法（-51 行），迁移至 qualify_gate 层实现统一检查入口"
 
       # 强耦合测试例外
+      - path: "tests/vibe3/prompts/test_provenance.py"
+        limit: 550
+        reason: "Prompt provenance collection and anomaly detection tests (37 cases), covering collect_dry_run_provenance, detect_anomalies, get_section_sources, write_prompt_provenance, and integration tests for all recipe types (plan/run/review/governance); PR #3049 + #3054 added section source attribution and governance scan provenance tests"
       - path: "tests/vibe3/services/test_shared_errors.py"
         limit: 446
         reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file; PR #2788 follow-up added TestLogDispatchError class with 4 test methods (test_github_error_logged_as_warning_without_traceback, test_called_process_error_logged_as_warning_without_traceback, test_generic_exception_logged_with_traceback, test_long_error_message_truncated) to verify error log grading behavior for GitHub API vs internal errors (+65 lines)"
