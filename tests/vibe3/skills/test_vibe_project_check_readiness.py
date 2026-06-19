@@ -23,6 +23,7 @@ def test_project_check_covers_prompt_recipe_runtime_assets() -> None:
         "supervisor/governance/roadmap-intake.md",
         "supervisor/governance/cron-supervisor.md",
         "supervisor/governance/code-auditor.md",
+        "supervisor/governance/audit-observation.md",
     ]
     for asset in required_assets:
         assert asset in content

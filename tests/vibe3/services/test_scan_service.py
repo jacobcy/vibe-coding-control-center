@@ -218,6 +218,24 @@ class TestValidateGovernanceMaterialConsistency:
         assert issues[0]["type"] == "missing_file"
         assert material_name in issues[0]["message"]
 
+    def test_default_file_check_uses_runtime_asset_root(self, tmp_path, monkeypatch):
+        """Default file lookup follows runtime assets, not git common dir."""
+        material_name = "supervisor/governance/test-material.md"
+        material_file = tmp_path / material_name
+        material_file.parent.mkdir(parents=True, exist_ok=True)
+        material_file.write_text("# Test\n")
+
+        recipes_file = tmp_path / "prompt-recipes.yaml"
+        recipes_file.write_text(_make_recipes_yaml([{"name": material_name}]))
+
+        adapter = _make_adapter([{"name": "test-material", "path": material_name}])
+        monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
+
+        issues = validate_governance_material_consistency(
+            adapter=adapter, recipes_path=recipes_file
+        )
+        assert issues == []
+
     def test_orphaned_adapter_registration(self, tmp_path):
         """Adapter has supervisor/governance/ resource not in catalog -> orphaned."""
         # Catalog only has "known.md"

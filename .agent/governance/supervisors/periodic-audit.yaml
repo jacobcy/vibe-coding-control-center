@@ -127,6 +127,31 @@ checks:
       action: report
       message: "Handoff drift detected against current truth sources."
 
+  - id: audit_observation
+    enabled: true
+    scope: repository
+    schedule: "manual_or_daily"
+    target: recent_blocked_failed_aborted_flows
+    goal: "Produce bounded audit observations from recent failed runtime flows without adding collection code."
+    material: supervisor/governance/audit-observation.md
+    data_sources:
+      - vibe3.task_status
+      - vibe3.flow_status
+      - vibe3.handoff
+      - github.issues
+      - github.pull_requests
+      - git.history
+    predicates:
+      - "sample at most 3 recent blocked, failed, or aborted flows"
+      - "each observation must cite source-backed facts"
+      - "agent interpretation must stay separate from raw facts"
+      - "no prompt, policy, skill, code, or label changes are allowed"
+    on_violation:
+      severity: warning
+      action: report
+      message: "Audit observation could not produce a source-backed bounded observation."
+
 notes:
   - "Supervisor checks are expected to stay narrow and composable."
   - "Auto-remediation can be added later, but reporting is the default."
+  - "Audit observation is intentionally agent-driven; code-assisted collection requires a future issue backed by repeated observation failures."

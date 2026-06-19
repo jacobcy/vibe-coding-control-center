@@ -265,6 +265,31 @@ def build_code_auditor_context(
     )
 
 
+def build_audit_observation_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-observation material.
+
+    The material owns the actual evidence collection through stable CLI
+    commands. This context only orients the agent to the current runtime size.
+    """
+    return build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="blocked/aborted flow observation",
+        scope_note=(
+            "本材料不从 prompt 预置候选列表。请按材料中的稳定命令读取 "
+            "`flow status --all --format json` 和 "
+            "`task status --all --format json`，选择最近最多 3 个 "
+            "blocked/aborted/failed flow，输出 observation 并写入 "
+            "`governance` handoff 链。"
+        ),
+    )
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 

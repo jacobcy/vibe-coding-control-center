@@ -237,6 +237,7 @@ def validate_governance_material_consistency(
                 }
             )
             return issues
+    explicit_repo_root = repo_root is not None
     if repo_root is None:
         from vibe3.clients import GitClient
 
@@ -295,7 +296,12 @@ def validate_governance_material_consistency(
 
     # Check 2: material_catalog -> file system
     for material in material_catalog:
-        file_path = repo_root / material.name
+        if explicit_repo_root:
+            file_path = repo_root / material.name
+        else:
+            from vibe3.clients import resolve_runtime_asset
+
+            file_path = resolve_runtime_asset(material.name)
         if not file_path.exists():
             issues.append(
                 {

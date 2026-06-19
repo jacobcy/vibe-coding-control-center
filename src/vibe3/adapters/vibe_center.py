@@ -78,6 +78,16 @@ def _build_vibe_center_manifest(
                 name="cron-supervisor",
                 path="supervisor/governance/cron-supervisor.md",
             ),
+            AdapterResource(
+                type="supervisor",
+                name="code-auditor",
+                path="supervisor/governance/code-auditor.md",
+            ),
+            AdapterResource(
+                type="supervisor",
+                name="audit-observation",
+                path="supervisor/governance/audit-observation.md",
+            ),
         ]
     )
 
