@@ -17,7 +17,7 @@ from vibe3.prompts import (
     PromptVariableSource,
     VariableSourceKind,
 )
-from vibe3.services.shared import resolve_branch_arg
+from vibe3.services.flow import resolve_branch_arg
 from vibe3.utils import sanitize_prompt_for_display
 
 app = typer.Typer(
