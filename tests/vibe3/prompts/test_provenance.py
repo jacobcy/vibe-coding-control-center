@@ -266,6 +266,29 @@ def test_write_prompt_provenance_valid_json() -> None:
     path.unlink()
 
 
+def test_get_section_sources_governance_scan_returns_material_catalog() -> None:
+    """Template-based governance.scan should expose material_catalog
+    as section sources."""
+    manifest = PromptManifest.load_default()
+    section_sources = manifest.get_section_sources("governance.scan", "")
+
+    assert len(section_sources) > 0
+    assert all(isinstance(s, SectionSourceProvenance) for s in section_sources)
+    assert all(s.source_kind == VariableSourceKind.FILE for s in section_sources)
+    assert all(s.source_ref is not None for s in section_sources)
+
+
+def test_get_section_sources_run_plan_has_provider_sources() -> None:
+    """run.plan sections should carry provider source attribution after YAML upgrade."""
+    manifest = PromptManifest.load_default()
+    section_sources = manifest.get_section_sources("run.plan", "coding.bootstrap")
+
+    assert len(section_sources) == 6
+    populated = [s for s in section_sources if s.source_kind is not None]
+    assert len(populated) == 6
+    assert all(s.source_kind == VariableSourceKind.PROVIDER for s in populated)
+
+
 def test_token_estimate() -> None:
     """Verify token estimation formula."""
     text = "a" * 100

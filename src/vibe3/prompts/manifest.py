@@ -225,8 +225,21 @@ class PromptManifest:
         """
         recipe_def = self.recipe(recipe_key)
 
-        # Template-based recipes have no variants/sections
+        # Template-based recipes have no variants - return material catalog
+        # as section sources
         if not recipe_def.variants:
+            if (
+                recipe_def.loaded_definition is not None
+                and recipe_def.loaded_definition.material_catalog
+            ):
+                return [
+                    SectionSourceProvenance(
+                        key=item.name,
+                        source_kind=item.source.kind,
+                        source_ref=_source_ref(item.source),
+                    )
+                    for item in recipe_def.loaded_definition.material_catalog
+                ]
             return []
 
         variant_def = recipe_def.variant(variant_key)
