@@ -408,10 +408,18 @@ def build_governance_request(
         from vibe3.prompts.provenance import collect_dry_run_provenance
 
         manifest = PromptManifest.load_default()
+        recipe_def = manifest.recipe("governance.scan")
+
+        # Template-based recipes have no variants; use empty string for variant_key
+        variant_key = ""
+        if recipe_def.variants:
+            # Fallback if variants exist
+            variant_key = "default"
+
         provenance = collect_dry_run_provenance(
             manifest=manifest,
             recipe_key="governance.scan",
-            variant_key="default",
+            variant_key=variant_key,
             rendered_text=plan_content,
             variable_provenance=render_result.provenance,
             warnings=render_result.warnings,

@@ -220,8 +220,15 @@ class PromptManifest:
         Does NOT render sections; only returns metadata from the loaded
         recipe definition. Provider-rendered sections (no source override)
         will have source_kind=None.
+
+        For template-based recipes (no variants), returns empty list.
         """
         recipe_def = self.recipe(recipe_key)
+
+        # Template-based recipes have no variants/sections
+        if not recipe_def.variants:
+            return []
+
         variant_def = recipe_def.variant(variant_key)
 
         # Try loaded_definition for section source specs
