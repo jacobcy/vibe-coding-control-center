@@ -16,6 +16,7 @@ from vibe3.config import diagnose_profile
 from vibe3.exceptions import DiagnosticContext, MissingResourceError
 from vibe3.prompts.models import (
     LoadedPromptRecipeDefinition,
+    MaterialLayer,
     PromptRecipeKind,
     PromptRecipeVariantSpec,
     PromptSectionSpec,
@@ -174,8 +175,18 @@ class PromptManifest:
                         if isinstance(source_raw, dict):
                             source = _parse_variable_source(source_raw)
                             name = str(item["name"])
+                            # Parse layer field
+                            layer_raw = item.get("layer")
+                            valid_layers = {e.value for e in MaterialLayer}
+                            layer = (
+                                MaterialLayer(layer_raw)
+                                if layer_raw in valid_layers
+                                else None
+                            )
                             catalog_items.append(
-                                PromptMaterialSpec(name=name, source=source)
+                                PromptMaterialSpec(
+                                    name=name, source=source, layer=layer
+                                )
                             )
                 material_catalog = tuple(catalog_items)
 
@@ -225,6 +236,7 @@ class PromptManifest:
         self,
         recipe_key: str,
         variant_key: str,
+        active_layers: set[MaterialLayer] | None = None,
     ) -> list[SectionSourceProvenance]:
         """Return section source metadata for a recipe variant.
 
@@ -234,6 +246,13 @@ class PromptManifest:
 
         For template-based recipes (no variants), returns material_catalog
         entries as section sources with FILE source_kind.
+
+        Args:
+            recipe_key: Recipe identifier
+            variant_key: Variant identifier
+            active_layers: Set of active material layers. If None, all layers
+                are considered active (backward compatible). When provided,
+                sections with a layer not in active_layers will have enabled=False.
         """
         recipe_def = self.recipe(recipe_key)
 
@@ -249,6 +268,12 @@ class PromptManifest:
                         key=item.name,
                         source_kind=item.source.kind,
                         source_ref=_source_ref(item.source),
+                        layer=item.layer,
+                        enabled=(
+                            active_layers is None
+                            or item.layer is None
+                            or item.layer in active_layers
+                        ),
                     )
                     for item in recipe_def.loaded_definition.material_catalog
                 ]
@@ -265,6 +290,12 @@ class PromptManifest:
                         key=s.key,
                         source_kind=s.source.kind if s.source else None,
                         source_ref=_source_ref(s.source) if s.source else None,
+                        layer=s.layer,
+                        enabled=(
+                            active_layers is None
+                            or s.layer is None
+                            or s.layer in active_layers
+                        ),
                     )
                     for s in variant_spec.sections
                 ]
@@ -277,8 +308,17 @@ class PromptManifest:
         recipe_key: str,
         variant_key: str,
         providers: dict[str, PromptProvider],
+        active_layers: set[MaterialLayer] | None = None,
     ) -> str:
         """Render configured sections through provider-backed section keys.
+
+        Args:
+            recipe_key: Recipe identifier
+            variant_key: Variant identifier
+            providers: Mapping of section keys to provider functions
+            active_layers: Set of active material layers. If None, all layers
+                are rendered (backward compatible). When provided, sections with
+                a layer not in active_layers are skipped.
 
         Raises:
             KeyError: If recipe, variant, or provider not found.
@@ -287,24 +327,69 @@ class PromptManifest:
         recipe_def = self.recipe(recipe_key)
         variant_def = recipe_def.variant(variant_key)
 
-        for section_key in variant_def.sections:
-            provider = providers.get(section_key)
-            if provider is None:
-                logger.bind(
-                    domain="prompt_manifest",
-                    recipe=recipe_key,
-                    variant=variant_key,
-                    missing_section=section_key,
-                    available_providers=list(providers.keys()),
-                ).error("Prompt section provider not registered")
-                raise KeyError(
-                    f"Prompt section provider not registered: {section_key}. "
-                    f"Check configuration for recipe '{recipe_key}' "
-                    f"variant '{variant_key}'."
-                )
-            value = provider()
-            if value:
-                rendered.append(value)
+        # Get section specs with layer information
+        section_specs: tuple[PromptSectionSpec, ...] = ()
+        if recipe_def.loaded_definition is not None:
+            variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
+            if variant_spec is not None:
+                section_specs = variant_spec.sections
+
+        # If no specs available, fall back to string keys
+        if not section_specs:
+            for section_key in variant_def.sections:
+                provider = providers.get(section_key)
+                if provider is None:
+                    logger.bind(
+                        domain="prompt_manifest",
+                        recipe=recipe_key,
+                        variant=variant_key,
+                        missing_section=section_key,
+                        available_providers=list(providers.keys()),
+                    ).error("Prompt section provider not registered")
+                    raise KeyError(
+                        f"Prompt section provider not registered: {section_key}. "
+                        f"Check configuration for recipe '{recipe_key}' "
+                        f"variant '{variant_key}'."
+                    )
+                value = provider()
+                if value:
+                    rendered.append(value)
+        else:
+            # Render with layer filtering
+            for spec in section_specs:
+                # Check if section should be skipped due to layer filtering
+                if (
+                    active_layers is not None
+                    and spec.layer is not None
+                    and spec.layer not in active_layers
+                ):
+                    logger.bind(
+                        domain="prompt_manifest",
+                        recipe=recipe_key,
+                        variant=variant_key,
+                        section=spec.key,
+                        layer=spec.layer.value,
+                    ).debug("Skipping section due to inactive layer")
+                    continue
+
+                provider = providers.get(spec.key)
+                if provider is None:
+                    logger.bind(
+                        domain="prompt_manifest",
+                        recipe=recipe_key,
+                        variant=variant_key,
+                        missing_section=spec.key,
+                        available_providers=list(providers.keys()),
+                    ).error("Prompt section provider not registered")
+                    raise KeyError(
+                        f"Prompt section provider not registered: {spec.key}. "
+                        f"Check configuration for recipe '{recipe_key}' "
+                        f"variant '{variant_key}'."
+                    )
+                value = provider()
+                if value:
+                    rendered.append(value)
+
         return "\n\n---\n\n".join(rendered)
 
 
@@ -350,7 +435,10 @@ def _parse_section_specs(sections_raw: Any) -> tuple[PromptSectionSpec, ...]:
                 source = _parse_variable_source(source_raw)
             else:
                 source = None
-            specs.append(PromptSectionSpec(key=key, source=source))
+            # Parse layer field
+            layer_raw = item.get("layer")
+            layer = MaterialLayer(layer_raw) if layer_raw else None
+            specs.append(PromptSectionSpec(key=key, source=source, layer=layer))
 
     return tuple(specs)
 

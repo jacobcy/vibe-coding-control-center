@@ -372,3 +372,225 @@ recipes:
     # Simulate prompts_path pointing to a settings file in the prompts dir
     manifest = PromptManifest.load_for_prompts_path(prompts_dir / "custom-config.yaml")
     assert "my.recipe" in manifest.recipes
+
+
+# Layer parsing and filtering tests
+
+
+def test_parse_section_layer_from_yaml(tmp_path: Path) -> None:
+    """Verify section layer field is correctly parsed from YAML."""
+    from vibe3.prompts.models import MaterialLayer
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    variants:
+      default:
+        sections:
+          - key: test.core_section
+            layer: core_invariant
+          - key: test.policy_section
+            layer: project_policy
+          - key: test.no_layer_section
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+    recipe = manifest.recipe("test.recipe")
+
+    # Check loaded_definition has layer info
+    assert recipe.loaded_definition is not None
+    variant_spec = recipe.loaded_definition.variants["default"]
+    assert len(variant_spec.sections) == 3
+
+    assert variant_spec.sections[0].layer == MaterialLayer.CORE_INVARIANT
+    assert variant_spec.sections[1].layer == MaterialLayer.PROJECT_POLICY
+    assert variant_spec.sections[2].layer is None
+
+
+def test_parse_material_catalog_layer_from_yaml(tmp_path: Path) -> None:
+    """Verify material_catalog layer field is correctly parsed from YAML."""
+    from vibe3.prompts.models import MaterialLayer
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    kind: template_recipe
+    template_key: test.template
+    material_catalog:
+      - name: test/material1.md
+        source:
+          kind: file
+          path: test/material1.md
+        layer: project_policy
+      - name: test/material2.md
+        source:
+          kind: file
+          path: test/material2.md
+        layer: runtime_evidence
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+    recipe = manifest.recipe("test.recipe")
+
+    assert recipe.loaded_definition is not None
+    assert len(recipe.loaded_definition.material_catalog) == 2
+
+    assert (
+        recipe.loaded_definition.material_catalog[0].layer
+        == MaterialLayer.PROJECT_POLICY
+    )
+    assert (
+        recipe.loaded_definition.material_catalog[1].layer
+        == MaterialLayer.RUNTIME_EVIDENCE
+    )
+
+
+def test_render_sections_filters_by_active_layers(tmp_path: Path) -> None:
+    """Verify render_sections filters out sections with inactive layers."""
+    from vibe3.prompts.models import MaterialLayer
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    variants:
+      default:
+        sections:
+          - key: test.core
+            layer: core_invariant
+          - key: test.policy
+            layer: project_policy
+          - key: test.no_layer
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+
+    # Cross-project: only core_invariant active, project_policy should be filtered
+    active_layers = {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
+    rendered = manifest.render_sections(
+        "test.recipe",
+        "default",
+        providers={
+            "test.core": lambda: "Core content",
+            "test.policy": lambda: "Policy content",
+            "test.no_layer": lambda: "No layer content",
+        },
+        active_layers=active_layers,
+    )
+
+    # Should contain core and no_layer sections, but not policy
+    assert "Core content" in rendered
+    assert "No layer content" in rendered
+    assert "Policy content" not in rendered
+
+
+def test_render_sections_no_active_layers_allows_all(tmp_path: Path) -> None:
+    """Verify active_layers=None renders all sections (backward compatible)."""
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    variants:
+      default:
+        sections:
+          - key: test.core
+            layer: core_invariant
+          - key: test.policy
+            layer: project_policy
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+
+    # active_layers=None should render all sections
+    rendered = manifest.render_sections(
+        "test.recipe",
+        "default",
+        providers={
+            "test.core": lambda: "Core content",
+            "test.policy": lambda: "Policy content",
+        },
+        active_layers=None,  # None means no filtering
+    )
+
+    assert "Core content" in rendered
+    assert "Policy content" in rendered
+
+
+def test_get_section_sources_respects_layer_enabled(tmp_path: Path) -> None:
+    """Verify get_section_sources sets enabled field based on active_layers."""
+    from vibe3.prompts.models import MaterialLayer
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    variants:
+      default:
+        sections:
+          - key: test.core
+            layer: core_invariant
+          - key: test.policy
+            layer: project_policy
+          - key: test.no_layer
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+
+    # Cross-project: only core_invariant active
+    active_layers = {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
+    sources = manifest.get_section_sources("test.recipe", "default", active_layers)
+
+    assert len(sources) == 3
+    assert sources[0].key == "test.core"
+    assert sources[0].layer == MaterialLayer.CORE_INVARIANT
+    assert sources[0].enabled is True
+
+    assert sources[1].key == "test.policy"
+    assert sources[1].layer == MaterialLayer.PROJECT_POLICY
+    assert sources[1].enabled is False  # Not in active_layers
+
+    assert sources[2].key == "test.no_layer"
+    assert sources[2].layer is None
+    assert sources[2].enabled is True  # No layer = always enabled
+
+
+def test_default_layer_is_none(tmp_path: Path) -> None:
+    """Verify sections without layer annotation have layer=None."""
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  test.recipe:
+    variants:
+      default:
+        sections:
+          - test.section_without_layer
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+    recipe = manifest.recipe("test.recipe")
+
+    assert recipe.loaded_definition is not None
+    variant_spec = recipe.loaded_definition.variants["default"]
+    assert len(variant_spec.sections) == 1
+    assert variant_spec.sections[0].layer is None

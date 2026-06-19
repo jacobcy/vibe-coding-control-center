@@ -507,3 +507,108 @@ def test_collect_provenance_with_warnings() -> None:
 
     assert len(provenance.warnings) == 1
     assert "missing provider: custom_section" in provenance.warnings
+
+
+# Layer coverage anomaly detection tests
+
+
+def test_detect_missing_core_invariant() -> None:
+    """Verify missing_core_invariant flag when no core_invariant layer present."""
+    from vibe3.prompts.models import MaterialLayer
+
+    # No core_invariant sections
+    section_sources = (
+        SectionSourceProvenance(
+            key="test.runtime",
+            layer=MaterialLayer.RUNTIME_EVIDENCE,
+            enabled=True,
+        ),
+        SectionSourceProvenance(
+            key="test.policy",
+            layer=MaterialLayer.PROJECT_POLICY,
+            enabled=True,
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "test prompt", section_sources, ("test.runtime", "test.policy")
+    )
+
+    assert anomalies.missing_core_invariant is True
+
+
+def test_detect_no_missing_core_invariant_when_present() -> None:
+    """Verify missing_core_invariant flag is False when core_invariant layer present."""
+    from vibe3.prompts.models import MaterialLayer
+
+    # Has core_invariant section
+    section_sources = (
+        SectionSourceProvenance(
+            key="test.core",
+            layer=MaterialLayer.CORE_INVARIANT,
+            enabled=True,
+        ),
+        SectionSourceProvenance(
+            key="test.runtime",
+            layer=MaterialLayer.RUNTIME_EVIDENCE,
+            enabled=True,
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "test prompt", section_sources, ("test.core", "test.runtime")
+    )
+
+    assert anomalies.missing_core_invariant is False
+
+
+def test_detect_vibe_center_policy_leak_cross_project() -> None:
+    """Verify vibe_center_policy_leak flag when project_policy enabled."""
+    from vibe3.prompts.models import MaterialLayer
+
+    # project_policy enabled in cross-project context (should be disabled)
+    section_sources = (
+        SectionSourceProvenance(
+            key="test.core",
+            layer=MaterialLayer.CORE_INVARIANT,
+            enabled=True,
+        ),
+        SectionSourceProvenance(
+            key="test.policy",
+            layer=MaterialLayer.PROJECT_POLICY,
+            enabled=True,  # Should be False in cross-project context
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "test prompt", section_sources, ("test.core", "test.policy")
+    )
+
+    # Flag is set when project_policy is enabled (regardless of context detection)
+    assert anomalies.vibe_center_policy_leak is True
+
+
+def test_detect_no_policy_leak_when_disabled() -> None:
+    """Verify vibe_center_policy_leak flag is False when project_policy disabled."""
+    from vibe3.prompts.models import MaterialLayer
+
+    # project_policy disabled (cross-project scenario)
+    section_sources = (
+        SectionSourceProvenance(
+            key="test.core",
+            layer=MaterialLayer.CORE_INVARIANT,
+            enabled=True,
+        ),
+        SectionSourceProvenance(
+            key="test.policy",
+            layer=MaterialLayer.PROJECT_POLICY,
+            enabled=False,  # Disabled in cross-project context
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "test prompt", section_sources, ("test.core", "test.policy")
+    )
+
+    # No leak when project_policy is disabled
+    assert anomalies.vibe_center_policy_leak is False

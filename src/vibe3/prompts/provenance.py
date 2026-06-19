@@ -7,6 +7,7 @@ import hashlib
 from vibe3.prompts import PromptManifest
 from vibe3.prompts.models import (
     AnomalyFlags,
+    MaterialLayer,
     PromptRenderProvenance,
     PromptVariableProvenance,
     SectionSourceProvenance,
@@ -89,6 +90,20 @@ def detect_anomalies(
         for s in section_sources
     )
 
+    # Check for missing core invariant layer
+    # Core invariant layer should always be present in a valid prompt
+    missing_core_invariant = not any(
+        s.layer == MaterialLayer.CORE_INVARIANT for s in section_sources
+    )
+
+    # Check for vibe-center policy leak in cross-project context
+    # If a section has layer=PROJECT_POLICY and enabled=True but is being used
+    # in a cross-project context (where PROJECT_POLICY should be disabled),
+    # this indicates a potential leak of vibe-center-specific governance
+    vibe_center_policy_leak = any(
+        s.layer == MaterialLayer.PROJECT_POLICY and s.enabled for s in section_sources
+    )
+
     return AnomalyFlags(
         has_large_material=has_large_material,
         has_duplicate_material=has_duplicate_material,
@@ -96,6 +111,8 @@ def detect_anomalies(
         missing_verification_contract=missing_verification_contract,
         has_repo_profile=has_repo_profile,
         has_project_policy_overlay=has_project_policy_overlay,
+        missing_core_invariant=missing_core_invariant,
+        vibe_center_policy_leak=vibe_center_policy_leak,
     )
 
 

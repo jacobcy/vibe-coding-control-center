@@ -19,6 +19,21 @@ class VariableSourceKind(str, Enum):
     PROVIDER = "provider"
 
 
+class MaterialLayer(str, Enum):
+    """Material layer classification for cross-project prompt assembly.
+
+    When running inside vibe-center repo, all layers are active.
+    When running cross-project, only core_invariant and runtime_evidence
+    from vibe-center are active; repo_profile and project_policy come
+    from the target repo's own config.
+    """
+
+    CORE_INVARIANT = "core_invariant"
+    REPO_PROFILE = "repo_profile"
+    PROJECT_POLICY = "project_policy"
+    RUNTIME_EVIDENCE = "runtime_evidence"
+
+
 class PromptRecipeKind(str, Enum):
     """Recipe assembly strategy."""
 
@@ -89,6 +104,7 @@ class PromptSectionSpec(BaseModel):
 
     key: str
     source: PromptVariableSource | None = None
+    layer: MaterialLayer | None = None
 
 
 class PromptMaterialSpec(BaseModel):
@@ -98,6 +114,7 @@ class PromptMaterialSpec(BaseModel):
 
     name: str
     source: PromptVariableSource
+    layer: MaterialLayer | None = None
 
 
 class MaterialEntry(BaseModel):
@@ -158,6 +175,9 @@ class AnomalyFlags(BaseModel):
     missing_verification_contract: bool = False
     has_repo_profile: bool = False
     has_project_policy_overlay: bool = False
+    missing_core_invariant: bool = False  # core protocol layer is missing
+    vibe_center_policy_leak: bool = False
+    # cross-project runtime has vibe-center-specific governance material leaked
 
 
 class SectionSourceProvenance(BaseModel):
@@ -169,6 +189,8 @@ class SectionSourceProvenance(BaseModel):
     source_kind: VariableSourceKind | None = None
     source_ref: str | None = None
     size_chars: int | None = None
+    layer: MaterialLayer | None = None
+    enabled: bool = True
 
 
 class PromptRenderProvenance(BaseModel):

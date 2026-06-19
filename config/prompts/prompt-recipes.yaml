@@ -36,12 +36,16 @@ recipes:
             source:
               kind: file
               path: supervisor/manager.md
+            layer: project_policy
           - key: manager.target
+            layer: core_invariant
           - key: manager.quick_commands
+            layer: core_invariant
 
       retry.resume:
         sections:
-          - manager.retry_task
+          - key: manager.retry_task
+            layer: core_invariant
 
   # Executor role, plan/flow_plan/lightweight modes.
   #
@@ -59,26 +63,32 @@ recipes:
             source:
               kind: provider
               provider: run.plan_ref
+            layer: runtime_evidence
           - key: run.coding_task
             source:
               kind: provider
               provider: run.coding_task
+            layer: core_invariant
           - key: run.policy
             source:
               kind: provider
               provider: run.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: run.output_format
             source:
               kind: provider
               provider: run.output_format
+            layer: core_invariant
           - key: run.exit_contract
             source:
               kind: provider
               provider: run.exit_contract
+            layer: core_invariant
 
       retry.bootstrap:
         sections:
@@ -86,26 +96,32 @@ recipes:
             source:
               kind: provider
               provider: run.plan_ref
+            layer: runtime_evidence
           - key: run.retry_task
             source:
               kind: provider
               provider: run.retry_task
+            layer: core_invariant
           - key: run.policy
             source:
               kind: provider
               provider: run.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: run.output_format
             source:
               kind: provider
               provider: run.output_format
+            layer: core_invariant
           - key: run.exit_contract
             source:
               kind: provider
               provider: run.exit_contract
+            layer: core_invariant
 
       retry.resume:
         sections:
@@ -113,10 +129,12 @@ recipes:
             source:
               kind: provider
               provider: run.retry_task
+            layer: core_invariant
           - key: run.exit_contract
             source:
               kind: provider
               provider: run.exit_contract
+            layer: core_invariant
 
   run.skill:
     template_key: run.skill
@@ -124,8 +142,10 @@ recipes:
     variants:
       default:
         sections:
-          - run.skill_content
-          - run.exit_contract
+          - key: run.skill_content
+            layer: runtime_evidence
+          - key: run.exit_contract
+            layer: core_invariant
 
   run.publish:
     template_key: run.skill
@@ -133,8 +153,10 @@ recipes:
     variants:
       default:
         sections:
-          - run.skill_content
-          - run.publish_exit_contract
+          - key: run.skill_content
+            layer: runtime_evidence
+          - key: run.publish_exit_contract
+            layer: core_invariant
 
   # Planner role assembly.
   #
@@ -152,18 +174,22 @@ recipes:
             source:
               kind: provider
               provider: plan.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: plan.output_format
             source:
               kind: provider
               provider: plan.output_format
+            layer: core_invariant
           - key: plan.exit_contract
             source:
               kind: provider
               provider: plan.exit_contract
+            layer: core_invariant
 
       retry.bootstrap:
         sections:
@@ -171,22 +197,27 @@ recipes:
             source:
               kind: provider
               provider: plan.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: plan.output_format
             source:
               kind: provider
               provider: plan.output_format
+            layer: core_invariant
           - key: plan.retry_task
             source:
               kind: provider
               provider: plan.retry_task
+            layer: core_invariant
           - key: plan.exit_contract
             source:
               kind: provider
               provider: plan.exit_contract
+            layer: core_invariant
 
       retry.resume:
         sections:
@@ -194,10 +225,12 @@ recipes:
             source:
               kind: provider
               provider: plan.retry_task
+            layer: core_invariant
           - key: plan.exit_contract
             source:
               kind: provider
               provider: plan.exit_contract
+            layer: core_invariant
 
   # Reviewer role assembly.
   #
@@ -214,26 +247,32 @@ recipes:
             source:
               kind: provider
               provider: review.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: review.snapshot_diff
             source:
               kind: provider
               provider: review.snapshot_diff
+            layer: runtime_evidence
           - key: review.ast_analysis
             source:
               kind: provider
               provider: review.ast_analysis
+            layer: runtime_evidence
           - key: review.output_format
             source:
               kind: provider
               provider: review.output_format
+            layer: core_invariant
           - key: review.exit_contract
             source:
               kind: provider
               provider: review.exit_contract
+            layer: core_invariant
 
       retry.bootstrap:
         sections:
@@ -241,30 +280,37 @@ recipes:
             source:
               kind: provider
               provider: review.policy
+            layer: core_invariant
           - key: common.rules
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
           - key: review.snapshot_diff
             source:
               kind: provider
               provider: review.snapshot_diff
+            layer: runtime_evidence
           - key: review.ast_analysis
             source:
               kind: provider
               provider: review.ast_analysis
+            layer: runtime_evidence
           - key: review.output_format
             source:
               kind: provider
               provider: review.output_format
+            layer: core_invariant
           - key: review.retry_task
             source:
               kind: provider
               provider: review.retry_task
+            layer: core_invariant
           - key: review.exit_contract
             source:
               kind: provider
               provider: review.exit_contract
+            layer: core_invariant
 
       retry.resume:
         sections:
@@ -272,14 +318,17 @@ recipes:
             source:
               kind: provider
               provider: review.output_format
+            layer: core_invariant
           - key: review.retry_task
             source:
               kind: provider
               provider: review.retry_task
+            layer: core_invariant
           - key: review.exit_contract
             source:
               kind: provider
               provider: review.exit_contract
+            layer: core_invariant
 
   # Supervisor handoff role.
   #
@@ -347,22 +396,27 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/assignee-pool.md
+        layer: project_policy
       - name: supervisor/governance/roadmap-intake.md
         source:
           kind: file
           path: supervisor/governance/roadmap-intake.md
+        layer: project_policy
       - name: supervisor/governance/cron-supervisor.md
         source:
           kind: file
           path: supervisor/governance/cron-supervisor.md
+        layer: project_policy
       - name: supervisor/governance/code-auditor.md
         source:
           kind: file
           path: supervisor/governance/code-auditor.md
+        layer: project_policy
       - name: supervisor/governance/audit-observation.md
         source:
           kind: file
           path: supervisor/governance/audit-observation.md
+        layer: project_policy
     variables:
       server_status:
         kind: provider

@@ -13,6 +13,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients import resolve_runtime_asset
+from vibe3.clients.runtime_assets import bundled_project_root
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (
@@ -23,8 +24,31 @@ from vibe3.prompts import (
     make_context_builder,
     resolve_common_rules_path,
 )
+from vibe3.prompts.models import MaterialLayer
 
 PlanPromptMode = Literal["first", "retry"]
+
+
+def _detect_active_layers() -> set[MaterialLayer]:
+    """Detect which material layers are active in the current runtime context.
+
+    When running inside the vibe-center repo, all layers are active.
+    When running cross-project, only core_invariant and runtime_evidence
+    from vibe-center are active; repo_profile and project_policy come
+    from the target repo's own config.
+    """
+    try:
+        Path.cwd().resolve().relative_to(bundled_project_root())
+        # Same repo: all layers active
+        return {
+            MaterialLayer.CORE_INVARIANT,
+            MaterialLayer.REPO_PROFILE,
+            MaterialLayer.PROJECT_POLICY,
+            MaterialLayer.RUNTIME_EVIDENCE,
+        }
+    except ValueError:
+        # Cross-project: only core and runtime from vibe-center
+        return {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
 
 
 def _build_plan_policy_section(policy_path: str | None) -> str | None:
@@ -133,7 +157,10 @@ def describe_plan_sections(
     """Return configured plan.default section keys for dry-run summaries."""
     variant = _plan_variant(mode, context_mode)
     manifest = PromptManifest.load_for_prompts_path(prompts_path)
-    return list(manifest.recipe("plan.default").variant(variant).sections)
+    # Get section sources with active_layers for enabled/disabled status marking
+    active_layers = _detect_active_layers()
+    sources = manifest.get_section_sources("plan.default", variant, active_layers)
+    return [s.key for s in sources]
 
 
 def _build_plan_prompt_providers(
@@ -229,10 +256,15 @@ def build_plan_prompt_body(
         manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
     else:
         manifest = PromptManifest.load_default()
+
+    # Detect active layers based on runtime context
+    active_layers = _detect_active_layers()
+
     body = manifest.render_sections(
         recipe_key="plan.default",
         variant_key=_plan_variant(mode, context_mode),
         providers=_build_plan_prompt_providers(request, config, context_mode),
+        active_layers=active_layers,
     )
     log.bind(body_len=len(body)).success("Plan prompt body built")
     return body
