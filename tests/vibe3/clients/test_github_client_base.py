@@ -107,3 +107,32 @@ class TestRunGhCommand:
             # Verify that timeout was passed as GH_API_TIMEOUT
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["timeout"] == GH_API_TIMEOUT
+
+    def test_run_gh_command_passes_input_text_via_stdin(self) -> None:
+        """input_text should be passed to subprocess.run as input with stdin=PIPE."""
+        client = GitHubClientBase()
+
+        with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+
+            result = client._run_gh_command(
+                ["gh", "api", "--input", "-"],
+                input_text='{"body":"test comment"}',
+            )
+
+            assert result is not None
+            assert mock_run.call_args[1]["input"] == '{"body":"test comment"}'
+            assert mock_run.call_args[1]["stdin"] == subprocess.PIPE
+
+    def test_run_gh_command_without_input_text_omits_stdin(self) -> None:
+        """When input_text is not provided, stdin and input should not be set."""
+        client = GitHubClientBase()
+
+        with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+
+            result = client._run_gh_command(["gh", "issue", "list"])
+
+            assert result is not None
+            assert mock_run.call_args[1].get("input") is None
+            assert mock_run.call_args[1].get("stdin") is None

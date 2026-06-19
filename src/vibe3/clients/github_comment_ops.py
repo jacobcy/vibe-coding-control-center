@@ -7,7 +7,7 @@ from typing import Any, cast
 from loguru import logger
 
 from vibe3.clients.github_client_base import raise_gh_pr_error
-from vibe3.exceptions import VibeError
+from vibe3.exceptions import GitHubError, VibeError
 
 
 def _generate_ai_review_mention_body(reviewers: list[str]) -> str:
@@ -38,36 +38,34 @@ class CommentMixin:
             pr_number=pr_number,
         ).debug("Calling GitHub API: list_pr_comments")
 
-        try:
-            repo_result = subprocess.run(
-                ["gh", "repo", "view", "--json", "nameWithOwner"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            repo = json.loads(repo_result.stdout)["nameWithOwner"]
+        result = self._run_gh_command(
+            ["gh", "api", f"repos/:owner/:repo/issues/{pr_number}/comments"]
+        )
 
-            result = subprocess.run(
-                [
-                    "gh",
-                    "api",
-                    f"repos/{repo}/issues/{pr_number}/comments",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
+        if result is None:
+            raise GitHubError(
+                -1,
+                "Failed to list comments: gh command timeout or not found",
             )
-            raw_comments = json.loads(result.stdout)
 
-            # Normalize REST fields to project contract
-            normalized = []
-            for c in raw_comments:
-                c["author"] = c.get("user", {})
-                c["createdAt"] = c.get("created_at")
-                normalized.append(c)
-            return cast(list[dict[str, Any]], normalized)
-        except subprocess.CalledProcessError as e:
-            raise_gh_pr_error(e, "list comments")
+        if result.returncode != 0:
+            error = subprocess.CalledProcessError(
+                result.returncode,
+                result.args,
+                result.stdout,
+                result.stderr,
+            )
+            raise_gh_pr_error(error, "list comments")
+
+        raw_comments = json.loads(result.stdout)
+
+        # Normalize REST fields to project contract
+        normalized = []
+        for c in raw_comments:
+            c["author"] = c.get("user", {})
+            c["createdAt"] = c.get("created_at")
+            normalized.append(c)
+        return cast(list[dict[str, Any]], normalized)
 
     def create_pr_comment(self: Any, pr_number: int, body: str) -> str:
         """Create a comment on a PR. Returns comment URL."""
@@ -77,23 +75,27 @@ class CommentMixin:
             pr_number=pr_number,
         ).debug("Calling GitHub API: create_pr_comment")
 
-        try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "comment",
-                    str(pr_number),
-                    "--body",
-                    body,
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
+        result = self._run_gh_command(
+            ["gh", "pr", "comment", str(pr_number), "--body", body]
+        )
+
+        if result is None:
+            raise GitHubError(
+                -1,
+                f"Failed to create comment on PR {pr_number}: "
+                "gh command timeout or not found",
             )
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            raise_gh_pr_error(e, "comment")
+
+        if result.returncode != 0:
+            error = subprocess.CalledProcessError(
+                result.returncode,
+                result.args,
+                result.stdout,
+                result.stderr,
+            )
+            raise_gh_pr_error(error, "comment")
+
+        return cast(str, result.stdout.strip())
 
     def update_pr_comment(self: Any, comment_id: str, body: str) -> str:
         """Update an existing PR comment via GitHub API."""
@@ -103,34 +105,37 @@ class CommentMixin:
             comment_id=comment_id,
         ).debug("Calling GitHub API: update_pr_comment")
 
-        try:
-            repo_result = subprocess.run(
-                ["gh", "repo", "view", "--json", "nameWithOwner"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            repo = json.loads(repo_result.stdout)["nameWithOwner"]
+        result = self._run_gh_command(
+            [
+                "gh",
+                "api",
+                "-X",
+                "PATCH",
+                f"repos/:owner/:repo/issues/comments/{comment_id}",
+                "--input",
+                "-",
+            ],
+            input_text=json.dumps({"body": body}),
+        )
 
-            result = subprocess.run(
-                [
-                    "gh",
-                    "api",
-                    "-X",
-                    "PATCH",
-                    f"repos/{repo}/issues/comments/{comment_id}",
-                    "--input",
-                    "-",
-                ],
-                input=json.dumps({"body": body}),
-                capture_output=True,
-                text=True,
-                check=True,
+        if result is None:
+            raise GitHubError(
+                -1,
+                f"Failed to update comment {comment_id}: "
+                "gh command timeout or not found",
             )
-            data = json.loads(result.stdout)
-            return cast(str, data.get("html_url", comment_id))
-        except subprocess.CalledProcessError as e:
-            raise_gh_pr_error(e, f"update comment {comment_id}")
+
+        if result.returncode != 0:
+            error = subprocess.CalledProcessError(
+                result.returncode,
+                result.args,
+                result.stdout,
+                result.stderr,
+            )
+            raise_gh_pr_error(error, f"update comment {comment_id}")
+
+        data = json.loads(result.stdout)
+        return cast(str, data.get("html_url", comment_id))
 
     def request_ai_review(
         self: Any, pr_number: int, reviewers: list[str]
