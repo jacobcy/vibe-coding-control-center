@@ -137,10 +137,7 @@ def describe_review_sections(
 ) -> list[str]:
     """Return configured review.default section keys for dry-run summaries."""
     variant = _review_variant(mode, context_mode)
-    if prompts_path is not None:
-        manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
-    else:
-        manifest = PromptManifest.load_default()
+    manifest = PromptManifest.load_for_prompts_path(prompts_path)
     return list(manifest.recipe("review.default").variant(variant).sections)
 
 

@@ -132,10 +132,7 @@ def describe_plan_sections(
 ) -> list[str]:
     """Return configured plan.default section keys for dry-run summaries."""
     variant = _plan_variant(mode, context_mode)
-    if prompts_path is not None:
-        manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
-    else:
-        manifest = PromptManifest.load_default()
+    manifest = PromptManifest.load_for_prompts_path(prompts_path)
     return list(manifest.recipe("plan.default").variant(variant).sections)
 
 

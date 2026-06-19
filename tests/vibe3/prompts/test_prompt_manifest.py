@@ -312,3 +312,63 @@ def test_no_large_file_sources_in_default_recipes() -> None:
     if missing:
         missing_list = "\n  - ".join([""] + missing)
         pytest.fail(f"kind:file sources point to non-existent files:{missing_list}")
+
+
+def test_load_for_prompts_path_none_uses_default() -> None:
+    """When prompts_path is None, load_for_prompts_path returns the default manifest."""
+    manifest = PromptManifest.load_for_prompts_path(None)
+    assert isinstance(manifest, PromptManifest)
+    # Verify it loaded the default recipes (recipes from repo config exist)
+    assert "plan.default" in manifest.recipes
+    assert "review.default" in manifest.recipes
+    assert "run.plan" in manifest.recipes
+
+
+def test_load_for_prompts_path_custom_path(tmp_path: Path) -> None:
+    """When prompts_path is set, loads from prompts_path.parent/prompt-recipes.yaml."""
+    prompts_dir = tmp_path / "config" / "prompts"
+    prompts_dir.mkdir(parents=True)
+    recipes_path = prompts_dir / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  custom.recipe:
+    variants:
+      default:
+        sections:
+          - custom.section
+""",
+        encoding="utf-8",
+    )
+
+    # Simulate prompts_path as a file in the prompts dir (e.g. a .envrc or marker)
+    prompts_file = prompts_dir / "some-file"
+    prompts_file.touch()
+
+    manifest = PromptManifest.load_for_prompts_path(prompts_file)
+    assert "custom.recipe" in manifest.recipes
+    assert manifest.recipe("custom.recipe").variant("default").sections == (
+        "custom.section",
+    )
+
+
+def test_load_for_prompts_path_custom_path_with_manifest(tmp_path: Path) -> None:
+    """Verify load_for_prompts_path works with a direct path to a prompts dir."""
+    prompts_dir = tmp_path / "my-prompts"
+    prompts_dir.mkdir(parents=True)
+    recipes_path = prompts_dir / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  my.recipe:
+    variants:
+      default:
+        sections:
+          - my.section
+""",
+        encoding="utf-8",
+    )
+
+    # Simulate prompts_path pointing to a settings file in the prompts dir
+    manifest = PromptManifest.load_for_prompts_path(prompts_dir / "custom-config.yaml")
+    assert "my.recipe" in manifest.recipes

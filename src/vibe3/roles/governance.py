@@ -408,11 +408,7 @@ def build_governance_request(
         )
 
         # Collect and write provenance for audit
-        manifest = (
-            PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
-            if prompts_path is not None
-            else PromptManifest.load_default()
-        )
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
         recipe_def = manifest.recipe("governance.scan")
 
         # Template-based recipes have no variants; use empty string for variant_key

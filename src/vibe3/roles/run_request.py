@@ -153,11 +153,7 @@ def build_run_sync_request(
         # Determine variant_key: {mode}.{context_mode}
         variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
 
-        manifest = (
-            PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
-            if prompts_path is not None
-            else PromptManifest.load_default()
-        )
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
         provenance = collect_dry_run_provenance(
             manifest=manifest,
             recipe_key="run.plan",
