@@ -34,6 +34,12 @@ def resolve_branch_arg(
     """
     import importlib
 
+    if flow_service is None:
+        raise ValueError(
+            "flow_service is required. "
+            "Pass a FlowService instance (from vibe3.services.flow)."
+        )
+
     _pr_resolver = importlib.import_module("vibe3.services.pr.resolver")
     resolve_command_branch = _pr_resolver.resolve_command_branch
 

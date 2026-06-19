@@ -87,9 +87,11 @@ class TestClientsModularity:
         get_error_handling_contract) through the barrel warrant review for
         dependency direction but are valid public API usage.
 
-        This is a baseline tracking gate, not a hard block. Increases over
-        the baseline require justification. Do NOT resolve by replacing barrel
-        imports with deep imports — public API is the contract.
+        Current baseline: 15 imports across clients/ (issue #2902).
+        This is a growth-prevention gate, not a hard block.
+        Increases over the baseline require justification.
+        Do NOT resolve by replacing barrel imports with deep imports —
+        public API is the contract.
         """
         import ast
 
@@ -123,12 +125,11 @@ class TestClientsModularity:
             except SyntaxError:
                 continue
 
-        # Baseline: 15 imports (as of issue #2848)
+        # Baseline: 15 imports (stabilized in issue #2902)
         # Most are exception TYPE imports (GitError, GitHubError, etc.)
         # defined directly in exceptions/__init__.py — legitimate L6 deps.
         # A few are lazy FUNCTION imports (classify_error_hybrid,
-        # get_error_handling_contract) — valid public API usage, flagged
-        # for dependency direction awareness.
+        # get_error_handling_contract) — valid public API usage.
         baseline = 15
 
         if imports_found:
@@ -146,10 +147,3 @@ class TestClientsModularity:
             f"Exceptions barrel imports in clients/ increased: "
             f"expected <= {baseline}, found {len(imports_found)}"
         )
-
-        # Expected state: baseline imports remain (tracked by issue #2848)
-        if imports_found:
-            pytest.xfail(
-                f"Baseline: {len(imports_found)} exceptions barrel imports in clients/ "
-                f"(issue #2848)"
-            )

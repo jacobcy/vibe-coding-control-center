@@ -206,10 +206,12 @@ LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
 def test_root_barrel_import_count() -> None:
     """Verify root barrel imports (from vibe3.services import ...).
 
-    Goal: Zero root barrel imports (all imports should be direct).
-    Current baseline: 130 call sites across 77 files (PR #2837 added 1 new
-    `from vibe3.services import build_event_projection_hook` for the
-    DomainEvent → FlowEvent projection boundary).
+    Goal: Zero root barrel imports - all imports should be direct to the
+    appropriate subpackage barrel (e.g., vibe3.services.flow, vibe3.services.pr).
+
+    All root barrel imports have been eliminated through dependency injection
+    and direct submodule imports. This test enforces that no new root barrel
+    imports are introduced.
     """
     imports = count_barrel_imports("vibe3.services")
 
