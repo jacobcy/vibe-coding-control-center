@@ -278,13 +278,10 @@ def test_build_run_prompt_body_retry_includes_plan_verification(
     assert "git diff --name-only HEAD~1 HEAD -- tests/" in context
 
 
-def test_build_run_prompt_body_retry_resume_excludes_plan_verification(
+def test_build_run_prompt_body_retry_resume_omits_plan_ref_content(
     tmp_path: Path,
 ) -> None:
-    """Retry resume mode should not include full verification section.
-
-    Minimal context mode should not have complete verification section.
-    """
+    """Retry resume mode should omit plan_ref content."""
     config = VibeConfig.get_defaults()
     plan_file = tmp_path / "plan.md"
     plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
