@@ -580,11 +580,17 @@ def test_detect_vibe_center_policy_leak_cross_project() -> None:
         ),
     )
 
+    # Cross-project: only core and runtime active, not PROJECT_POLICY
+    active_layers = {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
+
     anomalies = detect_anomalies(
-        "test prompt", section_sources, ("test.core", "test.policy")
+        "test prompt",
+        section_sources,
+        ("test.core", "test.policy"),
+        active_layers=active_layers,
     )
 
-    # Flag is set when project_policy is enabled (regardless of context detection)
+    # Flag is set when project_policy is enabled but not in active_layers
     assert anomalies.vibe_center_policy_leak is True
 
 
@@ -606,9 +612,53 @@ def test_detect_no_policy_leak_when_disabled() -> None:
         ),
     )
 
+    # Cross-project: only core and runtime active
+    active_layers = {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
+
     anomalies = detect_anomalies(
-        "test prompt", section_sources, ("test.core", "test.policy")
+        "test prompt",
+        section_sources,
+        ("test.core", "test.policy"),
+        active_layers=active_layers,
     )
 
     # No leak when project_policy is disabled
+    assert anomalies.vibe_center_policy_leak is False
+
+
+def test_detect_no_policy_leak_same_repo() -> None:
+    """Verify no leak flag when project_policy enabled in same-repo context."""
+    from vibe3.prompts.models import MaterialLayer
+
+    # Same-repo scenario: project_policy legitimately enabled
+    # All layers are active in same-repo context
+    section_sources = (
+        SectionSourceProvenance(
+            key="test.core",
+            layer=MaterialLayer.CORE_INVARIANT,
+            enabled=True,
+        ),
+        SectionSourceProvenance(
+            key="test.policy",
+            layer=MaterialLayer.PROJECT_POLICY,
+            enabled=True,  # Enabled because we're in same-repo context
+        ),
+    )
+
+    # In same-repo context, active_layers includes PROJECT_POLICY
+    active_layers = {
+        MaterialLayer.CORE_INVARIANT,
+        MaterialLayer.REPO_PROFILE,
+        MaterialLayer.PROJECT_POLICY,
+        MaterialLayer.RUNTIME_EVIDENCE,
+    }
+
+    anomalies = detect_anomalies(
+        "test prompt",
+        section_sources,
+        ("test.core", "test.policy"),
+        active_layers=active_layers,
+    )
+
+    # No leak in same-repo context where project_policy is legitimately enabled
     assert anomalies.vibe_center_policy_leak is False

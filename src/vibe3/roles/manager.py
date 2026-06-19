@@ -8,6 +8,8 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.agents.plan_prompt import _detect_active_layers
+
 # public-api: pending upstream export
 from vibe3.clients import runtime_assets_root
 
@@ -396,6 +398,7 @@ def build_manager_sync_request(
             recipe_key="manager.default",
             variant_key=variant_key,
             rendered_text=prompt,
+            active_layers=_detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="manager", issue_number=issue.number

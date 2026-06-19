@@ -14,6 +14,7 @@ from vibe3.agents import (
     describe_review_sections,
     make_review_context_builder,
 )
+from vibe3.agents.review_prompt import _detect_active_layers
 from vibe3.analysis import build_change_analysis, build_snapshot_diff, changed_symbols
 
 # public-api: pending upstream export
@@ -218,6 +219,7 @@ def build_issue_review_request(
                 recipe_key="review.default",
                 variant_key=variant_key,
                 rendered_text=prompt,
+                active_layers=_detect_active_layers(),
             )
             provenance_path = write_prompt_provenance(
                 provenance, role="reviewer", issue_number=issue.number

@@ -21,9 +21,24 @@ def collect_dry_run_provenance(
     rendered_text: str,
     variable_provenance: tuple[PromptVariableProvenance, ...] = (),
     warnings: tuple[str, ...] = (),
+    active_layers: set[MaterialLayer] | None = None,
 ) -> PromptRenderProvenance:
-    """Build a PromptRenderProvenance record after rendering completes."""
-    section_sources_list = manifest.get_section_sources(recipe_key, variant_key)
+    """Build a PromptRenderProvenance record after rendering completes.
+
+    Args:
+        manifest: Prompt manifest instance
+        recipe_key: Recipe key (e.g., "plan.default")
+        variant_key: Variant key (e.g., "first.bootstrap")
+        rendered_text: The rendered prompt text
+        variable_provenance: Variable provenance records
+        warnings: Warning messages
+        active_layers: Set of active material layers. If None, all layers are considered
+            active (backward compatible). When provided, sections with a layer not in
+            active_layers will have enabled=False.
+    """
+    section_sources_list = manifest.get_section_sources(
+        recipe_key, variant_key, active_layers
+    )
     section_sources = tuple(section_sources_list)
 
     rendered_hash = hashlib.sha256(rendered_text.encode("utf-8")).hexdigest()[:16]
@@ -33,7 +48,11 @@ def collect_dry_run_provenance(
 
     section_order = tuple(s.key for s in section_sources)
     anomalies = detect_anomalies(
-        rendered_text, section_sources, section_order, variable_provenance
+        rendered_text,
+        section_sources,
+        section_order,
+        variable_provenance,
+        active_layers=active_layers,
     )
 
     return PromptRenderProvenance(
@@ -55,8 +74,19 @@ def detect_anomalies(
     section_sources: tuple[SectionSourceProvenance, ...],
     section_order: tuple[str, ...],
     variable_provenance: tuple[PromptVariableProvenance, ...] = (),
+    active_layers: set[MaterialLayer] | None = None,
 ) -> AnomalyFlags:
-    """Detect audit anomalies from provenance data."""
+    """Detect audit anomalies from provenance data.
+
+    Args:
+        rendered_text: The rendered prompt text
+        section_sources: Section source provenance records
+        section_order: Ordered section keys
+        variable_provenance: Variable provenance records
+        active_layers: Set of active material layers. Required for
+            vibe_center_policy_leak detection. When provided, only flags
+            leak if PROJECT_POLICY is enabled but not in active_layers.
+    """
     from vibe3.prompts.models import VariableSourceKind
 
     char_count = len(rendered_text)
@@ -100,9 +130,19 @@ def detect_anomalies(
     # If a section has layer=PROJECT_POLICY and enabled=True but is being used
     # in a cross-project context (where PROJECT_POLICY should be disabled),
     # this indicates a potential leak of vibe-center-specific governance
-    vibe_center_policy_leak = any(
-        s.layer == MaterialLayer.PROJECT_POLICY and s.enabled for s in section_sources
-    )
+    #
+    # Only flag if:
+    # 1. active_layers is provided (we know the context)
+    # 2. PROJECT_POLICY section is enabled
+    # 3. PROJECT_POLICY is NOT in active_layers (cross-project context)
+    vibe_center_policy_leak = False
+    if active_layers is not None:
+        vibe_center_policy_leak = any(
+            s.layer == MaterialLayer.PROJECT_POLICY
+            and s.enabled
+            and MaterialLayer.PROJECT_POLICY not in active_layers
+            for s in section_sources
+        )
 
     return AnomalyFlags(
         has_large_material=has_large_material,

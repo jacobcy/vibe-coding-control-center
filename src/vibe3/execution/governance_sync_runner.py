@@ -13,6 +13,7 @@ from loguru import logger
 from typer import echo
 
 from vibe3.agents import CodeagentBackend
+from vibe3.agents.plan_prompt import _detect_active_layers
 from vibe3.clients import get_store
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
@@ -103,6 +104,7 @@ def run_governance_sync(
             rendered_text=prompt_content,
             variable_provenance=render_result.provenance,
             warnings=render_result.warnings,
+            active_layers=_detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="governance", repo_root=repo
