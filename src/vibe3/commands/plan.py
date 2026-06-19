@@ -287,7 +287,7 @@ def default(
     if ctx.invoked_subcommand is not None:
         return
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)

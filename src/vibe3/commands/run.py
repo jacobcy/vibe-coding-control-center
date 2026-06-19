@@ -90,7 +90,7 @@ def run_command(
     # Load config and validate --model requires backend (CLI or config)
     _config = load_config_and_validate_model("run", agent, backend, model)
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     flow_service = FlowService()
     try:

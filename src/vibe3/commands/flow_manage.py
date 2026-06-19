@@ -175,7 +175,7 @@ def update(
     from vibe3.services.flow import resolve_branch_arg
     from vibe3.utils import try_parse_issue_number
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     # Auto-create branch if:
     # 1. Positional argument was an issue number (not explicit branch name)
@@ -448,7 +448,7 @@ def restore_flow(
 
     from vibe3.services.flow import resolve_branch_arg
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     from vibe3.clients import SQLiteClient
 

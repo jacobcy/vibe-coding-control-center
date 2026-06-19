@@ -7,7 +7,7 @@ from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
 from vibe3.models import VerdictValue
-from vibe3.services.flow import resolve_branch_arg
+from vibe3.services.flow import FlowService, resolve_branch_arg
 from vibe3.services.handoff import HandoffService
 from vibe3.services.pr import VerdictService
 from vibe3.ui import console
@@ -60,7 +60,7 @@ def init(
     if trace:
         enable_method_trace()
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     logger.bind(command="handoff init", force=force, branch=target_branch).info(
         "Initializing handoff"
@@ -103,7 +103,7 @@ def append(
     if trace:
         enable_method_trace()
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     logger.bind(
         command="handoff append", actor=actor, kind=kind, branch=target_branch
@@ -141,7 +141,7 @@ def plan(
 ) -> None:
     """Record plan handoff for a branch."""
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     _record_handoff_reference(
         command="handoff plan",
@@ -177,7 +177,7 @@ def report(
 ) -> None:
     """Record report handoff for a branch."""
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     _record_handoff_reference(
         command="handoff report",
@@ -220,7 +220,7 @@ def indicate(
     Provide a structured handoff file reference for downstream agent context.
     """
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     _record_handoff_reference(
         command="handoff indicate",
@@ -256,7 +256,7 @@ def audit(
 ) -> None:
     """Record audit handoff for a branch."""
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     _record_handoff_reference(
         command="handoff audit",
@@ -284,7 +284,7 @@ def next_step(
     if trace:
         enable_method_trace()
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
     service = HandoffService()
 
     # Validate flow exists before writing next_step
@@ -342,7 +342,7 @@ def verdict(
     if trace:
         enable_method_trace()
 
-    target_branch = resolve_branch_arg(branch)
+    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
 
     logger.bind(
         command="handoff verdict",
