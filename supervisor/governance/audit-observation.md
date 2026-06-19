@@ -57,41 +57,7 @@ uv run python src/vibe3/cli.py task status --all --format json > /tmp/vibe-audit
 筛出最近 blocked / aborted / failed 候选：
 
 ```bash
-uv run python - <<'PY'
-import json
-from pathlib import Path
-
-flows = json.loads(Path("/tmp/vibe-audit-flow-status.json").read_text())
-
-def is_candidate(flow):
-    statuses = {
-        str(flow.get("flow_status") or "").lower(),
-        str(flow.get("planner_status") or "").lower(),
-        str(flow.get("executor_status") or "").lower(),
-        str(flow.get("reviewer_status") or "").lower(),
-        str(flow.get("latest_verdict") or "").lower(),
-    }
-    return bool(statuses & {"blocked", "aborted", "failed", "block"})
-
-def sort_key(flow):
-    return (
-        flow.get("execution_completed_at")
-        or flow.get("execution_started_at")
-        or flow.get("updated_at")
-        or ""
-    )
-
-for flow in sorted((f for f in flows if is_candidate(f)), key=sort_key, reverse=True)[:10]:
-    print(
-        f"{flow.get('branch')} "
-        f"issue={flow.get('task_issue_number')} "
-        f"status={flow.get('flow_status')} "
-        f"planner={flow.get('planner_status')} "
-        f"executor={flow.get('executor_status')} "
-        f"reviewer={flow.get('reviewer_status')} "
-        f"pr={flow.get('pr_number')}"
-    )
-PY
+uv run python scripts/audit-candidates.py /tmp/vibe-audit-flow-status.json
 ```
 
 每轮最多选择 `3` 个样本。优先级：
