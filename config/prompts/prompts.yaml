@@ -569,6 +569,41 @@ run:
 
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
+
+    ### MANDATORY Pre-Report Test Implementation Check (before writing execution report)
+    **CRITICAL**: Before you write the execution report or claim "no deviations", you MUST verify
+    that ALL test-related implementation steps from the plan have been executed.
+
+    #### Step 1: Extract Test Requirements from Plan
+    Re-read the plan's Implementation Steps and extract ALL steps that involve:
+    - Creating new test files
+    - Modifying existing test files
+    - Adding test functions/methods to existing files
+
+    #### Step 2: Verify Test Changes with Git
+    Run this command to see what test files were actually created or modified:
+    ```bash
+    git diff --name-only HEAD~1 HEAD -- tests/
+    ```
+
+    #### Step 3: Compare and Decide
+    - **If plan requires test file creation but no test files appear in git diff**:
+      You have NOT implemented the plan's test requirements.
+      Document this as a DEVIATION — do NOT claim "no deviations from plan".
+    - **If all required test files appear in git diff**:
+      Proceed to run the tests and document results.
+    - **If plan has no test-related implementation steps**:
+      Document this finding and proceed.
+
+    #### Step 4: Run the Tests
+    For each test file that was required by the plan, run it:
+    ```bash
+    uv run pytest tests/vibe3/<module>/test_<file>.py -v
+    ```
+    If any test fails or was not created, document it as a deviation.
+
+    **This check is NON-SKIPPABLE. Skipping it invalidates your "no deviations" claim.**
+
     Document any deviations with reasons.
     Follow the repository execution contract.
 
@@ -638,6 +673,14 @@ run:
     Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
     Explain any audit item you intentionally do not change, with a concrete reason.
     Re-run the most relevant verification for the reported failures before exit.
+
+    ### Plan Requirements Verification (retry context)
+    Even in retry mode, you MUST verify that the plan's test requirements are satisfied:
+    1. Run `uv run python src/vibe3/cli.py handoff show @plan` to re-read the plan
+    2. Check the plan's Implementation Steps for test file creation/modification requirements
+    3. Verify with `git diff --name-only HEAD~1 HEAD -- tests/` that required test files exist
+    4. If any required test is missing, document as DEVIATION — do NOT claim completion
+
     Follow the repository execution contract.
 
   # Static: Custom run prompt (optional prefix)

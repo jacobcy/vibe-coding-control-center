@@ -234,3 +234,73 @@ def test_build_run_prompt_body_loads_custom_recipe(tmp_path: Path) -> None:
 
     # Verify custom marker appears (proves custom recipe was loaded)
     assert "CUSTOM_RECIPE_LOADED_MARKER" in result
+
+
+def test_build_run_prompt_body_includes_pre_report_test_check(tmp_path: Path) -> None:
+    """Run prompt must contain Pre-Report Test Implementation Check section."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    # Verify mandatory section appears
+    assert "Pre-Report Test Implementation Check" in context
+    assert "MANDATORY" in context
+
+    # Verify instruction to extract test requirements from plan
+    assert "Extract Test Requirements from Plan" in context
+
+    # Verify instruction to verify with git
+    assert "git diff --name-only HEAD~1 HEAD -- tests/" in context
+
+    # Verify NON-SKIPPABLE marker
+    assert "NON-SKIPPABLE" in context
+
+
+def test_build_run_prompt_body_retry_includes_plan_verification(
+    tmp_path: Path,
+) -> None:
+    """Retry mode (bootstrap) must include Plan Requirements Verification section."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config, mode="retry")
+
+    # Verify retry-specific verification section appears
+    assert "Plan Requirements Verification (retry context)" in context
+
+    # Verify instruction to re-read plan
+    assert "handoff show @plan" in context
+
+    # Verify instruction to verify test files exist
+    assert "git diff --name-only HEAD~1 HEAD -- tests/" in context
+
+
+def test_build_run_prompt_body_retry_resume_excludes_plan_verification(
+    tmp_path: Path,
+) -> None:
+    """Retry resume mode should not include full verification section.
+
+    Minimal context mode should not have complete verification section.
+    """
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+    audit_file = tmp_path / "audit.md"
+    audit_file.write_text("## Audit\nTest audit\n", encoding="utf-8")
+
+    context = build_run_prompt_body(
+        str(plan_file),
+        config,
+        audit_file=str(audit_file),
+        mode="retry",
+        context_mode="resume",
+    )
+
+    # Verify resume mode is minimal (no plan content)
+    assert "## Implementation Plan" not in context
+
+    # Verify focused retry guidance is present
+    assert "focused retry round" in context
