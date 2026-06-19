@@ -147,6 +147,7 @@ def build_plan_prompt(
     branch: str,
     flow_state: dict[str, object] | None,
     session_id: str | None = None,
+    prompts_path: Path | None = None,
 ) -> tuple[str, dict[str, str], dict[str, object], bool, str | None]:
     """Build the plan prompt body for an issue.
 
@@ -170,6 +171,7 @@ def build_plan_prompt(
         VibeConfig.get_defaults(),
         mode=meta.prompt_mode,  # type: ignore[arg-type]
         context_mode=meta.context_mode,
+        prompts_path=prompts_path,
     )
     fallback_prompt = None
     if meta.fallback_context_mode is not None:
@@ -178,10 +180,12 @@ def build_plan_prompt(
             VibeConfig.get_defaults(),
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.fallback_context_mode,
+            prompts_path=prompts_path,
         )
     sections = describe_plan_sections(
         meta.prompt_mode,  # type: ignore[arg-type]
         meta.context_mode,
+        prompts_path=prompts_path,
     )
     summary = meta.summary(sections)
     return prompt, meta.refs, summary, meta.include_global_notice, fallback_prompt
@@ -228,6 +232,7 @@ def build_plan_sync_request(
     dry_run: bool,
     show_prompt: bool,
     tick_id: int = 0,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
     from vibe3.clients import SQLiteClient
@@ -239,7 +244,14 @@ def build_plan_sync_request(
         dry_run_summary,
         include_global_notice,
         fallback_prompt,
-    ) = build_plan_prompt(config, issue, branch, flow_state, session_id=session_id)
+    ) = build_plan_prompt(
+        config,
+        issue,
+        branch,
+        flow_state,
+        session_id=session_id,
+        prompts_path=prompts_path,
+    )
 
     # Collect and write provenance for dry-run audit
     if dry_run:

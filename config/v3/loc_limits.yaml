@@ -173,8 +173,9 @@ code_limits:
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/plan.py"
-        limit: 510
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)"
+        limit: 515
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)；Issue #3028 新增 prompts_path 参数透传（+5行）"
+>>>>>>> b3e3a620a (feat: wire prompts_path through roles layer to describe_*_sections)
       - path: "src/vibe3/roles/run_command.py"
         limit: 420
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #2435 新增 AsyncDispatchResult dataclass 和 tmux/log 输出（+28 行）"

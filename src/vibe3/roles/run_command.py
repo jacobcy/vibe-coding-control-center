@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -144,6 +145,7 @@ def execute_manual_run(
     model: str | None,
     fresh_session: bool = False,
     publish: bool = False,
+    prompts_path: Path | None = None,
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
@@ -304,7 +306,7 @@ def execute_manual_run(
             refs=refs_for_summary,
         )
     dry_run_summary = meta.summary(
-        describe_run_plan_sections(prompt_mode, context_mode)
+        describe_run_plan_sections(prompt_mode, context_mode, prompts_path=prompts_path)
     )
     fallback_prompt = None
     if prompt_mode == "retry" and context_mode == "resume":
@@ -314,6 +316,7 @@ def execute_manual_run(
             audit_file=audit_file,
             mode=prompt_mode,
             context_mode="bootstrap",
+            prompts_path=prompts_path,
         )()
         dry_run_summary["fallback_context_mode"] = "bootstrap"
     include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
@@ -326,6 +329,7 @@ def execute_manual_run(
             audit_file=audit_file,
             mode=prompt_mode,
             context_mode=context_mode,
+            prompts_path=prompts_path,
         ),
         task=instructions or run_prompt,
         dry_run=dry_run,

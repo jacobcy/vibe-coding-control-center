@@ -154,6 +154,7 @@ def build_issue_review_request(
     show_prompt: bool = False,
     flow_state: dict[str, object] | None = None,
     tick_id: int = 0,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
     convention = get_convention()
@@ -185,6 +186,7 @@ def build_issue_review_request(
             VibeConfig.get_defaults(),
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.context_mode,
+            prompts_path=prompts_path,
         )
         fallback_prompt = None
         if meta.fallback_context_mode is not None:
@@ -193,10 +195,12 @@ def build_issue_review_request(
                 VibeConfig.get_defaults(),
                 mode=meta.prompt_mode,  # type: ignore[arg-type]
                 context_mode=meta.fallback_context_mode,
+                prompts_path=prompts_path,
             )
         sections = describe_review_sections(
             meta.prompt_mode,  # type: ignore[arg-type]
             meta.context_mode,
+            prompts_path=prompts_path,
         )
         refs = dict(meta.refs)
         if report_ref and "report_ref" not in refs:
@@ -284,6 +288,7 @@ def build_review_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     from vibe3.clients import SQLiteClient
 
@@ -299,6 +304,7 @@ def build_review_sync_request(
         show_prompt=show_prompt,
         sync=True,
         config=config,
+        prompts_path=prompts_path,
     )
 
 
