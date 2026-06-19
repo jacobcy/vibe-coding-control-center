@@ -208,6 +208,33 @@ tmux display-message -p '#{session_name}'
   - 优先复用现有的 monkeypatch/mock 模式
   - 不要因为"不熟悉现有模式"就发明新方案
 
+- **基础设施代码（测试、脚本）必须显式检查现有模式**
+  - **触发条件**：plan 涉及以下任一基础设施操作时触发：
+    - subprocess 调用（`subprocess.run`、`subprocess.Popen` 等）
+    - Python 解释器调用（`sys.executable` vs `python` vs `python3`）
+    - 文件操作（临时目录、路径构造、文件读写）
+    - 环境变量处理（`os.environ`、`PYTHONPATH` 等）
+    - 命令行工具调用（`git`、`uv`、`pytest` 等外部命令）
+  - **必须执行**：在规划前，先用搜索工具检查现有代码（同模块或其他测试文件）中对应操作的使用模式
+  - **必须记录**：如果搜索到现有模式，必须在 plan 中提供：
+    - 参考文件路径和行号（如 `tests/vibe3/test_cli_bootstrap.py:38`）
+    - 模式选择理由（为什么选择该模式）
+  - **必须标注**：如果选择偏离现有模式，必须在 plan 的 Risks 中显式标注偏离理由
+
+  示例搜索命令：
+  ```bash
+  # 检查 subprocess 调用中的解释器选择模式
+  rg 'sys\.executable' tests/
+  rg '"python"' tests/
+
+  # 检查 subprocess.run 的参数模式
+  rg 'subprocess\.run\(' tests/ -A 5
+  ```
+
+  参考案例（issue #2161）：
+  - 正确模式：使用 `sys.executable` 而非 `"python"` 调用子进程
+  - 参考位置：`tests/vibe3/test_cli_bootstrap.py:38`，`tests/vibe3/test_modularity/test_module_independence.py:37`
+
 - **如果发现可以复用**：
   ```bash
   uv run python src/vibe3/cli.py handoff append "发现可复用模式：<模式位置和用法>" --kind finding --actor "<actor>"
