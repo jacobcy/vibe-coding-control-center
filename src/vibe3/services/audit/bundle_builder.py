@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from vibe3.models.audit_evidence import (
+from vibe3.models import (
     CollectionContext,
     EvidenceSummary,
     PrimarySubject,

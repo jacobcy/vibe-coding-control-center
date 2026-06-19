@@ -1,6 +1,6 @@
 """Audit evidence bundle formatting utilities."""
 
-from vibe3.models.audit_evidence import EvidenceBundle
+from vibe3.models import EvidenceBundle
 
 
 def format_bundle_json(bundle: EvidenceBundle) -> str:

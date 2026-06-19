@@ -10,11 +10,12 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.audit.collector import AuditEvidenceCollector
-from vibe3.services.audit.formatter import format_bundle_json, format_bundle_summary
+from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+from vibe3.services.audit import (
+    AuditEvidenceCollector,
+    format_bundle_json,
+    format_bundle_summary,
+)
 
 app = typer.Typer(
     name="audit",

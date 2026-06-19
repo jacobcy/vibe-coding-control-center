@@ -10,15 +10,8 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.models.audit_evidence import (
-    EvidenceBundle,
-    FlowRef,
-    GitHubRef,
-    GitRef,
-)
+from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+from vibe3.models import EvidenceBundle, FlowRef, GitHubRef, GitRef
 from vibe3.services.audit.bundle_builder import (
     build_collection_context,
     build_primary_subject,
