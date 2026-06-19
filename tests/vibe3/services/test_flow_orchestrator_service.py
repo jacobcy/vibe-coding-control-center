@@ -321,6 +321,10 @@ def test_get_pr_for_issue_uses_branch_pr_status_fallback() -> None:
 
         # No PR in flow record, trigger standard branch→PR fallback
         service.get_flow_for_issue = MagicMock(return_value=None)
+        # Mock canonical_branch_name to return proper branch name
+        service.issue_flow_service.canonical_branch_name = MagicMock(
+            return_value="task/issue-123"
+        )
         github.list_all_prs = MagicMock(return_value=[])
         github.list_prs_for_branch = MagicMock(
             return_value=[_pr_response(number=42, branch="task/issue-123")]

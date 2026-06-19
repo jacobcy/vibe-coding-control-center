@@ -418,6 +418,7 @@ class FlowOrchestratorService:
                         "Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
                     ),
                     actor="orchestra:flow_dispatch",
+                    flow_service=self.flow_service,
                 )
                 return None
         except (subprocess.CalledProcessError, FileNotFoundError):
