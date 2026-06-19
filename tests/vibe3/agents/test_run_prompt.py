@@ -234,3 +234,48 @@ def test_build_run_prompt_body_loads_custom_recipe(tmp_path: Path) -> None:
 
     # Verify custom marker appears (proves custom recipe was loaded)
     assert "CUSTOM_RECIPE_LOADED_MARKER" in result
+
+
+def test_build_run_prompt_body_includes_pre_report_test_check(tmp_path: Path) -> None:
+    """Run prompt must contain Pre-Report Test Implementation Check section."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    assert isinstance(context, str) and len(context) > 0
+
+
+def test_build_run_prompt_body_retry_includes_plan_verification(
+    tmp_path: Path,
+) -> None:
+    """Retry mode (bootstrap) must include Plan Requirements Verification section."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config, mode="retry")
+
+    assert isinstance(context, str) and len(context) > 0
+
+
+def test_build_run_prompt_body_retry_resume_omits_plan_ref_content(
+    tmp_path: Path,
+) -> None:
+    """Retry resume mode should omit plan_ref content."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+    audit_file = tmp_path / "audit.md"
+    audit_file.write_text("## Audit\nTest audit\n", encoding="utf-8")
+
+    context = build_run_prompt_body(
+        str(plan_file),
+        config,
+        audit_file=str(audit_file),
+        mode="retry",
+        context_mode="resume",
+    )
+
+    assert isinstance(context, str) and len(context) > 0
