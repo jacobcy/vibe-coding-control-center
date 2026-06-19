@@ -120,7 +120,7 @@ def _build_output_contract_section(output_format: str | None) -> str:
     if output_format:
         return f"## Output format requirements\n{output_format}"
 
-    logger.warning("build_output_contract_section: output_format is empty or None")
+    logger.warning("_build_output_contract_section: output_format is empty or None")
     return ""
 
 
@@ -190,6 +190,7 @@ def build_review_prompt_body(
     config: VibeConfig | None = None,
     mode: ReviewPromptMode = "first",
     context_mode: PromptContextMode = "bootstrap",
+    prompts_path: Path | None = None,
 ) -> str:
     """Assemble the review prompt body from policy, tools, analysis, and output format.
 
@@ -199,6 +200,8 @@ def build_review_prompt_body(
         mode: Prompt mode. ``retry`` revisits an existing review round.
         context_mode: ``resume`` means an existing session is available, so use
             the minimal retry prompt instead of re-sending policy/rules context.
+        prompts_path: Optional custom path to prompts.yaml. When provided,
+            loads the prompt-recipes.yaml from the same directory.
 
     Returns:
         Assembled review prompt body string.
@@ -217,14 +220,16 @@ def build_review_prompt_body(
     if config is None:
         config = VibeConfig.get_defaults()
 
-    body = PromptManifest.load_default().render_sections(
+    if prompts_path is not None:
+        manifest = PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+    else:
+        manifest = PromptManifest.load_default()
+    body = manifest.render_sections(
         recipe_key="review.default",
         variant_key=_review_variant(mode, context_mode),
         providers=_build_review_prompt_providers(request, config),
     )
-    log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
-        "Review prompt body built"
-    )
+    log.bind(body_len=len(body)).success("Review prompt body built")
     return body
 
 
@@ -242,6 +247,8 @@ def make_review_context_builder(
     return make_context_builder(
         template_key="review.default",
         body_provider_key="review.context",
-        body_fn=lambda: build_review_prompt_body(request, cfg),
+        body_fn=lambda: build_review_prompt_body(
+            request, cfg, prompts_path=prompts_path
+        ),
         prompts_path=prompts_path,
     )

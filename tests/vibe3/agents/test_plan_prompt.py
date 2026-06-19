@@ -1,5 +1,7 @@
 """Tests for issue/spec-aware plan context building."""
 
+from pathlib import Path
+
 from vibe3.agents.plan_prompt import (
     _build_plan_output_contract_section,
     _build_plan_task_section,
@@ -54,3 +56,43 @@ def test_build_plan_prompt_body_includes_before_coding_marker_convention() -> No
     result = build_plan_prompt_body(request)
     assert "REQUIRED:BEFORE_CODING" in result
     assert "Mandatory Pre-Conditions" in result
+
+
+def test_build_plan_prompt_body_loads_custom_recipe(tmp_path: Path) -> None:
+    """Should load custom prompt-recipes.yaml when prompts_path is provided."""
+    from unittest.mock import patch
+
+    # Create custom prompts.yaml (required by PromptAssembler)
+    prompts_yaml = tmp_path / "prompts.yaml"
+    prompts_yaml.write_text(
+        "plan:\n  default: '{plan_prompt_body}'\n", encoding="utf-8"
+    )
+
+    # Create custom prompt-recipes.yaml with custom section key
+    recipes_yaml = tmp_path / "prompt-recipes.yaml"
+    recipes_yaml.write_text(
+        """recipes:
+  plan.default:
+    template_key: plan.default
+    description: Test recipe with custom section
+    variants:
+      first.bootstrap:
+        sections:
+          - custom.test_marker
+""",
+        encoding="utf-8",
+    )
+
+    # Create request
+    request = PlanRequest(scope=PlanScope.for_task(42))
+
+    # Mock the provider to return a custom marker
+    with patch(
+        "vibe3.agents.plan_prompt._build_plan_prompt_providers",
+        return_value={"custom.test_marker": lambda: "CUSTOM_RECIPE_LOADED_MARKER"},
+    ):
+        # Build prompt with custom prompts_path
+        result = build_plan_prompt_body(request, prompts_path=prompts_yaml)
+
+    # Verify custom marker appears (proves custom recipe was loaded)
+    assert "CUSTOM_RECIPE_LOADED_MARKER" in result

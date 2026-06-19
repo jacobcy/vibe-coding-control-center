@@ -265,3 +265,45 @@ class TestDescribeReviewSections:
         """Should raise KeyError for first.resume variant (not defined in YAML)."""
         with pytest.raises(KeyError, match="Prompt recipe variant not found"):
             describe_review_sections("first", "resume")
+
+
+class TestPromptsPathRouting:
+    """Tests for prompts_path parameter routing to custom manifest."""
+
+    def test_build_review_prompt_body_loads_custom_recipe(self, tmp_path: Path) -> None:
+        """Should load custom prompt-recipes.yaml when prompts_path is provided."""
+        # Create custom prompts.yaml (required by PromptAssembler)
+        prompts_yaml = tmp_path / "prompts.yaml"
+        prompts_yaml.write_text(
+            "review:\n  default: '{review_prompt_body}'\n", encoding="utf-8"
+        )
+
+        # Create custom prompt-recipes.yaml with custom section key
+        recipes_yaml = tmp_path / "prompt-recipes.yaml"
+        recipes_yaml.write_text(
+            """recipes:
+  review.default:
+    template_key: review.default
+    description: Test recipe with custom section
+    variants:
+      first.bootstrap:
+        sections:
+          - custom.test_marker
+""",
+            encoding="utf-8",
+        )
+
+        # Create request
+        scope = ReviewScope.for_base("main")
+        request = ReviewRequest(scope=scope)
+
+        # Mock the provider to return a custom marker
+        with patch(
+            "vibe3.agents.review_prompt._build_review_prompt_providers",
+            return_value={"custom.test_marker": lambda: "CUSTOM_RECIPE_LOADED_MARKER"},
+        ):
+            # Build prompt with custom prompts_path
+            result = build_review_prompt_body(request, prompts_path=prompts_yaml)
+
+        # Verify custom marker appears (proves custom recipe was loaded)
+        assert "CUSTOM_RECIPE_LOADED_MARKER" in result
