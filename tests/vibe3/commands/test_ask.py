@@ -296,3 +296,148 @@ class TestAskExecution:
         assert result.exit_code != 0
         assert "Failed to answer question" in result.output
         assert "Template not found" in result.output
+
+
+class TestAskBranchParameter:
+    """Tests for --branch parameter resolution and worktree handling."""
+
+    def setup_method(self):
+        self.runner = CliRunner()
+
+    @patch("vibe3.commands.ask.CodeagentBackend")
+    @patch("vibe3.commands.ask.PromptAssembler.render")
+    @patch("vibe3.commands.ask.GitClient")
+    @patch("vibe3.commands.ask.resolve_branch_arg")
+    def test_branch_option_resolves_and_passes_cwd(
+        self,
+        mock_resolve_branch,
+        mock_git_client_class,
+        mock_render,
+        mock_backend_class,
+    ):
+        """--branch option should resolve branch and pass worktree path as cwd."""
+        # Setup mocks
+        mock_resolve_branch.return_value = "task/issue-1234"
+
+        mock_git_client = MagicMock()
+        mock_git_client.find_worktree_path_for_branch.return_value = Path(
+            "/test/worktree/task/issue-1234"
+        )
+        mock_git_client_class.return_value = mock_git_client
+
+        mock_render_result = MagicMock()
+        mock_render_result.rendered_text = "Mock prompt"
+        mock_render.return_value = mock_render_result
+
+        mock_backend = MagicMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "Mock answer"
+        mock_result.stderr = ""
+        mock_backend.run.return_value = mock_result
+        mock_backend_class.return_value = mock_backend
+
+        # Execute
+        result = self.runner.invoke(app, ["--branch", "task/issue-1234", "Question?"])
+
+        # Verify
+        assert result.exit_code == 0
+        mock_resolve_branch.assert_called_once_with("task/issue-1234")
+        mock_git_client.find_worktree_path_for_branch.assert_called_once_with(
+            "task/issue-1234"
+        )
+        mock_backend.run.assert_called_once()
+        call_kwargs = mock_backend.run.call_args.kwargs
+        assert call_kwargs["cwd"] == Path("/test/worktree/task/issue-1234")
+
+    @patch("vibe3.commands.ask.CodeagentBackend")
+    @patch("vibe3.commands.ask.PromptAssembler.render")
+    @patch("vibe3.commands.ask.GitClient")
+    @patch("vibe3.commands.ask.resolve_branch_arg")
+    def test_branch_digits_to_canonical(
+        self,
+        mock_resolve_branch,
+        mock_git_client_class,
+        mock_render,
+        mock_backend_class,
+    ):
+        """--branch 1234 should resolve to canonical task/issue-1234."""
+        # Setup mocks
+        mock_resolve_branch.return_value = "task/issue-1234"
+
+        mock_git_client = MagicMock()
+        mock_git_client.find_worktree_path_for_branch.return_value = Path(
+            "/test/worktree/task/issue-1234"
+        )
+        mock_git_client_class.return_value = mock_git_client
+
+        mock_render_result = MagicMock()
+        mock_render_result.rendered_text = "Mock prompt"
+        mock_render.return_value = mock_render_result
+
+        mock_backend = MagicMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "Mock answer"
+        mock_result.stderr = ""
+        mock_backend.run.return_value = mock_result
+        mock_backend_class.return_value = mock_backend
+
+        # Execute
+        result = self.runner.invoke(app, ["--branch", "1234", "Question?"])
+
+        # Verify
+        assert result.exit_code == 0
+        mock_resolve_branch.assert_called_once_with("1234")
+        mock_git_client.find_worktree_path_for_branch.assert_called_once_with(
+            "task/issue-1234"
+        )
+
+    @patch("vibe3.commands.ask.CodeagentBackend")
+    @patch("vibe3.commands.ask.PromptAssembler.render")
+    @patch("vibe3.commands.ask.resolve_orchestra_repo_root")
+    def test_branch_none_defaults_to_current_behavior(
+        self, mock_repo_root, mock_render, mock_backend_class
+    ):
+        """No --branch option should use resolve_orchestra_repo_root."""
+        # Setup mocks
+        mock_repo_root.return_value = Path("/test/repo")
+
+        mock_render_result = MagicMock()
+        mock_render_result.rendered_text = "Mock prompt"
+        mock_render.return_value = mock_render_result
+
+        mock_backend = MagicMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "Mock answer"
+        mock_result.stderr = ""
+        mock_backend.run.return_value = mock_result
+        mock_backend_class.return_value = mock_backend
+
+        # Execute
+        result = self.runner.invoke(app, ["Question?"])
+
+        # Verify
+        assert result.exit_code == 0
+        mock_repo_root.assert_called_once()
+        mock_backend.run.assert_called_once()
+        call_kwargs = mock_backend.run.call_args.kwargs
+        assert call_kwargs["cwd"] == Path("/test/repo")
+
+    @patch("vibe3.commands.ask.GitClient")
+    @patch("vibe3.commands.ask.resolve_branch_arg")
+    def test_branch_no_worktree_error(self, mock_resolve_branch, mock_git_client_class):
+        """--branch with no existing worktree should show clear error."""
+        # Setup mocks
+        mock_resolve_branch.return_value = "task/issue-9999"
+
+        mock_git_client = MagicMock()
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+        mock_git_client_class.return_value = mock_git_client
+
+        # Execute
+        result = self.runner.invoke(app, ["--branch", "task/issue-9999", "Question?"])
+
+        # Verify
+        assert result.exit_code != 0
+        assert "No worktree found for branch" in result.output
+        assert "task/issue-9999" in result.output
+        assert "worktree" in result.output.lower()
