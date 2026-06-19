@@ -14,7 +14,11 @@ from vibe3.clients import GitHubClient
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution import ExecutionRolePolicyService, resolve_orchestra_repo_root
 from vibe3.models import ExecutionRequest, OrchestraConfig
-from vibe3.observability import append_governance_event, governance_dry_run_dir
+from vibe3.observability import (
+    append_governance_event,
+    governance_dry_run_dir,
+    write_prompt_provenance,
+)
 from vibe3.prompts import (
     DEFAULT_PROMPTS_PATH,
     PromptAssembler,
@@ -26,6 +30,7 @@ from vibe3.prompts import (
     PromptVariableSource,
     ProviderRegistry,
     VariableSourceKind,
+    collect_dry_run_provenance,
 )
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
@@ -407,6 +412,30 @@ def build_governance_request(
             f"dry-run plan written ({current_material}): {dry_run_plan_path}",
             repo_root=root,
         )
+
+        # Collect and write provenance for audit
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
+        recipe_def = manifest.recipe("governance.scan")
+
+        # Template-based recipes have no variants; use empty string for variant_key
+        variant_key = ""
+        if recipe_def.variants:
+            # Fallback if variants exist
+            variant_key = "default"
+
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="governance.scan",
+            variant_key=variant_key,
+            rendered_text=plan_content,
+            variable_provenance=render_result.provenance,
+            warnings=render_result.warnings,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="governance", repo_root=root
+        )
+        log.info(f"Dry run provenance file: {provenance_path}")
+
         return None
 
     options = resolve_governance_options(config)

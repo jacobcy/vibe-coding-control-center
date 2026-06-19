@@ -95,6 +95,7 @@ def test_build_plan_prompt_retry_resume_provides_bootstrap_fallback() -> None:
             "task/issue-123",
             flow_state,
             session_id="ses_123",
+            prompts_path=None,
         )
 
     assert refs == {"plan_ref": "docs/plans/issue-123-plan.md"}

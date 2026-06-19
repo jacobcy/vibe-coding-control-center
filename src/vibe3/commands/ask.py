@@ -1,11 +1,14 @@
 """Ask command for project knowledge queries."""
 
+from typing import Annotated
+
 import typer
 from loguru import logger
 from rich.console import Console
 from rich.panel import Panel
 
 from vibe3.agents import CodeagentBackend
+from vibe3.clients import GitClient
 from vibe3.execution import resolve_orchestra_repo_root
 from vibe3.models import AgentOptions
 from vibe3.prompts import (
@@ -14,6 +17,7 @@ from vibe3.prompts import (
     PromptVariableSource,
     VariableSourceKind,
 )
+from vibe3.services.flow import resolve_branch_arg
 from vibe3.utils import sanitize_prompt_for_display
 
 app = typer.Typer(
@@ -34,11 +38,17 @@ FORBIDDEN_PATTERNS = [
     "rm -rf",
 ]
 
+BranchOption = Annotated[
+    str | None,
+    typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
+]
+
 
 @app.callback()
 def ask(
     ctx: typer.Context,
     question: str = typer.Argument(..., help="Question about the project"),
+    branch: BranchOption = None,
 ) -> None:
     """Ask a question about project knowledge and get an answer from a code agent.
 
@@ -52,6 +62,8 @@ def ask(
         vibe3 ask "What is the structure of src/vibe3/?"
         vibe3 ask "How does CapacityService work?"
         vibe3 ask "What does HARD RULES mean?"
+        vibe3 ask "What changed in this branch?" --branch task/issue-1234
+        vibe3 ask "How does this feature work?" --branch 5678
     """
     # Skip if subcommand is invoked
     if ctx.invoked_subcommand is not None:
@@ -81,8 +93,20 @@ def ask(
             raise typer.Exit(1)
 
     try:
-        # Resolve repo root
-        repo_root = resolve_orchestra_repo_root()
+        # Resolve repo root based on branch
+        if branch is not None:
+            target_branch = resolve_branch_arg(branch)
+            git_client = GitClient()
+            worktree_path = git_client.find_worktree_path_for_branch(target_branch)
+            if worktree_path is None:
+                console.print(
+                    f"[red]Error: No worktree found for branch '{target_branch}'. "
+                    "Ask requires an existing worktree.[/red]"
+                )
+                raise typer.Exit(1)
+            repo_root = worktree_path
+        else:
+            repo_root = resolve_orchestra_repo_root()
 
         # Build prompt recipe
         recipe = PromptRecipe(

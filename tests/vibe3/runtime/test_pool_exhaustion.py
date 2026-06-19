@@ -3,8 +3,8 @@
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.domain_types import ServiceBase
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime.protocols import ServiceBase
 
 
 class _MockService(ServiceBase):

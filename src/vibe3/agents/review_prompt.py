@@ -133,12 +133,12 @@ def _review_variant(mode: ReviewPromptMode, context_mode: PromptContextMode) -> 
 def describe_review_sections(
     mode: ReviewPromptMode,
     context_mode: PromptContextMode,
+    prompts_path: Path | None = None,
 ) -> list[str]:
     """Return configured review.default section keys for dry-run summaries."""
     variant = _review_variant(mode, context_mode)
-    return list(
-        PromptManifest.load_default().recipe("review.default").variant(variant).sections
-    )
+    manifest = PromptManifest.load_for_prompts_path(prompts_path)
+    return list(manifest.recipe("review.default").variant(variant).sections)
 
 
 def _build_review_prompt_providers(

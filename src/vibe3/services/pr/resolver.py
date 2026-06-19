@@ -131,11 +131,23 @@ def resolve_command_branch(
         # When canonical_fallback is enabled, allow_no_flow should also be True
         # so resolve_issue_branch_input returns None instead of raising
         effective_allow_no_flow = allow_no_flow or canonical_fallback
-        resolved = resolve_issue_branch_input(
-            branch_opt, flow_service, allow_no_flow=effective_allow_no_flow
-        )
-        if resolved is not None:
-            return resolved
+        try:
+            resolved = resolve_issue_branch_input(
+                branch_opt, flow_service, allow_no_flow=effective_allow_no_flow
+            )
+            if resolved is not None:
+                return resolved
+        except UserError as e:
+            # If canonical_fallback is enabled and this is an unbound candidates error,
+            # fall back to canonical branch name for pure issue numbers
+            if (
+                canonical_fallback
+                and branch_opt.isdigit()
+                and "without task binding" in str(e)
+            ):
+                convention = get_convention()
+                return convention.branch.canonical_branch(int(branch_opt))  # type: ignore[no-any-return]
+            raise
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and branch_opt.isdigit():
             convention = get_convention()
@@ -154,11 +166,23 @@ def resolve_command_branch(
         # When canonical_fallback is enabled, allow_no_flow should also be True
         # so resolve_issue_branch_input returns None instead of raising
         effective_allow_no_flow = allow_no_flow or canonical_fallback
-        resolved = resolve_issue_branch_input(
-            position_arg, flow_service, allow_no_flow=effective_allow_no_flow
-        )
-        if resolved is not None:
-            return resolved
+        try:
+            resolved = resolve_issue_branch_input(
+                position_arg, flow_service, allow_no_flow=effective_allow_no_flow
+            )
+            if resolved is not None:
+                return resolved
+        except UserError as e:
+            # If canonical_fallback is enabled and this is an unbound candidates error,
+            # fall back to canonical branch name for pure issue numbers
+            if (
+                canonical_fallback
+                and position_arg.isdigit()
+                and "without task binding" in str(e)
+            ):
+                convention = get_convention()
+                return convention.branch.canonical_branch(int(position_arg))  # type: ignore[no-any-return]
+            raise
         # If unresolved and canonical_fallback enabled for issue numbers
         if canonical_fallback and position_arg.isdigit():
             convention = get_convention()

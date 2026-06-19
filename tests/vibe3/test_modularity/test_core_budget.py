@@ -79,6 +79,7 @@ CORE_RESPONSIBILITIES: dict[str, list[str]] = {
     ],
     "protocols": [
         "orchestra.protocols",
+        "runtime.protocols",
     ],
     "domain_types": [
         "orchestra.domain_types",

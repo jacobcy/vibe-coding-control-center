@@ -18,6 +18,8 @@ from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import log_dispatch_error
 
@@ -87,6 +89,25 @@ def run_governance_sync(
                 if len(prompt_content) > 2000
                 else prompt_content
             )
+
+        # Collect and write provenance for audit
+        manifest = PromptManifest.load_for_prompts_path(None)
+        recipe_def = manifest.recipe("governance.scan")
+        variant_key = ""
+        if recipe_def.variants:
+            variant_key = "default"
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="governance.scan",
+            variant_key=variant_key,
+            rendered_text=prompt_content,
+            variable_provenance=render_result.provenance,
+            warnings=render_result.warnings,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="governance", repo_root=repo
+        )
+        echo(f"-> Provenance: {provenance_path}")
         return
 
     material_info = f" material={material_override}" if material_override else ""

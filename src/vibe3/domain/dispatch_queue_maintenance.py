@@ -23,9 +23,9 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from vibe3.domain.protocols.dispatch_protocols import (
-        CheckServiceProtocol,
         QueuePersistenceServiceProtocol,
     )
+    from vibe3.runtime import CheckServiceProtocol
 
 
 class DispatchQueueMaintenanceService:

@@ -46,6 +46,8 @@ from vibe3.models import (
     StructureDiff,
     WorktreeRequirement,
 )
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -152,6 +154,7 @@ def build_issue_review_request(
     show_prompt: bool = False,
     flow_state: dict[str, object] | None = None,
     tick_id: int = 0,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
     convention = get_convention()
@@ -183,6 +186,7 @@ def build_issue_review_request(
             VibeConfig.get_defaults(),
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.context_mode,
+            prompts_path=prompts_path,
         )
         fallback_prompt = None
         if meta.fallback_context_mode is not None:
@@ -191,15 +195,36 @@ def build_issue_review_request(
                 VibeConfig.get_defaults(),
                 mode=meta.prompt_mode,  # type: ignore[arg-type]
                 context_mode=meta.fallback_context_mode,
+                prompts_path=prompts_path,
             )
         sections = describe_review_sections(
             meta.prompt_mode,  # type: ignore[arg-type]
             meta.context_mode,
+            prompts_path=prompts_path,
         )
         refs = dict(meta.refs)
         if report_ref and "report_ref" not in refs:
             refs["report_ref"] = report_ref
         dry_run_summary = meta.summary(sections)
+
+        # Collect and write provenance for dry-run audit
+        if dry_run:
+            # Determine variant_key: {mode}.{context_mode}
+            variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+
+            manifest = PromptManifest.load_for_prompts_path(prompts_path)
+            provenance = collect_dry_run_provenance(
+                manifest=manifest,
+                recipe_key="review.default",
+                variant_key=variant_key,
+                rendered_text=prompt,
+            )
+            provenance_path = write_prompt_provenance(
+                provenance, role="reviewer", issue_number=issue.number
+            )
+            # Add provenance path to dry_run_summary
+            if dry_run_summary:
+                dry_run_summary["provenance_path"] = str(provenance_path)
 
         return build_issue_sync_prompt_request(
             role="reviewer",
@@ -263,6 +288,7 @@ def build_review_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     from vibe3.clients import SQLiteClient
 
@@ -278,6 +304,7 @@ def build_review_sync_request(
         show_prompt=show_prompt,
         sync=True,
         config=config,
+        prompts_path=prompts_path,
     )
 
 

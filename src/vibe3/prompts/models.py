@@ -145,3 +145,44 @@ class LoadedPromptRecipeDefinition(BaseModel):
     variables: dict[str, PromptVariableSource] = Field(default_factory=dict)
     material_catalog: tuple[PromptMaterialSpec, ...] = ()
     description: str | None = None
+
+
+class AnomalyFlags(BaseModel):
+    """Audit anomaly markers for a rendered prompt."""
+
+    model_config = {"frozen": True}
+
+    has_large_material: bool = False
+    has_duplicate_material: bool = False
+    missing_output_contract: bool = False
+    missing_verification_contract: bool = False
+    has_repo_profile: bool = False
+    has_project_policy_overlay: bool = False
+
+
+class SectionSourceProvenance(BaseModel):
+    """Records where a rendered prompt section came from."""
+
+    model_config = {"frozen": True}
+
+    key: str
+    source_kind: VariableSourceKind | None = None
+    source_ref: str | None = None
+    size_chars: int | None = None
+
+
+class PromptRenderProvenance(BaseModel):
+    """Comprehensive provenance of a rendered prompt for audit input."""
+
+    model_config = {"frozen": True}
+
+    recipe_key: str
+    variant_key: str
+    section_order: tuple[str, ...] = ()
+    section_sources: tuple[SectionSourceProvenance, ...] = ()
+    variable_provenance: tuple[PromptVariableProvenance, ...] = ()
+    rendered_hash: str = ""  # SHA-256 hex digest (first 16 chars)
+    char_count: int = 0
+    token_estimate: int | None = None
+    warnings: tuple[str, ...] = ()
+    anomalies: AnomalyFlags = AnomalyFlags()

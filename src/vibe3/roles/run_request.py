@@ -17,6 +17,8 @@ from vibe3.execution import (
     build_role_sync_request,
 )
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
@@ -99,6 +101,7 @@ def build_run_sync_request(
     dry_run: bool,
     show_prompt: bool,
     tick_id: int = 0,
+    prompts_path: Path | None = None,
 ) -> ExecutionRequest:
     """Build the executor sync execution request."""
     store = SQLiteClient()
@@ -118,6 +121,7 @@ def build_run_sync_request(
     summary_sections = describe_run_plan_sections(
         meta.prompt_mode,  # type: ignore[arg-type]
         meta.context_mode,
+        prompts_path=prompts_path,
     )
     refs = dict(meta.refs)
     plan_ref = refs.get("plan_ref")
@@ -131,20 +135,44 @@ def build_run_sync_request(
             audit_file=audit_ref,
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.fallback_context_mode,
+            prompts_path=prompts_path,
         )()
+
+    # Build prompt for provenance collection and request
+    prompt = make_run_context_builder(
+        plan_ref,
+        VibeConfig.get_defaults(),
+        audit_file=audit_ref,
+        mode=meta.prompt_mode,  # type: ignore[arg-type]
+        context_mode=meta.context_mode,
+        prompts_path=prompts_path,
+    )()
+
+    # Collect and write provenance for dry-run audit
+    if dry_run:
+        # Determine variant_key: {mode}.{context_mode}
+        variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="run.plan",
+            variant_key=variant_key,
+            rendered_text=prompt,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="executor", issue_number=issue.number
+        )
+        # Add provenance path to dry_run_summary
+        if dry_run_summary:
+            dry_run_summary["provenance_path"] = str(provenance_path)
 
     return build_role_sync_request(
         role="executor",
         config=config,
         issue=issue,
         branch=branch,
-        prompt=make_run_context_builder(
-            plan_ref,
-            VibeConfig.get_defaults(),
-            audit_file=audit_ref,
-            mode=meta.prompt_mode,  # type: ignore[arg-type]
-            context_mode=meta.context_mode,
-        )(),
+        prompt=prompt,
         task=task,
         options=options,
         worktree_requirement=EXECUTOR_ROLE.worktree,

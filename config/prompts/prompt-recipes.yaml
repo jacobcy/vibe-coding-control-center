@@ -55,26 +55,68 @@ recipes:
     variants:
       coding.bootstrap:
         sections:
-          - run.plan_ref
-          - run.coding_task
-          - run.policy
-          - common.rules
-          - run.output_format
-          - run.exit_contract
+          - key: run.plan_ref
+            source:
+              kind: provider
+              provider: run.plan_ref
+          - key: run.coding_task
+            source:
+              kind: provider
+              provider: run.coding_task
+          - key: run.policy
+            source:
+              kind: provider
+              provider: run.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: run.output_format
+            source:
+              kind: provider
+              provider: run.output_format
+          - key: run.exit_contract
+            source:
+              kind: provider
+              provider: run.exit_contract
 
       retry.bootstrap:
         sections:
-          - run.plan_ref
-          - run.retry_task
-          - run.policy
-          - common.rules
-          - run.output_format
-          - run.exit_contract
+          - key: run.plan_ref
+            source:
+              kind: provider
+              provider: run.plan_ref
+          - key: run.retry_task
+            source:
+              kind: provider
+              provider: run.retry_task
+          - key: run.policy
+            source:
+              kind: provider
+              provider: run.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: run.output_format
+            source:
+              kind: provider
+              provider: run.output_format
+          - key: run.exit_contract
+            source:
+              kind: provider
+              provider: run.exit_contract
 
       retry.resume:
         sections:
-          - run.retry_task
-          - run.exit_contract
+          - key: run.retry_task
+            source:
+              kind: provider
+              provider: run.retry_task
+          - key: run.exit_contract
+            source:
+              kind: provider
+              provider: run.exit_contract
 
   run.skill:
     template_key: run.skill
@@ -106,23 +148,56 @@ recipes:
     variants:
       first.bootstrap:
         sections:
-          - plan.policy
-          - common.rules
-          - plan.output_format
-          - plan.exit_contract
+          - key: plan.policy
+            source:
+              kind: provider
+              provider: plan.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: plan.output_format
+            source:
+              kind: provider
+              provider: plan.output_format
+          - key: plan.exit_contract
+            source:
+              kind: provider
+              provider: plan.exit_contract
 
       retry.bootstrap:
         sections:
-          - plan.policy
-          - common.rules
-          - plan.output_format
-          - plan.retry_task
-          - plan.exit_contract
+          - key: plan.policy
+            source:
+              kind: provider
+              provider: plan.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: plan.output_format
+            source:
+              kind: provider
+              provider: plan.output_format
+          - key: plan.retry_task
+            source:
+              kind: provider
+              provider: plan.retry_task
+          - key: plan.exit_contract
+            source:
+              kind: provider
+              provider: plan.exit_contract
 
       retry.resume:
         sections:
-          - plan.retry_task
-          - plan.exit_contract
+          - key: plan.retry_task
+            source:
+              kind: provider
+              provider: plan.retry_task
+          - key: plan.exit_contract
+            source:
+              kind: provider
+              provider: plan.exit_contract
 
   # Reviewer role assembly.
   #
@@ -135,28 +210,76 @@ recipes:
     variants:
       first.bootstrap:
         sections:
-          - review.policy
-          - common.rules
-          - review.snapshot_diff
-          - review.ast_analysis
-          - review.output_format
-          - review.exit_contract
+          - key: review.policy
+            source:
+              kind: provider
+              provider: review.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: review.snapshot_diff
+            source:
+              kind: provider
+              provider: review.snapshot_diff
+          - key: review.ast_analysis
+            source:
+              kind: provider
+              provider: review.ast_analysis
+          - key: review.output_format
+            source:
+              kind: provider
+              provider: review.output_format
+          - key: review.exit_contract
+            source:
+              kind: provider
+              provider: review.exit_contract
 
       retry.bootstrap:
         sections:
-          - review.policy
-          - common.rules
-          - review.snapshot_diff
-          - review.ast_analysis
-          - review.output_format
-          - review.retry_task
-          - review.exit_contract
+          - key: review.policy
+            source:
+              kind: provider
+              provider: review.policy
+          - key: common.rules
+            source:
+              kind: provider
+              provider: common.rules
+          - key: review.snapshot_diff
+            source:
+              kind: provider
+              provider: review.snapshot_diff
+          - key: review.ast_analysis
+            source:
+              kind: provider
+              provider: review.ast_analysis
+          - key: review.output_format
+            source:
+              kind: provider
+              provider: review.output_format
+          - key: review.retry_task
+            source:
+              kind: provider
+              provider: review.retry_task
+          - key: review.exit_contract
+            source:
+              kind: provider
+              provider: review.exit_contract
 
       retry.resume:
         sections:
-          - review.output_format
-          - review.retry_task
-          - review.exit_contract
+          - key: review.output_format
+            source:
+              kind: provider
+              provider: review.output_format
+          - key: review.retry_task
+            source:
+              kind: provider
+              provider: review.retry_task
+          - key: review.exit_contract
+            source:
+              kind: provider
+              provider: review.exit_contract
 
   # Supervisor handoff role.
   #

@@ -10,9 +10,11 @@ KERNEL modules must import from this module instead of from vibe3.domain.
 
 from __future__ import annotations
 
-from abc import ABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Protocol
+
+# ServiceBase moved to runtime - re-export for backward compatibility
+from vibe3.runtime import ServiceBase  # canonical definition moved to runtime
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient
@@ -70,24 +72,6 @@ class CheckResultProtocol(Protocol):
 
 
 # ---- Service Protocols ----
-
-
-class ServiceBase(ABC):
-    """Abstract protocol for runtime services observed by HeartbeatServer."""
-
-    @property
-    def service_name(self) -> str:
-        """Human-readable service name for orchestration logs."""
-        return type(self).__name__
-
-    @property
-    def is_dispatch_service(self) -> bool:
-        """Whether this service initiates automated flow/task actions."""
-        return True
-
-    async def on_tick(self, tick_id: int = 0) -> None:
-        """Called on each heartbeat tick."""
-        ...
 
 
 class CapacityServiceProtocol(Protocol):

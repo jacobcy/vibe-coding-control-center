@@ -161,12 +161,12 @@ def _run_plan_variant(mode: RunPromptMode, context_mode: PromptContextMode) -> s
 def describe_run_plan_sections(
     mode: RunPromptMode,
     context_mode: PromptContextMode,
+    prompts_path: Path | None = None,
 ) -> list[str]:
     """Return configured run.plan section keys for dry-run summaries."""
     variant = _run_plan_variant(mode, context_mode)
-    return list(
-        PromptManifest.load_default().recipe("run.plan").variant(variant).sections
-    )
+    manifest = PromptManifest.load_for_prompts_path(prompts_path)
+    return list(manifest.recipe("run.plan").variant(variant).sections)
 
 
 def build_run_prompt_body(

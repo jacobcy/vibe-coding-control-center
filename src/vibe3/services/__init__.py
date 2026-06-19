@@ -265,7 +265,7 @@ _SYMBOL_MODULES = {
     "BaseResolutionUsecase": "vibe3.services.pr.base_resolution",
     "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "CheckCleanupService": "vibe3.services.check.cleanup",
-    "CheckResult": "vibe3.services.check.service",
+    "CheckResult": "vibe3.models.check_result",
     "CheckService": "vibe3.services.check.service",
     "CoordinationResolver": "vibe3.services.orchestra.coordination",
     "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
