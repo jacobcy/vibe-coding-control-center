@@ -109,7 +109,7 @@ class AutoSceneRecoveryService:
         error_msg: str,
     ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions import E_EXEC_AUTO_SCENE_RESET
-        from vibe3.services.shared import record_error
+        from vibe3.services.orchestra import record_error
 
         detail = "; ".join(damage_signals)
         recovery_actor = "orchestra:auto-recover"

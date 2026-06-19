@@ -130,7 +130,7 @@ def _dispatch_role_intent(
         else:
             # Dispatch-level infrastructure failure - record to error_log
             # FailedGate will control dispatch based on threshold
-            from vibe3.services.shared import record_error
+            from vibe3.services.orchestra import record_error
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:

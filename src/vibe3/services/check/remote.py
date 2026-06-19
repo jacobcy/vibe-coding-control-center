@@ -125,7 +125,7 @@ class CheckRemote:
         repo_path = Path(git_common_dir).parent if git_common_dir else Path.cwd()
 
         cache = MergedPRCache(repo_path)
-        from vibe3.services.shared.errors import record_error
+        from vibe3.services.orchestra import record_error
 
         cache_rebuild_count = cache.rebuild(
             this.github_client,

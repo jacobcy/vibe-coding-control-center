@@ -62,7 +62,7 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
+        patch("vibe3.services.orchestra.record_error") as mock_record_error,
         patch("vibe3.services.flow.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
@@ -78,7 +78,7 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
     assert result.launched is False
     assert result.skipped is True
     assert result.reason_code == "auto_scene_reset"
-    mock_tracking.get_instance.return_value.record_error.assert_called_once()
+    mock_record_error.assert_called_once()
     rebuild.rebuild_issue_flow.assert_called_once()
     call = rebuild.rebuild_issue_flow.call_args.kwargs
     assert call["issue"].number == 42
@@ -127,7 +127,7 @@ def test_auto_scene_reset_does_not_directly_unblock_without_rebuild(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.services.ErrorTrackingService"),
+        patch("vibe3.services.orchestra.record_error"),
         patch("vibe3.services.flow.FlowRebuildUsecase"),
         patch("vibe3.services.BlockedStateService") as blocked_cls,
     ):
@@ -173,7 +173,7 @@ def test_auto_scene_reset_skips_when_live_session_exists(
         return Path(req.repo_path) if req.repo_path else tmp_path
 
     with (
-        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
+        patch("vibe3.services.orchestra.record_error") as mock_record_error,
         patch("vibe3.services.flow.FlowRebuildUsecase") as mock_cleanup_cls,
     ):
         result = service.maybe_reset_damaged_scene(
@@ -184,7 +184,7 @@ def test_auto_scene_reset_skips_when_live_session_exists(
         )
 
     assert result is None
-    mock_tracking.get_instance.return_value.record_error.assert_not_called()
+    mock_record_error.assert_not_called()
     mock_cleanup_cls.assert_not_called()
 
 
@@ -231,7 +231,7 @@ def test_auto_scene_reset_reports_rebuild_failure(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.services.ErrorTrackingService") as mock_tracking,
+        patch("vibe3.services.orchestra.record_error") as mock_record_error,
         patch("vibe3.services.flow.FlowRebuildUsecase") as rebuild_cls,
     ):
         rebuild = MagicMock()
@@ -247,6 +247,6 @@ def test_auto_scene_reset_reports_rebuild_failure(
 
     assert result.launched is False
     assert result.reason_code == "auto_scene_reset_failed"
-    mock_tracking.get_instance.return_value.record_error.assert_called_once()
+    mock_record_error.assert_called_once()
     rebuild.rebuild_issue_flow.assert_called_once()
     assert store.add_event.call_count == 2

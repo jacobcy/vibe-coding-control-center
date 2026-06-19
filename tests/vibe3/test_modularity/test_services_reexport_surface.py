@@ -197,9 +197,7 @@ KNOWN_PURE_BRIDGES = set()
 
 KNOWN_LAYER_CROSSING_BRIDGES = set()
 
-ROOT_BARREL_IMPORT_BASELINE = (
-    2  # #2862: only 2 escape hatches remain (FlowService, ErrorTrackingService)
-)
+ROOT_BARREL_IMPORT_BASELINE = 0  # #2901: All root barrel escape hatches removed
 SHARED_BARREL_IMPORT_BASELINE = 16
 PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
 LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
@@ -230,13 +228,9 @@ def test_root_barrel_import_count() -> None:
             print(f"     {file}: {count} imports")
 
     assert len(imports) <= ROOT_BARREL_IMPORT_BASELINE, (
-        "Root barrel imports increased beyond the issue #2862 baseline: "
+        "Root barrel imports increased beyond the issue #2901 baseline: "
         f"expected <= {ROOT_BARREL_IMPORT_BASELINE}, found {len(imports)}"
     )
-    if imports:
-        pytest.xfail(
-            f"Baseline: {len(imports)} root barrel imports remain (issue #2862)"
-        )
 
     assert len(imports) == 0, f"Found {len(imports)} root barrel imports"
 

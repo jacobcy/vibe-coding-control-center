@@ -25,6 +25,10 @@ if TYPE_CHECKING:
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
     from vibe3.services.flow.blocked_state_service import BlockedStateService
+    from vibe3.services.flow.branch_resolution import (
+        resolve_branch_and_issue,
+        resolve_branch_arg,
+    )
     from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
@@ -62,6 +66,10 @@ if TYPE_CHECKING:
     from vibe3.services.issue.title_cache import IssueTitleCacheService
     from vibe3.services.orchestra.cleanup import ExpiredResourceCleanupService
     from vibe3.services.orchestra.coordination import CoordinationResolver
+    from vibe3.services.orchestra.error_recording import (
+        record_dispatch_failure_if_unexpected,
+        record_error,
+    )
     from vibe3.services.orchestra.error_tracking import ErrorTrackingService
     from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
     from vibe3.services.orchestra.serve_status import (
@@ -99,15 +107,9 @@ if TYPE_CHECKING:
         build_bind_task_hint,
     )
     from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
-    from vibe3.services.shared.branches import (
-        resolve_branch_and_issue,
-        resolve_branch_arg,
-    )
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
         log_dispatch_error,
-        record_dispatch_failure_if_unexpected,
-        record_error,
     )
 
     # Functions used in domain/execution/roles
@@ -349,11 +351,11 @@ _SYMBOL_MODULES = {
     "log_dispatch_error": "vibe3.services.shared.errors",
     "normalize_assignees": "vibe3.services.shared.labels",
     "normalize_labels": "vibe3.services.shared.labels",
-    "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
-    "record_error": "vibe3.services.shared.errors",
+    "record_dispatch_failure_if_unexpected": "vibe3.services.orchestra.error_recording",
+    "record_error": "vibe3.services.orchestra.error_recording",
     "ref_to_handoff_cmd": "vibe3.services.shared.paths",
-    "resolve_branch_and_issue": "vibe3.services.shared.branches",
-    "resolve_branch_arg": "vibe3.services.shared.branches",
+    "resolve_branch_and_issue": "vibe3.services.flow.branch_resolution",
+    "resolve_branch_arg": "vibe3.services.flow.branch_resolution",
     "resolve_command_branch": "vibe3.services.pr.resolver",
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
     "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",

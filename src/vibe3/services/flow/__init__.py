@@ -25,6 +25,10 @@ if TYPE_CHECKING:
         ConsistencyReport,
         UnblockResult,
     )
+    from vibe3.services.flow.branch_resolution import (
+        resolve_branch_and_issue,
+        resolve_branch_arg,
+    )
     from vibe3.services.flow.classifier import (
         FlowCategory,
         FlowState,
@@ -66,6 +70,8 @@ __all__ = [
     "FlowRebuildUsecase",
     "FlowRecoveryService",
     "infer_resume_label",
+    "resolve_branch_and_issue",
+    "resolve_branch_arg",
     "FlowService",
     "FlowStatusResolver",
     "FlowStatusService",
@@ -92,6 +98,8 @@ _SYMBOL_MODULES = {
     "FlowRebuildUsecase": "vibe3.services.flow.rebuild",
     "FlowRecoveryService": "vibe3.services.flow.recovery",
     "infer_resume_label": "vibe3.services.flow.resume_resolver",
+    "resolve_branch_and_issue": "vibe3.services.flow.branch_resolution",
+    "resolve_branch_arg": "vibe3.services.flow.branch_resolution",
     "FlowService": "vibe3.services.flow.service",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",

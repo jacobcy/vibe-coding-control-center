@@ -3,10 +3,17 @@
 Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
+
 
 def resolve_branch_arg(
     branch_arg: str | None,
-    flow_service: object | None = None,
+    flow_service: "FlowQueryProtocol",
 ) -> str:
     """Resolve --branch argument to a canonical branch name.
 
@@ -20,8 +27,7 @@ def resolve_branch_arg(
 
     Args:
         branch_arg: Branch argument from CLI (may be None, digits, or branch name)
-        flow_service: Optional FlowService instance (for testing). If None, creates
-                     a new instance via public API.
+        flow_service: FlowService instance implementing FlowQueryProtocol
 
     Returns:
         Resolved branch name
@@ -30,12 +36,6 @@ def resolve_branch_arg(
 
     _pr_resolver = importlib.import_module("vibe3.services.pr.resolver")
     resolve_command_branch = _pr_resolver.resolve_command_branch
-
-    if flow_service is None:
-        # Use public API for cross-module import (allows test patching)
-        from vibe3.services import FlowService
-
-        flow_service = FlowService()
 
     return resolve_command_branch(  # type: ignore[no-any-return]
         position_arg=branch_arg,
@@ -47,7 +47,7 @@ def resolve_branch_arg(
 
 def resolve_branch_and_issue(
     branch_arg: str | None,
-    flow_service: object | None = None,
+    flow_service: "FlowQueryProtocol",
 ) -> tuple[str, int | None]:
     """Resolve --branch argument and extract issue number in one call.
 
@@ -57,8 +57,7 @@ def resolve_branch_and_issue(
 
     Args:
         branch_arg: Branch argument from CLI (may be None, digits, or branch name)
-        flow_service: Optional FlowService instance (for testing). If None, creates
-                     a new instance via public API.
+        flow_service: FlowService instance implementing FlowQueryProtocol
 
     Returns:
         Tuple of (resolved_branch_name, issue_number or None)

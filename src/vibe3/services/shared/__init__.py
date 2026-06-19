@@ -7,13 +7,11 @@ Public API Contract:
 - format_agent_actor, extract_role_from_actor: Actor formatting
 - ArtifactParser: Artifact parsing
 - MissingTaskIssueError, build_bind_task_hint, ensure_task_issue_bound: Binding guard
-- resolve_issue_branch_input, resolve_branch_arg, resolve_branch_and_issue:
-  Branch resolution
+- resolve_issue_branch_input: Branch resolution
 - is_human_comment: Comment detection
 - FlowContextCacheService: Context caching
 - DependencyResolution, DependencyResolutionService: Dependency resolution
-- record_dispatch_failure_if_unexpected, log_dispatch_error,
-  has_recent_specific_error, record_error: Error utilities
+- log_dispatch_error, has_recent_specific_error: Error utilities
 - emit_issue_failed: Event emission
 - material_loader, policy_loader: File loading
 - LabelService: Label management
@@ -46,10 +44,6 @@ if TYPE_CHECKING:
         ensure_task_issue_bound,
     )
     from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
-    from vibe3.services.shared.branches import (
-        resolve_branch_and_issue,
-        resolve_branch_arg,
-    )
     from vibe3.services.shared.comment import is_human_comment
     from vibe3.services.shared.context_cache import FlowContextCacheService
     from vibe3.services.shared.dependency_resolution import (
@@ -59,8 +53,6 @@ if TYPE_CHECKING:
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
         log_dispatch_error,
-        record_dispatch_failure_if_unexpected,
-        record_error,
     )
     from vibe3.services.shared.events import emit_issue_failed
     from vibe3.services.shared.file_loader import material_loader, policy_loader
@@ -151,11 +143,7 @@ __all__ = [
     "normalize_labels",
     "parse_timeline_from_comments",
     "policy_loader",
-    "record_dispatch_failure_if_unexpected",
-    "record_error",
     "ref_to_handoff_cmd",
-    "resolve_branch_and_issue",
-    "resolve_branch_arg",
     "resolve_issue_branch_input",
     "resolve_ref_path",
     "sanitize_event_detail_paths",
@@ -207,11 +195,7 @@ _SYMBOL_MODULES = {
     "normalize_labels": "vibe3.services.shared.labels",
     "parse_timeline_from_comments": "vibe3.services.shared.timeline",
     "policy_loader": "vibe3.services.shared.file_loader",
-    "record_dispatch_failure_if_unexpected": "vibe3.services.shared.errors",
-    "record_error": "vibe3.services.shared.errors",
     "ref_to_handoff_cmd": "vibe3.services.shared.paths",
-    "resolve_branch_and_issue": "vibe3.services.shared.branches",
-    "resolve_branch_arg": "vibe3.services.shared.branches",
     "resolve_issue_branch_input": "vibe3.services.shared.branch_resolver",
     "resolve_ref_path": "vibe3.services.shared.paths",
     "sanitize_event_detail_paths": "vibe3.services.shared.paths",
@@ -229,7 +213,7 @@ def __getattr__(name: str) -> Any:
     """Lazy import for Shared services symbols to avoid circular dependencies.
 
     This allows external modules to use:
-        from vibe3.services.shared import LabelService, resolve_branch_arg
+        from vibe3.services.shared import LabelService, has_recent_specific_error
 
     While avoiding circular imports at module load time.
     """
