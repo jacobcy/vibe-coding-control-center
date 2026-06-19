@@ -16,7 +16,7 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
-from vibe3.services.flow import FlowTimelineService
+from vibe3.services.flow import FlowService, FlowTimelineService
 from vibe3.services.issue import fail_issue
 
 
@@ -58,6 +58,7 @@ class TestDatabaseErrorDoesNotTriggerBlock:
                 before_state_label="state/running",
                 repo="owner/repo",
                 flow_state=flow_state,
+                flow_service=FlowService(store=temp_db),
             )
 
         flow_state_after = temp_db.get_flow_state(branch)

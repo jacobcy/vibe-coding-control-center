@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
-    from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
+    from vibe3.config import TimelineCommentPolicy
     from vibe3.models import FlowStatusResponse
 
 
