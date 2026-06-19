@@ -57,12 +57,8 @@ KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
-# Subpackage public API migration made these existing couplings visible again.
-# Track them as debt while callers move through explicit subpackage barrels.
-KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = {
-    frozenset({"flow", "pr"}),
-    frozenset({"flow", "issue"}),
-}
+# All known cycles have been resolved as part of #2575 and #2902.
+KNOWN_SUBPACKAGE_CYCLES: set[frozenset[str]] = set()
 
 
 def _extract_imports_from_dir(
@@ -311,11 +307,12 @@ class TestSubpackageCoupling:
             )
 
     def test_known_subpackage_cycles_still_exist(self) -> None:
-        """Verify no known sub-package cycles remain (all resolved).
+        """Verify no sub-package cycles exist.
 
-        All known cycles have been resolved as part of #2575.
+        All known cycles have been resolved as part of #2575 and #2902.
         This test validates that no new cycles have been introduced.
-        If cycles are found, add them to KNOWN_SUBPACKAGE_CYCLES for tracking.
+        If cycles are found, add them to KNOWN_SUBPACKAGE_CYCLES for tracking
+        and investigate resolution strategies.
         """
         graph = _build_subpackage_dependency_graph()
 
@@ -351,16 +348,7 @@ class TestSubpackageCoupling:
                 + "\n".join(f"  - {sorted(s)}" for s in stale)
             )
 
-        if actual_cycles:
-            pytest.xfail(
-                "Known subpackage cycles remain: "
-                + ", ".join(
-                    " <-> ".join(sorted(c))
-                    for c in sorted(
-                        actual_cycles, key=lambda cycle: tuple(sorted(cycle))
-                    )
-                )
-            )
+        # All cycles resolved — this should pass without xfail
 
     def test_subpackage_dependency_report(self) -> None:
         """Print the full sub-package dependency graph for visibility.

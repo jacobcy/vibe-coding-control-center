@@ -130,12 +130,13 @@ class PRCreateUsecase:
 
     @property
     def _flow_service(self) -> FlowQueryProtocol:
-        """Return injected or fallback flow service."""
-        if self._service_input is not None:
-            return self._service_input
-        from vibe3.services.flow import FlowService
-
-        return FlowService()  # type: ignore[return-value]
+        """Return injected flow service (required)."""
+        if self._service_input is None:
+            raise RuntimeError(
+                "PRCreateUsecase requires flow_service to be injected. "
+                "Pass a FlowQueryProtocol instance to the constructor."
+            )
+        return self._service_input
 
     def check_flow_task(self, branch: str, *, yes: bool = False) -> None:
         """Require current flow to have task bound unless bypassed by --yes."""
