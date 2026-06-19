@@ -22,21 +22,15 @@ def collect_dry_run_provenance(
     warnings: tuple[str, ...] = (),
 ) -> PromptRenderProvenance:
     """Build a PromptRenderProvenance record after rendering completes."""
-    # Get section source metadata
     section_sources_list = manifest.get_section_sources(recipe_key, variant_key)
     section_sources = tuple(section_sources_list)
 
-    # Compute rendered hash (SHA-256 first 16 chars)
     rendered_hash = hashlib.sha256(rendered_text.encode("utf-8")).hexdigest()[:16]
 
-    # Compute char count and token estimate
     char_count = len(rendered_text)
     token_estimate_val = token_estimate(rendered_text)
 
-    # Build section order
     section_order = tuple(s.key for s in section_sources)
-
-    # Detect anomalies
     anomalies = detect_anomalies(rendered_text, section_sources, section_order)
 
     return PromptRenderProvenance(
@@ -61,22 +55,17 @@ def detect_anomalies(
     """Detect audit anomalies from provenance data."""
     char_count = len(rendered_text)
 
-    # has_large_material: char_count > 200_000
     has_large_material = char_count > 200_000
 
-    # has_duplicate_material: same source_ref appears more than once
     source_refs = [s.source_ref for s in section_sources if s.source_ref is not None]
     has_duplicate_material = len(source_refs) != len(set(source_refs))
 
-    # missing_output_contract: no section matching *.output_format
     missing_output_contract = not any("output_format" in key for key in section_order)
 
-    # missing_verification_contract: no section matching *.exit_contract
     missing_verification_contract = not any(
         "exit_contract" in key for key in section_order
     )
 
-    # has_repo_profile: FILE source with path containing "profile" or "repo"
     has_repo_profile = any(
         s.source_kind
         and s.source_ref
@@ -84,7 +73,6 @@ def detect_anomalies(
         for s in section_sources
     )
 
-    # has_project_policy_overlay: FILE source with path containing "policy" or "project"
     has_project_policy_overlay = any(
         s.source_kind
         and s.source_ref
