@@ -408,6 +408,9 @@ code_limits:
       - path: "tests/vibe3/analysis/test_dead_code_rules.py"
         limit: 458
         reason: "Dead code rules 测试集，覆盖 is_exception_class、is_dead_code、get_router_functions 等核心规则函数的单元测试；#2932 新增 test_is_exception_class_with_inheritance 等异常类检测测试（+58 行），从 400 行增至 458 行"
+      - path: "tests/vibe3/commands/test_ask.py"
+        limit: 450
+        reason: "Ask command 测试集，覆盖 input validation（4 tests）、forbidden patterns（6 tests）、execution logic with mocked backend（7 tests）、branch parameter（4 tests）等紧密耦合场景；新增 --branch 参数测试后从 299 行增至 443 行（+144 行）；所有测试围绕 ask 命令功能，拆分会降低可读性；仅超限 43 行（443 vs 400），符合 test exception 策略"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
