@@ -293,6 +293,9 @@ code_limits:
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
         limit: 680
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"
+      - path: "tests/vibe3/clients/test_git_status_ops.py"
+        limit: 460
+        reason: "Git status ops 测试集，覆盖 get_changed_files/get_numstat/get_name_status/_numstat_via_merge_base/_name_status_via_merge_base/_filter_unified_diff_by_paths 等 6 个函数的完整测试（Issue #3009 A/M/D file classification），与 git_status_ops.py 源文件（limit 450）对应；包含 5 个测试类（TestGetNumstat/TestNumstatViaMergeBase/TestGetNameStatus/TestNameStatusViaMergeBase/TestGetChangedFilesPathspec/TestFilterUnifiedDiffByPaths）共 57 个测试方法，测试完整的 git status operations 契约，拆分会破坏测试组织结构；PR #3031 新增基础设施测试"
       - path: "tests/vibe3/clients/test_git_client.py"
         limit: 500
         reason: "GitClient 测试集，覆盖 BranchSource/CommitSource/PRSource 操作、merge conflict 检测、resolve_base_ref/resolve_source 的 TTL cache/expiry/failure 行为、repo root 解析（5 种路径模式）等 38 个紧密耦合场景，共享 mock setup 和 GitClient fixture，拆分收益低"
