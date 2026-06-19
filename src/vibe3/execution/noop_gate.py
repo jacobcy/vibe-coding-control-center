@@ -1,7 +1,9 @@
 """Unified no-op gate: blocks when agent fails to change issue state."""
 
+from __future__ import annotations
+
 import json
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
@@ -10,6 +12,9 @@ from vibe3.clients import SQLiteClient
 from vibe3.config import get_role_output_contract
 from vibe3.models import VerdictRecord, VerdictValue
 from vibe3.services.shared import get_role_block_function
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
 
 # Loop prevention constants
 SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
@@ -51,6 +56,7 @@ def apply_unified_noop_gate(
     flow_state: dict | None = None,
     tick_id: int = 0,
     before_issue_is_closed: bool = False,
+    flow_service: "FlowQueryProtocol | None" = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -152,6 +158,7 @@ def apply_unified_noop_gate(
             repo=repo,
             reason="state label disappeared after agent",
             actor=actor,
+            flow_service=flow_service,
         )
         return
 
@@ -214,6 +221,7 @@ def apply_unified_noop_gate(
                         f"({pair_count} times >= {SINGLE_STEP_LIMIT})"
                     ),
                     actor=actor,
+                    flow_service=flow_service,
                 )
                 return
         except sqlite3.Error as e:
@@ -263,6 +271,7 @@ def apply_unified_noop_gate(
                     f"transition count exceeded: {new_count} >= {TRANSITION_LIMIT_HARD}"
                 ),
                 actor=actor,
+                flow_service=flow_service,
             )
             return
 
@@ -302,6 +311,7 @@ def apply_unified_noop_gate(
                 repo=repo,
                 reason=f"required ref missing: {_contract.required_ref}",
                 actor=actor,
+                flow_service=flow_service,
             )
             return
 
@@ -333,6 +343,7 @@ def apply_unified_noop_gate(
                 repo=repo,
                 reason="latest verdict missing after reviewer",
                 actor=actor,
+                flow_service=flow_service,
             )
             return
 
@@ -361,6 +372,7 @@ def apply_unified_noop_gate(
             repo=repo,
             reason="state unchanged",
             actor=actor,
+            flow_service=flow_service,
         )
         return
 

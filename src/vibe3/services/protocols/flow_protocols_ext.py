@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
+    from vibe3.config.timeline_comment_policy import TimelineCommentPolicy
     from vibe3.models import FlowStatusResponse
 
 
@@ -23,6 +24,7 @@ class FlowTimelineProtocol(Protocol):
         detail: str = "",
         issue_number: int | None = None,
         repo: str | None = None,
+        policy: "TimelineCommentPolicy | None" = None,
     ) -> None:
         """Record a timeline event for a flow branch.
 
@@ -33,6 +35,7 @@ class FlowTimelineProtocol(Protocol):
             detail: Event detail/reason
             issue_number: GitHub issue number (optional)
             repo: Repository name (optional)
+            policy: Timeline comment policy (optional)
         """
         ...
 

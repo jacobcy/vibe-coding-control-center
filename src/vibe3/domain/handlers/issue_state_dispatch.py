@@ -14,6 +14,7 @@ from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
 from vibe3.exceptions import CapacityDeferredError
 from vibe3.models import IssueInfo, IssueState
+from vibe3.services.flow import FlowService
 from vibe3.services.issue import block_manager_noop_issue
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
@@ -107,6 +108,7 @@ def handle_manager_dispatch_intent(
                 repo=None,
                 reason=reason,
                 actor="agent:manager",
+                flow_service=FlowService(),
             )
 
         loop = asyncio.get_running_loop()
