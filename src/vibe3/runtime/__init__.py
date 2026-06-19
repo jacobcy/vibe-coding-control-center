@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 # Lazy imports via __getattr__ for everything to avoid circular dependencies
 if TYPE_CHECKING:
-    from vibe3.orchestra import ServiceBase
     from vibe3.runtime.circuit_breaker import (
         CircuitBreaker,
         CircuitState,
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
         write_instance_info,
     )
     from vibe3.runtime.periodic_check_executor import execute_periodic_check
+    from vibe3.runtime.protocols import CheckServiceProtocol, ServiceBase
     from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
 
 
@@ -84,9 +84,13 @@ def __getattr__(name: str) -> object:
 
         return execute_periodic_check
     if name == "ServiceBase":
-        from vibe3.orchestra import ServiceBase
+        from vibe3.runtime.protocols import ServiceBase
 
         return ServiceBase
+    if name == "CheckServiceProtocol":
+        from vibe3.runtime.protocols import CheckServiceProtocol
+
+        return CheckServiceProtocol
 
     # Taxonomy symbols
     if name == "MODULE_CATEGORY_MAP":
@@ -102,6 +106,7 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
+    "CheckServiceProtocol",
     "CircuitBreaker",
     "CircuitState",
     "ErrorCategory",

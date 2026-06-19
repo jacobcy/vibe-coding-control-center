@@ -57,7 +57,6 @@ if TYPE_CHECKING:
     from vibe3.domain.orchestration_facade import OrchestrationFacade
     from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
-        CheckServiceProtocol,
         FlowServiceProtocol,
         LabelDispatchCallable,
     )
@@ -193,7 +192,6 @@ __all__ = [
     "find_role_for_state",
     # Protocols
     "CapacityServiceProtocol",
-    "CheckServiceProtocol",
     "FlowServiceProtocol",
     "FlowManagerProtocol",
     "LabelDispatchCallable",

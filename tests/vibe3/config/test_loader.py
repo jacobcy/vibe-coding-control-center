@@ -327,6 +327,16 @@ class TestLoadRuntimeConfig:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
 
+        # Mock apply_env_overrides to skip environment variable processing
+        # This allows testing project config layering in isolation from user env vars
+        from vibe3.config import env_override
+
+        monkeypatch.setattr(
+            env_override,
+            "apply_env_overrides",
+            lambda config_dict, rules=None: config_dict,
+        )
+
         project_config = tmp_path / ".vibe"
         project_config.mkdir(parents=True)
         (project_config / "settings.yaml").write_text(

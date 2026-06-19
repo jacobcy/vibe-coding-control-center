@@ -56,7 +56,6 @@ def test_dispatch_coordinator_uses_domain_protocols():
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.protocols.dispatch_protocols import (
         CapacityServiceProtocol,
-        CheckServiceProtocol,
         FlowContextResolverProtocol,
         FlowServiceProtocol,
         IssueLoaderProtocol,
@@ -64,6 +63,7 @@ def test_dispatch_coordinator_uses_domain_protocols():
         QueuePersistenceServiceProtocol,
         QueueSelectorProtocol,
     )
+    from vibe3.runtime import CheckServiceProtocol
 
     # Verify protocols are importable
     assert QueuePersistenceServiceProtocol is not None

@@ -14,7 +14,8 @@ from rich.progress import (
     TextColumn,
 )
 
-from vibe3.services.check import CheckResult, CheckService, InitResult
+from vibe3.models import CheckResult
+from vibe3.services.check import CheckService, InitResult
 
 
 @dataclass

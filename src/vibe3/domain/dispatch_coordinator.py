@@ -37,7 +37,6 @@ from vibe3.domain.dispatch_queue_maintenance import (
 )
 from vibe3.domain.protocols.dispatch_protocols import (
     CapacityServiceProtocol,
-    CheckServiceProtocol,
     FlowContextResolverProtocol,
     FlowServiceProtocol,
     IssueCollectionServiceProtocol,
@@ -51,6 +50,7 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.domain.role_resolver import find_role_for_state
 from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
 from vibe3.observability import append_orchestra_event
+from vibe3.runtime import CheckServiceProtocol
 from vibe3.services.issue import IssueCollectionService
 from vibe3.services.shared import clean_old_state_labels, should_skip_from_queue
 

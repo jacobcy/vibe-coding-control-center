@@ -15,7 +15,7 @@ from loguru import logger
 
 from vibe3.config import PeriodicCheckConfig
 from vibe3.observability import append_orchestra_event
-from vibe3.orchestra import CheckServiceProtocol
+from vibe3.runtime.protocols import CheckServiceProtocol
 
 from .cleanup_executor import execute_expired_resource_cleanup
 

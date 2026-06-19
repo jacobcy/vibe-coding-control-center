@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         PRSource,
         UncommittedSource,
     )
+    from vibe3.models.check_result import CheckResult
     from vibe3.models.coordination_truth import CoordinationTruth
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
@@ -179,6 +180,7 @@ _LAZY_IMPORTS = {
     "DispatchExclusion": "vibe3.models.dispatch",
     "ChangeSource": "vibe3.models.change_source",
     "ChangeSourceType": "vibe3.models.change_source",
+    "CheckResult": "vibe3.models.check_result",
     "CICheck": "vibe3.models.pr",
     "CommitSource": "vibe3.models.change_source",
     "FORBIDDEN_TRANSITIONS": "vibe3.models.orchestration",
@@ -290,6 +292,7 @@ __all__: list[str] = [
     "CallNode",
     "ChangeSource",
     "ChangeSourceType",
+    "CheckResult",
     "CICheck",
     "CommandInspection",
     "CommitInfo",
