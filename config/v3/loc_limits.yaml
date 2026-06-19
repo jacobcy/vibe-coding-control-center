@@ -162,6 +162,11 @@ code_limits:
         limit: 610
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）；迁移至 check/ 子包（Issue #2584）"
 
+      # Prompts 层 —— 允许 410-420
+      - path: "src/vibe3/prompts/manifest.py"
+        limit: 410
+        reason: "Prompt recipe manifest 加载与 section source 提取；Issue #3028 follow-up 新增 _get_material_catalog_sources 和 load_for_prompts_path 方法以支持 template recipe material_catalog 来源追踪和自定义路径加载（+14 行）"
+
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
         limit: 480

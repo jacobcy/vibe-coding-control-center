@@ -440,13 +440,12 @@ def test_collect_run_plan_provenance_with_sources() -> None:
     assert len(provenance.section_order) > 0
     assert len(provenance.section_sources) > 0
     assert all(
-        s.source_kind == VariableSourceKind.PROVIDER
-        for s in provenance.section_sources
+        s.source_kind == VariableSourceKind.PROVIDER for s in provenance.section_sources
     )
 
 
 def test_collect_review_default_provenance_with_sources() -> None:
-    """Verify collect_dry_run_provenance for review.default includes provider sources."""
+    """Verify collect_dry_run_provenance for review.default source tracking."""
     manifest = PromptManifest.load_default()
     provenance = collect_dry_run_provenance(
         manifest,
@@ -460,8 +459,7 @@ def test_collect_review_default_provenance_with_sources() -> None:
     assert len(provenance.section_order) > 0
     assert len(provenance.section_sources) > 0
     assert all(
-        s.source_kind == VariableSourceKind.PROVIDER
-        for s in provenance.section_sources
+        s.source_kind == VariableSourceKind.PROVIDER for s in provenance.section_sources
     )
 
 

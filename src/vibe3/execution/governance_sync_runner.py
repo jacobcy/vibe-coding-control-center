@@ -18,7 +18,7 @@ from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-from vibe3.observability.orchestra_log import write_prompt_provenance
+from vibe3.observability import write_prompt_provenance
 from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import log_dispatch_error
