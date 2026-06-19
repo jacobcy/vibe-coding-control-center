@@ -112,6 +112,8 @@ class CommentMixin:
                 "-X",
                 "PATCH",
                 f"repos/:owner/:repo/issues/comments/{comment_id}",
+                "--input",
+                "-",
             ],
             input_text=json.dumps({"body": body}),
         )
