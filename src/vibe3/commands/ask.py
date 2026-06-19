@@ -62,6 +62,8 @@ def ask(
         vibe3 ask "What is the structure of src/vibe3/?"
         vibe3 ask "How does CapacityService work?"
         vibe3 ask "What does HARD RULES mean?"
+        vibe3 ask "What changed in this branch?" --branch task/issue-1234
+        vibe3 ask "How does this feature work?" --branch 5678
     """
     # Skip if subcommand is invoked
     if ctx.invoked_subcommand is not None:
