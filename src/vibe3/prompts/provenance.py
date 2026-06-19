@@ -31,7 +31,9 @@ def collect_dry_run_provenance(
     token_estimate_val = token_estimate(rendered_text)
 
     section_order = tuple(s.key for s in section_sources)
-    anomalies = detect_anomalies(rendered_text, section_sources, section_order)
+    anomalies = detect_anomalies(
+        rendered_text, section_sources, section_order, variable_provenance
+    )
 
     return PromptRenderProvenance(
         recipe_key=recipe_key,
@@ -51,14 +53,20 @@ def detect_anomalies(
     rendered_text: str,
     section_sources: tuple[SectionSourceProvenance, ...],
     section_order: tuple[str, ...],
+    variable_provenance: tuple[PromptVariableProvenance, ...] = (),
 ) -> AnomalyFlags:
     """Detect audit anomalies from provenance data."""
+    from vibe3.prompts.models import VariableSourceKind
+
     char_count = len(rendered_text)
 
     has_large_material = char_count > 200_000
 
-    source_refs = [s.source_ref for s in section_sources if s.source_ref is not None]
-    has_duplicate_material = len(source_refs) != len(set(source_refs))
+    # Check for duplicates at both section and variable level
+    section_refs = [s.source_ref for s in section_sources if s.source_ref is not None]
+    variable_refs = [v.resolved_from for v in variable_provenance if v.resolved_from]
+    all_refs = section_refs + variable_refs
+    has_duplicate_material = len(all_refs) != len(set(all_refs))
 
     missing_output_contract = not any("output_format" in key for key in section_order)
 
@@ -66,15 +74,16 @@ def detect_anomalies(
         "exit_contract" in key for key in section_order
     )
 
+    # Restrict to FILE source_kind to avoid false positives
     has_repo_profile = any(
-        s.source_kind
+        s.source_kind == VariableSourceKind.FILE
         and s.source_ref
         and ("profile" in s.source_ref or "repo" in s.source_ref)
         for s in section_sources
     )
 
     has_project_policy_overlay = any(
-        s.source_kind
+        s.source_kind == VariableSourceKind.FILE
         and s.source_ref
         and ("policy" in s.source_ref or "project" in s.source_ref)
         for s in section_sources

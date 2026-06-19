@@ -6,6 +6,7 @@ from pathlib import Path
 
 from vibe3.prompts import PromptManifest
 from vibe3.prompts.models import (
+    PromptVariableProvenance,
     SectionSourceProvenance,
     VariableSourceKind,
 )
@@ -119,7 +120,7 @@ def test_detect_anomalies_missing_output_contract() -> None:
     section_sources: tuple[SectionSourceProvenance, ...] = (
         SectionSourceProvenance(key="header"),
     )
-    section_order: tuple[str, ...] = "header"
+    section_order: tuple[str, ...] = ("header",)
 
     anomalies = detect_anomalies("text", section_sources, section_order)
 
@@ -144,7 +145,7 @@ def test_detect_anomalies_missing_verification_contract() -> None:
     section_sources: tuple[SectionSourceProvenance, ...] = (
         SectionSourceProvenance(key="header"),
     )
-    section_order: tuple[str, ...] = "header"
+    section_order: tuple[str, ...] = ("header",)
 
     anomalies = detect_anomalies("text", section_sources, section_order)
 
@@ -173,7 +174,7 @@ def test_detect_anomalies_repo_profile() -> None:
             source_ref="config/profile/repo.md",
         ),
     )
-    section_order: tuple[str, ...] = "repo"
+    section_order: tuple[str, ...] = ("repo",)
 
     anomalies = detect_anomalies("text", section_sources, section_order)
 
@@ -189,7 +190,7 @@ def test_detect_anomalies_policy_overlay() -> None:
             source_ref="config/policy/project.md",
         ),
     )
-    section_order: tuple[str, ...] = "policy"
+    section_order: tuple[str, ...] = ("policy",)
 
     anomalies = detect_anomalies("text", section_sources, section_order)
 
@@ -271,3 +272,83 @@ def test_token_estimate() -> None:
     estimate = token_estimate(text)
 
     assert estimate == 25  # 100 chars / 4
+
+
+def test_detect_anomalies_repo_profile_provider_source_no_false_positive() -> None:
+    """Provider source with 'profile' keyword should NOT trigger has_repo_profile."""
+    section_sources: tuple[SectionSourceProvenance, ...] = (
+        SectionSourceProvenance(
+            key="provider",
+            source_kind=VariableSourceKind.PROVIDER,
+            source_ref="get_profile_config",  # Has 'profile' keyword but is PROVIDER
+        ),
+    )
+    section_order: tuple[str, ...] = ("provider",)
+
+    anomalies = detect_anomalies("text", section_sources, section_order)
+
+    # Should NOT trigger because source_kind is not FILE
+    assert anomalies.has_repo_profile is False
+
+
+def test_detect_anomalies_policy_overlay_command_source_no_false_positive() -> None:
+    """Command source with 'policy' keyword should NOT trigger flag."""
+    section_sources: tuple[SectionSourceProvenance, ...] = (
+        SectionSourceProvenance(
+            key="cmd",
+            source_kind=VariableSourceKind.COMMAND,
+            source_ref="policy-check.sh",  # Has 'policy' keyword but is COMMAND
+        ),
+    )
+    section_order: tuple[str, ...] = ("cmd",)
+
+    anomalies = detect_anomalies("text", section_sources, section_order)
+
+    # Should NOT trigger because source_kind is not FILE
+    assert anomalies.has_project_policy_overlay is False
+
+
+def test_detect_anomalies_duplicate_in_variable_provenance() -> None:
+    """Duplicates across section and variable provenance should be detected."""
+    section_sources: tuple[SectionSourceProvenance, ...] = (
+        SectionSourceProvenance(key="section1", source_ref="shared_file.md"),
+    )
+    section_order: tuple[str, ...] = ("section1",)
+    variable_provenance: tuple[PromptVariableProvenance, ...] = (
+        PromptVariableProvenance(
+            variable="var1",
+            source_kind=VariableSourceKind.FILE,
+            resolved_from="shared_file.md",  # Same as section source
+            value_preview="content",
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "text", section_sources, section_order, variable_provenance
+    )
+
+    # Should detect duplicate across section and variable
+    assert anomalies.has_duplicate_material is True
+
+
+def test_detect_anomalies_no_duplicate_with_different_sources() -> None:
+    """Different sources in section and variable provenance should not trigger."""
+    section_sources: tuple[SectionSourceProvenance, ...] = (
+        SectionSourceProvenance(key="section1", source_ref="file1.md"),
+    )
+    section_order: tuple[str, ...] = ("section1",)
+    variable_provenance: tuple[PromptVariableProvenance, ...] = (
+        PromptVariableProvenance(
+            variable="var1",
+            source_kind=VariableSourceKind.FILE,
+            resolved_from="file2.md",  # Different from section source
+            value_preview="content",
+        ),
+    )
+
+    anomalies = detect_anomalies(
+        "text", section_sources, section_order, variable_provenance
+    )
+
+    # Should NOT detect duplicate
+    assert anomalies.has_duplicate_material is False
