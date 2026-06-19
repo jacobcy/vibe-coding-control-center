@@ -165,7 +165,10 @@ def test_plan_no_branch_uses_current_branch(
 
     runner.invoke(plan_app, [])
 
-    mock_resolve.assert_called_once_with(None)
+    # resolve_branch_arg is called with (None, flow_service=<FlowService instance>)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] is None
+    assert "flow_service" in mock_resolve.call_args[1]
 
 
 def test_plan_issue_number_resolves_to_branch(
@@ -177,7 +180,10 @@ def test_plan_issue_number_resolves_to_branch(
 
     runner.invoke(plan_app, ["--branch", "42"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg is called with ("42", flow_service=<FlowService instance>)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
+    assert "flow_service" in mock_resolve.call_args[1]
 
 
 def test_run_no_branch_uses_current_branch(
@@ -190,7 +196,10 @@ def test_run_no_branch_uses_current_branch(
 
     runner.invoke(run_app, ["test instructions"])
 
-    mock_resolve.assert_called_once_with(None)
+    # resolve_branch_arg is called with (None, flow_service=<FlowService instance>)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] is None
+    assert "flow_service" in mock_resolve.call_args[1]
 
 
 def test_run_issue_number_resolves_to_branch(
@@ -203,7 +212,10 @@ def test_run_issue_number_resolves_to_branch(
 
     runner.invoke(run_app, ["--branch", "42", "test instructions"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg is called with ("42", flow_service=<FlowService instance>)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
+    assert "flow_service" in mock_resolve.call_args[1]
 
 
 def test_review_no_branch_shows_help() -> None:
@@ -223,7 +235,10 @@ def test_review_issue_number_resolves_to_branch(
 
     runner.invoke(review_app, ["--branch", "42"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg is called with ("42", flow_service=<FlowService instance>)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
+    assert "flow_service" in mock_resolve.call_args[1]
 
 
 # ==============================================================================

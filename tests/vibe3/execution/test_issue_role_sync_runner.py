@@ -70,7 +70,7 @@ def _patch_runner_boundaries(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.execution.issue_role_sync_runner.resolve_branch_arg",
-        lambda value: f"resolved/{value}",
+        lambda value, flow_service=None: f"resolved/{value}",
     )
     monkeypatch.setattr(
         "vibe3.execution.issue_role_sync_runner.record_dispatch_failure_if_unexpected",

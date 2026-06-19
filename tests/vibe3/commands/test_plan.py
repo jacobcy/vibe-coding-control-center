@@ -118,7 +118,7 @@ def _patch_plan_deps(
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     return mock_async, mock_sync
 
