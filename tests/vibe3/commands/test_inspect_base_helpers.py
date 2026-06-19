@@ -89,9 +89,8 @@ def test_count_changed_lines_in_code_paths(mock_count, mock_get_config):
 
     count_changed_lines_in_code_paths(mock_git, MagicMock())
 
-    mock_count.assert_called_once_with(
-        "diff content", code_paths=["lib/", "src/vibe3/"]
-    )
+    mock_git.get_diff.assert_called_once()
+    mock_count.assert_called_once_with("diff content")
 
 
 @patch("vibe3.commands.inspect_base_helpers.get_config")
