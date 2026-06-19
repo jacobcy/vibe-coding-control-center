@@ -375,3 +375,137 @@ def test_detect_anomalies_no_duplicate_with_different_sources() -> None:
 
     # Should NOT detect duplicate
     assert anomalies.has_duplicate_material is False
+
+
+# --- Integration tests: section sources from real recipes ---
+
+
+def test_get_section_sources_run_plan() -> None:
+    """Verify run.plan recipe yields section sources with provider attribution."""
+    manifest = PromptManifest.load_default()
+    sources = manifest.get_section_sources("run.plan", "coding.bootstrap")
+
+    assert len(sources) > 0
+    assert all(
+        s.source_kind == VariableSourceKind.PROVIDER for s in sources
+    ), "run.plan sections should have provider source attribution"
+
+
+def test_get_section_sources_review_default() -> None:
+    """Verify review.default recipe yields section sources with provider attribution."""
+    manifest = PromptManifest.load_default()
+    sources = manifest.get_section_sources("review.default", "first.bootstrap")
+
+    assert len(sources) > 0
+    assert all(
+        s.source_kind == VariableSourceKind.PROVIDER for s in sources
+    ), "review.default sections should have provider source attribution"
+
+
+def test_get_section_sources_governance_scan_template() -> None:
+    """Verify governance.scan template recipe yields material_catalog as sources.
+
+    Template-based recipes have no variants, but should return
+    material_catalog entries with FILE source_kind and material paths.
+    """
+    manifest = PromptManifest.load_default()
+    sources = manifest.get_section_sources("governance.scan", "")
+
+    assert len(sources) > 0, (
+        "Expected governance.scan template recipe to yield "
+        "material_catalog as section sources"
+    )
+    for s in sources:
+        assert s.source_kind == VariableSourceKind.FILE, (
+            f"Expected FILE source_kind for governance.scan section {s.key}, "
+            f"got {s.source_kind}"
+        )
+        assert (
+            s.source_ref is not None
+        ), f"Expected source_ref for governance.scan section '{s.key}'"
+
+
+def test_collect_run_plan_provenance_with_sources() -> None:
+    """Verify collect_dry_run_provenance for run.plan includes provider sources."""
+    manifest = PromptManifest.load_default()
+    provenance = collect_dry_run_provenance(
+        manifest,
+        recipe_key="run.plan",
+        variant_key="coding.bootstrap",
+        rendered_text="run prompt content",
+    )
+
+    assert provenance.recipe_key == "run.plan"
+    assert provenance.variant_key == "coding.bootstrap"
+    assert len(provenance.section_order) > 0
+    assert len(provenance.section_sources) > 0
+    assert all(
+        s.source_kind == VariableSourceKind.PROVIDER
+        for s in provenance.section_sources
+    )
+
+
+def test_collect_review_default_provenance_with_sources() -> None:
+    """Verify collect_dry_run_provenance for review.default includes provider sources."""
+    manifest = PromptManifest.load_default()
+    provenance = collect_dry_run_provenance(
+        manifest,
+        recipe_key="review.default",
+        variant_key="first.bootstrap",
+        rendered_text="review prompt content",
+    )
+
+    assert provenance.recipe_key == "review.default"
+    assert provenance.variant_key == "first.bootstrap"
+    assert len(provenance.section_order) > 0
+    assert len(provenance.section_sources) > 0
+    assert all(
+        s.source_kind == VariableSourceKind.PROVIDER
+        for s in provenance.section_sources
+    )
+
+
+def test_collect_governance_scan_provenance() -> None:
+    """Verify collect_dry_run_provenance for governance.scan (template recipe).
+
+    Template recipes (governance.scan) use material_catalog as section sources.
+    All material_catalog entries should have FILE source_kind and valid paths.
+    """
+    manifest = PromptManifest.load_default()
+    provenance = collect_dry_run_provenance(
+        manifest,
+        recipe_key="governance.scan",
+        variant_key="",
+        rendered_text="governance prompt content",
+    )
+
+    assert provenance.recipe_key == "governance.scan"
+    assert provenance.variant_key == ""
+    # Template recipes have no section_order (no variants),
+    # but should have section_sources from material_catalog
+    assert (
+        len(provenance.section_sources) > 0
+    ), "Expected governance.scan to yield material_catalog section sources"
+    for section in provenance.section_sources:
+        assert section.source_kind == VariableSourceKind.FILE, (
+            f"Expected FILE source_kind for governance.scan section "
+            f"'{section.key}', got {section.source_kind}"
+        )
+        assert (
+            section.source_ref is not None
+        ), f"Expected source_ref for governance.scan section '{section.key}'"
+
+
+def test_collect_provenance_with_warnings() -> None:
+    """Verify warnings are carried through provenance."""
+    manifest = PromptManifest.load_default()
+    provenance = collect_dry_run_provenance(
+        manifest,
+        recipe_key="plan.default",
+        variant_key="first.bootstrap",
+        rendered_text="test",
+        warnings=("missing provider: custom_section",),
+    )
+
+    assert len(provenance.warnings) == 1
+    assert "missing provider: custom_section" in provenance.warnings

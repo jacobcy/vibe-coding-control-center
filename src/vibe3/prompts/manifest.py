@@ -232,7 +232,8 @@ class PromptManifest:
         recipe definition. Provider-rendered sections (no source override)
         will have source_kind=None.
 
-        For template-based recipes (no variants), returns empty list.
+        For template-based recipes (no variants), returns material_catalog
+        entries as section sources with FILE source_kind.
         """
         recipe_def = self.recipe(recipe_key)
 
