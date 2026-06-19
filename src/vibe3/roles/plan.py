@@ -266,7 +266,11 @@ def build_plan_sync_request(
         # e.g., "first.bootstrap", "retry.bootstrap", "retry.resume"
         variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
 
-        manifest = PromptManifest.load_default()
+        manifest = (
+            PromptManifest.load(prompts_path.parent / "prompt-recipes.yaml")
+            if prompts_path is not None
+            else PromptManifest.load_default()
+        )
         provenance = collect_dry_run_provenance(
             manifest=manifest,
             recipe_key="plan.default",

@@ -164,8 +164,8 @@ code_limits:
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
-        limit: 475
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines)"
+        limit: 480
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -173,9 +173,8 @@ code_limits:
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/plan.py"
-        limit: 515
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)；Issue #3028 新增 prompts_path 参数透传（+5行）"
->>>>>>> b3e3a620a (feat: wire prompts_path through roles layer to describe_*_sections)
+        limit: 520
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)；Issue #3028 新增 prompts_path 参数透传和 provenance manifest loading (+5 lines)"
       - path: "src/vibe3/roles/run_command.py"
         limit: 420
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #2435 新增 AsyncDispatchResult dataclass 和 tmux/log 输出（+28 行）"
