@@ -186,9 +186,9 @@ class ErrorTrackingService:
         """
         # Auto-infer tick_id from contextvar if not provided
         if tick_id is None:
-            from vibe3.runtime.heartbeat import _current_tick_id
+            from vibe3.runtime import get_current_tick_id
 
-            tick_id = _current_tick_id.get()
+            tick_id = get_current_tick_id()
 
         # Infer severity from registry if not provided
         if severity is None:

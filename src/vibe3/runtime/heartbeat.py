@@ -27,6 +27,18 @@ _current_tick_id: contextvars.ContextVar[int] = contextvars.ContextVar(
 )
 
 
+def get_current_tick_id() -> int:
+    """Get current heartbeat tick ID from context (0 if outside heartbeat).
+
+    This function provides safe access to the current tick_id contextvar.
+    Returns 0 when called outside of a heartbeat tick loop (e.g., in CLI, tests).
+
+    Returns:
+        Current tick ID (0 if not in heartbeat context)
+    """
+    return _current_tick_id.get()
+
+
 class FailedGateProtocol(Protocol):
     """Protocol for FailedGate to avoid circular dependency.
 
