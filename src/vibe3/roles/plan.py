@@ -42,6 +42,8 @@ from vibe3.models import (
     PlanSpecInput,
     WorktreeRequirement,
 )
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -238,6 +240,34 @@ def build_plan_sync_request(
         include_global_notice,
         fallback_prompt,
     ) = build_plan_prompt(config, issue, branch, flow_state, session_id=session_id)
+
+    # Collect and write provenance for dry-run audit
+    if dry_run:
+        meta = build_prompt_meta(
+            flow_state,
+            ref_keys=("plan_ref",),
+            retry_ref_keys=("plan_ref",),
+            session_id=session_id,
+            default_mode="first",
+        )
+        # Determine variant_key: {mode}.{context_mode}
+        # e.g., "first.bootstrap", "retry.bootstrap", "retry.resume"
+        variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+
+        manifest = PromptManifest.load_default()
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="plan.default",
+            variant_key=variant_key,
+            rendered_text=prompt,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="planner", issue_number=issue.number
+        )
+        # Add provenance path to dry_run_summary
+        if dry_run_summary:
+            dry_run_summary["provenance_path"] = str(provenance_path)
+
     task = f"Create implementation plan for issue #{issue.number}: {issue.title}"
 
     return build_role_sync_request(

@@ -164,8 +164,8 @@ code_limits:
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
-        limit: 450
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability"
+        limit: 475
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -173,8 +173,8 @@ code_limits:
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/plan.py"
-        limit: 480
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑"
+        limit: 510
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)"
       - path: "src/vibe3/roles/run_command.py"
         limit: 420
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #2435 新增 AsyncDispatchResult dataclass 和 tmux/log 输出（+28 行）"
@@ -423,7 +423,7 @@ code_limits:
     # Milestone 1: 70,000 LOC (new feature expansion phase)
     # Milestone 2: 65,000 LOC (post-refactor target)
     # Final target: 60,000 LOC (long-term governance goal)
-    v3_python: 80000        # Python 核心代码总行数（提升至 80k 支持新特性扩展：PR #2723 snapshot limit、event rules engine、webhook integration、domain event system）
+    v3_python: 85000        # Python 核心代码总行数（提升至 85k 支持新特性扩展：PR #2723 snapshot limit、event rules engine、webhook integration、domain event system、PR #3047 dry-run provenance collection）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
     last_reviewed: "2026-06-12"    # Track last governance review (Issue #625)
 

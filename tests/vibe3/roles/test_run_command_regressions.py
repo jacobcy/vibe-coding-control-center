@@ -11,6 +11,21 @@ from vibe3.exceptions import SkillNotAvailableError
 from vibe3.roles.run_command import execute_manual_run, resolve_skill_path
 
 
+@pytest.fixture(autouse=True)
+def clear_repo_context_caches():
+    """Keep profile/repo cache mutations from leaking across tests."""
+    from vibe3.config.convention_resolver import get_convention, get_resolver
+    from vibe3.utils.git_helpers import find_repo_root as _find_repo_root_impl
+
+    get_convention.cache_clear()
+    get_resolver.cache_clear()
+    _find_repo_root_impl.cache_clear()
+    yield
+    get_convention.cache_clear()
+    get_resolver.cache_clear()
+    _find_repo_root_impl.cache_clear()
+
+
 def test_skill_not_available_error_includes_profile() -> None:
     """SkillNotAvailableError includes the current profile in the message."""
     with (

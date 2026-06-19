@@ -20,6 +20,7 @@ from vibe3.prompts.models import (
     PromptRecipeVariantSpec,
     PromptSectionSpec,
     PromptVariableSource,
+    SectionSourceProvenance,
     VariableSourceKind,
 )
 
@@ -209,6 +210,43 @@ class PromptManifest:
                 ),
             ) from exc
 
+    def get_section_sources(
+        self,
+        recipe_key: str,
+        variant_key: str,
+    ) -> list[SectionSourceProvenance]:
+        """Return section source metadata for a recipe variant.
+
+        Does NOT render sections; only returns metadata from the loaded
+        recipe definition. Provider-rendered sections (no source override)
+        will have source_kind=None.
+
+        For template-based recipes (no variants), returns empty list.
+        """
+        recipe_def = self.recipe(recipe_key)
+
+        # Template-based recipes have no variants/sections
+        if not recipe_def.variants:
+            return []
+
+        variant_def = recipe_def.variant(variant_key)
+
+        # Try loaded_definition for section source specs
+        if recipe_def.loaded_definition is not None:
+            variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
+            if variant_spec is not None:
+                return [
+                    SectionSourceProvenance(
+                        key=s.key,
+                        source_kind=s.source.kind if s.source else None,
+                        source_ref=_source_ref(s.source) if s.source else None,
+                    )
+                    for s in variant_spec.sections
+                ]
+
+        # Fallback: legacy variant (string keys only, no source info)
+        return [SectionSourceProvenance(key=key) for key in variant_def.sections]
+
     def render_sections(
         self,
         recipe_key: str,
@@ -311,3 +349,16 @@ def _parse_variable_source(raw: dict[str, Any]) -> PromptVariableSource:
         context_key=raw.get("context_key"),
         kwargs=raw.get("kwargs", {}),
     )
+
+
+def _source_ref(source: PromptVariableSource) -> str | None:
+    """Extract reference string from a variable source."""
+    if source.kind == VariableSourceKind.FILE:
+        return source.path
+    if source.kind == VariableSourceKind.PROVIDER:
+        return source.provider
+    if source.kind == VariableSourceKind.SKILL:
+        return source.skill
+    if source.kind == VariableSourceKind.COMMAND:
+        return source.command
+    return None

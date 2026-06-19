@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         governance_log_dir,
         orchestra_events_log_path,
         orchestra_log_dir,
+        write_prompt_provenance,
     )
     from vibe3.observability.trace_method import (
         set_trace_max_lines,
@@ -56,6 +57,7 @@ _LAZY_IMPORTS = {
     "governance_log_dir": "vibe3.observability.orchestra_log",
     "orchestra_events_log_path": "vibe3.observability.orchestra_log",
     "orchestra_log_dir": "vibe3.observability.orchestra_log",
+    "write_prompt_provenance": "vibe3.observability.orchestra_log",
     "set_trace_max_lines": "vibe3.observability.trace_method",
     "set_trace_min_ms": "vibe3.observability.trace_method",
     "trace_method": "vibe3.observability.trace_method",
@@ -89,4 +91,5 @@ __all__ = [
     "set_trace_max_lines",
     "set_trace_min_ms",
     "setup_logging",
+    "write_prompt_provenance",
 ]

@@ -470,15 +470,15 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
     with patch("vibe3.services.check.cleanup.TaskResumeOperations"):
         service._resume_blocked_issue("task/issue-300")
 
-    # Verify comment added
-    github_client.add_comment.assert_called_once()
-    call_args = github_client.add_comment.call_args
-    assert call_args[0][0] == 300  # issue_number
+        # Verify comment added (inside patch context)
+        github_client.add_comment.assert_called_once()
+        call_args = github_client.add_comment.call_args
+        assert call_args[0][0] == 300  # issue_number
 
-    comment_body = call_args[0][1]
-    assert "旧 flow 已清理" in comment_body
-    assert "follow-up issue" in comment_body.lower()
-    assert "不建议" in comment_body
+        comment_body = call_args[0][1]
+        assert "旧 flow 已清理" in comment_body
+        assert "follow-up issue" in comment_body.lower()
+        assert "不建议" in comment_body
 
 
 def test_resume_blocked_issue_uses_task_resume_operations() -> None:
@@ -501,6 +501,7 @@ def test_resume_blocked_issue_uses_task_resume_operations() -> None:
 
         service._resume_blocked_issue("task/issue-300")
 
+        # Verify reset_issue_to_ready called (inside patch context)
         operations.reset_issue_to_ready.assert_called_once()
         call = operations.reset_issue_to_ready.call_args.kwargs
         assert call["issue_number"] == 300
