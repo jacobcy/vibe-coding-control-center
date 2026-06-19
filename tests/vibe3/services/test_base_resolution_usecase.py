@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.vibe3.pr_patch_constants import PR_BASE_RESOLUTION
 from vibe3.exceptions import UserError
 from vibe3.services.pr.base_resolution import BaseResolutionUsecase
 
@@ -90,9 +91,7 @@ def test_collect_branch_material_uses_git_client() -> None:
 
 def test_resolve_inspect_base_falls_back_to_main_when_parent_merged() -> None:
     """When auto-detected parent is already merged, should use origin/main."""
-    with patch(
-        "vibe3.services.pr.base_resolution.is_branch_merged_to_main"
-    ) as mock_merged:
+    with patch(f"{PR_BASE_RESOLUTION}.is_branch_merged_to_main") as mock_merged:
         mock_merged.return_value = True
         usecase = BaseResolutionUsecase(
             parent_branch_finder=lambda branch: "task/old-branch"
@@ -107,9 +106,7 @@ def test_resolve_inspect_base_falls_back_to_main_when_parent_merged() -> None:
 
 def test_resolve_inspect_base_keeps_parent_when_not_merged() -> None:
     """When auto-detected parent is not merged, should use it as base."""
-    with patch(
-        "vibe3.services.pr.base_resolution.is_branch_merged_to_main"
-    ) as mock_merged:
+    with patch(f"{PR_BASE_RESOLUTION}.is_branch_merged_to_main") as mock_merged:
         mock_merged.return_value = False
         usecase = BaseResolutionUsecase(
             parent_branch_finder=lambda branch: "task/active-branch"

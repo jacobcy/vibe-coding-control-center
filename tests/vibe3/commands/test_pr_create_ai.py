@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
+from tests.vibe3.pr_patch_constants import PR_CREATE, PR_PACKAGE
 from vibe3.cli import app
 from vibe3.config.settings import AIConfig
 from vibe3.models import BranchSource
@@ -84,7 +85,7 @@ class TestPRCreateCommandAI:
                 "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
                 return_value="main",
             ),
-            patch("vibe3.services.pr.create.PRCreateUsecase.check_flow_task"),
+            patch(f"{PR_PACKAGE}.PRCreateUsecase.check_flow_task"),
             patch("vibe3.commands.pr_create.PRService") as mock_service,
             patch(
                 "vibe3.commands.pr_create.check_branch_behind", return_value=None
@@ -117,9 +118,7 @@ class TestPRCreateCommandAI:
                     body="Test body",
                     model_dump=lambda: {"number": 123},
                 )
-                with patch(
-                    "vibe3.services.pr.create.VibeConfig.get_defaults"
-                ) as mock_config:
+                with patch(f"{PR_CREATE}.VibeConfig.get_defaults") as mock_config:
                     mock_config.return_value.ai.enabled = False
                     result = runner.invoke(app, ["pr", "create", "--ai", "--yes"])
                     # Should fail because title missing and AI disabled
@@ -138,29 +137,25 @@ class TestPRCreateCommandAI:
                 return_value="origin/main",
             ):
                 with patch(
-                    "vibe3.services.pr.create.BaseResolutionUsecase.collect_branch_material"
+                    f"{PR_PACKAGE}.BaseResolutionUsecase.collect_branch_material"
                 ) as mock_material:
                     mock_material.return_value = MagicMock(
                         commits=["feat: add feature"],
                         changed_files=["src/file.py"],
                     )
-                    with patch(
-                        "vibe3.services.pr.create.VibeConfig.get_defaults"
-                    ) as mock_config:
+                    with patch(f"{PR_CREATE}.VibeConfig.get_defaults") as mock_config:
                         mock_config.return_value.ai = AIConfig()
                         with patch(
-                            "vibe3.services.pr.create.AISuggestionClient.suggest_pr_content"
+                            f"{PR_CREATE}.AISuggestionClient.suggest_pr_content"
                         ) as mock_suggest:
                             mock_suggest.return_value = (
                                 "feat: ai title",
                                 "Summary\n\n- change",
                             )
                             with (
+                                patch(f"{PR_PACKAGE}.PRCreateUsecase.check_flow_task"),
                                 patch(
-                                    "vibe3.services.pr.create.PRCreateUsecase.check_flow_task"
-                                ),
-                                patch(
-                                    "vibe3.services.pr.create._build_inspect_summary",
+                                    f"{PR_CREATE}._build_inspect_summary",
                                     return_value="",
                                 ),
                                 patch(
@@ -206,13 +201,13 @@ class TestPRCreateCommandAI:
                 "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
                 return_value="main",
             ):
-                with patch("vibe3.services.pr.create.PRCreateUsecase.check_flow_task"):
+                with patch(f"{PR_PACKAGE}.PRCreateUsecase.check_flow_task"):
                     with patch("vibe3.commands.pr_create.PRService") as mock_service:
                         pr_service = mock_service.return_value
                         pr_service.get_open_pr_for_branch.return_value = None
                         # Mock collect_branch_material to return empty commits
                         with patch(
-                            "vibe3.services.pr.create.BaseResolutionUsecase.collect_branch_material"
+                            f"{PR_PACKAGE}.BaseResolutionUsecase.collect_branch_material"
                         ) as mock_material:
                             mock_material.return_value = MagicMock(
                                 commits=[],  # No commits
@@ -283,7 +278,7 @@ class TestPRCreateBranchBehind:
                 "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
                 return_value="main",
             ),
-            patch("vibe3.services.pr.create.PRCreateUsecase.check_flow_task"),
+            patch(f"{PR_PACKAGE}.PRCreateUsecase.check_flow_task"),
             patch("vibe3.commands.pr_create.PRService") as mock_service,
             patch("vibe3.commands.pr_create.check_branch_behind") as mock_check_behind,
             patch(

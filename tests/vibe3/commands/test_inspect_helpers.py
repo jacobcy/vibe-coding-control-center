@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.vibe3.pr_patch_constants import PR_ANALYSIS
 from vibe3.clients.git_status_ops import _get_commit_files
 from vibe3.commands.inspect_helpers import (
     calculate_pr_risk_score,
@@ -77,7 +78,7 @@ file3.py
 def test_get_recent_commits_success():
     """Successfully get recent commits."""
     with (
-        patch("vibe3.services.pr.analysis.subprocess.run") as mock_run,
+        patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run,
         patch("vibe3.utils.git_helpers.get_commit_message") as mock_get_commit_message,
     ):
         # Mock subprocess.run to return commit SHAs
@@ -105,7 +106,7 @@ def test_get_recent_commits_success():
 def test_get_recent_commits_limit():
     """Respect limit parameter."""
     with (
-        patch("vibe3.services.pr.analysis.subprocess.run") as mock_run,
+        patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run,
         patch("vibe3.utils.git_helpers.get_commit_message") as mock_get_commit_message,
     ):
         mock_run.return_value = MagicMock(
@@ -119,7 +120,7 @@ def test_get_recent_commits_limit():
 
 def test_get_recent_commits_empty():
     """Handle empty commits list."""
-    with patch("vibe3.services.pr.analysis.subprocess.run") as mock_run:
+    with patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="\n",
@@ -130,7 +131,7 @@ def test_get_recent_commits_empty():
 
 def test_get_recent_commits_github_error():
     """Handle GitHub API error gracefully."""
-    with patch("vibe3.services.pr.analysis.subprocess.run") as mock_run:
+    with patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run:
         mock_run.side_effect = Exception("API error")
         result = get_recent_commits(42)
         assert result == []
@@ -139,7 +140,7 @@ def test_get_recent_commits_github_error():
 def test_get_recent_commits_git_error():
     """Skip commits with git errors, continue with others."""
     with (
-        patch("vibe3.services.pr.analysis.subprocess.run") as mock_run,
+        patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run,
         patch("vibe3.utils.git_helpers.get_commit_message") as mock_get_commit_message,
     ):
         mock_run.return_value = MagicMock(
@@ -162,7 +163,7 @@ def test_get_recent_commits_git_error():
 def test_get_recent_commits_short_sha():
     """SHA is shortened to 7 characters."""
     with (
-        patch("vibe3.services.pr.analysis.subprocess.run") as mock_run,
+        patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run,
         patch("vibe3.utils.git_helpers.get_commit_message") as mock_get_commit_message,
     ):
         mock_run.return_value = MagicMock(
@@ -179,7 +180,7 @@ def test_get_recent_commits_short_sha():
 
 def test_get_pr_commit_count_success():
     """Get commit count successfully."""
-    with patch("vibe3.services.pr.analysis.subprocess.run") as mock_run:
+    with patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="a\nb\nc\nd\ne\n",
@@ -190,7 +191,7 @@ def test_get_pr_commit_count_success():
 
 def test_get_pr_commit_count_empty():
     """Handle empty commits."""
-    with patch("vibe3.services.pr.analysis.subprocess.run") as mock_run:
+    with patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="\n",
@@ -201,7 +202,7 @@ def test_get_pr_commit_count_empty():
 
 def test_get_pr_commit_count_error():
     """Return 0 on error."""
-    with patch("vibe3.services.pr.analysis.subprocess.run") as mock_run:
+    with patch(f"{PR_ANALYSIS}.subprocess.run") as mock_run:
         mock_run.side_effect = Exception("API error")
         result = get_pr_commit_count(42)
         assert result == 0
@@ -213,7 +214,7 @@ def test_get_pr_commit_count_error():
 @pytest.fixture
 def mock_config():
     """Mock get_config to return test configuration."""
-    with patch("vibe3.services.pr.analysis.get_config") as mock:
+    with patch(f"{PR_ANALYSIS}.get_config") as mock:
         config = MagicMock()
         config.review_scope.critical_paths = ["src/vibe3/config/", "src/vibe3/clients/"]
         config.review_scope.public_api_paths = ["src/vibe3/api/"]
@@ -224,7 +225,7 @@ def mock_config():
 @pytest.fixture
 def mock_generate_score():
     """Mock generate_score_report."""
-    with patch("vibe3.services.pr.analysis.generate_score_report") as mock:
+    with patch(f"{PR_ANALYSIS}.generate_score_report") as mock:
         mock.return_value = {
             "score": 6,
             "level": "MEDIUM",
