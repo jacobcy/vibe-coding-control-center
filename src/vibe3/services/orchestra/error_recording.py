@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def record_error(
     error_code: str,
     error_message: str,
-    tick_id: int = 0,
+    tick_id: int | None = None,
     issue_number: int | None = None,
     branch: str | None = None,
     store: "SQLiteClient | None" = None,
@@ -30,7 +30,7 @@ def record_error(
     Args:
         error_code: Error code (E_MODEL_*, E_API_*, E_EXEC_*)
         error_message: Error message
-        tick_id: Heartbeat tick ID
+        tick_id: Heartbeat tick ID (auto-inferred from context if None)
         issue_number: Associated issue number
         branch: Associated branch name
         store: SQLiteClient instance (uses default if None)
@@ -39,6 +39,12 @@ def record_error(
     Returns:
         (threshold_reached, error_count_in_window)
     """
+    # Auto-infer tick_id from contextvar if not provided
+    if tick_id is None:
+        from vibe3.runtime.heartbeat import _current_tick_id
+
+        tick_id = _current_tick_id.get()
+
     from vibe3.services.orchestra import ErrorTrackingService
 
     error_svc = ErrorTrackingService.get_instance(store=store)
@@ -108,7 +114,7 @@ def record_dispatch_failure_if_unexpected(
             record_error(
                 error_code=error_code,  # Use classified error code
                 error_message=error_message,
-                tick_id=tick_id or 0,
+                tick_id=tick_id,
                 issue_number=effective_issue_number,
                 branch=branch,
                 store=SQLiteClient(),
@@ -164,7 +170,7 @@ def record_dispatch_failure_if_unexpected(
         record_error(
             error_code="E_DISPATCH_FAILURE",
             error_message=error_message,
-            tick_id=tick_id or 0,
+            tick_id=tick_id,
             issue_number=effective_issue_number,
             branch=branch,
             store=_store,
