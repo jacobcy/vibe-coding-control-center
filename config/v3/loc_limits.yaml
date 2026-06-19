@@ -300,11 +300,11 @@ code_limits:
         limit: 500
         reason: "GitClient 测试集，覆盖 BranchSource/CommitSource/PRSource 操作、merge conflict 检测、resolve_base_ref/resolve_source 的 TTL cache/expiry/failure 行为、repo root 解析（5 种路径模式）等 38 个紧密耦合场景，共享 mock setup 和 GitClient fixture，拆分收益低"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
-        limit: 540
-        reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
+        limit: 550
+        reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标；#3026 加强断言参数验证后略微超标"
       - path: "tests/vibe3/clients/test_github_client_issues.py"
-        limit: 440
-        reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低"
+        limit: 465
+        reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低；#3026 加强断言参数验证后略微超标"
       - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
