@@ -17,7 +17,7 @@ Allowed:
 - 读取本地 flow/task/handoff 状态。
 - 读取 GitHub issue / PR 事实。
 - 读取 git 分支、提交和 diff 元数据。
-- 将本轮观察结果登记到 `governance` handoff 链。
+- 将本轮观察结果写入 `.git/shared/observations/` 共享目录。
 
 Forbidden:
 
@@ -25,6 +25,7 @@ Forbidden:
 - 新增 CLI、collector、service、model、formatter 或数据库 schema。
 - 修改 issue/PR 状态、label、assignee 或 milestone。
 - 直接读取或写入 `.git/vibe3/handoff/`。
+- 直接写入数据库或 handoff store。
 - 基于单轮 observation 创建修复 issue 或修复 PR。
 
 ## Stable Entry
@@ -187,31 +188,37 @@ audit_observation:
 - <what could not be verified this round>
 
 ### Persistence
-- handoff_branch: governance
-- handoff_kind: finding
-- handoff_read: uv run python src/vibe3/cli.py handoff status --branch governance --all --format json
+- storage: .git/shared/observations/ (cross-worktree shared directory in git common dir)
+- filename: audit-observation-<ISO8601-timestamp>.yaml
+- discovery: ls .git/shared/observations/audit-observation-*.yaml
 ~~~
 
-稳定输出必须写入共享 handoff store，由 `handoff.db` 管理。不要直接写数据库或 `.git/vibe3/handoff/`。
+稳定输出必须写入 `.git/shared/observations/` 共享目录（位于 git common dir，跨 worktree 可见）。
+不要写 handoff store，不要写数据库。
 
-将完整 observation 压缩成一条 handoff finding，至少包含 `created_at`、样本列表、cluster key、主要 limitation：
+将完整 observation 保存为 YAML 文件：
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "<audit observation summary>" \
-  --branch governance \
-  --actor governance/audit-observation \
-  --kind finding
+mkdir -p "$(git rev-parse --git-common-dir)/shared/observations"
+cat > "$(git rev-parse --git-common-dir)/shared/observations/audit-observation-$(date -u +%Y%m%dT%H%M%S).yaml" <<'OBSERVATION'
+audit_observation:
+  schema_version: 1
+  created_at: "<iso8601>"
+  created_by: "governance/audit-observation"
+  source_material: "supervisor/governance/audit-observation.md"
+  ...
+OBSERVATION
 ```
 
-后续读取稳定输出：
+当前阶段手动查看：
 
 ```bash
-uv run python src/vibe3/cli.py handoff status --branch governance --all --format json
-uv run python src/vibe3/cli.py handoff show @current --branch governance
+ls -la "$(git rev-parse --git-common-dir)/shared/observations/"
+cat "$(git rev-parse --git-common-dir)/shared/observations/audit-observation-<timestamp>.yaml"
 ```
 
 ## Stop Point
 
-完成 stdout 输出和 handoff finding 登记后停止。
+完成 stdout 输出和 .git/shared/observations/ 文件写入后停止。
 
 不要进入聚类、修复建议、issue 创建、label 修改或代码实现阶段。
