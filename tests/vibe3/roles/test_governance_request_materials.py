@@ -174,21 +174,29 @@ class TestRoundRobinMaterialSelection:
     def test_tick_wraps_around(self):
         """execution_count wraps around material catalog.
 
-        (4 materials, count 4 -> index 0).
+        (5 materials, count 5 -> index 0).
         """
         recipe = build_governance_recipe(
-            _make_config(), tick_count=0, execution_count=4
+            _make_config(), tick_count=0, execution_count=5
         )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """execution_count=9 wraps around 4 materials to index 1 (9 % 4 = 1)."""
+        """execution_count=11 wraps around 5 materials to index 1 (11 % 5 = 1)."""
         recipe = build_governance_recipe(
-            _make_config(), tick_count=0, execution_count=9
+            _make_config(), tick_count=0, execution_count=11
         )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/roadmap-intake.md"
+
+    def test_tick_4_selects_audit_observation(self):
+        """execution_count=4 selects audit-observation from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=4
+        )
+        val = recipe.variables["supervisor_name"].value
+        assert val == "supervisor/governance/audit-observation.md"
 
     def test_build_governance_request_uses_round_robin(self):
         """build_governance_request picks material per execution_count.

@@ -245,6 +245,31 @@ class TestBuildGovernanceSnapshotContextCodeAuditor:
         mock_github.assert_not_called()
 
 
+class TestBuildGovernanceSnapshotContextAuditObservation:
+    def test_scope_orients_to_stable_status_commands(self) -> None:
+        snapshot = _make_snapshot()
+        result = build_governance_snapshot_context(
+            snapshot,
+            config=_make_config(),
+            material_override="audit-observation",
+        )
+
+        assert result["issue_scope_name"] == "blocked/aborted flow observation"
+        assert "flow status --all --format json" in result["scope_note"]
+        assert "task status --all --format json" in result["scope_note"]
+        assert "governance" in result["scope_note"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_does_not_call_github(self, mock_github) -> None:
+        build_governance_snapshot_context(
+            _make_snapshot(),
+            config=_make_config(),
+            material_override="audit-observation",
+        )
+
+        mock_github.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------

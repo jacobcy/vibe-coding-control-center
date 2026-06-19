@@ -236,6 +236,10 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/code-auditor.md
+      - name: supervisor/governance/audit-observation.md
+        source:
+          kind: file
+          path: supervisor/governance/audit-observation.md
     variables:
       server_status:
         kind: provider

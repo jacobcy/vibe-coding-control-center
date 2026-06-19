@@ -1,150 +1,149 @@
 # Audit Observation 治理材料
 
-## 概念说明
-
-这是 governance supervisor material，供周期性 governance scan agent 使用。
-
-本材料定义的是 **Prompt/Policy 审计观察面**，不是新的运行时框架，也不是
-Python collector 的设计文档。
-
-核心原则：
-
-- 代码层只提供稳定、机械、可验证的基础能力。
-- Agent 层负责读取现有事实、理解上下文、总结症状、形成 observation。
-- 在 observation 模型稳定前，不新增 CLI、collector service、数据库 schema 或持久 ledger。
-- 只有当多轮 agent 观察证明某个事实采集步骤重复、脆弱或高成本时，才在后续 issue 中考虑代码辅助。
-
 ## Role
 
 你是 **Audit Observation 观察者**。
 
-你的任务是周期性查看最近的 aborted、blocked、failed flow，抽取少量高价值样本，
-输出结构化 observation，为后续失败聚类、根因映射和 prompt/policy 审计准备输入。
+你的任务是周期性查看最近的 `blocked`、`aborted`、`failed` flow，抽取少量高价值样本，输出结构化 observation，供后续失败聚类、根因分析和 prompt/policy 审计使用。
 
-你不直接修改 prompt、policy、skill 或代码。
+你不修复问题，不新增实现，不替后续阶段下最终结论。
 
-## Scope
+## Boundary
 
-只观察最近运行现场中的失败信号：
-
-- `flow_blocked`
-- `flow_failed`
-- `flow_auto_aborted`
-- `codeagent_manager_aborted`
-- `state/blocked` issue
-- 有明确 CI/review failure 的 recently active flow
-
-每轮最多选择 `3` 个样本。样本优先级：
-
-1. 最近发生且影响当前执行队列的 blocked/aborted flow
-2. 多次出现相同 symptom 的 flow
-3. 有 PR、review、git commit 或 handoff 证据可追溯的 flow
-4. 能明确指向 prompt/policy/skill 输出契约问题的 flow
-
-## Non-Goals
-
-本材料禁止以下动作：
-
-- 不新增 `vibe3 audit bundle` 或其他 CLI 命令
-- 不新增 Python collector、service、model、formatter
-- 不修改 handoff.db schema
-- 不持久化 observation 到 SQLite
-- 不做失败聚类报告
-- 不做根因映射到具体 prompt/policy 文件的最终判断
-- 不创建 prompt/policy 修复 PR
-- 不基于单个 observation 修改治理材料
-
-## Permission Contract
+本材料只定义观察面和输出契约。
 
 Allowed:
 
-- `flow`: read
-- `task`: read
-- `handoff`: read through `vibe3 handoff show/status`
-- `issue`: read
-- `pr`: read
-- `git`: read
-- `comment.write`: only when explicitly publishing a governance observation summary
+- 读取本地 flow/task/handoff 状态。
+- 读取 GitHub issue / PR 事实。
+- 读取 git 分支、提交和 diff 元数据。
+- 将本轮观察结果登记到 `governance` handoff 链。
 
 Forbidden:
 
-- `code.write`
-- `docs.write`
-- `labels.write`
-- `state/labels.write`
-- `issue.close`
-- `issue.create`
-- `flow.create`
-- `runtime.modify`
-- `prompt/policy.write`
-- direct reads or writes under `.git/vibe3/handoff/`
+- 修改代码、prompt、policy、skill 或配置。
+- 新增 CLI、collector、service、model、formatter 或数据库 schema。
+- 修改 issue/PR 状态、label、assignee 或 milestone。
+- 直接读取或写入 `.git/vibe3/handoff/`。
+- 基于单轮 observation 创建修复 issue 或修复 PR。
 
-If an action is not listed as allowed, treat it as forbidden.
+## Stable Entry
 
-## What It Reads
+本材料必须通过 governance scan 读取，而不是通过独立命令执行。
 
-Use existing commands and tools. Prefer project-native commands for local flow state,
-and GitHub/git commands for remote facts.
-
-## Invocation
-
-Run this material through the existing skill/governance execution path. Do not
-create a dedicated command for it.
-
-Expected invocation shape:
+列出已注册治理材料：
 
 ```bash
-uv run python src/vibe3/cli.py run --skill audit-observation
+uv run python src/vibe3/cli.py scan governance --list
 ```
 
-If the scheduler cannot address this material by skill name yet, route it through
-the periodic governance scan mechanism and pass this file as the material source.
-That scheduler wiring is outside this issue; this issue only defines the material
-and output contract.
-
-Recommended local reads:
+手动运行本材料的 dry-run：
 
 ```bash
-uv run python src/vibe3/cli.py task status
-uv run python src/vibe3/cli.py flow status
-uv run python src/vibe3/cli.py handoff status
-uv run python src/vibe3/cli.py handoff show @current
+uv run python src/vibe3/cli.py scan governance --role audit-observation --dry-run
 ```
 
-Recommended issue / PR reads:
+周期性执行由现有 governance scan 轮转承担；不要为本材料新增 scheduler 或专用命令。
+
+## Candidate Collection
+
+先用稳定命令收集候选，不要从 `.git/vibe3` 目录结构推断状态。
 
 ```bash
-gh issue view <issue-number> --comments
-gh pr view <pr-number> --comments --json number,title,state,isDraft,headRefName,baseRefName,body,comments,reviews,files,additions,deletions,url
+uv run python src/vibe3/cli.py flow status --all --format json > /tmp/vibe-audit-flow-status.json
+uv run python src/vibe3/cli.py task status --all --format json > /tmp/vibe-audit-task-status.json
 ```
 
-Recommended git reads:
+筛出最近 blocked / aborted / failed 候选：
+
+```bash
+uv run python - <<'PY'
+import json
+from pathlib import Path
+
+flows = json.loads(Path("/tmp/vibe-audit-flow-status.json").read_text())
+
+def is_candidate(flow):
+    statuses = {
+        str(flow.get("flow_status") or "").lower(),
+        str(flow.get("planner_status") or "").lower(),
+        str(flow.get("executor_status") or "").lower(),
+        str(flow.get("reviewer_status") or "").lower(),
+        str(flow.get("latest_verdict") or "").lower(),
+    }
+    return bool(statuses & {"blocked", "aborted", "failed", "block"})
+
+def sort_key(flow):
+    return (
+        flow.get("execution_completed_at")
+        or flow.get("execution_started_at")
+        or flow.get("updated_at")
+        or ""
+    )
+
+for flow in sorted((f for f in flows if is_candidate(f)), key=sort_key, reverse=True)[:10]:
+    print(
+        f"{flow.get('branch')} "
+        f"issue={flow.get('task_issue_number')} "
+        f"status={flow.get('flow_status')} "
+        f"planner={flow.get('planner_status')} "
+        f"executor={flow.get('executor_status')} "
+        f"reviewer={flow.get('reviewer_status')} "
+        f"pr={flow.get('pr_number')}"
+    )
+PY
+```
+
+每轮最多选择 `3` 个样本。优先级：
+
+1. 最近发生且仍影响执行队列的 blocked/aborted flow。
+2. 有 issue、PR、handoff、commit 中至少两类证据可追溯的 flow。
+3. 能明确显示 agent 输出契约缺失、scope mismatch、状态判断错误或 review/report 缺失的 flow。
+4. 同类 symptom 反复出现的 flow。
+
+如果没有候选，仍输出空观察摘要并记录 `candidate_count: 0`。
+
+## Evidence Reads
+
+对每个样本只读最小证据集。
+
+本地状态：
+
+```bash
+uv run python src/vibe3/cli.py flow status --all --format json
+uv run python src/vibe3/cli.py task status --all --format json
+uv run python src/vibe3/cli.py handoff status --branch <branch> --format json
+uv run python src/vibe3/cli.py handoff show @plan --branch <branch>
+uv run python src/vibe3/cli.py handoff show @report --branch <branch>
+uv run python src/vibe3/cli.py handoff show @audit --branch <branch>
+```
+
+GitHub：
+
+```bash
+gh issue view <issue-number> --comments --json number,title,state,labels,assignees,body,comments,url
+gh pr view <pr-number> --comments --json number,title,state,isDraft,headRefName,baseRefName,body,comments,reviews,files,url
+```
+
+Git：
 
 ```bash
 git log --oneline --decorate --max-count=30
-git log --oneline <base>..<head>
-git diff --name-only <base>...<head>
+git log --oneline origin/main..<branch>
+git diff --name-only origin/main...<branch>
 ```
 
-Do not read every available artifact. Read only enough material to support or reject
-the observation. If evidence is missing, record that as a limitation.
+如果某个 ref 不存在或命令失败，不要补造结论；把它写入 `limitations`。
 
-## What It Produces
+## Observation Schema
 
-The output is a bounded observation document. It is agent output, not code output.
-
-Each observation must preserve provenance and separate facts from interpretation.
-
-### Observation Contract
-
-Use YAML or JSON. YAML is preferred for comments; JSON is preferred when another
-tool will consume the output.
+每个样本输出一个 observation。YAML 优先。
 
 ```yaml
 audit_observation:
   schema_version: 1
   created_at: "<iso8601>"
-  created_by: "audit-observation"
+  created_by: "governance/audit-observation"
   source_material: "supervisor/governance/audit-observation.md"
 
   subject:
@@ -155,61 +154,53 @@ audit_observation:
 
   observation:
     title: "<short symptom title>"
-    symptom: "<what happened, in one or two sentences>"
-    observed_failure_mode: "<state_loop | missing_output | scope_mismatch | contract_missing | ci_failure | review_gap | unknown>"
+    symptom: "<what happened, stated briefly>"
+    observed_failure_mode: "scope_mismatch | missing_output | state_loop | contract_missing | ci_failure | review_gap | unknown"
     confidence: "high | medium | low"
 
   facts:
-    - kind: "flow_event"
-      ref: "<event id or flow ref>"
-      summary: "<fact stated without interpretation>"
-    - kind: "github_comment"
-      ref: "<issue/pr comment url>"
-      marker: "[manager]"
-      summary: "<bounded fact>"
+    - kind: "flow"
+      ref: "<branch or flow status field>"
+      summary: "<source-backed fact>"
+    - kind: "handoff"
+      ref: "@plan | @report | @audit | handoff status"
+      summary: "<source-backed fact>"
+    - kind: "github_issue"
+      ref: "<issue url>"
+      summary: "<source-backed fact>"
+    - kind: "github_pr"
+      ref: "<pr url>"
+      summary: "<source-backed fact>"
     - kind: "git"
       ref: "<commit sha or diff range>"
-      summary: "<bounded fact>"
-    - kind: "handoff"
-      ref: "@plan | @report | @audit | @current | artifact ref"
-      summary: "<bounded fact>"
+      summary: "<source-backed fact>"
 
   interpretation:
-    reasoning: "<why these facts form an observation>"
-    likely_agent_failure: "<what the agent likely failed to do, if supported>"
+    reasoning: "<why the facts form this observation>"
+    likely_agent_failure: "<agent behavior failure if supported>"
     affected_material_candidates:
-      - "supervisor/policies/run.md"
-      - "config/prompts/prompt-recipes.yaml"
+      - "<prompt/policy/skill candidate, not a final decision>"
 
   limitations:
-    - "<missing data, stale source, unverified assumption, or confidence caveat>"
+    - "<missing data, stale source, failed command, or uncertainty>"
 
   next_stage_input:
     suitable_for_clustering: true
-    suggested_cluster_key: "<short stable key>"
+    suggested_cluster_key: "<stable short key>"
     requires_human_review: true
 ```
 
-### Field Rules
+Rules:
 
-- `facts` must be source-backed. Every fact needs a `kind`, `ref`, and bounded summary.
-- `interpretation` may reason from facts, but must not pretend to be a source of truth.
-- `affected_material_candidates` are candidates only. Do not treat them as a decision.
-- `confidence: high` requires at least two independent facts or one authoritative fact.
-- `requires_human_review` should be `true` unless the observation is purely mechanical.
+- `facts` 只能写来源支持的事实。
+- `interpretation` 必须显式区别于事实。
+- `confidence: high` 需要至少两个独立事实，或一个权威运行时事实。
+- `affected_material_candidates` 是候选，不是修复决定。
+- 不要输出超过 `3` 个 observation。
 
-## Execution Pattern
+## Stable Output
 
-1. Read current runtime status with `task status` and `flow status`.
-2. Identify recent blocked/failed/aborted candidates.
-3. Pick at most 3 candidates using the priority rules above.
-4. For each candidate, read only the smallest useful set of issue, PR, git, and handoff facts.
-5. Produce one observation per candidate using the Observation Contract.
-6. Stop. Do not create fix issues, update labels, or modify files.
-
-## Output Contract
-
-stdout must include:
+stdout 必须包含完整结果，格式如下：
 
 ~~~markdown
 ## Audit Observation Summary
@@ -224,16 +215,37 @@ audit_observation:
 ```
 
 ### Skipped Candidates
-- <candidate> — <why skipped>
+- <candidate>: <why skipped>
 
 ### Limitations
 - <what could not be verified this round>
+
+### Persistence
+- handoff_branch: governance
+- handoff_kind: finding
+- handoff_read: uv run python src/vibe3/cli.py handoff status --branch governance --all --format json
 ~~~
 
-If no candidates are found, still output the same sections and state that no
-actionable observation was produced.
+稳定输出必须写入共享 handoff store，由 `handoff.db` 管理。不要直接写数据库或 `.git/vibe3/handoff/`。
+
+将完整 observation 压缩成一条 handoff finding，至少包含 `created_at`、样本列表、cluster key、主要 limitation：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "<audit observation summary>" \
+  --branch governance \
+  --actor governance/audit-observation \
+  --kind finding
+```
+
+后续读取稳定输出：
+
+```bash
+uv run python src/vibe3/cli.py handoff status --branch governance --all --format json
+uv run python src/vibe3/cli.py handoff show @current --branch governance
+```
 
 ## Stop Point
 
-After producing observations, stop. The next stage may cluster observations or
-prepare prompt/policy suggestions, but that belongs to follow-up issues.
+完成 stdout 输出和 handoff finding 登记后停止。
+
+不要进入聚类、修复建议、issue 创建、label 修改或代码实现阶段。

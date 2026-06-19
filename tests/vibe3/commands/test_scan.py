@@ -33,6 +33,12 @@ class TestScanCommand:
         assert "--dry-run" in output
         assert "--no-async" in output
 
+    def test_scan_governance_list_includes_audit_observation(self):
+        result = runner.invoke(app, ["scan", "governance", "--list"])
+        assert result.exit_code == 0
+        output = _strip_ansi(result.output)
+        assert "audit-observation" in output
+
     def test_scan_supervisor_help(self):
         result = runner.invoke(app, ["scan", "supervisor", "--help"])
         assert result.exit_code == 0

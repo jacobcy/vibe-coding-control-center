@@ -276,6 +276,7 @@ test -f ~/.vibe/supervisor/governance/assignee-pool.md && echo "ok" || echo "MIS
 test -f ~/.vibe/supervisor/governance/roadmap-intake.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/roadmap-intake.md"
 test -f ~/.vibe/supervisor/governance/cron-supervisor.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/cron-supervisor.md"
 test -f ~/.vibe/supervisor/governance/code-auditor.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/code-auditor.md"
+test -f ~/.vibe/supervisor/governance/audit-observation.md && echo "ok" || echo "MISSING: ~/.vibe/supervisor/governance/audit-observation.md"
 ```
 
 **Step 5.5: 检查全局 skills**
