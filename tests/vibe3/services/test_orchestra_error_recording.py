@@ -333,7 +333,6 @@ class TestRecordDispatchFailureIfUnexpected:
         ):
             # Create a MagicMock exception (simulating test leak)
             mock_exception = MagicMock()
-            mock_exception.__str__ = lambda self: "MagicMock()"
 
             record_dispatch_failure_if_unexpected(
                 role="manager",
@@ -345,8 +344,12 @@ class TestRecordDispatchFailureIfUnexpected:
         # Should NOT record error for mock leaks
         mock_record_error.assert_not_called()
 
-    def test_magicmock_in_error_message_skipped(self) -> None:
-        """Verify exceptions with MagicMock in message are skipped."""
+    def test_magicmock_in_error_message_is_recorded(self) -> None:
+        """Verify real exceptions with 'MagicMock' in message ARE recorded.
+
+        This is the correct behavior: only mock TYPE instances are skipped,
+        not production errors that happen to contain 'MagicMock' strings.
+        """
         mock_store = MagicMock()
 
         with (
@@ -358,7 +361,8 @@ class TestRecordDispatchFailureIfUnexpected:
                 return_value=mock_store,
             ),
         ):
-            # Exception with "MagicMock" in string
+            # Exception with "MagicMock" in string - should still be recorded
+            # because it's a real exception type (ValueError), not a mock instance
             record_dispatch_failure_if_unexpected(
                 role="executor",
                 issue_number=123,
@@ -368,5 +372,5 @@ class TestRecordDispatchFailureIfUnexpected:
                 ),
             )
 
-        # Should NOT record error for mock leaks
-        mock_record_error.assert_not_called()
+        # SHOULD record error - it's a real ValueError, not a mock leak
+        mock_record_error.assert_called_once()

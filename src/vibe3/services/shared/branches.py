@@ -3,10 +3,17 @@
 Thin wrapper around resolve_command_branch for backward compatibility.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.services.protocols import FlowQueryProtocol
+
 
 def resolve_branch_arg(
     branch_arg: str | None,
-    flow_service: object,
+    flow_service: "FlowQueryProtocol",
 ) -> str:
     """Resolve --branch argument to a canonical branch name.
 
@@ -20,7 +27,7 @@ def resolve_branch_arg(
 
     Args:
         branch_arg: Branch argument from CLI (may be None, digits, or branch name)
-        flow_service: FlowService instance (required)
+        flow_service: FlowService instance implementing FlowQueryProtocol
 
     Returns:
         Resolved branch name
@@ -40,7 +47,7 @@ def resolve_branch_arg(
 
 def resolve_branch_and_issue(
     branch_arg: str | None,
-    flow_service: object,
+    flow_service: "FlowQueryProtocol",
 ) -> tuple[str, int | None]:
     """Resolve --branch argument and extract issue number in one call.
 
@@ -50,7 +57,7 @@ def resolve_branch_and_issue(
 
     Args:
         branch_arg: Branch argument from CLI (may be None, digits, or branch name)
-        flow_service: FlowService instance (required)
+        flow_service: FlowService instance implementing FlowQueryProtocol
 
     Returns:
         Tuple of (resolved_branch_name, issue_number or None)

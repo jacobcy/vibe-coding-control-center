@@ -82,12 +82,14 @@ def record_dispatch_failure_if_unexpected(
 
     # Handle exception-level failures
     if exception is not None:
+        from unittest.mock import MagicMock, Mock
+
         from vibe3.clients import SQLiteClient
         from vibe3.exceptions import classify_error_hybrid
 
-        # Detect test mock leaks - skip recording entirely
-        exc_str = str(exception)
-        if "MagicMock" in exc_str or "Mock" in type(exception).__name__:
+        # Detect test mock leaks by type inheritance, not string matching
+        # This avoids false positives when production errors contain "Mock" strings
+        if isinstance(exception, (Mock, MagicMock)):
             logger.bind(
                 domain=f"{role}_dispatch",
                 issue_number=issue_number,
@@ -136,6 +138,7 @@ def record_dispatch_failure_if_unexpected(
     if reason_code == "launch_failed":
         from vibe3.clients import SQLiteClient
 
+        # Use single store instance for both check and potential recording
         _store = SQLiteClient()
         if has_recent_specific_error(
             issue_number=effective_issue_number,
@@ -145,9 +148,12 @@ def record_dispatch_failure_if_unexpected(
         ):
             # Bottom layer recorded specific error - skip duplicate
             return
-        # else: fall through to record E_DISPATCH_FAILURE
+        # else: fall through to record E_DISPATCH_FAILURE using same _store
+    else:
+        # For other reason_codes, create store only when needed
+        from vibe3.clients import SQLiteClient
 
-    from vibe3.clients import SQLiteClient
+        _store = SQLiteClient()
 
     # Include dispatch_source marker and reason_code for disambiguation
     reason_detail = result.reason or "(no detail)"
@@ -155,7 +161,6 @@ def record_dispatch_failure_if_unexpected(
         f"{dispatch_source} {role} dispatch failed [{reason_code}]: {reason_detail}"
     )
     try:
-        _store = SQLiteClient()
         record_error(
             error_code="E_DISPATCH_FAILURE",
             error_message=error_message,
