@@ -125,7 +125,18 @@ def test_create_pr_success(
         pr = github_client.create_pr(request)
 
         assert pr.number == 123
-        mock_subprocess.assert_called()
+        # Verify gh pr create was called with correct arguments
+        args = mock_subprocess.call_args[0][0]
+        assert args[:3] == ["gh", "pr", "create"]
+        assert "--title" in args
+        assert "Test PR" in args
+        assert "--body" in args
+        assert "Test body" in args
+        assert "--head" in args
+        assert "feature-branch" in args
+        assert "--base" in args
+        assert "main" in args
+        assert "--draft" in args
 
 
 def test_create_pr_maps_recoverable_error_to_user_error(
@@ -287,7 +298,9 @@ def test_mark_ready_success(
         pr = github_client.mark_ready(123)
 
         assert pr.number == 123
-        mock_subprocess.assert_called()
+        mock_subprocess.assert_called_once_with(
+            ["gh", "pr", "ready", "123"], capture_output=True, text=True, check=True
+        )
 
 
 def test_mark_ready_maps_recoverable_error_to_user_error(
@@ -342,16 +355,21 @@ def test_update_pr_maps_error_to_user_error(github_client: GitHubClient) -> None
 def test_merge_pr_success(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:
-    """Test merge PR success."""
+    """Test merge PR."""
     mock_subprocess.return_value.returncode = 0
 
     with patch.object(github_client, "get_pr") as mock_get_pr:
-        mock_get_pr.return_value = MagicMock(number=123)
+        mock_get_pr.return_value = MagicMock(number=123, state=PRState.MERGED)
 
         pr = github_client.merge_pr(123)
 
         assert pr.number == 123
-        mock_subprocess.assert_called()
+        mock_subprocess.assert_called_once_with(
+            ["gh", "pr", "merge", "123", "--squash"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
 
 
 def test_extract_pr_number(github_client: GitHubClient) -> None:
