@@ -387,6 +387,23 @@ def build_manager_sync_request(
         "refs": {"role": "manager", "issue": str(issue.number), "branch": branch},
     }
 
+    # Collect and write provenance for dry-run audit
+    if dry_run:
+        from vibe3.observability.orchestra_log import write_prompt_provenance
+        from vibe3.prompts.provenance import collect_dry_run_provenance
+
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="manager.default",
+            variant_key=variant_key,
+            rendered_text=prompt,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="manager", issue_number=issue.number
+        )
+        # Add provenance path to dry_run_summary
+        dry_run_summary["provenance_path"] = str(provenance_path)
+
     manager_task = (
         "Act as the manager state controller. "
         "Inspect the scene, read issue comments and handoff, "

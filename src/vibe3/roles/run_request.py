@@ -133,18 +133,44 @@ def build_run_sync_request(
             context_mode=meta.fallback_context_mode,
         )()
 
+    # Build prompt for provenance collection and request
+    prompt = make_run_context_builder(
+        plan_ref,
+        VibeConfig.get_defaults(),
+        audit_file=audit_ref,
+        mode=meta.prompt_mode,  # type: ignore[arg-type]
+        context_mode=meta.context_mode,
+    )()
+
+    # Collect and write provenance for dry-run audit
+    if dry_run:
+        from vibe3.observability.orchestra_log import write_prompt_provenance
+        from vibe3.prompts import PromptManifest
+        from vibe3.prompts.provenance import collect_dry_run_provenance
+
+        # Determine variant_key: {mode}.{context_mode}
+        variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+
+        manifest = PromptManifest.load_default()
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="run.plan",
+            variant_key=variant_key,
+            rendered_text=prompt,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="executor", issue_number=issue.number
+        )
+        # Add provenance path to dry_run_summary
+        if dry_run_summary:
+            dry_run_summary["provenance_path"] = str(provenance_path)
+
     return build_role_sync_request(
         role="executor",
         config=config,
         issue=issue,
         branch=branch,
-        prompt=make_run_context_builder(
-            plan_ref,
-            VibeConfig.get_defaults(),
-            audit_file=audit_ref,
-            mode=meta.prompt_mode,  # type: ignore[arg-type]
-            context_mode=meta.context_mode,
-        )(),
+        prompt=prompt,
         task=task,
         options=options,
         worktree_requirement=EXECUTOR_ROLE.worktree,

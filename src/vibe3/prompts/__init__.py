@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         PromptRecipeVariant,
     )
     from vibe3.prompts.models import (
+        AnomalyFlags,
         LoadedPromptRecipeDefinition,
         MaterialEntry,
         PolicyEntry,
@@ -44,10 +45,12 @@ if TYPE_CHECKING:
         PromptRecipe,
         PromptRecipeKind,
         PromptRecipeVariantSpec,
+        PromptRenderProvenance,
         PromptRenderResult,
         PromptSectionSpec,
         PromptVariableProvenance,
         PromptVariableSource,
+        SectionSourceProvenance,
         VariableSourceKind,
     )
     from vibe3.prompts.provider_registry import ProviderRegistry
@@ -82,6 +85,7 @@ _LAZY_IMPORTS = {
     "PromptProvider": "vibe3.prompts.manifest",
     "PromptRecipeDefinition": "vibe3.prompts.manifest",
     "PromptRecipeVariant": "vibe3.prompts.manifest",
+    "AnomalyFlags": "vibe3.prompts.models",
     "LoadedPromptRecipeDefinition": "vibe3.prompts.models",
     "MaterialEntry": "vibe3.prompts.models",
     "PolicyEntry": "vibe3.prompts.models",
@@ -89,10 +93,12 @@ _LAZY_IMPORTS = {
     "PromptRecipe": "vibe3.prompts.models",
     "PromptRecipeKind": "vibe3.prompts.models",
     "PromptRecipeVariantSpec": "vibe3.prompts.models",
+    "PromptRenderProvenance": "vibe3.prompts.models",
     "PromptRenderResult": "vibe3.prompts.models",
     "PromptSectionSpec": "vibe3.prompts.models",
     "PromptVariableProvenance": "vibe3.prompts.models",
     "PromptVariableSource": "vibe3.prompts.models",
+    "SectionSourceProvenance": "vibe3.prompts.models",
     "VariableSourceKind": "vibe3.prompts.models",
     "ProviderRegistry": "vibe3.prompts.provider_registry",
     "build_tools_guide_section": "vibe3.prompts.sections",
@@ -129,6 +135,7 @@ __all__ = [
     "PromptRecipeDefinition",
     "PromptRecipeVariant",
     # Models
+    "AnomalyFlags",
     "LoadedPromptRecipeDefinition",
     "MaterialEntry",
     "PolicyEntry",
@@ -136,10 +143,12 @@ __all__ = [
     "PromptRecipe",
     "PromptRecipeKind",
     "PromptRecipeVariantSpec",
+    "PromptRenderProvenance",
     "PromptRenderResult",
     "PromptSectionSpec",
     "PromptVariableProvenance",
     "PromptVariableSource",
+    "SectionSourceProvenance",
     "VariableSourceKind",
     # Provider
     "ProviderRegistry",

@@ -7,10 +7,13 @@ from pydantic import ValidationError
 
 from vibe3.prompts.exceptions import MissingVariableError
 from vibe3.prompts.models import (
+    AnomalyFlags,
     PromptRecipe,
+    PromptRenderProvenance,
     PromptRenderResult,
     PromptVariableProvenance,
     PromptVariableSource,
+    SectionSourceProvenance,
     VariableSourceKind,
 )
 
@@ -142,3 +145,68 @@ class TestPromptExceptions:
         exc = MissingVariableError(variable="skill_content", template_key="test.key")
         assert "skill_content" in str(exc)
         assert "test.key" in str(exc)
+
+
+class TestSectionSourceProvenance:
+    def test_section_source_provenance_immutable(self) -> None:
+        """Verify frozen model."""
+        prov = SectionSourceProvenance(
+            key="test_section",
+            source_kind=VariableSourceKind.FILE,
+            source_ref="config/test.md",
+        )
+        with pytest.raises((AttributeError, TypeError, ValidationError)):
+            prov.key = "other"  # type: ignore[misc]
+
+    def test_section_source_minimal(self) -> None:
+        """Section source with only key."""
+        prov = SectionSourceProvenance(key="header")
+        assert prov.key == "header"
+        assert prov.source_kind is None
+        assert prov.source_ref is None
+
+
+class TestPromptRenderProvenance:
+    def test_prompt_render_provenance_immutable(self) -> None:
+        """Verify frozen model."""
+        prov = PromptRenderProvenance(
+            recipe_key="test.recipe",
+            variant_key="default",
+        )
+        with pytest.raises((AttributeError, TypeError, ValidationError)):
+            prov.recipe_key = "other"  # type: ignore[misc]
+
+    def test_prompt_render_provenance_defaults(self) -> None:
+        """Verify default values."""
+        prov = PromptRenderProvenance(
+            recipe_key="test.recipe",
+            variant_key="default",
+        )
+        assert prov.recipe_key == "test.recipe"
+        assert prov.variant_key == "default"
+        assert prov.section_order == ()
+        assert prov.section_sources == ()
+        assert prov.variable_provenance == ()
+        assert prov.rendered_hash == ""
+        assert prov.char_count == 0
+        assert prov.token_estimate is None
+        assert prov.warnings == ()
+        assert isinstance(prov.anomalies, AnomalyFlags)
+
+
+class TestAnomalyFlags:
+    def test_anomaly_flags_defaults(self) -> None:
+        """Verify all flags default to False."""
+        flags = AnomalyFlags()
+        assert flags.has_large_material is False
+        assert flags.has_duplicate_material is False
+        assert flags.missing_output_contract is False
+        assert flags.missing_verification_contract is False
+        assert flags.has_repo_profile is False
+        assert flags.has_project_policy_overlay is False
+
+    def test_anomaly_flags_immutable(self) -> None:
+        """Verify frozen model."""
+        flags = AnomalyFlags(has_large_material=True)
+        with pytest.raises((AttributeError, TypeError, ValidationError)):
+            flags.has_large_material = False  # type: ignore[misc]

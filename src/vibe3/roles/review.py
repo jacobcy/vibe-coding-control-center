@@ -201,6 +201,29 @@ def build_issue_review_request(
             refs["report_ref"] = report_ref
         dry_run_summary = meta.summary(sections)
 
+        # Collect and write provenance for dry-run audit
+        if dry_run:
+            from vibe3.observability.orchestra_log import write_prompt_provenance
+            from vibe3.prompts import PromptManifest
+            from vibe3.prompts.provenance import collect_dry_run_provenance
+
+            # Determine variant_key: {mode}.{context_mode}
+            variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+
+            manifest = PromptManifest.load_default()
+            provenance = collect_dry_run_provenance(
+                manifest=manifest,
+                recipe_key="review.default",
+                variant_key=variant_key,
+                rendered_text=prompt,
+            )
+            provenance_path = write_prompt_provenance(
+                provenance, role="reviewer", issue_number=issue.number
+            )
+            # Add provenance path to dry_run_summary
+            if dry_run_summary:
+                dry_run_summary["provenance_path"] = str(provenance_path)
+
         return build_issue_sync_prompt_request(
             role="reviewer",
             issue=issue,

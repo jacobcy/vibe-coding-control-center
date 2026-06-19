@@ -401,6 +401,26 @@ def build_governance_request(
             f"dry-run plan written ({current_material}): {dry_run_plan_path}",
             repo_root=root,
         )
+
+        # Collect and write provenance for audit
+        from vibe3.observability.orchestra_log import write_prompt_provenance
+        from vibe3.prompts import PromptManifest
+        from vibe3.prompts.provenance import collect_dry_run_provenance
+
+        manifest = PromptManifest.load_default()
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="governance.scan",
+            variant_key="default",
+            rendered_text=plan_content,
+            variable_provenance=render_result.provenance,
+            warnings=render_result.warnings,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="governance", repo_root=root
+        )
+        log.info(f"Dry run provenance file: {provenance_path}")
+
         return None
 
     options = resolve_governance_options(config)

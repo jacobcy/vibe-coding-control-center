@@ -164,3 +164,41 @@ def append_governance_event(message: str, *, repo_root: Path | None = None) -> P
     # Delegate to append_orchestra_event to use persistent handle
     append_orchestra_event("governance", message, repo_root=repo_root)
     return path
+
+
+def write_prompt_provenance(
+    provenance: object,  # PromptRenderProvenance (avoid circular import)
+    role: str,
+    issue_number: int | None = None,
+    repo_root: Path | None = None,
+) -> Path:
+    """Write PromptRenderProvenance as JSON artifact in dry-run directory.
+
+    Args:
+        provenance: PromptRenderProvenance model instance
+        role: Role identifier (e.g., 'planner', 'governance')
+        issue_number: Optional issue number for context
+        repo_root: Optional repository root path
+
+    Returns:
+        Path to the written JSON file
+    """
+    from pydantic import BaseModel
+
+    # Ensure we have a Pydantic model
+    if not isinstance(provenance, BaseModel):
+        raise TypeError("provenance must be a Pydantic BaseModel instance")
+
+    # Generate filename with timestamp and optional issue number
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    issue_suffix = f"_{issue_number}" if issue_number else ""
+    filename = f"provenance_{role}_{timestamp}{issue_suffix}.json"
+
+    # Write to governance dry-run directory
+    dry_run_path = governance_dry_run_dir(repo_root)
+    output_path = dry_run_path / filename
+
+    # Write JSON with model_dump()
+    output_path.write_text(provenance.model_dump_json(indent=2), encoding="utf-8")
+
+    return output_path
