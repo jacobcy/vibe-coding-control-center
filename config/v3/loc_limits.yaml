@@ -423,7 +423,7 @@ code_limits:
     # Milestone 1: 70,000 LOC (new feature expansion phase)
     # Milestone 2: 65,000 LOC (post-refactor target)
     # Final target: 60,000 LOC (long-term governance goal)
-    v3_python: 80000        # Python 核心代码总行数（提升至 80k 支持新特性扩展：PR #2723 snapshot limit、event rules engine、webhook integration、domain event system）
+    v3_python: 85000        # Python 核心代码总行数（提升至 85k 支持新特性扩展：PR #2723 snapshot limit、event rules engine、webhook integration、domain event system、PR #3047 dry-run provenance collection）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
     last_reviewed: "2026-06-12"    # Track last governance review (Issue #625)
 
