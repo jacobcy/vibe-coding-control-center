@@ -19,14 +19,14 @@ class TestSameRepoScenario:
 
     def test_all_layers_active_in_vibe_center(self, tmp_path: Path) -> None:
         """Verify all layers are active when running inside vibe-center."""
-        from vibe3.agents.plan_prompt import _detect_active_layers
+        from vibe3.prompts import detect_active_layers
 
         # Mock bundled_project_root to return current directory
         with patch(
-            "vibe3.agents.plan_prompt.bundled_project_root",
+            "vibe3.clients.runtime_assets.bundled_project_root",
             return_value=Path.cwd().resolve(),
         ):
-            active_layers = _detect_active_layers()
+            active_layers = detect_active_layers()
 
         assert MaterialLayer.CORE_INVARIANT in active_layers
         assert MaterialLayer.REPO_PROFILE in active_layers
@@ -136,14 +136,14 @@ class TestCrossProjectScenario:
 
     def test_only_core_and_runtime_active_cross_project(self, tmp_path: Path) -> None:
         """Verify only core_invariant and runtime_evidence active cross-project."""
-        from vibe3.agents.plan_prompt import _detect_active_layers
+        from vibe3.prompts import detect_active_layers
 
         # Mock bundled_project_root to return different path than CWD
         with patch(
-            "vibe3.agents.plan_prompt.bundled_project_root",
+            "vibe3.clients.runtime_assets.bundled_project_root",
             return_value=Path("/different/path/to/vibe-center"),
         ):
-            active_layers = _detect_active_layers()
+            active_layers = detect_active_layers()
 
         assert MaterialLayer.CORE_INVARIANT in active_layers
         assert MaterialLayer.RUNTIME_EVIDENCE in active_layers

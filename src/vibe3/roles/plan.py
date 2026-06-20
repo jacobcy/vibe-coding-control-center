@@ -13,7 +13,6 @@ from vibe3.agents import (
     describe_plan_sections,
     make_plan_context_builder,
 )
-from vibe3.agents.plan_prompt import _detect_active_layers
 from vibe3.clients import GitHubClient
 from vibe3.config import (
     PLANNER_GATE_CONFIG,
@@ -44,7 +43,11 @@ from vibe3.models import (
     WorktreeRequirement,
 )
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    detect_active_layers,
+)
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -273,7 +276,7 @@ def build_plan_sync_request(
             recipe_key="plan.default",
             variant_key=variant_key,
             rendered_text=prompt,
-            active_layers=_detect_active_layers(),
+            active_layers=detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="planner", issue_number=issue.number

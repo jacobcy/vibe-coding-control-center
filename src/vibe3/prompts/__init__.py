@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         PromptVariableSource,
         SectionSourceProvenance,
         VariableSourceKind,
+        detect_active_layers,
     )
     from vibe3.prompts.provenance import collect_dry_run_provenance
     from vibe3.prompts.provider_registry import ProviderRegistry
@@ -103,6 +104,7 @@ _LAZY_IMPORTS = {
     "PromptVariableSource": "vibe3.prompts.models",
     "SectionSourceProvenance": "vibe3.prompts.models",
     "VariableSourceKind": "vibe3.prompts.models",
+    "detect_active_layers": "vibe3.prompts.models",
     "ProviderRegistry": "vibe3.prompts.provider_registry",
     "build_tools_guide_section": "vibe3.prompts.sections",
     "resolve_common_rules_path": "vibe3.prompts.sections",
@@ -155,6 +157,8 @@ __all__ = [
     "PromptVariableSource",
     "SectionSourceProvenance",
     "VariableSourceKind",
+    # Layer detection
+    "detect_active_layers",
     # Provider
     "ProviderRegistry",
     # Exceptions

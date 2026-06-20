@@ -34,6 +34,28 @@ class MaterialLayer(str, Enum):
     RUNTIME_EVIDENCE = "runtime_evidence"
 
 
+def detect_active_layers() -> set[MaterialLayer]:
+    """Detect which material layers are active in the current runtime context.
+
+    When running inside the vibe-center repo, all layers are active.
+    When running cross-project, only core_invariant and runtime_evidence
+    from vibe-center are active; repo_profile and project_policy come
+    from the target repo's own config.
+    """
+    from vibe3.clients.runtime_assets import bundled_project_root
+
+    try:
+        Path.cwd().resolve().relative_to(bundled_project_root())
+        return {
+            MaterialLayer.CORE_INVARIANT,
+            MaterialLayer.REPO_PROFILE,
+            MaterialLayer.PROJECT_POLICY,
+            MaterialLayer.RUNTIME_EVIDENCE,
+        }
+    except ValueError:
+        return {MaterialLayer.CORE_INVARIANT, MaterialLayer.RUNTIME_EVIDENCE}
+
+
 class PromptRecipeKind(str, Enum):
     """Recipe assembly strategy."""
 

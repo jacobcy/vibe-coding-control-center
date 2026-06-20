@@ -9,7 +9,6 @@ from vibe3.agents import (
     describe_run_plan_sections,
     make_run_context_builder,
 )
-from vibe3.agents.run_prompt import _detect_active_layers
 from vibe3.clients import SQLiteClient
 from vibe3.config import VibeConfig, get_convention
 from vibe3.execution import (
@@ -19,7 +18,11 @@ from vibe3.execution import (
 )
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    detect_active_layers,
+)
 from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
@@ -160,7 +163,7 @@ def build_run_sync_request(
             recipe_key="run.plan",
             variant_key=variant_key,
             rendered_text=prompt,
-            active_layers=_detect_active_layers(),
+            active_layers=detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="executor", issue_number=issue.number

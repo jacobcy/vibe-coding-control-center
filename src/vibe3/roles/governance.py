@@ -10,7 +10,6 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.agents.plan_prompt import _detect_active_layers
 from vibe3.clients import GitHubClient
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution import ExecutionRolePolicyService, resolve_orchestra_repo_root
@@ -32,6 +31,7 @@ from vibe3.prompts import (
     ProviderRegistry,
     VariableSourceKind,
     collect_dry_run_provenance,
+    detect_active_layers,
 )
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
@@ -431,7 +431,7 @@ def build_governance_request(
             rendered_text=plan_content,
             variable_provenance=render_result.provenance,
             warnings=render_result.warnings,
-            active_layers=_detect_active_layers(),
+            active_layers=detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="governance", repo_root=root

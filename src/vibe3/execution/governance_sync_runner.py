@@ -13,14 +13,17 @@ from loguru import logger
 from typer import echo
 
 from vibe3.agents import CodeagentBackend
-from vibe3.agents.plan_prompt import _detect_active_layers
 from vibe3.clients import get_store
 from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    detect_active_layers,
+)
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import log_dispatch_error
 
@@ -104,7 +107,7 @@ def run_governance_sync(
             rendered_text=prompt_content,
             variable_provenance=render_result.provenance,
             warnings=render_result.warnings,
-            active_layers=_detect_active_layers(),
+            active_layers=detect_active_layers(),
         )
         provenance_path = write_prompt_provenance(
             provenance, role="governance", repo_root=repo
