@@ -131,6 +131,33 @@ class TestQueueScheduledRefresh:
         await coordinator.coordinate(tick_id=10)
         assert len(collect_called) == 0
 
+    @pytest.mark.asyncio
+    async def test_scheduled_refresh_preserves_paused_when_nothing_dispatchable(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        capacity = make_capacity(remaining=2)
+        coordinator = make_coordinator(
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 10
+        coordinator._dispatch_paused = True
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready", waiting_state="ready"),
+        ]
+
+        async def mock_collect():
+            return [QueueEntry(issue_number=2, collected_state="handoff")]
+
+        coordinator._collect_frozen_queue = mock_collect
+        coordinator._has_dispatchable_entries = lambda _entries: False
+        coordinator._has_actionable_entries = MagicMock(return_value=False)
+        await coordinator.coordinate(tick_id=10)
+        assert coordinator.is_dispatch_paused() is True
+
 
 class TestQueueExhaustedRefresh:
     """Tests for _queue_exhausted_refresh trigger."""

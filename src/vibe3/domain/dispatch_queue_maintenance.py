@@ -240,10 +240,13 @@ class DispatchQueueMaintenanceService:
             ).debug("Running scheduled full queue refresh")
             fresh = await self._collect_frozen_queue_fn()
             self._invalidate_pr_cache()
-            new_paused = bool(
-                fresh and all(entry.collected_state == "blocked" for entry in fresh)
-            )
-            return True, fresh, new_paused
+
+            # Merge with existing queue to preserve waiting_state,
+            # then check dispatchable entries using the same logic
+            # as exhausted_refresh (commit aff68e917).
+            merged = self._merge_queue_fn(frozen_queue or [], fresh)
+            new_paused = not self._has_dispatchable_entries(merged)
+            return True, merged, new_paused
         return False, frozen_queue, dispatch_paused
 
     def paused_blocked_check(
