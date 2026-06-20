@@ -248,9 +248,10 @@ class HeartbeatServer:
                     )
                     # Record to error_log for FailedGate monitoring
                     try:
-                        from vibe3.services.orchestra import record_error
+                        import importlib
 
-                        record_error(
+                        _svc = importlib.import_module("vibe3.services")
+                        _svc.record_error(
                             error_code="E_DISPATCH_FAILURE",
                             error_message=(
                                 f"cleanup_old_errors failed at "
@@ -290,9 +291,10 @@ class HeartbeatServer:
                         )
                         # Record to error_log for FailedGate monitoring
                         try:
-                            from vibe3.services.orchestra import record_error
+                            import importlib
 
-                            record_error(
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
                                 error_code="E_DISPATCH_FAILURE",
                                 error_message=(
                                     f"actor cleanup failed at "
@@ -337,9 +339,10 @@ class HeartbeatServer:
                         )
                         # Record to error_log for FailedGate monitoring
                         try:
-                            from vibe3.services.orchestra import record_error
+                            import importlib
 
-                            record_error(
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
                                 error_code="E_DISPATCH_FAILURE",
                                 error_message=(
                                     f"pack-refs failed at "
@@ -369,9 +372,10 @@ class HeartbeatServer:
                         ).warning(f"Periodic check failed: {exc}")
                         # Record to error_log for FailedGate monitoring
                         try:
-                            from vibe3.services.orchestra import record_error
+                            import importlib
 
-                            record_error(
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
                                 error_code="E_DISPATCH_FAILURE",
                                 error_message=(
                                     f"periodic_check failed at "
@@ -442,9 +446,10 @@ class HeartbeatServer:
                 )
                 # Record to error_log for FailedGate monitoring
                 try:
-                    from vibe3.services.orchestra import record_error
+                    import importlib
 
-                    record_error(
+                    _svc = importlib.import_module("vibe3.services")
+                    _svc.record_error(
                         error_code="E_DISPATCH_FAILURE",
                         error_message=(
                             f"tick service {type(service).__name__} "
