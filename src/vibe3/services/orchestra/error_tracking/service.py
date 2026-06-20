@@ -166,7 +166,7 @@ class ErrorTrackingService:
         self,
         error_code: str,
         error_message: str,
-        tick_id: int = 0,
+        tick_id: int | None = None,
         issue_number: int | None = None,
         branch: str | None = None,
         severity: ErrorSeverity | None = None,
@@ -176,7 +176,7 @@ class ErrorTrackingService:
         Args:
             error_code: Error code (E_MODEL_*, E_API_*, E_EXEC_*)
             error_message: Error message/details
-            tick_id: Tick ID (defaults to 0)
+            tick_id: Tick ID (auto-inferred from context if None)
             issue_number: Optional linked issue
             branch: Optional linked branch
             severity: Optional severity level. If None, inferred from error registry.
@@ -184,6 +184,12 @@ class ErrorTrackingService:
         Returns:
             (threshold_reached: bool, error_count_in_window: int)
         """
+        # Auto-infer tick_id from contextvar if not provided
+        if tick_id is None:
+            from vibe3.runtime import get_current_tick_id
+
+            tick_id = get_current_tick_id()
+
         # Infer severity from registry if not provided
         if severity is None:
             contract = get_error_handling_contract(error_code)

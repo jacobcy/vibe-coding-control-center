@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
@@ -19,6 +20,23 @@ from .pool_exhaustion import check_pool_exhaustion
 
 if TYPE_CHECKING:
     from vibe3.domain import GateResult
+
+# Context variable to propagate current tick_id through async call stack
+_current_tick_id: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "current_tick_id", default=0
+)
+
+
+def get_current_tick_id() -> int:
+    """Get current heartbeat tick ID from context (0 if outside heartbeat).
+
+    This function provides safe access to the current tick_id contextvar.
+    Returns 0 when called outside of a heartbeat tick loop (e.g., in CLI, tests).
+
+    Returns:
+        Current tick ID (0 if not in heartbeat context)
+    """
+    return _current_tick_id.get()
 
 
 class FailedGateProtocol(Protocol):
@@ -176,179 +194,243 @@ class HeartbeatServer:
 
             self._tick_count += 1
             tick_number = self._tick_count
-            started_at = time.perf_counter()
-            logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
-
-            # Write tick marker for readability (INFO level - shows timeline)
-            # Blank line before each tick for visual separation
-            append_orchestra_event("server", "")
-            append_orchestra_event("server", f"tick #{tick_number} start")
-
-            # Check FailedGate before dispatching
-            if self._failed_gate is not None:
-                gate_result = self._failed_gate.check()
-
-                if gate_result.blocked:
-                    # Gate is ACTIVE - skip dispatch and increment blocked_ticks
-                    self._failed_gate.increment_blocked_ticks()
-                    append_orchestra_event(
-                        "server",
-                        (
-                            f"tick #{tick_number} blocked by failed gate: "
-                            f"{gate_result.reason}"
-                        ),
-                    )
-                    logger.bind(domain="orchestra", action="tick").warning(
-                        f"Tick #{tick_number} blocked by failed gate: "
-                        f"{gate_result.reason}"
-                    )
-                    # Skip service dispatch, continue to next tick
-                    continue
-
-            # Cleanup old error records (maintenance)
-            if self._error_tracker is not None:
-                error_tracking = self._error_tracker
-            else:
-                import importlib
-
-                _services = importlib.import_module("vibe3.services")
-                error_tracking = _services.ErrorTrackingService.get_instance()
-
-            # Cleanup retention-based errors
+            token = _current_tick_id.set(tick_number)
             try:
-                deleted_old = error_tracking.cleanup_old_errors()  # type: ignore[attr-defined]
-            except Exception as exc:
-                append_orchestra_event(
-                    "server",
-                    f"tick #{tick_number} cleanup_old_errors failed: {exc}",
-                    level="WARNING",
-                )
-                logger.bind(domain="orchestra", action="cleanup").warning(
-                    f"cleanup_old_errors failed: {exc}"
-                )
-            else:
-                if deleted_old > 0:
-                    append_orchestra_event(
-                        "server",
-                        (
-                            f"tick #{tick_number} cleanup: deleted {deleted_old} "
-                            "old error records"
-                        ),
-                        level="DEBUG",
-                    )
-                    logger.bind(domain="orchestra", action="cleanup").debug(
-                        f"Cleaned up {deleted_old} old error records "
-                        f"(retention={error_tracking.retention_days}d)"  # type: ignore[attr-defined]
-                    )
+                started_at = time.perf_counter()
+                logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
 
-            # Cleanup expired actor registry entries (maintenance)
-            if self._actor_cleanup:
-                try:
-                    expired_actors = self._actor_cleanup()
-                except Exception as exc:
-                    append_orchestra_event(
-                        "server",
-                        f"tick #{tick_number} actor cleanup failed: {exc}",
-                        level="WARNING",
-                    )
-                    logger.bind(domain="orchestra", action="cleanup").warning(
-                        f"Actor registry cleanup failed: {exc}"
-                    )
-                else:
-                    if expired_actors:
+                # Write tick marker for readability (INFO level - shows timeline)
+                # Blank line before each tick for visual separation
+                append_orchestra_event("server", "")
+                append_orchestra_event("server", f"tick #{tick_number} start")
+
+                # Check FailedGate before dispatching
+                if self._failed_gate is not None:
+                    gate_result = self._failed_gate.check()
+
+                    if gate_result.blocked:
+                        # Gate is ACTIVE - skip dispatch and increment blocked_ticks
+                        self._failed_gate.increment_blocked_ticks()
                         append_orchestra_event(
                             "server",
                             (
-                                f"tick #{tick_number} cleanup: expired "
-                                f"{len(expired_actors)} actors"
+                                f"tick #{tick_number} blocked by failed gate: "
+                                f"{gate_result.reason}"
+                            ),
+                        )
+                        logger.bind(domain="orchestra", action="tick").warning(
+                            f"Tick #{tick_number} blocked by failed gate: "
+                            f"{gate_result.reason}"
+                        )
+                        # Skip service dispatch, continue to next tick
+                        continue
+
+                # Cleanup old error records (maintenance)
+                if self._error_tracker is not None:
+                    error_tracking = self._error_tracker
+                else:
+                    import importlib
+
+                    _services = importlib.import_module("vibe3.services")
+                    error_tracking = _services.ErrorTrackingService.get_instance()
+
+                # Cleanup retention-based errors
+                try:
+                    deleted_old = error_tracking.cleanup_old_errors()  # type: ignore[attr-defined]
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} cleanup_old_errors failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").warning(
+                        f"cleanup_old_errors failed: {exc}"
+                    )
+                    # Record to error_log for FailedGate monitoring
+                    try:
+                        import importlib
+
+                        _svc = importlib.import_module("vibe3.services")
+                        _svc.record_error(
+                            error_code="E_DISPATCH_FAILURE",
+                            error_message=(
+                                f"cleanup_old_errors failed at "
+                                f"tick #{tick_number}: {exc}"
+                            ),
+                            tick_id=tick_number,
+                        )
+                    except Exception:
+                        pass
+                else:
+                    if deleted_old > 0:
+                        append_orchestra_event(
+                            "server",
+                            (
+                                f"tick #{tick_number} cleanup: deleted {deleted_old} "
+                                "old error records"
                             ),
                             level="DEBUG",
                         )
                         logger.bind(domain="orchestra", action="cleanup").debug(
-                            f"Expired {len(expired_actors)} actor(s) from registry"
+                            f"Cleaned up {deleted_old} old error records "
+                            f"(retention={error_tracking.retention_days}d)"  # type: ignore[attr-defined]
                         )
 
-            # Periodic Git ref packing to prevent stale references
-            if tick_number % PACK_REFS_INTERVAL_TICKS == 0:
-                try:
-                    from vibe3.clients import GitClient
+                # Cleanup expired actor registry entries (maintenance)
+                if self._actor_cleanup:
+                    try:
+                        expired_actors = self._actor_cleanup()
+                    except Exception as exc:
+                        append_orchestra_event(
+                            "server",
+                            f"tick #{tick_number} actor cleanup failed: {exc}",
+                            level="WARNING",
+                        )
+                        logger.bind(domain="orchestra", action="cleanup").warning(
+                            f"Actor registry cleanup failed: {exc}"
+                        )
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            import importlib
 
-                    GitClient().pack_refs_all()
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"actor cleanup failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        if expired_actors:
+                            append_orchestra_event(
+                                "server",
+                                (
+                                    f"tick #{tick_number} cleanup: expired "
+                                    f"{len(expired_actors)} actors"
+                                ),
+                                level="DEBUG",
+                            )
+                            logger.bind(domain="orchestra", action="cleanup").debug(
+                                f"Expired {len(expired_actors)} actor(s) from registry"
+                            )
+
+                # Periodic Git ref packing to prevent stale references
+                if tick_number % PACK_REFS_INTERVAL_TICKS == 0:
+                    try:
+                        from vibe3.clients import GitClient
+
+                        GitClient().pack_refs_all()
+                        append_orchestra_event(
+                            "server",
+                            f"tick #{tick_number} pack-refs completed",
+                        )
+                    except Exception as exc:
+                        append_orchestra_event(
+                            "server",
+                            f"tick #{tick_number} pack-refs failed: {exc}",
+                            level="WARNING",
+                        )
+                        logger.bind(domain="orchestra", action="maintenance").warning(
+                            f"pack-refs failed: {exc}"
+                        )
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            import importlib
+
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"pack-refs failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
+
+                # Periodic consistency check
+                # (PR merged/closed, issue closed, label anomalies, etc.)
+                if (
+                    self.config.periodic_check.enabled
+                    and tick_number % self.config.periodic_check.interval_ticks == 0
+                ):
+                    try:
+                        await self._run_periodic_check(tick_number)
+                    except Exception as exc:
+                        append_orchestra_event(
+                            "server",
+                            f"tick #{tick_number} periodic check failed: {exc}",
+                            level="WARNING",
+                        )
+                        logger.bind(
+                            domain="orchestra", action="periodic_check"
+                        ).warning(f"Periodic check failed: {exc}")
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            import importlib
+
+                            _svc = importlib.import_module("vibe3.services")
+                            _svc.record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"periodic_check failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
+
+                tasks = []
+                tick_services: list[str] = []
+                for svc in self._services:
+                    tick_services.append(svc.service_name)
+                    tasks.append(self._tick_service(svc, tick_number))
+
+                # Only log services list in DEBUG mode
+                if tick_services:
                     append_orchestra_event(
                         "server",
-                        f"tick #{tick_number} pack-refs completed",
+                        "tick #"
+                        + str(tick_number)
+                        + " services: "
+                        + ", ".join(tick_services),
+                        level="DEBUG",
                     )
-                except Exception as exc:
-                    append_orchestra_event(
-                        "server",
-                        f"tick #{tick_number} pack-refs failed: {exc}",
-                        level="WARNING",
-                    )
-                    logger.bind(domain="orchestra", action="maintenance").warning(
-                        f"pack-refs failed: {exc}"
-                    )
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Periodic consistency check
-            # (PR merged/closed, issue closed, label anomalies, etc.)
-            if (
-                self.config.periodic_check.enabled
-                and tick_number % self.config.periodic_check.interval_ticks == 0
-            ):
-                try:
-                    await self._run_periodic_check(tick_number)
-                except Exception as exc:
-                    append_orchestra_event(
-                        "server",
-                        f"tick #{tick_number} periodic check failed: {exc}",
-                        level="WARNING",
-                    )
-                    logger.bind(domain="orchestra", action="periodic_check").warning(
-                        f"Periodic check failed: {exc}"
-                    )
-
-            tasks = []
-            tick_services: list[str] = []
-            for svc in self._services:
-                tick_services.append(svc.service_name)
-                tasks.append(self._tick_service(svc, tick_number))
-
-            # Only log services list in DEBUG mode
-            if tick_services:
+                duration = time.perf_counter() - started_at
                 append_orchestra_event(
                     "server",
-                    "tick #"
-                    + str(tick_number)
-                    + " services: "
-                    + ", ".join(tick_services),
-                    level="DEBUG",
+                    f"tick #{tick_number} completed in {duration:.2f}s",
                 )
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
 
-            duration = time.perf_counter() - started_at
-            append_orchestra_event(
-                "server",
-                f"tick #{tick_number} completed in {duration:.2f}s",
-            )
+                # Check debug tick limit (existing logic)
+                if self.config.debug and tick_number >= self.config.debug_max_ticks:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            "debug tick limit reached "
+                            f"({self.config.debug_max_ticks}), stopping server"
+                        ),
+                    )
+                    self.stop()
 
-            # Check debug tick limit (existing logic)
-            if self.config.debug and tick_number >= self.config.debug_max_ticks:
-                append_orchestra_event(
-                    "server",
-                    (
-                        "debug tick limit reached "
-                        f"({self.config.debug_max_ticks}), stopping server"
-                    ),
+                # Check pool exhaustion (new logic)
+                self._exhausted_ticks = check_pool_exhaustion(
+                    self._dispatch_coordinator,
+                    self.config,
+                    self._exhausted_ticks,
+                    self.stop,
                 )
-                self.stop()
-
-            # Check pool exhaustion (new logic)
-            self._exhausted_ticks = check_pool_exhaustion(
-                self._dispatch_coordinator,
-                self.config,
-                self._exhausted_ticks,
-                self.stop,
-            )
+            finally:
+                _current_tick_id.reset(token)
 
     async def _tick_service(self, service: ServiceBase, tick_id: int) -> None:
         async with self._semaphore:
@@ -362,6 +444,21 @@ class HeartbeatServer:
                 logger.bind(domain="orchestra").warning(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
+                # Record to error_log for FailedGate monitoring
+                try:
+                    import importlib
+
+                    _svc = importlib.import_module("vibe3.services")
+                    _svc.record_error(
+                        error_code="E_DISPATCH_FAILURE",
+                        error_message=(
+                            f"tick service {type(service).__name__} "
+                            f"failed at tick #{tick_id}: {exc}"
+                        ),
+                        tick_id=tick_id,
+                    )
+                except Exception:
+                    pass
 
     async def _run_periodic_check(self, tick_number: int) -> None:
         """Run periodic consistency check (every N ticks)."""

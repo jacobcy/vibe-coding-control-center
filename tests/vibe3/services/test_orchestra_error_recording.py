@@ -111,7 +111,7 @@ class TestRecordDispatchFailureIfUnexpected:
             "Worktree not found"
         )
         assert call_args[1]["error_message"] == expected_msg
-        assert call_args[1]["tick_id"] == 0  # Manual dispatch marker
+        assert call_args[1]["tick_id"] is None  # Not specified, auto-infer
         assert call_args[1]["issue_number"] == 456
         assert call_args[1]["branch"] == "dev/test"
         """Verify None issue_number is coerced to 0 for manual dispatch."""
@@ -146,14 +146,14 @@ class TestRecordDispatchFailureIfUnexpected:
                 "manual reviewer dispatch failed [worktree_unavailable]: "
                 "Worktree resolution failed"
             ),
-            tick_id=0,  # Manual dispatch marker
+            tick_id=None,  # Not specified, auto-infer
             issue_number=0,  # Coerced from None
             branch="dev/test",
             store=ANY,
         )
 
-    def test_tick_id_always_zero_for_manual_dispatch(self) -> None:
-        """Verify tick_id is always 0 for manual dispatch (not heartbeat)."""
+    def test_tick_id_unspecified_for_manual_dispatch(self) -> None:
+        """Verify tick_id is None for manual dispatch (auto-infer from context)."""
         result = ExecutionLaunchResult(
             launched=False,
             skipped=False,
@@ -179,9 +179,9 @@ class TestRecordDispatchFailureIfUnexpected:
                 branch="dev/test",
             )
 
-        # Verify tick_id is explicitly 0, not default
+        # Verify tick_id is None, will auto-infer from contextvar
         call_args = mock_record_error.call_args
-        assert call_args[1]["tick_id"] == 0
+        assert call_args[1]["tick_id"] is None
 
     def test_exception_triggers_recording(self) -> None:
         """Verify exception param triggers record_error regardless of result."""
@@ -230,7 +230,7 @@ class TestRecordDispatchFailureIfUnexpected:
         mock_record_error.assert_called_once_with(
             error_code="E_EXEC_UNKNOWN",  # Classified by classify_error_hybrid
             error_message="manual executor dispatch failed [exception]: Test error",
-            tick_id=0,
+            tick_id=None,  # Not specified, auto-infer
             issue_number=456,
             branch="dev/test",
             store=ANY,
@@ -265,7 +265,7 @@ class TestRecordDispatchFailureIfUnexpected:
             call_args[1]["error_message"]
             == "manual reviewer dispatch failed [exception]: Unexpected error"
         )
-        assert call_args[1]["tick_id"] == 0
+        assert call_args[1]["tick_id"] is None  # Not specified, auto-infer
         assert call_args[1]["issue_number"] == 789
         assert call_args[1]["branch"] == "feature/test"
 
