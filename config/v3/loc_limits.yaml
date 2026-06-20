@@ -262,6 +262,9 @@ code_limits:
       - path: "tests/vibe3/prompts/test_prompt_manifest.py"
         limit: 600
         reason: "Prompt manifest 测试集，覆盖 PromptManifest 加载、recipe 解析、variant 处理、section specs 解析、MaterialLayer 过滤、active_layers 语义、get_section_sources provenance 提取等核心功能；Issue #2951 新增 10 个 MaterialLayer 相关测试用例（get_section_sources filtering、active_layers semantics、cross-project context、same-repo context 等）验证跨项目 prompt assembly 逻辑（+222 lines）"
+      - path: "tests/vibe3/prompts/test_material_layer.py"
+        limit: 420
+        reason: "MaterialLayer 跨项目过滤行为集成测试，3 个测试类（TestSameRepoScenario、TestCrossProjectScenario、TestCommonRulesIntegration）共 12 个测试，覆盖同仓库全部 layer 激活、跨项目 project_policy 过滤、common.rules 重分类验证（core_invariant vs project_policy）等紧密耦合场景；Issue #2951 新增，所有测试共享 PromptManifest fixture 和 active_layers 配置模式，拆分降低可读性"
       - path: "tests/vibe3/services/test_shared_errors.py"
         limit: 446
         reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file; PR #2788 follow-up added TestLogDispatchError class with 4 test methods (test_github_error_logged_as_warning_without_traceback, test_called_process_error_logged_as_warning_without_traceback, test_generic_exception_logged_with_traceback, test_long_error_message_truncated) to verify error log grading behavior for GitHub API vs internal errors (+65 lines)"
