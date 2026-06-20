@@ -164,13 +164,13 @@ code_limits:
 
       # Prompts 层 —— 允许 410-420
       - path: "src/vibe3/prompts/manifest.py"
-        limit: 410
-        reason: "Prompt recipe manifest 加载与 section source 提取；Issue #3028 follow-up 新增 _get_material_catalog_sources 和 load_for_prompts_path 方法以支持 template recipe material_catalog 来源追踪和自定义路径加载（+14 行）"
+        limit: 480
+        reason: "Prompt recipe manifest 加载与 section source 提取；Issue #3028 follow-up 新增 _get_material_catalog_sources 和 load_for_prompts_path 方法以支持 template recipe material_catalog 来源追踪和自定义路径加载（+14 行）；Issue #2951 新增 MaterialLayer 支持、get_section_sources active_layers 过滤、section source provenance 提取（+128 lines net）"
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
-        limit: 480
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines)"
+        limit: 485
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #2951 retry added active_layers import and parameter pass for correct vibe_center_policy_leak detection (+2 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -257,8 +257,11 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/prompts/test_provenance.py"
-        limit: 550
-        reason: "Prompt provenance collection and anomaly detection tests (37 cases), covering collect_dry_run_provenance, detect_anomalies, get_section_sources, write_prompt_provenance, and integration tests for all recipe types (plan/run/review/governance); PR #3049 + #3054 added section source attribution and governance scan provenance tests"
+        limit: 670
+        reason: "Prompt provenance collection and anomaly detection tests (36 cases), covering collect_dry_run_provenance, detect_anomalies, get_section_sources, write_prompt_provenance, and integration tests for all recipe types (plan/run/review/governance); PR #3049 + #3054 added section source attribution and governance scan provenance tests (+41 lines); Issue #2951 retry added test_detect_no_policy_leak_same_repo and updated existing tests to pass active_layers parameter for correct vibe_center_policy_leak detection (+155 lines)"
+      - path: "tests/vibe3/prompts/test_prompt_manifest.py"
+        limit: 600
+        reason: "Prompt manifest 测试集，覆盖 PromptManifest 加载、recipe 解析、variant 处理、section specs 解析、MaterialLayer 过滤、active_layers 语义、get_section_sources provenance 提取等核心功能；Issue #2951 新增 10 个 MaterialLayer 相关测试用例（get_section_sources filtering、active_layers semantics、cross-project context、same-repo context 等）验证跨项目 prompt assembly 逻辑（+222 lines）"
       - path: "tests/vibe3/services/test_shared_errors.py"
         limit: 446
         reason: "Shared error handling tests, covers hierarchy/uniqueness/subclass/instantiation patterns in a single cohesive file; PR #2788 follow-up added TestLogDispatchError class with 4 test methods (test_github_error_logged_as_warning_without_traceback, test_called_process_error_logged_as_warning_without_traceback, test_generic_exception_logged_with_traceback, test_long_error_message_truncated) to verify error log grading behavior for GitHub API vs internal errors (+65 lines)"
