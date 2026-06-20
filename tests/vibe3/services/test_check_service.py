@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+from vibe3.exceptions import InvalidBranchLinkError
 from vibe3.models.pr import PRState
 
 if TYPE_CHECKING:
@@ -509,19 +510,27 @@ def test_handle_pr_terminal_state_when_add_marker_fails_does_not_cleanup() -> No
 
 
 def test_transfer_dependencies_transfers_links() -> None:
-    """_transfer_dependencies should transfer dependency links to bridge issue."""
+    """_transfer_dependencies should transfer dependency links to bridge issue.
+
+    Verify that TaskService.link_issue() is called with correct parameters.
+    """
     service = _make_check_pr_service()
 
     # Mock dependents
     service.store.get_flow_dependents.return_value = ["task/dep-1", "task/dep-2"]
 
-    # Call _transfer_dependencies
-    result = service._transfer_dependencies("task/old-issue", 100, 200)
+    # Mock TaskService.link_issue to track calls
+    with patch("vibe3.services.check.pr_service.TaskService") as mock_task_service:
+        mock_task_svc = mock_task_service.return_value
+        mock_task_svc.link_issue.return_value = None
 
-    # Verify add_issue_link called for each dependent
-    assert service.store.add_issue_link.call_count == 2
-    service.store.add_issue_link.assert_any_call("task/dep-1", 200, "dependency")
-    service.store.add_issue_link.assert_any_call("task/dep-2", 200, "dependency")
+        # Call _transfer_dependencies
+        result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+        # Verify TaskService.link_issue called for each dependent
+        assert mock_task_svc.link_issue.call_count == 2
+        mock_task_svc.link_issue.assert_any_call("task/dep-1", 200, role="dependency")
+        mock_task_svc.link_issue.assert_any_call("task/dep-2", 200, role="dependency")
 
     # Verify return value
     assert result == 2
@@ -538,18 +547,21 @@ def test_transfer_dependencies_partial_failure_returns_successful_count() -> Non
         "task/dep-3",
     ]
 
-    # Second call raises exception
-    service.store.add_issue_link.side_effect = [
-        None,
-        RuntimeError("DB write failed"),
-        None,
-    ]
+    # Mock TaskService.link_issue with partial failure
+    with patch("vibe3.services.check.pr_service.TaskService") as mock_task_service:
+        mock_task_svc = mock_task_service.return_value
+        # Second call raises exception
+        mock_task_svc.link_issue.side_effect = [
+            None,
+            RuntimeError("DB write failed"),
+            None,
+        ]
 
-    result = service._transfer_dependencies("task/old-issue", 100, 200)
+        result = service._transfer_dependencies("task/old-issue", 100, 200)
 
-    # All 3 were attempted, but only 2 succeeded
-    assert service.store.add_issue_link.call_count == 3
-    assert result == 2
+        # All 3 were attempted, but only 2 succeeded
+        assert mock_task_svc.link_issue.call_count == 3
+        assert result == 2
 
 
 def test_transfer_dependencies_no_dependents_returns_zero() -> None:
@@ -559,14 +571,44 @@ def test_transfer_dependencies_no_dependents_returns_zero() -> None:
     # Mock no dependents
     service.store.get_flow_dependents.return_value = []
 
-    # Call _transfer_dependencies
-    result = service._transfer_dependencies("task/old-issue", 100, 200)
+    # Mock TaskService to verify it's not called
+    with patch("vibe3.services.check.pr_service.TaskService") as mock_task_service:
+        mock_task_svc = mock_task_service.return_value
 
-    # Verify add_issue_link not called
-    service.store.add_issue_link.assert_not_called()
+        # Call _transfer_dependencies
+        result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+        # Verify TaskService.link_issue not called
+        mock_task_svc.link_issue.assert_not_called()
 
     # Verify return value
     assert result == 0
+
+
+def test_transfer_dependencies_rejects_protected_branch() -> None:
+    """Should raise InvalidBranchLinkError when transferring to protected branch."""
+    service = _make_check_pr_service()
+
+    # Mock dependents including a protected branch
+    service.store.get_flow_dependents.return_value = ["main", "task/dep-2"]
+
+    # Mock TaskService.link_issue to raise InvalidBranchLinkError for protected branch
+    with patch("vibe3.services.check.pr_service.TaskService") as mock_task_service:
+        mock_task_svc = mock_task_service.return_value
+        # First call (main) raises error, second call (task/dep-2) succeeds
+        mock_task_svc.link_issue.side_effect = [
+            InvalidBranchLinkError("main", 200),
+            None,
+        ]
+
+        # Call _transfer_dependencies
+        result = service._transfer_dependencies("task/old-issue", 100, 200)
+
+        # Should have attempted both, but only 1 succeeded
+        assert mock_task_svc.link_issue.call_count == 2
+        mock_task_svc.link_issue.assert_any_call("main", 200, role="dependency")
+        mock_task_svc.link_issue.assert_any_call("task/dep-2", 200, role="dependency")
+        assert result == 1  # Only task/dep-2 succeeded
 
 
 def test_reset_issue_after_pr_closed_transfers_dependencies() -> None:
