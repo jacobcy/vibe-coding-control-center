@@ -283,9 +283,9 @@ def test_get_section_sources_run_plan_has_provider_sources() -> None:
     manifest = PromptManifest.load_default()
     section_sources = manifest.get_section_sources("run.plan", "coding.bootstrap")
 
-    assert len(section_sources) == 6
+    assert len(section_sources) == 7
     populated = [s for s in section_sources if s.source_kind is not None]
-    assert len(populated) == 6
+    assert len(populated) == 7
     assert all(s.source_kind == VariableSourceKind.PROVIDER for s in populated)
 
 
