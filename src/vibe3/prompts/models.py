@@ -42,7 +42,7 @@ def detect_active_layers() -> set[MaterialLayer]:
     from vibe-center are active; repo_profile and project_policy come
     from the target repo's own config.
     """
-    from vibe3.clients.runtime_assets import bundled_project_root
+    from vibe3.clients import bundled_project_root
 
     try:
         Path.cwd().resolve().relative_to(bundled_project_root())
