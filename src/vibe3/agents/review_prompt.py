@@ -28,6 +28,7 @@ from vibe3.prompts import (
     detect_active_layers,
     make_context_builder,
     resolve_common_rules_path,
+    resolve_policy_path,
 )
 
 ReviewPromptMode = Literal["first", "retry"]
@@ -172,9 +173,15 @@ def _build_review_prompt_providers(
             resolve_common_rules_path(config.review.common_rules, resolver)
         )
 
+    def common_develop_rules_section() -> str | None:
+        return build_tools_guide_section(
+            resolve_policy_path("common-develop", resolver)
+        )
+
     return {
         "review.policy": review_policy,
         "common.rules": common_rules_section,
+        "common-develop.rules": common_develop_rules_section,
         "review.snapshot_diff": lambda: build_snapshot_diff_section(
             request.structure_diff
         ),

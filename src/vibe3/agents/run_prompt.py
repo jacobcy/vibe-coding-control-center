@@ -24,6 +24,7 @@ from vibe3.prompts import (
     detect_active_layers,
     make_context_builder,
     resolve_common_rules_path,
+    resolve_policy_path,
 )
 
 
@@ -128,6 +129,11 @@ def _build_run_prompt_providers(
             )
         )
 
+    def common_develop_rules_section() -> str | None:
+        return build_tools_guide_section(
+            resolve_policy_path("common-develop", resolver)
+        )
+
     return {
         "run.plan_ref": plan_ref,
         "run.skill_content": lambda: skill_content,
@@ -135,6 +141,7 @@ def _build_run_prompt_providers(
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
         "common.rules": common_rules_section,
+        "common-develop.rules": common_develop_rules_section,
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None
         ),

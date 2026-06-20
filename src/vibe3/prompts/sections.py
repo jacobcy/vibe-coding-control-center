@@ -62,3 +62,19 @@ def resolve_common_rules_path(
         return agent_common_rules
     # Cast needed: lazy __getattr__ import loses type info
     return cast(str | None, resolver.get_policy_path("common"))
+
+
+def resolve_policy_path(
+    policy_name: str,
+    resolver: ConventionResolver,
+) -> str | None:
+    """Resolve a named policy path via convention resolver.
+
+    Args:
+        policy_name: Policy name registered in adapter manifest
+        resolver: Convention resolver for policy path resolution
+
+    Returns:
+        Resolved policy path or None
+    """
+    return cast(str | None, resolver.get_policy_path(policy_name))

@@ -306,7 +306,12 @@ recipes:
 
 
 class TestCommonRulesIntegration:
-    """Integration tests using real prompt-recipes.yaml for common.rules layer."""
+    """Integration tests using real prompt-recipes.yaml for common.rules layer.
+
+    After the common.md split:
+    - common.rules = core_invariant (vibe toolchain guidance, available everywhere)
+    - common-develop.rules = project_policy (vibe-center only)
+    """
 
     REAL_RECIPES = (
         Path(__file__).resolve().parents[3] / "config/prompts/prompt-recipes.yaml"
@@ -333,8 +338,8 @@ class TestCommonRulesIntegration:
         ("review.default", "retry.bootstrap"),
     ]
 
-    def test_common_rules_tagged_as_project_policy(self) -> None:
-        """Verify common.rules is tagged project_policy in all recipes."""
+    def test_common_rules_tagged_as_core_invariant(self) -> None:
+        """Verify common.rules is tagged core_invariant in all recipes."""
         manifest = PromptManifest.load(self.REAL_RECIPES)
 
         for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
@@ -347,56 +352,59 @@ class TestCommonRulesIntegration:
                 len(common_rules) == 1
             ), f"{tag}: want 1 common.rules, got {len(common_rules)}"
             assert (
-                common_rules[0].layer == MaterialLayer.PROJECT_POLICY
-            ), f"{tag}: should be project_policy"
+                common_rules[0].layer == MaterialLayer.CORE_INVARIANT
+            ), f"{tag}: should be core_invariant"
 
-    def test_common_rules_enabled_in_vibe_center(self) -> None:
-        """Verify common.rules is enabled when all layers are active (same-repo)."""
+    def test_common_rules_enabled_everywhere(self) -> None:
+        """Verify common.rules is enabled in both same-repo and cross-project."""
         manifest = PromptManifest.load(self.REAL_RECIPES)
 
         for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
-            sources = manifest.get_section_sources(
+            tag = f"{recipe_key}/{variant_key}"
+
+            all_sources = manifest.get_section_sources(
                 recipe_key, variant_key, active_layers=self.ALL_LAYERS
             )
-            common_rules = [s for s in sources if s.key == "common.rules"]
-            tag = f"{recipe_key}/{variant_key}"
+            common_rules = [s for s in all_sources if s.key == "common.rules"]
             assert (
                 common_rules[0].enabled is True
             ), f"{tag}: should be enabled in vibe-center"
 
-    def test_common_rules_disabled_cross_project(self) -> None:
-        """Verify common.rules is disabled in cross-project context."""
+            cross_sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.CROSS_PROJECT_LAYERS
+            )
+            cross_common = [s for s in cross_sources if s.key == "common.rules"]
+            assert (
+                cross_common[0].enabled is True
+            ), f"{tag}: should be enabled cross-project"
+
+    def test_common_develop_tagged_as_project_policy(self) -> None:
+        """Verify common-develop.rules is tagged project_policy in all recipes."""
+        manifest = PromptManifest.load(self.REAL_RECIPES)
+
+        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
+            sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.ALL_LAYERS
+            )
+            develop = [s for s in sources if s.key == "common-develop.rules"]
+            tag = f"{recipe_key}/{variant_key}"
+            assert (
+                len(develop) == 1
+            ), f"{tag}: want 1 common-develop.rules, got {len(develop)}"
+            assert (
+                develop[0].layer == MaterialLayer.PROJECT_POLICY
+            ), f"{tag}: should be project_policy"
+
+    def test_common_develop_disabled_cross_project(self) -> None:
+        """Verify common-develop.rules is disabled in cross-project context."""
         manifest = PromptManifest.load(self.REAL_RECIPES)
 
         for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
             sources = manifest.get_section_sources(
                 recipe_key, variant_key, active_layers=self.CROSS_PROJECT_LAYERS
             )
-            common_rules = [s for s in sources if s.key == "common.rules"]
+            develop = [s for s in sources if s.key == "common-develop.rules"]
             tag = f"{recipe_key}/{variant_key}"
             assert (
-                common_rules[0].enabled is False
+                develop[0].enabled is False
             ), f"{tag}: should be disabled cross-project"
-
-    def test_common_rules_provenance_consistent_across_pipelines(self) -> None:
-        """Verify common.rules provenance is consistent across plan/run/review."""
-        manifest = PromptManifest.load(self.REAL_RECIPES)
-
-        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
-            all_sources = manifest.get_section_sources(
-                recipe_key, variant_key, active_layers=self.ALL_LAYERS
-            )
-            cross_sources = manifest.get_section_sources(
-                recipe_key, variant_key, active_layers=self.CROSS_PROJECT_LAYERS
-            )
-
-            all_common = [s for s in all_sources if s.key == "common.rules"]
-            cross_common = [s for s in cross_sources if s.key == "common.rules"]
-
-            assert all_common[0].enabled is True
-            assert cross_common[0].enabled is False
-            assert (
-                all_common[0].layer
-                == cross_common[0].layer
-                == MaterialLayer.PROJECT_POLICY
-            )

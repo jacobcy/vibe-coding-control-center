@@ -78,6 +78,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: run.output_format
             source:
@@ -111,6 +116,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: run.output_format
             source:
@@ -179,6 +189,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: plan.output_format
             source:
@@ -202,6 +217,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: plan.output_format
             source:
@@ -252,6 +272,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: review.snapshot_diff
             source:
@@ -285,6 +310,11 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+            layer: core_invariant
+          - key: common-develop.rules
+            source:
+              kind: provider
+              provider: common-develop.rules
             layer: project_policy
           - key: review.snapshot_diff
             source:

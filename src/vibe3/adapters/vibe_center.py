@@ -42,6 +42,11 @@ def _build_vibe_center_manifest(
                 type="policy", name="common", path="supervisor/policies/common.md"
             ),
             AdapterResource(
+                type="policy",
+                name="common-develop",
+                path="supervisor/policies/common-develop.md",
+            ),
+            AdapterResource(
                 type="policy", name="plan", path="supervisor/policies/plan.md"
             ),
             AdapterResource(

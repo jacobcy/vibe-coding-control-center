@@ -23,6 +23,7 @@ from vibe3.prompts import (
     detect_active_layers,
     make_context_builder,
     resolve_common_rules_path,
+    resolve_policy_path,
 )
 
 PlanPromptMode = Literal["first", "retry"]
@@ -186,9 +187,15 @@ def _build_plan_prompt_providers(
             )
         )
 
+    def common_develop_rules_section() -> str | None:
+        return build_tools_guide_section(
+            resolve_policy_path("common-develop", resolver)
+        )
+
     return {
         "plan.policy": plan_policy,
         "common.rules": common_rules_section,
+        "common-develop.rules": common_develop_rules_section,
         "plan.output_format": plan_output_format,
         "plan.retry_task": plan_retry_task,
         "plan.exit_contract": plan_exit_contract,
