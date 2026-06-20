@@ -78,7 +78,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: run.output_format
             source:
               kind: provider
@@ -111,7 +111,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: run.output_format
             source:
               kind: provider
@@ -179,7 +179,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: plan.output_format
             source:
               kind: provider
@@ -202,7 +202,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: plan.output_format
             source:
               kind: provider
@@ -252,7 +252,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: review.snapshot_diff
             source:
               kind: provider
@@ -285,7 +285,7 @@ recipes:
             source:
               kind: provider
               provider: common.rules
-            layer: core_invariant
+            layer: project_policy
           - key: review.snapshot_diff
             source:
               kind: provider

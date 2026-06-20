@@ -303,3 +303,100 @@ recipes:
         # All sections should be present
         assert "Core content" in rendered
         assert "Policy content" in rendered
+
+
+class TestCommonRulesIntegration:
+    """Integration tests using real prompt-recipes.yaml for common.rules layer."""
+
+    REAL_RECIPES = (
+        Path(__file__).resolve().parents[3] / "config/prompts/prompt-recipes.yaml"
+    )
+
+    ALL_LAYERS = {
+        MaterialLayer.CORE_INVARIANT,
+        MaterialLayer.REPO_PROFILE,
+        MaterialLayer.PROJECT_POLICY,
+        MaterialLayer.RUNTIME_EVIDENCE,
+    }
+
+    CROSS_PROJECT_LAYERS = {
+        MaterialLayer.CORE_INVARIANT,
+        MaterialLayer.RUNTIME_EVIDENCE,
+    }
+
+    RECIPES_WITH_COMMON_RULES = [
+        ("run.plan", "coding.bootstrap"),
+        ("run.plan", "retry.bootstrap"),
+        ("plan.default", "first.bootstrap"),
+        ("plan.default", "retry.bootstrap"),
+        ("review.default", "first.bootstrap"),
+        ("review.default", "retry.bootstrap"),
+    ]
+
+    def test_common_rules_tagged_as_project_policy(self) -> None:
+        """Verify common.rules is tagged project_policy in all recipes."""
+        manifest = PromptManifest.load(self.REAL_RECIPES)
+
+        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
+            sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.ALL_LAYERS
+            )
+            common_rules = [s for s in sources if s.key == "common.rules"]
+            tag = f"{recipe_key}/{variant_key}"
+            assert (
+                len(common_rules) == 1
+            ), f"{tag}: want 1 common.rules, got {len(common_rules)}"
+            assert (
+                common_rules[0].layer == MaterialLayer.PROJECT_POLICY
+            ), f"{tag}: should be project_policy"
+
+    def test_common_rules_enabled_in_vibe_center(self) -> None:
+        """Verify common.rules is enabled when all layers are active (same-repo)."""
+        manifest = PromptManifest.load(self.REAL_RECIPES)
+
+        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
+            sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.ALL_LAYERS
+            )
+            common_rules = [s for s in sources if s.key == "common.rules"]
+            tag = f"{recipe_key}/{variant_key}"
+            assert (
+                common_rules[0].enabled is True
+            ), f"{tag}: should be enabled in vibe-center"
+
+    def test_common_rules_disabled_cross_project(self) -> None:
+        """Verify common.rules is disabled in cross-project context."""
+        manifest = PromptManifest.load(self.REAL_RECIPES)
+
+        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
+            sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.CROSS_PROJECT_LAYERS
+            )
+            common_rules = [s for s in sources if s.key == "common.rules"]
+            tag = f"{recipe_key}/{variant_key}"
+            assert (
+                common_rules[0].enabled is False
+            ), f"{tag}: should be disabled cross-project"
+
+    def test_common_rules_provenance_consistent_across_pipelines(self) -> None:
+        """Verify common.rules provenance is consistent across plan/run/review."""
+        manifest = PromptManifest.load(self.REAL_RECIPES)
+
+        for recipe_key, variant_key in self.RECIPES_WITH_COMMON_RULES:
+            all_sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.ALL_LAYERS
+            )
+            cross_sources = manifest.get_section_sources(
+                recipe_key, variant_key, active_layers=self.CROSS_PROJECT_LAYERS
+            )
+
+            all_common = [s for s in all_sources if s.key == "common.rules"]
+            cross_common = [s for s in cross_sources if s.key == "common.rules"]
+
+            assert all_common[0].enabled is True
+            assert cross_common[0].enabled is False
+            assert (
+                all_common[0].layer
+                == cross_common[0].layer
+                == MaterialLayer.PROJECT_POLICY
+            )
