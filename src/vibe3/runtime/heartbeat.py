@@ -246,6 +246,20 @@ class HeartbeatServer:
                     logger.bind(domain="orchestra", action="cleanup").warning(
                         f"cleanup_old_errors failed: {exc}"
                     )
+                    # Record to error_log for FailedGate monitoring
+                    try:
+                        from vibe3.services.orchestra import record_error
+
+                        record_error(
+                            error_code="E_DISPATCH_FAILURE",
+                            error_message=(
+                                f"cleanup_old_errors failed at "
+                                f"tick #{tick_number}: {exc}"
+                            ),
+                            tick_id=tick_number,
+                        )
+                    except Exception:
+                        pass
                 else:
                     if deleted_old > 0:
                         append_orchestra_event(
@@ -274,6 +288,20 @@ class HeartbeatServer:
                         logger.bind(domain="orchestra", action="cleanup").warning(
                             f"Actor registry cleanup failed: {exc}"
                         )
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            from vibe3.services.orchestra import record_error
+
+                            record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"actor cleanup failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
                     else:
                         if expired_actors:
                             append_orchestra_event(
@@ -307,6 +335,20 @@ class HeartbeatServer:
                         logger.bind(domain="orchestra", action="maintenance").warning(
                             f"pack-refs failed: {exc}"
                         )
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            from vibe3.services.orchestra import record_error
+
+                            record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"pack-refs failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
 
                 # Periodic consistency check
                 # (PR merged/closed, issue closed, label anomalies, etc.)
@@ -325,6 +367,20 @@ class HeartbeatServer:
                         logger.bind(
                             domain="orchestra", action="periodic_check"
                         ).warning(f"Periodic check failed: {exc}")
+                        # Record to error_log for FailedGate monitoring
+                        try:
+                            from vibe3.services.orchestra import record_error
+
+                            record_error(
+                                error_code="E_DISPATCH_FAILURE",
+                                error_message=(
+                                    f"periodic_check failed at "
+                                    f"tick #{tick_number}: {exc}"
+                                ),
+                                tick_id=tick_number,
+                            )
+                        except Exception:
+                            pass
 
                 tasks = []
                 tick_services: list[str] = []
@@ -384,6 +440,20 @@ class HeartbeatServer:
                 logger.bind(domain="orchestra").warning(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
+                # Record to error_log for FailedGate monitoring
+                try:
+                    from vibe3.services.orchestra import record_error
+
+                    record_error(
+                        error_code="E_DISPATCH_FAILURE",
+                        error_message=(
+                            f"tick service {type(service).__name__} "
+                            f"failed at tick #{tick_id}: {exc}"
+                        ),
+                        tick_id=tick_id,
+                    )
+                except Exception:
+                    pass
 
     async def _run_periodic_check(self, tick_number: int) -> None:
         """Run periodic consistency check (every N ticks)."""
