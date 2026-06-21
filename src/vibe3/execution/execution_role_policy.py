@@ -106,8 +106,8 @@ class ExecutionRolePolicyService:
 
     def resolve_agent_options(self, role: str) -> AgentOptions:
         agent = self.resolve_agent(role)
-        backend = self.resolve_backend(role) if not agent else None
-        model = self.resolve_model(role) if backend else None
+        backend = self.resolve_backend(role)
+        model = self.resolve_model(role)
         timeout = self.resolve_timeout(role)
 
         return AgentOptions(
