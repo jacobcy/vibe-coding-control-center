@@ -11,7 +11,7 @@ Public API:
 - Template helpers: DEFAULT_PROMPTS_PATH, resolve_prompt_template
 - Section builders: build_policy_section, build_tools_guide_section,
   resolve_common_rules_path, build_common_rules_section,
-  build_project_common_rules_section
+  build_project_common_rules_section, build_project_policy_section
 """
 
 from __future__ import annotations
@@ -61,6 +61,7 @@ if TYPE_CHECKING:
         build_common_rules_section,
         build_policy_section,
         build_project_common_rules_section,
+        build_project_policy_section,
         build_tools_guide_section,
         discover_project_scope_overlays,
         resolve_common_rules_path,
@@ -113,6 +114,7 @@ _LAZY_IMPORTS = {
     "resolve_common_rules_path": "vibe3.prompts.sections",
     "build_common_rules_section": "vibe3.prompts.sections",
     "build_project_common_rules_section": "vibe3.prompts.sections",
+    "build_project_policy_section": "vibe3.prompts.sections",
     "discover_project_scope_overlays": "vibe3.prompts.sections",
     "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
     "load_prompt_templates": "vibe3.prompts.template_loader",
@@ -185,6 +187,7 @@ __all__ = [
     "build_tools_guide_section",
     "build_common_rules_section",
     "build_project_common_rules_section",
+    "build_project_policy_section",
     "resolve_common_rules_path",
     "discover_project_scope_overlays",
     # Provenance
