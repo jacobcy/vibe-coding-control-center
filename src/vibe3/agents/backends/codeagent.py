@@ -95,55 +95,40 @@ class CodeagentBackend:
         options = effective_options  # Use resolved options for backend/model
         command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
 
-        preset_name = None
-        if (
-            original_options.agent
-            and not original_options.backend
-            and not original_options.model
-        ):
-            # Check if there's an env override for this agent
-            # If so, convert preset to backend/model flags
-            # (env override takes precedence)
-            # If not, use agent preset name (preset config applies)
-            if not has_agent_env_override(original_options.agent):
-                preset_name = resolve_repo_agent_preset_name(original_options.agent)
+        # Determine whether to use --agent or --backend/--model
+        # Env override takes precedence: use backend/model directly
+        # Otherwise, use agent preset if available
+        preset_name: str | None = None
 
-        if preset_name:
-            command.extend(["--agent", preset_name])
-            if options.model:
-                command.extend(["--model", options.model])
-        elif options.agent:
-            command.extend(["--agent", options.agent])
-            if options.model:
-                command.extend(["--model", options.model])
-        elif options.backend:
-            # Only resolve backend to agent preset if the backend
-            # wasn't from an env override
-            # Check if the original options had an agent with env override
-            if original_options.agent and has_agent_env_override(
-                original_options.agent
-            ):
-                # Backend came from env override for original agent
-                # Use backend/model directly instead of resolving to different agent
-                command.extend(["--backend", options.backend])
+        if original_options.agent:
+            if has_agent_env_override(original_options.agent):
+                # Env var override: use backend/model directly
+                if options.backend:
+                    command.extend(["--backend", options.backend])
                 if options.model:
                     command.extend(["--model", options.model])
             else:
-                # Try to resolve backend to an agent preset for full config (yolo, etc.)
-                preset_name = _resolve_backend_to_agent_preset(options.backend)
+                # No env override: use agent preset (with yolo config, etc.)
+                preset_name = resolve_repo_agent_preset_name(original_options.agent)
                 if preset_name:
-                    logger.bind(domain="agent_execution").debug(
-                        f"Resolved backend '{options.backend}' "
-                        f"to agent preset '{preset_name}'"
-                    )
                     command.extend(["--agent", preset_name])
-                    if options.model:
+                    # Only add --model if original_options didn't specify one
+                    # (preset's model will be used)
+                    if not original_options.model and options.model:
                         command.extend(["--model", options.model])
                 else:
-                    command.extend(["--backend", options.backend])
+                    # Preset not found, fall back to backend/model
+                    if options.backend:
+                        command.extend(["--backend", options.backend])
                     if options.model:
                         command.extend(["--model", options.model])
+        elif options.backend:
+            # No agent, use backend/model directly
+            command.extend(["--backend", options.backend])
+            if options.model:
+                command.extend(["--model", options.model])
         else:
+            # No agent, no backend: use default
             command.extend(["--agent", "vibe-reviewer"])
 
         command.append("--skip-permissions")
@@ -165,7 +150,7 @@ class CodeagentBackend:
         logger.bind(domain="agent_execution").debug(
             f"Built command: backend={options.backend or 'default'}, "
             f"model={options.model or 'default'}, "
-            f"agent={preset_name or options.agent or 'none'}, "
+            f"agent={preset_name or 'none'}, "
             f"cmd={' '.join(command[:6])}..."  # Truncate for readability
         )
 
