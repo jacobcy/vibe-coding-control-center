@@ -50,6 +50,7 @@ from vibe3.observability import write_prompt_provenance
 from vibe3.prompts import (
     PromptManifest,
     collect_dry_run_provenance,
+    discover_project_scope_overlays,
 )
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
@@ -190,6 +191,7 @@ def build_issue_review_request(
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.context_mode,
             prompts_path=prompts_path,
+            annotate_sections=dry_run,
         )
         fallback_prompt = None
         if meta.fallback_context_mode is not None:
@@ -199,6 +201,7 @@ def build_issue_review_request(
                 mode=meta.prompt_mode,  # type: ignore[arg-type]
                 context_mode=meta.fallback_context_mode,
                 prompts_path=prompts_path,
+                annotate_sections=dry_run,
             )
         sections = describe_review_sections(
             meta.prompt_mode,  # type: ignore[arg-type]
@@ -225,9 +228,12 @@ def build_issue_review_request(
             provenance_path = write_prompt_provenance(
                 provenance, role="reviewer", issue_number=issue.number
             )
-            # Add provenance path to dry_run_summary
+            # Add provenance path and overlays to dry_run_summary
             if dry_run_summary:
                 dry_run_summary["provenance_path"] = str(provenance_path)
+                overlays = discover_project_scope_overlays()
+                if overlays:
+                    dry_run_summary["project_scope_overlays"] = overlays
 
         return build_issue_sync_prompt_request(
             role="reviewer",
