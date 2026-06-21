@@ -21,6 +21,7 @@ from vibe3.prompts import (
     build_common_rules_section,
     build_policy_section,
     build_project_common_rules_section,
+    build_project_policy_section,
     make_context_builder,
 )
 
@@ -139,7 +140,10 @@ def _build_plan_prompt_providers(
             if plan_config.policy_file is not None
             else resolver.get_policy_path("plan")
         )
-        return build_policy_section(policy_path, "plan")
+        return build_policy_section(policy_path)
+
+    def project_plan_policy() -> str | None:
+        return build_project_policy_section("plan")
 
     def plan_output_format() -> str:
         output_format = (
@@ -169,6 +173,7 @@ def _build_plan_prompt_providers(
 
     return {
         "plan.policy": plan_policy,
+        "plan.policy@project": project_plan_policy,
         "common.rules": common_rules_section,
         "common.rules@project": project_common_rules_section,
         "plan.output_format": plan_output_format,

@@ -67,6 +67,10 @@ recipes:
             source:
               kind: provider
               provider: run.policy
+          - key: run.policy@project
+            source:
+              kind: provider
+              provider: run.policy@project
           - key: common.rules
             source:
               kind: provider
@@ -98,6 +102,10 @@ recipes:
             source:
               kind: provider
               provider: run.policy
+          - key: run.policy@project
+            source:
+              kind: provider
+              provider: run.policy@project
           - key: common.rules
             source:
               kind: provider
@@ -160,6 +168,10 @@ recipes:
             source:
               kind: provider
               provider: plan.policy
+          - key: plan.policy@project
+            source:
+              kind: provider
+              provider: plan.policy@project
           - key: common.rules
             source:
               kind: provider
@@ -187,6 +199,10 @@ recipes:
             source:
               kind: provider
               provider: plan.policy
+          - key: plan.policy@project
+            source:
+              kind: provider
+              provider: plan.policy@project
           - key: common.rules
             source:
               kind: provider
@@ -242,6 +258,10 @@ recipes:
             source:
               kind: provider
               provider: review.policy
+          - key: review.policy@project
+            source:
+              kind: provider
+              provider: review.policy@project
           - key: common.rules
             source:
               kind: provider
@@ -273,6 +293,10 @@ recipes:
             source:
               kind: provider
               provider: review.policy
+          - key: review.policy@project
+            source:
+              kind: provider
+              provider: review.policy@project
           - key: common.rules
             source:
               kind: provider

@@ -22,6 +22,7 @@ from vibe3.prompts import (
     build_common_rules_section,
     build_policy_section,
     build_project_common_rules_section,
+    build_project_policy_section,
     make_context_builder,
 )
 
@@ -105,7 +106,10 @@ def _build_run_prompt_providers(
             if run_config.policy_file is not None
             else resolver.get_policy_path("run")
         )
-        return build_policy_section(policy_path, "run")
+        return build_policy_section(policy_path)
+
+    def project_run_policy() -> str | None:
+        return build_project_policy_section("run")
 
     def mode_task(selected_mode: RunPromptMode) -> str | None:
         if not run_config:
@@ -130,6 +134,7 @@ def _build_run_prompt_providers(
         "run.coding_task": lambda: mode_task("coding"),
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
+        "run.policy@project": project_run_policy,
         "common.rules": common_rules_section,
         "common.rules@project": project_common_rules_section,
         "run.output_format": lambda: build_run_output_contract_section(

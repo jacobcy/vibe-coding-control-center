@@ -72,6 +72,32 @@ def run_full_check_shortcut() -> None:
         )
 
 
+def echo_dry_run_header(
+    role: str,
+    issue_number: int | None,
+    branch: str,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> None:
+    """Echo unified dry-run header for plan/run/review commands."""
+    issue_str = f"issue #{issue_number}" if issue_number else "adhoc"
+    typer.echo(f"-> {role} run: {issue_str} (dry-run)")
+    typer.echo(f"   branch: {branch}")
+    if backend and model:
+        actor = f"{backend}/{model}"
+    elif agent:
+        actor = agent
+    else:
+        role_to_default = {
+            "planner": "vibe-planner",
+            "executor": "vibe-executor",
+            "reviewer": "vibe-reviewer",
+        }
+        actor = role_to_default.get(role, role)
+    typer.echo(f"   actor:  {actor}")
+
+
 def _handle_codeagent_result(result: Any, label: str) -> None:
     """Display CodeagentResult and exit with error if execution failed.
 

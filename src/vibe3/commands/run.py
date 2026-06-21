@@ -122,6 +122,13 @@ def run_command(
             flow_service, target_branch, instructions, None, skill
         )
         # Publish ManualRunIntent event and wait for result
+        from vibe3.commands.common import echo_dry_run_header
+
+        if dry_run:
+            echo_dry_run_header(
+                "executor", issue_number, target_branch, agent, backend, model
+            )
+
         result = publish_and_wait(
             ManualRunIntent(
                 issue_number=issue_number,
@@ -198,6 +205,13 @@ def run_command(
         raise typer.Exit(1) from error
 
     # Publish ManualRunIntent event and wait for result
+    from vibe3.commands.common import echo_dry_run_header
+
+    if dry_run:
+        echo_dry_run_header(
+            "executor", issue_number, target_branch, agent, backend, model
+        )
+
     result = publish_and_wait(
         ManualRunIntent(
             issue_number=issue_number,

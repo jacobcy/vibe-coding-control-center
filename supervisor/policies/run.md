@@ -301,36 +301,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 执行完成后，必须基于改动文件选择合适的测试范围，而不是仅运行计划中明确提到的测试。
 
-#### 使用 pre_push_test_selector 工具
-
-项目提供了 `vibe3.analysis.pre_push_test_selector.select_pre_push_tests` 用于映射源文件到相关测试：
-
-```bash
-# 列出改动的源文件，通过 test selector 获取相关测试
-git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
-  uv run python src/vibe3/analysis/pre_push_test_selector.py
-```
-
-#### 三层映射策略
-
-1. **第一层：直接测试文件匹配**
-   - 改动 `src/vibe3/<module>/<name>.py` → 运行 `tests/vibe3/<module>/test_<name>.py`
-   - 优先级最高，必须运行
-
-2. **第二层：DAG 导入分析**
-   - 通过 import DAG 找出哪些测试间接引用了改动模块
-   - 优先级中等，建议运行
-
-3. **第三层：目录级回退**
-   - 运行改动源文件对应的整个测试目录：`tests/vibe3/<module>/`
-   - 优先级最低，覆盖面最广
-
-#### 范围过大处理
-
-如果测试范围 resolve 到 `tests/vibe3` 全量：
-- 本地只运行直接对应的测试目录（第一层和第二层）
-- 全量测试交由 CI 覆盖
-- 不要在本地盲目运行全量测试，避免超时
+项目专属的测试范围策略（pre_push_test_selector、三层映射等）见 run.policy@project。
 
 #### 测试失败处理
 
@@ -403,45 +374,6 @@ git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
 - 输出格式是否仍满足下游消费契约
 - 默认值、路径和字段名是否与代码一致
 
-### Framework 行为验证
-
-当 verification report 涉及框架（Click/Typer）行为判断时，executor 必须基于代码实际运行行为验证，而非假设参数默认值语义。
-
-#### 关键机制追踪验证
-
-executor 在 verification report 中应记录对框架关键机制的实际代码追踪：
-
-- `count=True` 选项的默认值是多少（0 vs 1），调用方是否设置了该选项
-- `ctx.meta` 的写入位置和时机（如 `main_callback` 中的 `ctx.meta["verbose"] = verbose`）
-- 继承 guard 的条件和触发结果（如 `if verbose == 1 and "verbose" in ctx.meta:` 的实际语义）
-- 最终生效值的完整链路（从入口到消费点）
-
-#### 禁止假设的声明
-
-executor 不得仅凭以下方式判断行为：
-
-- 仅看参数默认值就判断最终值（忽略 `ctx.meta` 覆盖）
-- 仅看 `count=True` 就判断级别映射（忽略实际值的数值含义）
-- 仅看单一函数签名就判断行为（忽略 callback/inheritance 链路）
-
-#### 验证方式要求
-
-当 verification report 涉及框架行为判断时，至少满足以下之一：
-
-- **代码追踪**: 从入口到消费点的完整调用链追踪，记录关键中间变量的实际值
-- **手动验证**: 在本地实际运行相关命令，观察日志级别或输出行为
-- **测试覆盖**: 相关行为是否已有测试覆盖，运行对应测试确认
-
-**验证方式与示例**:
-
-| 场景 | 验证方式 | 示例 |
-|------|----------|------|
-| `count=True` 默认值 | 代码追踪 + 手动验证 | `count=True` 默认 0，非 1 |
-| `ctx.meta` 继承 | 代码追踪全链路 | `main_callback` 设置 → 子命令读取 |
-| 继承 guard 触发条件 | 代码追踪 guard 条件 | `server_main` 中 `verbose == 1` 是该命令默认值，guard 检查是否需继承全局设置 |
-
-**注意**: 以上引用的代码路径（如 `cli.py:main_callback`）为示例，实际追踪时应基于当前项目的真实代码路径。
-
 ### 仅局部改动
 
 可以做更窄验证，但必须解释为什么窄验证足够覆盖风险。
@@ -475,26 +407,7 @@ executor 不得仅凭以下方式判断行为：
   - 如果 git status 显示有未提交改动，**不能**声称执行完成
   - 必须先完成 commit，再写 execution report
 
-### CI-like 环境验证
-
-对于以下场景，executor 必须在声称完成前验证 CI-like 环境：
-
-1. **Subprocess 测试**：涉及 subprocess 调用的测试
-   - 验证工作目录无关性
-   - 验证环境变量独立性
-   - 验证 git 路径独立性
-
-2. **Git 操作测试**：涉及 git 命令的测试
-   - 验证在 bare repository 场景下的行为
-   - 验证在不同 branch topology 下的行为
-
-3. **文件路径测试**：涉及特定路径假设的测试
-   - 验证相对路径在 CI 根目录和 worktree 中都能工作
-
-验证方式：
-- 设置 `GITHUB_ACTIONS=true` 环境变量运行测试
-- 或使用 `VIBE_CI_SIMULATE=1` 触发 pre-push CI 模拟
-- 对于 subprocess 测试，确认 mock 覆盖完整或使用 fixture
+项目专属的 CI-like 环境验证命令见 run.policy@project。
 
 ## 何时必须停止
 
