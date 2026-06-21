@@ -11,33 +11,42 @@
 - 移动或重命名符号
 - 重组模块结构
 
-验证命令：
+验证命令模板：
 ```bash
-# 直接子模块导入
+# 直接子模块导入（验证子模块自身无循环依赖）
 uv run python -c "from vibe3.<module>.<submodule> import <Symbol>"
 
-# 包级导入（验证 __init__.py 重导出链）
+# 包级导入（验证 __init__.py 重导出链无循环依赖）
 uv run python -c "from vibe3.<module> import <Symbol>"
 ```
 
-直接导入通过而包级导入失败是循环依赖的典型信号，必须在 plan 阶段记录为 finding 并标记为阻塞条件。
-
-## 三层架构跨层检查
-
-规划阶段搜索范围必须覆盖所有层：
-- `src/vibe3/services/` — 业务逻辑
-- `src/vibe3/ui/` — CLI 交互界面
-- `src/vibe3/commands/` — 命令入口
-- `tests/`、`docs/`
-
-详见 `common.rules@project` 中的「跨层一致性检查」。
+失败处理：直接导入通过而包级导入失败是循环依赖的典型信号，必须在 plan 阶段记录为 finding 并标记为阻塞条件。
 
 ## 基础设施代码参考模式
 
 编写涉及 subprocess、文件操作、环境变量的代码时，必须检查现有模式：
-- subprocess 解释器选择：使用 `sys.executable`（参考 `tests/vibe3/test_cli_bootstrap.py:38`）
+- subprocess 解释器选择：使用 `sys.executable`（参考 `tests/vibe3/test_cli_bootstrap.py:38`、`tests/vibe3/test_modularity/test_module_independence.py:37`）
 - 优先复用 `tests/` 中的现有 monkeypatch/mock 模式
-- 检查命令：`rg 'subprocess\.run\(|sys\.executable' tests/ -A 3`
+
+示例搜索命令：
+```bash
+rg 'subprocess\.run\(' tests/ -A 5
+rg '"python"' tests/
+```
+
+## 环境变量语义验证示例（TMUX 参考案例）
+
+```bash
+# 验证 TMUX 环境变量语义
+echo $TMUX
+# 输出: /private/tmp/tmux-501/default,4658,123
+# 结论: TMUX env var 是 socket path，不是 session name
+
+# 获取实际 session name
+tmux display-message -p '#{session_name}'
+# 输出: vibe3-executor-issue-42
+# 结论: 需要用 tmux display-message 获取 session name
+```
 
 ## 测试范围路径约定
 
@@ -48,15 +57,4 @@ uv run python -c "from vibe3.<module> import <Symbol>"
 
 ## ADR 约束
 
-规划前必须查看 `docs/decisions/INDEX.md` 和相关 accepted ADR，确认计划不违反任何当前有效 ADR。若需偏离，必须在 plan 中显式提议 supersede。
-
-## 环境变量语义验证示例
-
-```bash
-# 确认环境变量实际语义
-echo $<ENV_VAR>
-# 输出: <实际值>
-# 结论: <实际语义 vs 假设语义>
-```
-
-TMUX 参考案例：`echo $TMUX` 返回 socket path 而非 session name；需用 `tmux display-message -p '#{session_name}'` 获取 session name。
+规划前必须查看 `docs/decisions/INDEX.md` 和相关 accepted ADR，确认计划不违反任何当前有效 ADR。
