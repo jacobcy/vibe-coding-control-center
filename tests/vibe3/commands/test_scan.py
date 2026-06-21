@@ -51,9 +51,10 @@ class TestScanCommand:
     def test_material_override_propagates_to_event(self, mock_publish_wait: MagicMock):
         """Test material_override is passed to GovernanceScanStarted event."""
         from vibe3.commands.scan import _publish_and_wait_governance_event
+        from vibe3.models import ExecutionLaunchResult
 
-        # Mock successful execution result
-        mock_result = MagicMock()
+        # Mock successful execution result with correct type
+        mock_result = MagicMock(spec=ExecutionLaunchResult)
         mock_result.launched = True
         mock_publish_wait.return_value = mock_result
 

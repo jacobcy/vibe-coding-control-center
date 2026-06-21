@@ -104,10 +104,12 @@ class TestGovernanceScanHandler:
         mock_coordinator.dispatch_execution.assert_called_once()
         call_args = mock_coordinator.dispatch_execution.call_args
 
+        # Get the ExecutionRequest object
+        request = call_args.args[0]
+
         # Check that the command includes --material roadmap-intake
-        cmd = call_args.kwargs.get("cmd")
-        if cmd is None:
-            cmd = call_args.args[0]
+        cmd = request.cmd
+        assert isinstance(cmd, list), f"Expected cmd to be list, got {type(cmd)}"
         assert "--material" in cmd, f"Expected --material in cmd: {cmd}"
         assert "roadmap-intake" in cmd, f"Expected roadmap-intake in cmd: {cmd}"
 
