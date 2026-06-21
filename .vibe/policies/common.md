@@ -1,8 +1,7 @@
 # Vibe-Center Project Rules
 
-> **Scope**: project scope — 追加到 `~/.vibe/policies/common.md` (user scope) 之后
-> **同名文件，不同目录**：`~/.vibe/policies/common.md` (user) + `.vibe/policies/common.md` (project)
-> **加载方式**: `build_common_rules_section()` 先加载 user scope 再追加 project scope
+> **Scope**: project scope — 追加到 user scope 同级策略文件之后
+> **用途**: vibe-center 项目专属的开发规则和约定
 
 ## 跨层一致性检查
 

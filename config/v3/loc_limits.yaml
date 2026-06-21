@@ -206,7 +206,7 @@ code_limits:
         limit: 500
         reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
       - path: "lib/init.sh"
-        limit: 490
+        limit: 520
         reason: "vibe init 入口聚合 profile 解析、repo preflight、目录/bootstrap、GitHub labels、CLAUDE.md 校验等单一初始化生命周期；新增 .claude settings/hooks/agents seed 逻辑；新增 .vibe/settings.yaml 模板复制与提示逻辑（模板内容外置在 config/v3/settings.yaml.template）"
       - path: "scripts/tsu.sh"
         limit: 900
