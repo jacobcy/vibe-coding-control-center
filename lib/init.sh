@@ -99,6 +99,30 @@ _generate_settings_yaml() {
     _log_success "Created: .vibe/settings.yaml"
 }
 
+_seed_project_policies() {
+    local repo_root="$1"
+    local policies_dir="$repo_root/.vibe/policies"
+    local common_md="$policies_dir/common.md"
+
+    mkdir -p "$policies_dir"
+
+    if [[ -f "$common_md" ]]; then
+        _log_info "Already exists: .vibe/policies/common.md (skipped, not overwritten)"
+        return 0
+    fi
+
+    cat > "$common_md" << 'POLICIES_EOF'
+# Project-Specific Rules
+
+> **Scope**: project scope — 追加到 `~/.vibe/policies/common.md` (user scope) 之后
+> **用途**: 在此添加本项目的专属规则和约定
+
+<!-- 在此处添加项目专属内容 -->
+POLICIES_EOF
+
+    _log_success "Created: .vibe/policies/common.md"
+}
+
 # --- Main Function ---
 vibe_init() {
     # Enable strict mode for this function only
@@ -229,6 +253,7 @@ vibe_init() {
         echo "This will:"
         echo "  - Create .vibe/config.yaml (profile: $PROFILE_NAME)"
         echo "  - Create .vibe/settings.yaml (project override template)"
+        echo "  - Create .vibe/policies/common.md (project-specific rules)"
 
         # Show profile-specific actions (variables already defined above)
         if [[ "$ENABLE_AGENT" == true ]]; then
@@ -268,6 +293,9 @@ vibe_init() {
 
     # 3b. Create .vibe/settings.yaml override template
     _generate_settings_yaml "$REPO_ROOT"
+
+    # 3c. Seed .vibe/policies/common.md for project-specific rules
+    _seed_project_policies "$REPO_ROOT"
 
     # 4. Create necessary directories (profile-dependent)
     _log_info "Creating directory structure..."

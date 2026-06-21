@@ -1,18 +1,24 @@
-"""Shared prompt section builders.
-
-Public API:
-- ``build_tools_guide_section`` — build tools guide section from file
-- ``resolve_common_rules_path`` — resolve common rules path from config or resolver
-"""
-
 from __future__ import annotations
 
 from typing import cast
 
-from loguru import logger
-
 from vibe3.clients import resolve_runtime_asset
 from vibe3.config import ConventionResolver
+
+PROJECT_POLICIES_DIR = ".vibe/policies"
+
+
+def _read_file(path: str | None) -> str | None:
+    """Read file content, returning None if path is None or file doesn't exist."""
+    if not path:
+        return None
+    resolved = resolve_runtime_asset(path)
+    if not resolved.exists():
+        return None
+    try:
+        return resolved.read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
@@ -26,23 +32,37 @@ def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
     Returns:
         Tools guide section or None if not configured/available
     """
-    if not tools_guide_path:
+    content = _read_file(tools_guide_path)
+    if content is None:
         return None
+    return f"## Available Tools\n\n{content}"
 
-    log = logger.bind(domain="context_builder", action="build_tools_guide_section")
-    path = resolve_runtime_asset(tools_guide_path)
-    if not path.exists():
-        return None
 
-    try:
-        tools_guide = path.read_text(encoding="utf-8")
-        log.success("Tools guide section built")
-        return f"## Available Tools\n\n{tools_guide}"
-    except OSError as e:
-        log.bind(error=str(e), path=str(tools_guide_path)).warning(
-            "Could not read tools guide"
-        )
-        return None
+def build_policy_section(
+    user_path: str | None,
+    policy_name: str,
+) -> str | None:
+    """Build a policy section with user + project scope.
+
+    Loads user-scope policy from user_path, then appends project-scope
+    content from .vibe/policies/{policy_name}.md if it exists.
+
+    Args:
+        user_path: Path to the user-scope policy file
+        policy_name: Policy name used to locate the project-scope counterpart
+
+    Returns:
+        Combined policy content or None
+    """
+    user_content = _read_file(user_path)
+    project_content = _read_file(f"{PROJECT_POLICIES_DIR}/{policy_name}.md")
+
+    if project_content:
+        if user_content:
+            return f"{user_content}\n\n{project_content}"
+        return project_content
+
+    return user_content
 
 
 def resolve_common_rules_path(
@@ -62,3 +82,31 @@ def resolve_common_rules_path(
         return agent_common_rules
     # Cast needed: lazy __getattr__ import loses type info
     return cast(str | None, resolver.get_policy_path("common"))
+
+
+def build_common_rules_section(
+    agent_common_rules: str | None,
+    resolver: ConventionResolver,
+) -> str | None:
+    """Build common rules section with user + project scope.
+
+    Uses build_tools_guide_section for the user part (formatted with
+    ## Available Tools header), then appends raw project-scope content.
+
+    Args:
+        agent_common_rules: Configured common rules path from agent config
+        resolver: Convention resolver for fallback policy path resolution
+
+    Returns:
+        Combined common rules section or None
+    """
+    user_path = resolve_common_rules_path(agent_common_rules, resolver)
+    user_section = build_tools_guide_section(user_path)
+    project_content = _read_file(f"{PROJECT_POLICIES_DIR}/common.md")
+
+    if project_content:
+        if user_section:
+            return f"{user_section}\n\n{project_content}"
+        return project_content
+
+    return user_section

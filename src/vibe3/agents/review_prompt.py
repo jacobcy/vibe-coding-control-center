@@ -16,43 +16,18 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.analysis import build_snapshot_diff_section
-from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (
-    ContextBuilderError,
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    build_tools_guide_section,
+    build_common_rules_section,
+    build_policy_section,
     make_context_builder,
-    resolve_common_rules_path,
 )
 
 ReviewPromptMode = Literal["first", "retry"]
-
-
-def _build_policy_section(policy_path: str) -> str:
-    """Build policy section from file.
-
-    Source: config/v3/settings.yaml (review.policy_file)
-
-    Args:
-        policy_path: Path to review policy markdown file
-
-    Returns:
-        Policy markdown content
-
-    Raises:
-        ContextBuilderError: Cannot read policy file
-    """
-    log = logger.bind(domain="context_builder", action="build_policy_section")
-    try:
-        content = resolve_runtime_asset(policy_path).read_text(encoding="utf-8")
-        log.success("Policy section built")
-        return content
-    except OSError as e:
-        raise ContextBuilderError(f"Cannot read policy: {e}") from e
 
 
 def _build_ast_analysis_section(
@@ -155,18 +130,16 @@ def _build_review_prompt_providers(
 
     resolver = get_resolver()
 
-    def review_policy() -> str:
+    def review_policy() -> str | None:
         policy_path = (
             config.review.policy_file
             if config.review.policy_file is not None
             else resolver.get_policy_path("review")
         )
-        return _build_policy_section(policy_path) if policy_path else ""
+        return build_policy_section(policy_path, "review")
 
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(
-            resolve_common_rules_path(config.review.common_rules, resolver)
-        )
+        return build_common_rules_section(config.review.common_rules, resolver)
 
     return {
         "review.policy": review_policy,

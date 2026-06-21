@@ -12,40 +12,18 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    build_tools_guide_section,
+    build_common_rules_section,
+    build_policy_section,
     make_context_builder,
-    resolve_common_rules_path,
 )
 
 PlanPromptMode = Literal["first", "retry"]
-
-
-def _build_plan_policy_section(policy_path: str | None) -> str | None:
-    """Build plan policy section from file."""
-    if not policy_path:
-        return None
-
-    log = logger.bind(domain="plan_context_builder", action="build_plan_policy_section")
-    path = resolve_runtime_asset(policy_path)
-    if not path.exists():
-        return None
-
-    try:
-        content = path.read_text(encoding="utf-8")
-        log.success("Plan policy section built")
-        return content
-    except OSError as e:
-        log.bind(error=str(e), path=str(policy_path)).warning(
-            "Could not read plan policy"
-        )
-        return None
 
 
 def _build_plan_task_section(
@@ -156,9 +134,7 @@ def _build_plan_prompt_providers(
             if plan_config.policy_file is not None
             else resolver.get_policy_path("plan")
         )
-        if policy_path:
-            return _build_plan_policy_section(policy_path)
-        return None
+        return build_policy_section(policy_path, "plan")
 
     def plan_output_format() -> str:
         output_format = (
@@ -176,10 +152,8 @@ def _build_plan_prompt_providers(
         return _build_plan_task_section(task_request, plan_task_text)
 
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(
-            resolve_common_rules_path(
-                plan_config.common_rules if plan_config else None, resolver
-            )
+        return build_common_rules_section(
+            plan_config.common_rules if plan_config else None, resolver
         )
 
     return {

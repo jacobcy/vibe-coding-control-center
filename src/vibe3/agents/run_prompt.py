@@ -13,16 +13,15 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    build_tools_guide_section,
+    build_common_rules_section,
+    build_policy_section,
     make_context_builder,
-    resolve_common_rules_path,
 )
 
 
@@ -105,11 +104,7 @@ def _build_run_prompt_providers(
             if run_config.policy_file is not None
             else resolver.get_policy_path("run")
         )
-        if policy_path:
-            path = resolve_runtime_asset(policy_path)
-            if path.exists():
-                return path.read_text(encoding="utf-8")
-        return None
+        return build_policy_section(policy_path, "run")
 
     def mode_task(selected_mode: RunPromptMode) -> str | None:
         if not run_config:
@@ -121,10 +116,8 @@ def _build_run_prompt_providers(
         return getattr(run_config, "coding_task", None)
 
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(
-            resolve_common_rules_path(
-                run_config.common_rules if run_config else None, resolver
-            )
+        return build_common_rules_section(
+            run_config.common_rules if run_config else None, resolver
         )
 
     return {
