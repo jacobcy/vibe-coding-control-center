@@ -1,7 +1,7 @@
 """Tests for scan CLI command."""
 
 import re
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -46,6 +46,30 @@ class TestScanCommand:
         output = _strip_ansi(result.output)
         assert "Run both governance and supervisor scans once" in output
         assert "--dry-run" in output
+
+    @patch("vibe3.models.publish_and_wait")
+    def test_material_override_propagates_to_event(self, mock_publish_wait: MagicMock):
+        """Test material_override is passed to GovernanceScanStarted event."""
+        from vibe3.commands.scan import _publish_and_wait_governance_event
+
+        # Mock successful execution result
+        mock_result = MagicMock()
+        mock_result.launched = True
+        mock_publish_wait.return_value = mock_result
+
+        # Call with material_override
+        result = _publish_and_wait_governance_event(
+            material_override="roadmap-intake", tick_count=0
+        )
+
+        # Verify event was published with correct material_override
+        assert result is not None
+        mock_publish_wait.assert_called_once()
+        event = mock_publish_wait.call_args.args[0]
+
+        # Check event attributes
+        assert event.material_override == "roadmap-intake"
+        assert event.tick_count == 0
 
 
 class TestGovernanceScan:

@@ -272,7 +272,12 @@ class CodeagentBackend:
         keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start codeagent-wrapper in tmux and return the async handle."""
-        sync_models_json(options)
+        try:
+            sync_models_json(options)
+        except (OSError, Exception) as e:
+            logger.bind(domain="agent_execution").warning(
+                f"sync_models_json failed, continuing with execution: {e}"
+            )
 
         prompt_file_path, _ = prepare_prompt_file(prompt)
         command = self._build_command(
@@ -310,7 +315,12 @@ class CodeagentBackend:
         dry_run_summary: dict[str, object] | None = None,
     ) -> AgentResult:
         """Run codeagent-wrapper synchronously."""
-        sync_models_json(options)
+        try:
+            sync_models_json(options)
+        except (OSError, Exception) as e:
+            logger.bind(domain="agent_execution").warning(
+                f"sync_models_json failed, continuing with execution: {e}"
+            )
 
         project_root = str(cwd or Path.cwd())
         prompt_file_path, prompt_content = prepare_prompt_file(
