@@ -114,6 +114,11 @@ def _review_branch_impl(
         )
         raise typer.Exit(1)
 
+    from vibe3.commands.common import echo_dry_run_header
+
+    if dry_run:
+        echo_dry_run_header("reviewer", issue_number, branch, agent, backend, model)
+
     # Publish ManualReviewIntent event and wait for result
     result = publish_and_wait(
         ManualReviewIntent(
@@ -317,6 +322,13 @@ def base(
         resolved_base.base_branch,
         flow_service=flow_service,
     )
+
+    from vibe3.commands.common import echo_dry_run_header
+
+    if dry_run:
+        echo_dry_run_header(
+            "reviewer", issue_number, current_branch, agent, backend, model
+        )
 
     # Publish ManualReviewIntent event (handler will execute)
     # TODO(#2920): migrate base subcommand to publish_and_wait() pattern
