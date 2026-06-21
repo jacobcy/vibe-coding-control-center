@@ -63,17 +63,18 @@ class TestOpenCodeBackendVerification:
             prompt_file = tmp_path / "prompt.md"
             prompt_file.write_text("test prompt")
             command = CodeagentBackend._build_command(
-                resolved,
+                options,  # original_options
+                resolved,  # effective_options
                 str(prompt_file),
                 task="test task",
             )
 
-            # Verify command contains --backend opencode
-            assert "--backend" in command
-            backend_idx = command.index("--backend")
-            assert command[backend_idx + 1] == "opencode"
+            # Verify command uses --agent to preserve preset config (yolo, etc.)
+            assert "--agent" in command
+            agent_idx = command.index("--agent")
+            assert command[agent_idx + 1] == "vibe-executor"
 
-            # Verify command contains the model
+            # Verify command contains the model override
             assert "--model" in command
             model_idx = command.index("--model")
             assert command[model_idx + 1] == "my-provider/gpt-4o"
