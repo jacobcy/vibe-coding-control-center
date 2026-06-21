@@ -38,6 +38,7 @@ from vibe3.execution import (
     load_session_id,
 )
 from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
+from vibe3.prompts import discover_project_scope_overlays
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
@@ -320,6 +321,10 @@ def execute_manual_run(
             annotate_sections=dry_run,
         )()
         dry_run_summary["fallback_context_mode"] = "bootstrap"
+    if dry_run:
+        overlays = discover_project_scope_overlays()
+        if overlays:
+            dry_run_summary["project_scope_overlays"] = overlays
     include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
 
     command = create_codeagent_command(
