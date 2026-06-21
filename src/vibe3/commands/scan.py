@@ -32,6 +32,7 @@ def _publish_and_wait_governance_event(
     event = GovernanceScanStarted(
         tick_count=tick_count,
         execution_count=0,
+        material_override=material_override,
         actor="cli:scan-governance",
     )
     result = publish_and_wait(event)  # type: ignore[operator]

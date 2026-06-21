@@ -28,6 +28,8 @@ def sync_models_json(options: AgentOptions) -> None:
 
     Also syncs the complete agents dictionary from repo config to ensure
     codeagent-wrapper can resolve agent presets with their yolo settings.
+
+    Uses atomic write (temp file + rename) to prevent corruption from concurrent writes.
     """
     effective = resolve_effective_agent_options(options)
     if not effective.backend:
@@ -55,13 +57,20 @@ def sync_models_json(options: AgentOptions) -> None:
 
     try:
         MODELS_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MODELS_JSON_PATH.write_text(json.dumps(existing, indent=2))
+        # Atomic write: write to temp file then rename
+        tmp_path = MODELS_JSON_PATH.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(existing, indent=2))
+        tmp_path.rename(MODELS_JSON_PATH)
         logger.bind(
             domain="review_runner",
             backend=effective.backend,
             model=effective.model,
-        ).debug("Synced models.json")
+        ).debug("Synced models.json (atomic write)")
     except Exception as exc:
-        logger.bind(domain="review_runner").warning(
-            f"Failed to write models.json: {exc}"
-        )
+        logger.bind(
+            domain="review_runner",
+            path=str(MODELS_JSON_PATH),
+            backend=effective.backend,
+            model=effective.model,
+        ).error(f"Failed to write models.json: {exc}")
+        raise
