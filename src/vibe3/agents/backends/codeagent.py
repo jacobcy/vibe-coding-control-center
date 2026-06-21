@@ -76,14 +76,23 @@ class CodeagentBackend:
 
     @staticmethod
     def _build_command(
-        options: AgentOptions,
+        original_options: AgentOptions,
+        effective_options: AgentOptions,
         prompt_file_path: str,
         task: str | None = None,
         session_id: str | None = None,
     ) -> list[str]:
-        """Build codeagent-wrapper command."""
-        original_options = options
-        options = resolve_effective_agent_options(options)
+        """Build codeagent-wrapper command.
+
+        Args:
+            original_options: Original options with agent name
+                (may have backend/model=None)
+            effective_options: Resolved options with backend/model filled in
+            prompt_file_path: Path to prompt file
+            task: Optional task string
+            session_id: Optional session ID for resume
+        """
+        options = effective_options  # Use resolved options for backend/model
         command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
 
         preset_name = None
@@ -91,9 +100,13 @@ class CodeagentBackend:
             original_options.agent
             and not original_options.backend
             and not original_options.model
-            and not has_agent_env_override(original_options.agent)
         ):
-            preset_name = resolve_repo_agent_preset_name(original_options.agent)
+            # Check if there's an env override for this agent
+            # If so, convert preset to backend/model flags
+            # (env override takes precedence)
+            # If not, use agent preset name (preset config applies)
+            if not has_agent_env_override(original_options.agent):
+                preset_name = resolve_repo_agent_preset_name(original_options.agent)
 
         if preset_name:
             command.extend(["--agent", preset_name])
@@ -104,20 +117,32 @@ class CodeagentBackend:
             if options.model:
                 command.extend(["--model", options.model])
         elif options.backend:
-            # Try to resolve backend to an agent preset for full config (yolo, etc.)
-            preset_name = _resolve_backend_to_agent_preset(options.backend)
-            if preset_name:
-                logger.bind(domain="agent_execution").debug(
-                    f"Resolved backend '{options.backend}' "
-                    f"to agent preset '{preset_name}'"
-                )
-                command.extend(["--agent", preset_name])
-                if options.model:
-                    command.extend(["--model", options.model])
-            else:
+            # Only resolve backend to agent preset if the backend
+            # wasn't from an env override
+            # Check if the original options had an agent with env override
+            if original_options.agent and has_agent_env_override(
+                original_options.agent
+            ):
+                # Backend came from env override for original agent
+                # Use backend/model directly instead of resolving to different agent
                 command.extend(["--backend", options.backend])
                 if options.model:
                     command.extend(["--model", options.model])
+            else:
+                # Try to resolve backend to an agent preset for full config (yolo, etc.)
+                preset_name = _resolve_backend_to_agent_preset(options.backend)
+                if preset_name:
+                    logger.bind(domain="agent_execution").debug(
+                        f"Resolved backend '{options.backend}' "
+                        f"to agent preset '{preset_name}'"
+                    )
+                    command.extend(["--agent", preset_name])
+                    if options.model:
+                        command.extend(["--model", options.model])
+                else:
+                    command.extend(["--backend", options.backend])
+                    if options.model:
+                        command.extend(["--model", options.model])
         else:
             command.extend(["--agent", "vibe-reviewer"])
 
@@ -280,8 +305,11 @@ class CodeagentBackend:
             )
 
         prompt_file_path, _ = prepare_prompt_file(prompt)
+        original_options = options
+        effective_options = resolve_effective_agent_options(options)
         command = self._build_command(
-            options,
+            original_options,
+            effective_options,
             str(prompt_file_path),
             task=task,
             session_id=session_id,
@@ -331,6 +359,7 @@ class CodeagentBackend:
         diagnostic_prompt_length = len(prompt_content)
 
         # Log prompt metadata before execution for debugging
+        original_options = options
         effective_options = resolve_effective_agent_options(options)
         logger.bind(domain="agent_execution").debug(
             "Executing codeagent-wrapper: "
@@ -341,7 +370,8 @@ class CodeagentBackend:
 
         try:
             command = self._build_command(
-                options,
+                original_options,
+                effective_options,
                 str(prompt_file_path),
                 task=task,
                 session_id=session_id,
@@ -405,7 +435,8 @@ class CodeagentBackend:
                         )
                         diagnostic_prompt_length = len(fallback_prompt_content)
                     retry_command = self._build_command(
-                        options,
+                        original_options,
+                        effective_options,
                         str(retry_prompt_path),
                         task=task,
                         session_id=None,
