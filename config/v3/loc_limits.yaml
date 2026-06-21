@@ -169,8 +169,8 @@ code_limits:
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance.py"
-        limit: 480
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines)"
+        limit: 490
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -225,11 +225,11 @@ code_limits:
         limit: 500
         reason: "Heartbeat server 核心运行时，包含 tick loop、FailedGate 检查、error tracking cleanup、actor registry cleanup 等紧密耦合逻辑；Issue #3022 新增 tick_id contextvar 传播（+10 行 net）和 5 处 heartbeat 错误记录修复（+82 行，显式传入 tick_number 到 record_error）"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 480
-        reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持；Issue #3074 新增 _resolve_backend_to_agent_preset 辅助函数和诊断日志（+44 行）用于 backend 到 agent preset 的映射以支持 yolo 等完整 preset 配置传递"
+        limit: 490
+        reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持；Issue #3074 新增 _resolve_backend_to_agent_preset 辅助函数和诊断日志（+44 行）用于 backend 到 agent preset 的映射以支持 yolo 等完整 preset 配置传递；Issue #3074 follow-up 新增 VIBE_BACKEND_*/VIBE_MODEL_* env passthrough 逻辑（+8 行）确保环境变量覆盖传递到 async 子进程"
       - path: "src/vibe3/agents/backends/async_launcher.py"
-        limit: 410
-        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；新增 VIBE3_ASYNC_CHILD 到 CRITICAL_ENV_PASSTHROUGH 修复 pre-push hook 测试失败"
+        limit: 420
+        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；Issue #3074 新增 VIBE_BACKEND_*/VIBE_MODEL_* 到 CRITICAL_ENV_PASSTHROUGH（+8 行）确保环境变量覆盖传递到 async 子进程"
       - path: "src/vibe3/environment/worktree_lifecycle.py"
         limit: 500
         reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
