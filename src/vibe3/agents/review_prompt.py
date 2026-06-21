@@ -25,6 +25,7 @@ from vibe3.prompts import (
     build_common_rules_section,
     build_policy_section,
     build_project_common_rules_section,
+    build_project_policy_section,
     make_context_builder,
 )
 
@@ -137,7 +138,10 @@ def _build_review_prompt_providers(
             if config.review.policy_file is not None
             else resolver.get_policy_path("review")
         )
-        return build_policy_section(policy_path, "review")
+        return build_policy_section(policy_path)
+
+    def project_review_policy() -> str | None:
+        return build_project_policy_section("review")
 
     def common_rules_section() -> str | None:
         return build_common_rules_section(config.review.common_rules, resolver)
@@ -147,6 +151,7 @@ def _build_review_prompt_providers(
 
     return {
         "review.policy": review_policy,
+        "review.policy@project": project_review_policy,
         "common.rules": common_rules_section,
         "common.rules@project": project_common_rules_section,
         "review.snapshot_diff": lambda: build_snapshot_diff_section(

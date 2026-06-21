@@ -7,11 +7,12 @@ from vibe3.config import ConventionResolver
 
 PROJECT_POLICIES_DIR = ".vibe/policies"
 
-# Maps section key → policy file name in PROJECT_POLICIES_DIR
+# Maps @project section key → policy file name in PROJECT_POLICIES_DIR
 _SECTION_POLICY_NAMES: dict[str, str] = {
-    "plan.policy": "plan",
-    "run.policy": "run",
-    "review.policy": "review",
+    "common.rules@project": "common",
+    "plan.policy@project": "plan",
+    "run.policy@project": "run",
+    "review.policy@project": "review",
 }
 
 
@@ -61,29 +62,35 @@ def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
 
 def build_policy_section(
     user_path: str | None,
-    policy_name: str,
 ) -> str | None:
-    """Build a policy section with user + project scope.
+    """Build a user-scope policy section.
 
-    Loads user-scope policy from user_path, then appends project-scope
-    content from .vibe/policies/{policy_name}.md if it exists.
+    Reads only the user-scope policy file. Project-scope content is handled
+    separately as a dedicated @project recipe section via
+    ``build_project_policy_section()``.
 
     Args:
         user_path: Path to the user-scope policy file
-        policy_name: Policy name used to locate the project-scope counterpart
 
     Returns:
-        Combined policy content or None
+        Policy content or None
     """
-    user_content = _read_file(user_path)
-    project_content = _read_file(f"{PROJECT_POLICIES_DIR}/{policy_name}.md")
+    return _read_file(user_path)
 
-    if project_content:
-        if user_content:
-            return f"{user_content}\n\n{project_content}"
-        return project_content
 
-    return user_content
+def build_project_policy_section(policy_name: str) -> str | None:
+    """Build a project-scope policy section from .vibe/policies/{policy_name}.md.
+
+    This is the project-scope counterpart to ``build_policy_section()``,
+    following the same pattern as ``build_project_common_rules_section()``.
+
+    Args:
+        policy_name: Policy name matching the .md file basename
+
+    Returns:
+        Project-scope policy content or None
+    """
+    return _read_file(f"{PROJECT_POLICIES_DIR}/{policy_name}.md")
 
 
 def resolve_common_rules_path(
