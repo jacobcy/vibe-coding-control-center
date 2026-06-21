@@ -42,7 +42,7 @@ def test_execute_manual_review_sync_imports_session_service_from_execution(
         dry_run=True,
         instructions="smoke",
         branch="task/issue-2023",
-        context_builder=lambda _request, _config: (lambda: "context"),
+        context_builder=lambda _request, _config, **_: (lambda: "context"),
         agent="reviewer-fast",
         backend="codex",
         model="gpt-5.4",

@@ -43,7 +43,11 @@ from vibe3.models import (
     WorktreeRequirement,
 )
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    discover_project_scope_overlays,
+)
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,
@@ -276,9 +280,12 @@ def build_plan_sync_request(
         provenance_path = write_prompt_provenance(
             provenance, role="planner", issue_number=issue.number
         )
-        # Add provenance path to dry_run_summary
+        # Add provenance path and project-scope overlays to dry_run_summary
         if dry_run_summary:
             dry_run_summary["provenance_path"] = str(provenance_path)
+            overlays = discover_project_scope_overlays()
+            if overlays:
+                dry_run_summary["project_scope_overlays"] = overlays
 
     task = f"Create implementation plan for issue #{issue.number}: {issue.title}"
 
@@ -489,13 +496,34 @@ def execute_spec_plan_sync(
     show_prompt: bool = False,
 ) -> CodeagentResult:
     """Execute spec plan in sync mode (direct execution)."""
-    from vibe3.execution import load_session_id
+    from vibe3.execution import build_prompt_meta, load_session_id
 
     cfg = config or VibeConfig.get_defaults()
     session_id = None if fresh_session else load_session_id("planner", branch)
+
+    dry_run_summary: dict[str, Any] | None = None
+    if dry_run:
+        meta = build_prompt_meta(
+            None,
+            ref_keys=("plan_ref",),
+            retry_ref_keys=("plan_ref",),
+            session_id=session_id,
+            default_mode="first",
+        )
+        sections = describe_plan_sections(
+            meta.prompt_mode,  # type: ignore[arg-type]
+            meta.context_mode,  # type: ignore[arg-type]
+        )
+        dry_run_summary = meta.summary(sections)
+        overlays = discover_project_scope_overlays()
+        if overlays:
+            dry_run_summary["project_scope_overlays"] = overlays
+
     command = create_codeagent_command(
         role="planner",
-        context_builder=make_plan_context_builder(request, cfg),
+        context_builder=make_plan_context_builder(
+            request, cfg, annotate_sections=dry_run
+        ),
         task=request.task_guidance,
         dry_run=dry_run,
         show_prompt=show_prompt,
@@ -508,5 +536,6 @@ def execute_spec_plan_sync(
         backend=backend,
         model=model,
         session_id=session_id,
+        dry_run_summary=dry_run_summary,
     )
     return CodeagentExecutionService(cfg).execute_sync(command)

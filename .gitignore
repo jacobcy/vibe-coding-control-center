@@ -120,8 +120,10 @@ wt-*/
 .worktrees/
 
 # Local runtime artifacts (not shared)
-.vibe/
+.vibe/*
 !.vibe/config.yaml
+!.vibe/policies/
+!.vibe/policies/common.md
 .repomix/
 .hypothesis/
 .agent/plans/

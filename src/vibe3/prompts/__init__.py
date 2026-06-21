@@ -9,7 +9,9 @@ Public API:
 - ProviderRegistry: provider registration and dispatch
 - Exceptions: PromptAssemblyError, MissingVariableError, etc.
 - Template helpers: DEFAULT_PROMPTS_PATH, resolve_prompt_template
-- Section builders: build_tools_guide_section, resolve_common_rules_path
+- Section builders: build_policy_section, build_tools_guide_section,
+  resolve_common_rules_path, build_common_rules_section,
+  build_project_common_rules_section
 """
 
 from __future__ import annotations
@@ -56,7 +58,11 @@ if TYPE_CHECKING:
     from vibe3.prompts.provenance import collect_dry_run_provenance
     from vibe3.prompts.provider_registry import ProviderRegistry
     from vibe3.prompts.sections import (
+        build_common_rules_section,
+        build_policy_section,
+        build_project_common_rules_section,
         build_tools_guide_section,
+        discover_project_scope_overlays,
         resolve_common_rules_path,
     )
     from vibe3.prompts.template_loader import (
@@ -102,8 +108,12 @@ _LAZY_IMPORTS = {
     "SectionSourceProvenance": "vibe3.prompts.models",
     "VariableSourceKind": "vibe3.prompts.models",
     "ProviderRegistry": "vibe3.prompts.provider_registry",
+    "build_policy_section": "vibe3.prompts.sections",
     "build_tools_guide_section": "vibe3.prompts.sections",
     "resolve_common_rules_path": "vibe3.prompts.sections",
+    "build_common_rules_section": "vibe3.prompts.sections",
+    "build_project_common_rules_section": "vibe3.prompts.sections",
+    "discover_project_scope_overlays": "vibe3.prompts.sections",
     "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
     "load_prompt_templates": "vibe3.prompts.template_loader",
     "resolve_prompt_template": "vibe3.prompts.template_loader",
@@ -171,8 +181,12 @@ __all__ = [
     "resolve_prompts_path",
     "resolve_source",
     # Section builders
+    "build_policy_section",
     "build_tools_guide_section",
+    "build_common_rules_section",
+    "build_project_common_rules_section",
     "resolve_common_rules_path",
+    "discover_project_scope_overlays",
     # Provenance
     "collect_dry_run_provenance",
 ]

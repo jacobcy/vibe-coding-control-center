@@ -12,51 +12,27 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PlanRequest, PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    build_tools_guide_section,
+    build_common_rules_section,
+    build_policy_section,
+    build_project_common_rules_section,
     make_context_builder,
-    resolve_common_rules_path,
 )
 
 PlanPromptMode = Literal["first", "retry"]
 
 
-def _build_plan_policy_section(policy_path: str | None) -> str | None:
-    """Build plan policy section from file."""
-    if not policy_path:
-        return None
-
-    log = logger.bind(domain="plan_context_builder", action="build_plan_policy_section")
-    path = resolve_runtime_asset(policy_path)
-    if not path.exists():
-        return None
-
-    try:
-        content = path.read_text(encoding="utf-8")
-        log.success("Plan policy section built")
-        return content
-    except OSError as e:
-        log.bind(error=str(e), path=str(policy_path)).warning(
-            "Could not read plan policy"
-        )
-        return None
-
-
 def _build_plan_task_section(
     request: PlanRequest,
-    task_text: str | None,
 ) -> str:
-    """Build plan task section."""
-    if task_text:
-        if request.task_guidance:
-            return f"## Planning Task\n{task_text}\n\n{request.task_guidance}"
-        return f"## Planning Task\n{task_text}"
+    """Build plan task guidance section (no exit contract content)."""
+    if request.task_guidance:
+        return request.task_guidance
 
     scope_info = ""
     if request.scope.kind == "task" and request.scope.issue_number:
@@ -87,6 +63,13 @@ def _build_plan_task_section(
     if request.task_guidance:
         section += f"\n\n{request.task_guidance}"
     return section
+
+
+def _build_plan_exit_contract_section(task_text: str | None) -> str | None:
+    """Build plan exit contract section — static role contract only."""
+    if task_text:
+        return f"## Planner Exit Contract\n{task_text}"
+    return None
 
 
 def _build_plan_output_contract_section(output_format: str | None) -> str:
@@ -156,9 +139,7 @@ def _build_plan_prompt_providers(
             if plan_config.policy_file is not None
             else resolver.get_policy_path("plan")
         )
-        if policy_path:
-            return _build_plan_policy_section(policy_path)
-        return None
+        return build_policy_section(policy_path, "plan")
 
     def plan_output_format() -> str:
         output_format = (
@@ -169,27 +150,31 @@ def _build_plan_prompt_providers(
     def plan_retry_task() -> str | None:
         return getattr(plan_config, "retry_task", None) if plan_config else None
 
-    def plan_exit_contract() -> str:
+    def plan_exit_contract() -> str | None:
         plan_task_text = (
             getattr(plan_config, "plan_task", None) if plan_config else None
         )
-        return _build_plan_task_section(task_request, plan_task_text)
+        return _build_plan_exit_contract_section(plan_task_text)
+
+    def plan_task() -> str:
+        return _build_plan_task_section(task_request)
 
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(
-            resolve_common_rules_path(
-                plan_config.common_rules if plan_config else None, resolver
-            )
+        return build_common_rules_section(
+            plan_config.common_rules if plan_config else None, resolver
         )
+
+    def project_common_rules_section() -> str | None:
+        return build_project_common_rules_section()
 
     return {
         "plan.policy": plan_policy,
         "common.rules": common_rules_section,
+        "common.rules@project": project_common_rules_section,
         "plan.output_format": plan_output_format,
         "plan.retry_task": plan_retry_task,
         "plan.exit_contract": plan_exit_contract,
-        # Backward-compatible alias for local recipe overrides.
-        "plan.task": plan_exit_contract,
+        "plan.task": plan_task,
     }
 
 
@@ -199,6 +184,7 @@ def build_plan_prompt_body(
     mode: PlanPromptMode = "first",
     context_mode: PromptContextMode = "bootstrap",
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> str:
     """Assemble the plan prompt body from policy, tools guide, task, and output format.
 
@@ -210,6 +196,7 @@ def build_plan_prompt_body(
             the minimal retry prompt instead of re-sending policy/rules context.
         prompts_path: Optional custom path to prompts.yaml. When provided,
             loads the prompt-recipes.yaml from the same directory.
+        annotate_sections: When True, wrap each section with markers.
 
     Returns:
         Assembled plan prompt body string.
@@ -233,6 +220,7 @@ def build_plan_prompt_body(
         recipe_key="plan.default",
         variant_key=_plan_variant(mode, context_mode),
         providers=_build_plan_prompt_providers(request, config, context_mode),
+        annotate_sections=annotate_sections,
     )
     log.bind(body_len=len(body)).success("Plan prompt body built")
     return body
@@ -242,6 +230,7 @@ def make_plan_context_builder(
     request: PlanRequest,
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for the plan command.
 
@@ -252,6 +241,8 @@ def make_plan_context_builder(
     return make_context_builder(
         template_key="plan.default",
         body_provider_key="plan.context",
-        body_fn=lambda: build_plan_prompt_body(request, cfg, prompts_path=prompts_path),
+        body_fn=lambda: build_plan_prompt_body(
+            request, cfg, prompts_path=prompts_path, annotate_sections=annotate_sections
+        ),
         prompts_path=prompts_path,
     )

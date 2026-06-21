@@ -13,16 +13,16 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.clients import resolve_runtime_asset
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PromptContextMode
 from vibe3.prompts import (
     PromptContextBuilder,
     PromptManifest,
     PromptProvider,
-    build_tools_guide_section,
+    build_common_rules_section,
+    build_policy_section,
+    build_project_common_rules_section,
     make_context_builder,
-    resolve_common_rules_path,
 )
 
 
@@ -105,11 +105,7 @@ def _build_run_prompt_providers(
             if run_config.policy_file is not None
             else resolver.get_policy_path("run")
         )
-        if policy_path:
-            path = resolve_runtime_asset(policy_path)
-            if path.exists():
-                return path.read_text(encoding="utf-8")
-        return None
+        return build_policy_section(policy_path, "run")
 
     def mode_task(selected_mode: RunPromptMode) -> str | None:
         if not run_config:
@@ -121,11 +117,12 @@ def _build_run_prompt_providers(
         return getattr(run_config, "coding_task", None)
 
     def common_rules_section() -> str | None:
-        return build_tools_guide_section(
-            resolve_common_rules_path(
-                run_config.common_rules if run_config else None, resolver
-            )
+        return build_common_rules_section(
+            run_config.common_rules if run_config else None, resolver
         )
+
+    def project_common_rules_section() -> str | None:
+        return build_project_common_rules_section()
 
     return {
         "run.plan_ref": plan_ref,
@@ -134,6 +131,7 @@ def _build_run_prompt_providers(
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
         "common.rules": common_rules_section,
+        "common.rules@project": project_common_rules_section,
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None
         ),
@@ -176,6 +174,7 @@ def build_run_prompt_body(
     mode: RunPromptMode = "coding",
     context_mode: PromptContextMode = "bootstrap",
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
@@ -189,6 +188,7 @@ def build_run_prompt_body(
             the minimal retry prompt instead of re-sending bootstrap context.
         prompts_path: Optional custom path to prompts.yaml. When provided,
             loads the prompt-recipes.yaml from the same directory.
+        annotate_sections: When True, wrap each section with markers.
 
     Returns:
         Assembled prompt body string.
@@ -217,6 +217,7 @@ def build_run_prompt_body(
         recipe_key="run.plan",
         variant_key=_run_plan_variant(mode, context_mode),
         providers=_build_run_prompt_providers(config, plan_content),
+        annotate_sections=annotate_sections,
     )
     log.bind(
         body_len=len(body), retry=retry, mode=mode, context_mode=context_mode
@@ -224,13 +225,14 @@ def build_run_prompt_body(
     return body
 
 
-def make_run_context_builder(
+def make_run_context_builder(  # noqa: PLR0913
     plan_file: str | None,
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
     audit_file: str | None = None,
     mode: RunPromptMode = "coding",
     context_mode: PromptContextMode = "bootstrap",
+    annotate_sections: bool = False,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
 
@@ -242,7 +244,13 @@ def make_run_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
         body_fn=lambda: build_run_prompt_body(
-            plan_file, cfg, audit_file, mode, context_mode, prompts_path
+            plan_file,
+            cfg,
+            audit_file,
+            mode,
+            context_mode,
+            prompts_path,
+            annotate_sections=annotate_sections,
         ),
         prompts_path=prompts_path,
     )

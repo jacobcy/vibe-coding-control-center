@@ -317,6 +317,7 @@ def execute_manual_run(
             mode=prompt_mode,
             context_mode="bootstrap",
             prompts_path=prompts_path,
+            annotate_sections=dry_run,
         )()
         dry_run_summary["fallback_context_mode"] = "bootstrap"
     include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
@@ -330,6 +331,7 @@ def execute_manual_run(
             mode=prompt_mode,
             context_mode=context_mode,
             prompts_path=prompts_path,
+            annotate_sections=dry_run,
         ),
         task=instructions or run_prompt,
         dry_run=dry_run,

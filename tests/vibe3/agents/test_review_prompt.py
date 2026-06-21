@@ -12,32 +12,32 @@ import pytest
 from vibe3.agents.review_prompt import (
     _build_ast_analysis_section,
     _build_output_contract_section,
-    _build_policy_section,
     _build_review_task_section,
     build_review_prompt_body,
     describe_review_sections,
 )
 from vibe3.models import ReviewRequest, ReviewScope
-from vibe3.prompts.exceptions import ContextBuilderError
+from vibe3.prompts import build_policy_section
 
 
 class TestBuildPolicySection:
-    """Tests for _build_policy_section (unit test)."""
+    """Tests for build_policy_section from vibe3.prompts."""
 
     def test_reads_policy_file(self, tmp_path: Path) -> None:
         """Should read policy from file."""
         policy_file = tmp_path / "policy.md"
         policy_file.write_text("# Review Policy\n\nFocus on correctness.")
 
-        result = _build_policy_section(str(policy_file))
+        result = build_policy_section(str(policy_file), "test")
 
+        assert result is not None
         assert "# Review Policy" in result
         assert "Focus on correctness" in result
 
-    def test_raises_on_missing_file(self) -> None:
-        """Should raise ContextBuilderError if file not found."""
-        with pytest.raises(ContextBuilderError, match="Cannot read policy"):
-            _build_policy_section("/nonexistent/policy.md")
+    def test_returns_none_on_missing_file(self) -> None:
+        """Should return None if policy file not found."""
+        result = build_policy_section("/nonexistent/policy.md", "test")
+        assert result is None
 
 
 class TestBuildAstAnalysisSection:
@@ -165,15 +165,13 @@ class TestBuildReviewPromptBody:
         assert "total_changed" not in context.lower()
 
     def test_build_review_prompt_body_handles_missing_policy(self) -> None:
-        """Should raise error when policy file is missing."""
-        with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
-            mock_read.side_effect = OSError("File not found")
+        """Should complete without policy (returns None for missing file)."""
+        scope = ReviewScope.for_base("main")
+        request = ReviewRequest(scope=scope)
 
-            scope = ReviewScope.for_base("main")
-            request = ReviewRequest(scope=scope)
-
-            with pytest.raises(ContextBuilderError):  # ContextBuilderError
-                build_review_prompt_body(request)
+        context = build_review_prompt_body(request)
+        assert isinstance(context, str)
+        assert "Review Task" in context
 
     def test_build_review_prompt_body_hides_internal_prompt_wiring(self) -> None:
         """Context should not leak internal file/config wiring to the agent."""

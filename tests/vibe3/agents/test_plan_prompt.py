@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from vibe3.agents.plan_prompt import (
+    _build_plan_exit_contract_section,
     _build_plan_output_contract_section,
     _build_plan_task_section,
     build_plan_prompt_body,
@@ -41,13 +42,21 @@ def test_build_plan_output_contract_section_keeps_output_contract_only() -> None
 def test_build_plan_task_section_can_carry_ref_guidance() -> None:
     request = PlanRequest(scope=PlanScope.for_task(42))
 
-    result = _build_plan_task_section(
-        request,
-        "Write the canonical plan under docs/plans/ and run handoff plan.",
+    result = _build_plan_task_section(request)
+
+    assert "Planning Task" in result
+    assert "Issue: #42" in result
+
+
+def test_build_plan_exit_contract_carries_static_text() -> None:
+    result = _build_plan_exit_contract_section(
+        "Write the canonical plan under docs/plans/ and run handoff plan."
     )
+    assert result is not None
 
     assert "docs/plans/" in result
     assert "handoff plan" in result
+    assert "Planner Exit Contract" in result
 
 
 def test_build_plan_prompt_body_includes_before_coding_marker_convention() -> None:
