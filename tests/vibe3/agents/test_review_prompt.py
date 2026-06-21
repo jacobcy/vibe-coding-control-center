@@ -28,7 +28,7 @@ class TestBuildPolicySection:
         policy_file = tmp_path / "policy.md"
         policy_file.write_text("# Review Policy\n\nFocus on correctness.")
 
-        result = build_policy_section(str(policy_file), "test")
+        result = build_policy_section(str(policy_file))
 
         assert result is not None
         assert "# Review Policy" in result
@@ -36,7 +36,7 @@ class TestBuildPolicySection:
 
     def test_returns_none_on_missing_file(self) -> None:
         """Should return None if policy file not found."""
-        result = build_policy_section("/nonexistent/policy.md", "test")
+        result = build_policy_section("/nonexistent/policy.md")
         assert result is None
 
 
