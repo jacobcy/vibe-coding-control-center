@@ -355,10 +355,12 @@ def render_governance_prompt(
 
 
 def resolve_governance_options(config: OrchestraConfig) -> Any:
-    """Resolve governance agent options."""
-    return ExecutionRolePolicyService(config).resolve_effective_agent_options(
-        "governance"
-    )
+    """Resolve governance agent options.
+
+    Returns UNRESOLVED options (with agent name intact).
+    Resolution happens in CodeagentBackend.run() to preserve original agent info.
+    """
+    return ExecutionRolePolicyService(config).resolve_agent_options("governance")
 
 
 def build_governance_execution_name(tick_count: int) -> str:
