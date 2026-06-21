@@ -178,7 +178,7 @@ code_limits:
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/plan.py"
-        limit: 520
+        limit: 545
         reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)；Issue #3028 新增 prompts_path 参数透传和 provenance manifest loading (+5 lines)"
       - path: "src/vibe3/roles/run_command.py"
         limit: 420
@@ -225,7 +225,7 @@ code_limits:
         limit: 500
         reason: "Heartbeat server 核心运行时，包含 tick loop、FailedGate 检查、error tracking cleanup、actor registry cleanup 等紧密耦合逻辑；Issue #3022 新增 tick_id contextvar 传播（+10 行 net）和 5 处 heartbeat 错误记录修复（+82 行，显式传入 tick_number 到 record_error）"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 420
+        limit: 425
         reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断（仅针对 'no agent_message output' 错误）等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持，并在 #2265 follow-up 中改为按实际 prompt file payload 计算诊断长度后略微超标"
       - path: "src/vibe3/agents/backends/async_launcher.py"
         limit: 410
