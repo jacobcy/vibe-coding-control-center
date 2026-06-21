@@ -9,7 +9,6 @@ PROJECT_POLICIES_DIR = ".vibe/policies"
 
 # Maps section key → policy file name in PROJECT_POLICIES_DIR
 _SECTION_POLICY_NAMES: dict[str, str] = {
-    "common.rules": "common",
     "plan.policy": "plan",
     "run.policy": "run",
     "review.policy": "review",
@@ -110,25 +109,25 @@ def build_common_rules_section(
     agent_common_rules: str | None,
     resolver: ConventionResolver,
 ) -> str | None:
-    """Build common rules section with user + project scope.
+    """Build user-scope common rules section.
 
-    Reads user-scope content as-is (preserving its own headers), then
-    appends project-scope content from .vibe/policies/common.md.
+    Reads user-scope content as-is (preserving its own headers).
 
     Args:
         agent_common_rules: Configured common rules path from agent config
         resolver: Convention resolver for fallback policy path resolution
 
     Returns:
-        Combined common rules section or None
+        User-scope common rules content or None
     """
     user_path = resolve_common_rules_path(agent_common_rules, resolver)
-    user_content = _read_file(user_path)
-    project_content = _read_file(f"{PROJECT_POLICIES_DIR}/common.md")
+    return _read_file(user_path)
 
-    if project_content:
-        if user_content:
-            return f"{user_content}\n\n{project_content}"
-        return project_content
 
-    return user_content
+def build_project_common_rules_section() -> str | None:
+    """Build project-scope common rules section from .vibe/policies/common.md.
+
+    Returns:
+        Project-scope common rules content or None
+    """
+    return _read_file(f"{PROJECT_POLICIES_DIR}/common.md")

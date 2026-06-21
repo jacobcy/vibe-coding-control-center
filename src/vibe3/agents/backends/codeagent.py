@@ -273,7 +273,9 @@ class CodeagentBackend:
 
         project_root = str(cwd or Path.cwd())
         prompt_file_path, prompt_content = prepare_prompt_file(
-            prompt, include_global_notice=include_global_notice
+            prompt,
+            include_global_notice=include_global_notice,
+            annotate_global_notice=dry_run,
         )
         diagnostic_prompt_length = len(prompt_content)
 
@@ -300,10 +302,10 @@ class CodeagentBackend:
                     overlays: dict[str, str] = dry_run_summary.get(  # type: ignore[assignment]
                         "project_scope_overlays", {}
                     )
-                    for i, s in enumerate(
-                        cast("list[str]", dry_run_summary.get("sections", [])),
-                        1,
-                    ):
+                    sections = cast("list[str]", dry_run_summary.get("sections", []))
+                    if include_global_notice:
+                        sections = ["global.notice", *sections]
+                    for i, s in enumerate(sections, 1):
                         echo(f"  [{i}] {s}")
                         if s in overlays:
                             echo(f"        + {overlays[s]}  [project]")
@@ -324,7 +326,10 @@ class CodeagentBackend:
                     echo(
                         f"prompt_content:\n{sanitize_prompt_for_display(prompt_content)}"
                     )
-                if task:
+                # Only show task separately when NOT in show_prompt mode —
+                # in show_prompt mode the task guidance is visible inside
+                # the annotated prompt content.
+                if task and not show_prompt:
                     echo(f"task:\n{task}")
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 

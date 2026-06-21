@@ -277,8 +277,16 @@ class PromptManifest:
         recipe_key: str,
         variant_key: str,
         providers: dict[str, PromptProvider],
+        annotate_sections: bool = False,
     ) -> str:
         """Render configured sections through provider-backed section keys.
+
+        Args:
+            recipe_key: Recipe name, e.g. ``"plan.default"``.
+            variant_key: Variant name, e.g. ``"first.bootstrap"``.
+            providers: Dict mapping section key → callable provider.
+            annotate_sections: When True, wrap each section with
+                ``<!-- section:KEY -->`` / ``<!-- /section:KEY -->`` markers.
 
         Raises:
             KeyError: If recipe, variant, or provider not found.
@@ -304,6 +312,12 @@ class PromptManifest:
                 )
             value = provider()
             if value:
+                if annotate_sections:
+                    value = (
+                        f"<!-- section:{section_key} -->\n"
+                        f"{value}\n"
+                        f"<!-- /section:{section_key} -->"
+                    )
                 rendered.append(value)
         return "\n\n---\n\n".join(rendered)
 

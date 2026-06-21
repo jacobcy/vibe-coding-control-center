@@ -452,7 +452,9 @@ def execute_manual_review_sync(
     session_id = None if fresh_session else load_session_id("reviewer", branch)
     command = create_codeagent_command(
         role="reviewer",
-        context_builder=cast(Callable[[], str], context_builder(request, cfg)),
+        context_builder=cast(
+            Callable[[], str], context_builder(request, cfg, annotate_sections=dry_run)
+        ),
         task=task,
         dry_run=dry_run,
         handoff_kind="review",

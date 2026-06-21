@@ -22,7 +22,11 @@ def get_vibe_config() -> "VibeConfig":
     return VibeConfig.get_defaults()
 
 
-def build_prompt_file_content(prompt: str, include_global_notice: bool = True) -> str:
+def build_prompt_file_content(
+    prompt: str,
+    include_global_notice: bool = True,
+    annotate_global_notice: bool = False,
+) -> str:
     """Apply configured global notice to the prompt file content."""
     if not include_global_notice:
         return prompt
@@ -30,11 +34,17 @@ def build_prompt_file_content(prompt: str, include_global_notice: bool = True) -
     notice = config.agent_prompt.global_notice.strip()
     if not notice:
         return prompt
+    if annotate_global_notice:
+        notice = (
+            f"<!-- section:global.notice -->\n{notice}\n<!-- /section:global.notice -->"
+        )
     return f"{notice}\n\n---\n\n{prompt}"
 
 
 def prepare_prompt_file(
-    prompt: str, include_global_notice: bool = True
+    prompt: str,
+    include_global_notice: bool = True,
+    annotate_global_notice: bool = False,
 ) -> tuple[Path, str]:
     """Create temporary prompt file with global notice.
 
@@ -45,7 +55,9 @@ def prepare_prompt_file(
     prompt_dir = Path.home() / ".codeagent" / "agents"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     prompt_content = build_prompt_file_content(
-        prompt, include_global_notice=include_global_notice
+        prompt,
+        include_global_notice=include_global_notice,
+        annotate_global_notice=annotate_global_notice,
     )
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False, dir=prompt_dir

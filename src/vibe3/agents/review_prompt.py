@@ -24,6 +24,7 @@ from vibe3.prompts import (
     PromptProvider,
     build_common_rules_section,
     build_policy_section,
+    build_project_common_rules_section,
     make_context_builder,
 )
 
@@ -141,9 +142,13 @@ def _build_review_prompt_providers(
     def common_rules_section() -> str | None:
         return build_common_rules_section(config.review.common_rules, resolver)
 
+    def project_common_rules_section() -> str | None:
+        return build_project_common_rules_section()
+
     return {
         "review.policy": review_policy,
         "common.rules": common_rules_section,
+        "common.rules@project": project_common_rules_section,
         "review.snapshot_diff": lambda: build_snapshot_diff_section(
             request.structure_diff
         ),
@@ -164,6 +169,7 @@ def build_review_prompt_body(
     mode: ReviewPromptMode = "first",
     context_mode: PromptContextMode = "bootstrap",
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> str:
     """Assemble the review prompt body from policy, tools, analysis, and output format.
 
@@ -175,6 +181,7 @@ def build_review_prompt_body(
             the minimal retry prompt instead of re-sending policy/rules context.
         prompts_path: Optional custom path to prompts.yaml. When provided,
             loads the prompt-recipes.yaml from the same directory.
+        annotate_sections: When True, wrap each section with markers.
 
     Returns:
         Assembled review prompt body string.
@@ -201,6 +208,7 @@ def build_review_prompt_body(
         recipe_key="review.default",
         variant_key=_review_variant(mode, context_mode),
         providers=_build_review_prompt_providers(request, config),
+        annotate_sections=annotate_sections,
     )
     log.bind(body_len=len(body)).success("Review prompt body built")
     return body
@@ -210,6 +218,7 @@ def make_review_context_builder(
     request: ReviewRequest,
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for the review command.
 
@@ -221,7 +230,10 @@ def make_review_context_builder(
         template_key="review.default",
         body_provider_key="review.context",
         body_fn=lambda: build_review_prompt_body(
-            request, cfg, prompts_path=prompts_path
+            request,
+            cfg,
+            prompts_path=prompts_path,
+            annotate_sections=annotate_sections,
         ),
         prompts_path=prompts_path,
     )

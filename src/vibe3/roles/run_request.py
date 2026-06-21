@@ -140,6 +140,7 @@ def build_run_sync_request(
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.fallback_context_mode,
             prompts_path=prompts_path,
+            annotate_sections=dry_run,
         )()
 
     # Build prompt for provenance collection and request
@@ -150,6 +151,7 @@ def build_run_sync_request(
         mode=meta.prompt_mode,  # type: ignore[arg-type]
         context_mode=meta.context_mode,
         prompts_path=prompts_path,
+        annotate_sections=dry_run,
     )()
 
     # Collect and write provenance for dry-run audit

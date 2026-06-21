@@ -521,7 +521,9 @@ def execute_spec_plan_sync(
 
     command = create_codeagent_command(
         role="planner",
-        context_builder=make_plan_context_builder(request, cfg),
+        context_builder=make_plan_context_builder(
+            request, cfg, annotate_sections=dry_run
+        ),
         task=request.task_guidance,
         dry_run=dry_run,
         show_prompt=show_prompt,

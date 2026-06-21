@@ -71,6 +71,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: run.output_format
             source:
               kind: provider
@@ -98,6 +102,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: run.output_format
             source:
               kind: provider
@@ -156,6 +164,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: plan.output_format
             source:
               kind: provider
@@ -164,6 +176,10 @@ recipes:
             source:
               kind: provider
               provider: plan.exit_contract
+          - key: plan.task
+            source:
+              kind: provider
+              provider: plan.task
 
       retry.bootstrap:
         sections:
@@ -175,6 +191,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: plan.output_format
             source:
               kind: provider
@@ -187,6 +207,10 @@ recipes:
             source:
               kind: provider
               provider: plan.exit_contract
+          - key: plan.task
+            source:
+              kind: provider
+              provider: plan.task
 
       retry.resume:
         sections:
@@ -198,6 +222,10 @@ recipes:
             source:
               kind: provider
               provider: plan.exit_contract
+          - key: plan.task
+            source:
+              kind: provider
+              provider: plan.task
 
   # Reviewer role assembly.
   #
@@ -218,6 +246,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: review.snapshot_diff
             source:
               kind: provider
@@ -245,6 +277,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules
+          - key: common.rules@project
+            source:
+              kind: provider
+              provider: common.rules@project
           - key: review.snapshot_diff
             source:
               kind: provider
