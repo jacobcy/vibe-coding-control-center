@@ -105,6 +105,11 @@ class ExecutionRolePolicyService:
         return getattr(section, "timeout_seconds", 3600)
 
     def resolve_agent_options(self, role: str) -> AgentOptions:
+        # backend is always set (resolve_backend falls back to "claude").
+        # Callers must not treat backend as a user-specified override —
+        # _build_command uses has_agent_env_override() to distinguish whether
+        # an env override is active and should use --backend/--model directly,
+        # vs. using the agent preset name (which carries yolo/model config).
         agent = self.resolve_agent(role)
         backend = self.resolve_backend(role)
         model = self.resolve_model(role)

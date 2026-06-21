@@ -42,28 +42,6 @@ DEFAULT_WRAPPER_PATH: Final[Path] = (
 )
 
 
-def _resolve_backend_to_agent_preset(backend: str) -> str | None:
-    """Find an agent preset name that matches the given backend.
-
-    Args:
-        backend: Backend name (e.g., 'claude', 'gemini')
-
-    Returns:
-        Agent preset name if found, None otherwise
-    """
-    from vibe3.config import read_models_json, repo_models_json_path
-
-    data = read_models_json(repo_models_json_path())
-    agents = data.get("agents", {})
-    if isinstance(agents, dict):
-        for name, config in agents.items():
-            if isinstance(name, str) and isinstance(config, dict):
-                preset_backend = config.get("backend")
-                if isinstance(preset_backend, str) and preset_backend == backend:
-                    return name
-    return None
-
-
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
@@ -150,7 +128,7 @@ class CodeagentBackend:
         logger.bind(domain="agent_execution").debug(
             f"Built command: backend={options.backend or 'default'}, "
             f"model={options.model or 'default'}, "
-            f"agent={preset_name or 'none'}, "
+            f"agent={preset_name or original_options.agent or 'none'}, "
             f"cmd={' '.join(command[:6])}..."  # Truncate for readability
         )
 
