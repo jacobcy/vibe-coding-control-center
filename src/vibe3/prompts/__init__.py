@@ -60,6 +60,7 @@ if TYPE_CHECKING:
         build_common_rules_section,
         build_policy_section,
         build_tools_guide_section,
+        discover_project_scope_overlays,
         resolve_common_rules_path,
     )
     from vibe3.prompts.template_loader import (
@@ -109,6 +110,7 @@ _LAZY_IMPORTS = {
     "build_tools_guide_section": "vibe3.prompts.sections",
     "resolve_common_rules_path": "vibe3.prompts.sections",
     "build_common_rules_section": "vibe3.prompts.sections",
+    "discover_project_scope_overlays": "vibe3.prompts.sections",
     "DEFAULT_PROMPTS_PATH": "vibe3.prompts.template_loader",
     "load_prompt_templates": "vibe3.prompts.template_loader",
     "resolve_prompt_template": "vibe3.prompts.template_loader",
@@ -180,6 +182,7 @@ __all__ = [
     "build_tools_guide_section",
     "build_common_rules_section",
     "resolve_common_rules_path",
+    "discover_project_scope_overlays",
     # Provenance
     "collect_dry_run_provenance",
 ]

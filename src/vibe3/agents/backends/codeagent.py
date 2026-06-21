@@ -296,10 +296,29 @@ class CodeagentBackend:
 
             if dry_run:
                 if dry_run_summary:
-                    echo("=== Dry Run Summary ===")
-                    for key, value in dry_run_summary.items():
-                        echo(f"{key}: {value}")
-                echo(f"command: {' '.join(command)}")
+                    echo("=== Prompt Composition ===")
+                    overlays: dict[str, str] = dry_run_summary.get(  # type: ignore[assignment]
+                        "project_scope_overlays", {}
+                    )
+                    for i, s in enumerate(
+                        cast("list[str]", dry_run_summary.get("sections", [])),
+                        1,
+                    ):
+                        echo(f"  [{i}] {s}")
+                        if s in overlays:
+                            echo(f"        + {overlays[s]}  [project]")
+                    echo(
+                        f"  mode: {dry_run_summary.get('prompt_mode', '')}."
+                        f"{dry_run_summary.get('context_mode', '')}"
+                    )
+                    if dry_run_summary.get("session_reused"):
+                        echo(f"  session: {dry_run_summary.get('session_id', '')}")
+                    if "provenance_path" in dry_run_summary:
+                        echo(f"  provenance: {dry_run_summary['provenance_path']}")
+                # Strip task from command display — task is always the last
+                # positional arg when present, printed separately below.
+                cmd_display = command[:-1] if task and command else command
+                echo(f"command: {' '.join(cmd_display)}")
                 if show_prompt and prompt_file_path:
                     echo(f"prompt_file: {prompt_file_path}")
                     echo(

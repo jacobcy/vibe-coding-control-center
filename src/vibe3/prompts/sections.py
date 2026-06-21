@@ -7,6 +7,28 @@ from vibe3.config import ConventionResolver
 
 PROJECT_POLICIES_DIR = ".vibe/policies"
 
+# Maps section key → policy file name in PROJECT_POLICIES_DIR
+_SECTION_POLICY_NAMES: dict[str, str] = {
+    "common.rules": "common",
+    "plan.policy": "plan",
+    "run.policy": "run",
+    "review.policy": "review",
+}
+
+
+def discover_project_scope_overlays() -> dict[str, str]:
+    """Return {section_key: path} for each .vibe/policies/*.md file that exists.
+
+    Used by dry-run display to show which sections have project-scope overrides.
+    """
+    result: dict[str, str] = {}
+    for section_key, policy_name in _SECTION_POLICY_NAMES.items():
+        path = f"{PROJECT_POLICIES_DIR}/{policy_name}.md"
+        resolved = resolve_runtime_asset(path)
+        if resolved.exists():
+            result[section_key] = path
+    return result
+
 
 def _read_file(path: str | None) -> str | None:
     """Read file content, returning None if path is None or file doesn't exist."""
@@ -90,8 +112,8 @@ def build_common_rules_section(
 ) -> str | None:
     """Build common rules section with user + project scope.
 
-    Uses build_tools_guide_section for the user part (formatted with
-    ## Available Tools header), then appends raw project-scope content.
+    Reads user-scope content as-is (preserving its own headers), then
+    appends project-scope content from .vibe/policies/common.md.
 
     Args:
         agent_common_rules: Configured common rules path from agent config
@@ -101,12 +123,12 @@ def build_common_rules_section(
         Combined common rules section or None
     """
     user_path = resolve_common_rules_path(agent_common_rules, resolver)
-    user_section = build_tools_guide_section(user_path)
+    user_content = _read_file(user_path)
     project_content = _read_file(f"{PROJECT_POLICIES_DIR}/common.md")
 
     if project_content:
-        if user_section:
-            return f"{user_section}\n\n{project_content}"
+        if user_content:
+            return f"{user_content}\n\n{project_content}"
         return project_content
 
-    return user_section
+    return user_content

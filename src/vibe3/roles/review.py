@@ -47,7 +47,10 @@ from vibe3.models import (
     WorktreeRequirement,
 )
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+)
 from vibe3.roles.definitions import (
     IssueRoleSyncSpec,
     RoleOutputContract,

@@ -18,7 +18,11 @@ from vibe3.execution import (
 )
 from vibe3.models import ExecutionRequest, IssueInfo, OrchestraConfig
 from vibe3.observability import write_prompt_provenance
-from vibe3.prompts import PromptManifest, collect_dry_run_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    discover_project_scope_overlays,
+)
 from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.roles.run_helpers import (
     EXECUTOR_ROLE,
@@ -163,9 +167,12 @@ def build_run_sync_request(
         provenance_path = write_prompt_provenance(
             provenance, role="executor", issue_number=issue.number
         )
-        # Add provenance path to dry_run_summary
+        # Add provenance path and project-scope overlays to dry_run_summary
         if dry_run_summary:
             dry_run_summary["provenance_path"] = str(provenance_path)
+            overlays = discover_project_scope_overlays()
+            if overlays:
+                dry_run_summary["project_scope_overlays"] = overlays
 
     return build_role_sync_request(
         role="executor",
