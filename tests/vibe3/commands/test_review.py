@@ -91,10 +91,10 @@ def test_review_no_arg_defaults_to_current_branch():
         result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    # resolve_branch_arg is called with (None, flow_service=<FlowService instance>)
+    # resolve_branch_arg called with (None,)
+    # Convenience wrapper creates FlowService internally
     mock_resolve.assert_called_once()
     assert mock_resolve.call_args[0][0] is None
-    assert "flow_service" in mock_resolve.call_args[1]
     mock_async.assert_called_once()
 
 

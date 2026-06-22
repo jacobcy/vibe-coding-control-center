@@ -168,7 +168,7 @@ def test_plan_no_arg_defaults_to_current_branch(monkeypatch) -> None:
     assert result.exit_code == 0
     mock_resolve.assert_called_once()
     assert mock_resolve.call_args[0][0] is None
-    assert "flow_service" in mock_resolve.call_args[1]
+    # Convenience wrapper creates FlowService internally, so no flow_service kwarg
     mock_runner.assert_called_once()
 
 

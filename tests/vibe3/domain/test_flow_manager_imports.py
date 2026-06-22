@@ -10,14 +10,21 @@ def test_manager_uses_flow_factory():
     create_flow_manager from services.flow_factory instead of directly
     importing FlowManager from vibe3.domain.
     """
-    with open("src/vibe3/roles/manager.py") as f:
+    from pathlib import Path
+
+    manager_file = (
+        Path(__file__).parent.parent.parent.parent / "src/vibe3/roles/manager.py"
+    )
+    with open(manager_file) as f:
         content = f.read()
 
     # Should NOT import FlowManager from domain
     assert "from vibe3.domain import FlowManager" not in content
 
-    # Should use create_flow_manager via services.flow public API
-    assert "from vibe3.services.flow import create_flow_manager" in content
+    # Should import create_flow_manager from services.flow
+    # (may be on the same line as other imports)
+    assert "from vibe3.services.flow import" in content
+    assert "create_flow_manager" in content
 
 
 def test_server_registry_imports_from_domain():
