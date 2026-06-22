@@ -17,6 +17,7 @@ related_docs:
   - docs/standards/v3/event-driven-standard.md
   - docs/standards/v3/skill-standard.md
   - docs/standards/v3/skill-trigger-standard.md
+  - docs/standards/v3/skill-execution-trace-standard.md
   - supervisor/roadmap-common.md
 issues:
   - 2947

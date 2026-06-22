@@ -246,6 +246,41 @@ vibe3 check
 - uv run python src/vibe3/cli.py check  -> clean
 ```
 
+## Step 7: 留痕（Trace）
+
+完成诊断和修复后，根据当前环境留痕：
+
+**判断环境**：
+```bash
+# 检测是否有 flow 环境
+vibe3 flow show
+```
+
+**留痕规则**：
+- **有 flow 环境**：使用 handoff 记录诊断结果和修复动作
+  ```bash
+  vibe3 handoff append "[vibe-check] <诊断结论摘要>" --actor vibe-check --kind audit
+  ```
+
+- **无 flow 但有 issue**：在 issue 中记录诊断结果
+  ```bash
+  gh issue comment <issue-number> --body "## vibe-check 诊断结果
+
+  <诊断结论摘要>
+
+  **已执行修复**：<修复命令列表>
+  **需确认项**：<需要用户确认的问题>
+  "
+  ```
+
+- **都没有**：无需留痕
+
+**留痕内容应包含**：
+- 诊断结论
+- 已执行的修复命令
+- 需要用户确认的问题
+- shell 能力缺口（如有）
+
 ## 与其他命令的关系
 
 - `vibe3 task status`：主现场看板，优先用于看 orchestra / task runtime

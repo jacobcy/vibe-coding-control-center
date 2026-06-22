@@ -149,13 +149,40 @@ vibe3 internal bootstrap <issue-number> \
 - dependency issue 阻塞登记（仅 open 状态的依赖）
 - worktree context 准备（如果传了 `--worktree`）
 
-## 7. 记录 handoff
+## 7. 留痕（Trace）
 
-bootstrap 成功后记录稳定恢复点：
+bootstrap 成功后，根据当前环境留痕：
 
+**判断环境**：
 ```bash
-vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
+# 检测是否有 flow 环境
+vibe3 flow show
 ```
+
+**留痕规则**：
+- **有 flow 环境**（正常情况）：使用 handoff 记录创建决策
+  ```bash
+  vibe3 handoff append "[vibe-new] flow ready" --actor vibe-new --kind milestone
+  ```
+
+- **无 flow 但有 issue**（异常情况）：在 issue 中记录创建失败
+  ```bash
+  gh issue comment <issue-number> --body "## vibe-new 创建失败
+
+  **原因**：<失败原因>
+
+  **下一步**：<建议操作>
+  "
+  ```
+
+- **都没有**：无需留痕
+
+**留痕内容应包含**：
+- Flow 创建结果（成功/失败）
+- Issue 确认状态
+- Branch 名称
+- Worktree 路径（如有）
+- 下一步建议
 
 ## 8. 指向 vibe-continue 工作流
 

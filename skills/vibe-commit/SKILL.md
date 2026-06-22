@@ -149,7 +149,7 @@ git log HEAD..origin/main --oneline
 
 ```bash
 # 记录原因
-uv run python src/vibe3/cli.py handoff append "vibe-commit: 不再需要提交，理由：<具体原因>" --kind note
+vibe3 handoff append "[vibe-commit] 不再需要提交，理由：<具体原因>" --actor vibe-commit --kind note
 
 # 更新 issue 标签为 state/handoff (移除 state/merge-ready)
 gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/merge-ready"
@@ -459,16 +459,38 @@ gh pr comment <pr-number> --body "@codex review"
 
 PR 创建成功后，记录完成状态：
 
-1. **检查当前 flow 状态**：
-   ```bash
-   uv run python src/vibe3/cli.py flow show
-   ```
-   若有活跃 flow，记录完成交接；若无 flow，跳过 handoff 记录。
+**判断环境**：
+```bash
+# 检测是否有 flow 环境
+vibe3 flow show
+```
 
-2. **写入 handoff（如果存在 flow）**：
-   ```bash
-   uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind note
-   ```
+**留痕规则**：
+- **有 flow 环境**（正常情况）：使用 handoff 记录创建决策
+  ```bash
+  vibe3 handoff append "[vibe-commit] PR #<pr-number> created for issue #<issue-number>" --actor vibe-commit --kind note
+  ```
+
+- **无 flow 但有 issue**：在 issue 中记录创建决策
+  ```bash
+  gh issue comment <issue-number> --body "## PR Created
+
+  **PR**：#<pr-number>
+  **Branch**：<branch-name>
+  **Status**：Pending review
+
+  Next: `/vibe-integrate` to check CI and review status.
+  "
+  ```
+
+- **都没有**：无需留痕
+
+**留痕内容应包含**：
+- PR 编号
+- Issue 编号（如有）
+- Branch 名称
+- 提交策略（single/parallel/stacked）
+- 下一步建议
 
 若用户问"下一步是什么"，回答：
 > 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。

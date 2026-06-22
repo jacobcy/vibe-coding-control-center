@@ -96,7 +96,7 @@ Handoff 应优先回答"下个会话接手时需要知道什么"。
 - 不在 save 阶段替上层流程做新的任务拆分或优先级判断
 
 ```bash
-vibe3 handoff append "session save: <summary>" --actor vibe-save --kind milestone
+vibe3 handoff append "[vibe-save] session save: <summary>" --actor vibe-save --kind milestone
 ```
 
 如果当前目录尚未识别出当前 `flow` 对应的 `task`：
