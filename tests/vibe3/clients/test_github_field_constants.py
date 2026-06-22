@@ -8,7 +8,6 @@ import pytest
 from vibe3.clients.github_field_constants import (
     GITHUB_DEFAULT_LIST_FIELDS,
     GITHUB_DEFAULT_VIEW_FIELDS,
-    GITHUB_FIELDS_ISSUE_META,
     GITHUB_KNOWN_ISSUE_FIELDS,
     GITHUB_KNOWN_PR_FIELDS,
     GITHUB_PR_LIST_MERGED_FIELDS,
@@ -19,7 +18,7 @@ def test_all_fields_are_known() -> None:
     """All defined fields should be in GITHUB_KNOWN_ISSUE_FIELDS."""
     known_set = set(GITHUB_KNOWN_ISSUE_FIELDS)
 
-    for field in GITHUB_FIELDS_ISSUE_META:
+    for field in GITHUB_DEFAULT_LIST_FIELDS:
         assert field in known_set, f"Field {field} not in known fields"
 
     for field in GITHUB_DEFAULT_VIEW_FIELDS:
@@ -31,7 +30,6 @@ def test_all_fields_are_known() -> None:
 
 def test_no_duplicate_fields() -> None:
     """Field constants should not contain duplicates."""
-    assert len(GITHUB_FIELDS_ISSUE_META) == len(set(GITHUB_FIELDS_ISSUE_META))
     assert len(GITHUB_DEFAULT_VIEW_FIELDS) == len(set(GITHUB_DEFAULT_VIEW_FIELDS))
     assert len(GITHUB_DEFAULT_LIST_FIELDS) == len(set(GITHUB_DEFAULT_LIST_FIELDS))
 
