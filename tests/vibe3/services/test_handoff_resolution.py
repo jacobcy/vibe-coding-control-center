@@ -181,22 +181,27 @@ def test_resolve_handoff_target_at_indicate_self_referential(tmp_path: Path) -> 
 
 
 def test_resolve_vibe_material_in_vibe3_repo(tmp_path: Path) -> None:
-    """@vibe/<path> resolves when current repo is vibe3."""
-    from unittest.mock import patch
+    """@vibe/<path> resolves to bundled project root when in vibe3 repo.
 
-    # Create a file in the vibe3 installation
-    material_file = tmp_path / "skills" / "test-skill" / "SKILL.md"
-    material_file.parent.mkdir(parents=True)
-    material_file.write_text("skill content")
+    After refactor, this uses bundled_project_root() (module __file__ resolution)
+    instead of checking pyproject.toml in cwd. The file must exist in the actual
+    vibe-center repository or global distribution.
+    """
+    from vibe3.clients.runtime_assets import bundled_project_root
 
-    # Mock cwd to simulate running from vibe3 repo
-    with patch("pathlib.Path.cwd", return_value=tmp_path):
-        # Create pyproject.toml to identify as vibe3
-        pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text('[project]\nname = "vibe3"\n')
+    # Get the actual bundled project root
+    bundled_root = bundled_project_root()
 
-        result = resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
-        assert result == material_file
+    # Test that resolve_runtime_asset with namespace="vibe" returns
+    # the bundled root path even if the file doesn't exist
+    # (caller will handle FileNotFoundError)
+    result = resolve_handoff_target("@vibe/supervisor/policies/run.md")
+
+    # Should resolve to the bundled project root
+    expected = bundled_root / "supervisor/policies/run.md"
+    assert result == expected
+    # Verify the file exists (it should in the vibe-center repo)
+    assert result.exists()
 
 
 def test_resolve_vibe_material_with_explicit_vibe_dir(tmp_path: Path) -> None:
@@ -225,7 +230,7 @@ def test_resolve_vibe_material_fallback_global(tmp_path: Path) -> None:
 
     # Mock Path.home() to return our temp home
     with patch("pathlib.Path.home", return_value=tmp_path / "home"):
-        # Mock cwd to return non-vibe3 directory
+        # Mock cwd to return non-vibe3 directory (so bundled root check fails)
         with patch("pathlib.Path.cwd", return_value=tmp_path / "other"):
             result = resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
             assert result == material_file
@@ -253,14 +258,19 @@ def test_resolve_vibe_material_not_a_file(tmp_path: Path) -> None:
 
 
 def test_resolve_vibe_material_vibe_installation_not_found(tmp_path: Path) -> None:
-    """@vibe/<path> raises FileNotFoundError when vibe installation not found."""
+    """@vibe/<path> raises FileNotFoundError when material not found.
+
+    After refactor, this always resolves to either bundled_project_root
+    or runtime_assets_root, so the error is "Material not found" rather
+    than "Cannot find vibe3 installation".
+    """
     from unittest.mock import patch
 
-    # Mock cwd to return non-vibe3 directory
     # Mock Path.home() to return temp without .vibe
+    # Mock cwd to return non-vibe3 directory (so bundled root check fails)
     with patch("pathlib.Path.cwd", return_value=tmp_path / "other"):
         with patch("pathlib.Path.home", return_value=tmp_path / "home"):
-            with pytest.raises(
-                FileNotFoundError, match="Cannot find vibe3 installation"
-            ):
+            # The new behavior: resolves to bundled_root, then raises
+            # FileNotFoundError because the file doesn't exist
+            with pytest.raises(FileNotFoundError, match="Material not found"):
                 resolve_handoff_target("@vibe/skills/test-skill/SKILL.md")
