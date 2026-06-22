@@ -204,6 +204,19 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
+    # Resolve plan file path for actual reading (handles handoff artifacts, worktrees)
+    resolved_plan_for_read = plan_file
+    if plan_file:
+        try:
+            resolved_plan_for_read = str(
+                resolve_handoff_target(
+                    plan_file, branch=summary.branch or target_branch
+                )
+            )
+        except FileNotFoundError as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
     # Publish ManualRunIntent event and wait for result
     from vibe3.commands.common import echo_dry_run_header
 
@@ -217,7 +230,7 @@ def run_command(
             issue_number=issue_number,
             branch=target_branch,
             instructions=instructions,
-            plan_file=plan_file,
+            plan_file=resolved_plan_for_read,
             skill=None,
             summary_mode=summary.mode,
             summary_message=summary.message,
