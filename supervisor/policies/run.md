@@ -29,7 +29,7 @@
 
 - **如果发现 Requirements 不清晰**
   ```bash
-  uv run python src/vibe3/cli.py handoff append "Plan Verification 要求不清晰：<具体问题>" --kind finding --actor "executor"
+  vibe3 handoff append "Plan Verification 要求不清晰：<具体问题>" --kind finding --actor "executor"
   ```
   - 不要跳过验证步骤
   - 不要自行假设验证方法
@@ -39,7 +39,7 @@
 - 先完成当前步骤，再进入下一步。
 - 不把额外重构、顺手清理、风格统一混入执行主路径。
 - 如果发现计划与现场不符，先收敛问题，再继续。
-- 执行过程中出现 finding、bug、blocker、next step 等事项，优先用 `uv run python src/vibe3/cli.py handoff append` 记录，不要把这些临时记录混进主体交付内容。
+- 执行过程中出现 finding、bug、blocker、next step 等事项，优先用 `vibe3 handoff append` 记录，不要把这些临时记录混进主体交付内容。
 
 ### Scope Compliance 自检
 
@@ -56,7 +56,7 @@
 
 3. **如果发现 scope violation**
    ```bash
-   uv run python src/vibe3/cli.py handoff append "Scope violation: <步骤> 触犯了禁止的变更类型 <类型>" --kind finding --actor "executor"
+   vibe3 handoff append "Scope violation: <步骤> 触犯了禁止的变更类型 <类型>" --kind finding --actor "executor"
    ```
    - **停止当前步骤**
    - 等待 manager 指示是否扩展 scope
@@ -64,7 +64,7 @@
 
 4. **如果发现需要 scope 外变更才能完成目标**
    ```bash
-   uv run python src/vibe3/cli.py handoff append "需要扩展 scope：<具体原因和变更内容>" --kind finding --actor "executor"
+   vibe3 handoff append "需要扩展 scope：<具体原因和变更内容>" --kind finding --actor "executor"
    ```
    - **立即停止当前步骤**
    - 通过 `handoff append --kind finding` 记录需要扩展的原因和具体变更
@@ -81,7 +81,7 @@
    - ❌ 禁止删除任何符号（即使发现引用计数为零）
    - 如果发现死代码且不在 plan 声明范围内：
      ```bash
-     uv run python src/vibe3/cli.py handoff append "发现死代码：符号名=<symbol>，位置=<file>:<line>，引用计数=0，不在当前 plan scope 内" --kind finding --actor "executor"
+     vibe3 handoff append "发现死代码：符号名=<symbol>，位置=<file>:<line>，引用计数=0，不在当前 plan scope 内" --kind finding --actor "executor"
      ```
    - 不执行删除，留给后续独立 issue 处理
 
@@ -91,7 +91,7 @@
    - 每删除一个符号前，验证其在 plan 的声明列表中
    - 删除后，记录验证证据：
      ```bash
-     uv run python src/vibe3/cli.py handoff append "已删除死代码：<symbol>（plan 声明范围，验证：引用计数=0）" --kind note --actor "executor"
+     vibe3 handoff append "已删除死代码：<symbol>（plan 声明范围，验证：引用计数=0）" --kind note --actor "executor"
      ```
 
 3. **发现 plan 外的死代码**：
@@ -131,7 +131,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
    - 说明 audit 可能基于错误分支
    - 必须用 `handoff append` 记录 finding：
      ```bash
-     uv run python src/vibe3/cli.py handoff append "Audit 分支验证失败：audit 描述的文件 <文件> 不在当前分支变更中" --kind finding --actor "executor"
+     vibe3 handoff append "Audit 分支验证失败：audit 描述的文件 <文件> 不在当前分支变更中" --kind finding --actor "executor"
      ```
    - 等待 manager 指示，不要盲目执行 repair
 
@@ -163,14 +163,14 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 - **如果发现前提不成立**：
   ```bash
-  uv run python src/vibe3/cli.py handoff append "Plan 步骤前提不成立：<步骤编号> - <具体问题>" --kind finding --actor "<actor>"
+  vibe3 handoff append "Plan 步骤前提不成立：<步骤编号> - <具体问题>" --kind finding --actor "<actor>"
   ```
   - 不要盲目继续执行有缺陷的 plan
   - 等待 manager 指示或调整执行方案
 
 - **如果发现可以优化**：
   ```bash
-  uv run python src/vibe3/cli.py handoff append "Plan 优化建议：<优化点>" --kind note --actor "<actor>"
+  vibe3 handoff append "Plan 优化建议：<优化点>" --kind note --actor "<actor>"
   ```
 
 #### 4. Plan 是否包含未满足的 REQUIRED:BEFORE_CODING 前置条件？
@@ -184,7 +184,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
   - 尝试执行标记中指定的补救动作（如 rebase）
   - 如果补救失败：
     ```bash
-    uv run python src/vibe3/cli.py handoff append "Plan 前置条件未满足：<标记描述> - <失败原因>" --kind blocker --actor "executor"
+    vibe3 handoff append "Plan 前置条件未满足：<标记描述> - <失败原因>" --kind blocker --actor "executor"
     ```
     - 进入 blocked 状态，等待 manager 指示
     - 不要绕过前置条件继续执行
@@ -201,7 +201,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 - **如果不存在**：
   ```bash
-  uv run python src/vibe3/cli.py handoff append "步骤前提不成立：<步骤编号> - <原因>" --kind finding --actor "<actor>"
+  vibe3 handoff append "步骤前提不成立：<步骤编号> - <原因>" --kind finding --actor "<actor>"
   ```
   - 停止当前步骤，等待 manager 指示
   - 不要继续下一步，避免扩大问题
@@ -215,7 +215,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 - **如果不符合预期**：
   ```bash
-  uv run python src/vibe3/cli.py handoff append "执行结果不符预期：<步骤编号> - <预期> vs <实际>" --kind finding --actor "<actor>"
+  vibe3 handoff append "执行结果不符预期：<步骤编号> - <预期> vs <实际>" --kind finding --actor "<actor>"
   ```
   - 回滚当前步骤的改动
   - 分析原因后再继续
@@ -228,8 +228,8 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 ### 先看影响，再改实现
 
 执行前优先用项目工具确认影响面：
-- `uv run python src/vibe3/cli.py handoff status`
-- `uv run python src/vibe3/cli.py handoff show @current`
+- `vibe3 handoff status`
+- `vibe3 handoff show @current`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
@@ -292,7 +292,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 
 - **如果发现无法满足的 Verification**
   ```bash
-  uv run python src/vibe3/cli.py handoff append "Verification 无法满足：<要求> - <原因>" --kind finding --actor "executor"
+  vibe3 handoff append "Verification 无法满足：<要求> - <原因>" --kind finding --actor "executor"
   ```
   - 不要跳过或弱化该要求
   - 等待 manager 指示是否调整 scope
@@ -445,7 +445,7 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
    - 判断标准：rebase 冲突涉及超过 10 个文件或多次提交
    - 使用 merge 时必须在 handoff 中记录原因：
      ```bash
-     uv run python src/vibe3/cli.py handoff append "使用 merge 同步 main：<具体原因，如 rebase 冲突涉及 15 个文件，解决复杂度过高>" --kind note --actor "executor"
+     vibe3 handoff append "使用 merge 同步 main：<具体原因，如 rebase 冲突涉及 15 个文件，解决复杂度过高>" --kind note --actor "executor"
      ```
 
 3. **禁止无说明使用 merge**
@@ -487,7 +487,7 @@ git log --oneline -5
 - 为什么仍然是最小正确改动
 
 如果执行过程中发现额外问题或后续事项：
-- 用 `uv run python src/vibe3/cli.py handoff append "<message>" --kind finding|blocker|next|note` 单独记录
+- 用 `vibe3 handoff append "<message>" --kind finding|blocker|next|note` 单独记录
 - 主体输出只保留与本次执行交付直接相关的内容
 
 ## 禁止事项
