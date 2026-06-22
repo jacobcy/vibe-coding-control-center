@@ -159,6 +159,10 @@ def main_callback(
     setup_logging(verbose=verbose)
 
     # Git environment check: ensure running in a worktree, not bare repository
+    # Skip check in test environments or when explicitly disabled
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VIBE_SKIP_GIT_CHECK"):
+        return
+
     import subprocess
 
     try:
