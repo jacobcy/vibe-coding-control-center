@@ -81,10 +81,10 @@ def echo_dry_run_header(
     model: str | None,
 ) -> None:
     """Echo unified dry-run header for plan/run/review commands."""
-    from vibe3.config.agent_preset import resolve_effective_agent_options
+    from vibe3.config import resolve_effective_agent_options
     from vibe3.exceptions import AgentPresetNotFoundError
-    from vibe3.models.review_runner import AgentOptions
-    from vibe3.services.shared.actors import (
+    from vibe3.models import AgentOptions
+    from vibe3.services.shared import (
         format_agent_actor,
         format_dry_run_header,
     )

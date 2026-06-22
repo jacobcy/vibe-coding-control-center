@@ -91,7 +91,8 @@ def test_exceptions_barrel_import_count() -> None:
             print(f"     {file}: {count} imports")
 
     # Baseline established at issue #2848, updated to 162 after rebase onto main
-    baseline = 162
+    # Updated to 163 for issue #3072 (actor resolution in dry-run headers)
+    baseline = 163
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
@@ -129,8 +130,8 @@ def test_config_barrel_import_count() -> None:
 
     # Baseline established at issue #2848
     # Updated for #2912 (+2), #2938 (+1), #2939 (+1), #2945 (+1),
-    # #2869 (+1), #2323 (+1), #3074 (+1)
-    baseline = 148
+    # #2869 (+1), #2323 (+1), #3074 (+1), #3072 (+1)
+    baseline = 149
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
