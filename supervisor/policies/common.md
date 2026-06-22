@@ -12,7 +12,7 @@
 - 多 worktree 并行开发时，共享运行时数据位于主仓库 git common dir，也就是主仓库 `.git`，不是当前 worktree 自己的局部 `.git`。
 - 当前 flow 的结构化 handoff 以 `vibe3 handoff status` 为准，不要先读 `.agent/context/task.md`。
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
-- 查看当前 flow 的完整交接链路：`uv run python src/vibe3/cli.py handoff show @current`。
+- 查看当前 flow 的完整交接链路：`vibe3 handoff show @current`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
 - 凡是依赖环境变量/外部 API 的逻辑，必须验证语义假设，不能只凭文档或经验猜测。
@@ -24,7 +24,7 @@
 ### 1. Handoff 状态（manager 交接指令）
 
 ```bash
-uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
+vibe3 handoff status $(git branch --show-current)
 ```
 
 Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
@@ -32,7 +32,7 @@ Manager 可能已写入质量审查意见、具体修复要求、重点关注区
 ### 2. Task Show + Comments（最新上下文）
 
 ```bash
-uv run python src/vibe3/cli.py task show
+vibe3 task show
 ```
 
 **重要**：必须查看 issue comments 部分，特别是：
@@ -71,11 +71,11 @@ uv run python src/vibe3/cli.py task show
 首选命令：
 
 ```bash
-uv run python src/vibe3/cli.py inspect symbols <file>
-uv run python src/vibe3/cli.py inspect symbols <file>:<symbol>
-uv run python src/vibe3/cli.py inspect files <file>
-uv run python src/vibe3/cli.py inspect commit <sha>
-uv run python src/vibe3/cli.py inspect base --json
+vibe3 inspect symbols <file>
+vibe3 inspect symbols <file>:<symbol>
+vibe3 inspect files <file>
+vibe3 inspect commit <sha>
+vibe3 inspect base --json
 ```
 
 使用规则：
@@ -102,25 +102,25 @@ uv run python src/vibe3/cli.py inspect base --json
 
 ```bash
 # 保存当前结构快照
-uv run python src/vibe3/cli.py snapshot save
+vibe3 snapshot save
 
 # 保存为分支 baseline（用于后续 diff）
-uv run python src/vibe3/cli.py snapshot save --as-baseline
+vibe3 snapshot save --as-baseline
 
 # 对比当前结构与分支 baseline（开发起点）
-uv run python src/vibe3/cli.py snapshot diff
+vibe3 snapshot diff
 
 # 对比当前结构与最新快照
-uv run python src/vibe3/cli.py snapshot diff latest
+vibe3 snapshot diff latest
 
 # 查看指定分支的 baseline
-uv run python src/vibe3/cli.py snapshot show --branch main
+vibe3 snapshot show --branch main
 
 # 查看当前结构详情
-uv run python src/vibe3/cli.py snapshot show
+vibe3 snapshot show
 
 # 列出所有已保存的快照
-uv run python src/vibe3/cli.py snapshot list
+vibe3 snapshot list
 ```
 
 **与 inspect 的关系**：
@@ -156,7 +156,7 @@ uv run python src/vibe3/cli.py snapshot list
 执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 记录：
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor "<actor>"
+vibe3 handoff append "<message>" --kind finding --actor "<actor>"
 ```
 
 使用规则：
@@ -230,8 +230,8 @@ Issue / PR 评论和 handoff 是两条互补但不可替换的通道。
 推荐顺序：
 
 ```bash
-uv run python src/vibe3/cli.py inspect symbols path/to/file.py:symbol_name
-uv run python src/vibe3/cli.py inspect files path/to/file.py
+vibe3 inspect symbols path/to/file.py:symbol_name
+vibe3 inspect files path/to/file.py
 ```
 
 ### 做 review 前
@@ -241,8 +241,8 @@ uv run python src/vibe3/cli.py inspect files path/to/file.py
 推荐顺序：
 
 ```bash
-uv run python src/vibe3/cli.py inspect base --json
-uv run python src/vibe3/cli.py inspect commit <sha>
+vibe3 inspect base --json
+vibe3 inspect commit <sha>
 ```
 
 如果 inspect 已提供足够上下文，不要再把 review 退化成机械扫代码风格。
@@ -283,17 +283,17 @@ uv run ruff check
 
 1. **发现系统性改进点**（工具、规则、流程可优化）
    ```bash
-   uv run python src/vibe3/cli.py handoff append "系统改进建议：<建议内容>" --kind finding
+   vibe3 handoff append "系统改进建议：<建议内容>" --kind finding
    ```
 
 2. **发现代码模式问题**（可能影响其他模块）
    ```bash
-   uv run python src/vibe3/cli.py handoff append "发现代码模式问题：<问题描述>" --kind finding
+   vibe3 handoff append "发现代码模式问题：<问题描述>" --kind finding
    ```
 
 3. **发现配置与实现不一致**（系统性问题）
    ```bash
-   uv run python src/vibe3/cli.py handoff append "配置不一致：<具体问题>" --kind finding
+   vibe3 handoff append "配置不一致：<具体问题>" --kind finding
    ```
 
 ### Manager 会读取这些记录
