@@ -5,11 +5,24 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from loguru import logger
 
 # Add src to path for imports
 scripts_python = Path(__file__).parent.parent / "scripts" / "python"
 if str(scripts_python) not in sys.path:
     sys.path.insert(0, str(scripts_python))
+
+# Configure test logging to file for artifact leak tracking
+_log_file = Path(__file__).parent.parent / "temp" / "test-artifact-leaks.log"
+_log_file.parent.mkdir(parents=True, exist_ok=True)
+logger.add(
+    _log_file,
+    level="WARNING",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level:8} | {message}",
+    filter=lambda record: "artifact leak" in record["message"].lower(),
+    rotation="10 MB",
+    retention="30 days",
+)
 
 
 # ============================================================
