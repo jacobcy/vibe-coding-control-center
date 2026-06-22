@@ -462,7 +462,7 @@ PR 创建成功后，记录完成状态：
 **判断环境**：
 ```bash
 # 检测是否有 flow 环境
-uv run python src/vibe3/cli.py flow show
+vibe3 flow show
 ```
 
 **留痕规则**：
