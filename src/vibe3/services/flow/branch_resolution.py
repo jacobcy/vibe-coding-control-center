@@ -25,7 +25,7 @@ def resolve_branch_arg(
         Resolved branch name
     """
     from vibe3.services.flow import FlowService
-    from vibe3.services.shared.branches import resolve_branch_arg as _resolve
+    from vibe3.services.shared.branches import _resolve_branch_arg as _resolve
 
     flow_service = FlowService()
     return _resolve(branch_arg, flow_service=flow_service)

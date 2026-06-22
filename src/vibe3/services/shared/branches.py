@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from vibe3.services.protocols import FlowQueryProtocol
 
 
-def resolve_branch_arg(
+def _resolve_branch_arg(
     branch_arg: str | None,
     flow_service: "FlowQueryProtocol",
 ) -> str:
@@ -70,7 +70,7 @@ def resolve_branch_and_issue(
     """
     from vibe3.config import get_convention
 
-    branch = resolve_branch_arg(branch_arg, flow_service=flow_service)
+    branch = _resolve_branch_arg(branch_arg, flow_service=flow_service)
     convention = get_convention().branch
     issue_number = convention.parse_issue_number(branch)
     return branch, issue_number
