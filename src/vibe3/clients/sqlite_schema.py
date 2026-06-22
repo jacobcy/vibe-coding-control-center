@@ -400,9 +400,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     ).fetchall()
     for (error_code,) in null_severity_codes:
         # Inline severity inference based on error code prefix
-        # Avoids importing get_error_handling_contract from vibe3.exceptions
+        # Matches ERROR_REGISTRY in vibe3.exceptions.error_classification
         _severity_prefix_map: dict[str, str] = {
-            "E_MODEL_": "WARNING",
+            "E_MODEL_": "CRITICAL",  # NOT_FOUND, PERMISSION, CONFIG
             "E_API_": "ERROR",
             "E_EXEC_": "WARNING",
             "E_CAPACITY_": "WARNING",
