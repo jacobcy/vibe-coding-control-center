@@ -15,19 +15,55 @@ git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
   uv run python src/vibe3/analysis/pre_push_test_selector.py
 ```
 
-### 三层映射策略
+### 三层映射策略 (强制)
+
+执行验证时，executor **必须**使用 `pre_push_test_selector` 工具解析出完整测试集（含所有三层），并运行解析结果中的所有测试文件。不得仅运行 plan 中明确提到的测试，也不得仅运行第一层映射结果。
 
 1. **第一层：直接测试文件匹配**
    - 改动 `src/vibe3/<module>/<name>.py` → 运行 `tests/vibe3/<module>/test_<name>.py`
-   - 优先级最高，必须运行
+   - 优先级最高，**必须运行**
 
 2. **第二层：DAG 导入分析**
    - 通过 import DAG 找出哪些测试间接引用了改动模块
-   - 优先级中等，建议运行
+   - 优先级中等，**必须运行**（除非 test selector 未解析出任何 DAG 目标）
 
 3. **第三层：目录级回退**
    - 运行改动源文件对应的整个测试目录：`tests/vibe3/<module>/`
-   - 优先级最低，覆盖面最广
+   - 优先级最低，**必须运行**（除非 test selector 在上层已全覆盖或返回 skip 模式）
+
+### 执行模板
+
+```bash
+# 1. 获取当前分支相对 merge-base 的改动文件列表
+CHANGED=$(git diff --name-only origin/main...HEAD -- src/vibe3/)
+
+# 2. 通过 test selector 解析完整测试集（含 DAG 分析和目录回退）
+SELECTION=$(echo "$CHANGED" | uv run python src/vibe3/analysis/pre_push_test_selector.py)
+TARGETS=$(echo "$SELECTION" | python -c "import sys,json; print(' '.join(json.load(sys.stdin)['tests']))")
+MODE=$(echo "$SELECTION" | python -c "import sys,json; print(json.load(sys.stdin)['mode'])")
+
+# 3. 根据 mode 决定本地执行策略
+if [ "$MODE" = "skip" ]; then
+    echo "Selector returned skip mode — tests covered by CI"
+else
+    uv run pytest $TARGETS
+fi
+```
+
+### 验证自检（声称 tests=PASS 前必须完成）
+
+1. **确认已运行完整 selector 输出**：
+   - 记录 `pre_push_test_selector` 的 `mode` 和 `tests` 列表
+   - 确认 pytest 命令覆盖了列表中的所有测试文件
+
+2. **确认非 skip 模式下无遗漏**：
+   - 如果 mode 为 `incremental` 或 `smoke`，确认所有 `tests` 项都已执行
+   - 如果 mode 为 `skip`，在执行报告中明确说明原因和 CI 覆盖策略
+
+3. **如果发现测试失败**：
+   - 在执行报告中明确记录哪些测试失败
+   - 不得冒称 "所有测试通过"
+   - 提供失败测试的 reproduction 命令
 
 ### 范围过大处理
 
