@@ -292,6 +292,8 @@ manager 是入池后的执行 decider。每一轮必须把当前 issue 推向可
 gh issue view <issue-number> --comments
 gh issue view <issue-number> --json labels,state
 gh issue edit <issue-number> --title "..." --body "..."
+# PR 现场查询
+gh pr list --search "issue:<issue_number>" --state merged --json number,title,mergedAt
 ```
 
 **代码实际**（判断过时、已解决、质量时必须验证）：
@@ -478,6 +480,11 @@ Steps:
        - 搜索相关提交（`git log --oneline --all --grep="<关键词>"`）
        - 检查相关文件当前状态：`uv run python src/vibe3/cli.py inspect files <path>`
        - 确认代码中是否已包含 issue 要求的功能/修复
+       - **Merged PR 覆盖检测（强制）**：
+         ```bash
+         gh pr list --search "issue:<issue_number>" --state merged --json number,title,mergedAt --limit 1
+         ```
+         若返回 merged PR 记录：该 issue scope 已被 merged PR 覆盖 → 高置信度关闭
        - 若已解决，记录解决 PR/commit 编号，附代码证据
      - **低优先级无意义判断**：检查是否为长期无进展的代码清洁度任务
        - 优先级为 Low 且标签包含 `type/refactor`、`type/chore`
