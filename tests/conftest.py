@@ -35,9 +35,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     # Clean up MagicMock directories (test leak artifacts)
     leaks_found = []
     for item in project_root.iterdir():
-        if item.is_dir() and (
-            item.name == "MagicMock" or item.name.startswith("<MagicMock")
-        ):
+        if item.is_dir() and "MagicMock" in item.name:
             leaks_found.append(item.name)
             logger.warning(
                 f"Test artifact leak detected: {item.name}. "

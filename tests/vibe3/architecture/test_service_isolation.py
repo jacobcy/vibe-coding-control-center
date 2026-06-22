@@ -132,8 +132,7 @@ def find_internal_imports(module_a: str, module_b: str) -> List[Dict]:
 def test_no_cross_module_internal_imports():
     """Verify no cross-module internal imports.
 
-    Goal: All internal imports count should reach zero.
-    Current: Phase 5 establishes baseline.
+    Goal: All internal imports count should be zero.
     """
     violations = []
 
@@ -144,18 +143,15 @@ def test_no_cross_module_internal_imports():
             violations.extend(find_internal_imports(module_a, module_b))
             violations.extend(find_internal_imports(module_b, module_a))
 
-    # Phase 5 goal: establish baseline
-    baseline_count = len(violations)
-    print(f"\n📊 当前内部引用数量: {baseline_count}")
+    count = len(violations)
+    print(f"\n📊 当前内部引用数量: {count}")
 
-    # Output detailed violations
-    for v in violations[:10]:  # Show first 10
+    for v in violations[:10]:
         print(f"  {v['file']}:{v['line']} - {v['import']}")
 
-    if baseline_count > 10:
-        print(f"  ... 还有 {baseline_count - 10} 个违规")
+    if count > 10:
+        print(f"  ... 还有 {count - 10} 个违规")
 
-    # Phase 5: Record baseline, expect xfail (strict=False)
     assert len(violations) == 0, f"发现 {len(violations)} 处内部引用违规"
 
 
@@ -212,5 +208,4 @@ def test_imports_via_public_api():
         print(f"  {v['file']}:{v['line']} - {v['import']}")
         print(f"    {v['expected']}")
 
-    # Phase 5: Record baseline, expect xfail (strict=False)
     assert len(violations) == 0

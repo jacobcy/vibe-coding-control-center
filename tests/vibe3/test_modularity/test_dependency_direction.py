@@ -344,7 +344,6 @@ class TestKnownExceptions:
     """Document known acceptable violations."""
 
     # Known violations that are architecturally acceptable
-    # These will be marked as xfail to keep the suite green
     KNOWN_UPWARD_VIOLATIONS = [
         # Add known acceptable violations here with reasons
         # Example: "services imports from agents (acceptable because ...)"
