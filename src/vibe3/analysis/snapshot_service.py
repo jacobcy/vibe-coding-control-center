@@ -165,6 +165,27 @@ def _resolve_snapshot_repo_root(root: str) -> Path:
     return root_path
 
 
+def _to_repo_relative(path: str, repo_root: Path) -> str:
+    """Normalize a scanned file path to a repo-root-relative POSIX key.
+
+    Snapshot path keys must be stable regardless of whether the scan root was
+    absolute (worktree-aware, repo_path set) or relative (process cwd). Without
+    this, a baseline taken under repo_path stores absolute keys while the
+    pr-create snapshot stores relative keys, and compute_diff treats every file
+    as added+removed. Relative keys keep baseline and current comparable.
+    """
+    p = Path(path)
+    if not p.is_absolute():
+        return p.as_posix()
+    try:
+        return p.relative_to(repo_root).as_posix()
+    except ValueError:
+        try:
+            return p.resolve().relative_to(repo_root.resolve()).as_posix()
+        except ValueError:
+            return p.as_posix()
+
+
 def _collect_other_file_snapshots(
     tracked_dirs: list[str], repo_root: Path
 ) -> list[FileSnapshot]:
@@ -180,7 +201,10 @@ def _collect_other_file_snapshots(
         for f in sorted(top.rglob("*")):
             if not f.is_file():
                 continue
-            rel = str(f)
+            # Read happens via the Path object `f` (absolute, locatable); the
+            # `rel` key is repo-relative so it matches Python-analysis keys and
+            # the pr-create snapshot for stable diffing.
+            rel = _to_repo_relative(str(f), repo_root)
             # Skip excluded dirs
             parts = rel.split("/")
             if any(part in _EXCLUDED_DIRS for part in parts):
@@ -228,6 +252,10 @@ def build_snapshot(
 
         root = get_source_root()
 
+    # Preserve the relative source root for module-name computation; `root`
+    # itself may be absolutized below for worktree-aware file scanning.
+    module_root = root
+
     # Resolve relative root to worktree if repo_path is provided
     if repo_path is not None:
         root_path = Path(root)
@@ -254,9 +282,13 @@ def build_snapshot(
         file_paths_seen: set[str] = set()
 
         for file_struct in file_structures:
-            rel_path = file_struct.path
+            # Read imports from the original (possibly absolute) scan path so
+            # the file is locatable even when cwd differs from the worktree;
+            # store the snapshot under a repo-relative key for stable diffing.
+            scan_path = file_struct.path
+            imports = dag_service._extract_imports(scan_path)
+            rel_path = _to_repo_relative(scan_path, repo_root)
             file_paths_seen.add(rel_path)
-            imports = dag_service._extract_imports(rel_path)
 
             file_snapshot = FileSnapshot(
                 path=rel_path,
@@ -271,7 +303,7 @@ def build_snapshot(
             )
             files.append(file_snapshot)
 
-            module = _get_module_from_path(rel_path, root)
+            module = _get_module_from_path(rel_path, module_root)
             if module not in module_map:
                 module_map[module] = ModuleSnapshot(
                     module=module,
