@@ -18,7 +18,7 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.services.flow import resolve_branch_arg
 from vibe3.services.issue import load_issue_info
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
-from vibe3.services.shared import format_agent_actor
+from vibe3.services.shared import format_agent_actor, format_dry_run_header
 
 
 def run_issue_role_async(
@@ -128,9 +128,10 @@ def run_issue_role_async(
                 )
             raise typer.Exit(1) from exc
 
-    typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (async dry-run)")
-    typer.echo(f"   branch: {branch}")
-    typer.echo(f"   actor:  {actor}")
+    header = format_dry_run_header(
+        spec.role_name, issue_number, branch, actor, dry_run_mode="async dry-run"
+    )
+    typer.echo(header)
 
 
 def run_issue_role_sync(
@@ -203,9 +204,8 @@ def run_issue_role_sync(
     )
 
     if dry_run:
-        typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (dry-run)")
-        typer.echo(f"   branch: {branch}")
-        typer.echo(f"   actor:  {actor}")
+        header = format_dry_run_header(spec.role_name, issue_number, branch, actor)
+        typer.echo(header)
         return
 
     if not sync_result.launched:

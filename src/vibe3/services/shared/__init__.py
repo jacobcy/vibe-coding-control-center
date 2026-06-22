@@ -4,7 +4,7 @@ This package provides cross-cutting utilities used by other service subpackages
 and by external consumers (commands, execution, server).
 
 Public API Contract:
-- format_agent_actor, extract_role_from_actor: Actor formatting
+- format_agent_actor, format_dry_run_header, extract_role_from_actor: Actor formatting
 - ArtifactParser: Artifact parsing
 - MissingTaskIssueError, build_bind_task_hint, ensure_task_issue_bound: Binding guard
 - resolve_issue_branch_input: Branch resolution
@@ -36,7 +36,11 @@ All other symbols are internal to the shared package and should be imported dire
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.shared.actors import extract_role_from_actor, format_agent_actor
+    from vibe3.services.shared.actors import (
+        extract_role_from_actor,
+        format_agent_actor,
+        format_dry_run_header,
+    )
     from vibe3.services.shared.artifacts import ArtifactParser
     from vibe3.services.shared.binding_guard import (
         MissingTaskIssueError,
@@ -124,6 +128,7 @@ __all__ = [
     "ensure_task_issue_bound",
     "extract_role_from_actor",
     "format_agent_actor",
+    "format_dry_run_header",
     "get_git_common_dir",
     "get_role_block_function",
     "get_state_labels",
@@ -176,6 +181,7 @@ _SYMBOL_MODULES = {
     "ensure_task_issue_bound": "vibe3.services.shared.binding_guard",
     "extract_role_from_actor": "vibe3.services.shared.actors",
     "format_agent_actor": "vibe3.services.shared.actors",
+    "format_dry_run_header": "vibe3.services.shared.actors",
     "get_git_common_dir": "vibe3.services.shared.paths",
     "get_role_block_function": "vibe3.services.shared.roles",
     "get_state_labels": "vibe3.services.shared.labels",
