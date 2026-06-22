@@ -31,7 +31,7 @@ Errors are stored in the `error_log` SQLite table via `ErrorTrackingService`.
 Use the `record_error()` convenience function from `services.error_helpers`:
 
 ```python
-from vibe3.services.shared.errors import record_error
+from vibe3.services.orchestra import record_error
 
 # Minimal call
 record_error(
