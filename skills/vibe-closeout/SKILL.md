@@ -57,7 +57,7 @@ Before executing cleanup:
 - Verify `branch` field is present and non-empty
 
 If verification fails:
-- vibe3 handoff append "[vibe-closeout] Cleanup skipped - missing or invalid instructions"
+- vibe3 handoff append "[vibe-closeout] Cleanup skipped - missing or invalid instructions" --actor vibe-closeout
 - Exit
 
 ### Step 3: Execute Cleanup
@@ -127,7 +127,7 @@ After cleanup execution:
 Write handoff append confirming cleanup:
 
 ```bash
-vibe3 handoff append "[vibe-closeout] Cleanup completed: <branch> - mode: <cleanup_mode>" --kind note
+vibe3 handoff append "[vibe-closeout] Cleanup completed: <branch> - mode: <cleanup_mode>" --actor vibe-closeout --kind note
 ```
 
 ## Cleanup Modes
@@ -178,7 +178,7 @@ If cleanup fails:
 
 Example handoff append for failure:
 ```bash
-vibe3 handoff append "[vibe-closeout] Cleanup failed for <branch>: <error-details>" --kind blocker
+vibe3 handoff append "[vibe-closeout] Cleanup failed for <branch>: <error-details>" --actor vibe-closeout --kind blocker
 ```
 
 ## Verification Commands

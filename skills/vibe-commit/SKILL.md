@@ -149,7 +149,7 @@ git log HEAD..origin/main --oneline
 
 ```bash
 # 记录原因
-vibe3 handoff append "[vibe-commit] 不再需要提交，理由：<具体原因>" --kind note
+vibe3 handoff append "[vibe-commit] 不再需要提交，理由：<具体原因>" --actor vibe-commit --kind note
 
 # 更新 issue 标签为 state/handoff (移除 state/merge-ready)
 gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/merge-ready"
@@ -468,7 +468,7 @@ vibe3 flow show
 **留痕规则**：
 - **有 flow 环境**（正常情况）：使用 handoff 记录创建决策
   ```bash
-  vibe3 handoff append "[vibe-commit] PR #<pr-number> created for issue #<issue-number>" --kind note
+  vibe3 handoff append "[vibe-commit] PR #<pr-number> created for issue #<issue-number>" --actor vibe-commit --kind note
   ```
 
 - **无 flow 但有 issue**：在 issue 中记录创建决策
