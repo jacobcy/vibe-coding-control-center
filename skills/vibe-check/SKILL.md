@@ -259,7 +259,7 @@ vibe3 flow show
 **留痕规则**：
 - **有 flow 环境**：使用 handoff 记录诊断结果和修复动作
   ```bash
-  vibe3 handoff append "vibe-check: <诊断结论摘要>" --actor vibe-check --kind audit
+  vibe3 handoff append "[vibe-check] <诊断结论摘要>" --actor vibe-check --kind audit
   ```
 
 - **无 flow 但有 issue**：在 issue 中记录诊断结果

@@ -111,7 +111,7 @@ vibe3 flow show
 **留痕规则**：
 - **有 flow 环境**（正常情况）：使用 handoff 记录关闭决策
   ```bash
-  vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
+  vibe3 handoff append "[vibe-done] flow closed" --actor vibe-done --kind milestone
   ```
 
 - **无 flow 但有 issue**：在 issue 中记录关闭决策

@@ -402,7 +402,7 @@ vibe3 flow show
 **留痕规则**：
 - **有 flow 环境**：使用 handoff 记录处理汇总
   ```bash
-  vibe3 handoff append "vibe-task: 处理 RFC <N> 个, Blocked <M> 个, Epic <K> 个" --actor vibe-task --kind audit
+  vibe3 handoff append "[vibe-task] 处理 RFC <N> 个, Blocked <M> 个, Epic <K> 个" --actor vibe-task --kind audit
   ```
 
 - **无 flow 但有处理的 issues**：无需额外留痕（RFC 决策已在 issue comment 中记录）

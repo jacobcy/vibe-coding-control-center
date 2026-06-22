@@ -57,7 +57,7 @@ Before executing cleanup:
 - Verify `branch` field is present and non-empty
 
 If verification fails:
-- Write handoff append: "Cleanup skipped - missing or invalid instructions"
+- Write handoff append: "[vibe-closeout] Cleanup skipped - missing or invalid instructions"
 - Exit
 
 ### Step 3: Execute Cleanup
@@ -127,7 +127,7 @@ After cleanup execution:
 Write handoff append confirming cleanup:
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "Cleanup completed: <branch> - mode: <cleanup_mode>" --kind note
+uv run python src/vibe3/cli.py handoff append "[vibe-closeout] Cleanup completed: <branch> - mode: <cleanup_mode>" --kind note
 ```
 
 ## Cleanup Modes
@@ -178,7 +178,7 @@ If cleanup fails:
 
 Example handoff append for failure:
 ```bash
-uv run python src/vibe3/cli.py handoff append "Cleanup failed for <branch>: <error-details>" --kind blocker
+uv run python src/vibe3/cli.py handoff append "[vibe-closeout] Cleanup failed for <branch>: <error-details>" --kind blocker
 ```
 
 ## Verification Commands

@@ -139,7 +139,7 @@ git status
 
 ```bash
 # 记录分析结论到 handoff
-vibe3 handoff append "<分析结论摘要>" --actor vibe-continue --kind analysis
+vibe3 handoff append "[vibe-continue] <分析结论摘要>" --actor vibe-continue --kind analysis
 ```
 
 **可能的输出形式**：

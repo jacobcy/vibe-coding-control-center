@@ -149,7 +149,7 @@ git log HEAD..origin/main --oneline
 
 ```bash
 # 记录原因
-uv run python src/vibe3/cli.py handoff append "vibe-commit: 不再需要提交，理由：<具体原因>" --kind note
+uv run python src/vibe3/cli.py handoff append "[vibe-commit] 不再需要提交，理由：<具体原因>" --kind note
 
 # 更新 issue 标签为 state/handoff (移除 state/merge-ready)
 gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/merge-ready"
@@ -468,7 +468,7 @@ uv run python src/vibe3/cli.py flow show
 **留痕规则**：
 - **有 flow 环境**（正常情况）：使用 handoff 记录创建决策
   ```bash
-  uv run python src/vibe3/cli.py handoff append "vibe-commit: PR #<pr-number> created for issue #<issue-number>" --kind note
+  uv run python src/vibe3/cli.py handoff append "[vibe-commit] PR #<pr-number> created for issue #<issue-number>" --kind note
   ```
 
 - **无 flow 但有 issue**：在 issue 中记录创建决策

@@ -162,7 +162,7 @@ vibe3 flow show
 **留痕规则**：
 - **有 flow 环境**（正常情况）：使用 handoff 记录创建决策
   ```bash
-  vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
+  vibe3 handoff append "[vibe-new] flow ready" --actor vibe-new --kind milestone
   ```
 
 - **无 flow 但有 issue**（异常情况）：在 issue 中记录创建失败
