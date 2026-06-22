@@ -81,21 +81,34 @@ def echo_dry_run_header(
     model: str | None,
 ) -> None:
     """Echo unified dry-run header for plan/run/review commands."""
-    issue_str = f"issue #{issue_number}" if issue_number else "adhoc"
-    typer.echo(f"-> {role} run: {issue_str} (dry-run)")
-    typer.echo(f"   branch: {branch}")
-    if backend and model:
-        actor = f"{backend}/{model}"
-    elif agent:
-        actor = agent
-    else:
-        role_to_default = {
-            "planner": "vibe-planner",
-            "executor": "vibe-executor",
-            "reviewer": "vibe-reviewer",
-        }
-        actor = role_to_default.get(role, role)
-    typer.echo(f"   actor:  {actor}")
+    from vibe3.config import resolve_effective_agent_options
+    from vibe3.exceptions import AgentPresetNotFoundError
+    from vibe3.models import AgentOptions
+    from vibe3.services.shared import (
+        format_agent_actor,
+        format_dry_run_header,
+    )
+
+    options = AgentOptions(agent=agent, backend=backend, model=model)
+    try:
+        resolved = resolve_effective_agent_options(options)
+        if resolved.backend:
+            actor_display = format_agent_actor(resolved)
+        else:
+            raise AgentPresetNotFoundError("no backend resolved")
+    except AgentPresetNotFoundError:
+        if agent:
+            actor_display = agent
+        else:
+            role_to_default = {
+                "planner": "vibe-planner",
+                "executor": "vibe-executor",
+                "reviewer": "vibe-reviewer",
+            }
+            actor_display = role_to_default.get(role, role)
+
+    header = format_dry_run_header(role, issue_number, branch, actor_display)
+    typer.echo(header)
 
 
 def _handle_codeagent_result(result: Any, label: str) -> None:

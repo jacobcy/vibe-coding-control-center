@@ -80,3 +80,23 @@ def extract_role_from_actor(actor: str) -> str:
 
     # Default to "agent"
     return "agent"
+
+
+def format_dry_run_header(
+    role: str,
+    issue_number: int | None,
+    branch: str,
+    actor: str,
+    dry_run_mode: str = "dry-run",
+) -> str:
+    """Format the unified dry-run header string.
+
+    Returns a multi-line string (no trailing newline).
+    Callers echo or log the result as needed.
+    """
+    issue_str = f"issue #{issue_number}" if issue_number else "adhoc"
+    return (
+        f"-> {role} run: {issue_str} ({dry_run_mode})\n"
+        f"   branch: {branch}\n"
+        f"   actor:  {actor}"
+    )
