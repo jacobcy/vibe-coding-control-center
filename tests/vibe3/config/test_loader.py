@@ -326,6 +326,9 @@ class TestLoadRuntimeConfig:
         """Verify orchestra fields can be overridden from project config."""
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+        # Clear env overrides that would interfere with config file values
+        monkeypatch.delenv("VIBE_MODEL_MANAGER", raising=False)
+        monkeypatch.delenv("VIBE_BACKEND_MANAGER", raising=False)
 
         # Mock apply_env_overrides to skip environment variable processing
         # This allows testing project config layering in isolation from user env vars

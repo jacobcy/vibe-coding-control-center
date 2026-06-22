@@ -72,9 +72,6 @@ class TestPRStatusDetection:
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "done"
 
-    @pytest.mark.xfail(
-        reason="Pre-existing regression in verify_current_flow PR detection"
-    )
     def test_check_detects_closed_pr(self, tmp_path):
         """Should reset issue to READY when PR is closed (without merge)."""
         # ARRANGE: Flow with closed PR
@@ -128,9 +125,6 @@ class TestPRStatusDetection:
             # ASSERT: Should call reset to READY (not mark as aborted)
             mock_reset.assert_called_once_with("task/my-feature", 42)
 
-    @pytest.mark.xfail(
-        reason="Pre-existing regression in verify_current_flow PR detection"
-    )
     def test_check_keeps_active_flow_for_open_pr(self, tmp_path):
         """Should NOT mark flow as done when PR is still open."""
         # ARRANGE: Flow with open PR
@@ -182,9 +176,6 @@ class TestPRStatusDetection:
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "active"
 
-    @pytest.mark.xfail(
-        reason="Pre-existing regression in verify_current_flow PR detection"
-    )
     def test_check_handles_no_pr_gracefully(self, tmp_path):
         """Should not fail when flow has no PR."""
         # ARRANGE: Flow without PR

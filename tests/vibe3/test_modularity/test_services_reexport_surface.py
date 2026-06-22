@@ -14,8 +14,6 @@ import ast
 from pathlib import Path
 from typing import Dict, List
 
-import pytest
-
 
 def count_barrel_imports(import_target: str) -> List[Dict]:
     """Count barrel imports from the specified target across src/ and tests/.
@@ -192,24 +190,19 @@ def discover_bridge_modules() -> Dict[str, List[Dict]]:
     }
 
 
-# Known baseline bridges
-KNOWN_PURE_BRIDGES = set()
-
-KNOWN_LAYER_CROSSING_BRIDGES = set()
-
 ROOT_BARREL_IMPORT_BASELINE = 0  # #2901: All root barrel escape hatches removed
 SHARED_BARREL_IMPORT_BASELINE = 16
-PURE_BRIDGE_MODULE_BASELINE = len(KNOWN_PURE_BRIDGES)
-LAYER_CROSSING_BRIDGE_BASELINE = len(KNOWN_LAYER_CROSSING_BRIDGES)
 
 
 def test_root_barrel_import_count() -> None:
     """Verify root barrel imports (from vibe3.services import ...).
 
-    Goal: Zero root barrel imports (all imports should be direct).
-    Current baseline: 130 call sites across 77 files (PR #2837 added 1 new
-    `from vibe3.services import build_event_projection_hook` for the
-    DomainEvent → FlowEvent projection boundary).
+    Goal: Zero root barrel imports - all imports should be direct to the
+    appropriate subpackage barrel (e.g., vibe3.services.flow, vibe3.services.pr).
+
+    All root barrel imports have been eliminated through dependency injection
+    and direct submodule imports. This test enforces that no new root barrel
+    imports are introduced.
     """
     imports = count_barrel_imports("vibe3.services")
 
@@ -262,117 +255,42 @@ def test_shared_barrel_import_count() -> None:
 def test_pure_bridge_module_count() -> None:
     """Verify pure compatibility bridge modules.
 
-    Goal: Zero pure bridge modules (all compatibility shims should be removed).
-    Current baseline: 1 file.
+    Goal: Zero pure bridge modules (all compatibility shims removed as of issue #2698).
     """
     bridges = discover_bridge_modules()
     pure_bridges = bridges["pure_bridges"]
 
     print(f"\n📊 Pure bridge modules: {len(pure_bridges)} files")
-
-    known_bridges = set()
-    unknown_bridges = set()
-
     for bridge in pure_bridges:
-        file = bridge["file"]
-        print(f"   {file}")
+        print(f"   {bridge['file']}")
         print(f"     Re-exports from: {bridge['reexports_from']}")
         print(f"     Symbols: {', '.join(bridge['symbols'][:5])}")
 
-        if file in KNOWN_PURE_BRIDGES:
-            known_bridges.add(file)
-        else:
-            unknown_bridges.add(file)
-
-    # Cross-check against known baseline
-    if unknown_bridges:
-        print(f"\n   ⚠️  WARNING: {len(unknown_bridges)} unknown bridge(s) discovered:")
-        for file in unknown_bridges:
-            print(f"     {file}")
-        print("   This may indicate new compatibility debt or regression.")
-
-    # Verify all known bridges were discovered
-    missing_known = KNOWN_PURE_BRIDGES - known_bridges
-    if missing_known:
-        print(f"\n   ⚠️  WARNING: {len(missing_known)} known bridge(s) not detected:")
-        for file in missing_known:
-            print(f"     {file}")
-
-    assert not unknown_bridges, (
-        "Unknown pure bridge module(s) discovered: "
-        f"{', '.join(sorted(unknown_bridges))}"
+    assert len(pure_bridges) == 0, (
+        f"Found {len(pure_bridges)} pure bridge module(s). "
+        "All compatibility bridges should have been removed (issue #2698)."
     )
-    assert len(pure_bridges) <= PURE_BRIDGE_MODULE_BASELINE, (
-        "Pure bridge modules increased beyond the issue #2698 baseline: "
-        f"expected <= {PURE_BRIDGE_MODULE_BASELINE}, found {len(pure_bridges)}"
-    )
-    if pure_bridges:
-        pytest.xfail(
-            f"Baseline: {len(pure_bridges)} pure bridge modules remain (issue #2698)"
-        )
-
-    assert len(pure_bridges) == 0, f"Found {len(pure_bridges)} pure bridge modules"
 
 
 def test_layer_crossing_bridge_count() -> None:
     """Verify layer-crossing bridge modules.
 
-    Goal: Zero layer-crossing bridges (no services re-exporting from other layers).
-    Current baseline: 3 files.
+    Goal: Zero layer-crossing bridges (no services re-exporting from other layers,
+    all resolved as of issue #2698).
     """
     bridges = discover_bridge_modules()
     layer_crossing_bridges = bridges["layer_crossing_bridges"]
 
     print(f"\n📊 Layer-crossing bridge modules: {len(layer_crossing_bridges)} files")
-
-    known_bridges = set()
-    unknown_bridges = set()
-
     for bridge in layer_crossing_bridges:
-        file = bridge["file"]
-        print(f"   {file}")
+        print(f"   {bridge['file']}")
         print(f"     Re-exports from: {bridge['reexports_from']}")
         print(f"     Symbols: {', '.join(bridge['symbols'][:5])}")
 
-        if file in KNOWN_LAYER_CROSSING_BRIDGES:
-            known_bridges.add(file)
-        else:
-            unknown_bridges.add(file)
-
-    # Cross-check against known baseline
-    if unknown_bridges:
-        print(f"\n   ⚠️  WARNING: {len(unknown_bridges)} unknown bridge(s) discovered:")
-        for file in unknown_bridges:
-            print(f"     {file}")
-        print("   This may indicate new layer-crossing debt or regression.")
-
-    # Verify all known bridges were discovered
-    missing_known = KNOWN_LAYER_CROSSING_BRIDGES - known_bridges
-    if missing_known:
-        print(f"\n   ⚠️  WARNING: {len(missing_known)} known bridge(s) not detected:")
-        for file in missing_known:
-            print(f"     {file}")
-        print("   (May be due to classifier excluding files with local definitions)")
-
-    assert not unknown_bridges, (
-        "Unknown layer-crossing bridge module(s) discovered: "
-        f"{', '.join(sorted(unknown_bridges))}"
+    assert len(layer_crossing_bridges) == 0, (
+        f"Found {len(layer_crossing_bridges)} layer-crossing bridge module(s). "
+        "No services should re-export from other layers (issue #2698)."
     )
-    assert len(layer_crossing_bridges) <= LAYER_CROSSING_BRIDGE_BASELINE, (
-        "Layer-crossing bridge modules increased beyond the issue #2698 baseline: "
-        f"expected <= {LAYER_CROSSING_BRIDGE_BASELINE}, "
-        f"found {len(layer_crossing_bridges)}"
-    )
-    if layer_crossing_bridges:
-        pytest.xfail(
-            "Baseline: "
-            f"{len(layer_crossing_bridges)} layer-crossing bridge modules remain "
-            "(issue #2698)"
-        )
-
-    assert (
-        len(layer_crossing_bridges) == 0
-    ), f"Found {len(layer_crossing_bridges)} layer-crossing bridge modules"
 
 
 def test_root_barrel_all_matches_approved_public_api() -> None:

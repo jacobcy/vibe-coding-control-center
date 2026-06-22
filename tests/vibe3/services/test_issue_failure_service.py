@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.flow.service import FlowService
+from vibe3.services.flow.timeline import FlowTimelineService
 from vibe3.services.issue.failure import (
     block_manager_noop_issue,
     fail_manager_issue,
@@ -34,6 +35,7 @@ def test_fail_manager_issue_records_to_error_log_only():
                 issue_number=100,
                 reason="Test manager failure",
                 actor="agent:manager",
+                flow_timeline_service=FlowTimelineService(store=store),
             )
 
         flow_state = store.get_flow_state(branch)
@@ -89,6 +91,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                             repo=None,
                             reason="No progress made",
                             actor="agent:manager",
+                            flow_service=flow_service,
                         )
 
         # Verify reason recorded in flow and flow_status set to blocked
@@ -220,6 +223,7 @@ def test_fail_issue_records_to_error_log_only():
                 issue_number=500,
                 reason="Manager cycle exhausted",
                 actor="agent:manager",
+                flow_timeline_service=FlowTimelineService(store=store),
             )
 
         flow_state = store.get_flow_state(branch)
@@ -248,7 +252,11 @@ def test_block_manager_noop_issue_no_flow():
 
         with patch("vibe3.services.FlowService") as mock_flow_service:
             block_manager_noop_issue(
-                issue_number=123, repo=None, reason="Test reason", actor="test:actor"
+                issue_number=123,
+                repo=None,
+                reason="Test reason",
+                actor="test:actor",
+                flow_service=mock_flow_service.return_value,
             )
 
             # Should NOT call block_flow

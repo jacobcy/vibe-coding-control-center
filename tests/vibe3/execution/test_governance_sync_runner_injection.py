@@ -12,7 +12,6 @@ import pytest
 class TestGovernanceSyncRunnerWithInjection:
     """Test governance sync runner with injected dependencies."""
 
-    @pytest.mark.xfail(reason="Pre-existing: OrchestraStatusService mock needs update")
     def test_dry_run_shows_intent(self) -> None:
         """Dry run should print intent without executing."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
@@ -30,6 +29,14 @@ class TestGovernanceSyncRunnerWithInjection:
         # Create mock event logger
         mock_append_event = MagicMock()
 
+        # Mock OrchestraStatusService with .create() factory method
+        mock_status_service = MagicMock()
+        mock_status_service.snapshot.return_value = MagicMock(
+            circuit_breaker_state="closed"
+        )
+        mock_service_class = MagicMock()
+        mock_service_class.create.return_value = mock_status_service
+
         # Mock dependencies that are still needed
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
@@ -42,9 +49,7 @@ class TestGovernanceSyncRunnerWithInjection:
             )
             m.setattr(
                 "vibe3.services.orchestra.status.OrchestraStatusService",
-                lambda config, orchestrator=None: MagicMock(
-                    snapshot=lambda: MagicMock(circuit_breaker_state="closed")
-                ),
+                mock_service_class,
             )
 
             run_governance_sync(
@@ -59,7 +64,6 @@ class TestGovernanceSyncRunnerWithInjection:
         # Dry run should not dispatch to backend (no calls to append_event)
         mock_append_event.assert_not_called()
 
-    @pytest.mark.xfail(reason="Pre-existing: OrchestraStatusService mock needs update")
     def test_success_path_logs_completion(self) -> None:
         """Successful execution should log completion event."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
@@ -81,6 +85,14 @@ class TestGovernanceSyncRunnerWithInjection:
         mock_backend_result.exit_code = 0
         mock_backend_result.is_success.return_value = True
 
+        # Mock OrchestraStatusService with .create() factory method
+        mock_status_service = MagicMock()
+        mock_status_service.snapshot.return_value = MagicMock(
+            circuit_breaker_state="closed"
+        )
+        mock_service_class = MagicMock()
+        mock_service_class.create.return_value = mock_status_service
+
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
@@ -92,9 +104,7 @@ class TestGovernanceSyncRunnerWithInjection:
             )
             m.setattr(
                 "vibe3.services.orchestra.status.OrchestraStatusService",
-                lambda config, orchestrator=None: MagicMock(
-                    snapshot=lambda: MagicMock(circuit_breaker_state="closed")
-                ),
+                mock_service_class,
             )
             m.setattr(
                 "vibe3.execution.governance_sync_runner.CodeagentBackend",
@@ -115,7 +125,6 @@ class TestGovernanceSyncRunnerWithInjection:
         call_args = mock_append_event.call_args.args[0]
         assert "completed" in call_args or "tick=5" in call_args
 
-    @pytest.mark.xfail(reason="Pre-existing: OrchestraStatusService mock needs update")
     def test_error_path_records_to_error_tracking(self) -> None:
         """API error should be classified and recorded to ErrorTrackingService."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
@@ -133,6 +142,14 @@ class TestGovernanceSyncRunnerWithInjection:
         # Create mock event logger
         mock_append_event = MagicMock()
 
+        # Mock OrchestraStatusService with .create() factory method
+        mock_status_service = MagicMock()
+        mock_status_service.snapshot.return_value = MagicMock(
+            circuit_breaker_state="closed"
+        )
+        mock_service_class = MagicMock()
+        mock_service_class.create.return_value = mock_status_service
+
         with (pytest.MonkeyPatch().context() as m,):
             m.setattr(
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
@@ -144,9 +161,7 @@ class TestGovernanceSyncRunnerWithInjection:
             )
             m.setattr(
                 "vibe3.services.orchestra.status.OrchestraStatusService",
-                lambda config, orchestrator=None: MagicMock(
-                    snapshot=lambda: MagicMock(circuit_breaker_state="closed")
-                ),
+                mock_service_class,
             )
             m.setattr(
                 "vibe3.execution.governance_sync_runner.CodeagentBackend",
@@ -233,7 +248,6 @@ class TestGovernanceAsyncRunnerWithInjection:
         # and not injected, so we can't mock it via setattr. We skip the
         # assertion (verification is done via integration tests)
 
-    @pytest.mark.xfail(reason="Pre-existing: OrchestraStatusService mock needs update")
     def test_skip_when_circuit_breaker_open(self) -> None:
         """Async dispatch should be skipped when circuit breaker is open."""
         from vibe3.execution.governance_sync_runner import run_governance_async
@@ -249,6 +263,8 @@ class TestGovernanceAsyncRunnerWithInjection:
         mock_snapshot.circuit_breaker_state = "open"
         mock_status_service = MagicMock()
         mock_status_service.snapshot.return_value = mock_snapshot
+        mock_service_class = MagicMock()
+        mock_service_class.create.return_value = mock_status_service
 
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
@@ -277,7 +293,7 @@ class TestGovernanceAsyncRunnerWithInjection:
             )
             m.setattr(
                 "vibe3.services.orchestra.status.OrchestraStatusService",
-                lambda config, orchestrator=None: mock_status_service,
+                mock_service_class,
             )
             m.setattr(
                 "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",

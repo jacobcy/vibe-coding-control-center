@@ -118,7 +118,7 @@ def _patch_plan_deps(
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     return mock_async, mock_sync
 
@@ -166,7 +166,9 @@ def test_plan_no_arg_defaults_to_current_branch(monkeypatch) -> None:
     result = runner.invoke(plan_app, [])
 
     assert result.exit_code == 0
-    mock_resolve.assert_called_once_with(None)
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] is None
+    # Convenience wrapper creates FlowService internally, so no flow_service kwarg
     mock_runner.assert_called_once()
 
 
@@ -177,7 +179,8 @@ def test_plan_branch_no_flow_error(monkeypatch) -> None:
 
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
 
     result = runner.invoke(plan_app, ["--branch", "42"])
@@ -192,7 +195,8 @@ def test_plan_no_arg_no_flow_error(monkeypatch) -> None:
 
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "feature/no-flow"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "feature/no-flow",
     )
 
     result = runner.invoke(plan_app, [])
@@ -208,7 +212,8 @@ def test_plan_branch_no_spec_error(monkeypatch) -> None:
 
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
 
     result = runner.invoke(plan_app, ["--branch", "42"])
@@ -246,7 +251,7 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     # Mock load_config_and_validate_model since we refactored config loading
     mock_config = MagicMock()
@@ -309,7 +314,7 @@ def test_plan_dry_run_branch(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.roles.plan.create_codeagent_command",
@@ -377,7 +382,7 @@ def test_plan_show_prompt_propagates(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.roles.plan.create_codeagent_command",
@@ -439,7 +444,7 @@ def test_plan_async_shows_tmux_info(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     # Mock config loader for domain handler
     _patch_config_for_role(monkeypatch, mock_config)
@@ -547,7 +552,7 @@ def test_plan_model_with_config_backend_succeeds(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg",
-        lambda _: "task/issue-42",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
 
     # Mock config with backend set (simulating settings.yaml)

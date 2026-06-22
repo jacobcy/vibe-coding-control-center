@@ -52,7 +52,8 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     # Mock at both layers for EDA
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
@@ -88,7 +89,8 @@ def mock_run_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     monkeypatch.setattr("vibe3.commands.run.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
-        "vibe3.commands.run.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.run.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.commands.run.validate_run_prerequisites",
@@ -121,7 +123,8 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_config = MagicMock()
 
     monkeypatch.setattr(
-        "vibe3.commands.review.resolve_branch_arg", lambda _: "task/issue-42"
+        "vibe3.commands.review.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
     )
     monkeypatch.setattr(
         "vibe3.commands.review.validate_review_prerequisites",
@@ -165,7 +168,10 @@ def test_plan_no_branch_uses_current_branch(
 
     runner.invoke(plan_app, [])
 
-    mock_resolve.assert_called_once_with(None)
+    # resolve_branch_arg called with (None,)
+    # Convenience wrapper creates FlowService internally
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] is None
 
 
 def test_plan_issue_number_resolves_to_branch(
@@ -177,7 +183,10 @@ def test_plan_issue_number_resolves_to_branch(
 
     runner.invoke(plan_app, ["--branch", "42"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg called with ("42",)
+    # Convenience wrapper creates FlowService internally
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
 
 
 def test_run_no_branch_uses_current_branch(
@@ -190,7 +199,10 @@ def test_run_no_branch_uses_current_branch(
 
     runner.invoke(run_app, ["test instructions"])
 
-    mock_resolve.assert_called_once_with(None)
+    # resolve_branch_arg called with (None,)
+    # Convenience wrapper creates FlowService internally
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] is None
 
 
 def test_run_issue_number_resolves_to_branch(
@@ -203,7 +215,10 @@ def test_run_issue_number_resolves_to_branch(
 
     runner.invoke(run_app, ["--branch", "42", "test instructions"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg called with ("42",)
+    # Convenience wrapper creates FlowService internally
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
 
 
 def test_review_no_branch_shows_help() -> None:
@@ -223,7 +238,10 @@ def test_review_issue_number_resolves_to_branch(
 
     runner.invoke(review_app, ["--branch", "42"])
 
-    mock_resolve.assert_called_once_with("42")
+    # resolve_branch_arg called with ("42",)
+    # Convenience wrapper creates FlowService internally
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args[0][0] == "42"
 
 
 # ==============================================================================

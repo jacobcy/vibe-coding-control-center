@@ -47,7 +47,7 @@ def run_issue_role_async(
 
     store = SQLiteClient()
     if branch is not None:
-        branch = resolve_branch_arg(branch)  # type: ignore[misc]
+        branch = resolve_branch_arg(branch)
     else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)
@@ -162,7 +162,7 @@ def run_issue_role_sync(
 
     store = SQLiteClient()
     if branch is not None:
-        branch = resolve_branch_arg(branch)  # type: ignore[misc]
+        branch = resolve_branch_arg(branch)
     else:
         current_branch = GitClient().get_current_branch()
         branch = spec.resolve_branch(store, issue_number, current_branch)

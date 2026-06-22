@@ -49,7 +49,7 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
-from vibe3.services.flow import create_flow_manager
+from vibe3.services.flow import FlowTimelineService, create_flow_manager
 from vibe3.services.issue import fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
@@ -445,5 +445,6 @@ MANAGER_SYNC_SPEC = IssueRoleSyncSpec(
     failure_handler=lambda issue_number, reason: fail_manager_issue(
         issue_number=issue_number,
         reason=reason,
+        flow_timeline_service=FlowTimelineService(),
     ),
 )

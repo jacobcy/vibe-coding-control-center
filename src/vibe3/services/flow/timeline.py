@@ -45,7 +45,7 @@ class FlowTimelineService:
         branch: str,
         event_type: str,
         actor: str,
-        detail: str,
+        detail: str = "",
         issue_number: int | None = None,
         repo: str | None = None,
         policy: TimelineCommentPolicy | None = None,
