@@ -12,6 +12,11 @@ if TYPE_CHECKING:
         normalize_actor,
     )
     from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+    from vibe3.models.audit_observation import (
+        AuditObservation,
+        ObservationLayer,
+        ObservationSourceWindow,
+    )
     from vibe3.models.branch_convention import BranchConvention
     from vibe3.models.change_source import (
         BranchSource,
@@ -145,6 +150,9 @@ if TYPE_CHECKING:
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "AuditObservation": "vibe3.models.audit_observation",
+    "ObservationLayer": "vibe3.models.audit_observation",
+    "ObservationSourceWindow": "vibe3.models.audit_observation",
     "ControlPlaneEventPublished": "vibe3.models.domain_events",
     "DomainEvent": "vibe3.models.domain_events",
     "ExecutorDispatchIntent": "vibe3.models.domain_events",
@@ -287,6 +295,7 @@ __all__: list[str] = [
     "AgentResult",
     "ALLOWED_TRANSITIONS",
     "AsyncExecutionHandle",
+    "AuditObservation",
     "BranchConvention",
     "BranchSource",
     "CallNode",
@@ -344,6 +353,8 @@ __all__: list[str] = [
     "ModuleSnapshot",
     "normalize_actor",
     "OrchestraConfig",
+    "ObservationLayer",
+    "ObservationSourceWindow",
     "PRCriticalAnalysis",
     "PRMetadata",
     "PRMerged",
