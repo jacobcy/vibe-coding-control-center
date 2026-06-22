@@ -23,21 +23,39 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     Removes directories created by tests that accidentally pass MagicMock
     objects to Path operations, which results in directories with names like
     'MagicMock/' or '<MagicMock name=...'.
+
+    This cleanup logs all discovered leaks to help identify their source.
     """
     import shutil
+
+    from loguru import logger
 
     project_root = Path(__file__).parent.parent
 
     # Clean up MagicMock directories (test leak artifacts)
+    leaks_found = []
     for item in project_root.iterdir():
         if item.is_dir() and (
             item.name == "MagicMock" or item.name.startswith("<MagicMock")
         ):
+            leaks_found.append(item.name)
+            logger.warning(
+                f"Test artifact leak detected: {item.name}. "
+                "This indicates a test passed MagicMock to Path operations. "
+                "Please investigate and fix the leaking test."
+            )
             try:
                 shutil.rmtree(item)
-            except Exception:
-                # Ignore cleanup errors to avoid masking test failures
-                pass
+                logger.info(f"Cleaned up leaked directory: {item.name}")
+            except Exception as e:
+                logger.error(f"Failed to clean up {item.name}: {e}")
+
+    if leaks_found:
+        logger.warning(
+            f"Test suite completed with {len(leaks_found)} artifact leak(s): "
+            f"{', '.join(leaks_found)}. "
+            "These have been cleaned up but indicate test quality issues."
+        )
 
 
 # ============================================================
