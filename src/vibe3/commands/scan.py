@@ -209,7 +209,10 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
 
     from vibe3.clients import GitHubClient
     from vibe3.config import load_orchestra_config
-    from vibe3.roles import fetch_supervisor_candidates
+    from vibe3.roles import (
+        build_supervisor_handoff_payload,
+        fetch_supervisor_candidates,
+    )
     from vibe3.ui import display_supervisor_dry_run
 
     console = Console()
@@ -224,6 +227,37 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
         console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
         total_scanned = 0
         candidates = []
+
+    # Always show Prompt Composition summary (similar to governance)
+    if not show_prompt:
+        # Build sample prompt to show structure
+        try:
+            sample_prompt, _, _ = build_supervisor_handoff_payload(
+                config, 999999, "Sample Issue", annotate_sections=False
+            )
+            from vibe3.agents import CodeagentBackend
+            from vibe3.execution import ExecutionRolePolicyService
+
+            options = ExecutionRolePolicyService(
+                config
+            ).resolve_effective_agent_options("supervisor")
+
+            # Show structure via CodeagentBackend dry-run display
+            CodeagentBackend().run(
+                prompt=sample_prompt,
+                options=options,
+                task="supervisor scan",
+                dry_run=True,
+                show_prompt=False,
+                role="supervisor",
+                dry_run_summary={
+                    "prompt_mode": "handoff",
+                    "sections": ["supervisor.handoff"],
+                    "refs": {"role": "supervisor"},
+                },
+            )
+        except Exception as e:
+            console.print(f"[yellow]Could not build prompt preview: {e}[/yellow]")
 
     # Display via UI layer
     display_supervisor_dry_run(
