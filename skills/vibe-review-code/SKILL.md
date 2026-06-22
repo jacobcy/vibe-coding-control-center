@@ -48,7 +48,7 @@ Route elsewhere when:
 - Do not edit code while reviewing unless the user explicitly asks you to fix findings.
 - Never claim completion without verification evidence.
 - Use `uv run` for all Python project commands.
-- Do not write directly to `.git/vibe3` shared files; use `uv run python src/vibe3/cli.py handoff append ...` if review observations need internal handoff.
+- Do not write directly to `.git/vibe3` shared files; use `vibe3 handoff append ...` if review observations need internal handoff.
 
 ## Execution Flow
 
@@ -184,7 +184,7 @@ Run non-dry review commands only when the user explicitly wants the automated re
 If the review produces internal context that future agents need, append a concise handoff note:
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "[vibe-review-code] <summary>" --actor vibe-review-code --kind finding
+vibe3 handoff append "[vibe-review-code] <summary>" --actor vibe-review-code --kind finding
 ```
 
 Use `--kind finding|blocker|note|next` according to the handoff command help. Do not invent unsupported kinds.
