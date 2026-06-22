@@ -69,7 +69,7 @@ def test_resolve_vibe_project_asset_from_repo_root(monkeypatch, tmp_path: Path) 
     vibe_file.parent.mkdir(parents=True)
     vibe_file.write_text("project policy", encoding="utf-8")
 
-    # Initialize git repo
+    # Initialize git repo with initial commit to ensure it's a valid repo
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
@@ -79,6 +79,14 @@ def test_resolve_vibe_project_asset_from_repo_root(monkeypatch, tmp_path: Path) 
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    # Add initial commit to make the repo valid (skip hooks)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init", "--no-verify"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
@@ -110,7 +118,7 @@ def test_resolve_vibe_project_asset_from_subdirectory(
     vibe_file.parent.mkdir(parents=True)
     vibe_file.write_text("project policy", encoding="utf-8")
 
-    # Initialize git repo
+    # Initialize git repo with initial commit
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
@@ -120,6 +128,13 @@ def test_resolve_vibe_project_asset_from_subdirectory(
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init", "--no-verify"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
@@ -143,9 +158,13 @@ def test_resolve_vibe_project_asset_from_subdirectory(
 
 def test_resolve_vibe_project_asset_not_in_repo(monkeypatch, tmp_path: Path) -> None:
     """Verify .vibe/ paths return relative path when not in a git repo."""
-    # Create a non-git directory structure
+    # Create a non-git directory structure outside any git repo
     non_git_dir = tmp_path / "non-git"
     non_git_dir.mkdir()
+
+    # Clear git environment variables to isolate from parent git repos
+    monkeypatch.delenv("GIT_DIR", raising=False)
+    monkeypatch.delenv("GIT_WORK_TREE", raising=False)
     monkeypatch.chdir(non_git_dir)
 
     # Clear the lru_cache before testing
@@ -164,7 +183,7 @@ def test_resolve_vibe_project_graceful_missing(monkeypatch, tmp_path: Path) -> N
 
     The caller (_read_file) will handle missing files gracefully by returning None.
     """
-    # Create a git repo WITHOUT .vibe/policies
+    # Create a git repo WITHOUT .vibe/policies with initial commit
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
@@ -174,6 +193,16 @@ def test_resolve_vibe_project_graceful_missing(monkeypatch, tmp_path: Path) -> N
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    # Create a dummy file and commit to make repo valid
+    dummy = tmp_path / "README.md"
+    dummy.write_text("test", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init", "--no-verify"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
