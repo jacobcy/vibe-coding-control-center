@@ -275,16 +275,28 @@ class TestGovernanceDryRunPromptDisplay:
             app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
         )
         assert result.exit_code == 0
-        assert "assignee-pool" in result.output.lower() or "Material:" in result.output
+        # After fix: --dry-run shows Prompt Composition summary (not full prompt)
+        assert (
+            "Prompt Composition" in result.output or "prompt" in result.output.lower()
+        )
 
     @pytest.mark.slow
     def test_governance_dry_run_shows_prompt_preview(self):
         result = runner.invoke(
-            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+            app,
+            [
+                "scan",
+                "governance",
+                "--role",
+                "assignee-pool",
+                "--dry-run",
+                "--show-prompt",
+            ],
         )
         assert result.exit_code == 0
+        # With --show-prompt, should display full prompt with section markers
         output_lower = result.output.lower()
-        assert "prompt" in output_lower or "governance prompt" in output_lower
+        assert "<!-- section:" in output_lower or "governance.scan" in output_lower
 
 
 class TestSupervisorDryRunPromptDisplay:

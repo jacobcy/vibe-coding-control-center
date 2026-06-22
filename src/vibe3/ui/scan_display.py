@@ -100,7 +100,7 @@ def display_supervisor_dry_run(
         # Show prompt previews if requested
         if show_prompt:
             from vibe3.config import load_orchestra_config
-            from vibe3.roles.supervisor import build_supervisor_handoff_payload
+            from vibe3.roles import build_supervisor_handoff_payload
 
             config = load_orchestra_config()
             console.print("\n[bold]Prompt Previews:[/bold]\n")

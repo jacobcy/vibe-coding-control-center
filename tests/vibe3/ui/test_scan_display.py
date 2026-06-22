@@ -99,9 +99,7 @@ class TestDisplaySupervisorDryRun:
             }
         ]
 
-        with patch(
-            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
-        ) as mock_build:
+        with patch("vibe3.roles.build_supervisor_handoff_payload") as mock_build:
             mock_build.return_value = ("test prompt", None, "test task")
 
             display_supervisor_dry_run(
@@ -128,9 +126,7 @@ class TestDisplaySupervisorDryRun:
             }
         ]
 
-        with patch(
-            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
-        ) as mock_build:
+        with patch("vibe3.roles.build_supervisor_handoff_payload") as mock_build:
             mock_build.return_value = (
                 "<!-- section:supervisor.handoff -->\n"
                 "test prompt\n"
@@ -166,9 +162,7 @@ class TestDisplaySupervisorDryRun:
             for i in range(1, 16)
         ]
 
-        with patch(
-            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
-        ) as mock_build:
+        with patch("vibe3.roles.build_supervisor_handoff_payload") as mock_build:
             mock_build.return_value = ("test prompt", None, "test task")
 
             with patch.object(console, "print"):

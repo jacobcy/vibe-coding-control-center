@@ -106,7 +106,9 @@ def _publish_and_wait_supervisor_events(
     return results
 
 
-def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
+def _run_governance_scan_dry_run(
+    material_override: str | None = None, show_prompt: bool = False
+) -> None:
     """Execute governance scan in dry-run mode via run_governance_sync.
 
     Uses real-time snapshot (not synthetic context) to preview governance prompt.
@@ -114,6 +116,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
 
     Args:
         material_override: Optional governance role to override material rotation
+        show_prompt: If True, display full prompt content with section markers
     """
     from vibe3.execution import run_governance_sync
     from vibe3.observability import append_governance_event
@@ -125,7 +128,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         tick_count=0,  # Manual scan always uses tick=0
         material_override=material_override,
         dry_run=True,
-        show_prompt=True,
+        show_prompt=show_prompt,
         session_id=None,
         governance_fns=build_default_governance_fns(),
         append_event=append_governance_event,
@@ -248,6 +251,13 @@ def governance(
         bool,
         typer.Option("--dry-run", help="Build and display prompt without executing"),
     ] = False,
+    show_prompt: Annotated[
+        bool,
+        typer.Option(
+            "--show-prompt",
+            help="With --dry-run, display full prompt content with section markers",
+        ),
+    ] = False,
     no_async: _ASYNC_OPT = False,
     verbose: Annotated[
         int,
@@ -295,7 +305,7 @@ def governance(
 
     if dry_run:
         # In dry-run mode, build and display the prompt without executing
-        _run_governance_scan_dry_run(material_override=role)
+        _run_governance_scan_dry_run(material_override=role, show_prompt=show_prompt)
         return
 
     if role is None:
