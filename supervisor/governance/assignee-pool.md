@@ -79,6 +79,7 @@ issue 有 assignee → pool 分流 →
   ├─ roadmap/epic + all sub-issues completed → 直接关闭 epic → governed
   ├─ roadmap/epic + partial sub-issues → 只记录进度（partial 不写评论）
   ├─ 明确重复/过时（高置信度）→ 检查未完成工作 → follow-up（如有）+ close → governed
+  ├─ 已有 merged PR 覆盖 → 直接关闭（高置信度）→ governed
   ├─ 不明确重复/过时（低置信度）→ roadmap/rfc + suggest → governed
   ├─ blocked + reason == “state unchanged” + ref 存在 → resume → governed
   └─ 明确范围 + 清晰验收 + 无阻塞 → roadmap/p0~p2 + priority/* + state/ready → governed
@@ -108,6 +109,7 @@ Allowed:
 - `handoff`: read（读取交接上下文）
 - `scene`: read（读取现场信息）
 - `comment.write`: 写治理建议评论（格式为 `[governance suggest][assignee-pool]` 或 `[governance decide][assignee-pool]`）
+- `pr:read`: 通过 gh pr list 查询 merged PR（仅用于入池评估的覆盖检测）
 - `state/labels.write`: 两项动作，性质不同：
 
   1. **入池评估与标签补齐**（本职工作）：
@@ -265,6 +267,7 @@ pool 扫描有 assignee 的 issue →
   ├─ roadmap/epic + all sub-issues completed → 直接关闭 epic
   ├─ roadmap/epic + partial sub-issues completed → 只记录进度；非 manager assignee 不打 governed，避免 cleanup 循环
   ├─ 明确冲突或重复（高置信度）→ 检查未完成工作 → 创建 follow-up（如有）+ 关闭 → 打 governed
+  ├─ 已有 merged PR 覆盖 issue scope → 检查未完成工作 → 创建 follow-up（如有）+ 关闭 → 打 governed
   ├─ 不明确冲突或重复（低置信度）→ 设 roadmap/rfc + 写 suggest 说明人类需判断的问题 → 打 governed
   ├─ blocked_reason == "state unchanged" + ref 存在 → resume → 打 governed
   ├─ 明确范围 + 清晰验收 + 无阻塞 → 设 roadmap/p0~p2 + priority/* + state/ready → 打 governed
@@ -406,8 +409,25 @@ Steps:
    - 扫描 assignee issue pool 中有 manager assignee 但缺少 `state/*` label 的 issue
    - 对每个候选 issue：
      a. 检查是否已有优先级 label（`priority/[0-9]` 或 legacy priority）
-        - **若无优先级 label**：这是 roadmap intake 刚分配的 assignee，应走完整评估流程（步骤 b-f）
+        - **若无优先级 label**：这是 roadmap intake 刚分配的 assignee，应走完整评估流程（步骤 a.5-f）
         - **若已有优先级 label**：说明已经过 assignee pool 评估，只是漏改 state，可直接跳到步骤 e
+     a.5. **Merged PR 覆盖检测（强制）**：在设置 state/ready 前，检查 issue scope 是否已被 merged PR 覆盖：
+        - 执行命令：
+          ```bash
+          gh pr list --search "issue:<issue_number>" --state merged --json number,title,mergedAt --limit 1
+          ```
+        - 如果返回非空结果（存在引用该 issue 的 merged PR）：
+          - 提取 PR 编号和标题
+          - 执行未完成工作检查（分支、draft PR、refs）
+          - 若有未完成工作：创建 follow-up issue
+          - 关闭当前 issue：
+            ```bash
+            gh issue close <issue_number> --comment "已关闭：merged PR #<pr_number>「<pr_title>」已覆盖此 issue 的 scope"
+            ```
+          - 添加 orchestra-governed 标签
+          - 写 `[governance decide][assignee-pool]` comment 说明关闭理由和 PR 证据
+          - 跳过 state/ready，继续下一个候选
+        - 如果无结果：继续正常入池评估流程
      b. 检查是否已有活跃 flow（`has_flow=True`）→ 跳过（说明已在执行中）
      c. 评估优先级：阅读 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
      d. 检查并补齐 `roadmap/*` 标签（如缺失）
@@ -623,7 +643,8 @@ Exit:
 
 **判断标准**：
 - **明确的重复 issue**：目标完全相同，已存在另一个活跃的 issue
-- **明确的已解决 issue**：功能已通过明确的 PR/commit 实现，有清晰的代码证据
+- **明确的已解决 issue**：功能已通过明确的 PR/commit 实现，有清晰的代码证据。
+  - **补充**：通过 `gh pr list --search "issue:<N>" --state merged` 确认存在 merged PR 引用该 issue
 - **明确的废弃依赖**：依赖的模块已在其他 PR 中移除，有明确的移除记录
 
 **处理流程**：
