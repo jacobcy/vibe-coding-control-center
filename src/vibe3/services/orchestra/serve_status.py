@@ -223,9 +223,9 @@ class ServeStatusService:
             table = Table(title="Running / Queued", show_lines=True)
             table.add_column("Role", style="magenta", width=8)
             table.add_column("Status", style="green", width=8)
-            table.add_column("Target", style="yellow", width=12)
+            table.add_column("Target", style="yellow")
             table.add_column("Started", style="dim", width=12)
-            table.add_column("Log", style="dim", width=20)
+            table.add_column("Log", style="dim")
 
             for job in snapshot.active_jobs:
                 table.add_row(
@@ -241,9 +241,9 @@ class ServeStatusService:
             table = Table(title="Recent Sessions", show_lines=True)
             table.add_column("Role", style="magenta", width=8)
             table.add_column("Status", style="yellow", width=9)
-            table.add_column("Target", style="yellow", width=12)
+            table.add_column("Target", style="yellow")
             table.add_column("Ended", style="dim", width=12)
-            table.add_column("Log", style="dim", width=20)
+            table.add_column("Log", style="dim")
 
             for job in snapshot.recent_jobs:
                 table.add_row(
