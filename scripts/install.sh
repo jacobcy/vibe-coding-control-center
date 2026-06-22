@@ -291,7 +291,8 @@ fi
 _append_to_rc "$RC_FILE" 'export PATH="$HOME/.claude/bin:$PATH"' "Vibe Center - codeagent-wrapper PATH"
 _append_to_rc "$RC_FILE" $'if [[ -f ~/.vibe/config/keys.env ]]; then\n    set -a\n    source ~/.vibe/config/keys.env 2>/dev/null || true\n    set +a\nfi' "Load Vibe keys"
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center - Loader"
-_append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
+# NOTE: Removed ~/.local/bin PATH export to prevent uv tool install conflicts
+# uv automatically handles ~/.local/bin in PATH during its installation
 if [[ "$SHELL" == */bash ]]; then
     _append_to_rc "$RC_FILE" 'command -v direnv >/dev/null 2>&1 && eval "$(direnv hook bash)"' "Vibe Direnv Hook"
 else

@@ -4,7 +4,6 @@
   "backends": {
     "codex": {},
     "claude": {},
-    "gemini": {},
     "opencode": {}
   },
   "agents": {
@@ -44,8 +43,8 @@
       "description": "Governance agent: policy enforcement and cleanup"
     },
     "code-explorer": {
-      "backend": "gemini",
-      "model": "gemini-3-flash-preview",
+      "backend": "opencode",
+      "model": "deepseek/deepseek-v4-flash",
       "description": "General code exploration and analysis"
     },
     "document-writer": {
@@ -55,8 +54,8 @@
       "description": "Documentation generation and maintenance"
     },
     "frontend-ui-ux-engineer": {
-      "backend": "gemini",
-      "model": "gemini-3.1-pro-preview",
+      "backend": "opencode",
+      "model": "deepseek/deepseek-v4-flash",
       "yolo": true,
       "description": "Frontend development and UI/UX implementation"
     },
