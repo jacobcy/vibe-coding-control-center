@@ -116,7 +116,7 @@ if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
     echo "     (no local targets determined; CI runs full suite)"
 else
     echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
-    uv run pytest "${TEST_TARGETS[@]}" -q --tb=short || {
+    uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -m "not integration" || {
         if detect_rebase; then
             echo ""
             echo "ERROR: Tests failed"
@@ -143,7 +143,7 @@ if [ "${VIBE_CI_PARITY:-0}" = "1" ]; then
     if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
         echo "     Skipping CI parity (no test targets)"
     else
-        GITHUB_ACTIONS=true uv run pytest "${TEST_TARGETS[@]}" -q --tb=short || {
+        GITHUB_ACTIONS=true uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -m "not integration" || {
             echo "WARNING: Tests passed locally but failed in CI simulation"
             echo "This may indicate environment-dependent test behavior"
             # Non-blocking warning for now
