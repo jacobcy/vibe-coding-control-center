@@ -3,11 +3,35 @@
 from __future__ import annotations
 
 import os
+import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 from vibe3.exceptions import DiagnosticContext, MissingResourceError
 
 RUNTIME_ASSETS_ROOT_ENV = "VIBE3_RUNTIME_ASSETS_ROOT"
+
+
+@lru_cache(maxsize=1)
+def _git_toplevel() -> Path | None:
+    """Return the git working tree root, or None if not in a repo.
+
+    Uses `git rev-parse --show-toplevel` which returns the current worktree
+    root (not the main repo root). This is correct for .vibe/ paths which
+    are checked out per-worktree, not shared across worktrees.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    return None
 
 
 def bundled_project_root() -> Path:
@@ -36,6 +60,10 @@ def resolve_runtime_asset(path: str | Path) -> Path:
     bundled project copy; cross-project execution uses the global distribution.
     If the global copy has not been synced yet, fall back to the bundled project
     root.
+
+    Relative paths under ``.vibe/`` are project-scope assets anchored to the
+    git working tree root (``git rev-parse --show-toplevel``), ensuring correct
+    resolution from both repo root and subdirectories.
     """
     candidate = Path(path).expanduser()
     if candidate.is_absolute():
@@ -47,7 +75,16 @@ def resolve_runtime_asset(path: str | Path) -> Path:
         ("config",),
         ("skills",),
         (".agent",),
+        (".vibe",),  # project-scope, anchor to git toplevel
     }:
+        # Handle .vibe/ paths: resolve against git working tree root
+        if relative.parts[:1] == (".vibe",):
+            root = _git_toplevel()
+            if root is not None:
+                return root / relative
+            return relative  # not in a git repo, caller handles
+
+        # Existing logic for supervisor/config/skills/.agent
         bundled_path = bundled_project_root() / relative
         try:
             Path.cwd().resolve().relative_to(bundled_project_root())
