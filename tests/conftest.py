@@ -13,6 +13,34 @@ if str(scripts_python) not in sys.path:
 
 
 # ============================================================
+# Test Artifact Cleanup
+# ============================================================
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Clean up leaked test artifacts after test session finishes.
+
+    Removes directories created by tests that accidentally pass MagicMock
+    objects to Path operations, which results in directories with names like
+    'MagicMock/' or '<MagicMock name=...'.
+    """
+    import shutil
+
+    project_root = Path(__file__).parent.parent
+
+    # Clean up MagicMock directories (test leak artifacts)
+    for item in project_root.iterdir():
+        if item.is_dir() and (
+            item.name == "MagicMock" or item.name.startswith("<MagicMock")
+        ):
+            try:
+                shutil.rmtree(item)
+            except Exception:
+                # Ignore cleanup errors to avoid masking test failures
+                pass
+
+
+# ============================================================
 # Flow Service Fixtures
 # ============================================================
 
