@@ -581,3 +581,30 @@ def test_get_git_common_dir_cached_reuses_cached_value(
     result3 = snapshot_service._get_git_common_dir_cached()
     assert call_count == 1  # Still only one call
     assert result3 == result1
+
+
+def test_build_snapshot_forwards_repo_path_to_git_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """build_snapshot passes repo_path as cwd to GitClient."""
+    from vibe3.analysis import snapshot_service
+
+    captured_cwd = []
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "test-branch"
+    fake_git.get_current_commit.return_value = "abc1234567890"
+
+    def fake_git_client(github_client=None, cwd=None):
+        captured_cwd.append(cwd)
+        return fake_git
+
+    monkeypatch.setattr(snapshot_service, "GitClient", fake_git_client)
+
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / "src" / "vibe3").mkdir(parents=True)
+
+    snapshot_service.build_snapshot(repo_path=worktree)
+
+    assert len(captured_cwd) == 1
+    assert captured_cwd[0] == worktree

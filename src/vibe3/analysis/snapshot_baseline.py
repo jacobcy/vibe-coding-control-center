@@ -17,6 +17,7 @@ def save_branch_baseline(
     build_snapshot_func: Callable[[], StructureSnapshot] | None = None,
     _ensure_baseline_dir_func: Callable[[], None] | None = None,
     _get_baseline_dir_func: Callable[[], Path] | None = None,
+    repo_path: Path | None = None,
 ) -> Path | None:
     """Build current snapshot and save as baseline for the specified branch.
 
@@ -30,12 +31,28 @@ def save_branch_baseline(
         build_snapshot_func: Function to build snapshot if needed (dependency injection)
         _ensure_baseline_dir_func: Function to ensure baseline dir exists
         _get_baseline_dir_func: Function to get baseline dir path
+        repo_path: Repository path for worktree-aware operations. When set,
+            build_snapshot is called with repo_path argument.
 
     Returns:
         Path to saved baseline, or None if build failed
     """
     # Import snapshot_service helpers for default implementations
     # Local import to avoid circular dependency
+
+    # When repo_path is provided, construct a lambda that passes it
+    # to build_snapshot. This takes precedence over the default but
+    # allows explicit build_snapshot_func override.
+    if repo_path is not None and build_snapshot_func is None:
+        from vibe3.analysis.snapshot_service import (
+            build_snapshot as default_build_snapshot,
+        )
+
+        def _build_with_repo_path() -> StructureSnapshot:
+            return default_build_snapshot(repo_path=repo_path)
+
+        build_snapshot_func = _build_with_repo_path
+
     if build_snapshot_func is None:
         from vibe3.analysis.snapshot_service import (
             build_snapshot as default_build_snapshot,

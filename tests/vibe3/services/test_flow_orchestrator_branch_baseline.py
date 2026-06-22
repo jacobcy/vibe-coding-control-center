@@ -136,7 +136,7 @@ def test_bootstrap_issue_flow_skip_git_omits_creation_source() -> None:
 
 
 def test_bootstrap_issue_flow_default_baseline_is_idempotent() -> None:
-    """Default bootstrap should not overwrite an existing baseline snapshot."""
+    """Default bootstrap always rebuilds baseline with force=True and repo_path."""
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
@@ -158,11 +158,15 @@ def test_bootstrap_issue_flow_default_baseline_is_idempotent() -> None:
             source="skill",
         )
 
-    mock_save_baseline.assert_called_once_with("task/issue-901", force=False)
+    # After fix: bootstrap always forces rebuild and passes repo_path=None
+    # when ensure_worktree is False (default)
+    mock_save_baseline.assert_called_once_with(
+        "task/issue-901", force=True, repo_path=None
+    )
 
 
 def test_bootstrap_issue_flow_force_baseline_overwrites_existing() -> None:
-    """force_baseline=True should overwrite an existing baseline snapshot."""
+    """force_baseline parameter is now redundant - bootstrap always forces rebuild."""
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
@@ -185,4 +189,8 @@ def test_bootstrap_issue_flow_force_baseline_overwrites_existing() -> None:
             force_baseline=True,
         )
 
-    mock_save_baseline.assert_called_once_with("task/issue-902", force=True)
+    # After fix: bootstrap always uses force=True regardless of force_baseline
+    # and passes repo_path=None when ensure_worktree is False
+    mock_save_baseline.assert_called_once_with(
+        "task/issue-902", force=True, repo_path=None
+    )

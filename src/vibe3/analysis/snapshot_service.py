@@ -209,21 +209,36 @@ def _collect_other_file_snapshots(
     return files
 
 
-def build_snapshot(root: str | None = None) -> StructureSnapshot:
+def build_snapshot(
+    root: str | None = None, repo_path: Path | None = None
+) -> StructureSnapshot:
     """Build a structure snapshot from the current codebase.
 
     By default scans Python files in src/vibe3/ plus all non-Python files
     tracked by review_scope paths (skills/, supervisor/, config/, etc.).
+
+    Args:
+        root: Source root directory (defaults to get_source_root()).
+        repo_path: Repository path for worktree-aware operations. When set,
+            GitClient uses this as cwd and relative root paths are resolved
+            against this path.
     """
     if root is None:
         from vibe3.config import get_source_root
 
         root = get_source_root()
+
+    # Resolve relative root to worktree if repo_path is provided
+    if repo_path is not None:
+        root_path = Path(root)
+        if not root_path.is_absolute():
+            root = str(repo_path / root_path)
+
     log = logger.bind(domain="snapshot", action="build", root=root)
     log.info("Building structure snapshot")
 
     try:
-        git = GitClient()
+        git = GitClient(cwd=repo_path) if repo_path is not None else GitClient()
         branch = git.get_current_branch()
         commit = git.get_current_commit()
         commit_short = commit[:7] if commit else "unknown"

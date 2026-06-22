@@ -204,6 +204,10 @@ class FlowOrchestratorService:
                 )
 
             result = self.store.get_flow_state(branch) or flow_state.model_dump()
+
+            # Initialize worktree_ctx before conditional so it's
+            # accessible in skip_git block.
+            worktree_ctx = None
             if ensure_worktree:
                 worktree_manager = WorktreeManager(
                     self.config,
@@ -227,7 +231,10 @@ class FlowOrchestratorService:
                 try:
                     from vibe3.analysis import snapshot_service
 
-                    snapshot_service.save_branch_baseline(branch, force=force_baseline)
+                    repo_path = worktree_ctx.path if worktree_ctx else None
+                    snapshot_service.save_branch_baseline(
+                        branch, force=True, repo_path=repo_path
+                    )
                 except Exception:
                     pass
 
