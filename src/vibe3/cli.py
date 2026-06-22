@@ -158,6 +158,36 @@ def main_callback(
     ctx.meta["verbose"] = verbose
     setup_logging(verbose=verbose)
 
+    # Git environment check: ensure running in a worktree, not bare repository
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0 or result.stdout.strip() != "true":
+            from rich.console import Console
+
+            console = Console(stderr=True)
+            console.print(
+                "[red]Error:[/red] vibe3 commands must run in a Git "
+                "worktree, not a bare repository.\n"
+                "[yellow]Current location:[/yellow] Bare repository or "
+                "non-Git directory\n"
+                "[yellow]Solution:[/yellow] Navigate to a worktree:\n"
+                "  [cyan]cd .worktrees/main[/cyan]  # or any other "
+                "worktree\n"
+                "  [cyan]vibe3 <command>[/cyan]",
+                style=None,
+            )
+            raise SystemExit(1)
+    except FileNotFoundError:
+        # git not found - let individual commands handle this
+        pass
+
 
 @app.command(name="run")
 def run_command(
