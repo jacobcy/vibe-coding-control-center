@@ -87,6 +87,101 @@ class TestDisplaySupervisorDryRun:
             # Should print table with issue info
             assert mock_print.call_count > 0
 
+    def test_show_prompt_calls_build_supervisor_handoff_payload(self):
+        """show_prompt=True builds prompts for candidates."""
+        console = Console()
+
+        candidates = [
+            {
+                "number": 123,
+                "title": "Test Issue",
+                "labels": ["supervisor", "state/handoff"],
+            }
+        ]
+
+        with patch(
+            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
+        ) as mock_build:
+            mock_build.return_value = ("test prompt", None, "test task")
+
+            display_supervisor_dry_run(
+                console=console,
+                total_scanned=15,
+                candidates=candidates,
+                show_prompt=True,
+            )
+
+            # Should call build_supervisor_handoff_payload with annotate_sections=True
+            mock_build.assert_called_once()
+            call_kwargs = mock_build.call_args[1]
+            assert call_kwargs.get("annotate_sections") is True
+
+    def test_show_prompt_displays_prompt_content(self):
+        """show_prompt=True displays prompt content for candidates."""
+        console = Console()
+
+        candidates = [
+            {
+                "number": 123,
+                "title": "Test Issue",
+                "labels": ["supervisor", "state/handoff"],
+            }
+        ]
+
+        with patch(
+            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
+        ) as mock_build:
+            mock_build.return_value = (
+                "<!-- section:supervisor.handoff -->\n"
+                "test prompt\n"
+                "<!-- /section:supervisor.handoff -->",
+                None,
+                "test task",
+            )
+
+            with patch.object(console, "print") as mock_print:
+                display_supervisor_dry_run(
+                    console=console,
+                    total_scanned=15,
+                    candidates=candidates,
+                    show_prompt=True,
+                )
+
+                # Should print a Panel containing the prompt
+                calls = [str(call) for call in mock_print.call_args_list]
+                # Look for Panel object in calls
+                assert any("Panel" in c for c in calls)
+
+    def test_show_prompt_limits_to_10_candidates(self):
+        """show_prompt=True limits prompt preview to first 10 candidates."""
+        console = Console()
+
+        # Create 15 candidates
+        candidates = [
+            {
+                "number": i,
+                "title": f"Issue {i}",
+                "labels": ["supervisor", "state/handoff"],
+            }
+            for i in range(1, 16)
+        ]
+
+        with patch(
+            "vibe3.roles.supervisor.build_supervisor_handoff_payload"
+        ) as mock_build:
+            mock_build.return_value = ("test prompt", None, "test task")
+
+            with patch.object(console, "print"):
+                display_supervisor_dry_run(
+                    console=console,
+                    total_scanned=15,
+                    candidates=candidates,
+                    show_prompt=True,
+                )
+
+                # Should only call build_supervisor_handoff_payload 10 times
+                assert mock_build.call_count == 10
+
 
 class TestDisplayMaterialList:
     """Tests for material list display."""
