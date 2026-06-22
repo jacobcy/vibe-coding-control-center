@@ -98,26 +98,43 @@ git checkout main
 git pull origin main
 ```
 
-### Step 8: 记录 handoff
+### Step 8: 留痕（Trace）
 
-在当前 flow 的 handoff 链中记录终态：
+根据当前环境记录终态：
 
+**判断环境**：
 ```bash
-vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind note
+# 检测是否有 flow 环境
+vibe3 flow show
 ```
 
-格式：
-```markdown
-## Flow Closure
+**留痕规则**：
+- **有 flow 环境**（正常情况）：使用 handoff 记录关闭决策
+  ```bash
+  vibe3 handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
+  ```
 
-- flow: <flow-name>
-- status: completed
-- pr: <pr-link> (merged)
-- issues_closed: <issue-links>
-- follow_up: <issue-link or none>
-- resources_cleaned: branch + worktree
-- completed_at: <ISO-8601>
-```
+- **无 flow 但有 issue**：在 issue 中记录关闭决策
+  ```bash
+  gh issue comment <issue-number> --body "## Flow Closed
+
+  **PR**: #<pr-number> (merged)
+  **Issues Closed**: <issue-links>
+  **Follow-up**: <issue-link or none>
+  **Resources Cleaned**: branch + worktree
+  **Completed At**: <ISO-8601>
+  "
+  ```
+
+- **都没有**：无需留痕
+
+**留痕内容应包含**：
+- Flow 名称（如有）
+- PR 编号和状态（merged）
+- 已关闭的 issue 列表
+- Follow-up issue（如有）
+- 资源清理状态（branch + worktree）
+- 完成时间
 
 ## 停止点
 
