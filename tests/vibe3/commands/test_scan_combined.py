@@ -29,7 +29,9 @@ class TestCombinedScan:
         result = runner.invoke(app, ["scan", "all", "--dry-run"])
         assert result.exit_code == 0
         output_lower = result.output.lower()
-        assert "governance dry-run" in output_lower
+        # After refactor, governance uses CodeagentBackend.run(dry_run=True)
+        # which outputs "prompt composition" header
+        assert "prompt composition" in output_lower or "governance.scan" in output_lower
         assert "supervisor scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_combined_scan_async")
