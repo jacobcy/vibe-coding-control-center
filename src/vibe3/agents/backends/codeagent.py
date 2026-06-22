@@ -54,38 +54,59 @@ class CodeagentBackend:
 
     @staticmethod
     def _build_command(
-        options: AgentOptions,
+        original_options: AgentOptions,
+        effective_options: AgentOptions,
         prompt_file_path: str,
         task: str | None = None,
         session_id: str | None = None,
     ) -> list[str]:
-        """Build codeagent-wrapper command."""
-        original_options = options
-        options = resolve_effective_agent_options(options)
+        """Build codeagent-wrapper command.
+
+        Args:
+            original_options: Original options with agent name
+                (may have backend/model=None)
+            effective_options: Resolved options with backend/model filled in
+            prompt_file_path: Path to prompt file
+            task: Optional task string
+            session_id: Optional session ID for resume
+        """
+        options = effective_options  # Use resolved options for backend/model
         command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
 
-        preset_name = None
-        if (
-            original_options.agent
-            and not original_options.backend
-            and not original_options.model
-            and not has_agent_env_override(original_options.agent)
-        ):
-            preset_name = resolve_repo_agent_preset_name(original_options.agent)
+        # Determine whether to use --agent or --backend/--model
+        # Env override takes precedence: use backend/model directly
+        # Otherwise, use agent preset if available
+        preset_name: str | None = None
 
-        if preset_name:
-            command.extend(["--agent", preset_name])
-            if options.model:
-                command.extend(["--model", options.model])
-        elif options.agent:
-            command.extend(["--agent", options.agent])
-            if options.model:
-                command.extend(["--model", options.model])
+        if original_options.agent:
+            if has_agent_env_override(original_options.agent):
+                # Env var override: use backend/model directly
+                if options.backend:
+                    command.extend(["--backend", options.backend])
+                if options.model:
+                    command.extend(["--model", options.model])
+            else:
+                # No env override: use agent preset (with yolo config, etc.)
+                preset_name = resolve_repo_agent_preset_name(original_options.agent)
+                if preset_name:
+                    command.extend(["--agent", preset_name])
+                    # Only add --model if original_options didn't specify one
+                    # (preset's model will be used)
+                    if not original_options.model and options.model:
+                        command.extend(["--model", options.model])
+                else:
+                    # Preset not found, fall back to backend/model
+                    if options.backend:
+                        command.extend(["--backend", options.backend])
+                    if options.model:
+                        command.extend(["--model", options.model])
         elif options.backend:
+            # No agent, use backend/model directly
             command.extend(["--backend", options.backend])
             if options.model:
                 command.extend(["--model", options.model])
         else:
+            # No agent, no backend: use default
             command.extend(["--agent", "vibe-reviewer"])
 
         command.append("--skip-permissions")
@@ -102,6 +123,14 @@ class CodeagentBackend:
                 command.append("continue")
         elif safe_task:
             command.append(safe_task)
+
+        # Diagnostic logging of resolved command
+        logger.bind(domain="agent_execution").debug(
+            f"Built command: backend={options.backend or 'default'}, "
+            f"model={options.model or 'default'}, "
+            f"agent={preset_name or original_options.agent or 'none'}, "
+            f"cmd={' '.join(command[:6])}..."  # Truncate for readability
+        )
 
         return command
 
@@ -231,11 +260,19 @@ class CodeagentBackend:
         keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start codeagent-wrapper in tmux and return the async handle."""
-        sync_models_json(options)
+        try:
+            sync_models_json(options)
+        except (OSError, Exception) as e:
+            logger.bind(domain="agent_execution").warning(
+                f"sync_models_json failed, continuing with execution: {e}"
+            )
 
         prompt_file_path, _ = prepare_prompt_file(prompt)
+        original_options = options
+        effective_options = resolve_effective_agent_options(options)
         command = self._build_command(
-            options,
+            original_options,
+            effective_options,
             str(prompt_file_path),
             task=task,
             session_id=session_id,
@@ -269,7 +306,12 @@ class CodeagentBackend:
         dry_run_summary: dict[str, object] | None = None,
     ) -> AgentResult:
         """Run codeagent-wrapper synchronously."""
-        sync_models_json(options)
+        try:
+            sync_models_json(options)
+        except (OSError, Exception) as e:
+            logger.bind(domain="agent_execution").warning(
+                f"sync_models_json failed, continuing with execution: {e}"
+            )
 
         project_root = str(cwd or Path.cwd())
         prompt_file_path, prompt_content = prepare_prompt_file(
@@ -280,6 +322,7 @@ class CodeagentBackend:
         diagnostic_prompt_length = len(prompt_content)
 
         # Log prompt metadata before execution for debugging
+        original_options = options
         effective_options = resolve_effective_agent_options(options)
         logger.bind(domain="agent_execution").debug(
             "Executing codeagent-wrapper: "
@@ -290,7 +333,8 @@ class CodeagentBackend:
 
         try:
             command = self._build_command(
-                options,
+                original_options,
+                effective_options,
                 str(prompt_file_path),
                 task=task,
                 session_id=session_id,
@@ -354,7 +398,8 @@ class CodeagentBackend:
                         )
                         diagnostic_prompt_length = len(fallback_prompt_content)
                     retry_command = self._build_command(
-                        options,
+                        original_options,
+                        effective_options,
                         str(retry_prompt_path),
                         task=task,
                         session_id=None,

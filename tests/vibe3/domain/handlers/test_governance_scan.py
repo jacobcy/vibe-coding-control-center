@@ -55,6 +55,64 @@ class TestGovernanceScanHandler:
             in mock_append_governance_event.call_args.args[0]
         )
 
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.services.orchestra.OrchestraStatusService")
+    @patch("vibe3.orchestra.flow_dispatch.FlowManager")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
+    def test_material_override_propagates_to_command(
+        self,
+        mock_from_settings: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_status_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+        mock_append_governance_event: MagicMock,
+    ) -> None:
+        """material_override in event should produce --material flag in command."""
+        from vibe3.domain.handlers.governance_scan import (
+            handle_governance_scan_started,
+        )
+
+        mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
+        mock_from_settings.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = MagicMock(
+            launched=True, skipped=False
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        # Event with material_override
+        event = GovernanceScanStarted(tick_count=0, material_override="roadmap-intake")
+
+        result = handle_governance_scan_started(event)
+
+        # Verify launched (not skipped)
+        assert result is not None
+        assert result.launched is True
+        assert result.skipped is False
+
+        # Verify dispatch_execution was called
+        mock_coordinator.dispatch_execution.assert_called_once()
+        call_args = mock_coordinator.dispatch_execution.call_args
+
+        # Get the ExecutionRequest object
+        request = call_args.args[0]
+
+        # Check that the command includes --material roadmap-intake
+        cmd = request.cmd
+        assert isinstance(cmd, list), f"Expected cmd to be list, got {type(cmd)}"
+        assert "--material" in cmd, f"Expected --material in cmd: {cmd}"
+        assert "roadmap-intake" in cmd, f"Expected roadmap-intake in cmd: {cmd}"
+
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra.OrchestraStatusService")

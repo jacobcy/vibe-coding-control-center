@@ -23,6 +23,16 @@ CRITICAL_ENV_PASSTHROUGH = {
     "TMPDIR",
     "USER",
     "VIBE3_ASYNC_CHILD",
+    # VIBE_BACKEND_* and VIBE_MODEL_* must be passed through even if unchanged
+    # to ensure async child processes respect environment variable overrides.
+    # Only roles with corresponding EnvOverrideRule entries in env_override.py
+    # are listed here (manager, governance, supervisor).
+    "VIBE_BACKEND_GOVERNANCE",
+    "VIBE_BACKEND_MANAGER",
+    "VIBE_BACKEND_SUPERVISOR",
+    "VIBE_MODEL_GOVERNANCE",
+    "VIBE_MODEL_MANAGER",
+    "VIBE_MODEL_SUPERVISOR",
 }
 
 

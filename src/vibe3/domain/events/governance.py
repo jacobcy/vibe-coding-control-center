@@ -17,6 +17,7 @@ class GovernanceScanStarted(DomainEvent):
 
     tick_count: int
     execution_count: int = 0  # Independent counter for material rotation
+    material_override: str | None = None  # Optional material role override
     actor: str = "system:governance"
     timestamp: str | None = None
 

@@ -169,6 +169,10 @@ def handle_governance_scan_started(
         str(event.execution_count),
     ]
 
+    # Add material override if provided
+    if event.material_override:
+        cmd.extend(["--material", event.material_override])
+
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     # Ensure governance child process can write to events.log
