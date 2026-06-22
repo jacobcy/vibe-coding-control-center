@@ -39,8 +39,8 @@ CHANGED=$(git diff --name-only origin/main...HEAD -- src/vibe3/)
 
 # 2. 通过 test selector 解析完整测试集（含 DAG 分析和目录回退）
 SELECTION=$(echo "$CHANGED" | uv run python src/vibe3/analysis/pre_push_test_selector.py)
-TARGETS=$(echo "$SELECTION" | python -c "import sys,json; print(' '.join(json.load(sys.stdin)['tests']))")
-MODE=$(echo "$SELECTION" | python -c "import sys,json; print(json.load(sys.stdin)['mode'])")
+TARGETS=$(echo "$SELECTION" | uv run python -c "import sys,json; print(' '.join(json.load(sys.stdin)['tests']))")
+MODE=$(echo "$SELECTION" | uv run python -c "import sys,json; print(json.load(sys.stdin)['mode'])")
 
 # 3. 根据 mode 决定本地执行策略
 if [ "$MODE" = "skip" ]; then
