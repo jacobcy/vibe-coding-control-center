@@ -38,6 +38,9 @@ E_ISSUE_FAILED: Final[str] = "E_ISSUE_FAILED"
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
 
+# Test quality - test artifact leaks
+E_TEST_ARTIFACT_LEAK: Final[str] = "E_TEST_ARTIFACT_LEAK"
+
 # Data integrity errors - corruption detection
 E_INVALID_BRANCH_LINK: Final[str] = "E_INVALID_BRANCH_LINK"
 

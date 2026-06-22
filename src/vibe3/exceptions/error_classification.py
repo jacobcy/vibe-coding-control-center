@@ -33,6 +33,7 @@ from vibe3.exceptions.error_codes import (
     E_MODEL_CONFIG,
     E_MODEL_NOT_FOUND,
     E_MODEL_PERMISSION,
+    E_TEST_ARTIFACT_LEAK,
 )
 from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
 from vibe3.exceptions.runtime_errors import APIError, GitHubAPIError
@@ -342,6 +343,17 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         issue_action="record_only",
         gate_action="threshold",
         description="Invalid branch linked to issue in flow_issue_links",
+    ),
+    # WARNING: Test quality - test artifact leaks
+    E_TEST_ARTIFACT_LEAK: ErrorHandlingContract(
+        code=E_TEST_ARTIFACT_LEAK,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=False,
+        issue_action="record_only",
+        gate_action="ignore",
+        description="Test artifact leak (MagicMock passed to Path operations)",
     ),
 }
 
