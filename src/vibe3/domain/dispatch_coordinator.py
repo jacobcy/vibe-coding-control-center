@@ -318,13 +318,23 @@ class GlobalDispatchCoordinator:
         return False
 
     def _has_dispatchable_entries(self, entries: list[QueueEntry]) -> bool:
-        """Whether entries contain work that can pass dispatch preflight."""
+        """Whether entries contain work that can pass dispatch preflight.
+
+        Excludes aborted flows to prevent pool exhaustion detection interference.
+        Aborted flows are allowed through health checks for recovery opportunities,
+        but should not count as "dispatchable" for pool exhaustion purposes.
+        """
         for entry in entries:
             if entry.waiting_state is not None or entry.collected_state == "blocked":
                 continue
 
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None or issue.state == IssueState.DONE:
+                continue
+
+            # Exclude aborted flows from dispatchable count
+            _, flow_state = self._flow_context(issue.number)
+            if flow_state and flow_state.get("flow_status") == "aborted":
                 continue
 
             if issue.state != IssueState.BLOCKED and should_skip_from_queue(

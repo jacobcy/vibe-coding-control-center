@@ -337,3 +337,180 @@ async def test_coordinate_consumes_queue_dirty_signal():
 
     # Verify consume_queue_dirty_signal was called
     coordinator._queue_maintenance.consume_queue_dirty_signal.assert_called_once()
+
+
+def test_has_dispatchable_entries_excludes_aborted_flows():
+    """Verify aborted flows are excluded from dispatchable count.
+
+    This prevents pool exhaustion detection interference when aborted
+    flows pass health checks but shouldn't count as "truly dispatchable"
+    for the purpose of resetting the exhausted counter.
+    """
+    from unittest.mock import MagicMock
+
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_config.manager_usernames = ()  # Empty tuple for manager usernames
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Mock issue loader to return a ready issue
+    mock_issue = MagicMock(spec=IssueInfo)
+    mock_issue.number = 123
+    mock_issue.state = IssueState.READY
+    mock_issue.labels = []
+    mock_issue.assignees = []
+    coordinator._load_issue = lambda issue_number: (
+        mock_issue if issue_number == 123 else None
+    )
+
+    # Mock flow context to return aborted flow
+    coordinator._flow_context = lambda issue_number: (
+        "task/issue-123",
+        {"flow_status": "aborted"},
+    )
+
+    # Mock preflight to pass
+    from vibe3.domain.dispatch_preflight import DispatchPreflightDecision
+
+    coordinator._run_dispatch_preflight = lambda issue: DispatchPreflightDecision(
+        allowed=True, target_state=IssueState.READY
+    )
+
+    # Create queue entry for aborted flow
+    entry = QueueEntry(issue_number=123, collected_state="ready", waiting_state=None)
+
+    # Test: Should return False for aborted flow (excluded from dispatchable count)
+    result = coordinator._has_dispatchable_entries([entry])
+    assert result is False, "Aborted flow should not count as dispatchable"
+
+
+@pytest.mark.asyncio
+async def test_exhausted_refresh_pauses_on_aborted_only_queue():
+    """Verify pool exhaustion detection works when queue contains only aborted flows.
+
+    Integration test for the full exhausted_refresh() flow:
+    1. Queue contains only aborted flow entries
+    2. exhausted_refresh() collects fresh queue (also aborted)
+    3. Should return dispatch_paused=True (not reset by aborted flows)
+    """
+    from unittest.mock import MagicMock
+
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.domain.dispatch_preflight import DispatchPreflightDecision
+    from vibe3.models import IssueInfo, IssueState, OrchestraConfig, QueueEntry
+
+    # Create mock services
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_config.manager_usernames = ()
+    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh.enabled = False
+
+    mock_capacity = MagicMock()
+    mock_capacity.get_capacity_status.return_value = {"remaining": 1}
+
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Setup: Create aborted flow entry
+    aborted_issue = MagicMock(spec=IssueInfo)
+    aborted_issue.number = 123
+    aborted_issue.state = IssueState.READY
+    aborted_issue.labels = []
+    aborted_issue.assignees = []
+
+    coordinator._load_issue = lambda n: aborted_issue if n == 123 else None
+    coordinator._flow_context = lambda n: (
+        "task/issue-123",
+        {"flow_status": "aborted"},
+    )
+    coordinator._run_dispatch_preflight = lambda issue: DispatchPreflightDecision(
+        allowed=True, target_state=IssueState.READY
+    )
+
+    # Mock collect_frozen_queue to return aborted flow
+    aborted_entry = QueueEntry(
+        issue_number=123, collected_state="ready", waiting_state=None
+    )
+
+    async def mock_collect_frozen_queue():
+        return [aborted_entry]
+
+    coordinator._collect_frozen_queue = mock_collect_frozen_queue
+
+    # Setup queue maintenance service
+    # Mock should_collect to trigger collection
+    coordinator._should_collect_after_dispatch = lambda count: True
+
+    # Start with empty queue, not paused
+    frozen_queue = []
+    dispatch_paused = False
+
+    # Call exhausted_refresh (simulates queue exhausted after dispatch)
+    new_queue, new_paused = await coordinator._queue_maintenance.exhausted_refresh(
+        dispatched_count=0,
+        queue_refreshed=False,
+        frozen_queue=frozen_queue,
+        dispatch_paused=dispatch_paused,
+    )
+
+    # Verify: Should be paused because all entries are aborted
+    assert new_paused is True, (
+        "exhausted_refresh should return dispatch_paused=True "
+        "when queue contains only aborted flows"
+    )
+    assert len(new_queue) == 1, "Queue should contain the collected aborted entry"

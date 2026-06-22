@@ -425,6 +425,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_ask.py"
         limit: 450
         reason: "Ask command 测试集，覆盖 input validation（4 tests）、forbidden patterns（6 tests）、execution logic with mocked backend（7 tests）、branch parameter（4 tests）等紧密耦合场景；新增 --branch 参数测试后从 299 行增至 443 行（+144 行）；所有测试围绕 ask 命令功能，拆分会降低可读性；仅超限 43 行（443 vs 400），符合 test exception 策略"
+      - path: "tests/vibe3/domain/test_dispatch_coordinator.py"
+        limit: 550
+        reason: "GlobalDispatchCoordinator domain layer migration 测试集，覆盖 constructor DI verification、coordinate dispatch flow、queue lifecycle management、issue state handling、pool exhaustion detection 等紧密耦合场景；与源文件 dispatch_coordinator.py（limit 800）对应，测试 domain-first architecture 迁移后的协调器契约；PR #3101 新增 aborted flow exclusion 测试验证 pool exhaustion detection（+102 行含 integration test）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
