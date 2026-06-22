@@ -47,7 +47,10 @@ def display_governance_dry_run(
 
 
 def display_supervisor_dry_run(
-    console: Console, total_scanned: int, candidates: list[dict]
+    console: Console,
+    total_scanned: int,
+    candidates: list[dict],
+    show_prompt: bool = False,
 ) -> None:
     """Display supervisor scan dry-run output.
 
@@ -55,6 +58,7 @@ def display_supervisor_dry_run(
         console: Rich Console instance
         total_scanned: Total number of open issues scanned
         candidates: List of candidate issues (number, title, labels)
+        show_prompt: If True, build and display prompts for candidates
     """
     console.print("\n[bold]Supervisor Scan Dry-Run[/bold]")
     console.print("[cyan]Mode:[/cyan] dry-run (no execution)\n")
@@ -92,6 +96,43 @@ def display_supervisor_dry_run(
             "\n[dim]In real mode, would dispatch supervisor-apply agent "
             "for each issue[/dim]"
         )
+
+        # Show prompt previews if requested
+        if show_prompt:
+            from vibe3.config import load_orchestra_config
+            from vibe3.roles.supervisor import build_supervisor_handoff_payload
+
+            config = load_orchestra_config()
+            console.print("\n[bold]Prompt Previews:[/bold]\n")
+
+            for issue in candidates[:10]:  # Limit to first 10 candidates
+                try:
+                    prompt, _, _ = build_supervisor_handoff_payload(
+                        config,
+                        issue["number"],
+                        issue.get("title"),
+                        annotate_sections=True,
+                    )
+                    console.print(f"[cyan]--- Issue #{issue['number']} ---[/cyan]")
+                    console.print(
+                        Panel(
+                            prompt,
+                            title=f"Supervisor Prompt #{issue['number']}",
+                            border_style="blue",
+                        )
+                    )
+                    console.print()
+                except Exception as e:
+                    console.print(
+                        f"[red]Failed to build prompt for "
+                        f"#{issue['number']}: {e}[/red]\n"
+                    )
+
+            if len(candidates) > 10:
+                console.print(
+                    f"[dim]... skipping {len(candidates) - 10} "
+                    f"more prompt previews[/dim]\n"
+                )
     else:
         console.print(
             f"[yellow]Scanned {total_scanned} open issues, "

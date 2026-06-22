@@ -290,3 +290,60 @@ recipes:
         assert request.dry_run_summary["session_reused"] is True
         assert request.dry_run_summary["session_id"] == "session-1"
         assert request.dry_run_summary["sections"] == ["manager.retry_task"]
+
+    def test_dry_run_passes_annotate_sections_to_render_sections(
+        self, tmp_path, monkeypatch
+    ):
+        """dry_run=True passes annotate_sections=True to render_sections."""
+        from unittest.mock import patch
+
+        from vibe3.prompts import manifest
+
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text("""
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.target
+""")
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager.load_prompt_templates",
+            lambda prompts_path=None: {
+                "manager": {
+                    "target": "target section",
+                }
+            },
+        )
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        # Patch render_sections to capture annotate_sections parameter
+        with patch.object(
+            manifest.PromptManifest,
+            "render_sections",
+            wraps=manifest.PromptManifest.load_default().render_sections,
+        ) as mock_render:
+            # Need to return a valid prompt result
+            mock_render.return_value = "test prompt"
+
+            build_manager_sync_request(
+                config=config,
+                issue=IssueInfo(number=661, title="Test"),
+                branch="task/issue-661",
+                flow_state=None,
+                session_id=None,
+                options=object(),
+                actor="test",
+                dry_run=True,
+                show_prompt=False,
+            )
+
+            # Verify annotate_sections=True was passed
+            assert mock_render.called
+            call_kwargs = mock_render.call_args[1]
+            assert call_kwargs.get("annotate_sections") is True

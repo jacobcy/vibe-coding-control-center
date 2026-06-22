@@ -194,10 +194,13 @@ def _run_supervisor_scan() -> tuple[int, int]:
     return total_scanned, matched_count
 
 
-def _run_supervisor_scan_dry_run() -> None:
+def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
     """Execute supervisor scan in dry-run mode, displaying scan plan.
 
     Shows scan process without actual execution.
+
+    Args:
+        show_prompt: If True, build and display prompts for candidate issues
     """
     from rich.console import Console
 
@@ -220,7 +223,9 @@ def _run_supervisor_scan_dry_run() -> None:
         candidates = []
 
     # Display via UI layer
-    display_supervisor_dry_run(console, total_scanned, candidates)
+    display_supervisor_dry_run(
+        console, total_scanned, candidates, show_prompt=show_prompt
+    )
 
 
 @app.command()
@@ -314,6 +319,13 @@ def supervisor(
             "--dry-run", help="Show scan plan and candidates without executing"
         ),
     ] = False,
+    show_prompt: Annotated[
+        bool,
+        typer.Option(
+            "--show-prompt",
+            help="With --dry-run, build and display prompts for candidates",
+        ),
+    ] = False,
     verbose: Annotated[
         int,
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
@@ -327,7 +339,7 @@ def supervisor(
     setup_logging(verbose=verbose)
 
     if dry_run:
-        _run_supervisor_scan_dry_run()
+        _run_supervisor_scan_dry_run(show_prompt=show_prompt)
         return
 
     # Manual supervisor scan: direct dispatch without facade

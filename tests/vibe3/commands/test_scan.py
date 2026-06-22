@@ -79,7 +79,8 @@ class TestGovernanceScan:
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
         output_lower = result.output.lower()
-        assert "governance dry-run" in output_lower or "--- prompt ---" in output_lower
+        # After refactor, output uses CodeagentBackend.run(dry_run=True) format
+        assert "prompt composition" in output_lower or "governance.scan" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
