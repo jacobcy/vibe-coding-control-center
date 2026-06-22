@@ -389,6 +389,32 @@ Epic Issues（依赖图梳理）
 - Epic: 关注关键路径上的 issues
 ```
 
+### Step 6: 留痕（Trace）`[Agent]`
+
+完成所有处理后，根据当前环境留痕：
+
+**判断环境**：
+```bash
+# 检测是否有 flow 环境
+vibe3 flow show
+```
+
+**留痕规则**：
+- **有 flow 环境**：使用 handoff 记录处理汇总
+  ```bash
+  vibe3 handoff append "vibe-task: 处理 RFC <N> 个, Blocked <M> 个, Epic <K> 个" --actor vibe-task --kind audit
+  ```
+
+- **无 flow 但有处理的 issues**：无需额外留痕（RFC 决策已在 issue comment 中记录）
+
+- **都没有处理**：无需留痕
+
+**留痕内容应包含**：
+- 处理的 RFC 数量和决策
+- 处理的 Blocked 数量和恢复方案
+- Epic 依赖图关键节点
+- 依赖链总览
+
 ## 与其他 Skills 的区别
 
 - **vibe-task**: 看 RFC、blocked、epic issues（问题 issue）及依赖图
