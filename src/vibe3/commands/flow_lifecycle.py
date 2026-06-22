@@ -57,7 +57,7 @@ def blocked(
 
     service = FlowService()
 
-    target_branch = resolve_branch_arg(branch, flow_service=FlowService())
+    target_branch = resolve_branch_arg(branch)
 
     logger.bind(
         command="flow blocked",

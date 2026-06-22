@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -62,7 +62,7 @@ def record_error(
     issue_number: int | None = None,
     branch: str | None = None,
     store: "SQLiteClient | None" = None,
-    severity: "ErrorSeverity | None" = None,
+    severity: Any = None,
 ) -> tuple[bool, int]:
     """Convenient error recording function (auto-get singleton).
 
@@ -96,7 +96,7 @@ def record_error(
 
 
 def record_dispatch_failure_if_unexpected(
-    result: "ExecutionLaunchResult | None" = None,
+    result: Any = None,
     role: str = "",
     issue_number: int | None = None,
     branch: str = "",
