@@ -9,7 +9,7 @@ from vibe3.commands.flow import app as flow_app
 runner = CliRunner()
 
 
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_aborted_flow_without_tombstone(
     mock_client_class, mock_resolve_branch
@@ -47,7 +47,7 @@ def test_restore_aborted_flow_without_tombstone(
     mock_client.restore_flow.assert_called_once_with("task/issue-789")
 
 
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_soft_deleted_flow(mock_client_class, mock_resolve_branch) -> None:
     """Test that restore command succeeds for soft-deleted flow."""
@@ -76,7 +76,7 @@ def test_restore_soft_deleted_flow(mock_client_class, mock_resolve_branch) -> No
     mock_client.restore_flow.assert_called_once_with("task/issue-123")
 
 
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_already_active_flow(mock_client_class, mock_resolve_branch) -> None:
     """Test that restore command rejects already active flow."""
@@ -105,7 +105,7 @@ def test_restore_already_active_flow(mock_client_class, mock_resolve_branch) -> 
     mock_client.restore_flow.assert_not_called()
 
 
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_nonexistent_flow(mock_client_class, mock_resolve_branch) -> None:
     """Test that restore command fails for nonexistent flow."""
@@ -129,7 +129,7 @@ def test_restore_nonexistent_flow(mock_client_class, mock_resolve_branch) -> Non
 
 
 @patch("vibe3.commands.flow_manage.typer.confirm")
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_requires_confirmation_without_yes(
     mock_client_class, mock_resolve_branch, mock_confirm
@@ -155,7 +155,7 @@ def test_restore_requires_confirmation_without_yes(
 
 
 @patch("vibe3.commands.flow_manage.typer.confirm")
-@patch("vibe3.services.shared.branches.resolve_branch_arg")
+@patch("vibe3.services.shared.branches._resolve_branch_arg")
 @patch("vibe3.clients.SQLiteClient")
 def test_restore_confirmation_allows_restore(
     mock_client_class, mock_resolve_branch, mock_confirm
