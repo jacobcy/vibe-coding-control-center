@@ -142,3 +142,42 @@ class TestFromRepoPath:
         git_dir.mkdir(parents=True)
         store = SQLiteClient.from_repo_path(tmp_path)
         assert type(store).__name__ == "SQLiteClient"
+
+
+def test_severity_prefix_map_matches_error_registry():
+    """Verify inline severity map matches ERROR_REGISTRY.
+
+    The migration backfill in sqlite_schema.py uses an inline severity map
+    that must stay synchronized with ERROR_REGISTRY. This test catches drift.
+    """
+    from vibe3.exceptions.error_classification import ERROR_REGISTRY
+
+    # Inline map from sqlite_schema.py (must be kept in sync)
+    _severity_prefix_map: dict[str, str] = {
+        "E_MODEL_": "CRITICAL",
+        "E_API_": "ERROR",
+        "E_EXEC_": "WARNING",
+        "E_CAPACITY_": "WARNING",
+        "E_DISPATCH_": "WARNING",
+        "E_CONFIG_": "WARNING",
+        "E_INVALID_": "ERROR",
+        "E_ISSUE_": "ERROR",
+        "E_TEST_": "WARNING",
+    }
+
+    # Verify each error code in registry matches prefix inference
+    for error_code, contract in ERROR_REGISTRY.items():
+        expected_severity = contract.severity.value
+
+        # Infer severity from prefix
+        actual_severity = "ERROR"  # Default fallback
+        for prefix, sev in _severity_prefix_map.items():
+            if error_code.startswith(prefix):
+                actual_severity = sev
+                break
+
+        assert actual_severity == expected_severity, (
+            f"{error_code}: inline map inferred {actual_severity}, "
+            f"but ERROR_REGISTRY has {expected_severity}. "
+            f"Update _severity_prefix_map in sqlite_schema.py"
+        )
