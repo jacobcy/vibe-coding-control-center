@@ -135,11 +135,12 @@ def test_build_snapshot_custom_root_does_not_scan_workspace_paths(
 
     snapshot = snapshot_service.build_snapshot(root=str(root))
 
-    assert any(
-        f.path == str(tmp_path / "config" / "settings.yaml") for f in snapshot.files
-    )
-    assert any(f.path == str(tmp_path / "skills" / "demo.md") for f in snapshot.files)
-    assert all(Path(f.path).is_relative_to(tmp_path) for f in snapshot.files)
+    paths = {f.path for f in snapshot.files}
+    assert "config/settings.yaml" in paths
+    assert "skills/demo.md" in paths
+    # Isolation: snapshot keys are repo-relative (no absolute workspace leak),
+    # keeping baselines comparable across worktrees/machines (issue #3087).
+    assert all(not Path(f.path).is_absolute() for f in snapshot.files)
 
 
 def test_read_snapshot_metadata_extracts_all_fields(tmp_path: Path) -> None:
@@ -581,3 +582,68 @@ def test_get_git_common_dir_cached_reuses_cached_value(
     result3 = snapshot_service._get_git_common_dir_cached()
     assert call_count == 1  # Still only one call
     assert result3 == result1
+
+
+def test_build_snapshot_forwards_repo_path_to_git_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """build_snapshot passes repo_path as cwd to GitClient."""
+    from vibe3.analysis import snapshot_service
+
+    captured_cwd = []
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "test-branch"
+    fake_git.get_current_commit.return_value = "abc1234567890"
+
+    def fake_git_client(github_client=None, cwd=None):
+        captured_cwd.append(cwd)
+        return fake_git
+
+    monkeypatch.setattr(snapshot_service, "GitClient", fake_git_client)
+
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / "src" / "vibe3").mkdir(parents=True)
+
+    snapshot_service.build_snapshot(repo_path=worktree)
+
+    assert len(captured_cwd) == 1
+    assert captured_cwd[0] == worktree
+
+
+def test_build_snapshot_repo_path_produces_repo_relative_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """build_snapshot(repo_path=X) must store repo-relative file paths.
+
+    Regression for #3087: PR #3093 made the source root absolute under
+    repo_path, so FileSnapshot.path became absolute. The pr-create current
+    snapshot (built without repo_path) uses relative paths, so compute_diff
+    keyed every file as added+removed. Baseline and current must agree on
+    repo-relative path keys.
+    """
+    from vibe3.analysis import snapshot_service
+
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "task/issue-3087"
+    fake_git.get_current_commit.return_value = "abc1234567890"
+    monkeypatch.setattr(
+        snapshot_service,
+        "GitClient",
+        lambda github_client=None, cwd=None: fake_git,
+    )
+
+    worktree = tmp_path / "worktree"
+    src = worktree / "src" / "vibe3"
+    src.mkdir(parents=True)
+    (src / "sample.py").write_text("def foo():\n    return 1\n", encoding="utf-8")
+
+    snapshot = snapshot_service.build_snapshot(repo_path=worktree)
+
+    py_paths = [f.path for f in snapshot.files if f.path.endswith("sample.py")]
+    assert py_paths, "sample.py should be captured in snapshot"
+    for p in py_paths:
+        assert not Path(
+            p
+        ).is_absolute(), f"path must be repo-relative, got absolute: {p}"
+        assert p == "src/vibe3/sample.py", f"expected src/vibe3/sample.py, got {p}"

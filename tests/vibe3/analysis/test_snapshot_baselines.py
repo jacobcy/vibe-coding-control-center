@@ -290,3 +290,47 @@ def test_save_branch_baseline_idempotent(
     # Verify the file was overwritten (now has third snapshot ID)
     data3 = json.loads(filepath3.read_text())
     assert data3["snapshot_id"] == "test-snapshot-3"
+
+
+def test_save_branch_baseline_forwards_repo_path_to_build_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When repo_path is passed, build_snapshot receives repo_path arg."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+    monkeypatch.setattr(snapshot_service, "_ensure_baseline_dir", lambda: None)
+
+    captured_repo_path = []
+
+    def fake_build_snapshot(root=None, repo_path=None):
+        captured_repo_path.append(repo_path)
+        from vibe3.models.snapshot import StructureSnapshot
+
+        return StructureSnapshot(
+            snapshot_id="test",
+            branch="test-branch",
+            commit="abc1234",
+            commit_short="abc1234",
+            created_at="2026-01-01T00:00:00",
+            root="src/vibe3",
+            files=[],
+            modules=[],
+            dependencies=[],
+            metrics={},
+        )
+
+    # Monkeypatch build_snapshot at the module where it's defined
+    monkeypatch.setattr(snapshot_service, "build_snapshot", fake_build_snapshot)
+
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    snapshot_baseline.save_branch_baseline(
+        "test-branch", force=True, repo_path=worktree
+    )
+
+    assert len(captured_repo_path) == 1
+    assert captured_repo_path[0] == worktree
