@@ -125,12 +125,12 @@ class TestClientsModularity:
             except SyntaxError:
                 continue
 
-        # Baseline: 15 imports (stabilized in issue #2902)
-        # Most are exception TYPE imports (GitError, GitHubError, etc.)
+        # Baseline: 13 imports (reduced from 15 in issue #3085)
+        # All are exception TYPE imports (GitError, GitHubError, etc.)
         # defined directly in exceptions/__init__.py — legitimate L6 deps.
-        # A few are lazy FUNCTION imports (classify_error_hybrid,
-        # get_error_handling_contract) — valid public API usage.
-        baseline = 15
+        # Lazy FUNCTION imports (classify_error_hybrid, get_error_handling_contract)
+        # have been eliminated via DI and inline severity inference.
+        baseline = 13
 
         if imports_found:
             print(
