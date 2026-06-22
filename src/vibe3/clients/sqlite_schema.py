@@ -392,7 +392,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Backfill NULL/missing severity values using registry
     # Runs both for newly added column and for any rows with NULL severity
     # (handles interrupted migrations or earlier code writing without severity)
-    from vibe3.exceptions import get_error_handling_contract
 
     before_changes = conn.total_changes
     # Fetch all error codes with NULL severity
@@ -400,11 +399,29 @@ def init_schema(conn: sqlite3.Connection) -> None:
         "SELECT DISTINCT error_code FROM error_log WHERE severity IS NULL"
     ).fetchall()
     for (error_code,) in null_severity_codes:
-        contract = get_error_handling_contract(error_code)
+        # Inline severity inference based on error code prefix
+        # Matches ERROR_REGISTRY in vibe3.exceptions.error_classification
+        # WARNING: This is a duplicate - must sync with ERROR_REGISTRY
+        _severity_prefix_map: dict[str, str] = {
+            "E_MODEL_": "CRITICAL",  # NOT_FOUND, PERMISSION, CONFIG
+            "E_API_": "ERROR",
+            "E_EXEC_": "WARNING",
+            "E_CAPACITY_": "WARNING",
+            "E_DISPATCH_": "WARNING",  # E_DISPATCH_FAILURE
+            "E_CONFIG_": "WARNING",  # E_CONFIG_MISSING
+            "E_INVALID_": "ERROR",
+            "E_ISSUE_": "ERROR",
+            "E_TEST_": "WARNING",  # E_TEST_ARTIFACT_LEAK
+        }
+        severity = "ERROR"  # Conservative fallback
+        for prefix, sev in _severity_prefix_map.items():
+            if error_code.startswith(prefix):
+                severity = sev
+                break
         cursor.execute(
             "UPDATE error_log SET severity = ? WHERE error_code = ? "
             "AND severity IS NULL",
-            (contract.severity.value, error_code),
+            (severity, error_code),
         )
     updated = conn.total_changes - before_changes
     # Only log if updated is a real number (not a mock in tests)

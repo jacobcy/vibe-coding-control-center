@@ -50,8 +50,8 @@ code_limits:
         limit: 450
         reason: "Git status operations infrastructure module，包含 get_changed_files/get_diff/get_numstat/get_name_status 等 4 个统一接口 + _filter_unified_diff_by_paths 辅助函数（PR #3019 pathspec filtering）+ _numstat_via_merge_base/_name_status_via_merge_base merge-base helpers（Issue #3009 A/M/D file classification）；职责单一（git diff/status operations）且遵循既定模式（get_numstat → get_name_status mirror），拆分收益低"
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 570
-        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化"
+        limit: 580
+        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化；Issue #3085 新增内联 severity 推断逻辑（+18 行）消除跨层函数导入"
       - path: "src/vibe3/clients/git_client.py"
         limit: 650
         reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330），新增 get_remote_url() 支持 ConventionResolver 重构（Issue #2346）；Issue #2926 新增 _resolve_base_ref/_resolve_source 实现 origin/main 自动解析与 5 分钟 fetch 缓存（+59 行）"

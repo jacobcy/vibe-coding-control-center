@@ -12,7 +12,7 @@ while this cache persists merged PR status for issue completion checks.
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from loguru import logger
 
@@ -178,6 +178,7 @@ class MergedPRCache:
         *,
         action: str,
         error_recorder: ErrorRecorder | None,
+        _classify_error: Callable[[Exception], str] | None = None,
     ) -> None:
         """Record or log a GitHub fetch failure without depending on services."""
         if error_recorder is None:
@@ -189,9 +190,11 @@ class MergedPRCache:
             ).error("Failed to fetch merged PRs")
             return
 
-        from vibe3.exceptions import classify_error_hybrid
-
-        error_code = classify_error_hybrid(exc)
+        error_code: str
+        if _classify_error is not None:
+            error_code = _classify_error(exc)
+        else:
+            error_code = "E_EXEC_UNKNOWN"
         error_message = f"Failed to fetch merged PRs ({action}): {exc}"
 
         try:
@@ -215,6 +218,7 @@ class MergedPRCache:
         limit: int = 200,
         *,
         error_recorder: ErrorRecorder | None = None,
+        _classify_error: Callable[[Exception], str] | None = None,
     ) -> int:
         """Sync cache with latest merged PRs from GitHub.
 
@@ -239,6 +243,7 @@ class MergedPRCache:
                 exc,
                 action="sync",
                 error_recorder=error_recorder,
+                _classify_error=_classify_error,
             )
             return 0
 
@@ -281,6 +286,7 @@ class MergedPRCache:
         github_client: Any,
         *,
         error_recorder: ErrorRecorder | None = None,
+        _classify_error: Callable[[Exception], str] | None = None,
     ) -> int:
         """Rebuild cache from scratch with all merged PRs.
 
@@ -301,6 +307,7 @@ class MergedPRCache:
                 exc,
                 action="rebuild",
                 error_recorder=error_recorder,
+                _classify_error=_classify_error,
             )
             return 0
 

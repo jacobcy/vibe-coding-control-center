@@ -119,6 +119,7 @@ class CheckRemote:
 
         # Path B: rebuild merged PR cache
         from vibe3.clients import MergedPRCache
+        from vibe3.exceptions import classify_error_hybrid
 
         # Resolve repo path from git common dir
         git_common_dir = this.git_client.get_git_common_dir()
@@ -130,6 +131,7 @@ class CheckRemote:
         cache_rebuild_count = cache.rebuild(
             this.github_client,
             error_recorder=record_error,
+            _classify_error=classify_error_hybrid,
         )
         logger.bind(
             domain="check", path="cache_rebuild", prs_cached=cache_rebuild_count
