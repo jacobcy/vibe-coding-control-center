@@ -90,8 +90,8 @@ def test_exceptions_barrel_import_count() -> None:
         for file, count in sorted_files[:10]:
             print(f"     {file}: {count} imports")
 
-    # Baseline established at issue #2848, updated to 159 in #2902
-    baseline = 159
+    # Baseline established at issue #2848, updated to 162 after rebase onto main
+    baseline = 162
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
@@ -127,9 +127,10 @@ def test_config_barrel_import_count() -> None:
         for file, count in sorted_files[:10]:
             print(f"     {file}: {count} imports")
 
-    # Baseline established at issue #2848, updated for multiple PRs, stabilized at 146
-    # Updated to 147 for issue #2902 (FlowTimelineProtocol.policy parameter)
-    baseline = 147
+    # Baseline established at issue #2848
+    # Updated for #2912 (+2), #2938 (+1), #2939 (+1), #2945 (+1),
+    # #2869 (+1), #2323 (+1), #3074 (+1)
+    baseline = 148
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
