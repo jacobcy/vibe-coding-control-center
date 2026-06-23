@@ -483,7 +483,15 @@ def execute_manual_review_sync(
         branch=branch,
         actor="agent:review",
     )
-    return ReviewRunResult(verdict, audit_ref, issue_number)
+    return ReviewRunResult(
+        verdict,
+        audit_ref,
+        issue_number,
+        tmux_session=result.tmux_session,
+        log_path=result.log_path,
+        backend=result.backend,
+        model=result.model,
+    )
 
 
 def _dispatch_async_manual_review(

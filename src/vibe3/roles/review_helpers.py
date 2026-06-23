@@ -19,6 +19,8 @@ class ReviewRunResult:
     issue_number: int | None
     tmux_session: str | None = None  # NEW
     log_path: str | None = None  # NEW
+    backend: str | None = None  # NEW
+    model: str | None = None  # NEW
 
 
 def _load_existing_audit_ref(branch: str | None) -> str | None:

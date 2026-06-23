@@ -313,8 +313,17 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 backend=event.backend,
                 model=event.model,
             )
-            # Create result for branch review (no verdict, just completion signal)
-            result = ReviewRunResult("OK", None, event.issue_number)
+            # Create result for branch review
+            # (no verdict, just completion signal)
+            # Fill backend/model from CLI params
+            # (config already validated)
+            result = ReviewRunResult(
+                "OK",
+                None,
+                event.issue_number,
+                backend=event.backend,
+                model=event.model,
+            )
             # Store for backward compat
             _pending_results["review"] = result
             return result

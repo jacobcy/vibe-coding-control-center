@@ -54,6 +54,8 @@ class CodeagentResult:
     pid: int | None = None
     tmux_session: str | None = None
     log_path: str | None = None
+    backend: str | None = None
+    model: str | None = None
 
 
 def create_codeagent_command(

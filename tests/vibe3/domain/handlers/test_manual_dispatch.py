@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from vibe3.agents import CodeagentResult
 from vibe3.domain.handlers.manual_dispatch import (
     get_pending_result,
     handle_manual_plan_intent,
@@ -212,10 +213,11 @@ class TestManualPlanIntentSuccessPaths:
 
     def test_sync_returns_success_result(self) -> None:
         """Handler returns successful CodeagentResult on sync execution."""
-        from vibe3.agents import CodeagentResult
+        from pathlib import Path
+
         from vibe3.models.plan import PlanRequest, PlanScope
 
-        mock_result = CodeagentResult(success=True, handoff_file="plan.md")
+        mock_result = CodeagentResult(success=True, handoff_file=Path("plan.md"))
         mock_scope = PlanScope(kind="spec", description="test specification")
         mock_request = PlanRequest(scope=mock_scope, task_guidance="test task")
 
@@ -234,7 +236,7 @@ class TestManualPlanIntentSuccessPaths:
 
         assert result is not None
         assert result.success
-        assert result.handoff_file == "plan.md"
+        assert result.handoff_file == Path("plan.md")
 
 
 class TestManualRunIntentSuccessPaths:
@@ -242,9 +244,9 @@ class TestManualRunIntentSuccessPaths:
 
     def test_returns_success_result(self) -> None:
         """Handler returns successful CodeagentResult on execution."""
-        from vibe3.agents import CodeagentResult
+        from pathlib import Path
 
-        mock_result = CodeagentResult(success=True, handoff_file="run.md")
+        mock_result = CodeagentResult(success=True, handoff_file=Path("run.md"))
 
         event = ManualRunIntent(
             issue_number=42,
@@ -261,7 +263,7 @@ class TestManualRunIntentSuccessPaths:
 
         assert result is not None
         assert result.success
-        assert result.handoff_file == "run.md"
+        assert result.handoff_file == Path("run.md")
 
 
 class TestManualReviewIntentBranchSuccessPaths:
@@ -284,4 +286,127 @@ class TestManualReviewIntentBranchSuccessPaths:
 
         assert result is not None
         assert result.verdict == "OK"
+
+
+class TestBackendModelPropagation:
+    """Tests for backend and model field propagation through handlers."""
+
+    def setup_method(self) -> None:
+        """Clear pending results before each test."""
+        get_pending_result("plan")
+        get_pending_result("run")
+        get_pending_result("review")
+
+    def test_handle_manual_plan_propagates_backend_model(self) -> None:
+        """handle_manual_plan_intent returns CodeagentResult with backend/model."""
+        from pathlib import Path
+
+        from vibe3.models.plan import PlanRequest, PlanScope
+
+        mock_result = CodeagentResult(
+            success=True, backend="claude", model="sonnet", handoff_file=Path("plan.md")
+        )
+        mock_scope = PlanScope(kind="spec", description="test specification")
+        mock_request = PlanRequest(scope=mock_scope, task_guidance="test task")
+
+        event = ManualPlanIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            request=mock_request,
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.roles.execute_spec_plan_sync", return_value=mock_result),
+        ):
+            result = handle_manual_plan_intent(event)
+
+        assert result is not None
+        assert result.success
+        assert result.backend == "claude"
+        assert result.model == "sonnet"
+
+    def test_handle_manual_run_propagates_backend_model(self) -> None:
+        """handle_manual_run_intent returns CodeagentResult with backend/model."""
+        from pathlib import Path
+
+        mock_result = CodeagentResult(
+            success=True,
+            backend="gemini",
+            model="gemini-pro",
+            handoff_file=Path("run.md"),
+        )
+
+        event = ManualRunIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            instructions="do work",
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.roles.execute_manual_run", return_value=mock_result),
+        ):
+            result = handle_manual_run_intent(event)
+
+        assert result is not None
+        assert result.success
+        assert result.backend == "gemini"
+        assert result.model == "gemini-pro"
+
+    def test_handle_manual_review_base_propagates_backend_model(self) -> None:
+        """handle_manual_review_intent returns ReviewRunResult with backend/model."""
+        mock_review_result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file="audit.md",
+            issue_number=42,
+            backend="claude",
+            model="sonnet",
+        )
+
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="main",
+            is_base_review=True,
+            request=_make_review_request(),
+            no_async=True,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.roles.execute_manual_review_sync",
+                return_value=mock_review_result,
+            ),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "PASS"
+        assert result.backend == "claude"
+        assert result.model == "sonnet"
+
+    def test_handle_manual_review_branch_populates_backend_model(self) -> None:
+        """Branch review handler populates backend/model from event params."""
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=True,
+            backend="claude",
+            model="opus",
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch("vibe3.execution.run_issue_role_sync"),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "OK"
+        assert result.backend == "claude"
+        assert result.model == "opus"
         assert result.issue_number == 42

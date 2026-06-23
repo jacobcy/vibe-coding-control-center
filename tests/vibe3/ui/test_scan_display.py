@@ -84,6 +84,73 @@ class TestDisplayMaterialList:
             )
 
 
+class TestDisplayCodeagentResult:
+    """Tests for CodeagentResult display (plan/run/review commands)."""
+
+    def test_display_codeagent_result_shows_backend_and_model(self):
+        """display_codeagent_result shows backend/model when present."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=True,
+            backend="claude",
+            model="sonnet",
+            log_path="temp/logs/plan/test.log",
+            tmux_session="vibe3-plan-test",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Plan")
+        # Verify backend and model were printed
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Backend:" in c and "claude" in c for c in calls)
+        assert any("Model:" in c and "sonnet" in c for c in calls)
+        assert any("Log path:" in c for c in calls)
+        assert any("Tmux session:" in c for c in calls)
+
+    def test_display_codeagent_result_handles_missing_backend_model(self):
+        """display_codeagent_result handles missing backend/model gracefully."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=True,
+            log_path="temp/logs/plan/test.log",
+            tmux_session="vibe3-plan-test",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Run")
+        # Should not crash, and should still show log/tmux
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Log path:" in c for c in calls)
+        assert any("Tmux session:" in c for c in calls)
+        # Should not have Backend/Model labels
+        assert not any("Backend:" in c for c in calls)
+        assert not any("Model:" in c for c in calls)
+
+    def test_display_codeagent_result_handles_failure(self):
+        """display_codeagent_result shows stderr on failure."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=False,
+            exit_code=1,
+            stderr="Error: something went wrong",
+            backend="claude",
+            model="sonnet",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Review")
+        # Should show failure and stderr
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Failed" in c for c in calls)
+        assert any("Error: something went wrong" in c for c in calls)
+
+
 class TestDisplayExecutionResult:
     """Tests for execution result display."""
 

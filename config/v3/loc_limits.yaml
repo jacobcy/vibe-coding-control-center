@@ -277,6 +277,9 @@ code_limits:
       - path: "tests/vibe3/domain/handlers/test_governance_scan.py"
         limit: 450
         reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递"
+      - path: "tests/vibe3/domain/handlers/test_manual_dispatch.py"
+        limit: 450
+        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播"
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
