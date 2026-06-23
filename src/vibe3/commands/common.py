@@ -120,6 +120,9 @@ def _resolve_dry_run_actor(
                 str(default_model).strip() if isinstance(default_model, str) else None
             ),
         )
+        # Safe: format_agent_actor() with explicit backend cannot raise
+        # AgentPresetNotFoundError because resolve_effective_agent_options()
+        # returns early when backend is set.
         return format_agent_actor(default_options)
 
     # No defaults configured - fall back to role default

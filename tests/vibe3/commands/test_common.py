@@ -200,6 +200,60 @@ class TestResolveDryRunActor:
             )
         assert result == "claude"
 
+    def test_default_backend_whitespace_falls_back_to_role_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When default_backend is whitespace-only, fall back to role default."""
+        # Clear env vars that could provide defaults
+        monkeypatch.delenv("VIBE_DEFAULT_BACKEND", raising=False)
+        monkeypatch.delenv("VIBE_DEFAULT_MODEL", raising=False)
+
+        mock_data = {
+            "default_backend": "   ",  # whitespace-only
+            "default_model": "haiku",
+        }
+        with (
+            patch("vibe3.config.read_models_json", return_value=mock_data),
+            patch(
+                "vibe3.config.repo_models_json_path",
+                return_value="/fake/path/models.json",
+            ),
+        ):
+            result = _resolve_dry_run_actor(
+                role="planner",
+                agent=None,
+                backend=None,
+                model=None,
+            )
+        assert result == "vibe-planner"
+
+    def test_default_backend_non_string_falls_back_to_role_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When default_backend is non-string (e.g. int), fall back to role default."""
+        # Clear env vars that could provide defaults
+        monkeypatch.delenv("VIBE_DEFAULT_BACKEND", raising=False)
+        monkeypatch.delenv("VIBE_DEFAULT_MODEL", raising=False)
+
+        mock_data = {
+            "default_backend": 123,  # non-string type
+            "default_model": "haiku",
+        }
+        with (
+            patch("vibe3.config.read_models_json", return_value=mock_data),
+            patch(
+                "vibe3.config.repo_models_json_path",
+                return_value="/fake/path/models.json",
+            ),
+        ):
+            result = _resolve_dry_run_actor(
+                role="planner",
+                agent=None,
+                backend=None,
+                model=None,
+            )
+        assert result == "vibe-planner"
+
 
 class TestEchoDryRunHeader:
     """Tests for echo_dry_run_header command function."""
