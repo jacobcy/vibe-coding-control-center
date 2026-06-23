@@ -72,6 +72,65 @@ def run_full_check_shortcut() -> None:
         )
 
 
+def _resolve_dry_run_actor(
+    role: str,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> str:
+    """Resolve the dry-run actor string from CLI args plus configured defaults.
+
+    Resolution order:
+    1. If backend/model explicitly provided → return formatted backend/model
+    2. If agent preset provided → resolve via config, return formatted backend/model
+    3. If no flags (no-args case) → read default_backend/default_model from models.json
+    4. Fall back to role default (vibe-planner/vibe-executor/vibe-reviewer)
+    """
+    from vibe3.config import (
+        read_models_json,
+        repo_models_json_path,
+        resolve_effective_agent_options,
+    )
+    from vibe3.exceptions import AgentPresetNotFoundError
+    from vibe3.models import AgentOptions
+    from vibe3.services.shared import format_agent_actor
+
+    options = AgentOptions(agent=agent, backend=backend, model=model)
+    try:
+        resolved = resolve_effective_agent_options(options)
+        if resolved.backend:
+            return format_agent_actor(resolved)
+        # No backend resolved - fall through to defaults
+    except AgentPresetNotFoundError:
+        # Agent preset not found in config
+        if agent:
+            # Agent was explicitly provided but not found - return as-is
+            return agent
+        # No agent was provided - fall through to defaults
+
+    # No-flags case: try to read configured defaults
+    data = read_models_json(repo_models_json_path())
+    default_backend = data.get("default_backend")
+    default_model = data.get("default_model")
+
+    if isinstance(default_backend, str) and default_backend.strip():
+        default_options = AgentOptions(
+            backend=default_backend.strip(),
+            model=(
+                str(default_model).strip() if isinstance(default_model, str) else None
+            ),
+        )
+        return format_agent_actor(default_options)
+
+    # No defaults configured - fall back to role default
+    role_to_default = {
+        "planner": "vibe-planner",
+        "executor": "vibe-executor",
+        "reviewer": "vibe-reviewer",
+    }
+    return role_to_default.get(role, role)
+
+
 def echo_dry_run_header(
     role: str,
     issue_number: int | None,
@@ -81,32 +140,9 @@ def echo_dry_run_header(
     model: str | None,
 ) -> None:
     """Echo unified dry-run header for plan/run/review commands."""
-    from vibe3.config import resolve_effective_agent_options
-    from vibe3.exceptions import AgentPresetNotFoundError
-    from vibe3.models import AgentOptions
-    from vibe3.services.shared import (
-        format_agent_actor,
-        format_dry_run_header,
-    )
+    from vibe3.services.shared import format_dry_run_header
 
-    options = AgentOptions(agent=agent, backend=backend, model=model)
-    try:
-        resolved = resolve_effective_agent_options(options)
-        if resolved.backend:
-            actor_display = format_agent_actor(resolved)
-        else:
-            raise AgentPresetNotFoundError("no backend resolved")
-    except AgentPresetNotFoundError:
-        if agent:
-            actor_display = agent
-        else:
-            role_to_default = {
-                "planner": "vibe-planner",
-                "executor": "vibe-executor",
-                "reviewer": "vibe-reviewer",
-            }
-            actor_display = role_to_default.get(role, role)
-
+    actor_display = _resolve_dry_run_actor(role, agent, backend, model)
     header = format_dry_run_header(role, issue_number, branch, actor_display)
     typer.echo(header)
 
