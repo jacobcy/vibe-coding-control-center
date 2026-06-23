@@ -120,9 +120,14 @@ uv run pytest tests/vibe3/integration/test_ci_parity.py -v
 
 ### 要求
 
-1. **使用 `temp_store` fixture**
-   - 所有需要数据库的测试必须使用 `temp_store` fixture
-   - 该 fixture 自动创建临时数据库，测试结束后清理
+1. **默认隔离：`isolate_database` autouse fixture**
+   - `tests/vibe3/conftest.py` 会自动 monkeypatch `GitClient.get_git_common_dir()`
+   - Vibe3 测试中的默认 `SQLiteClient()` 会指向临时 git common dir 下的 `vibe3/handoff.db`
+   - 这层用于兜底旧测试和通过默认客户端路径创建 store 的代码
+
+2. **显式注入：`temp_store` fixture**
+   - 新增服务/集成测试如果需要把 store 注入被测对象，优先使用共享 `temp_store`
+   - 该 fixture 自动创建已初始化 schema 的临时数据库，测试结束后清理
 
    ```python
    def test_my_feature(temp_store: SQLiteClient) -> None:
@@ -130,20 +135,21 @@ uv run pytest tests/vibe3/integration/test_ci_parity.py -v
        service = MyService(store=temp_store)
    ```
 
-2. **禁止直接实例化 `SQLiteClient()`**
-   - ❌ `store = SQLiteClient()`  → 使用生产数据库
-   - ✅ `def test_xxx(temp_store)` → 使用 fixture
+3. **禁止绕过隔离框架直接触达生产数据库**
+   - ❌ 在不受 `isolate_database` 覆盖的测试/全局 hook 中直接使用默认 `SQLiteClient()`
+   - ✅ `def test_xxx(temp_store)` → 显式注入临时 store
+   - ✅ Vibe3 测试中只走默认客户端路径时，依赖 autouse `isolate_database`
 
-3. **pytest 钩子要求**
+4. **pytest 钩子要求**
    - `pytest_sessionfinish` 等全局钩子不得写入生产数据库
    - 如需记录测试错误，只写入日志文件或使用测试数据库
 
 ### 违规示例
 
 ```python
-# ❌ 错误：直接使用生产数据库
+# ❌ 错误：在全局 hook 或未启用 Vibe3 隔离 fixture 的测试中直接使用生产数据库
 def test_my_feature() -> None:
-    store = SQLiteClient()  # 这会写入 .git/vibe3/handoff.db
+    store = SQLiteClient()  # 可能写入 .git/vibe3/handoff.db
     service = MyService(store=store)
 ```
 

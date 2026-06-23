@@ -24,7 +24,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     objects to Path operations, which results in directories with names like
     'MagicMock/' or '<MagicMock name=...'.
 
-    Records leaks to ErrorTrackingService for visibility via `vibe3 serve status`.
+    Logs leaks without writing to ErrorTrackingService or production state.
     """
     import shutil
 

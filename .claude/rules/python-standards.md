@@ -201,15 +201,20 @@ tests/
 
 **要求**：
 
-1. **使用 `temp_store` fixture**
-   - 所有需要数据库的测试必须使用 `temp_store` fixture
-   - 该 fixture 自动创建临时数据库，测试结束后清理
+1. **默认隔离由 `isolate_database` 兜底**
+   - `tests/vibe3/conftest.py` 的 autouse fixture 会把默认 `SQLiteClient()` 指向临时 git common dir
+   - 这层保护用于覆盖旧测试和通过默认客户端路径创建 store 的代码
 
-2. **禁止直接实例化 `SQLiteClient()`**
-   - ❌ `store = SQLiteClient()`  → 使用生产数据库
-   - ✅ `def test_xxx(temp_store: SQLiteClient)` → 使用 fixture
+2. **显式数据库依赖使用 `temp_store` fixture**
+   - 新增服务/集成测试如果需要把 store 注入被测对象，优先使用共享 `temp_store`
+   - 该 fixture 自动创建已初始化 schema 的临时数据库，测试结束后清理
 
-3. **特殊情况**
+3. **禁止绕过隔离框架直接触达生产数据库**
+   - ❌ 在不受 `isolate_database` 覆盖的测试/全局 hook 中直接使用默认 `SQLiteClient()`
+   - ✅ `def test_xxx(temp_store: SQLiteClient)` → 显式注入临时 store
+   - ✅ Vibe3 测试中只走默认客户端路径时，依赖 autouse `isolate_database`
+
+4. **特殊情况**
    - 测试 `SQLiteClient` 本身的功能时
    - 测试数据库隔离机制时
    - 集成测试使用 `tmp_path` + monkeypatch 时
