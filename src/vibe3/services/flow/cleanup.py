@@ -327,9 +327,16 @@ class FlowCleanupService:
 
         Returns:
             True if this is a cleanup commit, False otherwise.
+
+        Note:
+            Currently only detects "init" commits (exact match, case-insensitive).
+            This is the primary pattern identified in issue #3107. Future patterns
+            (e.g., "cleanup", "teardown", "wip") may be added as needed. This
+            limited scope is intentional - the root cause of cleanup commit creation
+            is being investigated separately, and this serves as a defensive layer.
         """
         # Match "init" (exact match, case-insensitive)
-        # This is the primary pattern from issue #3090
+        # This is the primary pattern from issue #3107
         return subject.lower() == "init"
 
     def _has_meaningful_commits(self, branch: str) -> bool:
@@ -344,9 +351,17 @@ class FlowCleanupService:
         Returns:
             True if at least one meaningful commit exists.
             False if all commits are cleanup commits or no commits exist.
+
+        Note:
+            Assumes origin/main is the default branch. This is acceptable for
+            vibe-center repositories where task branches typically branch from main.
+            For repositories with different default branches (develop, master),
+            this would need adjustment. The assumption is documented here to alert
+            future maintainers to this limitation.
         """
         try:
             # Get commits unique to this branch (not in origin/main)
+            # NOTE: Hardcoded origin/main - see docstring for assumption details
             subjects = self.git_client.get_commit_subjects(
                 base_ref="origin/main", head_ref=branch
             )
