@@ -24,7 +24,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     objects to Path operations, which results in directories with names like
     'MagicMock/' or '<MagicMock name=...'.
 
-    Logs leaks without writing to ErrorTrackingService or production state.
+    Detects, logs, and cleans up MagicMock test artifact directories.
+    No database recording.
     """
     import shutil
 
