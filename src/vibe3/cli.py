@@ -24,6 +24,7 @@ from rich import box as _box  # noqa: E402
 from vibe3.commands import (  # noqa: E402
     ask,
     check,
+    feedback,
     flow,
     handoff,
     inspect,
@@ -76,7 +77,7 @@ Command groups by tier:
     run, plan, review
 
   Infrastructure/Governance:
-    serve, mcp, scan, check
+    serve, mcp, scan, check, feedback
 
   Utility:
     version, help
@@ -102,6 +103,7 @@ app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
+app.add_typer(feedback.app, name="feedback")
 app.add_typer(scan.app, name="scan")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")

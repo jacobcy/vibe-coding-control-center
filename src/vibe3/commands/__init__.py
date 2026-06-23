@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 _SYMBOL_MODULES = {
     "ask": "vibe3.commands.ask",
     "check": "vibe3.commands.check",
+    "feedback": "vibe3.commands.feedback",
     "flow": "vibe3.commands.flow",
     "handoff": "vibe3.commands.handoff",
     "inspect": "vibe3.commands.inspect",
@@ -77,6 +78,7 @@ def __getattr__(name: str) -> object:
 __all__ = [
     "ask",
     "check",
+    "feedback",
     "flow",
     "handoff",
     "inspect",

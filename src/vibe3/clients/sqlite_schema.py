@@ -203,6 +203,55 @@ _CREATE_TRANSITION_HISTORY_INDEXES = """
     ON transition_history(branch, created_at DESC)
 """
 
+_CREATE_FEEDBACK_OBSERVATIONS = """
+CREATE TABLE IF NOT EXISTS feedback_observations (
+    observation_id TEXT PRIMARY KEY,
+    observation_type TEXT NOT NULL,
+    source_material TEXT NOT NULL,
+    -- source_window denormalized fields
+    subject_issue_number INTEGER,
+    subject_branch TEXT,
+    subject_pr_number INTEGER,
+    subject_commit_shas JSON DEFAULT '[]',
+    subject_prompt_hash TEXT,
+    subject_skill_ids JSON DEFAULT '[]',
+    subject_memory_ids JSON DEFAULT '[]',
+    -- core observation
+    flow_status TEXT NOT NULL DEFAULT 'unknown',
+    symptom TEXT NOT NULL,
+    observed_failure_mode TEXT NOT NULL,
+    confidence TEXT NOT NULL CHECK(confidence IN ('high','medium','low')),
+    -- structured evidence (JSON-serialized)
+    facts JSON NOT NULL DEFAULT '[]',
+    interpretation_reasoning TEXT,
+    interpretation_likely_agent_failure TEXT,
+    interpretation_affected_material_candidates JSON DEFAULT '[]',
+    limitations JSON DEFAULT '[]',
+    -- next_stage_input denormalized fields
+    suitable_for_clustering BOOLEAN DEFAULT 1,
+    suggested_cluster_key TEXT,
+    requires_human_review BOOLEAN DEFAULT 1,
+    -- metadata
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    source_watermark TEXT NOT NULL
+)
+"""
+
+_CREATE_FEEDBACK_INDEXES = """
+    CREATE INDEX IF NOT EXISTS idx_feedback_source
+        ON feedback_observations(source_material);
+
+    CREATE INDEX IF NOT EXISTS idx_feedback_cluster
+        ON feedback_observations(suggested_cluster_key);
+
+    CREATE INDEX IF NOT EXISTS idx_feedback_created
+        ON feedback_observations(created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_feedback_watermark
+        ON feedback_observations(source_watermark)
+"""
+
 
 _CLEAN_STALE_VERDICT_LINES_SQL = """
     UPDATE flow_events
@@ -560,6 +609,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 inserted=inserted,
             )
 
+    # Create feedback_observations table and indexes
+    cursor.execute(_CREATE_FEEDBACK_OBSERVATIONS)
+    for stmt in _CREATE_FEEDBACK_INDEXES.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
+
     cursor.execute(
         "INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', 'v3')"
     )
@@ -571,7 +627,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Increment this when adding new migrations that need to run on existing DBs
     cursor.execute(
         "INSERT OR REPLACE INTO schema_meta (key, value) "
-        "VALUES ('migration_version', '4')"
+        "VALUES ('migration_version', '5')"
     )
     conn.commit()
     logger.bind(external="sqlite", operation="init_schema").debug(

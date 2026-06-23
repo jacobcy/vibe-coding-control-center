@@ -163,7 +163,7 @@ class SQLiteClientBase:
         with _init_lock:
             # Lightweight guard: check migration version
             # Update required_migration_version when adding new migrations
-            required_migration_version = 4  # Increment when adding
+            required_migration_version = 5  # Increment when adding
 
             # Check if already initialized for this db_path
             if self.db_path in _init_done:

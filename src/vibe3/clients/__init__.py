@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from vibe3.clients.ai_client import AIClient
     from vibe3.clients.ai_suggestion_client import AISuggestionClient
+    from vibe3.clients.feedback_store import FeedbackStore
     from vibe3.clients.git_client import GitClient, GitClientProtocol, find_repo_root
     from vibe3.clients.git_worktree_ops import prune_worktrees, remove_worktree
     from vibe3.clients.github_client import GitHubClient
@@ -98,6 +99,7 @@ _LAZY_IMPORTS = {
     "extract_class_names": "vibe3.clients.serena_client",
     "extract_function_locations": "vibe3.clients.serena_client",
     "extract_function_names": "vibe3.clients.serena_client",
+    "FeedbackStore": "vibe3.clients.feedback_store",
     "find_repo_root": "vibe3.clients.git_client",
     "get_store": "vibe3.clients.store_context",
     "has_manager_assignee": "vibe3.clients.label_utils",
@@ -167,6 +169,7 @@ __all__ = [
     "extract_class_names",
     "extract_function_locations",
     "extract_function_names",
+    "FeedbackStore",
     "find_repo_root",
     "get_store",
     "has_manager_assignee",

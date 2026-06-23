@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     )
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
+    from vibe3.services.feedback.import_service import FeedbackImportService
+    from vibe3.services.feedback.read_service import FeedbackReadService
+    from vibe3.services.feedback.write_service import FeedbackWriteService
     from vibe3.services.flow.blocked_state_service import BlockedStateService
     from vibe3.services.flow.branch_resolution import (
         resolve_branch_and_issue,
@@ -164,6 +167,9 @@ __all__ = [
     "CoordinationResolver",
     "ErrorTrackingService",
     "ExpiredResourceCleanupService",
+    "FeedbackWriteService",
+    "FeedbackReadService",
+    "FeedbackImportService",
     "FlowCategory",
     "FlowCleanupService",
     "FlowOrchestratorService",
@@ -270,6 +276,9 @@ _SYMBOL_MODULES = {
     "CoordinationResolver": "vibe3.services.orchestra.coordination",
     "ErrorTrackingService": "vibe3.services.orchestra.error_tracking.service",
     "ExpiredResourceCleanupService": "vibe3.services.orchestra.cleanup",
+    "FeedbackWriteService": "vibe3.services.feedback.write_service",
+    "FeedbackReadService": "vibe3.services.feedback.read_service",
+    "FeedbackImportService": "vibe3.services.feedback.import_service",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowCleanupService": "vibe3.services.flow.cleanup",
     "FlowOrchestratorService": "vibe3.services.orchestra.orchestrator",
