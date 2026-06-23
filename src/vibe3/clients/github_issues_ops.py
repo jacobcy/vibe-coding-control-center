@@ -24,6 +24,56 @@ from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
 # Avoids direct import from services layer (modularity constraint)
 ErrorRecorderCallback = Callable[..., tuple[bool, int]]
 
+
+def _classify_github_api_error(stderr: str, returncode: int) -> str:
+    """Classify GitHub API error from stderr output and exit code.
+
+    Args:
+        stderr: Error message from gh CLI
+        returncode: Exit code from gh subprocess
+
+    Returns:
+        Appropriate error code (E_API_RATE_LIMIT, E_API_TIMEOUT, etc.)
+    """
+    stderr_lower = stderr.lower()
+
+    # Rate limit errors (HTTP 403 with specific message)
+    if "rate limit" in stderr_lower or "rate_limit" in stderr_lower:
+        return "E_API_RATE_LIMIT"
+
+    # Timeout errors (network or API timeout)
+    if "timeout" in stderr_lower or "timed out" in stderr_lower:
+        return "E_API_TIMEOUT"
+
+    # Service unavailable (HTTP 503 or similar)
+    if "unavailable" in stderr_lower or "service unavailable" in stderr_lower:
+        return "E_API_UNAVAILABLE"
+
+    # Network errors (connection refused, DNS failure, etc.)
+    if any(
+        keyword in stderr_lower
+        for keyword in [
+            "connection refused",
+            "network",
+            "dns",
+            "could not resolve",
+            "connection reset",
+        ]
+    ):
+        return "E_API_NETWORK"
+
+    # Auth failures (exit code 1 often indicates permission/auth issues)
+    if returncode == 1 and (
+        "authentication" in stderr_lower
+        or "permission" in stderr_lower
+        or "forbidden" in stderr_lower
+    ):
+        return "E_API_UNKNOWN"  # Could add E_API_AUTH in future
+
+    # Fallback to unknown for unclassified errors
+    return "E_API_UNKNOWN"
+
+
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
     r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*#(\d+)",
@@ -182,8 +232,11 @@ class IssuesMixin(IssueAdminMixin):
             if result is not None:
                 if error_recorder is not None:
                     try:
+                        error_code = _classify_github_api_error(
+                            result.stderr, result.returncode
+                        )
                         error_recorder(
-                            error_code="E_API_UNKNOWN",
+                            error_code=error_code,
                             error_message=f"Failed to list merged PRs: {result.stderr}",
                         )
                     except Exception as record_exc:
@@ -265,8 +318,11 @@ class IssuesMixin(IssueAdminMixin):
             if result is not None:
                 if error_recorder is not None:
                     try:
+                        error_code = _classify_github_api_error(
+                            result.stderr, result.returncode
+                        )
                         error_recorder(
-                            error_code="E_API_UNKNOWN",
+                            error_code=error_code,
                             error_message=f"Failed to list issues: {result.stderr}",
                         )
                     except Exception as record_exc:
