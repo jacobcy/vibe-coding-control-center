@@ -179,6 +179,10 @@ def display_codeagent_result(
         if result.stderr:
             console.print(f"[red]{result.stderr}[/red]")
 
+    if result.backend:
+        console.print(f"[cyan]Backend:[/cyan] {result.backend}")
+    if result.model:
+        console.print(f"[cyan]Model:[/cyan] {result.model}")
     if result.log_path:
         console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
     if result.handoff_file:
