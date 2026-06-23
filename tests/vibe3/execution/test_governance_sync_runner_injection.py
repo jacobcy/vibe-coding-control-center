@@ -4,6 +4,7 @@ These tests verify the new dependency injection pattern introduced
 to decouple execution layer from roles/orchestra layer.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -297,7 +298,7 @@ class TestGovernanceAsyncRunnerWithInjection:
             )
             m.setattr(
                 "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
-                lambda: MagicMock(),
+                lambda: Path("/tmp/test-repo"),  # Return real Path, not MagicMock
             )
 
             run_governance_async(

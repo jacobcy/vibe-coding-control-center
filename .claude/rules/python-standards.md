@@ -195,6 +195,8 @@ tests/
         └── test_task.py
 ```
 
+**测试数据库隔离**：详见 `.vibe/policies/common.md` 的"测试数据库隔离"章节。
+
 ---
 
 ## 工具配置
