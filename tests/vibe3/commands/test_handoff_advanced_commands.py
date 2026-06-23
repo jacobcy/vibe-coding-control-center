@@ -377,7 +377,7 @@ def test_handoff_audit_command_real_service_path(tmp_path, monkeypatch):
     # Use real SQLiteClient with our temp git dir
     from vibe3.clients import SQLiteClient
 
-    real_store = SQLiteClient()
+    real_store = SQLiteClient(db_path=str(git_dir / "vibe3" / "handoff.db"))
 
     # Pre-seed flow state if needed, though record_audit should handle it
     audit_ref = ".agent/reports/audit-result.md"

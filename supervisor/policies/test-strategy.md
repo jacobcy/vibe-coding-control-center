@@ -231,3 +231,59 @@ def test_get_git_root_incomplete():
 
 - 本文档被 @vibe/supervisor/policies/run.md 引用：executor 验证原则（使用 `vibe3 handoff show @vibe/supervisor/policies/run.md` 命令读取）
 - 本文档被 @vibe/supervisor/policies/review.md 引用：审查检查清单
+
+## 8. Database Isolation Requirements
+
+### Mandatory: All tests must use isolated databases
+
+Tests must never write to the production database (`.git/vibe3/handoff.db`). All database writes during testing must be directed to isolated test databases.
+
+### Two tiers of isolation
+
+#### Implicit isolation (autouse fixture)
+
+- **Fixture**: `isolate_database` in `tests/vibe3/conftest.py`
+- **Scope**: Function-scope, autouse for all tests under `tests/vibe3/`
+- **Mechanism**: Monkeypatches `GitClient.get_git_common_dir()` to return a temp directory
+- **Coverage**: All `SQLiteClient()` calls in test code are automatically redirected
+
+**When this is sufficient**:
+- Tests that indirectly use database through service/client code
+- Tests that don't directly instantiate `SQLiteClient`
+
+#### Explicit isolation
+
+- **`temp_store` fixture**: Provides a pre-configured temporary database store
+- **Explicit `db_path` parameter**: Tests can specify `SQLiteClient(db_path=...)` with a temp path
+
+**When this is needed**:
+- Tests that directly exercise database operations
+- Tests that need control over database state
+
+### Session-level hooks and fixtures
+
+**Critical warning**: Session-level hooks (e.g., `pytest_sessionfinish`) run AFTER all function-scope fixtures are torn down. They CANNOT rely on `isolate_database` fixture for protection.
+
+**Requirements**:
+- Session-level hooks must not access the production database
+- If database access is necessary, use explicit test database paths
+- Prefer: session-level hooks should not write to any database
+
+### CI verification
+
+All CI runs must verify that tests do not write to production database:
+
+```bash
+# Check production database before and after test run
+sqlite3 .git/vibe3/handoff.db "SELECT COUNT(*) FROM error_log"
+# Count should not increase due to test execution
+```
+
+### Self-check for executors
+
+Before claiming tests pass, verify:
+
+- [ ] Tests under `tests/vibe3/` are protected by `isolate_database` autouse fixture
+- [ ] Tests that directly use `SQLiteClient()` use explicit `db_path` or `temp_store`
+- [ ] Session-level hooks do not write to production database
+- [ ] Running `sqlite3 .git/vibe3/handoff.db "SELECT COUNT(*) FROM error_log"` shows no increase after test run
