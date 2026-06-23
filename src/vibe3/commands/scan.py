@@ -257,9 +257,7 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
     # Display candidates via UI layer
     # (when show_prompt=True, also shows individual prompts)
     if candidates or not show_prompt:
-        display_supervisor_dry_run(
-            console, total_scanned, candidates, show_prompt=show_prompt
-        )
+        display_supervisor_dry_run(console, total_scanned, candidates)
 
 
 @app.command()

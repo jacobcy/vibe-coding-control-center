@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from vibe3.prompts import PromptMaterialSpec
@@ -15,50 +14,20 @@ if TYPE_CHECKING:
     from vibe3.models import ExecutionLaunchResult
 
 
-def display_governance_dry_run(
-    console: Console, material_name: str, prompt_content: str
-) -> None:
-    """Display governance scan dry-run output.
-
-    Args:
-        console: Rich Console instance
-        material_name: Governance material name/path
-        prompt_content: Rendered prompt content
-    """
-    # Extract short name
-    short_name = material_name
-    if "/" in material_name:
-        short_name = material_name.split("/")[-1]
-    if short_name.endswith(".md"):
-        short_name = short_name[:-3]
-
-    # Header
-    console.print("\n[bold]Governance Scan Dry-Run[/bold]")
-    console.print(f"[cyan]Material:[/cyan] {short_name}")
-
-    # Prompt preview
-    console.print("\n[bold]Prompt Preview:[/bold]")
-    console.print(Panel(prompt_content, title="Governance Prompt", border_style="blue"))
-
-    # Summary
-    console.print(f"\n[dim]Prompt length: {len(prompt_content)} characters[/dim]")
-    console.print(f"[dim]Material: {material_name}[/dim]")
-    console.print("[dim]Mode: dry-run (no execution)[/dim]\n")
-
-
 def display_supervisor_dry_run(
     console: Console,
     total_scanned: int,
     candidates: list[dict],
-    show_prompt: bool = False,
 ) -> None:
-    """Display supervisor scan dry-run output.
+    """Display supervisor scan dry-run candidate information.
+
+    Note: Prompt Composition is now handled by CodeagentBackend.run(dry_run=True)
+    This function only displays candidate list and scan summary.
 
     Args:
         console: Rich Console instance
         total_scanned: Total number of open issues scanned
         candidates: List of candidate issues (number, title, labels)
-        show_prompt: If True, build and display prompts for candidates
     """
     console.print("\n[bold]Supervisor Scan Dry-Run[/bold]")
     console.print("[cyan]Mode:[/cyan] dry-run (no execution)\n")
@@ -96,43 +65,6 @@ def display_supervisor_dry_run(
             "\n[dim]In real mode, would dispatch supervisor-apply agent "
             "for each issue[/dim]"
         )
-
-        # Show prompt previews if requested
-        if show_prompt:
-            from vibe3.config import load_orchestra_config
-            from vibe3.roles import build_supervisor_handoff_payload
-
-            config = load_orchestra_config()
-            console.print("\n[bold]Prompt Previews:[/bold]\n")
-
-            for issue in candidates[:10]:  # Limit to first 10 candidates
-                try:
-                    prompt, _, _ = build_supervisor_handoff_payload(
-                        config,
-                        issue["number"],
-                        issue.get("title"),
-                        annotate_sections=True,
-                    )
-                    console.print(f"[cyan]--- Issue #{issue['number']} ---[/cyan]")
-                    console.print(
-                        Panel(
-                            prompt,
-                            title=f"Supervisor Prompt #{issue['number']}",
-                            border_style="blue",
-                        )
-                    )
-                    console.print()
-                except Exception as e:
-                    console.print(
-                        f"[red]Failed to build prompt for "
-                        f"#{issue['number']}: {e}[/red]\n"
-                    )
-
-            if len(candidates) > 10:
-                console.print(
-                    f"[dim]... skipping {len(candidates) - 10} "
-                    f"more prompt previews[/dim]\n"
-                )
     else:
         console.print(
             f"[yellow]Scanned {total_scanned} open issues, "
