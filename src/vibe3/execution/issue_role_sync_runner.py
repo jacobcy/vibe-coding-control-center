@@ -203,9 +203,9 @@ def run_issue_role_sync(
         branch=branch,
     )
 
+    # dry-run output is handled by CodeagentBackend.run()
+    # which prints "=== Prompt Composition ===" and optional prompt content
     if dry_run:
-        header = format_dry_run_header(spec.role_name, issue_number, branch, actor)
-        typer.echo(header)
         return
 
     if not sync_result.launched:

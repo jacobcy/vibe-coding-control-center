@@ -368,6 +368,7 @@ def build_manager_sync_request(
         recipe_key="manager.default",
         variant_key=variant_key,
         providers=providers,
+        annotate_sections=dry_run,
     )
 
     # Derive summary fields from variant_key and recipe sections

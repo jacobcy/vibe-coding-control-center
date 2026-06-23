@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from vibe3.ui.scan_display import (
         display_codeagent_result,
         display_execution_result,
-        display_governance_dry_run,
         display_material_list,
         display_supervisor_dry_run,
     )
@@ -66,7 +65,6 @@ _SYMBOL_MODULES = {
     "display_codeagent_result": "vibe3.ui.scan_display",
     "display_supervisor_dry_run": "vibe3.ui.scan_display",
     "display_material_list": "vibe3.ui.scan_display",
-    "display_governance_dry_run": "vibe3.ui.scan_display",
     "build_task_show_payload": "vibe3.ui.task_ui",
     "render_task_show": "vibe3.ui.task_ui",
     "render_task_comments": "vibe3.ui.task_ui",
@@ -115,7 +113,6 @@ __all__ = [
     "display_codeagent_result",
     "display_supervisor_dry_run",
     "display_material_list",
-    "display_governance_dry_run",
     # Task UI
     "build_task_show_payload",
     "render_task_show",

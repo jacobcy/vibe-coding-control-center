@@ -407,9 +407,13 @@ class CodeagentExecutionService:
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
         effective = ctx.options
-        echo(f"-> Executing with {effective.agent or effective.backend}...")
-        if effective.model:
-            echo(f"   model: {effective.model}")
+
+        # Skip execution header in dry_run mode to avoid duplication
+        # Backend.run() will print "=== Prompt Composition ===" header
+        if not command.dry_run:
+            echo(f"-> Executing with {effective.agent or effective.backend}...")
+            if effective.model:
+                echo(f"   model: {effective.model}")
 
         try:
             agent_result = CodeagentBackend().run(

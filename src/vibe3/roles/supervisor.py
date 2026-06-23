@@ -77,6 +77,7 @@ def build_supervisor_handoff_payload(
     issue_number: int,
     issue_title: str | None = None,
     prompts_path: Path | None = None,
+    annotate_sections: bool = False,
 ) -> tuple[str, Any, str]:
     """Build payload for supervisor handoff execution.
 
@@ -125,6 +126,14 @@ def build_supervisor_handoff_payload(
     rendered = assembler.render(recipe, runtime_context=snapshot_context)
     _record_assembly_warnings(rendered.warnings)
     prompt = rendered.rendered_text
+
+    # Add section annotation if requested
+    if annotate_sections:
+        prompt = (
+            f"<!-- section:supervisor.handoff -->\n"
+            f"{prompt}\n"
+            f"<!-- /section:supervisor.handoff -->"
+        )
 
     options = ExecutionRolePolicyService(config).resolve_effective_agent_options(
         "supervisor"
@@ -257,6 +266,7 @@ def build_supervisor_cli_sync_request(
         config,
         issue.number,
         issue.title,
+        annotate_sections=dry_run,
     )
     return ExecutionRequest(
         role="supervisor",

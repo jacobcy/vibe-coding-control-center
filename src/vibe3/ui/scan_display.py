@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from vibe3.prompts import PromptMaterialSpec
@@ -15,41 +14,15 @@ if TYPE_CHECKING:
     from vibe3.models import ExecutionLaunchResult
 
 
-def display_governance_dry_run(
-    console: Console, material_name: str, prompt_content: str
-) -> None:
-    """Display governance scan dry-run output.
-
-    Args:
-        console: Rich Console instance
-        material_name: Governance material name/path
-        prompt_content: Rendered prompt content
-    """
-    # Extract short name
-    short_name = material_name
-    if "/" in material_name:
-        short_name = material_name.split("/")[-1]
-    if short_name.endswith(".md"):
-        short_name = short_name[:-3]
-
-    # Header
-    console.print("\n[bold]Governance Scan Dry-Run[/bold]")
-    console.print(f"[cyan]Material:[/cyan] {short_name}")
-
-    # Prompt preview
-    console.print("\n[bold]Prompt Preview:[/bold]")
-    console.print(Panel(prompt_content, title="Governance Prompt", border_style="blue"))
-
-    # Summary
-    console.print(f"\n[dim]Prompt length: {len(prompt_content)} characters[/dim]")
-    console.print(f"[dim]Material: {material_name}[/dim]")
-    console.print("[dim]Mode: dry-run (no execution)[/dim]\n")
-
-
 def display_supervisor_dry_run(
-    console: Console, total_scanned: int, candidates: list[dict]
+    console: Console,
+    total_scanned: int,
+    candidates: list[dict],
 ) -> None:
-    """Display supervisor scan dry-run output.
+    """Display supervisor scan dry-run candidate information.
+
+    Note: Prompt Composition is now handled by CodeagentBackend.run(dry_run=True)
+    This function only displays candidate list and scan summary.
 
     Args:
         console: Rich Console instance

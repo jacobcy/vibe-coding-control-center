@@ -80,22 +80,25 @@ def run_governance_sync(
     prompt_content = render_result.rendered_text
 
     if dry_run:
-        material_info = f" material={material_override}" if material_override else ""
-        echo(f"-> Governance dry-run: tick={tick_count}{material_info}")
-        if show_prompt:
-            echo("--- Prompt ---")
-            echo(
-                prompt_content[:2000] + "..."
-                if len(prompt_content) > 2000
-                else prompt_content
-            )
-
-        # Collect and write provenance for audit
         manifest = PromptManifest.load_for_prompts_path(None)
         recipe_def = manifest.recipe("governance.scan")
         variant_key = ""
         if recipe_def.variants:
             variant_key = "default"
+
+        sections = ["governance.scan"]
+        # template-based recipes have a single logical section
+        dry_run_summary: dict[str, object] = {
+            "prompt_mode": "scan",
+            "context_mode": "tick",
+            "sections": sections,
+            "refs": {
+                "role": "governance",
+                "tick": str(tick_count),
+            },
+        }
+
+        # Collect and write provenance
         provenance = collect_dry_run_provenance(
             manifest=manifest,
             recipe_key="governance.scan",
@@ -107,7 +110,25 @@ def run_governance_sync(
         provenance_path = write_prompt_provenance(
             provenance, role="governance", repo_root=repo
         )
-        echo(f"-> Provenance: {provenance_path}")
+        dry_run_summary["provenance_path"] = str(provenance_path)
+
+        # Add section annotation for template-based prompt
+        annotated_prompt = (
+            f"<!-- section:governance.scan -->\n"
+            f"{prompt_content}\n"
+            f"<!-- /section:governance.scan -->"
+        )
+
+        # Route through CodeagentBackend for consistent dry-run display
+        CodeagentBackend().run(
+            prompt=annotated_prompt,
+            options=options,
+            task="governance scan",
+            dry_run=True,
+            show_prompt=show_prompt,
+            role="governance",
+            dry_run_summary=dry_run_summary,
+        )
         return
 
     material_info = f" material={material_override}" if material_override else ""

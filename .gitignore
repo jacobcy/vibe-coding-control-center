@@ -123,6 +123,7 @@ wt-*/
 .vibe/*
 !.vibe/config.yaml
 !.vibe/policies/
+!.vibe/governance/
 .repomix/
 .hypothesis/
 .agent/plans/

@@ -7,47 +7,9 @@ from rich.console import Console
 from vibe3.models import ExecutionLaunchResult
 from vibe3.ui.scan_display import (
     display_execution_result,
-    display_governance_dry_run,
     display_material_list,
     display_supervisor_dry_run,
 )
-
-
-class TestDisplayGovernanceDryRun:
-    """Tests for governance dry-run display."""
-
-    def test_displays_material_info(self):
-        """Test that material information is displayed."""
-        console = Console()
-
-        with patch.object(console, "print") as mock_print:
-            display_governance_dry_run(
-                console=console,
-                material_name="supervisor/governance/assignee-pool.md",
-                prompt_content="# Test Prompt\nContent here",
-            )
-
-            # Check that material name is displayed
-            printed_text = " ".join(str(call) for call in mock_print.call_args_list)
-            assert "assignee-pool" in printed_text or "Material" in printed_text
-
-    def test_displays_prompt_preview(self):
-        """Test that prompt preview is displayed."""
-        console = Console()
-
-        with patch.object(console, "print") as mock_print:
-            display_governance_dry_run(
-                console=console,
-                material_name="test-material",
-                prompt_content="Test prompt content",
-            )
-
-            # Check that prompt is displayed (Panel or direct print)
-            printed_text = " ".join(str(call) for call in mock_print.call_args_list)
-            assert (
-                "Test prompt content" in printed_text
-                or len(mock_print.call_args_list) > 0
-            )
 
 
 class TestDisplaySupervisorDryRun:

@@ -148,3 +148,103 @@ class TestPromptAssemblerRender:
         assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
         assembler.render(recipe, runtime_context={"key": "ctx_val"})
         assert received == [{"key": "ctx_val"}]
+
+
+class TestGovernanceMaterialOverlay:
+    """Test governance material auto-appends project-specific overlay."""
+
+    def test_governance_material_with_overlay(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Test governance material auto-appends .vibe/governance overlay."""
+        from vibe3.prompts.builtin_providers import _resolve_file
+
+        # Create base governance material
+        base_dir = tmp_path / "supervisor" / "governance"
+        base_dir.mkdir(parents=True)
+        base_file = base_dir / "roadmap-intake.md"
+        base_file.write_text(
+            "# Base Content\n\nThis is the default governance material.",
+            encoding="utf-8",
+        )
+
+        # Create project-specific overlay
+        vibe_dir = tmp_path / ".vibe" / "governance"
+        vibe_dir.mkdir(parents=True)
+        overlay_file = vibe_dir / "roadmap-intake.md"
+        overlay_file.write_text(
+            "\n# Project-Specific Extensions\n\nThis is project-specific content.",
+            encoding="utf-8",
+        )
+
+        # Mock resolve_runtime_asset to use tmp_path
+        def mock_resolve(path: str) -> Path:
+            return tmp_path / path
+
+        import vibe3.prompts.builtin_providers as module
+
+        monkeypatch.setattr(module, "resolve_runtime_asset", mock_resolve)
+
+        # Test resolution
+        src = PromptVariableSource(
+            kind=VariableSourceKind.FILE, path="supervisor/governance/roadmap-intake.md"
+        )
+        result = _resolve_file(src)
+
+        # Verify both base and overlay content are present
+        assert "# Base Content" in result
+        assert "# Project-Specific Extensions" in result
+        assert "default governance material" in result
+        assert "project-specific content" in result
+
+    def test_governance_material_no_overlay(self, tmp_path: Path, monkeypatch) -> None:
+        """Test governance material works without project overlay."""
+        from vibe3.prompts.builtin_providers import _resolve_file
+
+        # Create only base governance material (no overlay)
+        base_dir = tmp_path / "supervisor" / "governance"
+        base_dir.mkdir(parents=True)
+        base_file = base_dir / "assignee-pool.md"
+        base_file.write_text("# Base Content Only", encoding="utf-8")
+
+        # Mock resolve_runtime_asset to use tmp_path
+        def mock_resolve(path: str) -> Path:
+            return tmp_path / path
+
+        import vibe3.prompts.builtin_providers as module
+
+        monkeypatch.setattr(module, "resolve_runtime_asset", mock_resolve)
+
+        # Test resolution
+        src = PromptVariableSource(
+            kind=VariableSourceKind.FILE, path="supervisor/governance/assignee-pool.md"
+        )
+        result = _resolve_file(src)
+
+        # Should only have base content
+        assert "# Base Content Only" in result
+        assert ".vibe" not in result
+
+    def test_non_governance_file_unchanged(self, tmp_path: Path, monkeypatch) -> None:
+        """Test non-governance files are not affected by overlay logic."""
+        from vibe3.prompts.builtin_providers import _resolve_file
+
+        # Create a regular file (not governance material)
+        test_file = tmp_path / "test.md"
+        test_file.write_text("# Test Content", encoding="utf-8")
+
+        # Mock resolve_runtime_asset to use tmp_path
+        def mock_resolve(path: str) -> Path:
+            return tmp_path / path
+
+        import vibe3.prompts.builtin_providers as module
+
+        monkeypatch.setattr(module, "resolve_runtime_asset", mock_resolve)
+
+        # Test resolution
+        src = PromptVariableSource(kind=VariableSourceKind.FILE, path="test.md")
+        result = _resolve_file(src)
+
+        # Should only have original content (no overlay attempt)
+        assert "# Test Content" in result
+        assert len(result.split("\n\n")) == 1  # No overlay appended

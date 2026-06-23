@@ -95,11 +95,6 @@ def _plan_for_branch(
         raise typer.Exit(1)
 
     # Publish ManualPlanIntent event and wait for result
-    from vibe3.commands.common import echo_dry_run_header
-
-    if dry_run:
-        echo_dry_run_header("planner", issue_number, branch, agent, backend, model)
-
     result = publish_and_wait(
         ManualPlanIntent(
             issue_number=issue_number,
@@ -232,11 +227,6 @@ def _plan_spec_impl(
         raise typer.Exit(1)
 
     # Publish ManualPlanIntent event and wait for result
-    from vibe3.commands.common import echo_dry_run_header
-
-    if dry_run:
-        echo_dry_run_header("planner", issue_number, branch, agent, backend, model)
-
     result = publish_and_wait(
         ManualPlanIntent(
             issue_number=issue_number,

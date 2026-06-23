@@ -75,6 +75,11 @@
 - 不在终端直接喷大体量内容；优先摘要、截断、过滤。
 - 跨会话记忆使用 `claude-memory` MCP 工具：被动记忆通过 hooks 自动捕获 observations（`search`、`get_observations` 查询）；主动记忆通过 `build_corpus` 创建知识库，`prime_corpus` + `query_corpus` 查询。
 - **Roadmap 分析缓存**：`.agent/context/memory.md` 用于 `/vibe-roadmap` 每次分析后的结果缓存（本地文件，不纳入 git）
+- **Project-Specific Extensions**：
+  - `.vibe/policies/` — 项目专属 policy overlay（自动附加到 `supervisor/policies/`）
+  - `.vibe/governance/` — 项目专属 governance material overlay（自动附加到 `supervisor/governance/`）
+  - 机制：文件名匹配时自动合并（base + project overlay），用于扩展默认 materials 而无需修改上游
+  - 示例：`.vibe/governance/roadmap-intake.md` → 附加到 `supervisor/governance/roadmap-intake.md`
 - 当前 flow handoff 通过 `vibe3 handoff show <target>` 读取，通过 `vibe3 handoff append` 写入。
   - `<target>` 支持三种命名空间：
     - `@key` — 共享 artifact（`.git/vibe3/handoff/` 下，忽略 `--branch`）

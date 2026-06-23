@@ -25,15 +25,43 @@ if [[ -f "$VIBE_LIB/utils.sh" ]]; then
 fi
 
 # ── Context Resolution ────────────────────────────────────
+# VIBE_REPO: 主仓库根目录（包含 .git 和 .worktrees 的目录）
+# VIBE_MAIN: main worktree 的位置
+#
+# 场景1 - 单 worktree（直接 clone）：
+#   VIBE_REPO = clone 目录（包含 .git）
+#   VIBE_MAIN = VIBE_REPO（没有 .worktrees/main）
+#
+# 场景2 - 多 worktree（bare repo）：
+#   VIBE_REPO = bare repo 目录（包含 .git 和 .worktrees）
+#   VIBE_MAIN = $VIBE_REPO/.worktrees/main
+
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  export VIBE_REPO="$(git rev-parse --show-toplevel 2>/dev/null)"
+  # 获取 git common dir（共享 .git 目录）
+  # - 单 worktree: .git
+  # - 多 worktree: 绝对路径（如 /path/to/repo/.git）
+  local git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+
+  if [[ -n "$git_common_dir" && -d "$git_common_dir" ]]; then
+    # VIBE_REPO 是 .git 的父目录
+    export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
+  else
+    # Fallback: 使用 show-toplevel
+    export VIBE_REPO="$(git rev-parse --show-toplevel 2>/dev/null || dirname "$VIBE_ROOT")"
+  fi
 else
   export VIBE_REPO="$(dirname "$VIBE_ROOT")"
 fi
 
-if [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
+# VIBE_MAIN: 在 VIBE_REPO 下查找 main
+if [[ -d "$VIBE_REPO/.worktrees/main" ]]; then
+  # 多 worktree 模式：main 在 .worktrees/main
+  export VIBE_MAIN="$VIBE_REPO/.worktrees/main"
+elif [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
+  # 兼容旧结构：main 作为子目录
   export VIBE_MAIN="$VIBE_REPO/main"
 else
+  # 单 worktree 模式：没有独立的 main
   export VIBE_MAIN="$VIBE_REPO"
 fi
 export VIBE_SESSION="${VIBE_SESSION:-vibe}"

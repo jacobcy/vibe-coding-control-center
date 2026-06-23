@@ -79,7 +79,8 @@ class TestGovernanceScan:
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
         output_lower = result.output.lower()
-        assert "governance dry-run" in output_lower or "--- prompt ---" in output_lower
+        # After refactor, output uses CodeagentBackend.run(dry_run=True) format
+        assert "prompt composition" in output_lower or "governance.scan" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
@@ -274,16 +275,28 @@ class TestGovernanceDryRunPromptDisplay:
             app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
         )
         assert result.exit_code == 0
-        assert "assignee-pool" in result.output.lower() or "Material:" in result.output
+        # After fix: --dry-run shows Prompt Composition summary (not full prompt)
+        assert (
+            "Prompt Composition" in result.output or "prompt" in result.output.lower()
+        )
 
     @pytest.mark.slow
     def test_governance_dry_run_shows_prompt_preview(self):
         result = runner.invoke(
-            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+            app,
+            [
+                "scan",
+                "governance",
+                "--role",
+                "assignee-pool",
+                "--dry-run",
+                "--show-prompt",
+            ],
         )
         assert result.exit_code == 0
+        # With --show-prompt, should display full prompt with section markers
         output_lower = result.output.lower()
-        assert "prompt" in output_lower or "governance prompt" in output_lower
+        assert "<!-- section:" in output_lower or "governance.scan" in output_lower
 
 
 class TestSupervisorDryRunPromptDisplay:
@@ -395,3 +408,35 @@ def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
         assert "Backend: anthropic" in result.output
         assert "Model: claude-3" in result.output
         assert "Dispatched to: vibe3-supervisor-456" in result.output
+
+
+def test_governance_show_prompt_requires_dry_run():
+    """Test that --show-prompt requires --dry-run in governance command."""
+    result = runner.invoke(
+        app, ["scan", "governance", "--show-prompt", "--role", "assignee-pool"]
+    )
+    assert result.exit_code == 1
+    assert "--show-prompt requires --dry-run" in result.output
+
+
+def test_supervisor_show_prompt_requires_dry_run():
+    """Test that --show-prompt requires --dry-run in supervisor command."""
+    result = runner.invoke(app, ["scan", "supervisor", "--show-prompt"])
+    assert result.exit_code == 1
+    assert "--show-prompt requires --dry-run" in result.output
+
+
+@patch("vibe3.roles.fetch_supervisor_candidates")
+@patch("vibe3.commands.scan.GitHubClient")
+@patch("vibe3.commands.scan.load_orchestra_config")
+def test_supervisor_dry_run_shows_summary_with_zero_candidates(
+    mock_config, mock_github_cls, mock_fetch
+):
+    """Test supervisor dry-run displays summary even with zero candidates."""
+    mock_config.return_value = MagicMock(repo="owner/repo")
+    mock_fetch.return_value = (0, [])
+
+    result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+    assert result.exit_code == 0
+    # Should show scan summary, not just prompt composition
+    assert "Candidates:" in result.output or "issues scanned" in result.output

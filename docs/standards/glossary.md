@@ -407,7 +407,42 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 讨论过程、阶段、交付路径时使用 `workflow`
   - 讨论运行时容器时不要用 `workflow` 代替 `flow`
 
-### 6.4 Installation Lifecycle
+### 6.4 Repository Context Variables
+
+- 正式术语：`repository context variables`
+- 别称：`仓库上下文变量`、`VIBE_REPO/VIBE_MAIN`
+- 定义：用于定位仓库资源的 Shell 环境变量，由 `lib/alias/loader.sh` 动态设置：
+  - **VIBE_REPO**：主仓库根目录（包含 `.git` 和 `.worktrees` 的目录）
+    - 单 worktree 模式：即 clone 目录本身
+    - 多 worktree 模式：bare repo 目录
+  - **VIBE_MAIN**：main worktree 的物理路径
+    - 单 worktree 模式：等于 VIBE_REPO
+    - 多 worktree 模式：`$VIBE_REPO/.worktrees/main`
+- 判定逻辑：
+  ```bash
+  # VIBE_REPO 解析顺序：
+  1. git rev-parse --git-common-dir → 父目录
+  2. git rev-parse --show-toplevel (fallback)
+
+  # VIBE_MAIN 查找顺序：
+  1. $VIBE_REPO/.worktrees/main
+  2. $VIBE_REPO/main (兼容旧结构)
+  3. $VIBE_REPO (单 worktree)
+  ```
+- 边界：
+  - VIBE_REPO 一定包含 `.git` 目录
+  - VIBE_REPO 一定包含 `.worktrees` 目录（多 worktree 模式）
+  - VIBE_MAIN 一定指向 main branch 的 worktree 物理目录
+- 使用规则：
+  - 所有定位共享资源的逻辑应基于 VIBE_REPO
+  - 定位 main worktree 资源应基于 VIBE_MAIN
+  - 不得假设 VIBE_REPO 等于当前 worktree
+  - 不得假设 VIBE_MAIN 等于 VIBE_REPO
+- 落点：
+  - 实现见 [lib/alias/loader.sh](../../lib/alias/loader.sh)
+  - 全局更新逻辑见 [lib/update.sh](../../lib/update.sh)
+
+### 6.5 Installation Lifecycle
 
 - 正式术语：`installation lifecycle`
 - 别称：`安装生命周期`
@@ -426,7 +461,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 讨论全局同步、更新分发时使用 `vibe update`
   - 讨论 worktree 初始化时使用 `scripts/init.sh`
 
-### 6.5 Global Distribution
+### 6.6 Global Distribution
 
 - 正式术语：`global distribution`
 - 别称：`全局分发`
@@ -442,7 +477,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
   - 讨论全局安装位置、跨项目共享时使用 `global distribution`
   - 指定路径时写作 `~/.vibe`
 
-### 6.6 Update Command
+### 6.7 Update Command
 
 - 正式术语：`update command`
 - 别称：`更新命令`
@@ -460,7 +495,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 使用规则：
   - 讨论全局同步、更新分发时使用 `update command`
 
-### 6.7 Effect Semantics
+### 6.8 Effect Semantics
 
 - 正式术语：`effect semantics`
 - 别称：`效果语义`
@@ -476,7 +511,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 使用规则：
   - 讨论变更生效时机、同步需求时使用 `effect semantics`
 
-### 6.8 Shared Venv
+### 6.9 Shared Venv
 
 - 正式术语：`shared venv`
 - 别称：`共享虚拟环境`

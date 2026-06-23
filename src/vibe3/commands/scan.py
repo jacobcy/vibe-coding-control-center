@@ -106,7 +106,9 @@ def _publish_and_wait_supervisor_events(
     return results
 
 
-def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
+def _run_governance_scan_dry_run(
+    material_override: str | None = None, show_prompt: bool = False
+) -> None:
     """Execute governance scan in dry-run mode via run_governance_sync.
 
     Uses real-time snapshot (not synthetic context) to preview governance prompt.
@@ -114,6 +116,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
 
     Args:
         material_override: Optional governance role to override material rotation
+        show_prompt: If True, display full prompt content with section markers
     """
     from vibe3.execution import run_governance_sync
     from vibe3.observability import append_governance_event
@@ -125,7 +128,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         tick_count=0,  # Manual scan always uses tick=0
         material_override=material_override,
         dry_run=True,
-        show_prompt=True,
+        show_prompt=show_prompt,
         session_id=None,
         governance_fns=build_default_governance_fns(),
         append_event=append_governance_event,
@@ -194,32 +197,65 @@ def _run_supervisor_scan() -> tuple[int, int]:
     return total_scanned, matched_count
 
 
-def _run_supervisor_scan_dry_run() -> None:
+def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
     """Execute supervisor scan in dry-run mode, displaying scan plan.
 
-    Shows scan process without actual execution.
+    Shows scan process without actual execution. Follows the same architectural
+    pattern as governance dry-run: uses CodeagentBackend for Prompt Composition
+    display, then shows candidate information.
+
+    Args:
+        show_prompt: If True, build and display prompts for candidate issues
     """
     from rich.console import Console
 
     from vibe3.clients import GitHubClient
     from vibe3.config import load_orchestra_config
-    from vibe3.roles import fetch_supervisor_candidates
+    from vibe3.roles import (
+        build_supervisor_handoff_payload,
+        fetch_supervisor_candidates,
+    )
     from vibe3.ui import display_supervisor_dry_run
 
     console = Console()
     config = load_orchestra_config()
 
-    # Fetch candidates via service layer
+    # Build sample prompt for Prompt Composition display
+    # (architectural alignment with governance)
+    try:
+        sample_prompt, options, _ = build_supervisor_handoff_payload(
+            config, 999999, "Sample Issue", annotate_sections=show_prompt
+        )
+        from vibe3.agents import CodeagentBackend
+
+        # Show Prompt Composition via CodeagentBackend (same pattern as governance)
+        CodeagentBackend().run(
+            prompt=sample_prompt,
+            options=options,
+            task="supervisor scan",
+            dry_run=True,
+            show_prompt=show_prompt,
+            role="supervisor",
+            dry_run_summary={
+                "prompt_mode": "handoff",
+                "sections": ["supervisor.handoff"],
+                "refs": {"role": "supervisor"},
+            },
+        )
+    except Exception as e:
+        console.print(f"[yellow]Could not build prompt preview: {e}[/yellow]")
+
+    # Fetch and display candidates via service layer
     try:
         github = GitHubClient()
         total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     except Exception as e:
-        # On error, display empty list
         console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
         total_scanned = 0
         candidates = []
 
-    # Display via UI layer
+    # Always display scan summary, even with zero candidates
+    # (when show_prompt=True and candidates exist, also shows individual prompts)
     display_supervisor_dry_run(console, total_scanned, candidates)
 
 
@@ -242,6 +278,13 @@ def governance(
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Build and display prompt without executing"),
+    ] = False,
+    show_prompt: Annotated[
+        bool,
+        typer.Option(
+            "--show-prompt",
+            help="With --dry-run, display full prompt content with section markers",
+        ),
     ] = False,
     no_async: _ASYNC_OPT = False,
     verbose: Annotated[
@@ -269,6 +312,11 @@ def governance(
         typer.echo("Error: --list and --role cannot be used together", err=True)
         raise typer.Exit(1)
 
+    # Validate --show-prompt requires --dry-run
+    from vibe3.commands.command_options import validate_show_prompt_dependency
+
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     # Handle --list option (highest priority)
     if list_materials:
         from vibe3.ui import display_material_list
@@ -290,7 +338,7 @@ def governance(
 
     if dry_run:
         # In dry-run mode, build and display the prompt without executing
-        _run_governance_scan_dry_run(material_override=role)
+        _run_governance_scan_dry_run(material_override=role, show_prompt=show_prompt)
         return
 
     if role is None:
@@ -314,6 +362,13 @@ def supervisor(
             "--dry-run", help="Show scan plan and candidates without executing"
         ),
     ] = False,
+    show_prompt: Annotated[
+        bool,
+        typer.Option(
+            "--show-prompt",
+            help="With --dry-run, build and display prompts for candidates",
+        ),
+    ] = False,
     verbose: Annotated[
         int,
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
@@ -326,8 +381,13 @@ def supervisor(
     """
     setup_logging(verbose=verbose)
 
+    # Validate --show-prompt requires --dry-run
+    from vibe3.commands.command_options import validate_show_prompt_dependency
+
+    validate_show_prompt_dependency(dry_run, show_prompt)
+
     if dry_run:
-        _run_supervisor_scan_dry_run()
+        _run_supervisor_scan_dry_run(show_prompt=show_prompt)
         return
 
     # Manual supervisor scan: direct dispatch without facade
