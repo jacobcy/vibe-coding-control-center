@@ -1,4 +1,12 @@
-"""Integration tests for Handoff commands - All CLI operations."""
+"""Integration tests for Handoff commands - All CLI operations.
+
+Note: test_handoff_audit_command_real_service_path uses direct
+SQLiteClient() instantiation. This is justified because:
+1. It's an integration test using tmp_path fixture
+2. GitClient.get_git_common_dir() is monkeypatched to temp directory
+3. SQLiteClient connects to tmp_path/.git/vibe3/handoff.db,
+   not production database
+"""
 
 from unittest.mock import MagicMock, patch
 

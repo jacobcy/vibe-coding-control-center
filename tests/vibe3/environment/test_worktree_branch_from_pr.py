@@ -10,7 +10,7 @@ from vibe3.environment.worktree import WorktreeManager
 class TestFindDependencyWakeupPR:
     """Tests for _find_dependency_wakeup_pr method."""
 
-    def test_no_wakeup_event_returns_none(self) -> None:
+    def test_no_wakeup_event_returns_none(self, temp_store: SQLiteClient) -> None:
         """When no dependency_wake_up event, return None."""
         # Setup
         import time
@@ -18,9 +18,8 @@ class TestFindDependencyWakeupPR:
         unique_id = int(time.time() * 1000)
         branch = f"task/issue-300-{unique_id}"
 
-        store = SQLiteClient()
-        store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
-        store.add_event(
+        temp_store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
+        temp_store.add_event(
             branch,
             "planner_started",
             "manager",
@@ -34,7 +33,7 @@ class TestFindDependencyWakeupPR:
 
         with patch(
             "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
-            return_value=store,
+            return_value=temp_store,
         ):
             # Execute
             result = manager._find_dependency_wakeup_pr(branch)
@@ -42,12 +41,13 @@ class TestFindDependencyWakeupPR:
             # Verify
             assert result is None
 
-    def test_wakeup_event_with_source_pr_returns_pr_number(self) -> None:
+    def test_wakeup_event_with_source_pr_returns_pr_number(
+        self, temp_store: SQLiteClient
+    ) -> None:
         """When wake-up event with source_pr exists, return PR number."""
         # Setup
-        store = SQLiteClient()
-        store.update_flow_state("task/issue-300", flow_slug="test-300")
-        store.add_event(
+        temp_store.update_flow_state("task/issue-300", flow_slug="test-300")
+        temp_store.add_event(
             "task/issue-300",
             "flow_unblocked",
             "orchestra:dependency_handler",
@@ -62,7 +62,7 @@ class TestFindDependencyWakeupPR:
 
         with patch(
             "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
-            return_value=store,
+            return_value=temp_store,
         ):
             # Execute
             result = manager._find_dependency_wakeup_pr("task/issue-300")
@@ -70,7 +70,9 @@ class TestFindDependencyWakeupPR:
             # Verify
             assert result == 42
 
-    def test_multiple_wakeup_events_returns_most_recent(self) -> None:
+    def test_multiple_wakeup_events_returns_most_recent(
+        self, temp_store: SQLiteClient
+    ) -> None:
         """When multiple wake-up events, pick the most recent source PR."""
         # Setup
         import time
@@ -78,10 +80,9 @@ class TestFindDependencyWakeupPR:
         unique_id = int(time.time() * 1000)
         branch = f"task/issue-300-{unique_id}"
 
-        store = SQLiteClient()
-        store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
+        temp_store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
         # First wake-up from PR 42
-        store.add_event(
+        temp_store.add_event(
             branch,
             "flow_unblocked",
             "orchestra:dependency_handler",
@@ -89,7 +90,7 @@ class TestFindDependencyWakeupPR:
             refs={"source_pr": "42"},
         )
         # Later wake-up from PR 43
-        store.add_event(
+        temp_store.add_event(
             branch,
             "flow_unblocked",
             "orchestra:dependency_handler",
@@ -104,7 +105,7 @@ class TestFindDependencyWakeupPR:
 
         with patch(
             "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
-            return_value=store,
+            return_value=temp_store,
         ):
             # Execute
             result = manager._find_dependency_wakeup_pr(branch)
@@ -112,7 +113,9 @@ class TestFindDependencyWakeupPR:
             # Verify
             assert result == 43
 
-    def test_wakeup_event_no_source_pr_returns_none(self) -> None:
+    def test_wakeup_event_no_source_pr_returns_none(
+        self, temp_store: SQLiteClient
+    ) -> None:
         """When wake-up event has no source_pr, return None."""
         # Setup
         import time
@@ -120,9 +123,8 @@ class TestFindDependencyWakeupPR:
         unique_id = int(time.time() * 1000)
         branch = f"task/issue-300-{unique_id}"
 
-        store = SQLiteClient()
-        store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
-        store.add_event(
+        temp_store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
+        temp_store.add_event(
             branch,
             "flow_unblocked",
             "orchestra:dependency_handler",
@@ -137,7 +139,7 @@ class TestFindDependencyWakeupPR:
 
         with patch(
             "vibe3.environment.worktree_pr_mixin.SQLiteClient.from_repo_path",
-            return_value=store,
+            return_value=temp_store,
         ):
             # Execute
             result = manager._find_dependency_wakeup_pr(branch)

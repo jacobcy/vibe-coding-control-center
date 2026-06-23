@@ -24,7 +24,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     objects to Path operations, which results in directories with names like
     'MagicMock/' or '<MagicMock name=...'.
 
-    Records leaks to ErrorTrackingService for visibility via `vibe3 serve status`.
+    Logs leaks without writing to ErrorTrackingService or production state.
     """
     import shutil
 
@@ -49,28 +49,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
                 logger.error(f"Failed to clean up {item.name}: {e}")
 
     if leaks_found:
-        # Record to ErrorTrackingService for `vibe3 serve status` visibility
-        try:
-            from vibe3.clients import SQLiteClient
-            from vibe3.exceptions.error_codes import E_TEST_ARTIFACT_LEAK
-            from vibe3.services.orchestra.error_tracking.service import (
-                ErrorTrackingService,
-            )
-
-            error_tracking = ErrorTrackingService.get_instance(store=SQLiteClient())
-            for leak_name in leaks_found:
-                error_tracking.record_error(
-                    error_code=E_TEST_ARTIFACT_LEAK,
-                    error_message=f"Test artifact leak: {leak_name}",
-                    tick_id=-1,  # Special marker for test-time leaks
-                )
-            logger.info(
-                f"Recorded {len(leaks_found)} test artifact leak(s) "
-                "to ErrorTrackingService. View with: vibe3 serve status"
-            )
-        except Exception as e:
-            logger.error(f"Failed to record leaks to ErrorTrackingService: {e}")
-
+        # Only log to file, do NOT write to production database
+        # Test errors should not pollute production ErrorTrackingService
         logger.warning(
             f"Test suite completed with {len(leaks_found)} artifact leak(s): "
             f"{', '.join(leaks_found)}. "

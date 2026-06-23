@@ -4,8 +4,16 @@
 
 ## 目录职责
 
+### 规则层（长期有效）
+
 - `.claude/rules/`：仓库长期规则、项目特定约束、实现标准
-- `supervisor/policies/`：按 `plan/run/review` mode 注入的策略材料与共享工具约束
+- `supervisor/policies/`：跨项目通用策略材料，按 `plan/run/review` mode 注入，被 run/review agent 消费
+- `.vibe/policies/`：**本项目特定**策略材料，追加到 supervisor/policies 同级策略文件之后
+
+### 区别说明
+
+- **supervisor/policies/**：跨项目通用，定义 agent 的验证原则、审查标准、执行模式（如 test-strategy.md）
+- **.vibe/policies/**：项目特定，定义本项目的开发规则、约定、CI 环境要求（如 LOC limits 处理、测试数据库隔离）
 
 ## 规则文件说明
 

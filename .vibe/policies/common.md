@@ -111,3 +111,70 @@ uv run pytest tests/vibe3/integration/test_ci_parity.py -v
 - 配置文件：`config/v3/loc_limits.yaml`
 - 项目规则：`CLAUDE.md` HARD RULES 第 12 条
 - 详细标准：`.claude/rules/coding-standards.md` Size And Complexity
+
+## 测试数据库隔离（强制）
+
+### 原则
+
+测试代码必须使用独立的测试数据库，**禁止写入生产数据库**。
+
+### 要求
+
+1. **默认隔离：`isolate_database` autouse fixture**
+   - `tests/vibe3/conftest.py` 会自动 monkeypatch `GitClient.get_git_common_dir()`
+   - Vibe3 测试中的默认 `SQLiteClient()` 会指向临时 git common dir 下的 `vibe3/handoff.db`
+   - 这层用于兜底旧测试和通过默认客户端路径创建 store 的代码
+
+2. **显式注入：`temp_store` fixture**
+   - 新增服务/集成测试如果需要把 store 注入被测对象，优先使用共享 `temp_store`
+   - 该 fixture 自动创建已初始化 schema 的临时数据库，测试结束后清理
+
+   ```python
+   def test_my_feature(temp_store: SQLiteClient) -> None:
+       # temp_store 指向临时数据库，不影响生产数据
+       service = MyService(store=temp_store)
+   ```
+
+3. **禁止绕过隔离框架直接触达生产数据库**
+   - ❌ 在不受 `isolate_database` 覆盖的测试/全局 hook 中直接使用默认 `SQLiteClient()`
+   - ✅ `def test_xxx(temp_store)` → 显式注入临时 store
+   - ✅ Vibe3 测试中只走默认客户端路径时，依赖 autouse `isolate_database`
+
+4. **pytest 钩子要求**
+   - `pytest_sessionfinish` 等全局钩子不得写入生产数据库
+   - 如需记录测试错误，只写入日志文件或使用测试数据库
+
+### 违规示例
+
+```python
+# ❌ 错误：在全局 hook 或未启用 Vibe3 隔离 fixture 的测试中直接使用生产数据库
+def test_my_feature() -> None:
+    store = SQLiteClient()  # 可能写入 .git/vibe3/handoff.db
+    service = MyService(store=store)
+```
+
+### 正确示例
+
+```python
+# ✅ 正确：使用测试数据库 fixture
+def test_my_feature(temp_store: SQLiteClient) -> None:
+    service = MyService(store=temp_store)  # 使用临时数据库
+```
+
+### 反模式警示
+
+**Issue #3110 案例**：`tests/conftest.py` 的 `pytest_sessionfinish` 钩子直接使用生产数据库记录测试错误，导致 31 条 `E_TEST_ARTIFACT_LEAK` 错误污染生产数据库。
+
+```python
+# ❌ 错误：全局钩子写入生产数据库
+def pytest_sessionfinish(session, exitstatus):
+    error_tracking = ErrorTrackingService.get_instance(store=SQLiteClient())
+    #                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+    #                                     使用了生产数据库！
+    error_tracking.record_error(...)
+```
+
+### 相关文档
+
+- Issue #3110: 测试数据库隔离 - pytest_sessionfinish 污染生产数据库
+- 测试 fixture 定义：`tests/vibe3/conftest.py`

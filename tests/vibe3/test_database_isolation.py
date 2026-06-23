@@ -46,3 +46,16 @@ def test_default_error_tracking_singleton_uses_isolated_database(
         ).fetchone()[0]
 
     assert count == 1
+
+
+def test_temp_store_fixture_provides_initialized_database(
+    temp_store: SQLiteClient,
+) -> None:
+    """Shared temp_store fixture should provide an initialized test database."""
+    temp_store.update_flow_state("task/temp-store", flow_slug="temp-store")
+
+    flow_state = temp_store.get_flow_state("task/temp-store")
+
+    assert flow_state is not None
+    assert flow_state["flow_slug"] == "temp-store"
+    assert Path(temp_store.db_path).name == "handoff.db"
