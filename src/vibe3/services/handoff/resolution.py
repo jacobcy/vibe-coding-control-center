@@ -168,8 +168,11 @@ def _resolve_vibe_material(
         return resolved
 
     # Priorities 2 & 3: Auto-detection via unified resolver
-    from vibe3.clients import resolve_runtime_asset
-    from vibe3.clients.runtime_assets import bundled_project_root, runtime_assets_root
+    from vibe3.clients import (
+        bundled_project_root,
+        resolve_runtime_asset,
+        runtime_assets_root,
+    )
 
     resolved = resolve_runtime_asset(material_path, namespace="vibe")
 
