@@ -290,6 +290,80 @@ def build_audit_observation_context(snapshot: Any) -> dict[str, Any]:
     )
 
 
+def build_audit_suggestion_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-suggestion material.
+
+    Reads observation ledger from shared directory and provides aggregate
+    statistics for the auditor to determine if there are enough observations
+    to form a cluster worth analyzing.
+
+    The context does NOT read full observation content - the agent reads
+    selected ones via tools per the material's instructions.
+    """
+    # Get shared observations directory path (cross-worktree shared location)
+    from vibe3.utils import get_git_common_dir
+
+    try:
+        git_common_dir = get_git_common_dir()
+        observations_dir = Path(git_common_dir) / "shared" / "observations"
+    except Exception:
+        # Fallback: use relative path from current working tree
+        observations_dir = Path(".git/shared/observations")
+
+    # Count observation files
+    observation_count = 0
+    observed_failure_modes: set[str] = set()
+
+    if observations_dir.exists():
+        # Read observation files (up to 20 for context stats)
+        observation_files = sorted(observations_dir.glob("audit-observation-*.yaml"))
+        observation_count = len(observation_files)
+
+        # Quick parse to extract failure modes (don't read full content)
+        for obs_file in observation_files[:20]:
+            try:
+                content = obs_file.read_text()
+                # Extract failure mode from YAML (simple pattern match)
+                if "observed_failure_mode:" in content:
+                    for line in content.split("\n"):
+                        if "observed_failure_mode:" in line:
+                            mode = line.split(":", 1)[1].strip().strip('"').strip("'")
+                            if mode:
+                                observed_failure_modes.add(mode)
+                            break
+            except Exception:
+                continue
+
+    result = build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="observation cluster analysis",
+        scope_note=(
+            f"观察记录统计：\n"
+            f"- 可用观察记录数：{observation_count}\n"
+            f"- 检测到的失败模式："
+            f"{', '.join(sorted(observed_failure_modes)) or '无'}\n\n"
+            "请使用 Read 工具读取 `.git/shared/observations/"
+            "audit-observation-*.yaml` 文件，"
+            "按材料中的聚类规则分析，达到最小重复度"
+            "（2+ 同类观察）才生成建议。"
+            f"{'目前无观察记录，跳过本轮。' if observation_count == 0 else ''}"
+        ),
+    )
+
+    # Add observation-specific fields for programmatic access
+    result["observation_count"] = observation_count
+    result["new_since_last_run"] = observation_count  # Simplified: assume all are new
+    result["observed_failure_modes"] = sorted(observed_failure_modes)
+
+    return result
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 

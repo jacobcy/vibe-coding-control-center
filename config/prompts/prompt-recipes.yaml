@@ -423,6 +423,10 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/audit-observation.md
+      - name: supervisor/governance/audit-suggestion.md
+        source:
+          kind: file
+          path: supervisor/governance/audit-suggestion.md
     variables:
       server_status:
         kind: provider

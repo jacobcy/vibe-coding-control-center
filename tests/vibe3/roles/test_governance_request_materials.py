@@ -174,21 +174,21 @@ class TestRoundRobinMaterialSelection:
     def test_tick_wraps_around(self):
         """execution_count wraps around material catalog.
 
-        (5 materials, count 5 -> index 0).
+        (6 materials, count 6 -> index 0).
         """
         recipe = build_governance_recipe(
-            _make_config(), tick_count=0, execution_count=5
+            _make_config(), tick_count=0, execution_count=6
         )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/assignee-pool.md"
 
     def test_large_tick_uses_modulo(self):
-        """execution_count=11 wraps around 5 materials to index 1 (11 % 5 = 1)."""
+        """execution_count=11 wraps around 6 materials to index 5 (11 % 6 = 5)."""
         recipe = build_governance_recipe(
             _make_config(), tick_count=0, execution_count=11
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/roadmap-intake.md"
+        assert val == "supervisor/governance/audit-suggestion.md"
 
     def test_tick_4_selects_audit_observation(self):
         """execution_count=4 selects audit-observation from recipe catalog."""
@@ -197,6 +197,14 @@ class TestRoundRobinMaterialSelection:
         )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/audit-observation.md"
+
+    def test_tick_5_selects_audit_suggestion(self):
+        """execution_count=5 selects audit-suggestion from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=5
+        )
+        val = recipe.variables["supervisor_name"].value
+        assert val == "supervisor/governance/audit-suggestion.md"
 
     def test_build_governance_request_uses_round_robin(self):
         """build_governance_request picks material per execution_count.

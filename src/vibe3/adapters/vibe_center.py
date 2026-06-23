@@ -88,6 +88,11 @@ def _build_vibe_center_manifest(
                 name="audit-observation",
                 path="supervisor/governance/audit-observation.md",
             ),
+            AdapterResource(
+                type="supervisor",
+                name="audit-suggestion",
+                path="supervisor/governance/audit-suggestion.md",
+            ),
         ]
     )
 

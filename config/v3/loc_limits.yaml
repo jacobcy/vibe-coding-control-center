@@ -171,6 +171,9 @@ code_limits:
         reason: "Prompt recipe manifest 加载与 section source 提取；Issue #3028 follow-up 新增 _get_material_catalog_sources 和 load_for_prompts_path 方法以支持 template recipe material_catalog 来源追踪和自定义路径加载（+14 行）"
 
       # Roles 层 —— 允许 480-600
+      - path: "src/vibe3/roles/governance_utils.py"
+        limit: 420
+        reason: "Governance utilities aggregation, includes build_issue_context (snapshot context), build_code_auditor_context (module selection for audit), build_audit_observation_context (observation collection), build_audit_suggestion_context (observation cluster analysis), and material name normalization; Issue #2957 added build_audit_suggestion_context for audit-suggestion governance material (+74 lines)"
       - path: "src/vibe3/roles/governance.py"
         limit: 490
         reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines)"
