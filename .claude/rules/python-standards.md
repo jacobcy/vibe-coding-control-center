@@ -195,7 +195,27 @@ tests/
         └── test_task.py
 ```
 
-**测试数据库隔离**：详见 `.vibe/policies/common.md` 的"测试数据库隔离"章节。
+### 测试数据库隔离（强制）
+
+**原则**：测试代码必须使用独立的测试数据库，禁止写入生产数据库。
+
+**要求**：
+
+1. **使用 `temp_store` fixture**
+   - 所有需要数据库的测试必须使用 `temp_store` fixture
+   - 该 fixture 自动创建临时数据库，测试结束后清理
+
+2. **禁止直接实例化 `SQLiteClient()`**
+   - ❌ `store = SQLiteClient()`  → 使用生产数据库
+   - ✅ `def test_xxx(temp_store: SQLiteClient)` → 使用 fixture
+
+3. **特殊情况**
+   - 测试 `SQLiteClient` 本身的功能时
+   - 测试数据库隔离机制时
+   - 集成测试使用 `tmp_path` + monkeypatch 时
+   - 必须在文件顶部注释说明原因
+
+**详细规范**：见 `.vibe/policies/common.md` 的"测试数据库隔离"章节（包含违规示例、正确示例、反模式警示）。
 
 ---
 
