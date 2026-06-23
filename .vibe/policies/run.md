@@ -31,6 +31,12 @@ git diff --name-only HEAD~1 HEAD -- src/vibe3/ | \
    - 运行改动源文件对应的整个测试目录：`tests/vibe3/<module>/`
    - 优先级最低，**必须运行**（除非 test selector 在上层已全覆盖或返回 skip 模式）
 
+4. **第四层：模块化架构守卫测试**
+   - 改动涉及 layer 级别源码（`src/vibe3/clients/`、`src/vibe3/services/`、`src/vibe3/config/`、`__init__.py` 等）时，必须追加对应的 modularity 测试
+   - 对应关系见 `plan.policy@project`「模块化测试覆盖检查」映射表
+   - 优先级与第一层相同 — **必须运行**
+   - 轻量级静态扫描测试，运行时间短，不应跳过
+
 ### 执行模板
 
 ```bash
