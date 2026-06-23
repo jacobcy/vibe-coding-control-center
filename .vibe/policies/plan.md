@@ -55,6 +55,26 @@ tmux display-message -p '#{session_name}'
 - 集成测试：`tests/vibe3/integration/`
 - 模块化测试：`tests/vibe3/test_modularity/`
 
+## 模块化测试覆盖检查
+
+涉及以下 layer 层面的源码改动时，Plan 的 Test Scope 必须包含对应的 modularity 架构守卫测试：
+
+| 改动路径 | 必须包含的 modularity 测试文件 |
+|---------|---------------------------|
+| `src/vibe3/clients/` | `tests/vibe3/test_modularity/test_clients_no_config_import.py` |
+| `src/vibe3/services/` | `tests/vibe3/test_modularity/test_services_reexport_surface.py`, `tests/vibe3/test_modularity/test_services_subpackage_boundaries.py` |
+| `src/vibe3/config/` | `tests/vibe3/test_modularity/test_config_no_adapters_import.py` |
+| 任意 `src/vibe3/**/__init__.py`（re-export 变更） | `tests/vibe3/test_modularity/test_public_interfaces.py` |
+| 跨 layer 导入变更 | `tests/vibe3/test_modularity/test_dependency_direction.py`, `tests/vibe3/test_modularity/test_kernel_import_boundary.py` |
+
+选择理由：这些测试是轻量级静态扫描（import analysis），48 个测试全量运行约 11s，单个 layer 对应的测试子集通常 < 2s，不应等到 Review 阶段才发现模块化边界违规。
+
+验证命令示例：
+```bash
+# clients/ 改动对应的 modularity 测试
+uv run pytest tests/vibe3/test_modularity/test_clients_no_config_import.py -v
+```
+
 ## ADR 约束
 
 规划前必须查看 `docs/decisions/INDEX.md` 和相关 accepted ADR，确认计划不违反任何当前有效 ADR。
