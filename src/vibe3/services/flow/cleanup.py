@@ -222,9 +222,23 @@ class FlowCleanupService:
             results["local_branch"] = False
 
     def _delete_remote_branch(self, branch: str, results: dict[str, bool]) -> None:
-        """Delete remote branch if exists."""
+        """Delete remote branch if exists.
+
+        DEFENSIVE LAYER 3: Skip remote branch deletion if the branch contains
+        only cleanup commits (e.g., "init" commits). These commits would corrupt
+        the PR diff if pushed to remote. The remote branch was likely never pushed
+        with these cleanup commits in the first place.
+        """
         try:
             if self._has_remote_branch(branch):
+                # Check for cleanup-only commits before attempting remote deletion
+                if not self._has_meaningful_commits(branch):
+                    logger.bind(domain="cleanup", branch=branch).warning(
+                        "Skipping remote branch deletion: only cleanup commits found, "
+                        "push would corrupt PR diff"
+                    )
+                    return
+
                 open_pr = self.pr_service.get_open_pr_for_branch(branch, refresh=True)
                 if open_pr is not None:
                     logger.bind(
@@ -301,6 +315,51 @@ class FlowCleanupService:
             return bool(result.strip())
         except Exception:
             return False
+
+    def _is_cleanup_commit(self, subject: str) -> bool:
+        """Check if a commit subject is a cleanup commit that should not be pushed.
+
+        Cleanup commits are typically created by automation or initialization processes
+        and should not be pushed to remote branches as they would corrupt PR diffs.
+
+        Args:
+            subject: The commit subject (first line of commit message).
+
+        Returns:
+            True if this is a cleanup commit, False otherwise.
+        """
+        # Match "init" (exact match, case-insensitive)
+        # This is the primary pattern from issue #3090
+        return subject.lower() == "init"
+
+    def _has_meaningful_commits(self, branch: str) -> bool:
+        """Check if a branch has meaningful commits beyond cleanup commits.
+
+        This method examines commits unique to the branch (not in origin/main)
+        to determine if there are any non-cleanup commits worth preserving.
+
+        Args:
+            branch: The branch name to check.
+
+        Returns:
+            True if at least one meaningful commit exists.
+            False if all commits are cleanup commits or no commits exist.
+        """
+        try:
+            # Get commits unique to this branch (not in origin/main)
+            subjects = self.git_client.get_commit_subjects(
+                base_ref="origin/main", head_ref=branch
+            )
+            # Check if any commit is NOT a cleanup commit
+            return any(not self._is_cleanup_commit(s) for s in subjects)
+        except Exception as exc:
+            # If we can't determine commit status, assume meaningful commits exist
+            # to avoid accidentally blocking legitimate cleanup
+            logger.bind(domain="cleanup", branch=branch).warning(
+                f"Failed to check commits for cleanup detection: {exc}. "
+                "Proceeding with remote branch deletion."
+            )
+            return True
 
     def _terminate_task_sessions(self, branch: str) -> None:
         """Kill lingering tmux sessions for a task issue.

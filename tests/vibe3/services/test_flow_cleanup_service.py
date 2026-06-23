@@ -124,3 +124,153 @@ def test_remove_worktree_falls_back_to_prune_on_failure() -> None:
         mock_prune.assert_called_once()
         # Worktree step should still be marked as failed
         assert results["worktree"] is False
+
+
+def test_is_cleanup_commit_matches_init() -> None:
+    """_is_cleanup_commit returns True for 'init' commit subjects."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    assert service._is_cleanup_commit("init") is True
+    assert service._is_cleanup_commit("Init") is True  # case-insensitive
+    assert service._is_cleanup_commit("INIT") is True  # case-insensitive
+
+
+def test_is_cleanup_commit_rejects_real_commit() -> None:
+    """_is_cleanup_commit returns False for real commit subjects."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    assert service._is_cleanup_commit("fix: typo") is False
+    assert service._is_cleanup_commit("feat: add new feature") is False
+    assert service._is_cleanup_commit("refactor: simplify logic") is False
+    assert service._is_cleanup_commit("initial commit") is False  # not exact match
+    assert service._is_cleanup_commit("") is False
+
+
+def test_has_meaningful_commits_returns_false_for_only_init_commits() -> None:
+    """_has_meaningful_commits returns False when branch only has 'init' commits."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    # Mock git client to return only init commits
+    service.git_client.get_commit_subjects.return_value = ["init", "init"]
+
+    result = service._has_meaningful_commits("task/issue-123")
+
+    assert result is False
+    service.git_client.get_commit_subjects.assert_called_once_with(
+        base_ref="origin/main", head_ref="task/issue-123"
+    )
+
+
+def test_has_meaningful_commits_returns_true_for_mixed_commits() -> None:
+    """_has_meaningful_commits returns True when branch has real commits."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    # Mock git client to return init + real commits
+    service.git_client.get_commit_subjects.return_value = [
+        "init",
+        "fix: real change",
+    ]
+
+    result = service._has_meaningful_commits("task/issue-123")
+
+    assert result is True
+
+
+def test_has_meaningful_commits_returns_true_for_only_real_commits() -> None:
+    """_has_meaningful_commits returns True when branch has only real commits."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    # Mock git client to return only real commits
+    service.git_client.get_commit_subjects.return_value = [
+        "feat: add feature",
+        "fix: bug fix",
+    ]
+
+    result = service._has_meaningful_commits("task/issue-123")
+
+    assert result is True
+
+
+def test_has_meaningful_commits_returns_true_on_error() -> None:
+    """_has_meaningful_commits returns True on error to avoid blocking cleanup."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+    # Mock git client to raise exception
+    service.git_client.get_commit_subjects.side_effect = Exception("git error")
+
+    result = service._has_meaningful_commits("task/issue-123")
+
+    # Should return True to avoid blocking legitimate cleanup
+    assert result is True
+
+
+def test_delete_remote_branch_skips_when_only_init_commits() -> None:
+    """Remote branch deletion must be skipped when branch only has init commits."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+    service.git_client.delete_remote_branch = MagicMock()
+    service._pr_service = MagicMock()
+
+    results = {"remote_branch": True}
+
+    with (
+        patch.object(service, "_has_remote_branch", return_value=True),
+        patch.object(service, "_has_meaningful_commits", return_value=False),
+    ):
+        service._delete_remote_branch("task/issue-123", results)
+
+    # delete_remote_branch should NOT be called
+    service.git_client.delete_remote_branch.assert_not_called()
+    # Results should remain True (successful skip)
+    assert results["remote_branch"] is True
+
+
+def test_delete_remote_branch_proceeds_when_meaningful_commits_exist() -> None:
+    """Remote branch deletion proceeds when branch has meaningful commits."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+    service.git_client.delete_remote_branch = MagicMock()
+    service._pr_service = MagicMock()
+    service._pr_service.get_open_pr_for_branch.return_value = None
+
+    results = {"remote_branch": True}
+
+    with (
+        patch.object(service, "_has_remote_branch", return_value=True),
+        patch.object(service, "_has_meaningful_commits", return_value=True),
+    ):
+        service._delete_remote_branch("task/issue-456", results)
+
+    # delete_remote_branch should be called
+    service.git_client.delete_remote_branch.assert_called_once_with("task/issue-456")
+    assert results["remote_branch"] is True
