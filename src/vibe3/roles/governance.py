@@ -35,6 +35,7 @@ from vibe3.prompts import (
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
     build_audit_observation_context,
+    build_audit_suggestion_context,
     build_broader_repo_entries,
     build_code_auditor_context,
     build_issue_context,
@@ -197,6 +198,11 @@ def build_governance_snapshot_context(
 
     if material_name == "audit-observation.md":
         ctx = build_audit_observation_context(snapshot)
+        ctx["material_hash"] = material_hash
+        return ctx
+
+    if material_name == "audit-suggestion.md":
+        ctx = build_audit_suggestion_context(snapshot)
         ctx["material_hash"] = material_hash
         return ctx
 
