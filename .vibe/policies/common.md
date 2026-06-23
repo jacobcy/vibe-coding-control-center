@@ -174,6 +174,47 @@ def pytest_sessionfinish(session, exitstatus):
     error_tracking.record_error(...)
 ```
 
+### Session-level hooks 特殊要求
+
+**关键警告**：Session-level hooks（如 `pytest_sessionfinish`）在所有 function-scope fixtures 销毁**之后**运行，无法依赖 `isolate_database` fixture 保护。
+
+**要求**：
+- Session-level hooks 不得访问生产数据库
+- 如需数据库访问，必须显式指定测试数据库路径
+- 优先方案：session-level hooks 不应写入任何数据库
+
+**最佳实践**：显式指定 `db_path`
+```python
+# ✅ 正确：显式指定测试数据库路径
+def test_with_explicit_db(tmp_path: Path) -> None:
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "vibe3").mkdir()
+
+    store = SQLiteClient(db_path=str(git_dir / "vibe3" / "handoff.db"))
+    # 显式控制数据库位置，不依赖 monkeypatch
+```
+
+### CI 验证
+
+所有 CI 运行必须验证测试未写入生产数据库：
+
+```bash
+# 测试前后检查生产数据库
+sqlite3 .git/vibe3/handoff.db "SELECT COUNT(*) FROM error_log"
+# 测试运行后计数不应增加
+```
+
+### Executor 自检清单
+
+在声称测试通过前，验证：
+
+- [ ] `tests/vibe3/` 下的测试受 `isolate_database` autouse fixture 保护
+- [ ] 直接使用 `SQLiteClient()` 的测试使用显式 `db_path` 或 `temp_store`
+- [ ] Session-level hooks 不写入生产数据库
+- [ ] 运行 `sqlite3 .git/vibe3/handoff.db "SELECT COUNT(*) FROM error_log"` 显示测试后无增加
+```
+
 ### 相关文档
 
 - Issue #3110: 测试数据库隔离 - pytest_sessionfinish 污染生产数据库
