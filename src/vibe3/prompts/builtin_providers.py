@@ -61,8 +61,27 @@ def _resolve_file(
     src: PromptVariableSource,
     warnings: list[str] | None = None,
 ) -> str:
+    """Resolve file source with optional project-specific overlay.
+
+    For governance materials (supervisor/governance/*.md), automatically
+    appends project-specific content from .vibe/governance/*.md if present.
+
+    Args:
+        src: Variable source with file path
+        warnings: Optional list to collect warning messages
+
+    Returns:
+        File content (base + project overlay if applicable), or empty string on error
+
+    Example:
+        supervisor/governance/roadmap-intake.md
+        + .vibe/governance/roadmap-intake.md (if exists)
+        = Combined content for governance material
+    """
     if not src.path:
         return ""
+
+    # Read base file
     path = resolve_runtime_asset(src.path)
     if not path.exists():
         msg = f"File source not found: {src.path}"
@@ -70,14 +89,35 @@ def _resolve_file(
         if warnings is not None:
             warnings.append(msg)
         return ""
+
     try:
-        return path.read_text(encoding="utf-8")
+        content = path.read_text(encoding="utf-8")
     except OSError as exc:
         msg = f"Cannot read file source {src.path}: {exc}"
         logger.bind(domain="prompt_assembly").warning(msg)
         if warnings is not None:
             warnings.append(msg)
         return ""
+
+    # Auto-append project-specific overlay for governance materials
+    if src.path.startswith("supervisor/governance/") and src.path.endswith(".md"):
+        basename = Path(src.path).name
+        project_overlay_path = f".vibe/governance/{basename}"
+        project_path = resolve_runtime_asset(project_overlay_path)
+
+        if project_path.exists():
+            try:
+                project_content = project_path.read_text(encoding="utf-8")
+                content = content + "\n\n" + project_content
+                logger.bind(domain="prompt_assembly").info(
+                    f"Appended project-specific overlay: {project_overlay_path}"
+                )
+            except OSError as exc:
+                logger.bind(domain="prompt_assembly").warning(
+                    f"Cannot read project overlay {project_overlay_path}: {exc}"
+                )
+
+    return content
 
 
 def _resolve_skill(
