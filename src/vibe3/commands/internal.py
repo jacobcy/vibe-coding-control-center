@@ -283,8 +283,8 @@ def internal_bootstrap(
 
     # Initialize handoff with issue context (reuse TaskShowService)
     from vibe3.services.flow import FlowService
-    from vibe3.services.handoff.storage import HandoffStorage
-    from vibe3.services.task.show import TaskShowService
+    from vibe3.services.handoff import HandoffStorage
+    from vibe3.services.task import TaskShowService
 
     flow_service = FlowService()
     task_show = TaskShowService(
