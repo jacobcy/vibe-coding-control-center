@@ -324,3 +324,139 @@ def test_internal_bootstrap_rejects_dependency_and_reason_together() -> None:
     assert result.exit_code == 1
     assert "不能同时指定" in result.output
     service.bootstrap_issue_flow.assert_not_called()
+
+
+# Tests for optional issue parameter with flow resolution
+
+
+def test_internal_manager_optional_issue_resolves_from_flow(monkeypatch):
+    """Test that internal manager resolves issue from current flow."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    # Mock FlowService to return a flow with bound issue
+    mock_flow = MagicMock()
+    mock_flow.task_issue_number = 999
+
+    with patch("vibe3.services.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/issue-999"
+        flow_service.get_flow_status.return_value = mock_flow
+        flow_service_cls.return_value = flow_service
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_run:
+            result = runner.invoke(cli_app, ["internal", "manager", "--no-async"])
+
+            assert result.exit_code == 0
+            # Should have called with issue 999 from the mock flow
+            assert mock_run.call_args.kwargs["issue_number"] == 999
+
+
+def test_internal_manager_optional_issue_no_current_branch(monkeypatch):
+    """Test error when no issue specified and no current branch detected."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    with patch("vibe3.services.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = None
+        flow_service_cls.return_value = flow_service
+
+        result = runner.invoke(cli_app, ["internal", "manager", "--no-async"])
+
+        assert result.exit_code == 1
+        assert "No current branch detected" in result.output
+
+
+def test_internal_manager_optional_issue_no_flow_found(monkeypatch):
+    """Test error when no issue specified and no flow found for branch."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    with patch("vibe3.services.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/issue-999"
+        flow_service.get_flow_status.return_value = None
+        flow_service_cls.return_value = flow_service
+
+        result = runner.invoke(cli_app, ["internal", "manager", "--no-async"])
+
+        assert result.exit_code == 1
+        assert "No flow found for branch" in result.output
+
+
+def test_internal_manager_optional_issue_flow_no_bound_issue(monkeypatch):
+    """Test error when no issue specified and flow has no bound issue."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    # Mock flow without bound issue
+    mock_flow = MagicMock()
+    mock_flow.task_issue_number = None
+
+    with patch("vibe3.services.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/issue-999"
+        flow_service.get_flow_status.return_value = mock_flow
+        flow_service_cls.return_value = flow_service
+
+        result = runner.invoke(cli_app, ["internal", "manager", "--no-async"])
+
+        assert result.exit_code == 1
+        assert "has no bound issue" in result.output
+
+
+def test_internal_manager_optional_issue_with_branch_override(monkeypatch):
+    """Test that --branch parameter works with optional issue resolution."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    # Mock FlowService to return a flow with bound issue
+    mock_flow = MagicMock()
+    mock_flow.task_issue_number = 777
+
+    with patch("vibe3.services.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        # When --branch is specified, it should be used instead of current branch
+        flow_service.get_flow_status.return_value = mock_flow
+        flow_service_cls.return_value = flow_service
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as mock_run:
+            result = runner.invoke(
+                cli_app,
+                ["internal", "manager", "--no-async", "--branch", "dev/issue-777"],
+            )
+
+            assert result.exit_code == 0
+            # Should have called with issue 777 from the mock flow
+            assert mock_run.call_args.kwargs["issue_number"] == 777
+            assert mock_run.call_args.kwargs["branch"] == "dev/issue-777"
+
+
+def test_internal_manager_show_prompt_forces_sync_path(monkeypatch):
+    """Test that --show-prompt forces sync execution (no_async=True)."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    with patch(
+        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+    ) as mock_sync:
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+        ) as mock_async:
+            result = runner.invoke(
+                cli_app,
+                [
+                    "internal",
+                    "manager",
+                    "123",
+                    "--dry-run",
+                    "--show-prompt",
+                ],
+            )
+
+            assert result.exit_code == 0
+            # Should have called sync path, NOT async
+            mock_sync.assert_called_once()
+            mock_async.assert_not_called()
+            # Verify show_prompt was passed
+            assert mock_sync.call_args.kwargs["show_prompt"] is True
+            assert mock_sync.call_args.kwargs["dry_run"] is True

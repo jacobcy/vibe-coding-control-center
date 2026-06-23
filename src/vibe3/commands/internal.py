@@ -49,7 +49,12 @@ app = typer.Typer(
 
 @app.command("manager")
 def internal_manager_dispatch(
-    issue: Annotated[int, typer.Argument(help="Issue number to manage")],
+    issue: Annotated[
+        int | None,
+        typer.Argument(
+            help="Issue number to manage (optional, defaults to current flow)"
+        ),
+    ] = None,
     no_async: _ASYNC_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
@@ -62,11 +67,61 @@ def internal_manager_dispatch(
         typer.Option("--yes", "-y", help="Bypass async child guard (for debugging)"),
     ] = False,
 ) -> None:
-    """L3: Dispatch the State Manager agent."""
+    """L3: Dispatch the State Manager agent.
+
+    If issue is not specified, uses the issue bound to current branch/flow.
+    """
     _require_async_child(yes=yes)
 
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
+
+    # --show-prompt requires sync execution (async path lacks show_prompt support)
+    if show_prompt:
+        no_async = True
+
+    # Resolve issue number from current flow if not specified
+    if issue is None:
+        from vibe3.services.flow import FlowService
+
+        flow_service = FlowService()
+        current_branch = branch or flow_service.get_current_branch()
+
+        if not current_branch:
+            typer.echo(
+                "Error: No current branch detected.\n"
+                "Please specify an issue: vibe3 internal manager <issue>\n"
+                "Or checkout a branch first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        flow = flow_service.get_flow_status(current_branch)
+
+        if not flow:
+            typer.echo(
+                f"Error: No flow found for branch '{current_branch}'.\n"
+                f"Options:\n"
+                f"  1. Bind an issue: vibe3 flow bind <issue>\n"
+                f"  2. Specify issue: vibe3 internal manager <issue>",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        if not flow.task_issue_number:
+            typer.echo(
+                f"Error: Flow on branch '{current_branch}' has no bound issue.\n"
+                f"Options:\n"
+                f"  1. Bind an issue: vibe3 flow bind <issue>\n"
+                f"  2. Specify issue: vibe3 internal manager <issue>",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        issue = flow.task_issue_number
+        logger.info(
+            f"Using issue #{issue} from current flow (branch: {current_branch})"
+        )
 
     from vibe3.execution import (
         run_issue_role_async,
