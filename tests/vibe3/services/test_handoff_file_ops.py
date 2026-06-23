@@ -49,14 +49,9 @@ class TestEnsureCurrentHandoff:
         assert handoff_path.exists()
         content = handoff_path.read_text()
         assert "# Handoff: feature/test-branch" in content
-        assert "lightweight handoff file" in content
-        assert "## Summary" in content
-        assert "## Findings" in content
-        assert "## Blockers" in content
-        assert "## Next Actions" in content
-        assert "## Key Files" in content
-        assert "## Evidence Refs" in content
+        assert "Lightweight handoff file" in content
         assert "## Updates" in content
+        # Template is minimal now - no Summary, Findings, Blockers, etc.
 
     def test_ensure_current_handoff_existing_file_is_idempotent(
         self, handoff_storage, temp_git_dir, mock_git_client
