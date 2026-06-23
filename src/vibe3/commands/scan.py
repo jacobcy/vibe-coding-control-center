@@ -254,10 +254,9 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
         total_scanned = 0
         candidates = []
 
-    # Display candidates via UI layer
-    # (when show_prompt=True, also shows individual prompts)
-    if candidates or not show_prompt:
-        display_supervisor_dry_run(console, total_scanned, candidates)
+    # Always display scan summary, even with zero candidates
+    # (when show_prompt=True and candidates exist, also shows individual prompts)
+    display_supervisor_dry_run(console, total_scanned, candidates)
 
 
 @app.command()
@@ -312,6 +311,11 @@ def governance(
     if list_materials and role is not None:
         typer.echo("Error: --list and --role cannot be used together", err=True)
         raise typer.Exit(1)
+
+    # Validate --show-prompt requires --dry-run
+    from vibe3.commands.command_options import validate_show_prompt_dependency
+
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Handle --list option (highest priority)
     if list_materials:
@@ -376,6 +380,11 @@ def supervisor(
     supervisor handoff dispatch. Runs once and exits.
     """
     setup_logging(verbose=verbose)
+
+    # Validate --show-prompt requires --dry-run
+    from vibe3.commands.command_options import validate_show_prompt_dependency
+
+    validate_show_prompt_dependency(dry_run, show_prompt)
 
     if dry_run:
         _run_supervisor_scan_dry_run(show_prompt=show_prompt)

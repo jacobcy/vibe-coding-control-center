@@ -437,6 +437,9 @@ code_limits:
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
+      - path: "tests/vibe3/commands/test_internal.py"
+        limit: 480
+        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）"
 
 
   total_file_loc:
