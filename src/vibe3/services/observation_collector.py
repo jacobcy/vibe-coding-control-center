@@ -248,93 +248,109 @@ class ObservationCollector:
             Created observation or None if unable to create
         """
         # Determine observation type and symptom
-        observation_type, symptom, failure_pattern = self._classify_flow(flow)
+        observation_type, symptom, observed_failure_mode = self._classify_flow(flow)
 
-        # Determine affected layer
-        affected_layer = self._infer_affected_layer(flow)
-
-        # Build source window
+        # Build source window with commit SHAs
         source_window = ObservationSourceWindow(
             issue_number=self._extract_issue_number(flow),
             branch=flow.branch,
             pr_number=self._extract_pr_number(flow),
+            commit_shas=self._extract_commit_shas(flow),
             prompt_hash=prompt_hash,
+            skill_ids=self._extract_skill_ids(flow),
+            memory_ids=self._extract_memory_ids(flow),
         )
 
-        # Build evidence summary
-        evidence_summary = self._build_evidence_summary(flow)
+        # Build facts list
+        facts = self._build_facts(flow)
+
+        # Build interpretation
+        interpretation = self._build_interpretation(flow, observed_failure_mode)
 
         # Determine confidence
         confidence = self._determine_confidence(flow)
 
-        # Build raw refs
-        raw_refs = self._build_raw_refs(flow)
-
         # Build limitations
         limitations = self._build_limitations(flow)
+
+        # Build next_stage_input
+        next_stage_input = self._build_next_stage_input(flow)
 
         return AuditObservation.create(
             observation_type=observation_type,
             source_window=source_window,
             symptom=symptom,
-            affected_layer=affected_layer,
-            evidence_summary=evidence_summary,
+            observed_failure_mode=observed_failure_mode,
             confidence=confidence,
             created_by="cli/audit-observe",
-            failure_pattern=failure_pattern,
-            raw_refs=raw_refs,
+            flow_status=flow.flow_status,
+            facts=facts,
+            interpretation=interpretation,
             limitations=limitations,
+            next_stage_input=next_stage_input,
             updated_at=flow.updated_at,
             prompt_hash=prompt_hash,
         )
 
-    def _classify_flow(self, flow: FlowState) -> tuple[str, str, str | None]:
+    def _classify_flow(self, flow: FlowState) -> tuple[
+        str,
+        str,
+        Literal[
+            "scope_mismatch",
+            "missing_output",
+            "state_loop",
+            "contract_missing",
+            "ci_failure",
+            "review_gap",
+            "unknown",
+        ],
+    ]:
         """Classify flow to determine observation type and symptom.
 
         Returns:
-            Tuple of (observation_type, symptom, failure_pattern)
+            Tuple of (observation_type, symptom, observed_failure_mode)
         """
         if flow.flow_status == "blocked":
             return (
                 "flow_blocked",
                 f"Flow blocked: {flow.blocked_reason or 'unknown reason'}",
-                "dependency_blocked",
+                "contract_missing",  # dependency issues -> contract
             )
         elif flow.flow_status == "aborted":
             return (
                 "flow_aborted",
                 "Flow was aborted",
-                "manual_abort",
+                "unknown",  # human decision
             )
         elif flow.executor_status == "crashed":
             return (
                 "execution_crashed",
                 "Executor crashed during run",
-                "runtime_crash",
+                "unknown",  # runtime failure
             )
         elif flow.planner_status == "crashed":
             return (
                 "planning_crashed",
                 "Planner crashed during plan generation",
-                "runtime_crash",
+                "unknown",  # runtime failure
             )
         elif flow.flow_status == "stale":
             return (
                 "flow_stale",
                 "Flow became stale (no recent updates)",
-                "timeout",
+                "unknown",  # timeout
             )
         elif flow.blocked_reason:
             return (
                 "flow_semantically_blocked",
                 f"Flow marked blocked: {flow.blocked_reason}",
-                "dependency_blocked",
+                "contract_missing",  # dependency issues
             )
         else:
             return (
                 "flow_anomaly",
                 f"Flow in unusual state: {flow.flow_status}",
-                None,
+                "unknown",
             )
 
     def _infer_affected_layer(self, flow: FlowState) -> ObservationLayer:
@@ -371,6 +387,187 @@ class ObservationCollector:
                 pass
 
         return None
+
+    def _extract_commit_shas(self, flow: FlowState) -> list[str]:
+        """Extract commit SHAs from flow branch.
+
+        Args:
+            flow: Flow to extract commits from
+
+        Returns:
+            List of commit SHAs (last 5 commits on branch)
+        """
+        import subprocess
+
+        try:
+            # Get last 5 commits on branch
+            result = subprocess.run(
+                ["git", "log", "--oneline", "-5", "--format=%H", flow.branch],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=5,
+            )
+            shas = result.stdout.strip().split("\n")
+            return [sha for sha in shas if sha]
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return []
+
+    def _extract_skill_ids(self, flow: FlowState) -> list[str]:
+        """Extract skill IDs from flow metadata.
+
+        Args:
+            flow: Flow to extract skill IDs from
+
+        Returns:
+            List of skill IDs (placeholder for future integration)
+        """
+        # TODO: Integrate with skill registry to extract skill IDs
+        # For now, return empty list as skills are not tracked in flow state
+        return []
+
+    def _extract_memory_ids(self, flow: FlowState) -> list[str]:
+        """Extract memory IDs from claude-mem integration.
+
+        Args:
+            flow: Flow to extract memory IDs from
+
+        Returns:
+            List of memory IDs (placeholder for future integration)
+        """
+        # TODO: Integrate with claude-mem to extract relevant memory IDs
+        # For now, return empty list as claude-mem is not integrated
+        return []
+
+    def _build_facts(self, flow: FlowState) -> list[dict[str, str]]:
+        """Build facts list from flow state.
+
+        Args:
+            flow: Flow to extract facts from
+
+        Returns:
+            List of fact dicts with kind, ref, summary
+        """
+        facts = []
+
+        # Flow fact
+        facts.append(
+            {
+                "kind": "flow",
+                "ref": flow.branch,
+                "summary": f"Flow status: {flow.flow_status}",
+            }
+        )
+
+        # GitHub issue fact
+        if flow.spec_ref:
+            facts.append(
+                {
+                    "kind": "github_issue",
+                    "ref": f"https://github.com/jacobcy/vibe-coding-control-center/issues/{self._extract_issue_number(flow)}",
+                    "summary": f"Issue bound to flow: {flow.spec_ref}",
+                }
+            )
+
+        # GitHub PR fact
+        if flow.pr_ref:
+            facts.append(
+                {
+                    "kind": "github_pr",
+                    "ref": flow.pr_ref,
+                    "summary": "PR created for flow",
+                }
+            )
+
+        # Handoff facts
+        if flow.plan_ref:
+            facts.append(
+                {
+                    "kind": "handoff",
+                    "ref": "@plan",
+                    "summary": f"Plan: {flow.plan_ref}",
+                }
+            )
+        if flow.report_ref:
+            facts.append(
+                {
+                    "kind": "handoff",
+                    "ref": "@report",
+                    "summary": f"Report: {flow.report_ref}",
+                }
+            )
+        if flow.audit_ref:
+            facts.append(
+                {
+                    "kind": "handoff",
+                    "ref": "@audit",
+                    "summary": f"Audit: {flow.audit_ref}",
+                }
+            )
+
+        # Git commit facts
+        commit_shas = self._extract_commit_shas(flow)
+        if commit_shas:
+            facts.append(
+                {
+                    "kind": "git",
+                    "ref": f"{flow.branch} ({len(commit_shas)} commits)",
+                    "summary": f"Recent commits: {', '.join(commit_shas[:3])}",
+                }
+            )
+
+        return facts
+
+    def _build_interpretation(
+        self, flow: FlowState, observed_failure_mode: str
+    ) -> dict[str, Any]:
+        """Build interpretation structure.
+
+        Args:
+            flow: Flow being observed
+            observed_failure_mode: Classified failure mode
+
+        Returns:
+            Interpretation dict with reasoning, likely_agent_failure,
+            affected_material_candidates
+        """
+        affected_layer = self._infer_affected_layer(flow)
+
+        interpretation = {
+            "reasoning": (
+                f"Flow in {flow.flow_status} state with "
+                f"{observed_failure_mode} failure mode"
+            ),
+            "likely_agent_failure": "",
+            "affected_material_candidates": [],
+            "affected_layer": affected_layer.value,
+        }
+
+        # Add reasoning based on flow state
+        if flow.executor_status == "crashed":
+            interpretation["likely_agent_failure"] = "Executor crashed during execution"
+        elif flow.planner_status == "crashed":
+            interpretation["likely_agent_failure"] = "Planner crashed during planning"
+        elif flow.blocked_reason:
+            current_reason = str(interpretation.get("reasoning", ""))
+            interpretation["reasoning"] = f"{current_reason}: {flow.blocked_reason}"
+
+        return interpretation
+
+    def _build_next_stage_input(self, flow: FlowState) -> dict[str, Any]:
+        """Build next stage input for clustering.
+
+        Args:
+            flow: Flow being observed
+
+        Returns:
+            Next stage input dict with clustering hints
+        """
+        return {
+            "suitable_for_clustering": True,
+            "suggested_cluster_key": f"{flow.flow_status}-{flow.branch}",
+            "requires_human_review": flow.flow_status in ("blocked", "aborted"),
+        }
 
     def _build_evidence_summary(self, flow: FlowState) -> str:
         """Build evidence summary from flow state.
@@ -489,7 +686,7 @@ class ObservationCollector:
         return filepath
 
     def _format_as_yaml(self, observation: AuditObservation) -> str:
-        """Format observation as YAML string.
+        """Format observation as YAML string aligned with governance schema.
 
         Args:
             observation: Observation to format
@@ -502,46 +699,75 @@ class ObservationCollector:
             "  schema_version: 1",
             f"  created_at: {observation.created_at}",
             f"  created_by: {observation.created_by}",
+            f"  source_material: {observation.source_material}",
             "",
             "  subject:",
         ]
 
+        # Subject section
         if observation.source_window.issue_number:
             lines.append(f"    issue_number: {observation.source_window.issue_number}")
         if observation.source_window.branch:
             lines.append(f"    branch: {observation.source_window.branch}")
         if observation.source_window.pr_number:
             lines.append(f"    pr_number: {observation.source_window.pr_number}")
+        lines.append(f"    flow_status: {observation.flow_status}")
 
+        # Observation section
         lines.extend(
             [
                 "",
                 "  observation:",
                 f"    title: {observation.observation_type}",
                 f"    symptom: {observation.symptom}",
-            ]
-        )
-
-        if observation.failure_pattern:
-            lines.append(f"    failure_pattern: {observation.failure_pattern}")
-
-        lines.extend(
-            [
-                f"    affected_layer: {observation.affected_layer.value}",
+                f"    observed_failure_mode: {observation.observed_failure_mode}",
                 f"    confidence: {observation.confidence}",
-                "",
-                "  evidence:",
-                f"    summary: {observation.evidence_summary}",
-                f"    sample_count: {observation.sample_count}",
-                "",
-                "  source_watermark: {}".format(observation.source_watermark),
-                "",
-                "  limitations:",
             ]
         )
 
+        # Facts section
+        lines.extend(["", "  facts:"])
+        for fact in observation.facts:
+            lines.extend(
+                [
+                    "    - kind: {}".format(fact.get("kind", "unknown")),
+                    "      ref: {}".format(fact.get("ref", "")),
+                    "      summary: {}".format(fact.get("summary", "")),
+                ]
+            )
+
+        # Interpretation section
+        lines.extend(["", "  interpretation:"])
+        interp = observation.interpretation
+        lines.append(f"    reasoning: {interp.get('reasoning', '')}")
+        lines.append(
+            f"    likely_agent_failure: {interp.get('likely_agent_failure', '')}"
+        )
+        lines.append("    affected_material_candidates:")
+        for candidate in interp.get("affected_material_candidates", []):
+            lines.append(f"      - {candidate}")
+        if "affected_layer" in interp:
+            lines.append(f"    affected_layer: {interp['affected_layer']}")
+
+        # Limitations section
+        lines.extend(["", "  limitations:"])
         for limitation in observation.limitations:
             lines.append(f"    - {limitation}")
+
+        # Next stage input section
+        lines.extend(["", "  next_stage_input:"])
+        next_input = observation.next_stage_input
+        suitable = next_input.get("suitable_for_clustering", True)
+        lines.append(f"    suitable_for_clustering: {suitable}")
+        if "suggested_cluster_key" in next_input:
+            lines.append(
+                f"    suggested_cluster_key: {next_input['suggested_cluster_key']}"
+            )
+        requires_review = next_input.get("requires_human_review", True)
+        lines.append(f"    requires_human_review: {requires_review}")
+
+        # Source watermark (for internal deduplication)
+        lines.extend(["", f"  source_watermark: {observation.source_watermark}"])
 
         return "\n".join(lines) + "\n"
 

@@ -46,10 +46,9 @@ class AuditObservation(BaseModel):
     Aligns with audit-observation.md YAML schema and provides:
     - Unique observation ID
     - Source window with traceable references
-    - Symptom and failure pattern classification
-    - Evidence summary with confidence level
+    - Symptom and failure mode classification
+    - Facts, interpretation, and next-stage input
     - Source watermark for deduplication
-    - Raw refs for additional context
     """
 
     observation_id: str = Field(
@@ -58,20 +57,27 @@ class AuditObservation(BaseModel):
     observation_type: str = Field(
         description="Type of observation, e.g., 'flow_failure', 'memory_signal'"
     )
+    source_material: str = Field(
+        default="supervisor/governance/audit-observation.md",
+        description="Source governance material for this observation",
+    )
     source_window: ObservationSourceWindow = Field(
         description="Source references for traceability"
     )
-    symptom: str = Field(description="Failure pattern description")
-    failure_pattern: str | None = Field(
-        default=None, description="Classified failure pattern"
+    flow_status: str = Field(
+        default="unknown",
+        description="Flow status: blocked | failed | aborted | done | unknown",
     )
-    affected_layer: ObservationLayer = Field(
-        description="Which layer in the system is affected"
-    )
-    evidence_summary: str = Field(description="Summary of supporting evidence")
-    sample_count: int = Field(
-        default=1, description="Number of samples in this observation"
-    )
+    symptom: str = Field(description="What happened, stated briefly")
+    observed_failure_mode: Literal[
+        "scope_mismatch",
+        "missing_output",
+        "state_loop",
+        "contract_missing",
+        "ci_failure",
+        "review_gap",
+        "unknown",
+    ] = Field(description="Classified failure mode per governance taxonomy")
     confidence: Literal["high", "medium", "low"] = Field(
         description="Confidence level based on evidence strength"
     )
@@ -84,14 +90,33 @@ class AuditObservation(BaseModel):
         description="Deduplication key: hash of (branch, event_timestamps, "
         "prompt_hash, pr_number)"
     )
-    raw_refs: dict[str, Any] = Field(
+    facts: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="List of source-backed facts with kind, ref, summary",
+    )
+    interpretation: dict[str, Any] = Field(
         default_factory=dict,
-        description="Additional raw references, e.g., {'flow': <branch>, "
-        "'handoff': <@key>}",
+        description="Interpretation: reasoning, likely_agent_failure, "
+        "affected_material_candidates, affected_layer",
     )
     limitations: list[str] = Field(
         default_factory=list,
         description="Missing data, stale source, or other limitations",
+    )
+    next_stage_input: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "suitable_for_clustering": True,
+            "requires_human_review": True,
+        },
+        description="Input for next stage: suitable_for_clustering, "
+        "suggested_cluster_key, requires_human_review",
+    )
+    sample_count: int = Field(
+        default=1, description="Number of samples in this observation"
+    )
+    raw_refs: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional raw references for internal use",
     )
 
     @staticmethod
@@ -134,14 +159,24 @@ class AuditObservation(BaseModel):
         observation_type: str,
         source_window: ObservationSourceWindow,
         symptom: str,
-        affected_layer: ObservationLayer,
-        evidence_summary: str,
+        observed_failure_mode: Literal[
+            "scope_mismatch",
+            "missing_output",
+            "state_loop",
+            "contract_missing",
+            "ci_failure",
+            "review_gap",
+            "unknown",
+        ],
         confidence: Literal["high", "medium", "low"],
         created_by: str,
-        failure_pattern: str | None = None,
+        flow_status: str = "unknown",
+        facts: list[dict[str, str]] | None = None,
+        interpretation: dict[str, Any] | None = None,
+        limitations: list[str] | None = None,
+        next_stage_input: dict[str, Any] | None = None,
         sample_count: int = 1,
         raw_refs: dict[str, Any] | None = None,
-        limitations: list[str] | None = None,
         updated_at: str | None = None,
         prompt_hash: str | None = None,
     ) -> AuditObservation:
@@ -159,19 +194,34 @@ class AuditObservation(BaseModel):
         # Compute observation ID
         observation_id = cls.compute_observation_id(created_at, source_watermark)
 
+        # Default interpretation structure
+        default_interpretation = {
+            "reasoning": "",
+            "likely_agent_failure": "",
+            "affected_material_candidates": [],
+        }
+
+        # Default next_stage_input structure
+        default_next_stage = {
+            "suitable_for_clustering": True,
+            "requires_human_review": True,
+        }
+
         return cls(
             observation_id=observation_id,
             observation_type=observation_type,
             source_window=source_window,
+            flow_status=flow_status,
             symptom=symptom,
-            failure_pattern=failure_pattern,
-            affected_layer=affected_layer,
-            evidence_summary=evidence_summary,
-            sample_count=sample_count,
+            observed_failure_mode=observed_failure_mode,
             confidence=confidence,
             created_by=created_by,
             created_at=created_at,
             source_watermark=source_watermark,
-            raw_refs=raw_refs or {},
+            facts=facts or [],
+            interpretation=interpretation or default_interpretation,
             limitations=limitations or [],
+            next_stage_input=next_stage_input or default_next_stage,
+            sample_count=sample_count,
+            raw_refs=raw_refs or {},
         )

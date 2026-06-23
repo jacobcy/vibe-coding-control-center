@@ -138,7 +138,7 @@ def observe(
         typer.echo(f"Type: {obs.observation_type}")
         typer.echo(f"Branch: {obs.source_window.branch}")
         typer.echo(f"Symptom: {obs.symptom}")
-        typer.echo(f"Layer: {obs.affected_layer.value}")
+        typer.echo(f"Failure Mode: {obs.observed_failure_mode}")
         typer.echo(f"Confidence: {obs.confidence}")
         typer.echo(f"Watermark: {obs.source_watermark}")
         typer.echo()
