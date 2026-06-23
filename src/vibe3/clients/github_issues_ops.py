@@ -4,7 +4,7 @@ import difflib
 import json
 import os
 import re
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from loguru import logger
 
@@ -19,6 +19,10 @@ from vibe3.clients.github_field_constants import (
     GITHUB_PR_LIST_MERGED_FIELDS,
 )
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
+
+# Error recorder callback type for dependency injection
+# Avoids direct import from services layer (modularity constraint)
+ErrorRecorderCallback = Callable[..., tuple[bool, int]]
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -129,11 +133,20 @@ def parse_linked_issues(body: str) -> list[int]:
 class IssuesMixin(IssueAdminMixin):
     """Mixin for issues-related operations."""
 
-    def list_merged_prs(self: Any, limit: int | None = 100) -> list[dict[str, Any]]:
+    def list_merged_prs(
+        self: Any,
+        limit: int | None = 100,
+        *,
+        error_recorder: ErrorRecorderCallback | None = None,
+    ) -> list[dict[str, Any]]:
         """List merged PRs with branch name and body.
 
         Args:
             limit: Maximum number of PRs to fetch. If None, fetch up to 5000 results.
+            error_recorder: Optional callback to persist API errors. If provided,
+                called on GitHub API failures with error_code and error_message.
+                This parameter enables dependency injection to avoid services/
+                import in clients/ layer.
 
         Returns:
             List of dicts with keys: number, headRefName, body, mergedAt
@@ -167,6 +180,17 @@ class IssuesMixin(IssueAdminMixin):
         result = self._run_gh_command(cmd)
         if result is None or result.returncode != 0:
             if result is not None:
+                if error_recorder is not None:
+                    try:
+                        error_recorder(
+                            error_code="E_API_UNKNOWN",
+                            error_message=f"Failed to list merged PRs: {result.stderr}",
+                        )
+                    except Exception as record_exc:
+                        logger.bind(
+                            external="github",
+                            error=str(record_exc),
+                        ).warning("Failed to record GitHub API error")
                 logger.bind(external="github", error=result.stderr).error(
                     "Failed to list merged PRs"
                 )
@@ -182,6 +206,8 @@ class IssuesMixin(IssueAdminMixin):
         label: str | None = None,
         search: str | None = None,
         fields: list[str] | None = None,
+        *,
+        error_recorder: ErrorRecorderCallback | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -195,6 +221,10 @@ class IssuesMixin(IssueAdminMixin):
             search: Server-side GitHub issue search query.
             fields: List of fields to fetch. If None, defaults to a set that
                 excludes the expensive ``body`` field.
+            error_recorder: Optional callback to persist API errors. If provided,
+                called on GitHub API failures with error_code and error_message.
+                This parameter enables dependency injection to avoid services/
+                import in clients/ layer.
         """
         logger.bind(
             external="github",
@@ -233,6 +263,17 @@ class IssuesMixin(IssueAdminMixin):
         result = self._run_gh_command(cmd)  # type: ignore[attr-defined]
         if result is None or result.returncode != 0:
             if result is not None:
+                if error_recorder is not None:
+                    try:
+                        error_recorder(
+                            error_code="E_API_UNKNOWN",
+                            error_message=f"Failed to list issues: {result.stderr}",
+                        )
+                    except Exception as record_exc:
+                        logger.bind(
+                            external="github",
+                            error=str(record_exc),
+                        ).warning("Failed to record GitHub API error")
                 logger.bind(external="github", error=result.stderr).error(
                     "Failed to list issues"
                 )
