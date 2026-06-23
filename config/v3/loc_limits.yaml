@@ -156,8 +156,8 @@ code_limits:
         limit: 650
         reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑；新增 quiet 模式、颜色高亮输出，以及 flow-record 安全闸（active/blocked 分支保护 + _get_active_flow_branches，替代 merge 状态作为删除依据，issue #2033）后略微超标"
       - path: "src/vibe3/services/flow/cleanup.py"
-        limit: 470
-        reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤；Issue #3107 新增 _is_cleanup_commit() 和 _has_meaningful_commits() 辅助方法用于检测 cleanup-only 分支（+45 行），防止 init commit 被推送到远程分支"
+        limit: 490
+        reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤；Issue #3107 新增 _is_cleanup_commit() 和 _has_meaningful_commits() 辅助方法用于检测 cleanup-only 分支（+45 行），防止 init commit 被推送到远程分支；PR #3127 新增设计决策文档注释说明 origin/main 假设和 cleanup 模式限制（+16 行）"
       - path: "src/vibe3/services/flow/blocked_state_service.py"
         limit: 450
         reason: "Blocked state 统一管理服务，协调 issue body/database/labels 三个数据源的状态一致性；包含 block_state_only、unblock_state_only、block_flow 等核心方法，以及 consistency checking 和 repair 逻辑；Issue #2839 新增 block_flow 方法支持 FlowBlocked domain event projection（+30 行）"
