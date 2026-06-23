@@ -40,7 +40,7 @@ class AuditObservation(BaseModel):
         description="Type: flow_blocked | execution_crashed | memory_signal | ..."
     )
     source_material: str = Field(
-        default=".vibe/governance/audit-observation.md",
+        default="supervisor/governance/audit-observation.md",
         description="Source governance material for this observation",
     )
 

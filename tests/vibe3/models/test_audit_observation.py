@@ -325,4 +325,6 @@ class TestAuditObservation:
         )
 
         # Should have default source material
-        assert observation.source_material == ".vibe/governance/audit-observation.md"
+        assert (
+            observation.source_material == "supervisor/governance/audit-observation.md"
+        )
