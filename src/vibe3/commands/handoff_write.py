@@ -55,8 +55,15 @@ def init(
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
+    _quiet: bool = False,  # Internal use: suppress output
 ) -> None:
-    """Initialize handoff file for a branch."""
+    """Initialize handoff file with issue context for a branch.
+
+    Fetches issue comments via TaskShowService and populates handoff with context.
+    Called by:
+    - vibe3 internal bootstrap (auto)
+    - vibe3 handoff init (manual)
+    """
     if trace:
         enable_method_trace()
 
@@ -71,7 +78,60 @@ def init(
         force=force, branch=target_branch
     )
 
-    console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
+    # Populate with issue context if branch has bound issue
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+    from vibe3.services.flow import FlowService
+    from vibe3.services.issue import IssueFlowService
+    from vibe3.services.task import TaskShowService
+
+    store = SQLiteClient()
+    git = GitClient()
+    github = GitHubClient()
+    flow_service = FlowService()
+    issue_flow_service = IssueFlowService(store=store)
+
+    # Resolve issue number from branch
+    issue_number = issue_flow_service.resolve_task_issue_number(target_branch)
+
+    if issue_number:
+        try:
+            task_show = TaskShowService(
+                store=store,
+                flow_service=flow_service,
+                github_client=github,
+                git_client=git,
+            )
+
+            issue_data = task_show.fetch_issue_with_comments(issue_number)
+            if isinstance(issue_data, dict):
+                comments_raw = issue_data.get("comments", [])
+                comments = comments_raw if isinstance(comments_raw, list) else []
+
+                if comments:
+                    latest_comment = task_show._build_comment_summary(
+                        comments[-1], full_body=True
+                    )
+                    if latest_comment:
+                        context = (
+                            f"Issue #{issue_number}: {issue_data.get('title', 'N/A')}\n"
+                            f"State: {issue_data.get('state', 'N/A')}\n\n"
+                            f"Latest comment by {latest_comment.author}:\n"
+                            f"{latest_comment.body}"
+                        )
+                        service.append_current_handoff(
+                            message=context,
+                            actor="init",
+                            kind="context",
+                            branch=target_branch,
+                        )
+        except Exception as e:
+            # Non-critical failure: log and continue
+            logger.bind(
+                command="handoff init", issue=issue_number, branch=target_branch
+            ).warning(f"Failed to fetch issue context: {e}")
+
+    if not _quiet:
+        console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 
 
 def append(

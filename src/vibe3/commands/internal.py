@@ -281,40 +281,13 @@ def internal_bootstrap(
         blocked_reason=blocked_reason,
     )
 
-    # Initialize handoff with issue context (reuse TaskShowService)
-    from vibe3.services.flow import FlowService
-    from vibe3.services.handoff import HandoffStorage
-    from vibe3.services.task import TaskShowService
+    # Initialize handoff with issue context (delegates to handoff init)
+    from vibe3.commands.handoff_write import init as handoff_init
 
-    flow_service = FlowService()
-    task_show = TaskShowService(
-        store=store,
-        flow_service=flow_service,
-        github_client=github,
-        git_client=git,
-    )
-
-    issue_data = task_show.fetch_issue_with_comments(issue)
-    if isinstance(issue_data, dict):
-        comments_raw = issue_data.get("comments", [])
-        comments = comments_raw if isinstance(comments_raw, list) else []
-
-        if comments:
-            latest_comment = task_show._build_comment_summary(
-                comments[-1], full_body=True
-            )
-            if latest_comment:
-                context = (
-                    f"Issue #{issue}: {issue_data.get('title', 'N/A')}\n"
-                    f"State: {issue_data.get('state', 'N/A')}\n\n"
-                    f"Latest comment by {latest_comment.author}:\n"
-                    f"{latest_comment.body}"
-                )
-                HandoffStorage(git_client=git).append_current_handoff(
-                    message=context,
-                    actor="bootstrap",
-                    kind="context",
-                    branch=branch,
-                )
+    try:
+        handoff_init(force=False, branch=branch, trace=False, _quiet=True)
+    except Exception as e:
+        # Non-critical failure: log and continue
+        logger.warning(f"Failed to initialize handoff: {e}")
 
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))
