@@ -458,3 +458,121 @@ def test_list_issues_default_fields_backward_compat(
         assert "labels" in issues[0]
         assert "assignees" in issues[0]
         assert "milestone" in issues[0]
+
+
+# Tests for error classification and error_recorder callback
+
+
+def test_classify_github_api_error_rate_limit() -> None:
+    """Should classify rate limit errors correctly."""
+    from vibe3.clients.github_issues_ops import _classify_github_api_error
+
+    assert _classify_github_api_error("rate limit exceeded", 1) == "E_API_RATE_LIMIT"
+    assert _classify_github_api_error("API rate_limit hit", 1) == "E_API_RATE_LIMIT"
+
+
+def test_classify_github_api_error_timeout() -> None:
+    """Should classify timeout errors correctly."""
+    from vibe3.clients.github_issues_ops import _classify_github_api_error
+
+    assert _classify_github_api_error("connection timeout", 1) == "E_API_TIMEOUT"
+    assert _classify_github_api_error("request timed out", 1) == "E_API_TIMEOUT"
+
+
+def test_classify_github_api_error_unavailable() -> None:
+    """Should classify service unavailable errors correctly."""
+    from vibe3.clients.github_issues_ops import _classify_github_api_error
+
+    assert _classify_github_api_error("service unavailable", 1) == "E_API_UNAVAILABLE"
+    assert (
+        _classify_github_api_error("GitHub API unavailable", 1) == "E_API_UNAVAILABLE"
+    )
+
+
+def test_classify_github_api_error_network() -> None:
+    """Should classify network errors correctly."""
+    from vibe3.clients.github_issues_ops import _classify_github_api_error
+
+    assert _classify_github_api_error("connection refused", 1) == "E_API_NETWORK"
+    assert _classify_github_api_error("DNS resolution failed", 1) == "E_API_NETWORK"
+    assert _classify_github_api_error("network error", 1) == "E_API_NETWORK"
+
+
+def test_classify_github_api_error_unknown() -> None:
+    """Should fallback to E_API_UNKNOWN for unclassified errors."""
+    from vibe3.clients.github_issues_ops import _classify_github_api_error
+
+    assert _classify_github_api_error("random error", 1) == "E_API_UNKNOWN"
+    assert _classify_github_api_error("", 1) == "E_API_UNKNOWN"
+
+
+def test_list_merged_prs_calls_error_recorder_on_failure(
+    github_client: GitHubClient,
+) -> None:
+    """Should call error_recorder callback when API fails."""
+    from unittest.mock import Mock
+
+    mock_recorder = Mock(return_value=(False, 1))
+
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="rate limit exceeded")
+
+        result = github_client.list_merged_prs(error_recorder=mock_recorder)
+
+        assert result == []
+        assert mock_recorder.called
+        call_kwargs = mock_recorder.call_args[1]
+        assert call_kwargs["error_code"] == "E_API_RATE_LIMIT"
+        assert "Failed to list merged PRs" in call_kwargs["error_message"]
+
+
+def test_list_issues_calls_error_recorder_on_failure(
+    github_client: GitHubClient,
+) -> None:
+    """Should call error_recorder callback when API fails."""
+    from unittest.mock import Mock
+
+    mock_recorder = Mock(return_value=(False, 1))
+
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="connection timeout")
+
+        result = github_client.list_issues(error_recorder=mock_recorder)
+
+        assert result == []
+        assert mock_recorder.called
+        call_kwargs = mock_recorder.call_args[1]
+        assert call_kwargs["error_code"] == "E_API_TIMEOUT"
+        assert "Failed to list issues" in call_kwargs["error_message"]
+
+
+def test_error_recorder_not_called_on_success(github_client: GitHubClient) -> None:
+    """Should not call error_recorder when API succeeds."""
+    from unittest.mock import Mock
+
+    mock_recorder = Mock(return_value=(False, 1))
+
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout=json.dumps([{"number": 1, "title": "Test"}])
+        )
+
+        github_client.list_issues(error_recorder=mock_recorder)
+
+        assert not mock_recorder.called
+
+
+def test_error_recorder_exception_suppressed(github_client: GitHubClient) -> None:
+    """Should suppress exceptions from error_recorder callback."""
+    from unittest.mock import Mock
+
+    mock_recorder = Mock(side_effect=RuntimeError("DB connection failed"))
+
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="API error")
+
+        # Should not raise, just log warning
+        result = github_client.list_issues(error_recorder=mock_recorder)
+
+        assert result == []
+        assert mock_recorder.called

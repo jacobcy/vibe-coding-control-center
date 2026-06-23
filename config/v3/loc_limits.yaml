@@ -59,8 +59,8 @@ code_limits:
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
       - path: "src/vibe3/clients/github_issues_ops.py"
-        limit: 450
-        reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议"
+        limit: 510
+        reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
         limit: 600
         reason: |
@@ -320,8 +320,8 @@ code_limits:
         limit: 550
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标；#3026 加强断言参数验证后略微超标"
       - path: "tests/vibe3/clients/test_github_client_issues.py"
-        limit: 465
-        reason: "GitHub client Issues 测试集，覆盖 24 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments 等），共享 mock setup 和 GitHub client fixture，拆分收益低；#3026 加强断言参数验证后略微超标"
+        limit: 585
+        reason: "GitHub client Issues 测试集，覆盖 33 个紧密耦合场景（list issues with assignees、close issue、remove/add assignees、add comment、view issue with custom/default fields、create issue with labels/assignees、list issue comments、错误分类、error_recorder 回调等），共享 mock setup 和 GitHub client fixture，拆分收益低；#3026 加强断言参数验证后略微超标；PR #3113 新增错误分类测试（5个）和 error_recorder 回调测试（4个），+135 行"
       - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
