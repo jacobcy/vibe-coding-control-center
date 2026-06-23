@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from vibe3.clients.protocols.role import TriggerableRoleDefinitionProtocol
     from vibe3.clients.recent_pr_cache import RecentPRCache
     from vibe3.clients.runtime_assets import (
+        bundled_project_root,
         check_runtime_asset,
         resolve_prompt_config,
         resolve_runtime_asset,
@@ -89,6 +90,7 @@ _LAZY_IMPORTS = {
     "SyncRule": "vibe3.clients.sync_rules",
     "SyncRulesConfig": "vibe3.clients.sync_rules",
     "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols.role",
+    "bundled_project_root": "vibe3.clients.runtime_assets",
     "check_runtime_asset": "vibe3.clients.runtime_assets",
     "collect_label_anomalies": "vibe3.clients.label_utils",
     "count_references": "vibe3.clients.serena_client",
@@ -157,6 +159,7 @@ __all__ = [
     "SyncRule",
     "SyncRulesConfig",
     "TriggerableRoleDefinitionProtocol",
+    "bundled_project_root",
     "check_runtime_asset",
     "collect_label_anomalies",
     "count_references",

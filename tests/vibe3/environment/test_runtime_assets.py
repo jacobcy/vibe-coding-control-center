@@ -222,3 +222,74 @@ def test_resolve_vibe_project_graceful_missing(monkeypatch, tmp_path: Path) -> N
     assert resolved == expected
     # But the file should not exist
     assert not resolved.exists()
+
+
+def test_resolve_vibe_namespace_in_worktree(monkeypatch, tmp_path: Path) -> None:
+    """Verify namespace="vibe" resolves to bundled project root when in worktree.
+
+    This tests the core fix: @vibe/<path> should resolve using module path
+    (bundled_project_root), not cwd, making it robust from subdirectories.
+    """
+    from vibe3.clients.runtime_assets import bundled_project_root
+
+    # Get the actual bundled project root (this test runs within vibe3)
+    bundled_root = bundled_project_root()
+
+    # Change to a subdirectory within the project
+    subdir = bundled_root / "src" / "vibe3"
+    monkeypatch.chdir(subdir)
+
+    # Resolve a vibe namespace asset
+    resolved = resolve_runtime_asset("supervisor/policies/run.md", namespace="vibe")
+
+    # Should resolve to bundled root
+    expected = bundled_root / "supervisor/policies/run.md"
+    assert resolved == expected
+
+
+def test_resolve_vibe_namespace_from_subdirectory(monkeypatch, tmp_path: Path) -> None:
+    """Verify namespace="vibe" works from a subdirectory (core bug fix).
+
+    This is the key scenario: @vibe/<path> resolution should work from any
+    subdirectory, not just from the project root. The fix delegates to
+    bundled_project_root() which uses module __file__ resolution.
+    """
+    from vibe3.clients.runtime_assets import bundled_project_root
+
+    bundled_root = bundled_project_root()
+
+    # Create a deeply nested subdirectory
+    deep_subdir = bundled_root / "src" / "vibe3" / "services" / "handoff"
+    monkeypatch.chdir(deep_subdir)
+
+    # Resolve a vibe namespace asset
+    resolved = resolve_runtime_asset("supervisor/policies/run.md", namespace="vibe")
+
+    # Should still resolve to bundled root
+    expected = bundled_root / "supervisor/policies/run.md"
+    assert resolved == expected
+
+
+def test_resolve_vibe_namespace_external_project(monkeypatch, tmp_path: Path) -> None:
+    """Verify namespace="vibe" falls back to global ~/.vibe from external project.
+
+    When running from a non-vibe-center project, should fall back to the
+    global distribution at ~/.vibe.
+    """
+    # Create an external project directory
+    external_project = tmp_path / "external-project"
+    external_project.mkdir()
+    monkeypatch.chdir(external_project)
+
+    # Set up a global distribution
+    global_root = tmp_path / "global-vibe"
+    global_file = global_root / "supervisor/policies/run.md"
+    global_file.parent.mkdir(parents=True)
+    global_file.write_text("global policy", encoding="utf-8")
+    monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(global_root))
+
+    # Resolve a vibe namespace asset
+    resolved = resolve_runtime_asset("supervisor/policies/run.md", namespace="vibe")
+
+    # Should fall back to global distribution
+    assert resolved == global_file

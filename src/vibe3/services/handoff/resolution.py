@@ -20,7 +20,6 @@ Four namespaces are supported:
 """
 
 import re
-import tomllib
 from pathlib import Path
 
 from vibe3.services.shared.paths import (
@@ -113,68 +112,6 @@ def _verify_handoff_dir_boundary(handoff_dir: Path, git_common: str) -> None:
         )
 
 
-def _find_vibe_installation_root(vibe_dir: str | None = None) -> Path:
-    """Find vibe3 installation root directory.
-
-    Priority:
-    1. Explicit vibe_dir parameter
-    2. Current repo's pyproject.toml if name is vibe3/vibe-center/
-       vibe-coding-control-center
-    3. ~/.vibe (global installation)
-
-    Args:
-        vibe_dir: Optional explicit vibe3 installation path
-
-    Returns:
-        Path to vibe3 installation root
-
-    Raises:
-        FileNotFoundError: If vibe3 installation cannot be found
-    """
-    # Priority 1: Explicit vibe_dir parameter
-    if vibe_dir:
-        vibe_path = Path(vibe_dir)
-        if not vibe_path.exists():
-            raise FileNotFoundError(
-                f"Specified vibe_dir does not exist: {vibe_dir}\n\n"
-                "The --vibe-dir path must point to an existing vibe3 installation."
-            )
-        return vibe_path
-
-    # Priority 2: Check if current repo is vibe3
-    cwd = Path.cwd()
-    pyproject_path = cwd / "pyproject.toml"
-    if pyproject_path.exists():
-        try:
-            with open(pyproject_path, "rb") as f:
-                pyproject = tomllib.load(f)
-                project_name = pyproject.get("project", {}).get("name", "")
-                if project_name in (
-                    "vibe3",
-                    "vibe-center",
-                    "vibe-coding-control-center",
-                ):
-                    return cwd
-        except Exception:
-            # Silently ignore parse errors and continue fallback chain
-            pass
-
-    # Priority 3: ~/.vibe global installation
-    global_vibe = Path.home() / ".vibe"
-    if global_vibe.exists():
-        return global_vibe
-
-    raise FileNotFoundError(
-        "Cannot find vibe3 installation directory.\n\n"
-        "vibe3 installation not found in any of:\n"
-        "  1. --vibe-dir parameter (not specified)\n"
-        "  2. Current repository (not a vibe3 project)\n"
-        "  3. ~/.vibe global installation (does not exist)\n\n"
-        "Specify installation: vibe3 handoff show @vibe/<path> --vibe-dir <path>\n"
-        "Or run from within vibe3 repository"
-    )
-
-
 def _resolve_vibe_material(
     target: str,
     vibe_dir: str | None = None,
@@ -196,17 +133,65 @@ def _resolve_vibe_material(
     material_path = target[6:]  # len("@vibe/") == 6
     _validate_vibe_path(material_path)
 
-    vibe_root = _find_vibe_installation_root(vibe_dir)
-    resolved = (vibe_root / material_path).resolve()
-    vibe_root_resolved = vibe_root.resolve()
+    # Priority 1: Explicit vibe_dir parameter
+    if vibe_dir:
+        vibe_path = Path(vibe_dir)
+        if not vibe_path.exists():
+            raise FileNotFoundError(
+                f"Specified vibe_dir does not exist: {vibe_dir}\n\n"
+                "The --vibe-dir path must point to an existing vibe3 installation."
+            )
+        resolved = (vibe_path / material_path).resolve()
+        vibe_path_resolved = vibe_path.resolve()
 
-    # Boundary check: ensure resolved path stays within vibe root
+        # Boundary check: ensure resolved path stays within vibe root
+        try:
+            resolved.relative_to(vibe_path_resolved)
+        except ValueError:
+            raise ValueError(
+                f"Security violation: resolved path escapes vibe root: {resolved}"
+            )
+
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Material not found: {target}\n\n"
+                f"File does not exist: {resolved}\n"
+                "Check the path or view available materials in the vibe3 installation."
+            )
+        if not resolved.is_file():
+            raise FileNotFoundError(
+                f"Not a file: {target}\n\n"
+                f"Path points to a directory: {resolved}\n"
+                "Materials must be files, not directories."
+            )
+
+        return resolved
+
+    # Priorities 2 & 3: Auto-detection via unified resolver
+    # Inline import to avoid circular dependency with clients module
+    from vibe3.clients import (
+        bundled_project_root,
+        resolve_runtime_asset,
+        runtime_assets_root,
+    )
+
+    resolved = resolve_runtime_asset(material_path, namespace="vibe")
+
+    # Defense-in-depth: verify resolved path stays within allowed roots
+    # (Already guaranteed by resolve_runtime_asset construction + _validate_vibe_path)
+    bundled_root = bundled_project_root().resolve()
+    global_root = runtime_assets_root().resolve()
+    resolved_normalized = resolved.resolve()
+
     try:
-        resolved.relative_to(vibe_root_resolved)
+        resolved_normalized.relative_to(bundled_root)
     except ValueError:
-        raise ValueError(
-            f"Security violation: resolved path escapes vibe root: {resolved}"
-        )
+        try:
+            resolved_normalized.relative_to(global_root)
+        except ValueError:
+            raise ValueError(
+                f"Security violation: resolved path escapes vibe roots: {resolved}"
+            )
 
     if not resolved.exists():
         raise FileNotFoundError(

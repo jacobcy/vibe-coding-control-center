@@ -52,7 +52,7 @@ def runtime_assets_root() -> Path:
     return Path.home() / ".vibe"
 
 
-def resolve_runtime_asset(path: str | Path) -> Path:
+def resolve_runtime_asset(path: str | Path, namespace: str = "default") -> Path:
     """Resolve a standard Vibe runtime asset path.
 
     Relative paths under ``supervisor/``, ``config/prompts/``, ``skills/``,
@@ -64,12 +64,36 @@ def resolve_runtime_asset(path: str | Path) -> Path:
     Relative paths under ``.vibe/`` are project-scope assets anchored to the
     git working tree root (``git rev-parse --show-toplevel``), ensuring correct
     resolution from both repo root and subdirectories.
+
+    Namespaces:
+        ``"default"``: Existing behavior for supervisor/config/skills/.agent paths.
+        ``"vibe"``: Resolves ``@vibe/<path>`` aliases — any relative path is
+            resolved against the bundled project root first, then falls back
+            to the global distribution. Skips prefix-based gating.
     """
     candidate = Path(path).expanduser()
     if candidate.is_absolute():
         return candidate
 
     relative = Path(candidate)
+
+    # Handle "vibe" namespace: @vibe/<path> alias resolution
+    if namespace == "vibe":
+        bundled_path = bundled_project_root() / relative
+        try:
+            Path.cwd().resolve().relative_to(bundled_project_root())
+            if bundled_path.exists():
+                return bundled_path
+        except ValueError:
+            pass
+
+        global_path = runtime_assets_root() / relative
+        if global_path.exists():
+            return global_path
+
+        return bundled_path
+
+    # Default namespace: prefix-based gating for supervisor/config/skills/.agent/.vibe
     if relative.parts[:1] in {
         ("supervisor",),
         ("config",),
