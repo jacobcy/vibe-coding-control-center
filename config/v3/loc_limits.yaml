@@ -106,6 +106,9 @@ code_limits:
       - path: "src/vibe3/commands/scan.py"
         limit: 450
         reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines)"
+      - path: "src/vibe3/commands/handoff_write.py"
+        limit: 450
+        reason: "Handoff write commands aggregation, covering init/append/plan/report/indicate/audit/next_step/verdict operations; Issue #3119 enhanced init with issue comment fetching via TaskShowService (+60 lines) to populate handoff with context from bound issue; init is called by bootstrap for auto-initialization"
 
       # Models 层 —— 允许 410
       - path: "src/vibe3/models/flow.py"
