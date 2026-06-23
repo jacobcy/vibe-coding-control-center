@@ -168,6 +168,7 @@ def _resolve_vibe_material(
         return resolved
 
     # Priorities 2 & 3: Auto-detection via unified resolver
+    # Inline import to avoid circular dependency with clients module
     from vibe3.clients import (
         bundled_project_root,
         resolve_runtime_asset,
@@ -176,7 +177,8 @@ def _resolve_vibe_material(
 
     resolved = resolve_runtime_asset(material_path, namespace="vibe")
 
-    # Boundary check: ensure resolved path stays within allowed roots
+    # Defense-in-depth: verify resolved path stays within allowed roots
+    # (Already guaranteed by resolve_runtime_asset construction + _validate_vibe_path)
     bundled_root = bundled_project_root().resolve()
     global_root = runtime_assets_root().resolve()
     resolved_normalized = resolved.resolve()

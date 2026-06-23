@@ -236,6 +236,14 @@ def test_resolve_vibe_material_fallback_global(tmp_path: Path) -> None:
             assert result == material_file
 
 
+def test_resolve_vibe_material_path_traversal_blocked() -> None:
+    """Verify @vibe/<path> rejects path traversal attempts."""
+    # Attempt to escape the vibe root using path traversal
+    # This should be rejected by _validate_vibe_path() before any file operations
+    with pytest.raises(ValueError, match="path traversal"):
+        resolve_handoff_target("@vibe/../../../etc/passwd")
+
+
 def test_resolve_vibe_material_not_found(tmp_path: Path) -> None:
     """@vibe/<path> raises FileNotFoundError when file does not exist."""
     vibe_root = tmp_path / "vibe3-install"
