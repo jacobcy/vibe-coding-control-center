@@ -113,6 +113,10 @@ class AuditObservation(BaseModel):
         - last updated timestamp
         - PR number (if any)
         - prompt hash (if any)
+
+        Note: Empty or None branch produces fixed watermark (SHA256 of "").
+        Observations without branch context should provide updated_at,
+        pr_number, or prompt_hash to ensure uniqueness.
         """
         components = [branch]
         if updated_at:

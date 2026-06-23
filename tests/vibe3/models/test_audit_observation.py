@@ -118,6 +118,21 @@ class TestAuditObservation:
         # Clean timestamp removes :, -, . (but keeps T)
         assert "20240101T000000000000" in obs_id
 
+    def test_observation_id_with_timezone(self) -> None:
+        """Test observation ID handles timezone-aware timestamps."""
+        obs_id = AuditObservation.compute_observation_id(
+            timestamp="2026-06-23T06:35:41.396760+00:00",
+            watermark="abc123def4567890",
+        )
+
+        assert obs_id.startswith("obs-")
+        # Timezone offset (+) is preserved in cleaned timestamp
+        assert "+" in obs_id
+        # Verify format: obs-<clean-timestamp>-<8-char-hash>
+        import re
+
+        assert re.match(r"^obs-[\w+-]+-[a-f0-9]{8}$", obs_id)
+
     def test_create_factory_method(self) -> None:
         """Test AuditObservation.create() factory method."""
         source_window = ObservationSourceWindow(
