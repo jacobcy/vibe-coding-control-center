@@ -1,9 +1,0 @@
-# Vibe Center repo's own profile configuration
-# This file makes the current repo an explicit adapter consumer
-# instead of relying on implicit "because it's in this repo" assumptions.
-
-profile: vibe-center
-
-# Adapter selection
-# Explicitly declare we're using the vibe-center adapter
-adapter: vibe-center

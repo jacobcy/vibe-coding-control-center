@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "orchestra": {
-      "command": "uv",
-      "args": ["run", "vibe3", "mcp", "run"]
-    }
-  }
-}
