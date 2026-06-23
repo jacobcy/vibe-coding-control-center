@@ -104,8 +104,8 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
       - path: "src/vibe3/commands/scan.py"
-        limit: 420
-        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines)"
+        limit: 450
+        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines)"
 
       # Models 层 —— 允许 410
       - path: "src/vibe3/models/flow.py"
