@@ -280,4 +280,14 @@ def internal_bootstrap(
         dependency_issue_numbers=tuple(dependency_issue_numbers or ()),
         blocked_reason=blocked_reason,
     )
+
+    # Initialize handoff with issue context (delegates to handoff init)
+    from vibe3.commands.handoff_write import init as handoff_init
+
+    try:
+        handoff_init(force=False, branch=branch, trace=False, _quiet=True)
+    except Exception as e:
+        # Non-critical failure: log and continue
+        logger.warning(f"Failed to initialize handoff: {e}")
+
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))
