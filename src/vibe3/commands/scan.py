@@ -200,7 +200,9 @@ def _run_supervisor_scan() -> tuple[int, int]:
 def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
     """Execute supervisor scan in dry-run mode, displaying scan plan.
 
-    Shows scan process without actual execution.
+    Shows scan process without actual execution. Follows the same architectural
+    pattern as governance dry-run: uses CodeagentBackend for Prompt Composition
+    display, then shows candidate information.
 
     Args:
         show_prompt: If True, build and display prompts for candidate issues
@@ -218,51 +220,46 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
     console = Console()
     config = load_orchestra_config()
 
-    # Fetch candidates via service layer
+    # Build sample prompt for Prompt Composition display
+    # (architectural alignment with governance)
+    try:
+        sample_prompt, options, _ = build_supervisor_handoff_payload(
+            config, 999999, "Sample Issue", annotate_sections=show_prompt
+        )
+        from vibe3.agents import CodeagentBackend
+
+        # Show Prompt Composition via CodeagentBackend (same pattern as governance)
+        CodeagentBackend().run(
+            prompt=sample_prompt,
+            options=options,
+            task="supervisor scan",
+            dry_run=True,
+            show_prompt=show_prompt,
+            role="supervisor",
+            dry_run_summary={
+                "prompt_mode": "handoff",
+                "sections": ["supervisor.handoff"],
+                "refs": {"role": "supervisor"},
+            },
+        )
+    except Exception as e:
+        console.print(f"[yellow]Could not build prompt preview: {e}[/yellow]")
+
+    # Fetch and display candidates via service layer
     try:
         github = GitHubClient()
         total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     except Exception as e:
-        # On error, display empty list
         console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
         total_scanned = 0
         candidates = []
 
-    # Always show Prompt Composition summary (similar to governance)
-    if not show_prompt:
-        # Build sample prompt to show structure
-        try:
-            sample_prompt, _, _ = build_supervisor_handoff_payload(
-                config, 999999, "Sample Issue", annotate_sections=False
-            )
-            from vibe3.agents import CodeagentBackend
-            from vibe3.execution import ExecutionRolePolicyService
-
-            options = ExecutionRolePolicyService(
-                config
-            ).resolve_effective_agent_options("supervisor")
-
-            # Show structure via CodeagentBackend dry-run display
-            CodeagentBackend().run(
-                prompt=sample_prompt,
-                options=options,
-                task="supervisor scan",
-                dry_run=True,
-                show_prompt=False,
-                role="supervisor",
-                dry_run_summary={
-                    "prompt_mode": "handoff",
-                    "sections": ["supervisor.handoff"],
-                    "refs": {"role": "supervisor"},
-                },
-            )
-        except Exception as e:
-            console.print(f"[yellow]Could not build prompt preview: {e}[/yellow]")
-
-    # Display via UI layer
-    display_supervisor_dry_run(
-        console, total_scanned, candidates, show_prompt=show_prompt
-    )
+    # Display candidates via UI layer
+    # (when show_prompt=True, also shows individual prompts)
+    if candidates or not show_prompt:
+        display_supervisor_dry_run(
+            console, total_scanned, candidates, show_prompt=show_prompt
+        )
 
 
 @app.command()
