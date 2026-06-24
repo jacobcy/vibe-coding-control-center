@@ -447,6 +447,7 @@ class CodeagentExecutionService:
                     stdout=agent_result.stdout,
                     stderr=agent_result.stderr,
                     session_id=agent_result.session_id or ctx.session_id,
+                    issue_number=command.issue_number,
                 )
 
             handoff_file = self._finalize_sync_execution(command, ctx, agent_result)
@@ -461,6 +462,7 @@ class CodeagentExecutionService:
                 session_id=effective_session_id,
                 backend=effective.backend,
                 model=effective.model,
+                issue_number=command.issue_number,
             )
         except Exception as exc:
             from vibe3.exceptions import (

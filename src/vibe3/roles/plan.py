@@ -474,6 +474,18 @@ def execute_spec_plan_async(
         issue_number=issue_number,
         branch=branch,
     )
+
+    # Get spec_ref from flow state
+    from vibe3.services.flow import FlowService
+
+    spec_ref = None
+    try:
+        flow = FlowService().get_flow_status(branch)
+        if flow and flow.spec_ref:
+            spec_ref = flow.spec_ref
+    except Exception:
+        pass  # Flow state may not exist yet, ignore silently
+
     return CodeagentResult(
         success=launch.launched,
         stderr=launch.reason or "",
@@ -481,6 +493,8 @@ def execute_spec_plan_async(
         log_path=launch.log_path,
         backend=launch.backend,
         model=launch.model,
+        issue_number=issue_number,
+        spec_ref=spec_ref,
     )
 
 
@@ -548,4 +562,16 @@ def execute_spec_plan_sync(
         session_id=session_id,
         dry_run_summary=dry_run_summary,
     )
-    return CodeagentExecutionService(cfg).execute_sync(command)
+    result = CodeagentExecutionService(cfg).execute_sync(command)
+
+    # Get spec_ref from flow state
+    from vibe3.services.flow import FlowService
+
+    try:
+        flow = FlowService().get_flow_status(branch)
+        if flow and flow.spec_ref:
+            result.spec_ref = flow.spec_ref
+    except Exception:
+        pass  # Flow state may not exist yet, ignore silently
+
+    return result

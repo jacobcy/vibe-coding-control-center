@@ -33,6 +33,9 @@ def test_codeagent_result_instantiation():
     assert res.exit_code == 0
     assert res.stderr == ""
     assert res.handoff_file is None
+    assert res.plan_ref is None
+    assert res.spec_ref is None
+    assert res.issue_number is None
 
 
 def test_create_codeagent_command_factory_roles():

@@ -183,6 +183,12 @@ def display_codeagent_result(
         console.print(f"[cyan]Backend:[/cyan] {result.backend}")
     if result.model:
         console.print(f"[cyan]Model:[/cyan] {result.model}")
+    if result.plan_ref:
+        console.print(f"[cyan]Plan:[/cyan] {result.plan_ref}")
+    if result.spec_ref:
+        console.print(f"[cyan]Spec:[/cyan] {result.spec_ref}")
+    if result.issue_number:
+        console.print(f"[cyan]Issue:[/cyan] #{result.issue_number}")
     if result.log_path:
         console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
     if result.handoff_file:

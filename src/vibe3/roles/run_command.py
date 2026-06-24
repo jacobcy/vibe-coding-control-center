@@ -408,6 +408,10 @@ def execute_manual_run(
             )
         raise
 
+    # Set plan_ref if plan_file is provided
+    if plan_file is not None:
+        result.plan_ref = plan_file
+
     if not dry_run and no_async and issue_number is not None:
         if result.success:
             publish_run_command_success(
