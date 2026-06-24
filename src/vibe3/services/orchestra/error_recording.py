@@ -105,6 +105,15 @@ def record_dispatch_failure_if_unexpected(
         # Classify exception to preserve real error types (API/MODEL/EXEC)
         error_code = classify_error_hybrid(exception)
 
+        # If unclassified, check for permanent code errors (vs transient infra)
+        # Permanent code bugs → E_DISPATCH_CODE_ERROR (ERROR, counts toward gate)
+        # Transient infra → stays E_EXEC_UNKNOWN (WARNING, no gate impact)
+        if error_code == "E_EXEC_UNKNOWN":
+            from vibe3.exceptions.error_classification import is_permanent_code_error
+
+            if is_permanent_code_error(exception):
+                error_code = "E_DISPATCH_CODE_ERROR"
+
         # Build error message with classification context
         error_message = (
             f"{dispatch_source} {role} dispatch failed [exception]: {exception}"

@@ -39,7 +39,7 @@ def has_recent_specific_error(
 
     query = f"""
         SELECT COUNT(*) FROM error_log
-        WHERE error_code != 'E_DISPATCH_FAILURE'
+        WHERE error_code NOT IN ('E_DISPATCH_FAILURE', 'E_DISPATCH_CODE_ERROR')
           AND issue_number = ?
           AND branch = ?
           AND datetime(created_at) >= datetime('now', '-{within_seconds} seconds')

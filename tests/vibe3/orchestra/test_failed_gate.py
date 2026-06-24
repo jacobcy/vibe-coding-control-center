@@ -355,3 +355,27 @@ def test_dispatch_failure_does_not_trigger_failed_gate() -> None:
     assert (
         contract.gate_action == "ignore"
     ), "E_DISPATCH_FAILURE gate_action must be 'ignore', not 'threshold'"
+
+
+def test_dispatch_code_error_triggers_failed_gate() -> None:
+    """E_DISPATCH_CODE_ERROR MUST count toward FailedGate threshold.
+
+    Permanent code bugs (ValueError, TypeError, etc.) indicate real issues
+    that won't self-heal. These should trigger FailedGate after threshold,
+    unlike transient E_DISPATCH_FAILURE which is infrastructure-only.
+    """
+    from vibe3.exceptions.error_classification import ERROR_REGISTRY
+
+    contract = ERROR_REGISTRY["E_DISPATCH_CODE_ERROR"]
+
+    assert contract.severity.value == "ERROR", (
+        f"E_DISPATCH_CODE_ERROR must be ERROR severity, "
+        f"got {contract.severity.value}"
+    )
+    assert contract.counts_toward_threshold is True, (
+        "E_DISPATCH_CODE_ERROR must count toward FailedGate threshold — "
+        "permanent code bugs indicate systematic issues requiring attention"
+    )
+    assert (
+        contract.gate_action == "threshold"
+    ), "E_DISPATCH_CODE_ERROR gate_action must be 'threshold', not 'ignore'"

@@ -158,7 +158,8 @@ def test_severity_prefix_map_matches_error_registry():
         "E_API_": "ERROR",
         "E_EXEC_": "WARNING",
         "E_CAPACITY_": "WARNING",
-        "E_DISPATCH_": "WARNING",
+        "E_DISPATCH_CODE": "ERROR",  # Permanent code bugs (must precede E_DISPATCH_)
+        "E_DISPATCH_": "WARNING",  # Transient infrastructure
         "E_CONFIG_": "WARNING",
         "E_INVALID_": "ERROR",
         "E_ISSUE_": "ERROR",

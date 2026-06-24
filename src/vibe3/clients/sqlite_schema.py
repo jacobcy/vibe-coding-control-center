@@ -407,7 +407,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "E_API_": "ERROR",
             "E_EXEC_": "WARNING",
             "E_CAPACITY_": "WARNING",
-            "E_DISPATCH_": "WARNING",  # E_DISPATCH_FAILURE
+            "E_DISPATCH_CODE": "ERROR",  # Permanent code bugs (before E_DISPATCH_)
+            "E_DISPATCH_": "WARNING",  # E_DISPATCH_FAILURE (transient infra)
             "E_CONFIG_": "WARNING",  # E_CONFIG_MISSING
             "E_INVALID_": "ERROR",
             "E_ISSUE_": "ERROR",
