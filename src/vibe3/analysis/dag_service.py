@@ -105,7 +105,7 @@ def _extract_imports(file_path: str) -> list[str]:
                     else:
                         # 可能是类或函数，只记录模块
                         imports.append(node.module)
-    return imports
+    return list(dict.fromkeys(imports))
 
 
 def build_module_graph(src_root: str | None = None) -> dict[str, ModuleNode]:
