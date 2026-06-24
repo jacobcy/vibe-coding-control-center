@@ -1,6 +1,7 @@
 """Tests for review command assembler integration and CLI surface.
 
 Merged from test_review.py + test_review_help.py (non-removal tests).
+import pytest
 Removal tests from test_review_help.py are in test_removed_commands.py.
 """
 
@@ -266,6 +267,7 @@ def test_review_async_uses_shared_result_display() -> None:
 class TestReviewBaseExitCodes:
     """Verify review base exit codes follow verdict semantics."""
 
+    @pytest.mark.slow
     def test_minor_verdict_does_not_exit_nonzero(self) -> None:
         from vibe3.models import ReviewRequest, ReviewScope
         from vibe3.roles.review_helpers import ReviewRunResult
@@ -345,6 +347,7 @@ class TestReviewBaseExitCodes:
 
         assert result.exit_code == 1
 
+    @pytest.mark.slow
     def test_handler_exception_results_in_error_verdict(self) -> None:
         """A crash inside execute_manual_review_sync must surface as
         verdict=ERROR + exit 1, not a silent exit 0 (CRITICAL #2 fix)."""
@@ -492,6 +495,7 @@ def test_review_fresh_session_propagates():
         ),
     ],
 )
+@pytest.mark.slow
 def test_review_cli_option_propagates(
     cli_args: list[str], kwarg_name: str, expected_value: str
 ) -> None:

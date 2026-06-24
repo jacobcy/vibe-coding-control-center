@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import pytest
 
 from typer.testing import CliRunner
 
@@ -281,6 +282,7 @@ def test_plan_issue_subcommand_works(monkeypatch) -> None:
     mock_runner.assert_called_once()
 
 
+@pytest.mark.slow
 def test_plan_dry_run_branch(monkeypatch) -> None:
     """Test plan --branch --dry-run returns exit_code=0 without async dispatch."""
     _ensure_lazy_imports_populated()
@@ -350,6 +352,7 @@ def test_plan_sync_handler_failure_exits_nonzero(monkeypatch) -> None:
     assert "plan boom" in result.output
 
 
+@pytest.mark.slow
 def test_plan_show_prompt_propagates(monkeypatch) -> None:
     """Test plan --branch --dry-run --show-prompt passes show_prompt=True."""
     _ensure_lazy_imports_populated()

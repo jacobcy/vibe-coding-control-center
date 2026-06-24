@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import pytest
 
 import pytest
 from typer.testing import CliRunner
@@ -18,6 +19,7 @@ class TestHandoffBasicCommands:
     @pytest.mark.parametrize("force,expected_force", [(False, False), (True, True)])
     @patch("vibe3.commands.handoff_write.HandoffService")
     @patch("vibe3.services.FlowService")
+    @pytest.mark.slow
     def test_handoff_init_command(
         self, mock_flow_service_class, mock_service_class, force, expected_force
     ):

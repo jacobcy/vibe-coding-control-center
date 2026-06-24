@@ -468,6 +468,7 @@ class TestCollectFrozenQueueBlockedRequalification:
         assert [entry.issue_number for entry in queue] == [1]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_requalify_failure_does_not_abort_collection(
         self, make_capacity, make_coordinator, monkeypatch
     ) -> None:

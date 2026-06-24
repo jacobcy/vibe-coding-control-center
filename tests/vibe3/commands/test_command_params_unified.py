@@ -159,6 +159,7 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 # ==============================================================================
 
 
+@pytest.mark.slow
 def test_plan_no_branch_uses_current_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
@@ -174,6 +175,7 @@ def test_plan_no_branch_uses_current_branch(
     assert mock_resolve.call_args[0][0] is None
 
 
+@pytest.mark.slow
 def test_plan_issue_number_resolves_to_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
@@ -221,6 +223,7 @@ def test_run_issue_number_resolves_to_branch(
     assert mock_resolve.call_args[0][0] == "42"
 
 
+@pytest.mark.slow
 def test_review_no_branch_shows_help() -> None:
     """vibe3 review without args fails — requires branch context."""
     result = runner.invoke(review_app, [])
@@ -568,6 +571,7 @@ def test_run_show_prompt_forwarded(
     assert mock_execute.call_args.kwargs.get("show_prompt") is True
 
 
+@pytest.mark.slow
 def test_review_show_prompt_forwarded(
     monkeypatch: pytest.MonkeyPatch, mock_review_deps: None
 ) -> None:

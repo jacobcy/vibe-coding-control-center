@@ -1,9 +1,11 @@
 """Tests for vibe inspect base subcommand.
 
+import pytest
 Tests CLI surface: argument validation, help output, exit codes.
 All external services are mocked.
 """
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -147,6 +149,7 @@ def test_inspect_base_json_output():
     assert data["core_files"][0]["critical_path"] is True
 
 
+@pytest.mark.slow
 def test_inspect_base_json_custom_branch():
     """Test inspect base JSON output with custom base branch."""
     mock_git = MagicMock()
@@ -203,6 +206,7 @@ def test_inspect_base_help():
     assert "core" in result.output.lower() or "critical" in result.output.lower()
 
 
+@pytest.mark.slow
 def test_inspect_base_uses_shared_base_resolver():
     """inspect base should resolve branch through shared base resolver."""
     mock_git = MagicMock()
