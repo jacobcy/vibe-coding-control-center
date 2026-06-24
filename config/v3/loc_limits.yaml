@@ -290,8 +290,8 @@ code_limits:
         limit: 580
         reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；EDA 架构迁移后新增 lazy import cache mock 路径修复、_ensure_lazy_imports_populated 隔离辅助函数等（+105 行）"
       - path: "tests/vibe3/commands/test_scan.py"
-        limit: 680
-        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行）"
+        limit: 710
+        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行），refactor 新增 async skip/throttled display 测试（+25 行）"
       - path: "tests/vibe3/commands/test_review.py"
         limit: 530
         reason: "Review command 测试集，覆盖 dry_run、show_prompt、base/branch review、exit codes、context builder、CLI option 传递、async dispatch 等紧密耦合场景；Issue #3135 新增 unified display 和 async dispatch 测试（+130 行）"
@@ -456,8 +456,8 @@ code_limits:
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
       - path: "tests/vibe3/commands/test_internal.py"
-        limit: 550
-        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行）"
+        limit: 575
+        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行），新增 async skip/throttled display 测试（+28 行）"
 
 
   total_file_loc:
