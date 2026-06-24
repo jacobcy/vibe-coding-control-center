@@ -364,6 +364,82 @@ def build_audit_suggestion_context(snapshot: Any) -> dict[str, Any]:
     return result
 
 
+def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-decision material.
+
+    Reads report ledger from shared directory and provides aggregate
+    statistics for the decision-maker to determine if there are new
+    decision packets requiring formal decisions.
+
+    The context does NOT read full report content - the agent reads
+    selected ones via tools per the material's instructions.
+    """
+    # Get shared reports directory path (cross-worktree shared location)
+    from vibe3.utils import get_git_common_dir
+
+    try:
+        git_common_dir = get_git_common_dir()
+        reports_dir = Path(git_common_dir) / "shared" / "reports"
+    except Exception:
+        # Fallback: use relative path from current working tree
+        reports_dir = Path(".git/shared/reports")
+
+    # Count report files
+    report_count = 0
+    evidence_strengths: set[str] = set()
+
+    if reports_dir.exists():
+        # Read report files (up to 5 for context stats)
+        report_files = sorted(reports_dir.glob("audit-report-*.md"))
+        report_count = len(report_files)
+
+        # Quick parse to extract evidence strength (don't read full content)
+        for report_file in report_files[:5]:
+            try:
+                content = report_file.read_text()
+                # Extract evidence strength from Markdown (simple pattern match)
+                if "evidence strength:" in content.lower():
+                    for line in content.split("\n"):
+                        if "evidence strength:" in line.lower():
+                            strength = (
+                                line.split(":", 1)[1].strip().strip('"').strip("'")
+                            )
+                            if strength in ["strong", "medium", "weak", "inconclusive"]:
+                                evidence_strengths.add(strength)
+                            break
+            except Exception:
+                continue
+
+    result = build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="decision packet analysis",
+        scope_note=(
+            f"决策包统计：\n"
+            f"- 可用报告数：{report_count}\n"
+            f"- 检测到的证据强度："
+            f"{', '.join(sorted(evidence_strengths)) or '无'}\n\n"
+            "请使用 Read 工具读取 `.git/shared/reports/"
+            "audit-report-*.md` 文件，"
+            "按材料中的证据评估规则分析，为每个 decision packet"
+            "生成正式决策（accept/hold/reject/split）。"
+            f"{'目前无报告，跳过本轮。' if report_count == 0 else ''}"
+        ),
+    )
+
+    # Add decision-specific fields for programmatic access
+    result["report_count"] = report_count
+    result["new_since_last_run"] = report_count  # Simplified: assume all are new
+    result["evidence_strengths"] = sorted(evidence_strengths)
+
+    return result
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 
