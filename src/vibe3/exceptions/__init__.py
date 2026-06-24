@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from vibe3.exceptions.error_classification import (
         classify_error_hybrid,
         get_error_handling_contract,
+        is_permanent_code_error,
     )
     from vibe3.exceptions.error_codes import (
         E_EXEC_AUTO_SCENE_RESET,
