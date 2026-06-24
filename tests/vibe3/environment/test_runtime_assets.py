@@ -86,7 +86,7 @@ def test_resolve_vibe_project_asset_from_repo_root(monkeypatch, tmp_path: Path) 
     # Add initial commit to make the repo valid (skip hooks)
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "init", "--no-verify"],
+        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
@@ -134,7 +134,7 @@ def test_resolve_vibe_project_asset_from_subdirectory(
     )
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "init", "--no-verify"],
+        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
@@ -202,7 +202,7 @@ def test_resolve_vibe_project_graceful_missing(monkeypatch, tmp_path: Path) -> N
     dummy.write_text("test", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "init", "--no-verify"],
+        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
