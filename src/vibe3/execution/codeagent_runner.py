@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     )
     from vibe3.exceptions import ErrorSeverity
     from vibe3.models import AgentResult
-from vibe3.config import VibeConfig, get_role_section
+from vibe3.config import VibeConfig, get_role_section, resolve_effective_agent_options
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.execution_lifecycle import (
     execution_prefix,
@@ -406,7 +406,7 @@ class CodeagentExecutionService:
         ctx = self._prepare_sync_context(command)
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
-        effective = ctx.options
+        effective = resolve_effective_agent_options(ctx.options)
 
         # Skip execution header in dry_run mode to avoid duplication
         # Backend.run() will print "=== Prompt Composition ===" header
