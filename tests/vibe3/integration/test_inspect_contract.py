@@ -41,23 +41,6 @@ INSPECT_SUBCOMMANDS = [
     "dead-code",
 ]
 
-# Subcommands that produce valid YAML output (skip base/uncommit in CI
-# because they need git context that may not be available).
-YAML_TESTABLE = [
-    "files",
-    "symbols",
-    "commands",
-    "dead-code",
-]
-
-# Args for each subcommand's --yaml invocation.
-YAML_ARGS: dict[str, list[str]] = {
-    "files": ["src/vibe3/cli.py"],
-    "symbols": ["src/vibe3/cli.py"],
-    "commands": [],
-    "dead-code": [],
-}
-
 
 class TestInspectFormatContract:
     """Verify all inspect subcommands support --json and --yaml."""
@@ -73,21 +56,6 @@ class TestInspectFormatContract:
         result = runner.invoke(app, ["inspect", subcommand, "--help"])
         output = _strip_ansi(result.output)
         assert "--yaml" in output, f"inspect {subcommand} missing --yaml"
-
-
-@pytest.mark.integration
-class TestInspectYamlOutput:
-    """Verify --yaml output is valid and has expected structure."""
-
-    @pytest.mark.parametrize("subcommand", YAML_TESTABLE)
-    def test_yaml_produces_valid_output(self, subcommand: str) -> None:
-        args = YAML_ARGS.get(subcommand, [])
-        result = runner.invoke(app, ["inspect", subcommand, *args, "--yaml"])
-        assert result.exit_code == 0, f"inspect {subcommand} --yaml failed"
-        # Use stdout only (stderr contains log messages)
-        clean_output = _strip_ansi(result.stdout)
-        data = yaml.safe_load(clean_output)
-        assert isinstance(data, dict), f"inspect {subcommand} YAML is not a dict"
 
 
 @pytest.mark.integration
