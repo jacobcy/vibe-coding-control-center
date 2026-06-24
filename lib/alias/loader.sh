@@ -32,8 +32,12 @@ fi
 #   VIBE_REPO = clone 目录（包含 .git）
 #   VIBE_MAIN = VIBE_REPO（没有 .worktrees/main）
 #
-# 场景2 - 多 worktree（bare repo）：
-#   VIBE_REPO = bare repo 目录（包含 .git 和 .worktrees）
+# 场景2 - 多 worktree（非裸主仓库 + linked worktrees）：
+#   VIBE_REPO = 主仓库目录（如 main/，包含 .git 和 .worktrees）
+#   VIBE_MAIN = $VIBE_REPO（主仓库即为 main worktree）
+#
+# 场景3 - 多 worktree（bare repo + linked worktrees）：
+#   VIBE_REPO = bare repo 目录（git-common-dir 本身）
 #   VIBE_MAIN = $VIBE_REPO/.worktrees/main
 
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -43,8 +47,20 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
   local git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
 
   if [[ -n "$git_common_dir" && -d "$git_common_dir" ]]; then
-    # VIBE_REPO 是 .git 的父目录
-    export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
+    # Distinguish between non-bare and bare repos based on basename.
+    # The .git basename check implicitly distinguishes non-bare from bare repos:
+    # - Non-bare repos have git-common-dir ending in .git (e.g., .../main/.git)
+    # - Bare repos have git-common-dir as the repo root itself (no .git suffix)
+    if [[ "$(basename "$git_common_dir")" == ".git" ]]; then
+      # Non-bare repo: git-common-dir = .../main/.git → VIBE_REPO = .../main
+      export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
+    elif [[ "$(git -C "$git_common_dir" rev-parse --is-bare-repository 2>/dev/null)" == "true" ]]; then
+      # True bare repo: git-common-dir IS the repo root
+      export VIBE_REPO="$(cd "$git_common_dir" && pwd)"
+    else
+      # Fallback: treat git-common-dir parent as repo root (conservative)
+      export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
+    fi
   else
     # Fallback: 使用 show-toplevel
     export VIBE_REPO="$(git rev-parse --show-toplevel 2>/dev/null || dirname "$VIBE_ROOT")"
@@ -53,16 +69,43 @@ else
   export VIBE_REPO="$(dirname "$VIBE_ROOT")"
 fi
 
-# VIBE_MAIN: 在 VIBE_REPO 下查找 main
-if [[ -d "$VIBE_REPO/.worktrees/main" ]]; then
-  # 多 worktree 模式：main 在 .worktrees/main
-  export VIBE_MAIN="$VIBE_REPO/.worktrees/main"
-elif [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
-  # 兼容旧结构：main 作为子目录
-  export VIBE_MAIN="$VIBE_REPO/main"
-else
-  # 单 worktree 模式：没有独立的 main
-  export VIBE_MAIN="$VIBE_REPO"
+# VIBE_MAIN: 在 VIBE_REPO 下查找 main worktree
+# Priority 1: Parse git worktree list --porcelain for refs/heads/main
+local main_worktree_path=""
+local worktree_line=""
+while IFS= read -r line; do
+  case "$line" in
+    worktree\ *)
+      worktree_line="${line#worktree }"
+      ;;
+    branch\ refs/heads/main)
+      main_worktree_path="$worktree_line"
+      break
+      ;;
+  esac
+done < <(git worktree list --porcelain 2>/dev/null)
+
+if [[ -n "$main_worktree_path" && -d "$main_worktree_path" ]]; then
+  # Found main branch worktree via git worktree list
+  export VIBE_MAIN="$main_worktree_path"
+elif [[ -d "$VIBE_REPO/.worktrees/main" ]]; then
+  # Convention-based layout: verify the worktree has main branch
+  local main_wt_branch=""
+  main_wt_branch="$(git -C "$VIBE_REPO/.worktrees/main" symbolic-ref --short HEAD 2>/dev/null || true)"
+  if [[ "$main_wt_branch" == "main" ]]; then
+    export VIBE_MAIN="$VIBE_REPO/.worktrees/main"
+  fi
+fi
+
+# If VIBE_MAIN not yet set, try old structure or fallback to VIBE_REPO
+if [[ -z "${VIBE_MAIN:-}" ]]; then
+  if [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
+    # 兼容旧结构：main 作为子目录
+    export VIBE_MAIN="$VIBE_REPO/main"
+  else
+    # 单 worktree 模式：没有独立的 main
+    export VIBE_MAIN="$VIBE_REPO"
+  fi
 fi
 export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
