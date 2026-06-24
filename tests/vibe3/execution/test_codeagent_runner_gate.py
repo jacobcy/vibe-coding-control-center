@@ -406,6 +406,7 @@ class TestTransitionCountFlow:
 class TestSeverityAwareErrorHandling:
     """Test severity-based error handling in codeagent_runner."""
 
+    @pytest.mark.slow
     def test_agent_execution_metadata_is_recorded_on_failure(self) -> None:
         """Backend diagnostics should reach lifecycle refs.
 

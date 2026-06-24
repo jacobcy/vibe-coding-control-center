@@ -1,6 +1,7 @@
 """Tests for pre-push incremental test selector."""
 
 from vibe3.analysis.pre_push_test_selector import select_pre_push_tests
+import pytest
 
 
 def test_selects_changed_test_files_incrementally() -> None:
@@ -17,6 +18,7 @@ def test_maps_source_file_to_related_tests() -> None:
     assert "tests/vibe3/analysis/test_pre_push_scope.py" in selection.tests
 
 
+@pytest.mark.slow
 def test_dag_resolves_tests_for_unmapped_source() -> None:
     # shared/signatures.py has no test_signatures.py (name miss).
     # Multiple services import SignatureService (verdict_service, orchestrator,
@@ -35,6 +37,7 @@ def test_dag_resolves_tests_for_unmapped_source() -> None:
     assert selection.unmapped_sources == ["src/vibe3/services/shared/signatures.py"]
 
 
+@pytest.mark.slow
 def test_falls_back_to_dir_when_source_mapping_missing() -> None:
     # A real source file with no exact test file match AND no tests importing it
     # via DAG should scope to the test directory rather than the full suite.
@@ -49,6 +52,7 @@ def test_falls_back_to_dir_when_source_mapping_missing() -> None:
     ]
 
 
+@pytest.mark.slow
 def test_skips_when_test_dir_missing() -> None:
     # If the corresponding test directory doesn't exist at all, skip local run
     # instead of falling back to full suite (CI covers full suite).
@@ -85,6 +89,7 @@ def test_maps_hook_changes_to_hook_regression_tests() -> None:
     assert selection.tests == ["tests/vibe3/analysis/test_pre_push_scope.py"]
 
 
+@pytest.mark.slow
 def test_top_level_unmapped_source_skips_full_suite() -> None:
     # src/vibe3/__init__.py has no direct test file mapping.
     # Its directory fallback would resolve to tests/vibe3 (the full suite root).
@@ -104,6 +109,7 @@ def test_excludes_init_py_from_v3_test_files() -> None:
     assert "tests/vibe3/agents/__init__.py" not in selection.tests
 
 
+@pytest.mark.slow
 def test_excludes_init_py_from_source_to_test_mapping() -> None:
     """Changing src/vibe3/.../__init__.py must not map to tests/.../__init__.py."""
     selection = select_pre_push_tests(

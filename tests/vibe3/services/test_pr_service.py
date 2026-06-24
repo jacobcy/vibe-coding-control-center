@@ -36,6 +36,7 @@ def no_conflict_git():
     return git
 
 
+@pytest.mark.slow
 def test_create_pr_success(pr_service: PRService, no_conflict_git: MagicMock) -> None:
     """Test create PR success."""
     gh_instance = pr_service.github_client

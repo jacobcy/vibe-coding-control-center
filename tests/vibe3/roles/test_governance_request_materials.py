@@ -53,6 +53,7 @@ class TestBuildGovernanceRequest:
         assert build_governance_request(config, 1, snapshot) is None
 
     @patch("vibe3.roles.governance._write_dry_run_plan")
+    @pytest.mark.slow
     def test_returns_none_when_dry_run(self, mock_write):
         mock_write.return_value = Path("/tmp/dry.md")
         snapshot = _make_snapshot()

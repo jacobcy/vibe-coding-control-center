@@ -163,6 +163,7 @@ class TestQueueExhaustedRefresh:
     """Tests for _queue_exhausted_refresh trigger."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_queue_exhausted_triggers_rebuild(
         self,
         make_issue,

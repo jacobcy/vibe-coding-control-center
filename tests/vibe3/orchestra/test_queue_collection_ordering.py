@@ -56,6 +56,7 @@ class TestCollectionOrder:
         assert [entry.issue_number for entry in queue] == [2, 4, 3, 5, 6, 1]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_one_open_issue_call(
         self, make_issue_info, make_capacity, make_coordinator
     ) -> None:

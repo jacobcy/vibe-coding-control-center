@@ -232,6 +232,7 @@ def test_review_no_branch_shows_help() -> None:
     assert result.exception is not None
 
 
+@pytest.mark.slow
 def test_review_issue_number_resolves_to_branch(
     monkeypatch: pytest.MonkeyPatch, mock_review_deps: None
 ) -> None:
@@ -440,6 +441,7 @@ def test_run_sync_handler_failure_exits_nonzero(
     assert "run boom" in result.output
 
 
+@pytest.mark.slow
 def test_review_base_dry_run_returns_dry_run_verdict(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -74,6 +74,7 @@ class TestReviewContextBuilderUsesAssembler:
 # ==============================================================================
 
 
+@pytest.mark.slow
 def test_review_no_arg_defaults_to_current_branch():
     """vibe review (no subcommand) -> executes review on current branch."""
     with (
@@ -164,6 +165,7 @@ def test_review_dry_run_uses_codeagent_result_display(monkeypatch) -> None:
     assert getattr(result, "report_ref") == "docs/reports/review.md"
 
 
+@pytest.mark.slow
 def test_review_base_dry_run_does_not_emit_legacy_actor_header() -> None:
     """review base dry-run should use result metadata instead of actor header."""
     from vibe3.models import ReviewRequest, ReviewScope
@@ -307,6 +309,7 @@ class TestReviewBaseExitCodes:
 
         assert result.exit_code == 0
 
+    @pytest.mark.slow
     def test_refuse_verdict_exits_nonzero(self) -> None:
 
         from vibe3.models import ReviewRequest, ReviewScope
@@ -392,6 +395,7 @@ def test_review_base_help_mentions_show_prompt_option():
     assert "--show-prompt" in output
 
 
+@pytest.mark.slow
 def test_review_base_show_prompt_forwarded_to_sync():
     """review base --show-prompt should forward the flag to
     execute_manual_review_sync (requires --dry-run)."""

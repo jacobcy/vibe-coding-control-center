@@ -1,6 +1,7 @@
 """Tests for FlowManager query operations."""
 
 from unittest.mock import MagicMock, patch
+import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -72,6 +73,7 @@ class TestFlowQuery:
 
         assert pr_number == 789
 
+    @pytest.mark.slow
     def test_get_pr_for_issue_returns_none_without_flow(self):
         config = OrchestraConfig()
         manager = FlowManager(config)

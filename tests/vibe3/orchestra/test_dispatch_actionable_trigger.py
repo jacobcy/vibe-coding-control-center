@@ -149,6 +149,7 @@ class TestMergeQueue:
 class TestDispatchLoop:
     """Test _dispatch_loop extraction."""
 
+    @pytest.mark.slow
     def test_dispatch_loop_returns_count(self, mock_coordinator):
         """_dispatch_loop should return dispatched_count."""
         # Setup: create queue with actionable entries
@@ -197,6 +198,7 @@ class TestDispatchLoop:
             # Issue 1 should be dispatched, issue 2 skipped (BLOCKED)
             assert dispatched_count == 1
 
+    @pytest.mark.slow
     def test_dispatch_loop_respects_capacity(self, mock_coordinator):
         """_dispatch_loop should stop when capacity is full."""
         # Setup: capacity = 1 slot
