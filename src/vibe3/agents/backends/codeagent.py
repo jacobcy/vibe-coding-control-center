@@ -365,6 +365,16 @@ class CodeagentBackend:
                 # positional arg when present, printed separately below.
                 cmd_display = command[:-1] if task and command else command
                 echo(f"command: {' '.join(cmd_display)}")
+                if effective_options.backend or effective_options.model:
+                    from rich.console import Console
+
+                    console = Console()
+                    if effective_options.backend:
+                        console.print(
+                            f"[cyan]Backend:[/cyan] {effective_options.backend}"
+                        )
+                    if effective_options.model:
+                        console.print(f"[cyan]Model:[/cyan] {effective_options.model}")
                 if show_prompt and prompt_file_path:
                     echo(f"prompt_file: {prompt_file_path}")
                     echo(
