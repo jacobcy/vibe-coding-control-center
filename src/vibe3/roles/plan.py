@@ -521,12 +521,20 @@ def execute_spec_plan_sync(
         if overlays:
             dry_run_summary["project_scope_overlays"] = overlays
 
+    # In dry_run without show_prompt, use a short task label to avoid
+    # cluttering the output with the full issue body.
+    task_label: str | None
+    if dry_run and not show_prompt and issue_number is not None:
+        task_label = f"issue: #{issue_number}"
+    else:
+        task_label = request.task_guidance
+
     command = create_codeagent_command(
         role="planner",
         context_builder=make_plan_context_builder(
             request, cfg, annotate_sections=dry_run
         ),
-        task=request.task_guidance,
+        task=task_label,
         dry_run=dry_run,
         show_prompt=show_prompt,
         handoff_kind="plan",
