@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     )
     from vibe3.exceptions import ErrorSeverity
     from vibe3.models import AgentResult
-from vibe3.config import VibeConfig, get_role_section
+from vibe3.config import VibeConfig, get_role_section, resolve_effective_agent_options
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.execution_lifecycle import (
     execution_prefix,
@@ -406,7 +406,9 @@ class CodeagentExecutionService:
         ctx = self._prepare_sync_context(command)
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
-        effective = ctx.options
+        # Resolve preset once here; pass pre-resolved options to
+        # CodeagentBackend.run() so its internal resolution is a no-op.
+        effective = resolve_effective_agent_options(ctx.options)
 
         # Skip execution header in dry_run mode to avoid duplication
         # Backend.run() will print "=== Prompt Composition ===" header
@@ -418,7 +420,7 @@ class CodeagentExecutionService:
         try:
             agent_result = CodeagentBackend().run(
                 prompt=prompt_content,
-                options=ctx.options,
+                options=effective,
                 task=command.task,
                 dry_run=command.dry_run,
                 session_id=ctx.session_id,
@@ -431,14 +433,14 @@ class CodeagentExecutionService:
                 dry_run_summary=command.dry_run_summary,
             )
             if command.dry_run:
+                # Backend/model are already displayed in the prompt
+                # composition section by CodeagentBackend.run().
                 return CodeagentResult(
                     success=True,
                     exit_code=agent_result.exit_code,
                     stdout=agent_result.stdout,
                     stderr=agent_result.stderr,
                     session_id=agent_result.session_id or ctx.session_id,
-                    backend=effective.backend,
-                    model=effective.model,
                 )
 
             handoff_file = self._finalize_sync_execution(command, ctx, agent_result)

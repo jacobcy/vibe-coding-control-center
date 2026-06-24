@@ -424,10 +424,22 @@ def execute_manual_review_async(
                 reason_code=reason_code,
             )
         return ReviewRunResult(
-            "ERROR", None, issue_number, launch.tmux_session, launch.log_path
+            "ERROR",
+            None,
+            issue_number,
+            launch.tmux_session,
+            launch.log_path,
+            backend=launch.backend,
+            model=launch.model,
         )
     return ReviewRunResult(
-        "ASYNC", None, issue_number, launch.tmux_session, launch.log_path
+        "ASYNC",
+        None,
+        issue_number,
+        launch.tmux_session,
+        launch.log_path,
+        backend=launch.backend,
+        model=launch.model,
     )
 
 
@@ -476,7 +488,13 @@ def execute_manual_review_sync(
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
-        return ReviewRunResult("DRY_RUN", None, issue_number)
+        return ReviewRunResult(
+            "DRY_RUN",
+            None,
+            issue_number,
+            backend=result.backend,
+            model=result.model,
+        )
 
     audit_ref, verdict = finalize_review_output(
         review_output=result.stdout,

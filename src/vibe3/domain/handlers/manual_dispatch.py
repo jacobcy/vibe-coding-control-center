@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.config import resolve_effective_agent_options
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import (
     ManualPlanIntent,
@@ -301,6 +302,19 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
             return None
 
         if event.no_async or event.dry_run:
+            # Resolve effective options once; pass resolved backend/model
+            # to run_issue_role_sync so its internal resolution is a no-op.
+            from vibe3.execution import resolve_command_agent_options
+
+            options = resolve_command_agent_options(
+                config=config,
+                section="review",
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+            )
+            effective = resolve_effective_agent_options(options)
+
             # Sync mode
             run_issue_role_sync(
                 issue_number=event.issue_number,
@@ -310,19 +324,16 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 spec=REVIEW_SYNC_SPEC,
                 branch=event.branch,
                 agent=event.agent,
-                backend=event.backend,
-                model=event.model,
+                backend=effective.backend or event.backend,
+                model=effective.model or event.model,
             )
-            # Create result for branch review
-            # (no verdict, just completion signal)
-            # Fill backend/model from CLI params
-            # (config already validated)
+            verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
-                "OK",
+                verdict,
                 None,
                 event.issue_number,
-                backend=event.backend,
-                model=event.model,
+                backend=effective.backend,
+                model=effective.model,
             )
             # Store for backward compat
             _pending_results["review"] = result

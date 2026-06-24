@@ -50,13 +50,33 @@ _YES_OPT = Annotated[
 ]
 
 
-def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
+def _emit_review_result(
+    verdict: str,
+    handoff_file: str | None,
+    backend: str | None = None,
+    model: str | None = None,
+) -> None:
     """Render review result summary consistently."""
-    if verdict in {"ASYNC", "DRY_RUN"}:
+    from rich.console import Console
+
+    console = Console()
+
+    if verdict == "ASYNC":
         return
-    typer.echo(f"\n=== Verdict: {verdict} ===")
+
+    console.print("\n[bold]Review Result[/bold]")
+
+    if verdict == "DRY_RUN":
+        console.print("[green]✓ Completed successfully[/green]")
+        return
+
+    if backend:
+        console.print(f"[cyan]Backend:[/cyan] {backend}")
+    if model:
+        console.print(f"[cyan]Model:[/cyan] {model}")
+    console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
-        typer.echo(f"-> Review saved to: {handoff_file}")
+        console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
 
 
 def _check_report_ref(branch: str) -> bool:
@@ -133,10 +153,12 @@ def _review_branch_impl(
     # Display result
     if result is None:
         typer.echo("Review dispatched (async mode)")
-    elif result.verdict in {"ASYNC", "DRY_RUN"}:
+    elif result.verdict in {"ASYNC"}:
         pass  # already handled
     else:
-        _emit_review_result(result.verdict, result.handoff_file)
+        _emit_review_result(
+            result.verdict, result.handoff_file, result.backend, result.model
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -355,6 +377,8 @@ def base(
         pass
     else:
         # Sync mode: display result
-        _emit_review_result(result.verdict, result.handoff_file)
+        _emit_review_result(
+            result.verdict, result.handoff_file, result.backend, result.model
+        )
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)

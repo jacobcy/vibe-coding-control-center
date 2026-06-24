@@ -184,14 +184,14 @@ code_limits:
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
       - path: "src/vibe3/roles/review.py"
-        limit: 600
-        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
+        limit: 610
+        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成；Issue #3134 新增 dry_run 的 backend/model 透传（+6 行）"
       - path: "src/vibe3/roles/plan.py"
-        limit: 545
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #2949 added dry-run provenance collection and variant key determination (+29 lines)；Issue #3028 新增 prompts_path 参数透传和 provenance manifest loading (+5 lines)"
+        limit: 555
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）"
       - path: "src/vibe3/roles/run_command.py"
-        limit: 420
-        reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #2435 新增 AsyncDispatchResult dataclass 和 tmux/log 输出（+28 行）"
+        limit: 425
+        reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）"
 
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"

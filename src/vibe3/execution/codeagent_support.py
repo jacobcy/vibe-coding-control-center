@@ -17,7 +17,12 @@ def resolve_command_agent_options(
     backend: str | None = None,
     model: str | None = None,
 ) -> AgentOptions:
-    """Resolve command agent options with CLI override support."""
+    """Resolve command agent options with CLI override support.
+
+    Priority: CLI params > config params
+    When agent is specified: backend/model serve as fallback/recording values
+    When backend only: user takes full control, no model fallback
+    """
     target_config = getattr(config, section, None)
     config_agent = None
     config_backend = None
@@ -32,7 +37,13 @@ def resolve_command_agent_options(
         config_timeout = getattr(agent_config, "timeout_seconds", 3600)
 
     if agent:
-        return AgentOptions(agent=agent, timeout_seconds=config_timeout)
+        return AgentOptions(
+            agent=agent,
+            backend=backend or config_backend,
+            # Fallback to config model (agent preset + recording backend pattern)
+            model=model or config_model,
+            timeout_seconds=config_timeout,
+        )
 
     if backend:
         return AgentOptions(
@@ -44,6 +55,8 @@ def resolve_command_agent_options(
     if config_agent:
         return AgentOptions(
             agent=config_agent,
+            backend=config_backend,
+            model=config_model,
             timeout_seconds=config_timeout,
         )
 

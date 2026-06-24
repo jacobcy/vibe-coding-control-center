@@ -24,7 +24,11 @@ def test_execute_manual_review_sync_imports_session_service_from_execution(
 
         def execute_sync(self, command: object) -> object:
             captured["session_id"] = getattr(command, "session_id")
-            return type("Result", (), {"stdout": "", "success": True})()
+            return type(
+                "Result",
+                (),
+                {"stdout": "", "success": True, "backend": None, "model": None},
+            )()
 
     monkeypatch.setattr(
         review_module,
@@ -48,5 +52,5 @@ def test_execute_manual_review_sync_imports_session_service_from_execution(
         model="gpt-5.4",
     )
 
-    assert result == ReviewRunResult("DRY_RUN", None, None)
+    assert result == ReviewRunResult("DRY_RUN", None, None, backend=None, model=None)
     assert captured["session_id"] == "session-1"
