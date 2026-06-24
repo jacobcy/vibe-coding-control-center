@@ -9,6 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.models import ExecutionLaunchResult
+
 
 class TestGovernanceSyncRunnerWithInjection:
     """Test governance sync runner with injected dependencies."""
@@ -239,6 +241,18 @@ class TestGovernanceAsyncRunnerWithInjection:
                 "vibe3.environment.session_registry.SessionRegistryService",
                 lambda store, backend: mock_registry,
             )
+            m.setattr(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+                lambda config, store, backend, start_async=None, capacity=None: (
+                    MagicMock(
+                        dispatch_execution=lambda request: ExecutionLaunchResult(
+                            launched=False,
+                            skipped=True,
+                            reason="test: mocked coordinator",
+                        )
+                    )
+                ),
+            )
 
             run_governance_async(
                 tick_count=0,
@@ -299,6 +313,18 @@ class TestGovernanceAsyncRunnerWithInjection:
             m.setattr(
                 "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
                 lambda: Path("/tmp/test-repo"),  # Return real Path, not MagicMock
+            )
+            m.setattr(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+                lambda config, store, backend, start_async=None, capacity=None: (
+                    MagicMock(
+                        dispatch_execution=lambda request: ExecutionLaunchResult(
+                            launched=False,
+                            skipped=True,
+                            reason="test: mocked coordinator",
+                        )
+                    )
+                ),
             )
 
             run_governance_async(
