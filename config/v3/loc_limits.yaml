@@ -98,8 +98,8 @@ code_limits:
         limit: 560
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑、外部事件记录优化（resolved_branch 计算一次重用）、统一 issue number 解析（IssueFlowService.resolve_task_issue_number 集成）等紧密耦合功能"
       - path: "src/vibe3/commands/flow_manage.py"
-        limit: 500
-        reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持"
+        limit: 550
+        reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks，新增 issue number 自动创建 branch + flow 逻辑，新增 --min-ms trace 参数支持；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 521 行"
       - path: "src/vibe3/commands/plan.py"
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
@@ -107,8 +107,8 @@ code_limits:
         limit: 450
         reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines)"
       - path: "src/vibe3/commands/handoff_write.py"
-        limit: 450
-        reason: "Handoff write commands aggregation, covering init/append/plan/report/indicate/audit/next_step/verdict operations; Issue #3119 enhanced init with issue comment fetching via TaskShowService (+60 lines) to populate handoff with context from bound issue; init is called by bootstrap for auto-initialization"
+        limit: 550
+        reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
 
       # Models 层 —— 允许 410
       - path: "src/vibe3/models/flow.py"

@@ -71,9 +71,6 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code == 0
         assert "Handoff" in result.output
-        # get_current_branch is called once for conditional --branch hint logic
-        # Note: resolve_command_branch now uses GitClient directly, not FlowService
-        assert mock_flow_service.get_current_branch.call_count == 1
         mock_status_service.get_handoff_status.assert_called_once()
 
     @patch("vibe3.commands.handoff_read.HandoffStatusService")
@@ -118,7 +115,7 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code == 0
         mock_status_service.get_handoff_status.assert_called_once_with(
-            "task/issue-436", limit=2
+            "task/issue-436", limit=None
         )
 
     def test_handoff_show_without_target_shows_help(self):

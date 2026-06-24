@@ -132,7 +132,9 @@ def _ensure_branch_has_no_live_runtime_session(
         raise typer.Exit(1)
 
 
-def _ensure_current_handoff_for_flow(target_branch: str) -> None:
+def ensure_current_handoff_for_flow(
+    target_branch: str, source: str = "flow update"
+) -> None:
     """Ensure current.md exists for flow, auto-initialize if missing.
 
     Called by:
@@ -141,6 +143,7 @@ def _ensure_current_handoff_for_flow(target_branch: str) -> None:
 
     Args:
         target_branch: Branch name to check for current.md
+        source: Caller identifier for logging context (default: "flow update")
     """
     from vibe3.exceptions import UserError
     from vibe3.services.handoff import HandoffService
@@ -152,7 +155,7 @@ def _ensure_current_handoff_for_flow(target_branch: str) -> None:
     except UserError:
         # current.md doesn't exist, initialize it quietly
         logger.bind(
-            command="flow update",
+            command=source,
             branch=target_branch,
         ).info("Auto-initializing missing handoff")
 
@@ -232,10 +235,13 @@ def update(
     _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
     # Register/Ensure flow
+    flow_before = flow_service.get_flow_status(target_branch)
     flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
+    is_new_flow = flow_before is None
 
-    # Ensure current.md exists for this flow
-    _ensure_current_handoff_for_flow(target_branch)
+    # Ensure current.md exists only for newly created flows
+    if is_new_flow:
+        ensure_current_handoff_for_flow(target_branch)
 
     # Update metadata if explicitly provided — keep name and actor separate
     # to avoid silently writing worktree identity when only --name is given.
@@ -288,8 +294,10 @@ def update(
                     flow.model_dump(), default_flow_style=False, allow_unicode=True
                 )
             )
-    else:
+    elif is_new_flow:
         render_flow_created(flow)
+    else:
+        typer.echo(f"✓ Flow confirmed: {flow.flow_slug}\n  branch: {flow.branch}")
 
 
 def bind(

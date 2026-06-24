@@ -475,3 +475,138 @@ def test_append_current_handoff_records_handoff_append_event(tmp_path: Path) -> 
     assert len(events) == 1
     assert events[0]["detail"] == "Test context message"
     assert events[0]["actor"] == "init"
+
+
+def test_get_recent_updates_returns_chronological_order(tmp_path: Path) -> None:
+    """Verify get_recent_updates returns entries in oldest-first order from file."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    handoff_dir = get_branch_handoff_dir(str(git_common), "task/issue-304")
+    handoff_dir.mkdir(parents=True)
+
+    # Use isoformat timestamps without tz offset (matching production format)
+    handoff_file = handoff_dir / "current.md"
+    handoff_file.write_text("""# Handoff: task/issue-304
+
+## Updates
+
+### 2026-06-24T10:00:00 | planner | plan
+First entry - oldest
+
+### 2026-06-24T11:00:00 | executor | run
+Second entry - middle
+
+### 2026-06-24T12:00:00 | reviewer | review
+Third entry - newest
+""")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    updates = service.storage.get_recent_updates(branch="task/issue-304", limit=None)
+
+    assert len(updates) == 3
+    # First entry should be oldest (file order)
+    assert updates[0]["timestamp"] == "2026-06-24T10:00:00"
+    assert updates[0]["actor"] == "planner"
+    assert updates[0]["kind"] == "plan"
+    assert updates[0]["message"] == "First entry - oldest"
+    # Last entry should be newest
+    assert updates[2]["timestamp"] == "2026-06-24T12:00:00"
+    assert updates[2]["actor"] == "reviewer"
+    assert updates[2]["kind"] == "review"
+    assert updates[2]["message"] == "Third entry - newest"
+
+
+def test_get_recent_updates_limit_returns_recent_n(tmp_path: Path) -> None:
+    """Verify get_recent_updates with limit returns the last N entries."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    handoff_dir = get_branch_handoff_dir(str(git_common), "task/issue-304")
+    handoff_dir.mkdir(parents=True)
+
+    handoff_file = handoff_dir / "current.md"
+    handoff_file.write_text("""# Handoff: task/issue-304
+
+## Updates
+
+### 2026-06-24T10:00:00 | planner | plan
+First entry
+
+### 2026-06-24T11:00:00 | executor | run
+Second entry
+
+### 2026-06-24T12:00:00 | reviewer | review
+Third entry
+""")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    # Default limit is 2
+    updates = service.storage.get_recent_updates(branch="task/issue-304")
+
+    assert len(updates) == 2
+    # With limit=2, should get the LAST 2 entries, oldest-first
+    assert updates[0]["timestamp"] == "2026-06-24T11:00:00"
+    assert updates[0]["actor"] == "executor"
+    assert updates[1]["timestamp"] == "2026-06-24T12:00:00"
+    assert updates[1]["actor"] == "reviewer"
+
+
+def test_get_recent_updates_empty_when_no_updates_section(tmp_path: Path) -> None:
+    """Verify get_recent_updates returns empty list when no Updates heading."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    handoff_dir = get_branch_handoff_dir(str(git_common), "task/issue-304")
+    handoff_dir.mkdir(parents=True)
+
+    handoff_file = handoff_dir / "current.md"
+    handoff_file.write_text("# Handoff: task/issue-304\n\nJust a plain handoff file.")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    updates = service.storage.get_recent_updates(branch="task/issue-304")
+    assert updates == []
+
+
+def test_get_recent_updates_returns_empty_when_file_missing(tmp_path: Path) -> None:
+    """Verify get_recent_updates returns empty list when no handoff file."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    updates = service.storage.get_recent_updates(branch="task/issue-304")
+    assert updates == []

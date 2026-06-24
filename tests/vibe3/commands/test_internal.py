@@ -242,7 +242,7 @@ def test_internal_bootstrap_dispatch() -> None:
                         "vibe3.services.orchestra.FlowOrchestratorService"
                     ) as service_cls:
                         with patch(
-                            "vibe3.commands.flow_manage._ensure_current_handoff_for_flow"
+                            "vibe3.commands.flow_manage.ensure_current_handoff_for_flow"
                         ) as mock_ensure_handoff:
                             github = MagicMock()
                             github.view_issue.return_value = issue_payload
@@ -282,8 +282,8 @@ def test_internal_bootstrap_dispatch() -> None:
     assert call.kwargs["blocked_reason"] is None
     payload = json.loads(result.stdout)
     assert payload["branch"] == "dev/issue-123"
-    # Verify handoff helper is called
-    mock_ensure_handoff.assert_called_once_with("dev/issue-123")
+    # Verify handoff helper is called with source="bootstrap"
+    mock_ensure_handoff.assert_called_once_with("dev/issue-123", source="bootstrap")
 
 
 def test_internal_bootstrap_rejects_dependency_and_reason_together() -> None:

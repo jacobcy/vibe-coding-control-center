@@ -8,6 +8,7 @@ from vibe3.services.shared import SpecRefService, ref_to_handoff_cmd
 from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
+from vibe3.utils import format_timestamp_local
 
 
 def _render_flow_row(
@@ -211,7 +212,7 @@ def render_flow_status(
     if status.timeline:
         console.print("  [dim]timeline:[/]  [dim](from GitHub comments)[/]")
         for event in status.timeline:
-            ts = event.timestamp.replace("T", " ")[:16]
+            ts = format_timestamp_local(event.timestamp)
             console.print(
                 f"    [dim]{ts}[/] [cyan]{event.event_type}[/] [dim]{event.actor}[/]"
             )

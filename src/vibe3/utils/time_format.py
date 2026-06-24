@@ -75,3 +75,24 @@ def format_age_aware_time(
     else:
         # ≥7 days: MM-DD HH:MM
         return local_time.strftime("%m-%d %H:%M")
+
+
+def format_timestamp_local(ts_str: str) -> str:
+    """Convert ISO timestamp string to local time for display.
+
+    Handles both UTC timestamps from SQLite (e.g. +00:00) and
+    already-local timestamps from handoff files (e.g. +08:00).
+
+    Args:
+        ts_str: ISO 8601 timestamp string
+
+    Returns:
+        Local time formatted as "YYYY-MM-DD HH:MM"
+    """
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        local_dt = dt.astimezone()
+        return local_dt.strftime("%Y-%m-%d %H:%M")
+    except (ValueError, KeyError):
+        # Fallback: raw string extraction
+        return ts_str[:16].replace("T", " ")

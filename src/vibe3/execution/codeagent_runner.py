@@ -339,8 +339,14 @@ class CodeagentExecutionService:
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
             # Supervisor (L2) is lightweight: no flow, no state machine, skip gate.
+            # Only task/issue- branches participate in orchestra state machine;
+            # human-managed branches (e.g. dev/issue-) skip the label transition check.
             _noop_gate_roles = {"manager", "planner", "executor", "reviewer"}
-            if command.issue_number is not None and command.role in _noop_gate_roles:
+            if (
+                command.issue_number is not None
+                and command.role in _noop_gate_roles
+                and ctx.branch.startswith("task/issue-")
+            ):
                 apply_unified_noop_gate(
                     store=ctx.store,
                     issue_number=command.issue_number,

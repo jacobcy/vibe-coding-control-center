@@ -118,10 +118,9 @@ class HandoffStatusService:
         # Fetch live sessions from registry
         live_sessions = self._get_live_sessions_for_branch(branch)
 
-        # Fetch recent updates from handoff file
-        updates_limit = None if limit is None else 2
+        # Fetch recent updates from handoff file (all entries)
         recent_updates = self.handoff_service.storage.get_recent_updates(
-            branch, limit=updates_limit
+            branch, limit=limit
         )
 
         # Resolve worktree path for the target branch
