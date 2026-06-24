@@ -69,6 +69,10 @@ def _emit_review_result(
 
     if verdict == "DRY_RUN":
         console.print("[green]✓ Completed successfully[/green]")
+        if backend:
+            console.print(f"[cyan]Backend:[/cyan] {backend}")
+        if model:
+            console.print(f"[cyan]Model:[/cyan] {model}")
         if report_ref:
             console.print(f"[cyan]Report:[/cyan] {report_ref}")
         return

@@ -439,14 +439,14 @@ class CodeagentExecutionService:
                 dry_run_summary=command.dry_run_summary,
             )
             if command.dry_run:
-                # Backend/model are already displayed in the prompt
-                # composition section by CodeagentBackend.run().
                 return CodeagentResult(
                     success=True,
                     exit_code=agent_result.exit_code,
                     stdout=agent_result.stdout,
                     stderr=agent_result.stderr,
                     session_id=agent_result.session_id or ctx.session_id,
+                    backend=effective.backend,
+                    model=effective.model,
                     issue_number=command.issue_number,
                 )
 
