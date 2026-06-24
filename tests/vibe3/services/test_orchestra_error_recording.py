@@ -226,9 +226,9 @@ class TestRecordDispatchFailureIfUnexpected:
                 exception=ValueError("Test error"),
             )
 
-        # ValueError is unclassified, maps to E_EXEC_UNKNOWN (WARNING severity)
+        # ValueError is a permanent code bug → E_DISPATCH_CODE_ERROR (ERROR severity)
         mock_record_error.assert_called_once_with(
-            error_code="E_EXEC_UNKNOWN",  # Classified by classify_error_hybrid
+            error_code="E_DISPATCH_CODE_ERROR",  # Classified as permanent code error
             error_message="manual executor dispatch failed [exception]: Test error",
             tick_id=None,  # Not specified, auto-infer
             issue_number=456,
