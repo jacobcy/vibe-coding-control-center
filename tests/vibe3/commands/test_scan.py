@@ -110,6 +110,7 @@ class TestGovernanceScan:
 
 
 class TestSupervisorScan:
+    @pytest.mark.slow
     def test_supervisor_dry_run(self):
         result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
         assert result.exit_code == 0

@@ -77,6 +77,7 @@ def test_flow_orchestrator_snapshot_returns_none_when_unreachable() -> None:
         assert snapshot is None
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_checkouts_branch_in_non_worktree_mode() -> None:
     """CRITICAL: Non-worktree mode must checkout newly created branch.
 
@@ -156,6 +157,7 @@ def test_bootstrap_issue_flow_skips_checkout_in_worktree_mode() -> None:
     assert result["branch"] == "dev/issue-888"
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     config = load_orchestra_config()
     store = MagicMock()
@@ -467,6 +469,7 @@ def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:
         assert result is None
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict() -> None:
     """Fetch should retry on 'cannot lock ref' GitError and succeed."""
     from vibe3.exceptions import GitError
@@ -507,6 +510,7 @@ def test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict() -> None:
     assert result["branch"] == "dev/issue-999"
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_packs_refs_on_lock_conflict() -> None:
     """Fetch should pack refs before retrying on 'cannot lock ref' error."""
     from vibe3.exceptions import GitError

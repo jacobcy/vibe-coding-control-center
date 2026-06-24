@@ -456,6 +456,7 @@ def test_review_base_help_shows_new_options():
     assert "--fresh-session" in output
 
 
+@pytest.mark.slow
 def test_review_fresh_session_propagates():
     """review --fresh-session should propagate to run_issue_role_sync."""
     with (

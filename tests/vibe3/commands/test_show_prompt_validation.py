@@ -135,6 +135,7 @@ class TestReviewCommandValidation:
         # Mock should NOT be called since validation happens first
         mock_review.assert_not_called()
 
+    @pytest.mark.slow
     def test_review_show_prompt_with_dry_run_still_works(self):
         """review command should accept --show-prompt with --dry-run."""
         with patch(

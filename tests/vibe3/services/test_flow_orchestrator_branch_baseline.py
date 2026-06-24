@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
@@ -61,6 +63,7 @@ def test_validate_or_recreate_branch_force_recreates_when_diverged() -> None:
     )
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_omits_creation_source_when_diverged_kept() -> None:
     """creation_source stays None when an existing diverged branch is kept as-is."""
     config = load_orchestra_config()
@@ -87,6 +90,7 @@ def test_bootstrap_issue_flow_omits_creation_source_when_diverged_kept() -> None
     assert kwargs["creation_source"] is None
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_sets_creation_source_for_new_branch() -> None:
     """A freshly created branch should record scene_base_ref as creation_source."""
     config = load_orchestra_config()
