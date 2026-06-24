@@ -243,6 +243,43 @@ def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
         assert mock_publish_and_wait.call_count == 2
 
 
+def test_supervisor_scan_async_results_use_shared_launch_display() -> None:
+    """Supervisor async dispatch should not use command-specific result echo."""
+    from vibe3.models import ExecutionLaunchResult
+
+    with (
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
+        patch("vibe3.ui.display_execution_result") as mock_display,
+    ):
+        mock_fetch.return_value = (
+            1,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
+        launch = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-supervisor-issue-123",
+            log_path="temp/logs/supervisor.log",
+            backend="claude",
+            model="sonnet",
+        )
+        mock_publish_and_wait.return_value = launch
+
+        result = runner.invoke(app, ["scan", "supervisor"])
+
+    assert result.exit_code == 0
+    mock_display.assert_called_once()
+    assert mock_display.call_args.args[1] is launch
+    assert mock_display.call_args.args[2] == "Supervisor Dispatch"
+    assert "Dispatched to:" not in result.output
+
+
 def test_governance_list_shows_materials():
     result = runner.invoke(app, ["scan", "governance", "--list"])
     assert result.exit_code == 0
@@ -401,13 +438,13 @@ def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
         assert "Candidates:" in result.output
         assert "#123: Issue A" in result.output
         assert "#456: Issue B" in result.output
-        assert "Execution:" in result.output
+        assert "Supervisor Dispatch Result" in result.output
         assert "Backend: openai" in result.output
         assert "Model: gpt-4" in result.output
-        assert "Dispatched to: vibe3-supervisor-123" in result.output
+        assert "Tmux session: vibe3-supervisor-123" in result.output
         assert "Backend: anthropic" in result.output
         assert "Model: claude-3" in result.output
-        assert "Dispatched to: vibe3-supervisor-456" in result.output
+        assert "Tmux session: vibe3-supervisor-456" in result.output
 
 
 def test_governance_show_prompt_requires_dry_run():
@@ -440,3 +477,229 @@ def test_supervisor_dry_run_shows_summary_with_zero_candidates(
     assert result.exit_code == 0
     # Should show scan summary, not just prompt composition
     assert "Candidates:" in result.output or "issues scanned" in result.output
+
+
+class TestGovernanceDryRunResultDisplay:
+    """Governance dry-run must display Backend/Model via display_codeagent_result,
+    consistent with plan/run/review --dry-run pattern (PR #3143)."""
+
+    def test_dry_run_displays_result_via_shared_function(self):
+        """_run_governance_scan_dry_run calls display_codeagent_result."""
+        with (
+            patch("vibe3.execution.run_governance_sync") as mock_run_sync,
+            patch("vibe3.observability.append_governance_event"),
+            patch("vibe3.roles.governance_factory.build_default_governance_fns"),
+            patch("vibe3.ui.display_codeagent_result") as mock_display,
+        ):
+            from vibe3.agents import CodeagentResult
+
+            mock_run_sync.return_value = CodeagentResult(
+                success=True, backend="openai", model="gpt-5"
+            )
+
+            from vibe3.commands.scan import _run_governance_scan_dry_run
+
+            _run_governance_scan_dry_run(
+                material_override="assignee-pool", show_prompt=False
+            )
+
+            mock_display.assert_called_once()
+            call_args = mock_display.call_args
+            result_arg = call_args[0][1]
+            assert isinstance(result_arg, CodeagentResult)
+            assert result_arg.backend == "openai"
+            assert result_arg.model == "gpt-5"
+            assert result_arg.success is True
+            assert call_args[0][2] == "Governance Scan"
+
+    @patch("vibe3.execution.governance_sync_runner.CodeagentBackend")
+    @patch("vibe3.execution.governance_sync_runner.load_orchestra_config")
+    @patch("vibe3.services.orchestra.OrchestraStatusService")
+    @patch("vibe3.execution.governance_sync_runner.resolve_display_agent_options")
+    def test_run_governance_sync_dry_run_returns_codeagent_result(
+        self,
+        mock_resolve_opts,
+        mock_status_svc,
+        mock_load_config,
+        mock_backend_cls,
+    ):
+        """dry_run=True returns CodeagentResult with backend/model."""
+        from vibe3.agents import CodeagentResult
+        from vibe3.execution.governance_sync_runner import run_governance_sync
+        from vibe3.models import AgentOptions
+
+        # Setup mocks
+        mock_config = MagicMock()
+        mock_load_config.return_value = mock_config
+        mock_status = MagicMock()
+        mock_status.snapshot.return_value = MagicMock()
+        mock_status_svc.create.return_value = mock_status
+
+        mock_backend = MagicMock()
+        mock_backend.run.return_value = MagicMock(exit_code=0)
+        mock_backend_cls.return_value = mock_backend
+
+        mock_resolve_opts.return_value = AgentOptions(
+            backend="anthropic", model="claude-sonnet-4-6"
+        )
+
+        mock_governance_fns = MagicMock()
+        mock_governance_fns.resolve_options.return_value = AgentOptions(
+            agent="vibe-governance"
+        )
+        mock_governance_fns.build_snapshot_context.return_value = {}
+        mock_governance_fns.render_prompt.return_value = MagicMock(
+            rendered_text="test prompt",
+            provenance={},
+            warnings=[],
+        )
+
+        mock_append_event = MagicMock()
+
+        with patch(
+            "vibe3.execution.governance_sync_runner.PromptManifest"
+        ) as mock_manifest_cls:
+            mock_manifest = MagicMock()
+            mock_recipe = MagicMock()
+            mock_recipe.variants = {}
+            mock_manifest.recipe.return_value = mock_recipe
+            mock_manifest_cls.load_for_prompts_path.return_value = mock_manifest
+
+            with (
+                patch(
+                    "vibe3.execution.governance_sync_runner.collect_dry_run_provenance"
+                ),
+                patch("vibe3.execution.governance_sync_runner.write_prompt_provenance"),
+            ):
+                result = run_governance_sync(
+                    tick_count=0,
+                    material_override="assignee-pool",
+                    dry_run=True,
+                    show_prompt=False,
+                    session_id=None,
+                    governance_fns=mock_governance_fns,
+                    append_event=mock_append_event,
+                )
+
+        assert result is not None
+        assert isinstance(result, CodeagentResult)
+        assert result.success is True
+        assert result.backend == "anthropic"
+        assert result.model == "claude-sonnet-4-6"
+
+    def test_run_governance_sync_non_dry_run_returns_none(self):
+        """dry_run=False returns None (no result display needed)."""
+        with (
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend"
+            ) as mock_backend_cls,
+            patch(
+                "vibe3.execution.governance_sync_runner.load_orchestra_config"
+            ) as mock_load_config,
+            patch("vibe3.services.orchestra.OrchestraStatusService") as mock_status_svc,
+        ):
+            mock_config = MagicMock()
+            mock_load_config.return_value = mock_config
+            mock_status = MagicMock()
+            mock_status.snapshot.return_value = MagicMock()
+            mock_status_svc.create.return_value = mock_status
+
+            mock_backend = MagicMock()
+            mock_backend.run.return_value = MagicMock(exit_code=0)
+            mock_backend_cls.return_value = mock_backend
+
+            mock_governance_fns = MagicMock()
+            mock_governance_fns.resolve_options.return_value = MagicMock()
+            mock_governance_fns.build_snapshot_context.return_value = {}
+            mock_governance_fns.render_prompt.return_value = MagicMock(
+                rendered_text="test prompt",
+                provenance={},
+                warnings=[],
+            )
+
+            from vibe3.execution.governance_sync_runner import run_governance_sync
+
+            result = run_governance_sync(
+                tick_count=0,
+                dry_run=False,
+                show_prompt=False,
+                session_id=None,
+                governance_fns=mock_governance_fns,
+                append_event=MagicMock(),
+            )
+
+            assert result is None
+
+    @pytest.mark.slow
+    def test_governance_dry_run_shows_backend_and_model(self):
+        """Integration: 'scan governance --dry-run' shows Backend/Model in output."""
+        result = runner.invoke(app, ["scan", "governance", "--dry-run"])
+        if result.exit_code != 0:
+            pytest.skip(f"Environment issue: {result.exception}")
+        output = result.output
+        # After fix: Backend/Model should appear in Governance Scan Result section
+        assert "Backend:" in output, f"Missing Backend: in output:\n{output}"
+        assert "Model:" in output, f"Missing Model: in output:\n{output}"
+        assert "Governance Scan Result" in output
+        assert "Completed successfully" in output
+
+
+class TestSupervisorDryRunResultDisplay:
+    """Supervisor dry-run must display Backend/Model via display_codeagent_result,
+    consistent with plan/run/review/governance --dry-run pattern."""
+
+    def test_dry_run_displays_result_via_shared_function(self):
+        """_run_supervisor_scan_dry_run calls display_codeagent_result."""
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh_cls,
+            patch("vibe3.config.load_orchestra_config") as mock_load_config,
+            patch(
+                "vibe3.roles.supervisor.build_supervisor_handoff_payload"
+            ) as mock_build,
+            patch("vibe3.roles.scan_service.fetch_supervisor_candidates") as mock_fetch,
+            patch("vibe3.agents.CodeagentBackend"),
+            patch("vibe3.agents.backends.codeagent.sync_models_json"),
+            patch("vibe3.ui.scan_display.display_supervisor_dry_run"),
+            patch("vibe3.ui.display_codeagent_result") as mock_display,
+        ):
+            from vibe3.models import AgentOptions
+
+            mock_config = MagicMock()
+            mock_config.repo = "owner/repo"
+            sh = MagicMock()
+            sh.backend = "openai"
+            sh.model = "gpt-4"
+            mock_config.supervisor_handoff = sh
+            mock_load_config.return_value = mock_config
+            mock_build.return_value = (
+                "test prompt",
+                AgentOptions(agent="vibe-supervisor", backend="openai", model="gpt-5"),
+                {},
+            )
+            mock_fetch.return_value = (0, [])
+            mock_gh = MagicMock()
+            mock_gh_cls.return_value = mock_gh
+
+            from vibe3.commands.scan import _run_supervisor_scan_dry_run
+
+            _run_supervisor_scan_dry_run(show_prompt=False)
+
+            mock_display.assert_called_once()
+            call_args = mock_display.call_args
+            result_arg = call_args[0][1]
+            assert result_arg.success is True
+            assert result_arg.backend is not None
+            assert result_arg.model is not None
+            assert call_args[0][2] == "Supervisor Scan"
+
+    @pytest.mark.slow
+    def test_supervisor_dry_run_shows_backend_and_model(self):
+        """Integration: 'scan supervisor --dry-run' shows Backend/Model."""
+        result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+        if result.exit_code != 0:
+            pytest.skip(f"Environment issue: {result.exception}")
+        output = result.output
+        assert "Backend:" in output, f"Missing Backend: in output:\n{output}"
+        assert "Model:" in output, f"Missing Model: in output:\n{output}"
+        assert "Supervisor Scan Result" in output
+        assert "Completed successfully" in output

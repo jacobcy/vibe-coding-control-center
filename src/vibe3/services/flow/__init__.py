@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow.rebuild import FlowRebuildUsecase
     from vibe3.services.flow.recovery import FlowRecoveryService
     from vibe3.services.flow.resume_resolver import infer_resume_label
-    from vibe3.services.flow.service import FlowService
+    from vibe3.services.flow.service import FlowService, resolve_flow_ref
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
     from vibe3.services.flow.timeline import FlowTimelineService
@@ -73,6 +73,7 @@ __all__ = [
     "resolve_branch_and_issue",
     "resolve_branch_arg",
     "FlowService",
+    "resolve_flow_ref",
     "FlowStatusResolver",
     "FlowStatusService",
     "FlowTimelineService",
@@ -101,6 +102,7 @@ _SYMBOL_MODULES = {
     "resolve_branch_and_issue": "vibe3.services.flow.branch_resolution",
     "resolve_branch_arg": "vibe3.services.flow.branch_resolution",
     "FlowService": "vibe3.services.flow.service",
+    "resolve_flow_ref": "vibe3.services.flow.service",
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
     "FlowTimelineService": "vibe3.services.flow.timeline",

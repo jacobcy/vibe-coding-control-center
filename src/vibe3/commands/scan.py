@@ -114,17 +114,23 @@ def _run_governance_scan_dry_run(
     Uses real-time snapshot (not synthetic context) to preview governance prompt.
     This fixes Issue #803 Problem 1: dry-run must match production execution path.
 
+    Displays result via shared display_codeagent_result, consistent with
+    plan/run/review --dry-run (PR #3143).
+
     Args:
         material_override: Optional governance role to override material rotation
         show_prompt: If True, display full prompt content with section markers
     """
+    from rich.console import Console
+
     from vibe3.execution import run_governance_sync
     from vibe3.observability import append_governance_event
     from vibe3.roles import build_default_governance_fns
+    from vibe3.ui import display_codeagent_result
 
     # Call internal governance runner with dry_run=True
     # This uses real snapshot instead of synthetic dry-run context
-    run_governance_sync(
+    result = run_governance_sync(
         tick_count=0,  # Manual scan always uses tick=0
         material_override=material_override,
         dry_run=True,
@@ -133,6 +139,10 @@ def _run_governance_scan_dry_run(
         governance_fns=build_default_governance_fns(),
         append_event=append_governance_event,
     )
+
+    if result:
+        console = Console()
+        display_codeagent_result(console, result, "Governance Scan")
 
 
 def _display_supervisor_candidates(candidates: list[dict[str, Any]]) -> None:
@@ -154,19 +164,14 @@ def _display_execution_results(
     results: list[ExecutionLaunchResult | None],
 ) -> None:
     """Display execution dispatch results."""
-    launched = [
-        (r.backend, r.model, r.tmux_session)
-        for r in results
-        if r and r.launched and r.tmux_session
-    ]
-    if launched:
-        typer.echo("\nExecution:")
-        for backend, model, session in launched:
-            if backend:
-                typer.echo(f"Backend: {backend}")
-            if model:
-                typer.echo(f"Model: {model}")
-            typer.echo(f"Dispatched to: {session}")
+    from rich.console import Console
+
+    from vibe3.ui import display_execution_result
+
+    console = Console()
+    for result in results:
+        if result is not None:
+            display_execution_result(console, result, "Supervisor Dispatch")
 
 
 def _run_supervisor_scan() -> tuple[int, int]:
@@ -226,7 +231,8 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
         sample_prompt, options, _ = build_supervisor_handoff_payload(
             config, 999999, "Sample Issue", annotate_sections=show_prompt
         )
-        from vibe3.agents import CodeagentBackend
+        from vibe3.agents import CodeagentBackend, CodeagentResult
+        from vibe3.execution import resolve_display_agent_options
 
         # Show Prompt Composition via CodeagentBackend (same pattern as governance)
         CodeagentBackend().run(
@@ -241,6 +247,20 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
                 "sections": ["supervisor.handoff"],
                 "refs": {"role": "supervisor"},
             },
+        )
+
+        # Display result via shared function, consistent with plan/run/review/governance
+        from vibe3.ui import display_codeagent_result
+
+        effective = resolve_display_agent_options(options)
+        display_codeagent_result(
+            console,
+            CodeagentResult(
+                success=True,
+                backend=effective.backend,
+                model=effective.model,
+            ),
+            "Supervisor Scan",
         )
     except Exception as e:
         console.print(f"[yellow]Could not build prompt preview: {e}[/yellow]")

@@ -20,6 +20,7 @@ from vibe3.config import (
     get_convention,
     load_orchestra_config,
     load_runtime_config,
+    resolve_effective_agent_options,
 )
 from vibe3.execution import (
     CodeagentExecutionService,
@@ -29,6 +30,7 @@ from vibe3.execution import (
     build_role_sync_request,
     build_self_invocation,
     build_task_flow_branch_resolver,
+    resolve_command_agent_options,
     resolve_env_overridable_agent_options,
 )
 from vibe3.models import (
@@ -413,6 +415,13 @@ def resolve_spec_plan_input(
     )
 
 
+def _resolve_spec_ref(branch: str) -> str | None:
+    """Get spec_ref from flow state, or None if unavailable."""
+    from vibe3.services.flow import resolve_flow_ref
+
+    return resolve_flow_ref(branch, "spec_ref")
+
+
 def execute_spec_plan_async(
     *,
     request: PlanRequest,
@@ -427,15 +436,12 @@ def execute_spec_plan_async(
 ) -> CodeagentResult:
     """Execute spec plan in async mode (tmux wrapper).
 
-    ``request`` and ``config`` are intentionally unused: async mode re-invokes
-    the CLI via ``cli_args`` inside a tmux session, so all configuration is
-    re-resolved from scratch by the child process. Passing a custom ``request``
-    or ``config`` here has no effect.
-
-    ``agent``, ``backend``, ``model``, and ``fresh_session`` are also unused here
-    because they should already be included in ``cli_args`` by the caller.
+    Async mode re-invokes the CLI via ``cli_args`` inside a tmux session. The
+    child process still resolves execution config, while this parent resolves
+    display metadata so async output uses the same result renderer as dry-run
+    and sync paths.
     """
-    _ = request, config, agent, backend, model, fresh_session
+    _ = request, fresh_session
     from vibe3.clients import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
@@ -474,13 +480,31 @@ def execute_spec_plan_async(
         issue_number=issue_number,
         branch=branch,
     )
+
+    spec_ref = _resolve_spec_ref(branch)
+    resolved_backend = None
+    resolved_model = None
+    if config is not None:
+        options = resolve_command_agent_options(
+            config=config,
+            section="plan",
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        effective_options = resolve_effective_agent_options(options)
+        resolved_backend = effective_options.backend
+        resolved_model = effective_options.model
+
     return CodeagentResult(
         success=launch.launched,
         stderr=launch.reason or "",
         tmux_session=launch.tmux_session,
         log_path=launch.log_path,
-        backend=launch.backend,
-        model=launch.model,
+        backend=launch.backend or resolved_backend,
+        model=launch.model or resolved_model,
+        issue_number=issue_number,
+        spec_ref=spec_ref,
     )
 
 
@@ -517,6 +541,25 @@ def execute_spec_plan_sync(
             meta.context_mode,  # type: ignore[arg-type]
         )
         dry_run_summary = meta.summary(sections)
+
+        # Collect and write prompt provenance for dry-run audit
+        variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+        context_builder = make_plan_context_builder(
+            request, cfg, annotate_sections=True
+        )
+        prompt_text = context_builder()
+        manifest = PromptManifest.load_for_prompts_path(None)
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="plan.default",
+            variant_key=variant_key,
+            rendered_text=prompt_text,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="planner", issue_number=issue_number or 0
+        )
+        dry_run_summary["provenance_path"] = str(provenance_path)
+
         overlays = discover_project_scope_overlays()
         if overlays:
             dry_run_summary["project_scope_overlays"] = overlays
@@ -548,4 +591,8 @@ def execute_spec_plan_sync(
         session_id=session_id,
         dry_run_summary=dry_run_summary,
     )
-    return CodeagentExecutionService(cfg).execute_sync(command)
+    result = CodeagentExecutionService(cfg).execute_sync(command)
+
+    result.spec_ref = _resolve_spec_ref(branch)
+
+    return result

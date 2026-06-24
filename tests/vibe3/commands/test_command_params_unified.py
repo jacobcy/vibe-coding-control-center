@@ -5,6 +5,7 @@ behavior across plan/run/review/internal-manager commands.
 """
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -308,6 +309,117 @@ def test_run_dry_run_forwards_to_execution(
 
     mock_execute.assert_called_once()
     assert mock_execute.call_args.kwargs.get("dry_run") is True
+
+
+def test_run_dry_run_does_not_emit_legacy_actor_header(
+    monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
+) -> None:
+    """run dry-run metadata should come from the result display only."""
+    from vibe3.agents import CodeagentResult
+
+    mock_execute = MagicMock(
+        return_value=CodeagentResult(success=True, backend="claude", model="haiku")
+    )
+    monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
+
+    result = runner.invoke(run_app, ["--dry-run", "--no-async", "test instructions"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "actor:" not in output
+    assert "Lightweight mode" not in output
+    assert "Run Result" in output
+
+
+def test_run_flow_plan_dry_run_uses_result_ref_not_mode_header(
+    monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
+) -> None:
+    """flow-plan dry-run should not print a run-only pre-result header."""
+    from vibe3.agents import CodeagentResult
+
+    monkeypatch.setattr(
+        "vibe3.commands.run.resolve_run_mode",
+        MagicMock(
+            return_value=SimpleNamespace(
+                mode="flow",
+                plan_file="docs/plans/cleanup-v2.md",
+                message=None,
+                branch="task/issue-42",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.ensure_plan_file_exists", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.resolve_handoff_target",
+        lambda value, branch=None: Path(value),
+    )
+    mock_execute = MagicMock(
+        return_value=CodeagentResult(
+            success=True,
+            backend="claude",
+            model="haiku",
+            plan_ref="docs/plans/cleanup-v2.md",
+        )
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.ensure_plan_file_exists", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.resolve_handoff_target",
+        lambda value, branch=None: Path(value),
+    )
+    monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
+
+    result = runner.invoke(run_app, ["--dry-run", "--no-async"])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "-> Using flow plan:" not in output
+    assert "Plan:" in output
+    assert "Run Result" in output
+
+
+def test_run_async_launch_uses_shared_result_display(
+    monkeypatch: pytest.MonkeyPatch, mock_run_deps: dict
+) -> None:
+    """run async launch should render backend/model/ref/tmux/log via shared display."""
+    from vibe3.agents import CodeagentResult
+
+    mock_execute = MagicMock(
+        return_value=CodeagentResult(
+            success=True,
+            backend="claude",
+            model="haiku",
+            plan_ref="docs/plans/cleanup-v2.md",
+            tmux_session="vibe3-executor-issue-42",
+            log_path="temp/logs/run.async.log",
+        )
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.ensure_plan_file_exists", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.run.resolve_handoff_target",
+        lambda value, branch=None: Path(value),
+    )
+    monkeypatch.setattr("vibe3.roles.run_command.execute_manual_run", mock_execute)
+    monkeypatch.setattr("vibe3.roles.execute_manual_run", mock_execute)
+
+    result = runner.invoke(run_app, [])
+
+    assert result.exit_code == 0
+    output = result.output
+    assert "-> Using flow plan:" not in output
+    assert "Backend: claude" in output
+    assert "Model: haiku" in output
+    assert "Plan:" in output
+    assert "Run Result" in output
+    assert "Tmux session: vibe3-executor-issue-42" in output
+    assert "Log path: temp/logs/run.async.log" in output
 
 
 def test_run_sync_handler_failure_exits_nonzero(

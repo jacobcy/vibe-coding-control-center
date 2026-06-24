@@ -7,6 +7,23 @@ from vibe3.services.flow.transition import FlowTransitionMixin
 from vibe3.services.shared.paths import GitPathProtocol
 
 
+def resolve_flow_ref(branch: str | None, attr: str) -> str | None:
+    """Resolve a ref attribute from flow state, or None if unavailable.
+
+    Generic helper for reading spec_ref, report_ref, plan_ref etc. from
+    a branch's flow state. Returns None if the branch has no flow, the
+    attribute is missing, or any error occurs.
+    """
+    if not branch:
+        return None
+    try:
+        flow = FlowService().get_flow_status(branch)
+        value = getattr(flow, attr, None)
+        return value if value else None
+    except Exception:
+        return None
+
+
 class FlowService(FlowLifecycleMixin, FlowTransitionMixin):
     """Service for managing flow state.
 

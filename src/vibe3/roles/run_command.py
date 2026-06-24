@@ -28,6 +28,7 @@ from vibe3.config import (
     VibeConfig,
     get_resolver,
     load_orchestra_config,
+    resolve_effective_agent_options,
 )
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution import (
@@ -36,9 +37,15 @@ from vibe3.execution import (
     build_prompt_meta,
     build_self_invocation,
     load_session_id,
+    resolve_command_agent_options,
 )
 from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
-from vibe3.prompts import discover_project_scope_overlays
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    discover_project_scope_overlays,
+)
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
@@ -54,6 +61,30 @@ class AsyncDispatchResult:
     log_path: str | None
     backend: str | None = None
     model: str | None = None
+    launched: bool = True
+    reason: str | None = None
+
+
+def _resolve_run_result_agent_options(
+    *,
+    config: VibeConfig,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve run backend/model for display metadata."""
+    try:
+        options = resolve_command_agent_options(
+            config=config,
+            section="run",
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        effective = resolve_effective_agent_options(options)
+    except Exception:
+        return None, None
+    return effective.backend, effective.model
 
 
 def resolve_skill_path(
@@ -130,6 +161,8 @@ def dispatch_run_command_async(
         log_path=launch.log_path,
         backend=launch.backend,
         model=launch.model,
+        launched=launch.launched,
+        reason=launch.reason,
     )
 
 
@@ -200,11 +233,25 @@ def execute_manual_run(
                 ),
                 handoff_metadata=handoff_metadata,
             )
-            if dispatch_result.tmux_session:
-                logger.info(f"tmux session: {dispatch_result.tmux_session}")
-            if dispatch_result.log_path:
-                logger.info(f"log: {dispatch_result.log_path}")
-            return None
+            resolved_backend = dispatch_result.backend
+            resolved_model = dispatch_result.model
+            if not resolved_backend or not resolved_model:
+                fallback_backend, fallback_model = _resolve_run_result_agent_options(
+                    config=config,
+                    agent=agent,
+                    backend=backend,
+                    model=model,
+                )
+                resolved_backend = resolved_backend or fallback_backend
+                resolved_model = resolved_model or fallback_model
+            return CodeagentResult(
+                success=dispatch_result.launched,
+                stderr=dispatch_result.reason or "",
+                tmux_session=dispatch_result.tmux_session,
+                log_path=dispatch_result.log_path,
+                backend=resolved_backend,
+                model=resolved_model,
+            )
 
         # Check if this is a publish path execution
         # Two entry points:
@@ -329,6 +376,30 @@ def execute_manual_run(
         overlays = discover_project_scope_overlays()
         if overlays:
             dry_run_summary["project_scope_overlays"] = overlays
+
+        # Collect and write prompt provenance for dry-run audit
+        variant_key = f"{prompt_mode}.{context_mode}"
+        context_builder = make_run_context_builder(
+            plan_file,
+            config,
+            audit_file=audit_file,
+            mode=prompt_mode,
+            context_mode=context_mode,
+            prompts_path=prompts_path,
+            annotate_sections=True,
+        )
+        prompt_text = context_builder()
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="run.plan",
+            variant_key=variant_key,
+            rendered_text=prompt_text,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="executor", issue_number=issue_number or 0
+        )
+        dry_run_summary["provenance_path"] = str(provenance_path)
     include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
 
     command = create_codeagent_command(
@@ -391,11 +462,26 @@ def execute_manual_run(
             ),
             handoff_metadata={"plan_ref": plan_file} if plan_file else None,
         )
-        if dispatch_result.tmux_session:
-            logger.info(f"tmux session: {dispatch_result.tmux_session}")
-        if dispatch_result.log_path:
-            logger.info(f"log: {dispatch_result.log_path}")
-        return None
+        resolved_backend = dispatch_result.backend
+        resolved_model = dispatch_result.model
+        if not resolved_backend or not resolved_model:
+            fallback_backend, fallback_model = _resolve_run_result_agent_options(
+                config=config,
+                agent=agent,
+                backend=backend,
+                model=model,
+            )
+            resolved_backend = resolved_backend or fallback_backend
+            resolved_model = resolved_model or fallback_model
+        return CodeagentResult(
+            success=dispatch_result.launched,
+            stderr=dispatch_result.reason or "",
+            tmux_session=dispatch_result.tmux_session,
+            log_path=dispatch_result.log_path,
+            backend=resolved_backend,
+            model=resolved_model,
+            plan_ref=plan_file,
+        )
 
     execution_service = CodeagentExecutionService(config)
     try:
@@ -407,6 +493,10 @@ def execute_manual_run(
                 reason=str(exc) or "Execution aborted",
             )
         raise
+
+    # Set plan_ref if plan_file is provided
+    if plan_file is not None:
+        result.plan_ref = plan_file
 
     if not dry_run and no_async and issue_number is not None:
         if result.success:

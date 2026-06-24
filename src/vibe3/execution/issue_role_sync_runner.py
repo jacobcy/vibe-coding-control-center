@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 
 from vibe3.agents import CodeagentBackend
@@ -20,6 +22,10 @@ from vibe3.services.issue import load_issue_info
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import format_agent_actor, format_dry_run_header
 
+if TYPE_CHECKING:
+    from vibe3.agents import CodeagentResult
+    from vibe3.models import ExecutionLaunchResult
+
 
 def run_issue_role_async(
     *,
@@ -31,7 +37,7 @@ def run_issue_role_async(
     backend: str | None = None,
     model: str | None = None,
     fresh_session: bool = False,
-) -> None:
+) -> "ExecutionLaunchResult | None":
     """Run a role asynchronously via tmux wrapper.
 
     Launches tmux session and returns immediately.
@@ -68,7 +74,7 @@ def run_issue_role_async(
     if not dry_run:
         if not coordinator.capacity.can_dispatch(spec.role_name):
             typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
-            return
+            return None
 
     if not dry_run:
         request = spec.build_async_request(config, issue, actor, branch)
@@ -98,12 +104,9 @@ def run_issue_role_async(
                 typer.echo(
                     f"{spec.role_name} dispatch queued/throttled: {result.reason}"
                 )
-                return
+                return result
 
-            typer.echo(f"-> {spec.role_name} run: issue #{issue_number}")
-            typer.echo(f"tmux session: {result.tmux_session}")
-            typer.echo(f"log: {result.log_path}")
-            return
+            return result
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
                 role=spec.role_name,
@@ -132,6 +135,7 @@ def run_issue_role_async(
         spec.role_name, issue_number, branch, actor, dry_run_mode="async dry-run"
     )
     typer.echo(header)
+    return None
 
 
 def run_issue_role_sync(
@@ -145,7 +149,7 @@ def run_issue_role_sync(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
-) -> None:
+) -> "CodeagentResult | None":
     """Run a role synchronously (direct execution without tmux wrapper).
 
     Orchestrated process runs the agent synchronously and waits for completion.
@@ -203,10 +207,26 @@ def run_issue_role_sync(
         branch=branch,
     )
 
-    # dry-run output is handled by CodeagentBackend.run()
-    # which prints "=== Prompt Composition ===" and optional prompt content
     if dry_run:
-        return
+        from vibe3.agents import CodeagentResult
+        from vibe3.config import resolve_repo_agent_preset
+
+        # Resolve model from agent preset when backend is already set
+        # (resolve_effective_agent_options short-circuits when backend
+        # is truthy, which it always is for roles going through
+        # ExecutionRolePolicyService.resolve_backend).
+        model = options.model
+        if not model and options.agent:
+            preset = resolve_repo_agent_preset(options.agent)
+            if preset:
+                _, model = preset
+
+        return CodeagentResult(
+            success=sync_result.launched,
+            backend=options.backend or sync_result.backend,
+            model=model or sync_result.model,
+            issue_number=issue_number,
+        )
 
     if not sync_result.launched:
         # Soft-skip reason codes: coordinator intentionally declined, not a failure
@@ -215,10 +235,12 @@ def run_issue_role_sync(
             typer.echo(
                 f"{spec.role_name} dispatch queued/throttled: {sync_result.reason}"
             )
-            return
+            return None
         if spec.failure_handler is not None:
             spec.failure_handler(
                 issue_number,
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
+
+    return None

@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Sequence
 
-from vibe3.config import VibeConfig
+from vibe3.config import (
+    VibeConfig,
+    resolve_effective_agent_options,
+    resolve_repo_agent_preset,
+)
 from vibe3.models import AgentOptions
 
 
@@ -70,6 +74,29 @@ def resolve_command_agent_options(
     raise ValueError(
         f"No agent configuration found for '{section}' command. "
         f"Configure agent_config in settings.yaml or use CLI options."
+    )
+
+
+def resolve_display_agent_options(options: AgentOptions) -> AgentOptions:
+    """Resolve backend/model metadata for result display.
+
+    Some role paths carry an agent preset plus an explicit backend. The core
+    resolver preserves the explicit backend and may leave model empty, while
+    display still needs the preset's model when available.
+    """
+    effective = resolve_effective_agent_options(options)
+    if effective.model or not options.agent:
+        return effective
+
+    preset = resolve_repo_agent_preset(options.agent)
+    if not preset or not preset[1]:
+        return effective
+
+    return AgentOptions(
+        agent=effective.agent,
+        backend=effective.backend,
+        model=preset[1],
+        timeout_seconds=effective.timeout_seconds,
     )
 
 

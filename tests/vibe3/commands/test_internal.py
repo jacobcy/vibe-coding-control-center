@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app as cli_app
+from vibe3.models import ExecutionLaunchResult
 
 runner = CliRunner()
 
@@ -161,6 +162,33 @@ def test_internal_manager_branch_override_async(monkeypatch):
         assert mock_run.call_args.kwargs["issue_number"] == 123
         assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
         assert mock_run.call_args.kwargs["dry_run"] is False
+
+
+def test_internal_manager_async_skipped_uses_launch_result_display(monkeypatch):
+    """Async manager skipped/throttled dispatch must not render as Codeagent failure."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+    launch = ExecutionLaunchResult(
+        launched=False,
+        skipped=True,
+        reason="capacity limit reached",
+        reason_code="capacity",
+        backend="claude",
+        model="sonnet",
+    )
+    with (
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async",
+            return_value=launch,
+        ),
+        patch("vibe3.ui.display_execution_result") as mock_display,
+    ):
+        result = runner.invoke(cli_app, ["internal", "manager", "123"])
+
+    assert result.exit_code == 0
+    mock_display.assert_called_once()
+    assert mock_display.call_args.args[1] is launch
+    assert mock_display.call_args.args[2] == "Manager Dispatch"
+    assert "Failed" not in result.output
 
 
 def test_internal_manager_branch_numeric(monkeypatch):
@@ -464,4 +492,79 @@ def test_internal_manager_show_prompt_forces_sync_path(monkeypatch):
             mock_async.assert_not_called()
             # Verify show_prompt was passed
             assert mock_sync.call_args.kwargs["show_prompt"] is True
-            assert mock_sync.call_args.kwargs["dry_run"] is True
+
+
+class TestManagerDryRunResultDisplay:
+    """Manager --dry-run must use sync execution and display via
+    _handle_codeagent_result, consistent with plan/run/review commands."""
+
+    @patch("vibe3.commands.common._handle_codeagent_result")
+    def test_manager_dry_run_uses_handle_codeagent_result(self, mock_handle):
+        """Manager --dry-run passes CodeagentResult to _handle_codeagent_result."""
+        from vibe3.agents import CodeagentResult
+
+        fake_result = CodeagentResult(
+            success=True,
+            backend="anthropic",
+            model="claude-opus-4-8",
+            issue_number=123,
+        )
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync",
+            return_value=fake_result,
+        ) as mock_sync:
+            with patch(
+                "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+            ) as mock_async:
+                result = runner.invoke(
+                    cli_app,
+                    ["internal", "manager", "123", "--dry-run", "--no-async", "--yes"],
+                )
+
+        assert result.exit_code == 0
+        mock_sync.assert_called_once()
+        mock_async.assert_not_called()
+        mock_handle.assert_called_once()
+        call_args = mock_handle.call_args
+        result_arg = call_args[0][0]
+        assert result_arg.success is True
+        assert result_arg.backend == "anthropic"
+        assert result_arg.model == "claude-opus-4-8"
+        assert call_args[0][1] == "Manager"
+
+    @patch("vibe3.commands.common._handle_codeagent_result")
+    def test_manager_dry_run_forces_sync_execution(self, mock_handle):
+        """Manager --dry-run (without --no-async) forces sync execution."""
+        from vibe3.agents import CodeagentResult
+
+        fake_result = CodeagentResult(
+            success=True,
+            backend="openai",
+            model="gpt-5",
+            issue_number=123,
+        )
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync",
+            return_value=fake_result,
+        ) as mock_sync:
+            with patch(
+                "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+            ) as mock_async:
+                result = runner.invoke(
+                    cli_app,
+                    ["internal", "manager", "123", "--dry-run", "--yes"],
+                )
+
+        assert result.exit_code == 0
+        # --dry-run forces sync execution, not async
+        mock_sync.assert_called_once()
+        mock_async.assert_not_called()
+        mock_handle.assert_called_once()
+        call_args = mock_handle.call_args
+        result_arg = call_args[0][0]
+        assert result_arg.success is True
+        assert result_arg.backend == "openai"
+        assert result_arg.model == "gpt-5"
+        assert call_args[0][1] == "Manager"

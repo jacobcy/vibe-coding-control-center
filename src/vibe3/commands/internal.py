@@ -76,8 +76,9 @@ def internal_manager_dispatch(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    # --show-prompt requires sync execution (async path lacks show_prompt support)
-    if show_prompt:
+    # --show-prompt and --dry-run require sync execution
+    # (async path cannot render prompt composition or return CodeagentResult)
+    if show_prompt or dry_run:
         no_async = True
 
     # Resolve issue number from current flow if not specified
@@ -130,7 +131,7 @@ def internal_manager_dispatch(
     from vibe3.roles import MANAGER_SYNC_SPEC
 
     if no_async:
-        run_issue_role_sync(
+        result = run_issue_role_sync(
             issue_number=issue,
             dry_run=dry_run,
             fresh_session=False,
@@ -139,12 +140,25 @@ def internal_manager_dispatch(
             branch=branch,
         )
     else:
-        run_issue_role_async(
+        result = run_issue_role_async(  # type: ignore[assignment]
             issue_number=issue,
             dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
             branch=branch,
         )
+
+    if result is not None:
+        if no_async:
+            from vibe3.commands.common import _handle_codeagent_result
+
+            _handle_codeagent_result(result, "Manager")  # type: ignore[arg-type]
+        else:
+            from rich.console import Console
+
+            from vibe3.ui import display_execution_result
+
+            console = Console()
+            display_execution_result(console, result, "Manager Dispatch")  # type: ignore[arg-type]
 
 
 @app.command("apply")

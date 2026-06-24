@@ -88,7 +88,7 @@ class TestDisplayCodeagentResult:
     """Tests for CodeagentResult display (plan/run/review commands)."""
 
     def test_display_codeagent_result_shows_backend_and_model(self):
-        """display_codeagent_result shows backend/model when present."""
+        """display_codeagent_result shows backend/model above the result block."""
         from vibe3.agents import CodeagentResult
 
         console = MagicMock()
@@ -108,6 +108,9 @@ class TestDisplayCodeagentResult:
         assert any("Model:" in c and "sonnet" in c for c in calls)
         assert any("Log path:" in c for c in calls)
         assert any("Tmux session:" in c for c in calls)
+        backend_idx = next(i for i, c in enumerate(calls) if "Backend:" in c)
+        result_idx = next(i for i, c in enumerate(calls) if "Plan Result" in c)
+        assert backend_idx < result_idx
 
     def test_display_codeagent_result_handles_missing_backend_model(self):
         """display_codeagent_result handles missing backend/model gracefully."""
@@ -149,6 +152,73 @@ class TestDisplayCodeagentResult:
         calls = [str(c) for c in console.print.call_args_list]
         assert any("Failed" in c for c in calls)
         assert any("Error: something went wrong" in c for c in calls)
+
+    def test_display_codeagent_result_shows_plan_spec(self):
+        """display_codeagent_result shows refs above the result block."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=True,
+            backend="claude",
+            model="sonnet",
+            spec_ref=".agent/specs/issue-456.md",
+            plan_ref=".agent/plans/issue-123.md",
+            issue_number=456,
+            log_path="temp/logs/plan/test.log",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Plan")
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Spec:" in c and ".agent/specs/issue-456.md" in c for c in calls)
+        assert any("Plan:" in c and ".agent/plans/issue-123.md" in c for c in calls)
+        assert not any("Issue:" in c for c in calls)
+        # Spec should appear before Plan in the output order
+        spec_idx = next(i for i, c in enumerate(calls) if "Spec:" in c)
+        plan_idx = next(i for i, c in enumerate(calls) if "Plan:" in c)
+        result_idx = next(i for i, c in enumerate(calls) if "Plan Result" in c)
+        assert spec_idx < plan_idx
+        assert plan_idx < result_idx
+
+    def test_display_codeagent_result_shows_report_ref(self):
+        """display_codeagent_result supports review report refs."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=True,
+            backend="claude",
+            model="opus",
+            report_ref="docs/reports/review.md",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Review")
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("Report:" in c and "docs/reports/review.md" in c for c in calls)
+        report_idx = next(i for i, c in enumerate(calls) if "Report:" in c)
+        result_idx = next(i for i, c in enumerate(calls) if "Review Result" in c)
+        assert report_idx < result_idx
+
+    def test_display_codeagent_result_handles_missing_context_fields(self):
+        """display_codeagent_result handles missing plan_ref/spec_ref."""
+        from vibe3.agents import CodeagentResult
+
+        console = MagicMock()
+        result = CodeagentResult(
+            success=True,
+            backend="claude",
+            model="sonnet",
+            log_path="temp/logs/plan/test.log",
+        )
+        from vibe3.ui.scan_display import display_codeagent_result
+
+        display_codeagent_result(console, result, "Run")
+        # Should not crash, and should not show Plan/Spec labels
+        calls = [str(c) for c in console.print.call_args_list]
+        assert not any("Plan:" in c for c in calls)
+        assert not any("Spec:" in c for c in calls)
 
 
 class TestDisplayExecutionResult:
