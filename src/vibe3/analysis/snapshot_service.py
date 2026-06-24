@@ -752,11 +752,14 @@ def _register_snapshots_in_db(
 # Re-export baseline functions from snapshot_baseline.py
 # (Maintain backward compatibility for callers importing from snapshot_service)
 from vibe3.analysis.snapshot_baseline import (  # noqa: E402, F401
+    backfill_baseline_registry,
     load_branch_baseline,
     save_branch_baseline,
 )
 
-__all__.extend(["save_branch_baseline", "load_branch_baseline"])
+__all__.extend(
+    ["save_branch_baseline", "load_branch_baseline", "backfill_baseline_registry"]
+)
 
 
 def build_snapshot_diff(
