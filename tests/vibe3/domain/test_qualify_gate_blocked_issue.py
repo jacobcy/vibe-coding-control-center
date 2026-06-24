@@ -103,6 +103,7 @@ def test_qualify_blocked_issue_success(
     qualify_gate_service.run_qualify_gate.assert_called_once()
 
 
+@pytest.mark.slow
 def test_qualify_blocked_issue_reuses_truth(
     qualify_gate_service, sample_issue, mock_flow_manager
 ):
@@ -134,6 +135,7 @@ def test_qualify_blocked_issue_reuses_truth(
     assert result is None
 
 
+@pytest.mark.slow
 def test_qualify_blocked_issue_stays_blocked_when_manual_reason_present(
     qualify_gate_service, sample_issue, mock_flow_manager, mock_store
 ):

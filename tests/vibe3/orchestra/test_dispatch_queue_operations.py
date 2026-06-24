@@ -57,6 +57,7 @@ class TestQueueOperations:
         assert [entry.issue_number for entry in queue] == [1]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_dispatch_all_when_capacity_available(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -165,6 +166,7 @@ class TestQueueOperations:
         assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_skip_when_capacity_full(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -208,6 +210,7 @@ class TestQueueOperations:
         assert len(emit_calls) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_frozen_queue_prevents_duplicate_dispatch_without_state_change(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:

@@ -12,6 +12,7 @@ from vibe3.orchestra.global_dispatch_coordinator import QueueEntry
 
 class TestStateTransitions:
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_collect_order_prefers_higher_state_roles_first(
         self,
         make_issue,
@@ -58,6 +59,7 @@ class TestStateTransitions:
         assert emit_calls[0][1].number == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_capacity_limit_stops_dispatch(
         self,
         make_issue,
@@ -110,6 +112,7 @@ class TestStateTransitions:
         assert 372 not in dispatched_numbers
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_state_change_requeues_issue_to_front(
         self,
         make_issue,
