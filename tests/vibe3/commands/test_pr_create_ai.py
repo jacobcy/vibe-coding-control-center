@@ -189,6 +189,7 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 0
         assert json.loads(result.output)["title"] == "feat: ai title"
 
+    @pytest.mark.slow
     def test_pr_create_ai_requires_commits_for_suggestions(
         self, runner: CliRunner
     ) -> None:

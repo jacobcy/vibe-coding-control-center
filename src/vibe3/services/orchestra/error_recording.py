@@ -109,7 +109,7 @@ def record_dispatch_failure_if_unexpected(
         # Permanent code bugs → E_DISPATCH_CODE_ERROR (ERROR, counts toward gate)
         # Transient infra → stays E_EXEC_UNKNOWN (WARNING, no gate impact)
         if error_code == "E_EXEC_UNKNOWN":
-            from vibe3.exceptions.error_classification import is_permanent_code_error
+            from vibe3.exceptions import is_permanent_code_error
 
             if is_permanent_code_error(exception):
                 error_code = "E_DISPATCH_CODE_ERROR"
