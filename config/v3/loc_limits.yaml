@@ -109,6 +109,9 @@ code_limits:
       - path: "src/vibe3/commands/handoff_write.py"
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
+      - path: "src/vibe3/commands/review.py"
+        limit: 415
+        reason: "Review 命令聚合，包含 branch/base review 入口、report_ref 解析、verdict 显示、gate check 逻辑等；Issue #3135 新增 report_ref 显示和 _resolve_report_ref 辅助函数（+11 行）"
 
       # Models 层 —— 允许 410
       - path: "src/vibe3/models/flow.py"
@@ -187,8 +190,8 @@ code_limits:
         limit: 610
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成；Issue #3134 新增 dry_run 的 backend/model 透传（+6 行）"
       - path: "src/vibe3/roles/plan.py"
-        limit: 575
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）；Issue #3135 新增 plan_ref/spec_ref/issue_number 字段（+27 行）并提取 _resolve_spec_ref 消除 sync/async 路径重复（-4 行）"
+        limit: 595
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）；Issue #3135 新增 plan_ref/spec_ref/issue_number 字段（+27 行）、_resolve_spec_ref 提取（-4 行）和 prompt provenance 收集（+15 行）"
       - path: "src/vibe3/roles/run_command.py"
         limit: 460
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）；Issue #3135 新增 plan_ref 字段填充（+4 行）和 prompt provenance 收集（+30 行）用于显示执行上下文"
