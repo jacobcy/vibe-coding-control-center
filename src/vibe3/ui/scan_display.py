@@ -1,12 +1,12 @@
 """UI display functions for scan command.
 
-display_codeagent_result has moved to vibe3.ui.result_display — re-exported
+Result display helpers have moved to vibe3.ui.result_display — re-exported
 here for backward compatibility.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import Union
 
 from rich.console import Console
 from rich.table import Table
@@ -14,10 +14,10 @@ from rich.table import Table
 from vibe3.prompts import PromptMaterialSpec
 
 # Re-export for backward compatibility — canonical location is result_display
-from vibe3.ui.result_display import display_codeagent_result  # noqa: F401
-
-if TYPE_CHECKING:
-    from vibe3.models import ExecutionLaunchResult
+from vibe3.ui.result_display import (  # noqa: F401
+    display_codeagent_result,
+    display_execution_result,
+)
 
 
 def display_supervisor_dry_run(
@@ -125,36 +125,3 @@ def display_material_list(
         table.add_row(short_name, description)
 
     console.print(table)
-
-
-def display_execution_result(console: Console, result: "ExecutionLaunchResult") -> None:
-    """Display execution launch result from governance/supervisor dispatch.
-
-    Args:
-        console: Rich Console instance
-        result: ExecutionLaunchResult from handler dispatch
-    """
-    console.print("\n[bold]Execution Launch Result[/bold]")
-
-    if result.launched:
-        console.print("[green]✓ Launched successfully[/green]")
-        if result.backend:
-            console.print(f"[cyan]Backend:[/cyan] {result.backend}")
-        if result.model:
-            console.print(f"[cyan]Model:[/cyan] {result.model}")
-        if result.tmux_session:
-            console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
-        if result.log_path:
-            console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
-    else:
-        if result.skipped:
-            console.print("[yellow]⚠ Skipped[/yellow]")
-        else:
-            console.print("[red]✗ Launch failed[/red]")
-
-        if result.reason:
-            console.print(f"[cyan]Reason:[/cyan] {result.reason}")
-        if result.reason_code:
-            console.print(f"[cyan]Code:[/cyan] {result.reason_code}")
-
-    console.print()  # Blank line for readability

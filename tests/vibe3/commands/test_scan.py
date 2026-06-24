@@ -243,6 +243,43 @@ def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
         assert mock_publish_and_wait.call_count == 2
 
 
+def test_supervisor_scan_async_results_use_shared_launch_display() -> None:
+    """Supervisor async dispatch should not use command-specific result echo."""
+    from vibe3.models import ExecutionLaunchResult
+
+    with (
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
+        patch("vibe3.ui.display_execution_result") as mock_display,
+    ):
+        mock_fetch.return_value = (
+            1,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
+        launch = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-supervisor-issue-123",
+            log_path="temp/logs/supervisor.log",
+            backend="claude",
+            model="sonnet",
+        )
+        mock_publish_and_wait.return_value = launch
+
+        result = runner.invoke(app, ["scan", "supervisor"])
+
+    assert result.exit_code == 0
+    mock_display.assert_called_once()
+    assert mock_display.call_args.args[1] is launch
+    assert mock_display.call_args.args[2] == "Supervisor Dispatch"
+    assert "Dispatched to:" not in result.output
+
+
 def test_governance_list_shows_materials():
     result = runner.invoke(app, ["scan", "governance", "--list"])
     assert result.exit_code == 0
@@ -401,13 +438,13 @@ def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
         assert "Candidates:" in result.output
         assert "#123: Issue A" in result.output
         assert "#456: Issue B" in result.output
-        assert "Execution:" in result.output
+        assert "Supervisor Dispatch Result" in result.output
         assert "Backend: openai" in result.output
         assert "Model: gpt-4" in result.output
-        assert "Dispatched to: vibe3-supervisor-123" in result.output
+        assert "Tmux session: vibe3-supervisor-123" in result.output
         assert "Backend: anthropic" in result.output
         assert "Model: claude-3" in result.output
-        assert "Dispatched to: vibe3-supervisor-456" in result.output
+        assert "Tmux session: vibe3-supervisor-456" in result.output
 
 
 def test_governance_show_prompt_requires_dry_run():
@@ -478,7 +515,7 @@ class TestGovernanceDryRunResultDisplay:
     @patch("vibe3.execution.governance_sync_runner.CodeagentBackend")
     @patch("vibe3.execution.governance_sync_runner.load_orchestra_config")
     @patch("vibe3.services.orchestra.OrchestraStatusService")
-    @patch("vibe3.execution.governance_sync_runner.resolve_effective_agent_options")
+    @patch("vibe3.execution.governance_sync_runner.resolve_display_agent_options")
     def test_run_governance_sync_dry_run_returns_codeagent_result(
         self,
         mock_resolve_opts,

@@ -17,8 +17,8 @@ from vibe3.clients import get_store
 from vibe3.config import (
     GOVERNANCE_GATE_CONFIG,
     load_orchestra_config,
-    resolve_effective_agent_options,
 )
+from vibe3.execution.codeagent_support import resolve_display_agent_options
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
@@ -139,18 +139,11 @@ def run_governance_sync(
         )
 
         # Return CodeagentResult for consistent display with plan/run/review
-        effective = resolve_effective_agent_options(options)
-        model = effective.model
-        if not model and options.agent:
-            from vibe3.config import resolve_repo_agent_preset
-
-            preset = resolve_repo_agent_preset(options.agent)
-            if preset and preset[1]:
-                model = preset[1]
+        effective = resolve_display_agent_options(options)
         return CodeagentResult(
             success=True,
             backend=effective.backend,
-            model=model,
+            model=effective.model,
         )
 
     material_info = f" material={material_override}" if material_override else ""

@@ -164,19 +164,14 @@ def _display_execution_results(
     results: list[ExecutionLaunchResult | None],
 ) -> None:
     """Display execution dispatch results."""
-    launched = [
-        (r.backend, r.model, r.tmux_session)
-        for r in results
-        if r and r.launched and r.tmux_session
-    ]
-    if launched:
-        typer.echo("\nExecution:")
-        for backend, model, session in launched:
-            if backend:
-                typer.echo(f"Backend: {backend}")
-            if model:
-                typer.echo(f"Model: {model}")
-            typer.echo(f"Dispatched to: {session}")
+    from rich.console import Console
+
+    from vibe3.ui import display_execution_result
+
+    console = Console()
+    for result in results:
+        if result is not None:
+            display_execution_result(console, result, "Supervisor Dispatch")
 
 
 def _run_supervisor_scan() -> tuple[int, int]:
@@ -237,7 +232,7 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
             config, 999999, "Sample Issue", annotate_sections=show_prompt
         )
         from vibe3.agents import CodeagentBackend, CodeagentResult
-        from vibe3.config import resolve_effective_agent_options
+        from vibe3.execution import resolve_display_agent_options
 
         # Show Prompt Composition via CodeagentBackend (same pattern as governance)
         CodeagentBackend().run(
@@ -257,20 +252,13 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
         # Display result via shared function, consistent with plan/run/review/governance
         from vibe3.ui import display_codeagent_result
 
-        effective = resolve_effective_agent_options(options)
-        model = effective.model
-        if not model and options.agent:
-            from vibe3.config import resolve_repo_agent_preset
-
-            preset = resolve_repo_agent_preset(options.agent)
-            if preset and preset[1]:
-                model = preset[1]
+        effective = resolve_display_agent_options(options)
         display_codeagent_result(
             console,
             CodeagentResult(
                 success=True,
                 backend=effective.backend,
-                model=model,
+                model=effective.model,
             ),
             "Supervisor Scan",
         )

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app as cli_app
+from vibe3.models import ExecutionLaunchResult
 
 runner = CliRunner()
 
@@ -161,6 +162,33 @@ def test_internal_manager_branch_override_async(monkeypatch):
         assert mock_run.call_args.kwargs["issue_number"] == 123
         assert mock_run.call_args.kwargs["branch"] == "task/issue-1905"
         assert mock_run.call_args.kwargs["dry_run"] is False
+
+
+def test_internal_manager_async_skipped_uses_launch_result_display(monkeypatch):
+    """Async manager skipped/throttled dispatch must not render as Codeagent failure."""
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+    launch = ExecutionLaunchResult(
+        launched=False,
+        skipped=True,
+        reason="capacity limit reached",
+        reason_code="capacity",
+        backend="claude",
+        model="sonnet",
+    )
+    with (
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async",
+            return_value=launch,
+        ),
+        patch("vibe3.ui.display_execution_result") as mock_display,
+    ):
+        result = runner.invoke(cli_app, ["internal", "manager", "123"])
+
+    assert result.exit_code == 0
+    mock_display.assert_called_once()
+    assert mock_display.call_args.args[1] is launch
+    assert mock_display.call_args.args[2] == "Manager Dispatch"
+    assert "Failed" not in result.output
 
 
 def test_internal_manager_branch_numeric(monkeypatch):

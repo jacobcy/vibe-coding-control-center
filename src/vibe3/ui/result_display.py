@@ -8,6 +8,7 @@ from rich.console import Console
 
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentResult
+    from vibe3.models import ExecutionLaunchResult
 
 
 def display_codeagent_result(
@@ -54,6 +55,45 @@ def display_codeagent_result(
         console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
     if result.handoff_file:
         console.print(f"[cyan]Handoff:[/cyan] {result.handoff_file}")
+    if result.tmux_session:
+        console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
+
+    console.print()  # Blank line for readability
+
+
+def display_execution_result(
+    console: Console,
+    result: ExecutionLaunchResult,
+    label: str = "Execution Launch",
+) -> None:
+    """Display an ExecutionLaunchResult from async dispatch paths.
+
+    Args:
+        console: Rich Console instance
+        result: ExecutionLaunchResult from handler dispatch
+        label: Label for the dispatch header.
+    """
+    if result.backend:
+        console.print()
+        console.print(f"[cyan]Backend:[/cyan] {result.backend}")
+    if result.model:
+        console.print(f"[cyan]Model:[/cyan] {result.model}")
+
+    console.print(f"\n[bold]{label} Result[/bold]")
+
+    if result.launched:
+        console.print("[green]✓ Launched successfully[/green]")
+    elif result.skipped:
+        console.print("[yellow]⚠ Skipped[/yellow]")
+    else:
+        console.print("[red]✗ Launch failed[/red]")
+
+    if result.reason:
+        console.print(f"[cyan]Reason:[/cyan] {result.reason}")
+    if result.reason_code:
+        console.print(f"[cyan]Code:[/cyan] {result.reason_code}")
+    if result.log_path:
+        console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
     if result.tmux_session:
         console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
 
