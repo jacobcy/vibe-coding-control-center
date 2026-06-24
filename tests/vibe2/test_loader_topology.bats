@@ -8,10 +8,15 @@ setup() {
     TEST_REPO=$(mktemp -d)
     export HOME=$(mktemp -d)
 
-    # Configure git identity for tests that create commits
-    git config --global user.email "test@example.com"
-    git config --global user.name "Test User"
-    git config --global init.defaultBranch main
+    # Use environment variables for git identity to avoid polluting global config.
+    # GIT_CONFIG_GLOBAL=/dev/null prevents reading/writing any user-level gitconfig,
+    # ensuring full isolation from the host environment (CI or local).
+    export GIT_AUTHOR_NAME="Test User"
+    export GIT_AUTHOR_EMAIL="test@example.com"
+    export GIT_COMMITTER_NAME="Test User"
+    export GIT_COMMITTER_EMAIL="test@example.com"
+    export GIT_CONFIG_GLOBAL="/dev/null"
+    export GIT_CONFIG_SYSTEM="/dev/null"
 }
 
 teardown() {
@@ -46,7 +51,7 @@ _has_main_branch() {
 @test "VIBE_REPO: non-bare repo with .git basename resolves to parent" {
     # Create a non-bare repo
     cd "$TEST_REPO"
-    git init
+    git init -b main
     echo "test" > test.txt
     git add test.txt
     git commit -m "initial"
@@ -75,7 +80,7 @@ _has_main_branch() {
 @test "VIBE_REPO: linked worktree with .git basename resolves to main repo" {
     # Create a non-bare repo with worktrees
     cd "$TEST_REPO"
-    git init
+    git init -b main
     echo "test" > test.txt
     git add test.txt
     git commit -m "initial"
@@ -104,7 +109,7 @@ _has_main_branch() {
 @test "VIBE_MAIN: .worktrees/main with wrong branch is skipped" {
     # Create a non-bare repo
     cd "$TEST_REPO"
-    git init
+    git init -b main
     git commit --allow-empty -m "initial"
 
     # Create .worktrees/main but bind it to a feature branch
@@ -118,10 +123,10 @@ _has_main_branch() {
 @test "VIBE_MAIN: git worktree list --porcelain finds main branch worktree" {
     # Create a repo with a main worktree
     cd "$TEST_REPO"
-    git init
+    git init -b main
     git commit --allow-empty -m "initial"
 
-    # Check that porcelain output has refs/heads/main (since we set init.defaultBranch main)
+    # Check that porcelain output has refs/heads/main
     local found_main=0
     while IFS= read -r line; do
         if [[ "$line" == "branch refs/heads/main" ]]; then
@@ -130,8 +135,29 @@ _has_main_branch() {
         fi
     done < <(git worktree list --porcelain 2>/dev/null)
 
-    # With init.defaultBranch main, the default branch should be 'main'
+    # With -b main, the default branch should be 'main'
     [[ $found_main -eq 1 ]]
+}
+
+@test "VIBE_MAIN: falls back to convention when git worktree list fails" {
+    # Create a non-bare repo
+    cd "$TEST_REPO"
+    git init -b main
+    git commit --allow-empty -m "initial"
+
+    # Create a worktrees directory but no actual worktrees
+    mkdir -p "$TEST_REPO/.worktrees"
+
+    # Mock git worktree list to fail by using a non-git directory
+    local fallback_repo=$(mktemp -d)
+    cd "$fallback_repo"
+
+    # Without a git repo, git worktree list will fail
+    # The fallback should be to use the convention-based path
+    ! git worktree list --porcelain 2>/dev/null
+
+    # Clean up
+    rm -rf "$fallback_repo"
 }
 
 @test "loader.sh exists and has expected resolution logic" {

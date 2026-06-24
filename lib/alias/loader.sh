@@ -47,7 +47,10 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
   local git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
 
   if [[ -n "$git_common_dir" && -d "$git_common_dir" ]]; then
-    # Distinguish between non-bare and bare repos based on basename
+    # Distinguish between non-bare and bare repos based on basename.
+    # The .git basename check implicitly distinguishes non-bare from bare repos:
+    # - Non-bare repos have git-common-dir ending in .git (e.g., .../main/.git)
+    # - Bare repos have git-common-dir as the repo root itself (no .git suffix)
     if [[ "$(basename "$git_common_dir")" == ".git" ]]; then
       # Non-bare repo: git-common-dir = .../main/.git → VIBE_REPO = .../main
       export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
