@@ -160,6 +160,7 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 # ==============================================================================
 
 
+@pytest.mark.slow
 def test_plan_no_branch_uses_current_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
