@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.commands.ask import MAX_QUESTION_LENGTH, app
@@ -80,6 +81,7 @@ class TestAskForbiddenPatterns:
         assert result.exit_code != 0
         assert "ignore all previous" in result.output.lower()
 
+    @pytest.mark.slow
     def test_clean_question_passes(self):
         """Normal question without forbidden content should pass validation."""
         # This will fail at execution (no mock backend), but should pass forbidden check

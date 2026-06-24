@@ -75,6 +75,7 @@ class TestInspectFormatContract:
         assert "--yaml" in output, f"inspect {subcommand} missing --yaml"
 
 
+@pytest.mark.integration
 class TestInspectYamlOutput:
     """Verify --yaml output is valid and has expected structure."""
 
