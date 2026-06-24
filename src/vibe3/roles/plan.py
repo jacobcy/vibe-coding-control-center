@@ -413,6 +413,19 @@ def resolve_spec_plan_input(
     )
 
 
+def _resolve_spec_ref(branch: str) -> str | None:
+    """Get spec_ref from flow state, or None if unavailable."""
+    from vibe3.services.flow import FlowService
+
+    try:
+        flow = FlowService().get_flow_status(branch)
+        if flow and flow.spec_ref:
+            return flow.spec_ref
+    except Exception:
+        pass
+    return None
+
+
 def execute_spec_plan_async(
     *,
     request: PlanRequest,
@@ -475,16 +488,7 @@ def execute_spec_plan_async(
         branch=branch,
     )
 
-    # Get spec_ref from flow state
-    from vibe3.services.flow import FlowService
-
-    spec_ref = None
-    try:
-        flow = FlowService().get_flow_status(branch)
-        if flow and flow.spec_ref:
-            spec_ref = flow.spec_ref
-    except Exception:
-        pass  # Flow state may not exist yet, ignore silently
+    spec_ref = _resolve_spec_ref(branch)
 
     return CodeagentResult(
         success=launch.launched,
@@ -564,14 +568,6 @@ def execute_spec_plan_sync(
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
 
-    # Get spec_ref from flow state
-    from vibe3.services.flow import FlowService
-
-    try:
-        flow = FlowService().get_flow_status(branch)
-        if flow and flow.spec_ref:
-            result.spec_ref = flow.spec_ref
-    except Exception:
-        pass  # Flow state may not exist yet, ignore silently
+    result.spec_ref = _resolve_spec_ref(branch)
 
     return result
