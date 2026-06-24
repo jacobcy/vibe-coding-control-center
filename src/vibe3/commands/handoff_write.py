@@ -128,7 +128,7 @@ def init(
                 comments_raw = issue_data.get("comments", [])
                 comments = comments_raw if isinstance(comments_raw, list) else []
 
-                from vibe3.services.shared.comment import is_human_comment
+                from vibe3.services.shared import is_human_comment
 
                 # Find latest human instruction
                 latest_human_comment = None
