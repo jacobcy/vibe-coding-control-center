@@ -55,6 +55,7 @@ from vibe3.roles.definitions import (
     RoleOutputContract,
     TriggerableRoleDefinition,
 )
+from vibe3.services.flow import FlowTimelineService
 from vibe3.services.issue import fail_planner_issue
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
@@ -325,7 +326,9 @@ PLAN_SYNC_SPEC = IssueRoleSyncSpec(
     ),
     build_sync_request=build_plan_sync_request,
     failure_handler=lambda issue_number, reason: fail_planner_issue(
-        issue_number=issue_number, reason=reason
+        issue_number=issue_number,
+        reason=reason,
+        flow_timeline_service=FlowTimelineService(),
     ),
 )
 

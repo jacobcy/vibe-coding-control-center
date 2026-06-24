@@ -61,7 +61,7 @@ from vibe3.roles.review_helpers import (
     ReviewRunResult,
     finalize_review_output,
 )
-from vibe3.services.flow import FlowService
+from vibe3.services.flow import FlowService, FlowTimelineService
 from vibe3.services.issue import fail_reviewer_issue
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
@@ -330,6 +330,7 @@ REVIEW_SYNC_SPEC = IssueRoleSyncSpec(
     failure_handler=lambda issue_number, reason: fail_reviewer_issue(
         issue_number=issue_number,
         reason=reason,
+        flow_timeline_service=FlowTimelineService(),
     ),
 )
 
