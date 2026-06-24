@@ -29,8 +29,8 @@ class TestResolveAgentOptions:
         )
 
         assert result.agent == "cli-agent"
-        assert result.backend is None
-        assert result.model is None
+        assert result.backend == "config-backend"
+        assert result.model == "config-model"
         assert result.timeout_seconds == 3600
 
     def test_cli_backend_overrides_config_backend(self) -> None:
@@ -68,8 +68,8 @@ class TestResolveAgentOptions:
         result = resolve_command_agent_options(config=config, section="run")
 
         assert result.agent == "config-agent"
-        assert result.backend is None
-        assert result.model is None
+        assert result.backend == "config-backend"
+        assert result.model == "config-model"
         assert result.timeout_seconds == 3600
 
     def test_config_backend_used_when_no_agent(self) -> None:
@@ -194,6 +194,9 @@ class TestResolveAgentOptions:
         config = MagicMock(spec=VibeConfig)
         config.run = MagicMock()
         config.run.agent_config = MagicMock()
+        config.run.agent_config.agent = None
+        config.run.agent_config.backend = None
+        config.run.agent_config.model = None
         config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(
@@ -204,7 +207,7 @@ class TestResolveAgentOptions:
         )
 
         assert result.agent == "cli-agent"
-        assert result.backend is None  # Backend ignored when agent is set
+        assert result.backend == "cli-backend"
         assert result.model is None
 
     def test_cli_model_overrides_config_model_when_config_has_backend(self) -> None:

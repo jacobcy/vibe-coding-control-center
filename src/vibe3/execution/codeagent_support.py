@@ -32,7 +32,12 @@ def resolve_command_agent_options(
         config_timeout = getattr(agent_config, "timeout_seconds", 3600)
 
     if agent:
-        return AgentOptions(agent=agent, timeout_seconds=config_timeout)
+        return AgentOptions(
+            agent=agent,
+            backend=backend or config_backend,
+            model=model or config_model,
+            timeout_seconds=config_timeout,
+        )
 
     if backend:
         return AgentOptions(
@@ -44,6 +49,8 @@ def resolve_command_agent_options(
     if config_agent:
         return AgentOptions(
             agent=config_agent,
+            backend=config_backend,
+            model=config_model,
             timeout_seconds=config_timeout,
         )
 
