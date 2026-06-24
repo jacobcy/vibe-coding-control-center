@@ -271,6 +271,8 @@ class TestManualReviewIntentBranchSuccessPaths:
 
     def test_branch_sync_returns_success_result(self) -> None:
         """Handler returns ReviewRunResult with verdict OK on branch review."""
+        from unittest.mock import MagicMock
+
         event = ManualReviewIntent(
             issue_number=42,
             branch="task/issue-42",
@@ -278,8 +280,17 @@ class TestManualReviewIntentBranchSuccessPaths:
             no_async=True,
         )
 
+        mock_config = MagicMock()
+        mock_config.review.agent_config.agent = "vibe-reviewer"
+        mock_config.review.agent_config.backend = None
+        mock_config.review.agent_config.model = None
+        mock_config.review.agent_config.timeout_seconds = 3600
+
         with (
-            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.config.load_config_for_role",
+                return_value=mock_config,
+            ),
             patch("vibe3.execution.run_issue_role_sync"),
         ):
             result = handle_manual_review_intent(event)
