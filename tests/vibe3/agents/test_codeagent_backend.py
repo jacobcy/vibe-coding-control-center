@@ -167,10 +167,10 @@ class TestCodeagentBackend:
 
         assert content == "prompt body"
 
-    def test_dry_run_does_not_print_backend_model_metadata(
+    def test_dry_run_displays_backend_model_metadata(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Dry-run backend details are rendered by command result display."""
+        """Dry-run renders backend/model via CodeagentBackend for unified display."""
         backend = CodeagentBackend()
 
         backend.run(
@@ -184,8 +184,8 @@ class TestCodeagentBackend:
         captured = capsys.readouterr()
         assert "command:" in captured.out
         assert "task:\ntask body" in captured.out
-        assert "Backend:" not in captured.out
-        assert "Model:" not in captured.out
+        assert "Backend:" in captured.out
+        assert "Model:" in captured.out
 
     def test_build_prompt_file_content_can_skip_global_notice(self) -> None:
         config = VibeConfig(
