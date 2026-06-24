@@ -57,11 +57,10 @@ dur_lines=$(grep -E "^[0-9]+\.[0-9]+s" "$TMPFILE" || true)
 if [[ -n "$dur_lines" ]]; then
     echo "$dur_lines"
     echo ""
-    # Count how many are >2s
-    over_2s=$(echo "$dur_lines" | awk -F's' '$1+0 > 2 {count++} END {print count+0}')
-    over_3s=$(echo "$dur_lines" | awk -F's' '$1+0 > 3 {count++} END {print count+0}')
-    echo -e "  ${YELLOW}>2s: $over_2s tests | >3s: $over_3s tests${NC}"
-    echo -e "  To move a slow test to Quality CI job, add: ${CYAN}@pytest.mark.slow${NC}"
+    # Count how many are >1s (monitoring threshold)
+    over_1s=$(echo "$dur_lines" | awk -F's' '$1+0 > 1 {count++} END {print count+0}')
+    echo -e "  ${YELLOW}>1s: $over_1s tests${NC}"
+    echo -e "  To mark a slow test for exclusion from fast CI, add: ${CYAN}@pytest.mark.slow${NC}"
 else
     echo "  No duration data found."
 fi

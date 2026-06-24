@@ -250,6 +250,7 @@ class TestQueueOperations:
         assert len(emit_calls) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_emit_failure_handled_gracefully(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
