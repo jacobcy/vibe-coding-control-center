@@ -76,8 +76,9 @@ def internal_manager_dispatch(
     # Validate --show-prompt requires --dry-run
     validate_show_prompt_dependency(dry_run, show_prompt)
 
-    # --show-prompt requires sync execution (async path lacks show_prompt support)
-    if show_prompt:
+    # --show-prompt and --dry-run require sync execution
+    # (async path cannot render prompt composition or return CodeagentResult)
+    if show_prompt or dry_run:
         no_async = True
 
     # Resolve issue number from current flow if not specified
@@ -130,7 +131,7 @@ def internal_manager_dispatch(
     from vibe3.roles import MANAGER_SYNC_SPEC
 
     if no_async:
-        run_issue_role_sync(
+        result = run_issue_role_sync(
             issue_number=issue,
             dry_run=dry_run,
             fresh_session=False,
@@ -139,41 +140,17 @@ def internal_manager_dispatch(
             branch=branch,
         )
     else:
-        run_issue_role_async(
+        result = run_issue_role_async(  # type: ignore[assignment]
             issue_number=issue,
             dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
             branch=branch,
         )
 
-    if dry_run:
-        try:
-            from rich.console import Console
+    if dry_run and result is not None:
+        from vibe3.commands.common import _handle_codeagent_result
 
-            from vibe3.agents import CodeagentResult
-            from vibe3.config import (
-                load_orchestra_config,
-                resolve_effective_agent_options,
-            )
-            from vibe3.execution import ExecutionRolePolicyService
-            from vibe3.ui import display_codeagent_result
-
-            config = load_orchestra_config()
-            options = ExecutionRolePolicyService(config).resolve_agent_options(
-                "manager"
-            )
-            effective = resolve_effective_agent_options(options)
-            display_codeagent_result(
-                Console(),
-                CodeagentResult(
-                    success=True,
-                    backend=effective.backend,
-                    model=effective.model,
-                ),
-                "Manager",
-            )
-        except Exception:
-            pass  # Display is best-effort; fail gracefully in test envs
+        _handle_codeagent_result(result, "Manager")
 
 
 @app.command("apply")

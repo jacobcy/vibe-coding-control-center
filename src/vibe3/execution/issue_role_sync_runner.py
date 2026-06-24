@@ -23,6 +23,7 @@ from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import format_agent_actor, format_dry_run_header
 
 if TYPE_CHECKING:
+    from vibe3.agents import CodeagentResult
     from vibe3.models import ExecutionLaunchResult
 
 
@@ -148,7 +149,7 @@ def run_issue_role_sync(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
-) -> None:
+) -> "CodeagentResult | None":
     """Run a role synchronously (direct execution without tmux wrapper).
 
     Orchestrated process runs the agent synchronously and waits for completion.
@@ -206,10 +207,26 @@ def run_issue_role_sync(
         branch=branch,
     )
 
-    # dry-run output is handled by CodeagentBackend.run()
-    # which prints "=== Prompt Composition ===" and optional prompt content
     if dry_run:
-        return
+        from vibe3.agents import CodeagentResult
+        from vibe3.config import resolve_repo_agent_preset
+
+        # Resolve model from agent preset when backend is already set
+        # (resolve_effective_agent_options short-circuits when backend
+        # is truthy, which it always is for roles going through
+        # ExecutionRolePolicyService.resolve_backend).
+        model = options.model
+        if not model and options.agent:
+            preset = resolve_repo_agent_preset(options.agent)
+            if preset:
+                _, model = preset
+
+        return CodeagentResult(
+            success=sync_result.launched,
+            backend=options.backend or sync_result.backend,
+            model=model or sync_result.model,
+            issue_number=issue_number,
+        )
 
     if not sync_result.launched:
         # Soft-skip reason codes: coordinator intentionally declined, not a failure
@@ -218,10 +235,12 @@ def run_issue_role_sync(
             typer.echo(
                 f"{spec.role_name} dispatch queued/throttled: {sync_result.reason}"
             )
-            return
+            return None
         if spec.failure_handler is not None:
             spec.failure_handler(
                 issue_number,
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
+
+    return None
