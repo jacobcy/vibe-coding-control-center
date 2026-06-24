@@ -44,10 +44,15 @@ def _file_to_module(file_path: str, root: str = "src") -> str:
         模块名（如 vibe3.services.flow_service）
     """
     p = Path(file_path)
-    parts = p.with_suffix("").parts
-    # 找到 root 之后的部分
+    parts = list(p.with_suffix("").parts)
     try:
-        idx = list(parts).index(root)
+        # Find the last occurrence of root to handle absolute paths where
+        # the same component appears multiple times (e.g.
+        # /Users/.../src/.../src/vibe3/... → find the src/ that precedes
+        # the actual source tree, not the home-directory one).
+        rev_parts = list(reversed(parts))
+        idx_from_end = rev_parts.index(root)
+        idx = len(parts) - 1 - idx_from_end
         return ".".join(parts[idx + 1 :])
     except ValueError:
         return str(p.with_suffix("")).replace("/", ".")

@@ -148,7 +148,11 @@ def _silence_orchestra_log():
 
 @pytest.fixture(autouse=True)
 def cleanup_tmux_sessions():
-    """Auto-cleanup any leaked governance-tick-* tmux sessions after each test."""
+    """Auto-cleanup any leaked governance-tick-* tmux sessions after each test.
+
+    Performance note: 5-second timeout is acceptable for test cleanup.
+    Most runs complete in <0.1s when no sessions exist.
+    """
     yield
     import subprocess
     import sys

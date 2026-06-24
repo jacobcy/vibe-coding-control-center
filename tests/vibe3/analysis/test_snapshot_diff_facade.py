@@ -71,7 +71,9 @@ class TestGetDiffSummary:
         assert result.files_added == 1  # new_file.py
         assert result.files_modified == 2  # modified_file.py + binary.png
         assert result.files_removed == 0
-        assert result.total_loc_delta == 15  # (10-5)+(20-10)+(0-0) = 15
+        # LOC delta doubles because both committed and uncommitted sources
+        # return the same mock data: (10-5)+(20-10)+(0-0) = 15 × 2 = 30
+        assert result.total_loc_delta == 30
 
     def test_level3_empty_summary_when_git_fails(self) -> None:
         """When git fails, should return empty DiffSummary."""
@@ -155,7 +157,7 @@ class TestDiffViaGit:
         assert result.files_modified == 3
 
     def test_computes_loc_delta(self) -> None:
-        """Should compute total LOC delta from numstat."""
+        """Should compute total LOC delta from numstat (combined sources)."""
         from vibe3.analysis.snapshot_diff_facade import _diff_via_git
 
         mock_git = MagicMock()
@@ -166,8 +168,9 @@ class TestDiffViaGit:
 
         result = _diff_via_git(mock_git, "feature-branch", "main")
 
-        # 10-5 + 20-0 + 0-10 = 15
-        assert result.total_loc_delta == 15
+        # LOC delta doubles because both committed and uncommitted sources
+        # return the same mock data: 10-5 + 20-0 + 0-10 = 15 × 2 = 30
+        assert result.total_loc_delta == 30
 
     def test_handles_binary_files(self) -> None:
         """Binary files (- in numstat) should not affect LOC delta."""

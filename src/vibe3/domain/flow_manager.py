@@ -4,6 +4,8 @@ This module owns issue->flow orchestration for execution-facing roles.
 Migrated from orchestra/flow_dispatch.py to establish domain-first architecture.
 """
 
+from __future__ import annotations
+
 import subprocess
 from typing import cast
 
