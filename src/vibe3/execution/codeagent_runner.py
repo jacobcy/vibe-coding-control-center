@@ -406,6 +406,8 @@ class CodeagentExecutionService:
         ctx = self._prepare_sync_context(command)
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
+        # Resolve preset once here; pass pre-resolved options to
+        # CodeagentBackend.run() so its internal resolution is a no-op.
         effective = resolve_effective_agent_options(ctx.options)
 
         # Skip execution header in dry_run mode to avoid duplication
@@ -418,7 +420,7 @@ class CodeagentExecutionService:
         try:
             agent_result = CodeagentBackend().run(
                 prompt=prompt_content,
-                options=ctx.options,
+                options=effective,
                 task=command.task,
                 dry_run=command.dry_run,
                 session_id=ctx.session_id,
