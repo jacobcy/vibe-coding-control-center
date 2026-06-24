@@ -107,8 +107,8 @@ def save_branch_baseline(
                 file_path=str(filepath),
                 baseline_for=branch,
             )
-        except Exception:
-            logger.warning("Failed to register baseline in DB (non-fatal)")
+        except Exception as e:
+            logger.warning(f"Failed to register baseline in DB (non-fatal): {e}")
 
         log.bind(path=str(filepath)).success("Branch baseline saved")
         return filepath
@@ -164,3 +164,105 @@ def load_branch_baseline(
     except Exception as e:
         logger.warning(f"Failed to load branch baseline: {e}")
         return None
+
+
+def backfill_baseline_registry(
+    _get_baseline_dir_func: Callable[[], Path] | None = None,
+) -> int:
+    """Scan baseline JSON files and backfill missing records into snapshot_registry.
+
+    This function recovers orphaned baseline records that were saved to the
+    filesystem but failed to register in the database due to silent exception
+    swallowing in save_branch_baseline().
+
+    Returns:
+        Number of baseline records backfilled into the database.
+    """
+    # Import snapshot_service helper for default implementation
+    if _get_baseline_dir_func is None:
+        from vibe3.analysis.snapshot_service import (
+            _get_baseline_dir as default_get_baseline_dir,
+        )
+
+        _get_baseline_dir_func = default_get_baseline_dir
+
+    log = logger.bind(domain="snapshot", action="backfill_baselines")
+    log.info("Starting baseline registry backfill")
+
+    try:
+        baseline_dir = _get_baseline_dir_func()
+        if not baseline_dir.exists():
+            log.info("Baseline directory does not exist, nothing to backfill")
+            return 0
+
+        # Scan all baseline_*.json files
+        baseline_files = list(baseline_dir.glob("baseline_*.json"))
+        total_files = len(baseline_files)
+        backfilled_count = 0
+        skipped_count = 0
+
+        if total_files == 0:
+            log.info("No baseline files found")
+            return 0
+
+        log.info(f"Found {total_files} baseline files to process")
+
+        client = SQLiteClient()
+
+        for filepath in baseline_files:
+            try:
+                # Parse JSON file
+                data = json.loads(filepath.read_text(encoding="utf-8"))
+
+                # Skip files without baseline_for (not true baselines)
+                baseline_for = data.get("baseline_for")
+                if not baseline_for:
+                    skipped_count += 1
+                    log.bind(path=str(filepath)).debug(
+                        "Skipping file with empty baseline_for"
+                    )
+                    continue
+
+                # Extract required fields
+                snapshot_id = data.get("snapshot_id", "")
+                if not snapshot_id:
+                    skipped_count += 1
+                    log.bind(path=str(filepath)).warning(
+                        "Skipping file with missing snapshot_id"
+                    )
+                    continue
+
+                # Register in database
+                client.upsert_snapshot_registry(
+                    snapshot_id=snapshot_id,
+                    branch=data.get("branch", ""),
+                    commit_short=data.get("commit_short", ""),
+                    commit_hash=data.get("commit"),
+                    created_at=data.get("created_at", ""),
+                    file_path=str(filepath),
+                    baseline_for=baseline_for,
+                )
+                backfilled_count += 1
+
+            except json.JSONDecodeError as e:
+                skipped_count += 1
+                log.bind(path=str(filepath), error=str(e)).warning(
+                    "Failed to parse baseline file, skipping"
+                )
+            except Exception as e:
+                skipped_count += 1
+                log.bind(
+                    path=str(filepath),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                ).warning("Failed to backfill baseline file")
+
+        log.info(
+            f"Backfill complete: {backfilled_count} records registered, "
+            f"{skipped_count} skipped, {total_files} total files processed"
+        )
+        return backfilled_count
+
+    except Exception as e:
+        log.error(f"Backfill failed: {e}")
+        raise

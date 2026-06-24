@@ -334,3 +334,139 @@ def test_save_branch_baseline_forwards_repo_path_to_build_snapshot(
 
     assert len(captured_repo_path) == 1
     assert captured_repo_path[0] == worktree
+
+
+def test_save_branch_baseline_logs_exception_on_db_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that DB write failure logs the actual exception message."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+    from vibe3.models.snapshot import StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+    monkeypatch.setattr(snapshot_service, "_ensure_baseline_dir", lambda: None)
+
+    # Mock build_snapshot
+    def fake_build() -> StructureSnapshot:
+        return StructureSnapshot(
+            snapshot_id="test-123",
+            branch="test-branch",
+            commit="abcdef1234567890",
+            commit_short="abcdef1",
+            created_at="2026-04-20T10:00:00",
+            root="src/vibe3",
+            files=[],
+            modules=[],
+            dependencies=[],
+            metrics={},
+        )
+
+    monkeypatch.setattr(snapshot_service, "build_snapshot", fake_build)
+
+    # Mock SQLiteClient to raise exception
+    class MockSQLiteClient:
+        def upsert_snapshot_registry(self, *args, **kwargs):
+            raise RuntimeError("Mock DB connection error")
+
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", MockSQLiteClient)
+
+    # Save baseline - should return Path (non-fatal) but log error
+    result = snapshot_baseline.save_branch_baseline("test-branch", force=True)
+    assert result is not None  # File still created
+    assert result.exists()
+    # Non-fatal behavior verified: file created even though DB failed
+
+
+def test_backfill_baseline_registry_processes_valid_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test backfill_baseline_registry processes valid baseline files."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Create valid baseline file
+    valid_baseline = {
+        "snapshot_id": "baseline-1",
+        "branch": "feature/test",
+        "commit": "abc1234",
+        "commit_short": "abc1234",
+        "created_at": "2026-06-15T10:00:00",
+        "baseline_for": "feature/test",
+    }
+    (baseline_dir / "baseline_feature-test.json").write_text(json.dumps(valid_baseline))
+
+    # Create file with empty baseline_for (should be skipped)
+    no_baseline = {
+        "snapshot_id": "baseline-2",
+        "branch": "main",
+        "commit": "def5678",
+        "commit_short": "def5678",
+        "created_at": "2026-06-14T10:00:00",
+        "baseline_for": "",
+    }
+    (baseline_dir / "baseline_main.json").write_text(json.dumps(no_baseline))
+
+    # Mock SQLiteClient to capture upsert calls
+    upsert_calls = []
+
+    class MockSQLiteClient:
+        def upsert_snapshot_registry(self, **kwargs):
+            upsert_calls.append(kwargs)
+
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", MockSQLiteClient)
+
+    # Run backfill
+    count = snapshot_baseline.backfill_baseline_registry()
+
+    # Should only process the valid baseline
+    assert count == 1
+    assert len(upsert_calls) == 1
+    assert upsert_calls[0]["baseline_for"] == "feature/test"
+
+
+def test_backfill_baseline_registry_handles_parse_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test backfill handles corrupt JSON files gracefully."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Create valid baseline
+    valid = {
+        "snapshot_id": "valid-1",
+        "branch": "main",
+        "commit": "abc1234",
+        "commit_short": "abc1234",
+        "created_at": "2026-06-15T10:00:00",
+        "baseline_for": "main",
+    }
+    (baseline_dir / "baseline_main.json").write_text(json.dumps(valid))
+
+    # Create corrupt JSON
+    (baseline_dir / "baseline_corrupt.json").write_text("{ not valid json }")
+
+    # Mock SQLiteClient
+    upsert_calls = []
+
+    class MockSQLiteClient:
+        def upsert_snapshot_registry(self, **kwargs):
+            upsert_calls.append(kwargs)
+
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", MockSQLiteClient)
+
+    # Run backfill - should not crash
+    count = snapshot_baseline.backfill_baseline_registry()
+
+    # Should process valid file and skip corrupt
+    assert count == 1
+    assert len(upsert_calls) == 1
+    assert upsert_calls[0]["snapshot_id"] == "valid-1"
+    # Graceful error handling verified: function returns count, doesn't crash

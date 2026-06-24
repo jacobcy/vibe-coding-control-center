@@ -112,3 +112,37 @@ def test_snapshot_save_as_baseline_force(monkeypatch):
     assert result.exit_code == 0
     assert len(calls) == 1
     assert calls[0] == ("feature/test", False)
+
+
+def test_snapshot_repair_baselines_reports_count(monkeypatch):
+    """repair-baselines command should report backfilled record count."""
+    from vibe3.analysis import snapshot_baseline
+
+    # Mock backfill_baseline_registry to return known count
+    monkeypatch.setattr(
+        snapshot_baseline,
+        "backfill_baseline_registry",
+        lambda: 42,
+    )
+
+    result = runner.invoke(app, ["repair-baselines"])
+
+    assert result.exit_code == 0
+    assert "42" in result.output
+    assert "backfilled" in result.output.lower()
+
+
+def test_snapshot_repair_baselines_handles_zero_count(monkeypatch):
+    """repair-baselines should handle case with no records to backfill."""
+    from vibe3.analysis import snapshot_baseline
+
+    monkeypatch.setattr(
+        snapshot_baseline,
+        "backfill_baseline_registry",
+        lambda: 0,
+    )
+
+    result = runner.invoke(app, ["repair-baselines"])
+
+    assert result.exit_code == 0
+    assert "no baseline records needed backfilling" in result.output.lower()
