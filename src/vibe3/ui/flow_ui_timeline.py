@@ -4,6 +4,7 @@ from vibe3.models import FlowEvent, FlowStatusResponse
 from vibe3.services.shared import check_ref_exists, ref_to_handoff_cmd
 from vibe3.ui.console_impl import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.utils import format_timestamp_local
 
 
 def filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
@@ -284,7 +285,7 @@ def _render_timeline(
 
     for event in reversed(events):
         color = _EVENT_COLOR.get(event.event_type, "white")
-        time_str = event.created_at[:16].replace("T", " ")
+        time_str = format_timestamp_local(event.created_at)
         actor_short = event.actor
         event_display = _format_event_type(event.event_type)
         console.print(

@@ -73,21 +73,28 @@ def init(
         "Initializing handoff"
     )
 
+    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+    from vibe3.services.flow import FlowService
+
+    store = SQLiteClient()
+    git = GitClient()
+    github = GitHubClient()
+    flow_service = FlowService(store=store, git_client=git)
+
+    # Ensure flow exists for standalone `vibe3 handoff init` usage.
+    # When called via ensure_current_handoff_for_flow (flow update / bootstrap),
+    # the caller has already ensured the flow — this is a cheap idempotent check.
+    flow_service.ensure_flow_for_branch(branch=target_branch, source="handoff_init")
+
     service = HandoffService()
     handoff_path = service.storage.ensure_current_handoff(
         force=force, branch=target_branch
     )
 
     # Populate with issue context if branch has bound issue
-    from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-    from vibe3.services.flow import FlowService
     from vibe3.services.issue import IssueFlowService
     from vibe3.services.task import TaskShowService
 
-    store = SQLiteClient()
-    git = GitClient()
-    github = GitHubClient()
-    flow_service = FlowService()
     issue_flow_service = IssueFlowService(store=store)
 
     # Resolve issue number from branch
@@ -104,26 +111,81 @@ def init(
 
             issue_data = task_show.fetch_issue_with_comments(issue_number)
             if isinstance(issue_data, dict):
+                # 1. Append issue summary
+                issue_title = issue_data.get("title", "N/A")
+                issue_state = issue_data.get("state", "N/A")
+                issue_summary = (
+                    f"Issue #{issue_number}: {issue_title}\n" f"State: {issue_state}"
+                )
+                service.append_current_handoff(
+                    message=issue_summary,
+                    actor="init",
+                    kind="context",
+                    branch=target_branch,
+                )
+
+                # 2. Extract human comments
                 comments_raw = issue_data.get("comments", [])
                 comments = comments_raw if isinstance(comments_raw, list) else []
 
-                if comments:
-                    latest_comment = task_show._build_comment_summary(
-                        comments[-1], full_body=True
+                from vibe3.services.shared import is_human_comment
+
+                # Find latest human instruction
+                latest_human_comment = None
+                for comment in reversed(comments):
+                    if is_human_comment(comment):
+                        latest_human_comment = comment
+                        break
+
+                if latest_human_comment:
+                    comment_summary = task_show.build_comment_summary(
+                        latest_human_comment, full_body=True
                     )
-                    if latest_comment:
-                        context = (
-                            f"Issue #{issue_number}: {issue_data.get('title', 'N/A')}\n"
-                            f"State: {issue_data.get('state', 'N/A')}\n\n"
-                            f"Latest comment by {latest_comment.author}:\n"
-                            f"{latest_comment.body}"
+                    if comment_summary:
+                        human_msg = (
+                            f"Latest human instruction by {comment_summary.author}:\n"
+                            f"{comment_summary.body}"
                         )
                         service.append_current_handoff(
-                            message=context,
+                            message=human_msg,
                             actor="init",
                             kind="context",
                             branch=target_branch,
                         )
+
+                # 3. Append latest comment if different from human instruction
+                if comments and comments[-1] != latest_human_comment:
+                    latest_comment_summary = task_show.build_comment_summary(
+                        comments[-1], full_body=True
+                    )
+                    if latest_comment_summary:
+                        latest_msg = (
+                            f"Latest comment by {latest_comment_summary.author}:\n"
+                            f"{latest_comment_summary.body}"
+                        )
+                        service.append_current_handoff(
+                            message=latest_msg,
+                            actor="init",
+                            kind="context",
+                            branch=target_branch,
+                        )
+
+                # 4. Append PR CI status if available
+                from vibe3.services.pr import PRService
+
+                pr_service = PRService()
+                pr_status = pr_service.get_branch_pr_status(target_branch)
+
+                if pr_status:
+                    pr_number = pr_status.number
+                    ci_status = pr_status.ci_status or "unknown"
+                    pr_msg = f"PR #{pr_number}: CI status: {ci_status}"
+                    service.append_current_handoff(
+                        message=pr_msg,
+                        actor="init",
+                        kind="ci_status",
+                        branch=target_branch,
+                    )
         except Exception as e:
             # Non-critical failure: log and continue
             logger.bind(

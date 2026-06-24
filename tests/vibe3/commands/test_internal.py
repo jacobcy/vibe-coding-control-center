@@ -241,31 +241,34 @@ def test_internal_bootstrap_dispatch() -> None:
                     with patch(
                         "vibe3.services.orchestra.FlowOrchestratorService"
                     ) as service_cls:
-                        github = MagicMock()
-                        github.view_issue.return_value = issue_payload
-                        github_cls.return_value = github
-                        service = MagicMock()
-                        service.bootstrap_issue_flow.return_value = {
-                            "branch": "dev/issue-123",
-                            "worktree_path": "/tmp/dev-issue-123",
-                        }
-                        service_cls.return_value = service
+                        with patch(
+                            "vibe3.commands.flow_manage.ensure_current_handoff_for_flow"
+                        ) as mock_ensure_handoff:
+                            github = MagicMock()
+                            github.view_issue.return_value = issue_payload
+                            github_cls.return_value = github
+                            service = MagicMock()
+                            service.bootstrap_issue_flow.return_value = {
+                                "branch": "dev/issue-123",
+                                "worktree_path": "/tmp/dev-issue-123",
+                            }
+                            service_cls.return_value = service
 
-                        result = runner.invoke(
-                            cli_app,
-                            [
-                                "internal",
-                                "bootstrap",
-                                "123",
-                                "--branch",
-                                "dev/issue-123",
-                                "--worktree",
-                                "--related",
-                                "456",
-                                "--dependency",
-                                "789",
-                            ],
-                        )
+                            result = runner.invoke(
+                                cli_app,
+                                [
+                                    "internal",
+                                    "bootstrap",
+                                    "123",
+                                    "--branch",
+                                    "dev/issue-123",
+                                    "--worktree",
+                                    "--related",
+                                    "456",
+                                    "--dependency",
+                                    "789",
+                                ],
+                            )
 
     assert result.exit_code == 0
     service.bootstrap_issue_flow.assert_called_once()
@@ -279,6 +282,8 @@ def test_internal_bootstrap_dispatch() -> None:
     assert call.kwargs["blocked_reason"] is None
     payload = json.loads(result.stdout)
     assert payload["branch"] == "dev/issue-123"
+    # Verify handoff helper is called with source="bootstrap"
+    mock_ensure_handoff.assert_called_once_with("dev/issue-123", source="bootstrap")
 
 
 def test_internal_bootstrap_rejects_dependency_and_reason_together() -> None:

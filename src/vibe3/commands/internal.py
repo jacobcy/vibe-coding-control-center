@@ -213,9 +213,12 @@ def internal_governance_dispatch(
 def internal_bootstrap(
     issue: Annotated[int, typer.Argument(help="Issue number to bootstrap")],
     branch: Annotated[
-        str,
-        typer.Option("--branch", help="Target flow branch"),
-    ],
+        str | None,
+        typer.Option(
+            "--branch",
+            help="Target flow branch (defaults to dev/issue-<id>)",
+        ),
+    ] = None,
     use_worktree: Annotated[
         bool,
         typer.Option(
@@ -269,11 +272,16 @@ def internal_bootstrap(
     issue_info = load_issue_info(issue, config=config, github=github)
     service = FlowOrchestratorService(config, store=store, git=git, github=github)
 
+    # When --branch is not specified, auto-create a dev/issue-<id>
+    # human-collaboration branch (orchestra always passes explicit --branch)
+    resolved_branch = branch or f"dev/issue-{issue_info.number}"
+
     result = service.bootstrap_issue_flow(
         issue_info,
-        branch=branch,
+        branch=resolved_branch,
         slug=f"issue-{issue_info.number}",
         source=source,
+        actor="system:bootstrap",
         ensure_worktree=use_worktree,
         reactivate_existing=reactivate_existing,
         related_issue_numbers=tuple(related_issue_numbers or ()),
@@ -281,11 +289,11 @@ def internal_bootstrap(
         blocked_reason=blocked_reason,
     )
 
-    # Initialize handoff with issue context (delegates to handoff init)
-    from vibe3.commands.handoff_write import init as handoff_init
+    # Ensure handoff exists using shared helper (quiet, preserves JSON output)
+    from vibe3.commands.flow_manage import ensure_current_handoff_for_flow
 
     try:
-        handoff_init(force=False, branch=branch, trace=False, _quiet=True)
+        ensure_current_handoff_for_flow(resolved_branch, source="bootstrap")
     except Exception as e:
         # Non-critical failure: log and continue
         logger.warning(f"Failed to initialize handoff: {e}")

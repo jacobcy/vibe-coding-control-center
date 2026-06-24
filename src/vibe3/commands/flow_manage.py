@@ -132,6 +132,37 @@ def _ensure_branch_has_no_live_runtime_session(
         raise typer.Exit(1)
 
 
+def ensure_current_handoff_for_flow(target_branch: str, source: str) -> None:
+    """Ensure current.md exists for flow, auto-initialize if missing.
+
+    Called by:
+    - flow update (after ensuring flow exists)
+    - internal bootstrap (after ensuring flow exists)
+
+    Args:
+        target_branch: Branch name to check for current.md
+        source: Caller identifier for logging context
+    """
+    from vibe3.exceptions import UserError
+    from vibe3.services.handoff import HandoffService
+
+    service = HandoffService()
+    try:
+        # Try to read current.md
+        service.storage.read_current_handoff(branch=target_branch)
+    except UserError:
+        # current.md doesn't exist, initialize it quietly
+        logger.bind(
+            command=source,
+            branch=target_branch,
+        ).info("Auto-initializing missing handoff")
+
+        # Import init function to avoid circular dependency
+        from vibe3.commands.handoff_write import init
+
+        init(force=False, branch=target_branch, trace=False, _quiet=True)
+
+
 def update(
     branch_arg: BranchArg = None,
     branch_opt: Annotated[
@@ -202,7 +233,13 @@ def update(
     _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
     # Register/Ensure flow
+    flow_before = flow_service.get_flow_status(target_branch)
     flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
+    is_new_flow = flow_before is None
+
+    # Ensure current.md exists only for newly created flows
+    if is_new_flow:
+        ensure_current_handoff_for_flow(target_branch, source="flow update")
 
     # Update metadata if explicitly provided — keep name and actor separate
     # to avoid silently writing worktree identity when only --name is given.
@@ -255,8 +292,10 @@ def update(
                     flow.model_dump(), default_flow_style=False, allow_unicode=True
                 )
             )
-    else:
+    elif is_new_flow:
         render_flow_created(flow)
+    else:
+        typer.echo(f"✓ Flow confirmed: {flow.flow_slug}\n  branch: {flow.branch}")
 
 
 def bind(

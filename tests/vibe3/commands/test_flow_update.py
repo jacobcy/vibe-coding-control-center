@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.commands.flow import app as flow_app
+from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowState, FlowStatusResponse
 
 runner = CliRunner()
@@ -20,6 +21,7 @@ runner = CliRunner()
 # ==============================================================================
 
 
+@patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
 @patch("vibe3.commands.flow_manage.render_flow_created")
 @patch("vibe3.commands.flow_manage.FlowService")
 @patch("vibe3.services.FlowService")
@@ -29,6 +31,7 @@ def test_flow_update_idempotent(
     flow_service_cls_branch_arg,
     flow_service_cls,
     _render_flow_created,
+    mock_ensure_handoff,
 ) -> None:
     """flow update should ensure flow exists."""
     # Mock GitClient to return expected branch
@@ -57,6 +60,8 @@ def test_flow_update_idempotent(
     flow_service.ensure_flow_for_branch.assert_called_once_with(
         branch="task/set-default-flow", slug="set-default-flow"
     )
+    # Existing flow: handoff init should NOT be called
+    mock_ensure_handoff.assert_not_called()
 
 
 @patch("vibe3.commands.flow_manage.TaskService")
@@ -132,11 +137,13 @@ def test_flow_bind_remains_atomic_command_surface() -> None:
     assert callable(bind)
 
 
+@patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
 @patch("vibe3.commands.flow_manage.FlowService")
 @patch("vibe3.environment.session_registry.SessionRegistryService")
 def test_flow_update_blocks_when_branch_has_live_runtime_session(
     mock_registry_cls,
     mock_flow_service,
+    mock_ensure_handoff,
 ) -> None:
     """flow update should block when branch has live runtime sessions."""
 
@@ -193,11 +200,16 @@ def test_flow_update_does_not_print_branch_creation_in_json_format() -> None:
 class TestFlowAddStatusCheck:
     """Tests for flow add status checking."""
 
+    @patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
     @patch("vibe3.commands.flow_manage.FlowService")
     @patch("vibe3.services.FlowService")
     @patch("vibe3.services.pr.resolver.GitClient")
     def test_unregistered_branch_creates_flow(
-        self, mock_git_client_cls, mock_flow_service_class, mock_service_class
+        self,
+        mock_git_client_cls,
+        mock_flow_service_class,
+        mock_service_class,
+        mock_ensure_handoff,
     ):
         """A branch without any flow record should create a new flow."""
         # Mock GitClient to return expected branch
@@ -225,9 +237,10 @@ class TestFlowAddStatusCheck:
         )
 
     @pytest.mark.parametrize("flow_status", ["active", "done", "aborted", "stale"])
+    @patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
     @patch("vibe3.commands.flow_manage.FlowService")
     def test_existing_flow_confirms_idempotently(
-        self, mock_service_class, flow_status: str
+        self, mock_service_class, mock_ensure_handoff, flow_status: str
     ):
         """Existing flow should be confirmed idempotently."""
         mock_service = MagicMock()
@@ -249,3 +262,135 @@ class TestFlowAddStatusCheck:
 
         assert result.exit_code == 0
         mock_service.create_flow.assert_not_called()
+
+
+@patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
+@patch("vibe3.commands.flow_manage.FlowService")
+@patch("vibe3.services.FlowService")
+@patch("vibe3.services.pr.resolver.GitClient")
+def test_flow_update_auto_initializes_missing_handoff(
+    mock_git_client_cls,
+    flow_service_cls_branch_arg,
+    flow_service_cls,
+    mock_ensure_handoff,
+) -> None:
+    """flow update should auto-initialize handoff for a newly created flow."""
+    # Mock GitClient to return expected branch
+    mock_git_client = MagicMock()
+    mock_git_client.get_current_branch.return_value = "task/test-branch"
+    mock_git_client_cls.return_value = mock_git_client
+
+    flow_service_branch_arg = MagicMock()
+    flow_service_branch_arg.get_current_branch.return_value = "task/test-branch"
+    flow_service_cls_branch_arg.return_value = flow_service_branch_arg
+
+    flow_service = MagicMock()
+    flow = FlowState(
+        branch="task/test-branch",
+        flow_slug="test-branch",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    # get_flow_status returns None (no existing flow) → is_new_flow = True
+    flow_service.get_flow_status.return_value = None
+    flow_service.ensure_flow_for_branch.return_value = flow
+    flow_service_cls.return_value = flow_service
+
+    result = runner.invoke(flow_app, ["update"])
+
+    assert result.exit_code == 0
+    mock_ensure_handoff.assert_called_once_with(
+        "task/test-branch", source="flow update"
+    )
+
+
+@patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")
+@patch("vibe3.commands.flow_manage.FlowService")
+@patch("vibe3.services.FlowService")
+@patch("vibe3.services.pr.resolver.GitClient")
+def test_flow_update_does_not_reinit_existing_handoff(
+    mock_git_client_cls,
+    flow_service_cls_branch_arg,
+    flow_service_cls,
+    mock_ensure_handoff,
+) -> None:
+    """flow update should NOT call handoff init for existing flows."""
+    # Mock GitClient to return expected branch
+    mock_git_client = MagicMock()
+    mock_git_client.get_current_branch.return_value = "task/test-branch"
+    mock_git_client_cls.return_value = mock_git_client
+
+    flow_service_branch_arg = MagicMock()
+    flow_service_branch_arg.get_current_branch.return_value = "task/test-branch"
+    flow_service_cls_branch_arg.return_value = flow_service_branch_arg
+
+    flow_service = MagicMock()
+    flow = FlowState(
+        branch="task/test-branch",
+        flow_slug="test-branch",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    # Flow already exists → handoff init should NOT be called
+    flow_service.get_flow_status.return_value = flow
+    flow_service.ensure_flow_for_branch.return_value = flow
+    flow_service_cls.return_value = flow_service
+
+    result = runner.invoke(flow_app, ["update"])
+
+    assert result.exit_code == 0
+    mock_ensure_handoff.assert_not_called()
+
+
+def test_ensure_handoff_auto_initializes_on_missing_handoff() -> None:
+    """Verify ensure_current_handoff_for_flow calls init when handoff is missing.
+
+    This test exercises the actual try/except logic inside the function
+    (not mocking the function itself), catching UserError from
+    read_current_handoff and calling handoff_write.init.
+    """
+    with (
+        patch("vibe3.services.handoff.HandoffService") as mock_handoff_cls,
+        patch("vibe3.commands.handoff_write.init") as mock_init,
+    ):
+        mock_service = MagicMock()
+        mock_service.storage.read_current_handoff.side_effect = UserError(
+            "Handoff not found"
+        )
+        mock_handoff_cls.return_value = mock_service
+
+        from vibe3.commands.flow_manage import ensure_current_handoff_for_flow
+
+        ensure_current_handoff_for_flow("task/test-branch", source="test")
+
+        mock_service.storage.read_current_handoff.assert_called_once_with(
+            branch="task/test-branch"
+        )
+        mock_init.assert_called_once_with(
+            force=False,
+            branch="task/test-branch",
+            trace=False,
+            _quiet=True,
+        )
+
+
+def test_ensure_handoff_skips_init_when_handoff_exists() -> None:
+    """Verify ensure_current_handoff_for_flow does NOT call init when
+    read_current_handoff succeeds."""
+    with (
+        patch("vibe3.services.handoff.HandoffService") as mock_handoff_cls,
+        patch("vibe3.commands.handoff_write.init") as mock_init,
+    ):
+        mock_service = MagicMock()
+        # read succeeds - no exception
+        mock_service.storage.read_current_handoff.return_value = "existing content"
+        mock_handoff_cls.return_value = mock_service
+
+        from vibe3.commands.flow_manage import ensure_current_handoff_for_flow
+
+        ensure_current_handoff_for_flow("task/test-branch", source="test")
+
+        mock_service.storage.read_current_handoff.assert_called_once_with(
+            branch="task/test-branch"
+        )
+        mock_init.assert_not_called()

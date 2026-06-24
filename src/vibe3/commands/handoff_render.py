@@ -7,7 +7,7 @@ import re
 
 from vibe3.services.shared import ref_to_handoff_cmd, sanitize_event_detail_paths
 from vibe3.ui import console, resolve_ref_path
-from vibe3.utils import AUTOMATED_MARKERS
+from vibe3.utils import AUTOMATED_MARKERS, format_timestamp_local
 
 _to_handoff_cmd = ref_to_handoff_cmd
 
@@ -69,7 +69,7 @@ def _render_handoff_events(
         if verbose:
             time_str = event.created_at
         else:
-            time_str = event.created_at[:19].replace("T", " ")
+            time_str = format_timestamp_local(event.created_at)
         event_name = display_names.get(event.event_type, event.event_type)
 
         # Bug 9: Label manager handoffs vs human ones

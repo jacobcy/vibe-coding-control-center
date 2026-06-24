@@ -179,7 +179,7 @@ class TaskShowService:
             return collapsed
         return collapsed[:limit].rstrip() + "..."
 
-    def _build_comment_summary(
+    def build_comment_summary(
         self, comment: dict[str, Any] | None, *, full_body: bool = False
     ) -> TaskCommentSummary | None:
         """Build comment summary.
@@ -383,10 +383,10 @@ class TaskShowService:
                     if isinstance(comments_raw, list)
                     else []
                 )
-                latest_comment = self._build_comment_summary(
+                latest_comment = self.build_comment_summary(
                     comments[-1] if comments else None, full_body=True
                 )
-                latest_human_instruction = self._build_comment_summary(
+                latest_human_instruction = self.build_comment_summary(
                     next(
                         (
                             comment

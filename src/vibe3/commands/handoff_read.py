@@ -20,6 +20,7 @@ from vibe3.services.handoff import HandoffStatusService
 from vibe3.services.pr import resolve_command_branch
 from vibe3.services.shared import resolve_issue_branch_input
 from vibe3.ui import console, render_handoff_detail
+from vibe3.utils import format_timestamp_local
 
 
 def _format_relative_time(timestamp: datetime, now: datetime | None = None) -> str:
@@ -172,7 +173,6 @@ def status(
         int | None,
         typer.Option("--pr", help="PR number to resolve branch from"),
     ] = None,
-    show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
@@ -201,9 +201,8 @@ def status(
 
     # Aggregate handoff status from service
     status_service = HandoffStatusService(flow_service=flow_service)
-    limit = None if show_all else 2
     try:
-        result = status_service.get_handoff_status(target_branch, limit=limit)
+        result = status_service.get_handoff_status(target_branch, limit=None)
     except ValueError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -240,8 +239,8 @@ def status(
     if result.recent_updates:
         console.print("[bold]--- Recent Handoff Updates ---[/]")
         console.print()
-        for update in reversed(result.recent_updates):
-            timestamp = update["timestamp"][:19].replace("T", " ")
+        for update in result.recent_updates:
+            timestamp = format_timestamp_local(update["timestamp"])
             actor = update["actor"]
             kind = update["kind"]
             message = update["message"].split("\n")[0]  # First line only
@@ -287,16 +286,6 @@ def status(
         branch=target_branch,
         verbose=verbose,
     )
-    if not show_all and (result.events or result.recent_updates):
-        # Conditionally add --branch hint if viewing different branch
-        current_branch = flow_service.get_current_branch()
-        tip_cmd = "vibe3 handoff show @current"
-        if target_branch != current_branch:
-            tip_cmd += f" --branch {target_branch}"
-        console.print(
-            f"[dim]Tip: use '{tip_cmd}' to view full handoff content, "
-            "or 'vibe3 handoff status --all' to show all events.[/]"
-        )
 
 
 def register_read_commands(app: typer.Typer) -> None:

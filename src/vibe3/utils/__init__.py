@@ -72,7 +72,7 @@ if TYPE_CHECKING:
         orchestra_tmux_session_exists,
         validate_pid_file,
     )
-    from vibe3.utils.time_format import format_age_aware_time
+    from vibe3.utils.time_format import format_age_aware_time, format_timestamp_local
 
 # Lazy imports
 _LAZY_IMPORTS = {
@@ -92,6 +92,7 @@ _LAZY_IMPORTS = {
     "find_parent_branch": "vibe3.utils.branch_utils",
     "is_branch_merged_to_main": "vibe3.utils.branch_utils",
     "format_age_aware_time": "vibe3.utils.time_format",
+    "format_timestamp_local": "vibe3.utils.time_format",
     "format_branch_behind_body": "vibe3.utils.branch_compare",
     "format_branch_behind_console": "vibe3.utils.branch_compare",
     "get_branch_handoff_dir": "vibe3.utils.git_helpers",
@@ -160,6 +161,7 @@ __all__ = [
     "find_parent_branch",
     "is_branch_merged_to_main",
     "format_age_aware_time",
+    "format_timestamp_local",
     "format_branch_behind_body",
     "format_branch_behind_console",
     "get_branch_handoff_dir",
