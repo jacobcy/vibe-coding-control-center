@@ -150,8 +150,8 @@ class TestDisplayCodeagentResult:
         assert any("Failed" in c for c in calls)
         assert any("Error: something went wrong" in c for c in calls)
 
-    def test_display_codeagent_result_shows_plan_spec_issue(self):
-        """display_codeagent_result shows plan_ref, spec_ref, issue_number."""
+    def test_display_codeagent_result_shows_plan_spec(self):
+        """display_codeagent_result shows spec_ref and plan_ref after backend/model."""
         from vibe3.agents import CodeagentResult
 
         console = MagicMock()
@@ -159,22 +159,23 @@ class TestDisplayCodeagentResult:
             success=True,
             backend="claude",
             model="sonnet",
-            plan_ref=".agent/plans/issue-123.md",
             spec_ref=".agent/specs/issue-456.md",
-            issue_number=456,
+            plan_ref=".agent/plans/issue-123.md",
             log_path="temp/logs/plan/test.log",
         )
         from vibe3.ui.scan_display import display_codeagent_result
 
         display_codeagent_result(console, result, "Plan")
-        # Verify all three context fields were printed
         calls = [str(c) for c in console.print.call_args_list]
-        assert any("Plan:" in c and ".agent/plans/issue-123.md" in c for c in calls)
         assert any("Spec:" in c and ".agent/specs/issue-456.md" in c for c in calls)
-        assert any("Issue:" in c and "#456" in c for c in calls)
+        assert any("Plan:" in c and ".agent/plans/issue-123.md" in c for c in calls)
+        # Spec should appear before Plan in the output order
+        spec_idx = next(i for i, c in enumerate(calls) if "Spec:" in c)
+        plan_idx = next(i for i, c in enumerate(calls) if "Plan:" in c)
+        assert spec_idx < plan_idx
 
     def test_display_codeagent_result_handles_missing_context_fields(self):
-        """display_codeagent_result handles missing plan_ref/spec_ref/issue_number."""
+        """display_codeagent_result handles missing plan_ref/spec_ref."""
         from vibe3.agents import CodeagentResult
 
         console = MagicMock()
@@ -187,30 +188,8 @@ class TestDisplayCodeagentResult:
         from vibe3.ui.scan_display import display_codeagent_result
 
         display_codeagent_result(console, result, "Run")
-        # Should not crash, and should not show Plan/Spec/Issue labels
+        # Should not crash, and should not show Plan/Spec labels
         calls = [str(c) for c in console.print.call_args_list]
-        assert not any("Plan:" in c for c in calls)
-        assert not any("Spec:" in c for c in calls)
-        assert not any("Issue:" in c for c in calls)
-
-    def test_display_codeagent_result_shows_issue_without_plan_or_spec(self):
-        """display_codeagent_result shows only issue_number when others missing."""
-        from vibe3.agents import CodeagentResult
-
-        console = MagicMock()
-        result = CodeagentResult(
-            success=True,
-            backend="claude",
-            model="sonnet",
-            issue_number=789,
-            log_path="temp/logs/run/test.log",
-        )
-        from vibe3.ui.scan_display import display_codeagent_result
-
-        display_codeagent_result(console, result, "Run")
-        # Should only show Issue, not Plan/Spec
-        calls = [str(c) for c in console.print.call_args_list]
-        assert any("Issue:" in c and "#789" in c for c in calls)
         assert not any("Plan:" in c for c in calls)
         assert not any("Spec:" in c for c in calls)
 

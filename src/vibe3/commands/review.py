@@ -55,7 +55,6 @@ def _emit_review_result(
     handoff_file: str | None,
     backend: str | None = None,
     model: str | None = None,
-    issue_number: int | None = None,
     report_ref: str | None = None,
 ) -> None:
     """Render review result summary consistently."""
@@ -71,19 +70,15 @@ def _emit_review_result(
     if verdict == "DRY_RUN":
         console.print("[green]✓ Completed successfully[/green]")
         if report_ref:
-            console.print(f"[cyan]Plan:[/cyan] {report_ref}")
-        if issue_number:
-            console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
+            console.print(f"[cyan]Report:[/cyan] {report_ref}")
         return
 
     if backend:
         console.print(f"[cyan]Backend:[/cyan] {backend}")
     if model:
         console.print(f"[cyan]Model:[/cyan] {model}")
-    if issue_number:
-        console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
     if report_ref:
-        console.print(f"[cyan]Plan:[/cyan] {report_ref}")
+        console.print(f"[cyan]Report:[/cyan] {report_ref}")
     console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
@@ -185,7 +180,6 @@ def _review_branch_impl(
             result.handoff_file,
             result.backend,
             result.model,
-            result.issue_number,
             report_ref,
         )
 
