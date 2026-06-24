@@ -140,10 +140,17 @@ def run_governance_sync(
 
         # Return CodeagentResult for consistent display with plan/run/review
         effective = resolve_effective_agent_options(options)
+        model = effective.model
+        if not model and options.agent:
+            from vibe3.config import resolve_repo_agent_preset
+
+            preset = resolve_repo_agent_preset(options.agent)
+            if preset and preset[1]:
+                model = preset[1]
         return CodeagentResult(
             success=True,
             backend=effective.backend,
-            model=effective.model,
+            model=model,
         )
 
     material_info = f" material={material_override}" if material_override else ""

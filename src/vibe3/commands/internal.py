@@ -147,10 +147,30 @@ def internal_manager_dispatch(
             branch=branch,
         )
 
-    if dry_run and result is not None:
-        from vibe3.commands.common import _handle_codeagent_result
+    if result is not None:
+        if dry_run:
+            from vibe3.commands.common import _handle_codeagent_result
 
-        _handle_codeagent_result(result, "Manager")
+            _handle_codeagent_result(result, "Manager")  # type: ignore[arg-type]
+        else:
+            # Async dispatch: show dispatch info consistent with plan/run/review
+            from rich.console import Console
+
+            from vibe3.agents import CodeagentResult
+            from vibe3.ui import display_codeagent_result
+
+            console = Console()
+            display_codeagent_result(
+                console,
+                CodeagentResult(
+                    success=bool(result.launched),  # type: ignore[union-attr,attr-defined]
+                    backend=result.backend,  # type: ignore[union-attr]
+                    model=result.model,  # type: ignore[union-attr]
+                    tmux_session=result.tmux_session,  # type: ignore[union-attr]
+                    log_path=result.log_path,  # type: ignore[union-attr]
+                ),
+                "Manager",
+            )
 
 
 @app.command("apply")

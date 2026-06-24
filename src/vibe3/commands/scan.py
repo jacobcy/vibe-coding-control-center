@@ -258,12 +258,19 @@ def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:
         from vibe3.ui import display_codeagent_result
 
         effective = resolve_effective_agent_options(options)
+        model = effective.model
+        if not model and options.agent:
+            from vibe3.config import resolve_repo_agent_preset
+
+            preset = resolve_repo_agent_preset(options.agent)
+            if preset and preset[1]:
+                model = preset[1]
         display_codeagent_result(
             console,
             CodeagentResult(
                 success=True,
                 backend=effective.backend,
-                model=effective.model,
+                model=model,
             ),
             "Supervisor Scan",
         )

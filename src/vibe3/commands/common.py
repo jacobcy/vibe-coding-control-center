@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING
 
 import typer
 
 from vibe3.commands.check_support import execute_check_mode
+
+if TYPE_CHECKING:
+    from vibe3.agents import CodeagentResult
 
 
 def validate_trace_options(trace: bool, min_ms: float | None) -> None:
@@ -72,7 +75,7 @@ def run_full_check_shortcut() -> None:
         )
 
 
-def _handle_codeagent_result(result: Any, label: str) -> None:
+def _handle_codeagent_result(result: CodeagentResult | None, label: str) -> None:
     """Display CodeagentResult and exit with error if execution failed.
 
     Shared helper for plan/run commands that use publish_and_wait pattern.

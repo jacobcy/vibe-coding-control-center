@@ -1,4 +1,8 @@
-"""UI display functions for scan command."""
+"""UI display functions for scan command.
+
+display_codeagent_result has moved to vibe3.ui.result_display — re-exported
+here for backward compatibility.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +13,10 @@ from rich.table import Table
 
 from vibe3.prompts import PromptMaterialSpec
 
+# Re-export for backward compatibility — canonical location is result_display
+from vibe3.ui.result_display import display_codeagent_result  # noqa: F401
+
 if TYPE_CHECKING:
-    from vibe3.agents import CodeagentResult
     from vibe3.models import ExecutionLaunchResult
 
 
@@ -150,52 +156,5 @@ def display_execution_result(console: Console, result: "ExecutionLaunchResult") 
             console.print(f"[cyan]Reason:[/cyan] {result.reason}")
         if result.reason_code:
             console.print(f"[cyan]Code:[/cyan] {result.reason_code}")
-
-    console.print()  # Blank line for readability
-
-
-def display_codeagent_result(
-    console: Console,
-    result: "CodeagentResult | None",
-    label: str = "Execution",
-) -> None:
-    """Display CodeagentResult from plan/run execution.
-
-    Args:
-        console: Rich Console instance
-        result: CodeagentResult from handler execution
-        label: Label for the result header (e.g., "Plan", "Run")
-    """
-    if result is None:
-        console.print(f"\n[bold]{label} Result[/bold]")
-        console.print("[yellow]No result returned (async mode)[/yellow]\n")
-        return
-
-    if result.backend:
-        console.print()
-        console.print(f"[cyan]Backend:[/cyan] {result.backend}")
-    if result.model:
-        console.print(f"[cyan]Model:[/cyan] {result.model}")
-    if result.spec_ref:
-        console.print(f"[cyan]Spec:[/cyan] {result.spec_ref}")
-    if result.plan_ref:
-        console.print(f"[cyan]Plan:[/cyan] {result.plan_ref}")
-    if result.report_ref:
-        console.print(f"[cyan]Report:[/cyan] {result.report_ref}")
-
-    console.print(f"\n[bold]{label} Result[/bold]")
-    if result.success:
-        console.print("[green]✓ Completed successfully[/green]")
-    else:
-        console.print("[red]✗ Failed[/red]")
-        if result.stderr:
-            console.print(f"[red]{result.stderr}[/red]")
-
-    if result.log_path:
-        console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
-    if result.handoff_file:
-        console.print(f"[cyan]Handoff:[/cyan] {result.handoff_file}")
-    if result.tmux_session:
-        console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
 
     console.print()  # Blank line for readability
