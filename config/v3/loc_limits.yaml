@@ -275,14 +275,14 @@ code_limits:
         limit: 510
         reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 680
-        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标"
+        limit: 700
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标；Issue #3135 更新 dry-run backend/model 显示测试（+17 行）"
       - path: "tests/vibe3/domain/handlers/test_governance_scan.py"
         limit: 450
         reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递"
       - path: "tests/vibe3/domain/handlers/test_manual_dispatch.py"
-        limit: 450
-        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播"
+        limit: 470
+        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播；Issue #3135 新增 async 路径 backend/model 回填测试（+20 行）"
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
@@ -290,8 +290,11 @@ code_limits:
         limit: 580
         reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；EDA 架构迁移后新增 lazy import cache mock 路径修复、_ensure_lazy_imports_populated 隔离辅助函数等（+105 行）"
       - path: "tests/vibe3/commands/test_scan.py"
-        limit: 450
-        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）"
+        limit: 680
+        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行）"
+      - path: "tests/vibe3/commands/test_review.py"
+        limit: 530
+        reason: "Review command 测试集，覆盖 dry_run、show_prompt、base/branch review、exit codes、context builder、CLI option 传递、async dispatch 等紧密耦合场景；Issue #3135 新增 unified display 和 async dispatch 测试（+130 行）"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
@@ -413,6 +416,9 @@ code_limits:
       - path: "tests/vibe3/roles/test_run_command.py"
         limit: 420
         reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
+      - path: "tests/vibe3/roles/test_plan.py"
+        limit: 410
+        reason: "Planner role 测试集，覆盖 no-op gate、prompt building、spec plan input resolution、async worktree requirement、sync cwd handling 等紧密耦合场景；Issue #3135 新增 backend/model 传播测试和 spec_ref 解析测试（+50 行）"
       - path: "tests/vibe3/config/test_loader.py"
         limit: 430
         reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"
@@ -450,8 +456,8 @@ code_limits:
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
       - path: "tests/vibe3/commands/test_internal.py"
-        limit: 480
-        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）"
+        limit: 550
+        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行）"
 
 
   total_file_loc:
