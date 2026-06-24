@@ -7,6 +7,11 @@ setup() {
     export VIBE_ROOT="$BATS_TEST_DIRNAME/../.."
     TEST_REPO=$(mktemp -d)
     export HOME=$(mktemp -d)
+
+    # Configure git identity for tests that create commits
+    git config --global user.email "test@example.com"
+    git config --global user.name "Test User"
+    git config --global init.defaultBranch main
 }
 
 teardown() {
@@ -116,8 +121,7 @@ _has_main_branch() {
     git init
     git commit --allow-empty -m "initial"
 
-    # Check that porcelain output doesn't have refs/heads/main initially
-    # (default branch might be 'master')
+    # Check that porcelain output has refs/heads/main (since we set init.defaultBranch main)
     local found_main=0
     while IFS= read -r line; do
         if [[ "$line" == "branch refs/heads/main" ]]; then
@@ -126,8 +130,8 @@ _has_main_branch() {
         fi
     done < <(git worktree list --porcelain 2>/dev/null)
 
-    # In a fresh repo, default branch is typically 'master', not 'main'
-    [[ $found_main -eq 0 ]]
+    # With init.defaultBranch main, the default branch should be 'main'
+    [[ $found_main -eq 1 ]]
 }
 
 @test "loader.sh exists and has expected resolution logic" {
