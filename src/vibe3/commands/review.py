@@ -55,6 +55,7 @@ def _emit_review_result(
     handoff_file: str | None,
     backend: str | None = None,
     model: str | None = None,
+    issue_number: int | None = None,
 ) -> None:
     """Render review result summary consistently."""
     from rich.console import Console
@@ -68,12 +69,20 @@ def _emit_review_result(
 
     if verdict == "DRY_RUN":
         console.print("[green]✓ Completed successfully[/green]")
+        if backend:
+            console.print(f"[cyan]Backend:[/cyan] {backend}")
+        if model:
+            console.print(f"[cyan]Model:[/cyan] {model}")
+        if issue_number:
+            console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
         return
 
     if backend:
         console.print(f"[cyan]Backend:[/cyan] {backend}")
     if model:
         console.print(f"[cyan]Model:[/cyan] {model}")
+    if issue_number:
+        console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
     console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
@@ -157,7 +166,11 @@ def _review_branch_impl(
         pass  # already handled
     else:
         _emit_review_result(
-            result.verdict, result.handoff_file, result.backend, result.model
+            result.verdict,
+            result.handoff_file,
+            result.backend,
+            result.model,
+            result.issue_number,
         )
 
 
