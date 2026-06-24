@@ -1,10 +1,14 @@
 """DAGService 单元测试."""
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from vibe3.analysis.dag_service import (
     DAGError,
     ModuleNode,
+    _extract_imports,
     build_module_graph,
     expand_impacted_modules,
 )
@@ -76,3 +80,24 @@ class TestExpandImpactedModules:
         result = expand_impacted_modules(seed_files=[], graph=MOCK_GRAPH)
         assert result.seed_modules == []
         assert result.impacted_modules == []
+
+
+class TestExtractImports:
+    """_extract_imports 测试."""
+
+    def test_deduplicates_multiple_imports_from_same_module(self) -> None:
+        """验证 `from ... import A, B, C` 不会产生重复模块名."""
+        # 创建临时 Python 文件
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("from vibe3.clients import GitClient, GitHubClient, SQLiteClient\n")
+            temp_file = f.name
+
+        try:
+            # 调用 _extract_imports
+            imports = _extract_imports(temp_file)
+
+            # 验证：应该只有一条 vibe3.clients 记录
+            assert imports == ["vibe3.clients"]
+        finally:
+            # 清理临时文件
+            Path(temp_file).unlink()
