@@ -145,7 +145,7 @@ def test_review_dry_run_uses_codeagent_result_display(monkeypatch) -> None:
         captured["result"] = result
         captured["label"] = label
 
-    monkeypatch.setattr("vibe3.ui.scan_display.display_codeagent_result", fake_display)
+    monkeypatch.setattr("vibe3.ui.display_codeagent_result", fake_display)
 
     _emit_review_result(
         "DRY_RUN",

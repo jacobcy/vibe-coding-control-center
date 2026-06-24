@@ -66,7 +66,7 @@ def _emit_review_result(
 
     if verdict in {"ASYNC", "DRY_RUN"}:
         from vibe3.agents import CodeagentResult
-        from vibe3.ui.scan_display import display_codeagent_result
+        from vibe3.ui import display_codeagent_result
 
         display_codeagent_result(
             console,
