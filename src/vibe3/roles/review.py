@@ -488,7 +488,13 @@ def execute_manual_review_sync(
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
-        return ReviewRunResult("DRY_RUN", None, issue_number)
+        return ReviewRunResult(
+            "DRY_RUN",
+            None,
+            issue_number,
+            backend=result.backend,
+            model=result.model,
+        )
 
     audit_ref, verdict = finalize_review_output(
         review_output=result.stdout,

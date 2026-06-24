@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.config import resolve_effective_agent_options
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import (
     ManualPlanIntent,
@@ -313,16 +314,24 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 backend=event.backend,
                 model=event.model,
             )
-            # Create result for branch review
-            # (no verdict, just completion signal)
-            # Fill backend/model from CLI params
-            # (config already validated)
+            # Resolve effective options to capture backend/model
+            # (run_issue_role_sync resolves internally but returns None)
+            from vibe3.execution import resolve_command_agent_options
+
+            options = resolve_command_agent_options(
+                config=config,
+                section="review",
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+            )
+            effective = resolve_effective_agent_options(options)
             result = ReviewRunResult(
                 "OK",
                 None,
                 event.issue_number,
-                backend=event.backend,
-                model=event.model,
+                backend=effective.backend,
+                model=effective.model,
             )
             # Store for backward compat
             _pending_results["review"] = result

@@ -14,7 +14,10 @@ if TYPE_CHECKING:
     )
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.codeagent_runner import CodeagentExecutionService
-    from vibe3.execution.codeagent_support import build_self_invocation
+    from vibe3.execution.codeagent_support import (
+        build_self_invocation,
+        resolve_command_agent_options,
+    )
     from vibe3.execution.command_adapter import (
         CommandAdapterEntry,
         CommandAdapterError,
@@ -97,6 +100,7 @@ _LAZY_IMPORTS = {
     "use_current_branch": "vibe3.execution.issue_role_support",
     # Codeagent support
     "build_self_invocation": "vibe3.execution.codeagent_support",
+    "resolve_command_agent_options": "vibe3.execution.codeagent_support",
     # Prompt metadata
     "build_prompt_meta": "vibe3.execution.prompt_meta",
     "PromptMeta": "vibe3.execution.prompt_meta",
@@ -164,6 +168,7 @@ __all__ = [
     "use_current_branch",
     # Codeagent support
     "build_self_invocation",
+    "resolve_command_agent_options",
     # Prompt metadata
     "build_prompt_meta",
     "PromptMeta",

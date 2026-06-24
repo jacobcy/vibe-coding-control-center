@@ -50,10 +50,19 @@ _YES_OPT = Annotated[
 ]
 
 
-def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
+def _emit_review_result(
+    verdict: str,
+    handoff_file: str | None,
+    backend: str | None = None,
+    model: str | None = None,
+) -> None:
     """Render review result summary consistently."""
     if verdict in {"ASYNC", "DRY_RUN"}:
         return
+    if backend:
+        typer.echo(f"Backend: {backend}")
+    if model:
+        typer.echo(f"Model: {model}")
     typer.echo(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         typer.echo(f"-> Review saved to: {handoff_file}")
@@ -136,7 +145,9 @@ def _review_branch_impl(
     elif result.verdict in {"ASYNC", "DRY_RUN"}:
         pass  # already handled
     else:
-        _emit_review_result(result.verdict, result.handoff_file)
+        _emit_review_result(
+            result.verdict, result.handoff_file, result.backend, result.model
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -355,6 +366,8 @@ def base(
         pass
     else:
         # Sync mode: display result
-        _emit_review_result(result.verdict, result.handoff_file)
+        _emit_review_result(
+            result.verdict, result.handoff_file, result.backend, result.model
+        )
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)
