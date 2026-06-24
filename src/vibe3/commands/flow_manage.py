@@ -142,13 +142,14 @@ def _ensure_current_handoff_for_flow(target_branch: str) -> None:
     Args:
         target_branch: Branch name to check for current.md
     """
+    from vibe3.exceptions import UserError
     from vibe3.services.handoff import HandoffService
 
     service = HandoffService()
     try:
         # Try to read current.md
         service.storage.read_current_handoff(branch=target_branch)
-    except FileNotFoundError:
+    except UserError:
         # current.md doesn't exist, initialize it quietly
         logger.bind(
             command="flow update",

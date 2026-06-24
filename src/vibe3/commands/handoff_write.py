@@ -145,7 +145,7 @@ def init(
                         break
 
                 if latest_human_comment:
-                    comment_summary = task_show._build_comment_summary(
+                    comment_summary = task_show.build_comment_summary(
                         latest_human_comment, full_body=True
                     )
                     if comment_summary:
@@ -162,7 +162,7 @@ def init(
 
                 # 3. Append latest comment if different from human instruction
                 if comments and comments[-1] != latest_human_comment:
-                    latest_comment_summary = task_show._build_comment_summary(
+                    latest_comment_summary = task_show.build_comment_summary(
                         comments[-1], full_body=True
                     )
                     if latest_comment_summary:
