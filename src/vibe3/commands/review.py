@@ -56,6 +56,7 @@ def _emit_review_result(
     backend: str | None = None,
     model: str | None = None,
     issue_number: int | None = None,
+    report_ref: str | None = None,
 ) -> None:
     """Render review result summary consistently."""
     from rich.console import Console
@@ -69,6 +70,8 @@ def _emit_review_result(
 
     if verdict == "DRY_RUN":
         console.print("[green]✓ Completed successfully[/green]")
+        if report_ref:
+            console.print(f"[cyan]Plan:[/cyan] {report_ref}")
         if issue_number:
             console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
         return
@@ -79,6 +82,8 @@ def _emit_review_result(
         console.print(f"[cyan]Model:[/cyan] {model}")
     if issue_number:
         console.print(f"[cyan]Issue:[/cyan] #{issue_number}")
+    if report_ref:
+        console.print(f"[cyan]Plan:[/cyan] {report_ref}")
     console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
@@ -95,6 +100,19 @@ def _check_report_ref(branch: str) -> bool:
     if flow and flow.report_ref:
         return True
     return False
+
+
+def _resolve_report_ref(branch: str | None) -> str | None:
+    """Get report_ref from flow state, or None if unavailable."""
+    if not branch:
+        return None
+    try:
+        flow = FlowService().get_flow_status(branch)
+        if flow and flow.report_ref:
+            return flow.report_ref
+    except Exception:
+        pass
+    return None
 
 
 def _review_branch_impl(
@@ -161,12 +179,14 @@ def _review_branch_impl(
     elif result.verdict in {"ASYNC"}:
         pass  # already handled
     else:
+        report_ref = _resolve_report_ref(branch)
         _emit_review_result(
             result.verdict,
             result.handoff_file,
             result.backend,
             result.model,
             result.issue_number,
+            report_ref,
         )
 
 
