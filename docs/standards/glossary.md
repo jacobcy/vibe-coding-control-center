@@ -413,25 +413,28 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 别称：`仓库上下文变量`、`VIBE_REPO/VIBE_MAIN`
 - 定义：用于定位仓库资源的 Shell 环境变量，由 `lib/alias/loader.sh` 动态设置：
   - **VIBE_REPO**：主仓库根目录（包含 `.git` 和 `.worktrees` 的目录）
-    - 单 worktree 模式：即 clone 目录本身
-    - 多 worktree 模式：bare repo 目录
+    - 非裸主仓库布局：主仓库目录（如 `main/`，包含 `.git` 和 `.worktrees`）
+    - 真正 bare repo 布局：bare repo 目录（git-common-dir 本身）
   - **VIBE_MAIN**：main worktree 的物理路径
     - 单 worktree 模式：等于 VIBE_REPO
-    - 多 worktree 模式：`$VIBE_REPO/.worktrees/main`
+    - 多 worktree 模式：main branch 对应的 worktree 物理路径
 - 判定逻辑：
   ```bash
   # VIBE_REPO 解析顺序：
-  1. git rev-parse --git-common-dir → 父目录
+  1. 检查 git-common-dir basename：
+     - 若为 .git → 非裸仓库，VIBE_REPO = dirname(git-common-dir)
+     - 若为 bare repo → VIBE_REPO = git-common-dir
   2. git rev-parse --show-toplevel (fallback)
 
   # VIBE_MAIN 查找顺序：
-  1. $VIBE_REPO/.worktrees/main
-  2. $VIBE_REPO/main (兼容旧结构)
-  3. $VIBE_REPO (单 worktree)
+  1. git worktree list --porcelain → 查找 branch refs/heads/main 对应的 worktree path
+  2. $VIBE_REPO/.worktrees/main (约定式布局)
+  3. $VIBE_REPO/main (兼容旧结构)
+  4. $VIBE_REPO (单 worktree)
   ```
 - 边界：
-  - VIBE_REPO 一定包含 `.git` 目录
-  - VIBE_REPO 一定包含 `.worktrees` 目录（多 worktree 模式）
+  - VIBE_REPO 一定包含 `.git` 目录（非裸仓库）或本身就是 bare repo 根目录
+  - VIBE_REPO 可能包含 `.worktrees` 目录（多 worktree 模式）
   - VIBE_MAIN 一定指向 main branch 的 worktree 物理目录
 - 使用规则：
   - 所有定位共享资源的逻辑应基于 VIBE_REPO
