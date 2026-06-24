@@ -8,6 +8,7 @@ fire-and-forget success (exit 0), breaking CI gating.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from vibe3.agents import CodeagentResult
@@ -421,3 +422,44 @@ class TestBackendModelPropagation:
         assert result.backend == "claude"
         assert result.model == "opus"
         assert result.issue_number == 42
+
+    def test_handle_manual_review_branch_async_fills_backend_model_from_config(
+        self,
+    ) -> None:
+        """Branch review async metadata should not depend on launcher fields."""
+        from vibe3.models import ExecutionLaunchResult
+
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=False,
+        )
+        config = SimpleNamespace(
+            review=SimpleNamespace(
+                agent_config=SimpleNamespace(
+                    agent=None,
+                    backend="claude",
+                    model="opus",
+                    timeout_seconds=3600,
+                )
+            )
+        )
+        launch = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-reviewer-issue-42",
+            log_path="temp/logs/review.log",
+            backend=None,
+            model=None,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=config),
+            patch("vibe3.execution.run_issue_role_async", return_value=launch),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "ASYNC"
+        assert result.backend == "claude"
+        assert result.model == "opus"

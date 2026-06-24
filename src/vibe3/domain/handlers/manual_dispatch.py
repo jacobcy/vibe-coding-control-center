@@ -285,14 +285,6 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
                 fresh_session=event.fresh_session,
             )
-            # Echo tmux info (same as CLI did)
-            import typer
-
-            if result.tmux_session:
-                typer.echo(f"tmux session: {result.tmux_session}")
-            if result.log_path:
-                typer.echo(f"log: {result.log_path}")
-            # Don't store result for async mode (CLI won't read it)
             return result
     else:
         # Branch review path (run_issue_role)
@@ -340,7 +332,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
             return result
         else:
             # Async mode
-            run_issue_role_async(
+            launch = run_issue_role_async(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
                 spec=REVIEW_SYNC_SPEC,
@@ -350,16 +342,27 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
                 fresh_session=event.fresh_session,
             )
-            # Return result indicating async dispatch
-            # LIMITATION: run_issue_role_async() returns None (doesn't provide
-            # tmux/log info). This means users only see "Review dispatched
-            # (async mode)" without session details. This is acceptable because:
-            # 1. Branch review async is uncommon (typically done sync or via
-            #    base review)
-            # 2. The async dispatch already echoes tmux/log via typer inside
-            #    run_issue_role_async
-            # 3. Adding return value would require refactoring
-            #    run_issue_role_async
-            # TODO: Consider refactoring run_issue_role_async to return
-            # ExecutionLaunchResult
-            return ReviewRunResult("ASYNC", None, event.issue_number)
+            resolved_backend = launch.backend if launch else None
+            resolved_model = launch.model if launch else None
+            if not resolved_backend or not resolved_model:
+                from vibe3.execution import resolve_command_agent_options
+
+                options = resolve_command_agent_options(
+                    config=config,
+                    section="review",
+                    agent=event.agent,
+                    backend=event.backend,
+                    model=event.model,
+                )
+                effective = resolve_effective_agent_options(options)
+                resolved_backend = resolved_backend or effective.backend
+                resolved_model = resolved_model or effective.model
+            return ReviewRunResult(
+                "ASYNC" if launch is None or launch.launched else "ERROR",
+                None,
+                event.issue_number,
+                tmux_session=launch.tmux_session if launch else None,
+                log_path=launch.log_path if launch else None,
+                backend=resolved_backend,
+                model=resolved_model,
+            )

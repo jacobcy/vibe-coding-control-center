@@ -1,6 +1,7 @@
 """Regression tests for run_command behavior that must not drift."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -221,6 +222,102 @@ def test_async_publish_dispatch_preserves_publish_cli_mode() -> None:
             publish=True,
         )
 
-    assert result is None
+    assert result is not None
+    assert result.success is True
+    assert result.plan_ref is None
     assert captured["cli_args"] == ["run", "--publish"]
     assert captured["handoff_metadata"] == {"skill": "vibe-commit", "publish": True}
+
+
+def test_async_plan_dispatch_returns_codeagent_result() -> None:
+    """Async run dispatch should return displayable launch metadata."""
+    from vibe3.roles.run_command import AsyncDispatchResult
+
+    with (
+        patch(
+            "vibe3.roles.run_command.dispatch_run_command_async",
+            return_value=AsyncDispatchResult(
+                tmux_session="vibe3-run-issue-42",
+                log_path="temp/logs/run.log",
+                backend="claude",
+                model="haiku",
+                launched=True,
+            ),
+        ),
+        patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+    ):
+        mock_sqlite_cls.return_value.get_flow_state.return_value = None
+        result = execute_manual_run(
+            config=MagicMock(run=MagicMock(run_prompt="run prompt")),
+            branch="task/issue-42",
+            issue_number=42,
+            instructions=None,
+            plan_file="docs/plans/cleanup-v2.md",
+            skill=None,
+            summary=MagicMock(mode="flow"),
+            dry_run=False,
+            no_async=False,
+            show_prompt=False,
+            agent=None,
+            backend=None,
+            model=None,
+        )
+
+    assert result is not None
+    assert result.success is True
+    assert result.backend == "claude"
+    assert result.model == "haiku"
+    assert result.plan_ref == "docs/plans/cleanup-v2.md"
+    assert result.tmux_session == "vibe3-run-issue-42"
+    assert result.log_path == "temp/logs/run.log"
+
+
+def test_async_plan_dispatch_fills_backend_model_from_run_config() -> None:
+    """Async run result metadata should not depend on launcher-populated fields."""
+    from vibe3.roles.run_command import AsyncDispatchResult
+
+    config = SimpleNamespace(
+        run=SimpleNamespace(
+            run_prompt="run prompt",
+            agent_config=SimpleNamespace(
+                agent=None,
+                backend="claude",
+                model="haiku",
+                timeout_seconds=3600,
+            ),
+        )
+    )
+
+    with (
+        patch(
+            "vibe3.roles.run_command.dispatch_run_command_async",
+            return_value=AsyncDispatchResult(
+                tmux_session="vibe3-run-issue-42",
+                log_path="temp/logs/run.log",
+                backend=None,
+                model=None,
+                launched=True,
+            ),
+        ),
+        patch("vibe3.roles.run_command.SQLiteClient") as mock_sqlite_cls,
+    ):
+        mock_sqlite_cls.return_value.get_flow_state.return_value = None
+        result = execute_manual_run(
+            config=config,
+            branch="task/issue-42",
+            issue_number=42,
+            instructions=None,
+            plan_file="docs/plans/cleanup-v2.md",
+            skill=None,
+            summary=MagicMock(mode="flow"),
+            dry_run=False,
+            no_async=False,
+            show_prompt=False,
+            agent=None,
+            backend=None,
+            model=None,
+        )
+
+    assert result is not None
+    assert result.backend == "claude"
+    assert result.model == "haiku"

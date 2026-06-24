@@ -56,33 +56,42 @@ def _emit_review_result(
     backend: str | None = None,
     model: str | None = None,
     report_ref: str | None = None,
+    tmux_session: str | None = None,
+    log_path: str | None = None,
 ) -> None:
     """Render review result summary consistently."""
     from rich.console import Console
 
     console = Console()
 
-    if verdict == "ASYNC":
-        return
+    if verdict in {"ASYNC", "DRY_RUN"}:
+        from vibe3.agents import CodeagentResult
+        from vibe3.ui.scan_display import display_codeagent_result
 
-    console.print("\n[bold]Review Result[/bold]")
-
-    if verdict == "DRY_RUN":
-        console.print("[green]✓ Completed successfully[/green]")
-        if backend:
-            console.print(f"[cyan]Backend:[/cyan] {backend}")
-        if model:
-            console.print(f"[cyan]Model:[/cyan] {model}")
-        if report_ref:
-            console.print(f"[cyan]Report:[/cyan] {report_ref}")
+        display_codeagent_result(
+            console,
+            CodeagentResult(
+                success=True,
+                backend=backend,
+                model=model,
+                report_ref=report_ref,
+                tmux_session=tmux_session,
+                log_path=log_path,
+            ),
+            "Review",
+        )
         return
 
     if backend:
+        console.print()
         console.print(f"[cyan]Backend:[/cyan] {backend}")
     if model:
         console.print(f"[cyan]Model:[/cyan] {model}")
     if report_ref:
         console.print(f"[cyan]Report:[/cyan] {report_ref}")
+
+    console.print("\n[bold]Review Result[/bold]")
+
     console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
@@ -175,8 +184,6 @@ def _review_branch_impl(
     # Display result
     if result is None:
         typer.echo("Review dispatched (async mode)")
-    elif result.verdict in {"ASYNC"}:
-        pass  # already handled
     else:
         report_ref = _resolve_report_ref(branch)
         _emit_review_result(
@@ -185,6 +192,8 @@ def _review_branch_impl(
             result.backend,
             result.model,
             report_ref,
+            result.tmux_session,
+            result.log_path,
         )
 
 
@@ -300,9 +309,8 @@ def base(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # Register EDA event handlers for review command
-    from vibe3.domain import get_pending_result, register_event_handlers
-    from vibe3.domain import publish as domain_publish
-    from vibe3.models import ManualReviewIntent
+    from vibe3.domain import register_event_handlers
+    from vibe3.models import ManualReviewIntent, publish_and_wait
 
     register_event_handlers()
 
@@ -367,20 +375,7 @@ def base(
         flow_service=flow_service,
     )
 
-    from vibe3.commands.common import echo_dry_run_header
-
-    if dry_run:
-        echo_dry_run_header(
-            "reviewer", issue_number, current_branch, agent, backend, model
-        )
-
-    # Publish ManualReviewIntent event (handler will execute)
-    # TODO(#2920): migrate base subcommand to publish_and_wait() pattern
-    # Currently uses legacy domain_publish() + get_pending_result(),
-    # while the handler already supports returning ReviewRunResult directly.
-    # Blocked by: base subcommand's sync_result display logic differs from
-    # _review_branch_impl (uses _emit_review_result vs inline display).
-    domain_publish(
+    result = publish_and_wait(
         ManualReviewIntent(
             issue_number=issue_number,
             branch=current_branch,
@@ -397,15 +392,16 @@ def base(
         )
     )
 
-    # Retrieve result from handler (sync execution)
-    result = get_pending_result("review")
     if result is None:
-        # Async mode: result is None, tmux session info already echoed by handler
-        pass
+        typer.echo("Review dispatched (async mode)")
     else:
-        # Sync mode: display result
         _emit_review_result(
-            result.verdict, result.handoff_file, result.backend, result.model
+            result.verdict,
+            result.handoff_file,
+            result.backend,
+            result.model,
+            tmux_session=result.tmux_session,
+            log_path=result.log_path,
         )
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)

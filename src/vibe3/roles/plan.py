@@ -20,6 +20,7 @@ from vibe3.config import (
     get_convention,
     load_orchestra_config,
     load_runtime_config,
+    resolve_effective_agent_options,
 )
 from vibe3.execution import (
     CodeagentExecutionService,
@@ -29,6 +30,7 @@ from vibe3.execution import (
     build_role_sync_request,
     build_self_invocation,
     build_task_flow_branch_resolver,
+    resolve_command_agent_options,
     resolve_env_overridable_agent_options,
 )
 from vibe3.models import (
@@ -440,15 +442,12 @@ def execute_spec_plan_async(
 ) -> CodeagentResult:
     """Execute spec plan in async mode (tmux wrapper).
 
-    ``request`` and ``config`` are intentionally unused: async mode re-invokes
-    the CLI via ``cli_args`` inside a tmux session, so all configuration is
-    re-resolved from scratch by the child process. Passing a custom ``request``
-    or ``config`` here has no effect.
-
-    ``agent``, ``backend``, ``model``, and ``fresh_session`` are also unused here
-    because they should already be included in ``cli_args`` by the caller.
+    Async mode re-invokes the CLI via ``cli_args`` inside a tmux session. The
+    child process still resolves execution config, while this parent resolves
+    display metadata so async output uses the same result renderer as dry-run
+    and sync paths.
     """
-    _ = request, config, agent, backend, model, fresh_session
+    _ = request, fresh_session
     from vibe3.clients import SQLiteClient
 
     # Resolve repo path from git common dir (main repo root)
@@ -489,14 +488,27 @@ def execute_spec_plan_async(
     )
 
     spec_ref = _resolve_spec_ref(branch)
+    resolved_backend = None
+    resolved_model = None
+    if config is not None:
+        options = resolve_command_agent_options(
+            config=config,
+            section="plan",
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        effective_options = resolve_effective_agent_options(options)
+        resolved_backend = effective_options.backend
+        resolved_model = effective_options.model
 
     return CodeagentResult(
         success=launch.launched,
         stderr=launch.reason or "",
         tmux_session=launch.tmux_session,
         log_path=launch.log_path,
-        backend=launch.backend,
-        model=launch.model,
+        backend=launch.backend or resolved_backend,
+        model=launch.model or resolved_model,
         issue_number=issue_number,
         spec_ref=spec_ref,
     )

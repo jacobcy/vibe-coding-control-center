@@ -28,6 +28,7 @@ from vibe3.config import (
     VibeConfig,
     get_resolver,
     load_orchestra_config,
+    resolve_effective_agent_options,
 )
 from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution import (
@@ -36,6 +37,7 @@ from vibe3.execution import (
     build_prompt_meta,
     build_self_invocation,
     load_session_id,
+    resolve_command_agent_options,
 )
 from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
 from vibe3.observability import write_prompt_provenance
@@ -59,6 +61,30 @@ class AsyncDispatchResult:
     log_path: str | None
     backend: str | None = None
     model: str | None = None
+    launched: bool = True
+    reason: str | None = None
+
+
+def _resolve_run_result_agent_options(
+    *,
+    config: VibeConfig,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve run backend/model for display metadata."""
+    try:
+        options = resolve_command_agent_options(
+            config=config,
+            section="run",
+            agent=agent,
+            backend=backend,
+            model=model,
+        )
+        effective = resolve_effective_agent_options(options)
+    except Exception:
+        return None, None
+    return effective.backend, effective.model
 
 
 def resolve_skill_path(
@@ -135,6 +161,8 @@ def dispatch_run_command_async(
         log_path=launch.log_path,
         backend=launch.backend,
         model=launch.model,
+        launched=launch.launched,
+        reason=launch.reason,
     )
 
 
@@ -205,11 +233,25 @@ def execute_manual_run(
                 ),
                 handoff_metadata=handoff_metadata,
             )
-            if dispatch_result.tmux_session:
-                logger.info(f"tmux session: {dispatch_result.tmux_session}")
-            if dispatch_result.log_path:
-                logger.info(f"log: {dispatch_result.log_path}")
-            return None
+            resolved_backend = dispatch_result.backend
+            resolved_model = dispatch_result.model
+            if not resolved_backend or not resolved_model:
+                fallback_backend, fallback_model = _resolve_run_result_agent_options(
+                    config=config,
+                    agent=agent,
+                    backend=backend,
+                    model=model,
+                )
+                resolved_backend = resolved_backend or fallback_backend
+                resolved_model = resolved_model or fallback_model
+            return CodeagentResult(
+                success=dispatch_result.launched,
+                stderr=dispatch_result.reason or "",
+                tmux_session=dispatch_result.tmux_session,
+                log_path=dispatch_result.log_path,
+                backend=resolved_backend,
+                model=resolved_model,
+            )
 
         # Check if this is a publish path execution
         # Two entry points:
@@ -420,11 +462,26 @@ def execute_manual_run(
             ),
             handoff_metadata={"plan_ref": plan_file} if plan_file else None,
         )
-        if dispatch_result.tmux_session:
-            logger.info(f"tmux session: {dispatch_result.tmux_session}")
-        if dispatch_result.log_path:
-            logger.info(f"log: {dispatch_result.log_path}")
-        return None
+        resolved_backend = dispatch_result.backend
+        resolved_model = dispatch_result.model
+        if not resolved_backend or not resolved_model:
+            fallback_backend, fallback_model = _resolve_run_result_agent_options(
+                config=config,
+                agent=agent,
+                backend=backend,
+                model=model,
+            )
+            resolved_backend = resolved_backend or fallback_backend
+            resolved_model = resolved_model or fallback_model
+        return CodeagentResult(
+            success=dispatch_result.launched,
+            stderr=dispatch_result.reason or "",
+            tmux_session=dispatch_result.tmux_session,
+            log_path=dispatch_result.log_path,
+            backend=resolved_backend,
+            model=resolved_model,
+            plan_ref=plan_file,
+        )
 
     execution_service = CodeagentExecutionService(config)
     try:

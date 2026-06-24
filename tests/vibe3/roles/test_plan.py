@@ -326,6 +326,57 @@ class TestExecuteSpecPlanAsyncWorktreeRequirement:
             assert exec_request.worktree_requirement == WorktreeRequirement.PERMANENT
             assert exec_request.target_id == 0
 
+    def test_result_includes_backend_model_from_plan_config_when_launch_omits_them(
+        self,
+    ) -> None:
+        """Async display metadata should come from the same resolved plan options."""
+        from unittest.mock import MagicMock, patch
+
+        mock_launch = MagicMock()
+        mock_launch.launched = True
+        mock_launch.tmux_session = "test-session"
+        mock_launch.log_path = "/tmp/test.log"
+        mock_launch.reason = ""
+        mock_launch.backend = None
+        mock_launch.model = None
+
+        config = SimpleNamespace(
+            plan=SimpleNamespace(
+                agent_config=SimpleNamespace(
+                    agent=None,
+                    backend="claude",
+                    model="sonnet",
+                    timeout_seconds=3600,
+                )
+            )
+        )
+
+        with (
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=Path("/fake/repo"),
+            ),
+            patch("vibe3.roles.plan.load_orchestra_config"),
+            patch("vibe3.clients.sqlite_client.SQLiteClient"),
+            patch("vibe3.roles.plan.ExecutionCoordinator") as mock_coord_cls,
+        ):
+            mock_coord = MagicMock()
+            mock_coord.dispatch_execution.return_value = mock_launch
+            mock_coord_cls.return_value = mock_coord
+
+            from vibe3.roles.plan import execute_spec_plan_async
+
+            result = execute_spec_plan_async(
+                request=MagicMock(),
+                issue_number=42,
+                branch="dev/issue-42",
+                cli_args=["plan"],
+                config=config,
+            )
+
+        assert result.backend == "claude"
+        assert result.model == "sonnet"
+
 
 class TestExecuteSpecPlanSyncCwdNone:
     """execute_spec_plan_sync must pass cwd=None to ExecutionRequest."""

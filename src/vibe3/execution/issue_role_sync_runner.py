@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 
 from vibe3.agents import CodeagentBackend
@@ -20,6 +22,9 @@ from vibe3.services.issue import load_issue_info
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import format_agent_actor, format_dry_run_header
 
+if TYPE_CHECKING:
+    from vibe3.models import ExecutionLaunchResult
+
 
 def run_issue_role_async(
     *,
@@ -31,7 +36,7 @@ def run_issue_role_async(
     backend: str | None = None,
     model: str | None = None,
     fresh_session: bool = False,
-) -> None:
+) -> "ExecutionLaunchResult | None":
     """Run a role asynchronously via tmux wrapper.
 
     Launches tmux session and returns immediately.
@@ -68,7 +73,7 @@ def run_issue_role_async(
     if not dry_run:
         if not coordinator.capacity.can_dispatch(spec.role_name):
             typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
-            return
+            return None
 
     if not dry_run:
         request = spec.build_async_request(config, issue, actor, branch)
@@ -98,12 +103,9 @@ def run_issue_role_async(
                 typer.echo(
                     f"{spec.role_name} dispatch queued/throttled: {result.reason}"
                 )
-                return
+                return result
 
-            typer.echo(f"-> {spec.role_name} run: issue #{issue_number}")
-            typer.echo(f"tmux session: {result.tmux_session}")
-            typer.echo(f"log: {result.log_path}")
-            return
+            return result
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
                 role=spec.role_name,
@@ -132,6 +134,7 @@ def run_issue_role_async(
         spec.role_name, issue_number, branch, actor, dry_run_mode="async dry-run"
     )
     typer.echo(header)
+    return None
 
 
 def run_issue_role_sync(

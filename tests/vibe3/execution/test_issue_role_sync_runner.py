@@ -109,7 +109,7 @@ def test_async_runner_passes_resolved_branch_to_async_request(monkeypatch) -> No
         build_sync_request=lambda *_args: None,  # type: ignore[arg-type]
     )
 
-    run_issue_role_async(
+    result = run_issue_role_async(
         issue_number=2058,
         dry_run=False,
         spec=spec,
@@ -121,6 +121,8 @@ def test_async_runner_passes_resolved_branch_to_async_request(monkeypatch) -> No
     )
 
     assert seen["branch"] == "resolved/2058"
+    assert result is not None
+    assert result.launched is True
     assert _FakeCoordinator.requests[0].target_branch == "resolved/2058"
     assert _FakeCoordinator.requests[0].cmd == [
         "vibe3",

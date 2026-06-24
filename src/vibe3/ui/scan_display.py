@@ -171,6 +171,18 @@ def display_codeagent_result(
         console.print("[yellow]No result returned (async mode)[/yellow]\n")
         return
 
+    if result.backend:
+        console.print()
+        console.print(f"[cyan]Backend:[/cyan] {result.backend}")
+    if result.model:
+        console.print(f"[cyan]Model:[/cyan] {result.model}")
+    if result.spec_ref:
+        console.print(f"[cyan]Spec:[/cyan] {result.spec_ref}")
+    if result.plan_ref:
+        console.print(f"[cyan]Plan:[/cyan] {result.plan_ref}")
+    if result.report_ref:
+        console.print(f"[cyan]Report:[/cyan] {result.report_ref}")
+
     console.print(f"\n[bold]{label} Result[/bold]")
     if result.success:
         console.print("[green]✓ Completed successfully[/green]")
@@ -179,14 +191,6 @@ def display_codeagent_result(
         if result.stderr:
             console.print(f"[red]{result.stderr}[/red]")
 
-    if result.backend:
-        console.print(f"[cyan]Backend:[/cyan] {result.backend}")
-    if result.model:
-        console.print(f"[cyan]Model:[/cyan] {result.model}")
-    if result.spec_ref:
-        console.print(f"[cyan]Spec:[/cyan] {result.spec_ref}")
-    if result.plan_ref:
-        console.print(f"[cyan]Plan:[/cyan] {result.plan_ref}")
     if result.log_path:
         console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
     if result.handoff_file:

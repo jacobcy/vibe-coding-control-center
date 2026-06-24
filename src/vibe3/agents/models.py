@@ -58,6 +58,7 @@ class CodeagentResult:
     model: str | None = None
     plan_ref: str | None = None
     spec_ref: str | None = None
+    report_ref: str | None = None
     issue_number: int | None = None
 
 

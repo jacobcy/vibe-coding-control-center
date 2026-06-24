@@ -134,6 +134,135 @@ def test_review_base_help_mentions_dry_run_option():
     assert "--message" not in output
 
 
+def test_review_dry_run_uses_codeagent_result_display(monkeypatch) -> None:
+    """Review dry-run should reuse the shared CodeagentResult display path."""
+    from vibe3.commands.review import _emit_review_result
+
+    captured: dict[str, object] = {}
+
+    def fake_display(console: object, result: object, label: str) -> None:
+        captured["console"] = console
+        captured["result"] = result
+        captured["label"] = label
+
+    monkeypatch.setattr("vibe3.ui.scan_display.display_codeagent_result", fake_display)
+
+    _emit_review_result(
+        "DRY_RUN",
+        None,
+        backend="claude",
+        model="opus",
+        report_ref="docs/reports/review.md",
+    )
+
+    result = captured["result"]
+    assert captured["label"] == "Review"
+    assert getattr(result, "success") is True
+    assert getattr(result, "backend") == "claude"
+    assert getattr(result, "model") == "opus"
+    assert getattr(result, "report_ref") == "docs/reports/review.md"
+
+
+def test_review_base_dry_run_does_not_emit_legacy_actor_header() -> None:
+    """review base dry-run should use result metadata instead of actor header."""
+    from vibe3.models import ReviewRequest, ReviewScope
+    from vibe3.roles.review_helpers import ReviewRunResult
+
+    with (
+        patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
+        patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
+        patch("vibe3.commands.review.build_base_review_request") as mock_request,
+        patch("vibe3.config.config_loader.load_config_for_role") as _mock_config,
+        patch("vibe3.roles.review.execute_manual_review_sync") as mock_execute,
+        patch("vibe3.roles.execute_manual_review_sync") as mock_execute_cache,
+        patch(
+            "vibe3.clients.git_status_ops.get_changed_files", return_value=["test.py"]
+        ) as _mock_changes,
+    ):
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_flow_status.return_value = None
+        mock_flow.return_value = (mock_flow_service, "feature/test")
+        mock_base.return_value.resolve_review_base.return_value = type(
+            "ResolvedBase",
+            (),
+            {"base_branch": "main", "auto_detected": False},
+        )()
+        mock_request.return_value = (
+            ReviewRequest(scope=ReviewScope.for_base("main")),
+            123,
+            None,
+        )
+        mock_execute.return_value = ReviewRunResult(
+            verdict="DRY_RUN",
+            handoff_file=None,
+            issue_number=123,
+            backend="claude",
+            model="opus",
+        )
+        mock_execute_cache.return_value = mock_execute.return_value
+
+        result = runner.invoke(
+            app, ["base", "main", "--no-async", "--yes", "--dry-run"]
+        )
+
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "actor:" not in output
+    assert "Review Result" in output
+    assert "Backend: claude" in output
+
+
+def test_review_async_uses_shared_result_display() -> None:
+    """review async launch should render shared result metadata."""
+    from vibe3.models import ExecutionLaunchResult
+
+    mock_config = MagicMock()
+    with (
+        patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+        ) as mock_async,
+        patch("vibe3.execution.run_issue_role_async") as mock_async_cache,
+        patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
+        patch("vibe3.commands.review._check_report_ref", return_value=True),
+        patch(
+            "vibe3.commands.review._resolve_report_ref",
+            return_value="docs/report.md",
+        ),
+    ):
+        import vibe3.config
+
+        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
+        try:
+            mock_flow = MagicMock()
+            mock_flow.task_issue_number = 3135
+            mock_validate.return_value = (mock_flow, 3135)
+            mock_resolve.return_value = "task/issue-3135"
+            launch = ExecutionLaunchResult(
+                launched=True,
+                tmux_session="vibe3-reviewer-issue-3135",
+                log_path="temp/logs/review.async.log",
+                backend="claude",
+                model="opus",
+            )
+            mock_async.return_value = launch
+            mock_async_cache.return_value = launch
+
+            result = runner.invoke(app, [])
+        finally:
+            del vibe3.config.load_config_for_role
+
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "-> reviewer run:" not in output
+    assert "Backend: claude" in output
+    assert "Model: opus" in output
+    assert "Report: docs/report.md" in output
+    assert "Review Result" in output
+    assert "Tmux session: vibe3-reviewer-issue-3135" in output
+    assert "Log path: temp/logs/review.async.log" in output
+
+
 class TestReviewBaseExitCodes:
     """Verify review base exit codes follow verdict semantics."""
 

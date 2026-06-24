@@ -154,7 +154,6 @@ def run_command(
             # @-prefixed: delegate to resolve_handoff_target (@plan, etc.)
             try:
                 resolved_plan = resolve_handoff_target(plan, branch=target_branch)
-                typer.echo(f"Using flow plan: {plan}")
             except (FileNotFoundError, ValueError) as e:
                 typer.echo(f"Error: {e}", err=True)
                 raise typer.Exit(1)
@@ -177,19 +176,14 @@ def run_command(
         plan_file = summary.plan_file
         log = logger.bind(domain="run", action="run", plan_file=plan_file)
         log.info("Starting plan execution")
-        typer.echo(f"-> Execute: {plan_file}")
     elif summary.mode == "lightweight":
         plan_file = None
         log = logger.bind(domain="run", action="run", plan_file="(lightweight)")
         log.info("Starting lightweight execution")
-        typer.echo("-> Lightweight mode: running with instructions only")
-        if summary.message:
-            typer.echo(summary.message)
     else:
         plan_file = summary.plan_file
         log = logger.bind(domain="run", action="run", plan_file=plan_file)
         log.info("Starting plan execution from flow")
-        typer.echo(f"-> Using flow plan: {plan_file}")
 
     try:
         ensure_plan_file_exists(plan_file, branch=summary.branch or target_branch)
@@ -211,13 +205,6 @@ def run_command(
             raise typer.Exit(1) from error
 
     # Publish ManualRunIntent event and wait for result
-    from vibe3.commands.common import echo_dry_run_header
-
-    if dry_run:
-        echo_dry_run_header(
-            "executor", issue_number, target_branch, agent, backend, model
-        )
-
     result = publish_and_wait(
         ManualRunIntent(
             issue_number=issue_number,
