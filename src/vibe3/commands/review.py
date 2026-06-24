@@ -57,8 +57,18 @@ def _emit_review_result(
     model: str | None = None,
 ) -> None:
     """Render review result summary consistently."""
-    if verdict in {"ASYNC", "DRY_RUN"}:
+    from rich.console import Console
+
+    console = Console()
+
+    if verdict in {"ASYNC"}:
         return
+
+    if verdict == "DRY_RUN":
+        console.print("\n[bold]Review Result[/bold]")
+        console.print("[green]✓ Completed successfully[/green]")
+        return
+
     if backend:
         typer.echo(f"Backend: {backend}")
     if model:
@@ -142,7 +152,7 @@ def _review_branch_impl(
     # Display result
     if result is None:
         typer.echo("Review dispatched (async mode)")
-    elif result.verdict in {"ASYNC", "DRY_RUN"}:
+    elif result.verdict in {"ASYNC"}:
         pass  # already handled
     else:
         _emit_review_result(
