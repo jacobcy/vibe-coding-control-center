@@ -206,9 +206,6 @@ def status(
     except ValueError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
-    except ValueError as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(1) from error
 
     if output_format == "json":
         output = {

@@ -299,7 +299,9 @@ def test_flow_update_auto_initializes_missing_handoff(
     result = runner.invoke(flow_app, ["update"])
 
     assert result.exit_code == 0
-    mock_ensure_handoff.assert_called_once_with("task/test-branch")
+    mock_ensure_handoff.assert_called_once_with(
+        "task/test-branch", source="flow update"
+    )
 
 
 @patch("vibe3.commands.flow_manage.ensure_current_handoff_for_flow")

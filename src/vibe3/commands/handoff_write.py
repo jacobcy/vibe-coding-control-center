@@ -73,7 +73,6 @@ def init(
         "Initializing handoff"
     )
 
-    # Ensure flow exists before creating handoff file
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.flow import FlowService
 
@@ -82,6 +81,9 @@ def init(
     github = GitHubClient()
     flow_service = FlowService(store=store, git_client=git)
 
+    # Ensure flow exists for standalone `vibe3 handoff init` usage.
+    # When called via ensure_current_handoff_for_flow (flow update / bootstrap),
+    # the caller has already ensured the flow — this is a cheap idempotent check.
     flow_service.ensure_flow_for_branch(branch=target_branch, source="handoff_init")
 
     service = HandoffService()
@@ -126,21 +128,12 @@ def init(
                 comments_raw = issue_data.get("comments", [])
                 comments = comments_raw if isinstance(comments_raw, list) else []
 
+                from vibe3.services.shared.comment import is_human_comment
+
                 # Find latest human instruction
                 latest_human_comment = None
                 for comment in reversed(comments):
-                    # Check if comment is from human (not agent)
-                    if not any(
-                        marker in str(comment.get("body", ""))
-                        for marker in [
-                            "[plan]",
-                            "[run]",
-                            "[review]",
-                            "[manager]",
-                            "[governance",
-                            "[roadmap",
-                        ]
-                    ):
+                    if is_human_comment(comment):
                         latest_human_comment = comment
                         break
 

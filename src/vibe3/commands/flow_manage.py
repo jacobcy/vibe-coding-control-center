@@ -132,9 +132,7 @@ def _ensure_branch_has_no_live_runtime_session(
         raise typer.Exit(1)
 
 
-def ensure_current_handoff_for_flow(
-    target_branch: str, source: str = "flow update"
-) -> None:
+def ensure_current_handoff_for_flow(target_branch: str, source: str) -> None:
     """Ensure current.md exists for flow, auto-initialize if missing.
 
     Called by:
@@ -143,7 +141,7 @@ def ensure_current_handoff_for_flow(
 
     Args:
         target_branch: Branch name to check for current.md
-        source: Caller identifier for logging context (default: "flow update")
+        source: Caller identifier for logging context
     """
     from vibe3.exceptions import UserError
     from vibe3.services.handoff import HandoffService
@@ -241,7 +239,7 @@ def update(
 
     # Ensure current.md exists only for newly created flows
     if is_new_flow:
-        ensure_current_handoff_for_flow(target_branch)
+        ensure_current_handoff_for_flow(target_branch, source="flow update")
 
     # Update metadata if explicitly provided — keep name and actor separate
     # to avoid silently writing worktree identity when only --name is given.
