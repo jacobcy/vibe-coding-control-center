@@ -38,7 +38,12 @@ from vibe3.execution import (
     load_session_id,
 )
 from vibe3.models import ExecutionRequest, PromptContextMode, WorktreeRequirement
-from vibe3.prompts import discover_project_scope_overlays
+from vibe3.observability import write_prompt_provenance
+from vibe3.prompts import (
+    PromptManifest,
+    collect_dry_run_provenance,
+    discover_project_scope_overlays,
+)
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
     publish_run_command_success,
@@ -329,6 +334,30 @@ def execute_manual_run(
         overlays = discover_project_scope_overlays()
         if overlays:
             dry_run_summary["project_scope_overlays"] = overlays
+
+        # Collect and write prompt provenance for dry-run audit
+        variant_key = f"{prompt_mode}.{context_mode}"
+        context_builder = make_run_context_builder(
+            plan_file,
+            config,
+            audit_file=audit_file,
+            mode=prompt_mode,
+            context_mode=context_mode,
+            prompts_path=prompts_path,
+            annotate_sections=True,
+        )
+        prompt_text = context_builder()
+        manifest = PromptManifest.load_for_prompts_path(prompts_path)
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="run.plan",
+            variant_key=variant_key,
+            rendered_text=prompt_text,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="executor", issue_number=issue_number or 0
+        )
+        dry_run_summary["provenance_path"] = str(provenance_path)
     include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
 
     command = create_codeagent_command(
