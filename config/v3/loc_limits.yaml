@@ -443,6 +443,9 @@ code_limits:
       - path: "tests/vibe3/roles/test_supervisor.py"
         limit: 500
         reason: "Supervisor role test suite covering handoff payload construction, task string generation, apply request building, identified events filtering, and profile resolution. Issue #3067 added annotate_sections parameter tests (2 tests, +186 LOC) to validate section marker wrapping. Original 293 + 186 = 479 LOC, exceeds limit by 79 lines."
+      - path: "tests/vibe3/analysis/test_snapshot_baselines.py"
+        limit: 500
+        reason: "Snapshot baseline 测试集，覆盖 save/load baseline、idempotency、repo_path forwarding、DB write failure logging、backfill function 等场景；Issue #3133 新增 3 个 backfill 测试和 1 个 DB failure logging 测试（+145 行）验证 backfill_baseline_registry 函数与异常日志改进"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
