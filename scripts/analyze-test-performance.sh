@@ -21,7 +21,7 @@ TMPFILE=$(mktemp)
 trap "rm -f '$TMPFILE'" EXIT
 
 # --- Threshold: tests slower than this are flagged ---
-THRESHOLD=0.7
+THRESHOLD=0.5
 
 # --- Parallel workers: use CPU count -1, min 2, max 4 ---
 if command -v sysctl &>/dev/null; then
