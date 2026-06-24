@@ -86,8 +86,8 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
       - path: "src/vibe3/commands/snapshot.py"
-        limit: 500
-        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要；PR #2945 code review follow-up 新增 config fallback 日志（+5 行）"
+        limit: 520
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff/repair-baselines 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要；PR #2945 code review follow-up 新增 config fallback 日志（+5 行）；Issue #3133 新增 repair-baselines CLI 子命令（+41 行）支持 baseline DB recovery"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
@@ -428,6 +428,9 @@ code_limits:
       - path: "tests/vibe3/analysis/test_snapshot_service.py"
         limit: 650
         reason: "Snapshot service 测试集，覆盖 find_snapshot_by_branch（8 个测试含 branch 查找、origin/ 前缀归一化、glob 预过滤验证、非常规文件名回退扫描）、build_snapshot（1 个测试）、baseline 操作（5 个测试含 save/load/not found/no baseline dir/list excludes/save for diff）、list_snapshots DB 优化（2 个测试含 DB path 和 fallback 验证）、repo_path forwarding（1 个测试验证 worktree-aware baseline）等 17 个紧密耦合场景，共享 snapshot_dir fixture 和 mock setup，拆分收益低；Issue #2616 新增 test_find_snapshot_by_branch_glob_filters_candidates 和 test_find_snapshot_by_branch_fallback_for_nonconforming_filename 验证 glob 预过滤与回退扫描行为（+94 行）；Issue #2926 新增 test_list_snapshots_from_db 和 test_list_snapshots_db_empty_fallsback 验证 DB-first 查询逻辑（+40 行）；Issue #2928 新增 test_get_git_common_dir_cached_reuses_cached_value 验证缓存行为（+43 行）；Issue #3087 新增 test_build_snapshot_forwards_repo_path_to_git_client 验证 worktree-aware baseline（+27 行）"
+      - path: "tests/vibe3/analysis/test_snapshot_baselines.py"
+        limit: 600
+        reason: "Snapshot baseline 测试集，覆盖 save_branch_baseline、load_branch_baseline、list_snapshots baseline filtering、baseline idempotency、repo_path forwarding、backfill_baseline_registry、DB failure logging 等 12 个紧密耦合场景，共享 baseline_dir fixture 和 mock setup，拆分收益低；Issue #3133 新增 3 个 backfill_baseline_registry 测试（test_backfill_baseline_registry_registers_files_with_baseline_for、test_backfill_baseline_registry_empty_dir、test_backfill_baseline_registry_handles_db_failure）验证 baseline DB recovery 逻辑（+161 行）；PR #3145 code review follow-up 新增 test_save_branch_baseline_logs_db_failure_details 测试验证异常日志记录（+61 行），从 495 行增至 556 行"
       - path: "tests/vibe3/analysis/test_serena_service.py"
         limit: 667
         reason: "Serena service 测试集，覆盖 analyze_file/analyze_files/analyze_changes/scan_dead_code/analyze_symbol 等核心功能，包含完整的 mock setup 和参数化测试；PR #2744 新增 4 个 scan_dead_code 测试验证 line/loc 计算逻辑（+128 行）；PR #2905 新增 6 个 analyze_symbol 测试覆盖正常提取、空结果、异常处理、CLI 检测、多引用场景（+71 行）；PR #2905 code review follow-up 完善断言覆盖与新增多引用测试（+48 行）；#2932 新增 test_exception_class_detection_works 测试验证异常类检测逻辑（+66 行），从 596 行增至 667 行"

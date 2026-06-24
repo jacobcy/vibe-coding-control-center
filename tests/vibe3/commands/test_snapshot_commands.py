@@ -112,3 +112,44 @@ def test_snapshot_save_as_baseline_force(monkeypatch):
     assert result.exit_code == 0
     assert len(calls) == 1
     assert calls[0] == ("feature/test", False)
+
+
+def test_repair_baselines_success(monkeypatch):
+    """Test repair-baselines command reports counts and exits successfully."""
+    from vibe3.commands import snapshot as snapshot_command
+
+    # Mock backfill_baseline_registry to return success counts
+    monkeypatch.setattr(
+        snapshot_command.snapshot_service,
+        "backfill_baseline_registry",
+        lambda: {"registered": 100, "skipped": 10, "failed": 0},
+    )
+
+    result = runner.invoke(app, ["repair-baselines"])
+
+    assert result.exit_code == 0
+    assert "Repair complete" in result.output
+    assert "Registered: 100" in result.output
+    assert "Skipped: 10" in result.output
+    assert "Failed: 0" in result.output
+
+
+def test_repair_baselines_with_failures(monkeypatch):
+    """Test repair-baselines exits with code 1 when there are failures."""
+    from vibe3.commands import snapshot as snapshot_command
+
+    # Mock backfill_baseline_registry to return failure counts
+    monkeypatch.setattr(
+        snapshot_command.snapshot_service,
+        "backfill_baseline_registry",
+        lambda: {"registered": 80, "skipped": 5, "failed": 15},
+    )
+
+    result = runner.invoke(app, ["repair-baselines"])
+
+    assert result.exit_code == 1
+    assert "Repair complete" in result.output
+    assert "Registered: 80" in result.output
+    assert "Skipped: 5" in result.output
+    assert "Failed: 15" in result.output
+    assert "Warning" in result.output

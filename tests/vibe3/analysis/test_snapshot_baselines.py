@@ -334,3 +334,223 @@ def test_save_branch_baseline_forwards_repo_path_to_build_snapshot(
 
     assert len(captured_repo_path) == 1
     assert captured_repo_path[0] == worktree
+
+
+def test_backfill_baseline_registry_registers_files_with_baseline_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test backfill_baseline_registry registers files with baseline_for field."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Create three baseline files
+    # Two with baseline_for field
+    baseline1 = StructureSnapshot(
+        snapshot_id="baseline-1",
+        branch="main",
+        commit="abc123",
+        commit_short="abc123",
+        created_at="2026-06-15T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=10,
+            total_loc=1000,
+            total_functions=50,
+            python_files=8,
+        ),
+        baseline_for="main",
+    )
+    (baseline_dir / "baseline_main.json").write_text(baseline1.model_dump_json())
+
+    baseline2 = StructureSnapshot(
+        snapshot_id="baseline-2",
+        branch="feature/test",
+        commit="def456",
+        commit_short="def456",
+        created_at="2026-06-16T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=15,
+            total_loc=1500,
+            total_functions=75,
+            python_files=12,
+        ),
+        baseline_for="feature/test",
+    )
+    (baseline_dir / "baseline_feature-test.json").write_text(
+        baseline2.model_dump_json()
+    )
+
+    # One without baseline_for field (should be skipped)
+    no_baseline = StructureSnapshot(
+        snapshot_id="no-baseline",
+        branch="other",
+        commit="ghi789",
+        commit_short="ghi789",
+        created_at="2026-06-17T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=5,
+            total_loc=500,
+            total_functions=25,
+            python_files=4,
+        ),
+    )
+    (baseline_dir / "regular_snapshot.json").write_text(no_baseline.model_dump_json())
+
+    # Mock SQLiteClient - patch in snapshot_baseline module where it's used
+    mock_client = MagicMock()
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", lambda: mock_client)
+
+    # Run backfill
+    result = snapshot_service.backfill_baseline_registry()
+
+    # Verify counts
+    assert result["registered"] == 2
+    assert result["skipped"] == 1
+    assert result["failed"] == 0
+
+    # Verify upsert was called for the two baselines
+    assert mock_client.upsert_snapshot_registry.call_count == 2
+
+
+def test_backfill_baseline_registry_empty_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test backfill_baseline_registry with empty baseline directory."""
+    from vibe3.analysis import snapshot_service
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Run backfill on empty directory
+    result = snapshot_service.backfill_baseline_registry()
+
+    # Verify all counts are 0
+    assert result["registered"] == 0
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+
+
+def test_backfill_baseline_registry_handles_db_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test backfill_baseline_registry handles DB write failures gracefully."""
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Create a baseline file
+    baseline = StructureSnapshot(
+        snapshot_id="baseline-fail",
+        branch="main",
+        commit="abc123",
+        commit_short="abc123",
+        created_at="2026-06-15T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=10,
+            total_loc=1000,
+            total_functions=50,
+            python_files=8,
+        ),
+        baseline_for="main",
+    )
+    (baseline_dir / "baseline_main.json").write_text(baseline.model_dump_json())
+
+    # Mock SQLiteClient that raises on upsert - patch in snapshot_baseline module
+    mock_client = MagicMock()
+    mock_client.upsert_snapshot_registry.side_effect = Exception("DB write failed")
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", lambda: mock_client)
+
+    # Run backfill - should not crash
+    result = snapshot_service.backfill_baseline_registry()
+
+    # Verify failed count is incremented
+    assert result["registered"] == 0
+    assert result["skipped"] == 0
+    assert result["failed"] == 1
+
+
+def test_save_branch_baseline_logs_db_failure_details(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test save_branch_baseline logs exception type and message on DB failure."""
+    from unittest.mock import Mock
+
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Mock build_snapshot to return a valid snapshot
+    mock_snapshot = StructureSnapshot(
+        snapshot_id="test-snapshot-db-fail",
+        branch="feature/test",
+        commit="abc1234",
+        commit_short="abc1234",
+        created_at="2026-06-15T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=10,
+            total_loc=1000,
+            total_functions=50,
+            python_files=8,
+        ),
+    )
+    monkeypatch.setattr(snapshot_service, "build_snapshot", lambda: mock_snapshot)
+
+    # Mock SQLiteClient to fail with specific exception type
+    mock_client = MagicMock()
+    mock_client.upsert_snapshot_registry.side_effect = RuntimeError(
+        "Connection lost during write"
+    )
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", lambda: mock_client)
+
+    # Mock logger.warning to capture the log call
+    mock_logger_warning = Mock()
+    monkeypatch.setattr(snapshot_baseline.logger, "warning", mock_logger_warning)
+
+    # Should succeed (file created) but log DB failure
+    filepath = snapshot_service.save_branch_baseline("feature/test", force=True)
+
+    # File should be created successfully
+    assert filepath is not None
+    assert filepath.exists()
+    assert "baseline_feature-test.json" in str(filepath)
+
+    # Verify logger.warning was called with exception type and message
+    assert mock_logger_warning.called
+    warning_msg = mock_logger_warning.call_args[0][0]
+    assert "RuntimeError" in warning_msg
+    assert "Connection lost during write" in warning_msg
+    assert "Failed to register baseline in DB" in warning_msg

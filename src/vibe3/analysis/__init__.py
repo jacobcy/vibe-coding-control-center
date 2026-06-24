@@ -62,6 +62,7 @@ if TYPE_CHECKING:
 
     # Snapshot baseline operations
     from vibe3.analysis.snapshot_baseline import (
+        backfill_baseline_registry,
         load_branch_baseline,
         save_branch_baseline,
     )
@@ -123,6 +124,7 @@ _LAZY_IMPORTS = {
     "find_snapshot_by_branch": "vibe3.analysis.snapshot_service",
     "save_branch_baseline": "vibe3.analysis.snapshot_baseline",
     "load_branch_baseline": "vibe3.analysis.snapshot_baseline",
+    "backfill_baseline_registry": "vibe3.analysis.snapshot_baseline",
     "build_snapshot_diff_section": "vibe3.analysis.snapshot_diff_section",
     "snapshot_service": "vibe3.analysis.snapshot_service",
     "structure_service": "vibe3.analysis.structure_service",
@@ -186,6 +188,7 @@ __all__ = [
     "find_snapshot_by_branch",
     "save_branch_baseline",
     "load_branch_baseline",
+    "backfill_baseline_registry",
     "build_snapshot_diff_section",
     "snapshot_service",
     "structure_service",

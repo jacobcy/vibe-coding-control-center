@@ -463,3 +463,49 @@ def diff(
     except snapshot_service.SnapshotError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
+
+
+@app.command(name="repair-baselines")
+def repair_baselines(
+    trace: _TRACE_OPT = False,
+) -> None:
+    """Repair baseline registry by backfilling from filesystem.
+
+    This command recovers orphaned baseline records that exist on disk
+    but are missing from the snapshot_registry database.
+
+    Use cases:
+        - Recover after DB write failures
+        - Migrate baseline records after DB initialization
+        - Repair data inconsistency between filesystem and database
+
+    The command scans all baseline JSON files in .git/vibe3/structure/baselines/
+    and registers them in the database.
+
+    Examples:
+        vibe3 snapshot repair-baselines
+    """
+    if trace:
+        enable_method_trace()
+
+    typer.echo("Repairing baseline registry...")
+
+    try:
+        counts = snapshot_service.backfill_baseline_registry()
+
+        typer.echo("✓ Repair complete:")
+        typer.echo(f"  Registered: {counts['registered']}")
+        typer.echo(f"  Skipped: {counts['skipped']}")
+        typer.echo(f"  Failed: {counts['failed']}")
+
+        if counts["failed"] > 0:
+            typer.echo(
+                "\n  [yellow]Warning:[/yellow] Some baselines could not be registered. "
+                "Check logs for details.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)

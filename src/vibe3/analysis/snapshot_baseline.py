@@ -107,8 +107,11 @@ def save_branch_baseline(
                 file_path=str(filepath),
                 baseline_for=branch,
             )
-        except Exception:
-            logger.warning("Failed to register baseline in DB (non-fatal)")
+        except Exception as e:
+            logger.warning(
+                f"Failed to register baseline in DB (non-fatal): "
+                f"{type(e).__name__}: {e}"
+            )
 
         log.bind(path=str(filepath)).success("Branch baseline saved")
         return filepath
@@ -164,3 +167,82 @@ def load_branch_baseline(
     except Exception as e:
         logger.warning(f"Failed to load branch baseline: {e}")
         return None
+
+
+def backfill_baseline_registry(
+    _get_baseline_dir_func: Callable[[], Path] | None = None,
+) -> dict[str, int]:
+    """Backfill snapshot_registry with baseline records from filesystem.
+
+    This is a one-time repair function to recover orphaned baseline records
+    that exist on disk but are missing from the database.
+
+    Args:
+        _get_baseline_dir_func: Function to get baseline dir path (dependency injection)
+
+    Returns:
+        Dict with counts: {"registered": int, "skipped": int, "failed": int}
+    """
+    # Import snapshot_service helper for default implementation
+    if _get_baseline_dir_func is None:
+        from vibe3.analysis.snapshot_service import (
+            _get_baseline_dir as default_get_baseline_dir,
+        )
+
+        _get_baseline_dir_func = default_get_baseline_dir
+
+    log = logger.bind(domain="snapshot", action="backfill_baselines")
+    log.info("Backfilling baseline registry from filesystem")
+
+    counts = {"registered": 0, "skipped": 0, "failed": 0}
+
+    try:
+        baseline_dir = _get_baseline_dir_func()
+        if not baseline_dir.exists():
+            log.info("No baseline directory found, nothing to backfill")
+            return counts
+
+        json_files = list(baseline_dir.glob("*.json"))
+        log.info(f"Found {len(json_files)} baseline files to process")
+
+        for filepath in json_files:
+            try:
+                # Read and parse the snapshot
+                data = json.loads(filepath.read_text(encoding="utf-8"))
+                snapshot = StructureSnapshot.model_validate(data)
+
+                # Only process files with baseline_for field
+                if not snapshot.baseline_for:
+                    counts["skipped"] += 1
+                    continue
+
+                # Register in database
+                client = SQLiteClient()
+                client.upsert_snapshot_registry(
+                    snapshot_id=snapshot.snapshot_id,
+                    branch=snapshot.branch,
+                    commit_short=snapshot.commit_short,
+                    commit_hash=snapshot.commit,
+                    created_at=snapshot.created_at,
+                    file_path=str(filepath),
+                    baseline_for=snapshot.baseline_for,
+                )
+                counts["registered"] += 1
+                log.debug(f"Registered baseline: {filepath.name}")
+
+            except Exception as e:
+                counts["failed"] += 1
+                logger.warning(
+                    f"Failed to backfill baseline {filepath.name}: "
+                    f"{type(e).__name__}: {e}"
+                )
+
+        log.info(
+            f"Backfill complete: registered={counts['registered']}, "
+            f"skipped={counts['skipped']}, failed={counts['failed']}"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to backfill baseline registry: {e}")
+
+    return counts
