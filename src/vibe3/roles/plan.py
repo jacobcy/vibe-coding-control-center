@@ -479,6 +479,8 @@ def execute_spec_plan_async(
         stderr=launch.reason or "",
         tmux_session=launch.tmux_session,
         log_path=launch.log_path,
+        backend=launch.backend,
+        model=launch.model,
     )
 
 

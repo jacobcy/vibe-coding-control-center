@@ -52,6 +52,8 @@ class AsyncDispatchResult:
 
     tmux_session: str | None
     log_path: str | None
+    backend: str | None = None
+    model: str | None = None
 
 
 def resolve_skill_path(
@@ -126,6 +128,8 @@ def dispatch_run_command_async(
     return AsyncDispatchResult(
         tmux_session=launch.tmux_session,
         log_path=launch.log_path,
+        backend=launch.backend,
+        model=launch.model,
     )
 
 

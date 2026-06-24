@@ -201,12 +201,19 @@ review:
     # 典型用途：保留 preset 作为实际执行入口，同时把 backend/model 写出来用于显式说明或记录。
     agent: "vibe-reviewer"
 
+    # Configuration priority: CLI args > env vars > settings.yaml > models.json preset
+    # 配置优先级：命令参数 > 环境变量 > settings.yaml > models.json preset
+    #
+    # When agent is configured but backend/model are NOT set here, the system will
+    # read backend/model from the agent's preset definition in config/v3/models.json.
+    # 当配置了 agent 但未设置 backend/model 时，系统将从 models.json 读取 preset 定义。
+    #
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
-    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - 同时配置 agent 和 backend/model：settings.yaml 值覆盖 preset（不推荐，保留 preset 即可）
     # - model 只有在 backend 已配置时才有意义
-    backend: "claude"  # e.g., "claude", "opencode", "gemini"
-    model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    # backend: "claude"  # e.g., "claude", "opencode", "gemini"
+    # model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
 
@@ -232,10 +239,10 @@ plan:
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
-    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - 同时配置 agent 和 backend/model：settings.yaml 值覆盖 preset（不推荐，保留 preset 即可）
     # - model 只有在 backend 已配置时才有意义
-    backend: "codex"  # e.g., "claude", "opencode", "gemini"
-    model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    # backend: "codex"  # e.g., "claude", "opencode", "gemini"
+    # model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
 # Run command configuration
@@ -259,10 +266,10 @@ run:
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
-    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - 同时配置 agent 和 backend/model：settings.yaml 值覆盖 preset（不推荐，保留 preset 即可）
     # - model 只有在 backend 已配置时才有意义
-    backend: "opencode"  # e.g., "claude", "opencode", "gemini"
-    model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    # backend: "opencode"  # e.g., "claude", "opencode", "gemini"
+    # model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
 

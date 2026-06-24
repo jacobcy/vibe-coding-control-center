@@ -424,10 +424,22 @@ def execute_manual_review_async(
                 reason_code=reason_code,
             )
         return ReviewRunResult(
-            "ERROR", None, issue_number, launch.tmux_session, launch.log_path
+            "ERROR",
+            None,
+            issue_number,
+            launch.tmux_session,
+            launch.log_path,
+            backend=launch.backend,
+            model=launch.model,
         )
     return ReviewRunResult(
-        "ASYNC", None, issue_number, launch.tmux_session, launch.log_path
+        "ASYNC",
+        None,
+        issue_number,
+        launch.tmux_session,
+        launch.log_path,
+        backend=launch.backend,
+        model=launch.model,
     )
 
 

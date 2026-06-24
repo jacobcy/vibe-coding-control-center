@@ -207,8 +207,8 @@ class TestResolveAgentOptions:
         )
 
         assert result.agent == "cli-agent"
-        assert result.backend == "cli-backend"
-        assert result.model is None
+        assert result.backend == "cli-backend"  # CLI backend propagated for recording
+        assert result.model is None  # No model in config or CLI
 
     def test_cli_model_overrides_config_model_when_config_has_backend(self) -> None:
         """CLI --model should override config model when config provides backend."""
