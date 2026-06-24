@@ -86,8 +86,8 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
 
       - path: "src/vibe3/commands/snapshot.py"
-        limit: 500
-        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要；PR #2945 code review follow-up 新增 config fallback 日志（+5 行）"
+        limit: 520
+        reason: "Snapshot 命令聚合，包含 build/save/list/show/diff/repair-baselines 等子命令、baseline 管理、diff workflow（含 fallback）、JSON output 等紧密耦合逻辑；Issue #2762 新增 --force 参数和 idempotency 文档（+5 行）；Issue #2845 新增数据库后端说明、输出解释、架构分析、使用场景等帮助文档（+30 行）；Issue #2831 新增 diff fallback 逻辑（+38 行）支持无 baseline 时的 git diff 摘要；PR #2945 code review follow-up 新增 config fallback 日志（+5 行）；Issue #3133 新增 repair-baselines CLI 子命令（+41 行）支持 baseline DB recovery"
       - path: "src/vibe3/commands/status.py"
         limit: 490
         reason: "Status 命令聚合，包含 Orchestra/Configuration/Flows/Tasks 多维度显示，新增 Vibe3 Configuration section（repo name, manager agents, polling interval 等）；#2177 新增 Runtime Versions section 显示 policy/material hashes（+53 行）"
@@ -104,14 +104,11 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
       - path: "src/vibe3/commands/scan.py"
-        limit: 475
-        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines)"
+        limit: 450
+        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines)"
       - path: "src/vibe3/commands/handoff_write.py"
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
-      - path: "src/vibe3/commands/review.py"
-        limit: 415
-        reason: "Review 命令聚合，包含 branch/base review 入口、report_ref 解析、verdict 显示、gate check 逻辑等；Issue #3135 新增 report_ref 显示和 _resolve_report_ref 辅助函数（+11 行）"
 
       # Models 层 —— 允许 410
       - path: "src/vibe3/models/flow.py"
@@ -190,11 +187,11 @@ code_limits:
         limit: 610
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成；Issue #3134 新增 dry_run 的 backend/model 透传（+6 行）"
       - path: "src/vibe3/roles/plan.py"
-        limit: 610
-        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）；Issue #3135 新增 plan_ref/spec_ref/issue_number 字段（+27 行）、_resolve_spec_ref 提取（-4 行）和 prompt provenance 收集（+15 行）；Issue #3135 新增 async 路径 backend/model 解析和 display consolidation（+9 行）"
+        limit: 555
+        reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）"
       - path: "src/vibe3/roles/run_command.py"
-        limit: 520
-        reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）；Issue #3135 新增 plan_ref 字段填充（+4 行）、prompt provenance 收集（+30 行）、AsyncDispatchResult launched/reason 字段和 async 路径 backend/model 解析（+53 行）"
+        limit: 425
+        reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）"
 
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"
@@ -278,17 +275,14 @@ code_limits:
         limit: 510
         reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 700
-        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标；Issue #3135 新增 async display consolidation 测试（+17 行）"
+        limit: 680
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标"
       - path: "tests/vibe3/domain/handlers/test_governance_scan.py"
         limit: 450
         reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递"
       - path: "tests/vibe3/domain/handlers/test_manual_dispatch.py"
-        limit: 470
-        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播；Issue #3135 新增 async dispatch 测试（+15 行）"
-      - path: "tests/vibe3/commands/test_review.py"
-        limit: 530
-        reason: "Review 命令测试集，覆盖 dry_run、report_ref 显示、base/branch review、actor header 等紧密耦合场景；Issue #3135 新增 CodeagentResult display 路径测试（+74 行）"
+        limit: 450
+        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播"
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"
@@ -296,8 +290,8 @@ code_limits:
         limit: 580
         reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；EDA 架构迁移后新增 lazy import cache mock 路径修复、_ensure_lazy_imports_populated 隔离辅助函数等（+105 行）"
       - path: "tests/vibe3/commands/test_scan.py"
-        limit: 450
-        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）"
+        limit: 680
+        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行）"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
         reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
@@ -419,9 +413,6 @@ code_limits:
       - path: "tests/vibe3/roles/test_run_command.py"
         limit: 420
         reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
-      - path: "tests/vibe3/roles/test_plan.py"
-        limit: 410
-        reason: "Plan 角色测试集，覆盖 backend/model 字段传播、async display consolidation、spec 解析等紧密耦合场景；Issue #3135 新增 async 路径测试（+51 行）"
       - path: "tests/vibe3/config/test_loader.py"
         limit: 430
         reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"
@@ -437,6 +428,9 @@ code_limits:
       - path: "tests/vibe3/analysis/test_snapshot_service.py"
         limit: 650
         reason: "Snapshot service 测试集，覆盖 find_snapshot_by_branch（8 个测试含 branch 查找、origin/ 前缀归一化、glob 预过滤验证、非常规文件名回退扫描）、build_snapshot（1 个测试）、baseline 操作（5 个测试含 save/load/not found/no baseline dir/list excludes/save for diff）、list_snapshots DB 优化（2 个测试含 DB path 和 fallback 验证）、repo_path forwarding（1 个测试验证 worktree-aware baseline）等 17 个紧密耦合场景，共享 snapshot_dir fixture 和 mock setup，拆分收益低；Issue #2616 新增 test_find_snapshot_by_branch_glob_filters_candidates 和 test_find_snapshot_by_branch_fallback_for_nonconforming_filename 验证 glob 预过滤与回退扫描行为（+94 行）；Issue #2926 新增 test_list_snapshots_from_db 和 test_list_snapshots_db_empty_fallsback 验证 DB-first 查询逻辑（+40 行）；Issue #2928 新增 test_get_git_common_dir_cached_reuses_cached_value 验证缓存行为（+43 行）；Issue #3087 新增 test_build_snapshot_forwards_repo_path_to_git_client 验证 worktree-aware baseline（+27 行）"
+      - path: "tests/vibe3/analysis/test_snapshot_baselines.py"
+        limit: 600
+        reason: "Snapshot baseline 测试集，覆盖 save_branch_baseline、load_branch_baseline、list_snapshots baseline filtering、baseline idempotency、repo_path forwarding、backfill_baseline_registry、DB failure logging 等 12 个紧密耦合场景，共享 baseline_dir fixture 和 mock setup，拆分收益低；Issue #3133 新增 3 个 backfill_baseline_registry 测试（test_backfill_baseline_registry_registers_files_with_baseline_for、test_backfill_baseline_registry_empty_dir、test_backfill_baseline_registry_handles_db_failure）验证 baseline DB recovery 逻辑（+161 行）；PR #3145 code review follow-up 新增 test_save_branch_baseline_logs_db_failure_details 测试验证异常日志记录（+61 行），从 495 行增至 556 行"
       - path: "tests/vibe3/analysis/test_serena_service.py"
         limit: 667
         reason: "Serena service 测试集，覆盖 analyze_file/analyze_files/analyze_changes/scan_dead_code/analyze_symbol 等核心功能，包含完整的 mock setup 和参数化测试；PR #2744 新增 4 个 scan_dead_code 测试验证 line/loc 计算逻辑（+128 行）；PR #2905 新增 6 个 analyze_symbol 测试覆盖正常提取、空结果、异常处理、CLI 检测、多引用场景（+71 行）；PR #2905 code review follow-up 完善断言覆盖与新增多引用测试（+48 行）；#2932 新增 test_exception_class_detection_works 测试验证异常类检测逻辑（+66 行），从 596 行增至 667 行"
@@ -456,8 +450,8 @@ code_limits:
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
       - path: "tests/vibe3/commands/test_internal.py"
-        limit: 480
-        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）"
+        limit: 550
+        reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行）"
 
 
   total_file_loc:
