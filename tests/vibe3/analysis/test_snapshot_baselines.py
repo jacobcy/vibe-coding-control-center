@@ -493,3 +493,64 @@ def test_backfill_baseline_registry_handles_db_failure(
     assert result["registered"] == 0
     assert result["skipped"] == 0
     assert result["failed"] == 1
+
+
+def test_save_branch_baseline_logs_db_failure_details(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test save_branch_baseline logs exception type and message on DB failure."""
+    from unittest.mock import Mock
+
+    from vibe3.analysis import snapshot_baseline, snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Mock build_snapshot to return a valid snapshot
+    mock_snapshot = StructureSnapshot(
+        snapshot_id="test-snapshot-db-fail",
+        branch="feature/test",
+        commit="abc1234",
+        commit_short="abc1234",
+        created_at="2026-06-15T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=10,
+            total_loc=1000,
+            total_functions=50,
+            python_files=8,
+        ),
+    )
+    monkeypatch.setattr(snapshot_service, "build_snapshot", lambda: mock_snapshot)
+
+    # Mock SQLiteClient to fail with specific exception type
+    mock_client = MagicMock()
+    mock_client.upsert_snapshot_registry.side_effect = RuntimeError(
+        "Connection lost during write"
+    )
+    monkeypatch.setattr(snapshot_baseline, "SQLiteClient", lambda: mock_client)
+
+    # Mock logger.warning to capture the log call
+    mock_logger_warning = Mock()
+    monkeypatch.setattr(snapshot_baseline.logger, "warning", mock_logger_warning)
+
+    # Should succeed (file created) but log DB failure
+    filepath = snapshot_service.save_branch_baseline("feature/test", force=True)
+
+    # File should be created successfully
+    assert filepath is not None
+    assert filepath.exists()
+    assert "baseline_feature-test.json" in str(filepath)
+
+    # Verify logger.warning was called with exception type and message
+    assert mock_logger_warning.called
+    warning_msg = mock_logger_warning.call_args[0][0]
+    assert "RuntimeError" in warning_msg
+    assert "Connection lost during write" in warning_msg
+    assert "Failed to register baseline in DB" in warning_msg
