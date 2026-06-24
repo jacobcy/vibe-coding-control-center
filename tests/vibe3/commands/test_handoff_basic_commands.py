@@ -308,3 +308,59 @@ class TestHandoffBasicCommands:
         assert "state:" in result.output
         assert "events:" in result.output
         assert "branch: feature/test" in result.output
+
+    @patch("vibe3.commands.handoff_read.HandoffStatusService")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_status_renders_recent_updates_chronologically(
+        self, mock_flow_service_class, mock_status_service_class
+    ):
+        """Test handoff status renders recent_updates in chronological
+        order (oldest first).
+        """
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/test-branch"
+        mock_flow_service_class.return_value = mock_flow_service
+
+        mock_status_service = MagicMock()
+        mock_status_result = MagicMock()
+        mock_status_result.flow_slug = "task-test-branch"
+        mock_status_result.worktree_root = "/path/to/worktree"
+        mock_status_result.state = FlowState(
+            branch="task/test-branch",
+            flow_slug="task-test-branch",
+            flow_status="active",
+        )
+        mock_status_result.events = []
+        mock_status_result.latest_verdict = None
+        mock_status_result.live_sessions = []
+
+        # Arrange two updates in file order: older first, newer second
+        older_update = {
+            "timestamp": "2026-06-24T10:00:00Z",
+            "actor": "planner",
+            "kind": "plan",
+            "message": "Older update message",
+        }
+        newer_update = {
+            "timestamp": "2026-06-24T11:00:00Z",
+            "actor": "executor",
+            "kind": "run",
+            "message": "Newer update message",
+        }
+        mock_status_result.recent_updates = [older_update, newer_update]
+        mock_status_service.get_handoff_status.return_value = mock_status_result
+        mock_status_service_class.return_value = mock_status_service
+
+        result = runner.invoke(app, ["handoff", "status"])
+
+        assert result.exit_code == 0
+
+        # Verify older update appears before newer update in stdout (chronological)
+        older_pos = result.output.find("Older update message")
+        newer_pos = result.output.find("Newer update message")
+        assert older_pos != -1, "Older update should appear in output"
+        assert newer_pos != -1, "Newer update should appear in output"
+        assert older_pos < newer_pos, (
+            f"Older update should appear before newer update: "
+            f"older at {older_pos}, newer at {newer_pos}"
+        )

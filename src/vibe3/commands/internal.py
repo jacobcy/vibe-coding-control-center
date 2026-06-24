@@ -281,11 +281,11 @@ def internal_bootstrap(
         blocked_reason=blocked_reason,
     )
 
-    # Initialize handoff with issue context (delegates to handoff init)
-    from vibe3.commands.handoff_write import init as handoff_init
+    # Ensure handoff exists using shared helper (quiet, preserves JSON output)
+    from vibe3.commands.flow_manage import _ensure_current_handoff_for_flow
 
     try:
-        handoff_init(force=False, branch=branch, trace=False, _quiet=True)
+        _ensure_current_handoff_for_flow(branch)
     except Exception as e:
         # Non-critical failure: log and continue
         logger.warning(f"Failed to initialize handoff: {e}")

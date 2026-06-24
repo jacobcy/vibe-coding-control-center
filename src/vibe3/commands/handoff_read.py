@@ -240,7 +240,7 @@ def status(
     if result.recent_updates:
         console.print("[bold]--- Recent Handoff Updates ---[/]")
         console.print()
-        for update in reversed(result.recent_updates):
+        for update in result.recent_updates:
             timestamp = update["timestamp"][:19].replace("T", " ")
             actor = update["actor"]
             kind = update["kind"]

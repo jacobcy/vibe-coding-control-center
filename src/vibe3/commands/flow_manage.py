@@ -132,6 +132,35 @@ def _ensure_branch_has_no_live_runtime_session(
         raise typer.Exit(1)
 
 
+def _ensure_current_handoff_for_flow(target_branch: str) -> None:
+    """Ensure current.md exists for flow, auto-initialize if missing.
+
+    Called by:
+    - flow update (after ensuring flow exists)
+    - internal bootstrap (after ensuring flow exists)
+
+    Args:
+        target_branch: Branch name to check for current.md
+    """
+    from vibe3.services.handoff import HandoffService
+
+    service = HandoffService()
+    try:
+        # Try to read current.md
+        service.storage.read_current_handoff(branch=target_branch)
+    except FileNotFoundError:
+        # current.md doesn't exist, initialize it quietly
+        logger.bind(
+            command="flow update",
+            branch=target_branch,
+        ).info("Auto-initializing missing handoff")
+
+        # Import init function to avoid circular dependency
+        from vibe3.commands.handoff_write import init
+
+        init(force=False, branch=target_branch, trace=False, _quiet=True)
+
+
 def update(
     branch_arg: BranchArg = None,
     branch_opt: Annotated[
@@ -203,6 +232,9 @@ def update(
 
     # Register/Ensure flow
     flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
+
+    # Ensure current.md exists for this flow
+    _ensure_current_handoff_for_flow(target_branch)
 
     # Update metadata if explicitly provided — keep name and actor separate
     # to avoid silently writing worktree identity when only --name is given.

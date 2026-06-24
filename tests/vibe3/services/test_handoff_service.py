@@ -447,3 +447,31 @@ def test_record_ref_skips_handoff_append_event(tmp_path: Path) -> None:
     handoff_append_events = [e for e in events if e.event_type == "handoff_append"]
     assert len(handoff_append_events) == 0
     service.storage.append_current_handoff.assert_called_once()
+
+
+def test_append_current_handoff_records_handoff_append_event(tmp_path: Path) -> None:
+    """Verify append_current_handoff records a handoff_append event in SQLite."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    # Call append_current_handoff
+    service.append_current_handoff(
+        "Test context message",
+        actor="init",
+        kind="context",
+        branch="task/issue-304",
+    )
+
+    # Verify handoff_append event was recorded
+    events = store.get_events("task/issue-304", event_type="handoff_append")
+    assert len(events) == 1
+    assert events[0]["detail"] == "Test context message"
+    assert events[0]["actor"] == "init"
