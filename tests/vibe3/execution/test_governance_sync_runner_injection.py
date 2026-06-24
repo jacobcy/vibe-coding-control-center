@@ -9,6 +9,28 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.models import ExecutionLaunchResult
+
+
+def _mock_execution_coordinator(monkeypatch):
+    """Helper to mock ExecutionCoordinator and prevent real tmux session creation.
+
+    This is used by tests that call run_governance_async to ensure
+    no real tmux sessions are created during test execution.
+    """
+    monkeypatch.setattr(
+        "vibe3.execution.coordinator.ExecutionCoordinator",
+        lambda config, store, backend, start_async=None, capacity=None: (
+            MagicMock(
+                dispatch_execution=lambda request: ExecutionLaunchResult(
+                    launched=False,
+                    skipped=True,
+                    reason="test: mocked coordinator",
+                )
+            )
+        ),
+    )
+
 
 class TestGovernanceSyncRunnerWithInjection:
     """Test governance sync runner with injected dependencies."""
@@ -239,6 +261,7 @@ class TestGovernanceAsyncRunnerWithInjection:
                 "vibe3.environment.session_registry.SessionRegistryService",
                 lambda store, backend: mock_registry,
             )
+            _mock_execution_coordinator(m)
 
             run_governance_async(
                 tick_count=0,
@@ -300,6 +323,7 @@ class TestGovernanceAsyncRunnerWithInjection:
                 "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
                 lambda: Path("/tmp/test-repo"),  # Return real Path, not MagicMock
             )
+            _mock_execution_coordinator(m)
 
             run_governance_async(
                 tick_count=5,

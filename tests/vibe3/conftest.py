@@ -144,3 +144,34 @@ def _silence_orchestra_log():
     yield
     mp.undo()
     _close_events_log()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_tmux_sessions():
+    """Auto-cleanup any leaked governance-tick-* tmux sessions after each test.
+
+    Performance note: 5-second timeout is acceptable for test cleanup.
+    Most runs complete in <0.1s when no sessions exist.
+    """
+    yield
+    import subprocess
+    import sys
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import subprocess; "
+                "proc = subprocess.run(['tmux', 'list-sessions', '-F', "
+                "'#{session_name}'], capture_output=True, text=True); "
+                "sessions = [s for s in proc.stdout.strip().split(chr(10)) "
+                "if s and 'governance-tick' in s]; "
+                "[subprocess.run(['tmux', 'kill-session', '-t', s]) "
+                "for s in sessions]",
+            ],
+            capture_output=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass  # tmux not installed or timeout — nothing to clean up
