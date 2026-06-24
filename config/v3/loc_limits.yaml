@@ -104,8 +104,8 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
       - path: "src/vibe3/commands/scan.py"
-        limit: 450
-        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines)"
+        limit: 475
+        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines)"
       - path: "src/vibe3/commands/handoff_write.py"
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
