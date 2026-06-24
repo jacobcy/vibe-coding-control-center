@@ -51,7 +51,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
     if [[ "$(basename "$git_common_dir")" == ".git" ]]; then
       # Non-bare repo: git-common-dir = .../main/.git → VIBE_REPO = .../main
       export VIBE_REPO="$(cd "$git_common_dir/.." && pwd)"
-    elif [[ "$(git rev-parse --is-bare-repository 2>/dev/null)" == "true" ]]; then
+    elif [[ "$(git -C "$git_common_dir" rev-parse --is-bare-repository 2>/dev/null)" == "true" ]]; then
       # True bare repo: git-common-dir IS the repo root
       export VIBE_REPO="$(cd "$git_common_dir" && pwd)"
     else
@@ -91,16 +91,18 @@ elif [[ -d "$VIBE_REPO/.worktrees/main" ]]; then
   main_wt_branch="$(git -C "$VIBE_REPO/.worktrees/main" symbolic-ref --short HEAD 2>/dev/null || true)"
   if [[ "$main_wt_branch" == "main" ]]; then
     export VIBE_MAIN="$VIBE_REPO/.worktrees/main"
+  fi
+fi
+
+# If VIBE_MAIN not yet set, try old structure or fallback to VIBE_REPO
+if [[ -z "${VIBE_MAIN:-}" ]]; then
+  if [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
+    # 兼容旧结构：main 作为子目录
+    export VIBE_MAIN="$VIBE_REPO/main"
   else
-    # .worktrees/main exists but is not on main branch, skip to next fallback
+    # 单 worktree 模式：没有独立的 main
     export VIBE_MAIN="$VIBE_REPO"
   fi
-elif [[ -d "$VIBE_REPO/main" && ( -d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git" ) ]]; then
-  # 兼容旧结构：main 作为子目录
-  export VIBE_MAIN="$VIBE_REPO/main"
-else
-  # 单 worktree 模式：没有独立的 main
-  export VIBE_MAIN="$VIBE_REPO"
 fi
 export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
