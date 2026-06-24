@@ -61,21 +61,22 @@ def _emit_review_result(
 
     console = Console()
 
-    if verdict in {"ASYNC"}:
+    if verdict == "ASYNC":
         return
 
+    console.print("\n[bold]Review Result[/bold]")
+
     if verdict == "DRY_RUN":
-        console.print("\n[bold]Review Result[/bold]")
         console.print("[green]✓ Completed successfully[/green]")
         return
 
     if backend:
-        typer.echo(f"Backend: {backend}")
+        console.print(f"[cyan]Backend:[/cyan] {backend}")
     if model:
-        typer.echo(f"Model: {model}")
-    typer.echo(f"\n=== Verdict: {verdict} ===")
+        console.print(f"[cyan]Model:[/cyan] {model}")
+    console.print(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
-        typer.echo(f"-> Review saved to: {handoff_file}")
+        console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
 
 
 def _check_report_ref(branch: str) -> bool:

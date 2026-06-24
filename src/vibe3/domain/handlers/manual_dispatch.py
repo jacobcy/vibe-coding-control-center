@@ -326,8 +326,9 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
             )
             effective = resolve_effective_agent_options(options)
+            verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
-                "OK",
+                verdict,
                 None,
                 event.issue_number,
                 backend=effective.backend,
