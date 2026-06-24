@@ -417,15 +417,9 @@ def resolve_spec_plan_input(
 
 def _resolve_spec_ref(branch: str) -> str | None:
     """Get spec_ref from flow state, or None if unavailable."""
-    from vibe3.services.flow import FlowService
+    from vibe3.services.flow import resolve_flow_ref
 
-    try:
-        flow = FlowService().get_flow_status(branch)
-        if flow and flow.spec_ref:
-            return flow.spec_ref
-    except Exception:
-        pass
-    return None
+    return resolve_flow_ref(branch, "spec_ref")
 
 
 def execute_spec_plan_async(

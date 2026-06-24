@@ -146,6 +146,35 @@ def internal_manager_dispatch(
             branch=branch,
         )
 
+    if dry_run:
+        try:
+            from rich.console import Console
+
+            from vibe3.agents import CodeagentResult
+            from vibe3.config import (
+                load_orchestra_config,
+                resolve_effective_agent_options,
+            )
+            from vibe3.execution import ExecutionRolePolicyService
+            from vibe3.ui import display_codeagent_result
+
+            config = load_orchestra_config()
+            options = ExecutionRolePolicyService(config).resolve_agent_options(
+                "manager"
+            )
+            effective = resolve_effective_agent_options(options)
+            display_codeagent_result(
+                Console(),
+                CodeagentResult(
+                    success=True,
+                    backend=effective.backend,
+                    model=effective.model,
+                ),
+                "Manager",
+            )
+        except Exception:
+            pass  # Display is best-effort; fail gracefully in test envs
+
 
 @app.command("apply")
 def internal_apply_dispatch(

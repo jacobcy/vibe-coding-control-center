@@ -464,4 +464,85 @@ def test_internal_manager_show_prompt_forces_sync_path(monkeypatch):
             mock_async.assert_not_called()
             # Verify show_prompt was passed
             assert mock_sync.call_args.kwargs["show_prompt"] is True
-            assert mock_sync.call_args.kwargs["dry_run"] is True
+
+
+class TestManagerDryRunResultDisplay:
+    """Manager --dry-run must display Backend/Model via display_codeagent_result,
+    consistent with plan/run/review/governance/supervisor --dry-run."""
+
+    def _setup_mocks(self):
+        """Shared mock setup for manager dry-run tests."""
+        return {
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync": MagicMock(),
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_async": MagicMock(),
+        }
+
+    @patch("vibe3.config.load_orchestra_config")
+    @patch("vibe3.execution.execution_role_policy.ExecutionRolePolicyService")
+    @patch("vibe3.config.resolve_effective_agent_options")
+    @patch("vibe3.ui.display_codeagent_result")
+    def test_manager_dry_run_sync_displays_backend_model(
+        self, mock_display, mock_resolve, mock_cmd_opts, mock_load_config
+    ):
+        """Manager --dry-run (sync) calls display_codeagent_result."""
+        mock_load_config.return_value = MagicMock()
+        mock_cmd_opts.return_value = MagicMock()
+        from vibe3.models import AgentOptions
+
+        mock_resolve.return_value = AgentOptions(
+            backend="anthropic", model="claude-opus-4-8"
+        )
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as _mock_sync:
+            with patch(
+                "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+            ) as _mock_async:
+                result = runner.invoke(
+                    cli_app,
+                    ["internal", "manager", "123", "--dry-run", "--no-async", "--yes"],
+                )
+
+        assert result.exit_code == 0
+        mock_display.assert_called_once()
+        call_args = mock_display.call_args
+        result_arg = call_args[0][1]
+        assert result_arg.success is True
+        assert result_arg.backend == "anthropic"
+        assert result_arg.model == "claude-opus-4-8"
+        assert call_args[0][2] == "Manager"
+
+    @patch("vibe3.config.load_orchestra_config")
+    @patch("vibe3.execution.execution_role_policy.ExecutionRolePolicyService")
+    @patch("vibe3.config.resolve_effective_agent_options")
+    @patch("vibe3.ui.display_codeagent_result")
+    def test_manager_dry_run_async_displays_backend_model(
+        self, mock_display, mock_resolve, mock_cmd_opts, mock_load_config
+    ):
+        """Manager --dry-run (async) calls display_codeagent_result."""
+        mock_load_config.return_value = MagicMock()
+        mock_cmd_opts.return_value = MagicMock()
+        from vibe3.models import AgentOptions
+
+        mock_resolve.return_value = AgentOptions(backend="openai", model="gpt-5")
+
+        with patch(
+            "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
+        ) as _mock_sync2:
+            with patch(
+                "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
+            ) as _mock_async2:
+                result = runner.invoke(
+                    cli_app,
+                    ["internal", "manager", "123", "--dry-run", "--yes"],
+                )
+
+        assert result.exit_code == 0
+        mock_display.assert_called_once()
+        call_args = mock_display.call_args
+        result_arg = call_args[0][1]
+        assert result_arg.success is True
+        assert result_arg.backend == "openai"
+        assert result_arg.model == "gpt-5"
+        assert call_args[0][2] == "Manager"

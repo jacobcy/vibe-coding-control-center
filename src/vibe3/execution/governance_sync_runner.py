@@ -12,9 +12,13 @@ from typing import Callable
 from loguru import logger
 from typer import echo
 
-from vibe3.agents import CodeagentBackend
+from vibe3.agents import CodeagentBackend, CodeagentResult
 from vibe3.clients import get_store
-from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
+from vibe3.config import (
+    GOVERNANCE_GATE_CONFIG,
+    load_orchestra_config,
+    resolve_effective_agent_options,
+)
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
@@ -34,7 +38,7 @@ def run_governance_sync(
     session_id: str | None = None,
     governance_fns: GovernanceFunctions,
     append_event: GovernanceEventLogger,
-) -> None:
+) -> CodeagentResult | None:
     """Run governance scan synchronously with error tracking.
 
     This function is called by `internal governance --no-async` CLI command.
@@ -51,6 +55,10 @@ def run_governance_sync(
         session_id: Optional session ID for resume
         governance_fns: Injected governance functions (required)
         append_event: Injected event logger (required)
+
+    Returns:
+        CodeagentResult in dry-run mode (for consistent display),
+        None for real execution (caller handles display separately).
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
@@ -129,7 +137,14 @@ def run_governance_sync(
             role="governance",
             dry_run_summary=dry_run_summary,
         )
-        return
+
+        # Return CodeagentResult for consistent display with plan/run/review
+        effective = resolve_effective_agent_options(options)
+        return CodeagentResult(
+            success=True,
+            backend=effective.backend,
+            model=effective.model,
+        )
 
     material_info = f" material={material_override}" if material_override else ""
     echo(f"-> Executing governance tick={tick_count}{material_info}...")
@@ -177,6 +192,8 @@ def run_governance_sync(
 
         # Re-raise for CLI exit code handling
         raise
+
+    return None
 
 
 def run_governance_async(

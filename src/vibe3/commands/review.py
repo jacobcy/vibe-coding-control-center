@@ -59,42 +59,32 @@ def _emit_review_result(
     tmux_session: str | None = None,
     log_path: str | None = None,
 ) -> None:
-    """Render review result summary consistently."""
+    """Render review result summary consistently.
+
+    All paths (sync, async, dry-run) use the shared display_codeagent_result
+    for metadata. Real execution additionally shows verdict and handoff file.
+    """
     from rich.console import Console
+
+    from vibe3.agents import CodeagentResult
+    from vibe3.ui import display_codeagent_result
 
     console = Console()
 
-    if verdict in {"ASYNC", "DRY_RUN"}:
-        from vibe3.agents import CodeagentResult
-        from vibe3.ui import display_codeagent_result
+    display_result = CodeagentResult(
+        success=verdict not in {"ERROR", "UNKNOWN"},
+        backend=backend,
+        model=model,
+        report_ref=report_ref,
+        tmux_session=tmux_session,
+        log_path=log_path,
+    )
+    display_codeagent_result(console, display_result, "Review")
 
-        display_codeagent_result(
-            console,
-            CodeagentResult(
-                success=True,
-                backend=backend,
-                model=model,
-                report_ref=report_ref,
-                tmux_session=tmux_session,
-                log_path=log_path,
-            ),
-            "Review",
-        )
-        return
-
-    if backend:
-        console.print()
-        console.print(f"[cyan]Backend:[/cyan] {backend}")
-    if model:
-        console.print(f"[cyan]Model:[/cyan] {model}")
-    if report_ref:
-        console.print(f"[cyan]Report:[/cyan] {report_ref}")
-
-    console.print("\n[bold]Review Result[/bold]")
-
-    console.print(f"\n=== Verdict: {verdict} ===")
-    if handoff_file:
-        console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
+    if verdict not in {"ASYNC", "DRY_RUN"}:
+        console.print(f"\n=== Verdict: {verdict} ===")
+        if handoff_file:
+            console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
 
 
 def _check_report_ref(branch: str) -> bool:
@@ -112,15 +102,9 @@ def _check_report_ref(branch: str) -> bool:
 
 def _resolve_report_ref(branch: str | None) -> str | None:
     """Get report_ref from flow state, or None if unavailable."""
-    if not branch:
-        return None
-    try:
-        flow = FlowService().get_flow_status(branch)
-        if flow and flow.report_ref:
-            return flow.report_ref
-    except Exception:
-        pass
-    return None
+    from vibe3.services.flow import resolve_flow_ref
+
+    return resolve_flow_ref(branch, "report_ref")
 
 
 def _review_branch_impl(
@@ -395,11 +379,13 @@ def base(
     if result is None:
         typer.echo("Review dispatched (async mode)")
     else:
+        report_ref = _resolve_report_ref(current_branch)
         _emit_review_result(
             result.verdict,
             result.handoff_file,
             result.backend,
             result.model,
+            report_ref=report_ref,
             tmux_session=result.tmux_session,
             log_path=result.log_path,
         )
