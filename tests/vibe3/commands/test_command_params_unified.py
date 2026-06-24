@@ -58,8 +58,7 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
     )
     # Mock at both layers for EDA
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
-    # Don't mock execute_spec_plan_sync in fixture - let individual tests control it
-    # The fixture is for setup, not for controlling execution behavior
+    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", MagicMock())
     # Mock in command's namespace (imported at module level)
     monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     # Mock at source (for lazy imports in handler)
@@ -160,7 +159,6 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 # ==============================================================================
 
 
-@pytest.mark.slow
 def test_plan_no_branch_uses_current_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
