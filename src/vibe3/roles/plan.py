@@ -535,6 +535,25 @@ def execute_spec_plan_sync(
             meta.context_mode,  # type: ignore[arg-type]
         )
         dry_run_summary = meta.summary(sections)
+
+        # Collect and write prompt provenance for dry-run audit
+        variant_key = f"{meta.prompt_mode}.{meta.context_mode}"
+        context_builder = make_plan_context_builder(
+            request, cfg, annotate_sections=True
+        )
+        prompt_text = context_builder()
+        manifest = PromptManifest.load_for_prompts_path(None)
+        provenance = collect_dry_run_provenance(
+            manifest=manifest,
+            recipe_key="plan.default",
+            variant_key=variant_key,
+            rendered_text=prompt_text,
+        )
+        provenance_path = write_prompt_provenance(
+            provenance, role="planner", issue_number=issue_number or 0
+        )
+        dry_run_summary["provenance_path"] = str(provenance_path)
+
         overlays = discover_project_scope_overlays()
         if overlays:
             dry_run_summary["project_scope_overlays"] = overlays
