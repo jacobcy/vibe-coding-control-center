@@ -324,6 +324,21 @@ class CodeagentBackend:
         # Log prompt metadata before execution for debugging
         original_options = options
         effective_options = resolve_effective_agent_options(options)
+        # resolve_effective_agent_options short-circuits when backend is set,
+        # but role-based paths always set backend="claude" via
+        # ExecutionRolePolicyService.resolve_backend. Resolve model from
+        # agent preset when it's missing.
+        if not effective_options.model and options.agent:
+            from vibe3.config import resolve_repo_agent_preset
+
+            preset = resolve_repo_agent_preset(options.agent)
+            if preset and preset[1]:
+                effective_options = AgentOptions(
+                    agent=effective_options.agent,
+                    backend=effective_options.backend,
+                    model=preset[1],
+                    timeout_seconds=effective_options.timeout_seconds,
+                )
         logger.bind(domain="agent_execution").debug(
             "Executing codeagent-wrapper: "
             f"backend={effective_options.backend or 'default'}, "
@@ -365,6 +380,16 @@ class CodeagentBackend:
                 # positional arg when present, printed separately below.
                 cmd_display = command[:-1] if task and command else command
                 echo(f"command: {' '.join(cmd_display)}")
+                if effective_options.backend or effective_options.model:
+                    from rich.console import Console
+
+                    console = Console()
+                    if effective_options.backend:
+                        console.print(
+                            f"[cyan]Backend:[/cyan] {effective_options.backend}"
+                        )
+                    if effective_options.model:
+                        console.print(f"[cyan]Model:[/cyan] {effective_options.model}")
                 if show_prompt and prompt_file_path:
                     echo(f"prompt_file: {prompt_file_path}")
                     echo(
