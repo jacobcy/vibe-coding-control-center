@@ -257,7 +257,13 @@ def build_supervisor_cli_sync_request(
     dry_run: bool,
     show_prompt: bool,
 ) -> ExecutionRequest:
-    """Build sync execution request for CLI-driven supervisor apply."""
+    """Build sync execution request for CLI-driven supervisor apply.
+
+    ``_session_id`` is accepted for signature parity with other role sync
+    request builders but intentionally unused: supervisor tasks are atomic
+    GitHub issue processing with no intermediate state to resume from, so a
+    fresh codeagent-wrapper session is always used (no ``-r`` flag).
+    """
     import os
 
     _ = flow_state
