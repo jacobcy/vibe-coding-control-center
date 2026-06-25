@@ -298,9 +298,6 @@ code_limits:
       - path: "tests/vibe3/commands/test_plan.py"
         limit: 580
         reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；EDA 架构迁移后新增 lazy import cache mock 路径修复、_ensure_lazy_imports_populated 隔离辅助函数等（+105 行）"
-      - path: "tests/vibe3/commands/test_scan.py"
-        limit: 710
-        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行），refactor 新增 async skip/throttled display 测试（+25 行）"
       - path: "tests/vibe3/commands/test_review.py"
         limit: 533
         reason: "Review command 测试集，覆盖 dry_run、show_prompt、base/branch review、exit codes、context builder、CLI option 传递、async dispatch 等紧密耦合场景；Issue #3135 新增 unified display 和 async dispatch 测试（+130 行）"
@@ -458,9 +455,6 @@ code_limits:
       - path: "tests/vibe3/domain/test_dispatch_coordinator.py"
         limit: 550
         reason: "GlobalDispatchCoordinator domain layer migration 测试集，覆盖 constructor DI verification、coordinate dispatch flow、queue lifecycle management、issue state handling、pool exhaustion detection 等紧密耦合场景；与源文件 dispatch_coordinator.py（limit 800）对应，测试 domain-first architecture 迁移后的协调器契约；PR #3101 新增 aborted flow exclusion 测试验证 pool exhaustion detection（+102 行含 integration test）"
-      - path: "tests/vibe3/roles/test_supervisor.py"
-        limit: 500
-        reason: "Supervisor role test suite covering handoff payload construction, task string generation, apply request building, identified events filtering, and profile resolution. Issue #3067 added annotate_sections parameter tests (2 tests, +186 LOC) to validate section marker wrapping. Original 293 + 186 = 479 LOC, exceeds limit by 79 lines."
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
