@@ -152,6 +152,14 @@ class SupervisorHandoffConfig(BaseModel):
         default=None,
         description="Model override (leave empty to use config/v3/models.json preset)",
     )
+    max_dispatch_per_tick: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Max supervisor dispatches per heartbeat tick. "
+            "Default 1 ensures one-at-a-time processing for supervisor apply tasks."
+        ),
+    )
 
 
 class PeriodicCheckConfig(BaseModel):

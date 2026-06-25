@@ -317,7 +317,11 @@ class OrchestrationFacade(ServiceBase):
         events = list(iter_supervisor_identified_events(config, raw_issues))
         matched_count = len(events)
 
-        for event in events:
+        # Throttle dispatches: only emit N events per tick
+        max_per_tick = config.supervisor_handoff.max_dispatch_per_tick
+        events_to_dispatch = events[:max_per_tick]
+
+        for event in events_to_dispatch:
             logger.bind(
                 domain="orchestration_facade",
                 issue_number=event.issue_number,
@@ -325,4 +329,15 @@ class OrchestrationFacade(ServiceBase):
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
             publish(event)
 
-        return (total_scanned, matched_count)
+        if matched_count > max_per_tick:
+            logger.bind(
+                domain="orchestration_facade",
+                total_candidates=matched_count,
+                dispatched=max_per_tick,
+                remaining=matched_count - max_per_tick,
+            ).info(
+                f"Supervisor scan throttled: {matched_count} candidates found, "
+                f"dispatching {max_per_tick} this tick"
+            )
+
+        return (total_scanned, min(matched_count, max_per_tick))
