@@ -258,3 +258,71 @@ class TestDisplayExecutionResult:
         # Should not have Backend/Model labels
         assert not any("Backend:" in c for c in calls)
         assert not any("Model:" in c for c in calls)
+
+
+class TestDisplayReviewResult:
+    """Tests for ReviewRunResult display (review command)."""
+
+    def test_display_review_result_field_order_matches_codeagent(self):
+        """display_review_result field order matches display_codeagent_result."""
+        from unittest.mock import MagicMock
+
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        from vibe3.ui.scan_display import display_review_result
+
+        console = MagicMock()
+        result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file=".git/vibe3/handoff/review-42.md",
+            issue_number=42,
+            backend="claude",
+            model="sonnet",
+            log_path="temp/logs/review/42.log",
+            tmux_session="vibe3-review-42",
+        )
+
+        display_review_result(console, result)
+        calls = [str(c) for c in console.print.call_args_list]
+
+        # Verify field order: Backend -> Model -> Log path -> Handoff -> Tmux session
+        call_str = " ".join(calls)
+        backend_idx = next(
+            (i for i, c in enumerate(calls) if "Backend:" in c), -1
+        )
+        model_idx = next((i for i, c in enumerate(calls) if "Model:" in c), -1)
+        log_idx = next((i for i, c in enumerate(calls) if "Log path:" in c), -1)
+        handoff_idx = next(
+            (i for i, c in enumerate(calls) if "Handoff:" in c), -1
+        )
+        tmux_idx = next(
+            (i for i, c in enumerate(calls) if "Tmux session:" in c), -1
+        )
+
+        assert backend_idx >= 0 and model_idx >= 0 and log_idx >= 0
+        assert handoff_idx >= 0 and tmux_idx >= 0
+        # Order check
+        assert backend_idx < model_idx < log_idx < handoff_idx < tmux_idx
+
+    def test_display_review_result_handles_missing_fields(self):
+        """display_review_result handles missing metadata gracefully."""
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        from vibe3.ui.scan_display import display_review_result
+
+        console = MagicMock()
+        result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file=None,
+            issue_number=42,
+        )
+
+        display_review_result(console, result)
+        calls = [str(c) for c in console.print.call_args_list]
+
+        # Should show verdict, not crash
+        assert any("Verdict:" in c for c in calls)
+        # Should not have metadata labels
+        assert not any("Backend:" in c for c in calls)
+        assert not any("Model:" in c for c in calls)
+        assert not any("Tmux session:" in c for c in calls)
