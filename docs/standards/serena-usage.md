@@ -50,16 +50,15 @@ AI 审核 Prompt 必须包含 Serena 提供的结构化证据：
 - **目标**：结构化审计、变更风险评分、决定是否允许 Merge。
 
 ### 2.3 Skill 层 (流程编排关)
-- **触发**：`/vibe-commit` / `/vibe-integrate` 流程中。
+- **触发**：`vibe3 flow` 流程中。
 - **策略**：上下文敏感。
 - **目标**：确保提交组符合原子性，同步 Spec 与代码。
 
 ### 2.4 Manual Audit (命令审计)
-- **触发**：手动调用 `scripts/vibe-review.sh`。
-- **参数标准**：
-  - `--uncommitted`: 审阅未提交改动。
-  - `--base <branch>`: 审阅相对基准分支的改动。
-  - `--commit <hash>`: 审阅特定提交。
+- **触发**：手动调用 `vibe3 review`。
+- **模式**：
+  - `vibe3 review base`: 审阅本地改动与基准分支的差异。
+  - `vibe3 review --branch <branch>`: 审阅 issue 实现分支。
 
 ---
 
@@ -68,8 +67,8 @@ AI 审核 Prompt 必须包含 Serena 提供的结构化证据：
 所有审核相关的工具命令应遵循以下标准，以方便 Agent 调用：
 
 ### 3.1 帮助与自检
-- `scripts/vibe-review.sh --help`: 显示所有审核网关状态与配置。
-- `scripts/vibe-review.sh check`: 审计本地审核环境（Serena 状态、API 额度）。
+- `vibe3 review base --help`: 显示 review 命令选项与参数配置。
+- `vibe3 check`: 审计本地环境（handoff 存储一致性、审核依赖状态）。
 
 ### 3.2 审计输出规范
 所有审核后端（Codex/Claude）的输出必须包含：
@@ -84,5 +83,5 @@ AI 审核 Prompt 必须包含 Serena 提供的结构化证据：
 
 - ❌ 禁止 AI 在不调用 Serena 的情况下声称“已理解影响范围”。
 - ❌ 禁止在审核报告中仅给出描述，不给出物理证据（文件/行号）。
-- ❌ 禁止绕过 `vibe-check` 进行生产环境代码合并。
+- ❌ 禁止绕过 `vibe3 check` 进行生产环境代码合并。
 

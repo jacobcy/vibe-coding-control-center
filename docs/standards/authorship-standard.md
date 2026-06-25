@@ -12,7 +12,6 @@ last_updated: 2026-04-01
 related_docs:
   - docs/standards/glossary.md
   - v3/data-model-standard.md
-  - skills/vibe-commit/SKILL.md
 ---
 
 # Vibe Coding 署名规范 (Authorship Standard)
@@ -43,7 +42,7 @@ related_docs:
 ### 2.2 主动署名 (Active Authorship)
 署名必须是由 Skill 层或 Agent 认知层主发起的一种声明，具有宣告性质。此逻辑现在统一由 `SignatureService` 决断并管理（具体包含 Flow 操作优先级的 `resolve_actor` 与用于 UI/PR 展示的 `normalize_actor`）。
 
-每当一个 Agent / Human 接管一个工作区中的 Flow 现场时（例如通过 `--actor` 显式标注或通过后台 Handoff 写入），底层 Flow State（`.git/vibe3/flow_state.json` 或 SQLite 数据库）必须记录/更新各个阶段的认知所有者。
+每当一个 Agent / Human 接管一个工作区中的 Flow 现场时（例如通过 `--actor` 显式标注或通过后台 Handoff 写入），底层 Flow State（SQLite 数据库 `flow_state` 表是主存储；`.git/vibe3/flow_state.json` 已迁移为次要兼容层）必须记录/更新各个阶段的认知所有者。
 
 ```json
 // 数据结构要求：
@@ -55,8 +54,9 @@ related_docs:
 }
 ```
 
-### 2.3 `vibe-save` 与 Handoff 的认知归属
-在进行中间态记录 (`/vibe-save` 工作流) 或记录 Handoff 时，Agent 必须将自己的身份显式带入产生的日志条目中，证明该阶段成果（如某个函数的重构思路）是由其负责产出的。系统会自动确保 `latest_actor` 的流转追踪正确落实。
+### 2.3 Handoff 的认知归属
+
+在进行中间态记录 (`vibe3 handoff append` / `vibe3 handoff plan`) 或记录 Handoff 时，Agent 必须将自己的身份显式带入产生的日志条目中，证明该阶段成果（如某个函数的重构思路）是由其负责产出的。系统会自动确保 `latest_actor` 的流转追踪正确落实。
 
 ## 3. 最终物化：PR Contributors 与 `Co-authored-by`
 
