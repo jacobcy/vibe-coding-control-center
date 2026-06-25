@@ -47,6 +47,8 @@ docs/
 **必读文档**：
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
+- **[agent-document-lifecycle-standard.md](standards/agent-document-lifecycle-standard.md)** - Agent 文档生命周期与临时文档/comment 留存规则
+- **[decisions/INDEX.md](decisions/INDEX.md)** - 架构决策记录 (ADR) 索引和发现入口
 - **[v3/architecture-convergence-standard.md](standards/v3/architecture-convergence-standard.md)** - Vibe3 目标架构总纲
 - **[v3/human-mirror-architecture-philosophy.md](standards/v3/human-mirror-architecture-philosophy.md)** - Vibe3 人机对称架构哲学
 - **[v3/serve-debugging-guide.md](standards/v3/serve-debugging-guide.md)** - Vibe3 Serve 调试指南

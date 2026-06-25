@@ -8,7 +8,7 @@ authority:
   - action-verb-reminders
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-05-22
+last_updated: 2026-06-25
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -23,7 +23,7 @@ related_docs:
 
 本文档只提供默认含义、执行提醒和禁止隐含项，用于减少语义歧义，不扩展成功能设计、命令设计、skill 设计或 workflow 设计。
 
-名词术语见 [glossary.md](docs/standards/glossary.md)。
+名词术语见 [glossary.md](./glossary.md)。
 
 ## 1. Use Rule
 

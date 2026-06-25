@@ -32,8 +32,9 @@ related_docs:
 
 - `.agent/plans/` 是临时计划工作区。
 - `.agent/reports/` 是临时报告工作区。
+- `.agent/audits/` 是临时审计工作区（Reviewer 审计结论，对应 `handoff_audit` artifact）。
 - 这两个目录下的文件都属于工作产物，不是长期规范真源。
-- 临时草稿和过程证据可先写入这里；需要长期保留、供人类阅读的正式 plan / report，应落在 `docs/plans/` 和 `docs/reports/`。
+- 临时草稿和过程证据可先写入这里；需要长期保留、供人类阅读的正式 plan / report / audit，应落在 `docs/plans/`、`docs/reports/` 和 `docs/audits/`。
 
 ## 3. 留存规则
 
@@ -45,11 +46,23 @@ related_docs:
 ## 4. 正式文档落点
 
 - GitHub issue 是任务身份真源。
-- 与任务相关的正式 Spec / Plan / Report 文档，可分别落在 `docs/specs/`、`docs/plans/`、`docs/reports/`。
+- 与任务相关的正式 Spec / Plan / Report / Audit 文档，可分别落在 `docs/specs/`、`docs/plans/`、`docs/reports/`、`docs/audits/`。
+- Manager 发布的正式指示可落在 `docs/directives/`（对应 `handoff_indicate` artifact）。
 - 不再维护统一任务镜像目录。
 - 若正式文档与 issue 冲突，以 issue 及其 comment 为准。
 
-## 5. 兼容原则
+## 5. Handoff Artifact 类型
+
+Agent 手写交接按以下类型分类，各对应一个 handoff artifact：
+
+| Artifact | 用途 | 写入命令 | 正式落点 |
+|----------|------|----------|----------|
+| `plan` | 执行计划（圈定上下文、拆分任务） | `vibe3 handoff plan` | `docs/plans/` |
+| `report` | 执行报告（实现过程、结果验证） | `vibe3 handoff report` | `docs/reports/` |
+| `audit` | 审计结论（Reviewer 评审意见、Verdict） | `vibe3 handoff audit` | `docs/audits/` |
+| `indicate` | 管理指示（Manager 指令、停点要求） | `vibe3 handoff indicate` | `docs/directives/` |
+
+## 6. 兼容原则
 
 - `docs/plans/` 和 `docs/reports/` 既承载当前可用的正式文档，也保留历史参考内容。
 - 如果需要引用历史结论，应优先引用 issue comment，而不是复制旧计划或旧报告正文。
