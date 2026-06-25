@@ -197,8 +197,8 @@ code_limits:
         limit: 450
         reason: "Error classification registry and helper functions (is_permanent_code_error, classify_error, ERROR_REGISTRY); Issue #3149 added E_DISPATCH_CODE_ERROR entry and is_permanent_code_error() classifier for permanent-vs-transient error distinction (+45 lines)"
       - path: "tests/vibe3/orchestra/test_queue_maintenance_triggers.py"
-        limit: 401
-        reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发等场景"
+        limit: 500
+        reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发、scheduled refresh 完整生命周期（tick-based trigger、dirty signal consumer、queue rebuild verification）、pool exhaustion detection 等紧密耦合场景；Issue #3148 新增 exhausted queue rebuild 集成测试后从 401 行增至 481 行"
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"
         limit: 620
