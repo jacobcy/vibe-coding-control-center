@@ -341,6 +341,18 @@ class TestCollectLabelAnomalies:
         )
         assert result == []
 
+    def test_orphan_execution_skipped_for_handoff_state(self) -> None:
+        # handoff is a supervisor handoff signal, not an execution state.
+        # Including it in EXECUTION_STATES caused #3151 Bug 3: supervisor
+        # issues without local flow had state/handoff reset to state/ready.
+        result = collect_label_anomalies(
+            ["state/handoff"],
+            issue_number=1,
+            has_local_flow=False,
+            is_manager_issue=True,
+        )
+        assert result == []
+
     def test_governed_without_terminal_label_backfills_ready(self) -> None:
         result = collect_label_anomalies(
             ["orchestra-governed"],

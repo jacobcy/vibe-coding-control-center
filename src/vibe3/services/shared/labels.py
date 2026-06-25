@@ -114,9 +114,7 @@ def clean_old_state_labels(
 # ---------------------------------------------------------------------------
 
 _ROADMAP_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
-EXECUTION_STATES = frozenset(
-    {"merge-ready", "review", "in-progress", "handoff", "claimed"}
-)
+EXECUTION_STATES = frozenset({"merge-ready", "review", "in-progress", "claimed"})
 _STATE_PRIORITY_ORDER = (
     "blocked",
     "done",
