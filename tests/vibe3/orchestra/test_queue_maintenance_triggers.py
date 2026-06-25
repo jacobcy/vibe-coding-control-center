@@ -158,6 +158,48 @@ class TestQueueScheduledRefresh:
         await coordinator.coordinate(tick_id=10)
         assert coordinator.is_dispatch_paused() is True
 
+    @pytest.mark.asyncio
+    async def test_scheduled_refresh_then_preflight_fail_repauses(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """Regression: scheduled_refresh weak check flips paused=False, then
+        _dispatch_loop preflight removes the entry (dispatched_count=0).
+        exhausted_refresh re-verification must re-pause instead of leaving
+        paused=False, which would reset the exhausted counter and prevent
+        server auto-stop.
+        """
+        capacity = make_capacity(remaining=2)
+        coordinator = make_coordinator(
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 10
+        coordinator._dispatch_paused = True
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready"),
+        ]
+
+        async def mock_collect():
+            return [QueueEntry(issue_number=1, collected_state="ready")]
+
+        coordinator._collect_frozen_queue = mock_collect
+
+        # Weak check passes during scheduled_refresh (entry present), then
+        # fails during exhausted_refresh re-verification (entry popped by
+        # _dispatch_loop since _load_issue returns None by default).
+        weak_check_results = [True, False]
+        coordinator._has_dispatchable_entries = lambda _entries: (
+            weak_check_results.pop(0)
+        )
+        coordinator._has_actionable_entries = MagicMock(return_value=False)
+
+        await coordinator.coordinate(tick_id=10)
+
+        assert coordinator.is_dispatch_paused() is True
+
 
 class TestQueueExhaustedRefresh:
     """Tests for _queue_exhausted_refresh trigger."""
@@ -264,6 +306,44 @@ class TestQueueExhaustedRefresh:
         await coordinator.coordinate(tick_id=6)
 
         assert coordinator.is_dispatch_paused() is True
+
+    @pytest.mark.asyncio
+    async def test_exhausted_refresh_respects_qualifiable_blocked_exception(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """When unpaused_for_qualifiable_blocked=True, the re-verification
+        block must NOT force-pause — respects the "keep unpaused to observe
+        remote state" exception, mirroring the need_collect branch.
+        """
+        capacity = make_capacity(remaining=2)
+        coordinator = make_coordinator(
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 10
+        coordinator._dispatch_paused = True
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="blocked"),
+        ]
+
+        async def mock_collect():
+            return [QueueEntry(issue_number=1, collected_state="blocked")]
+
+        coordinator._collect_frozen_queue = mock_collect
+        # Weak check returns False so scheduled_refresh keeps paused=True,
+        # letting paused_blocked_check produce unpaused_for_qualifiable_blocked.
+        coordinator._has_dispatchable_entries = lambda _entries: False
+        coordinator._has_actionable_entries = MagicMock(return_value=False)
+        coordinator._has_pending_blocked_entries = MagicMock(return_value=True)
+        coordinator._has_qualifiable_blocked_entries = MagicMock(return_value=True)
+
+        await coordinator.coordinate(tick_id=10)
+
+        # Stays unpaused: qualifiable blocked exception overrides re-verification.
+        assert coordinator.is_dispatch_paused() is False
 
 
 class TestQueuePausedBlockedCheck:

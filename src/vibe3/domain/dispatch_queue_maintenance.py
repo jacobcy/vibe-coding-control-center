@@ -331,6 +331,31 @@ class DispatchQueueMaintenanceService:
                 )
                 return new_frozen_queue, True
             return new_frozen_queue, False
+
+        # When collection was skipped (queue already refreshed this tick),
+        # still re-verify the paused state.  scheduled_refresh uses
+        # _has_dispatchable_entries, a weaker check than the full dispatch
+        # preflight run by _dispatch_loop, which is why we re-verify here:
+        # an entry that passes _has_dispatchable_entries may still fail
+        # dispatch preflight and be removed from the queue.  If nothing was
+        # dispatched and the queue now has no truly dispatchable entries, the
+        # pool is exhausted.  The unpaused_for_qualifiable_blocked guard
+        # mirrors the need_collect branch above: a just-re-qualified blocked
+        # entry may have changed remote state after the fresh queue was built,
+        # so keep dispatch unpaused to let the next tick observe it.
+        if (
+            dispatched_count == 0
+            and queue_refreshed
+            and not unpaused_for_qualifiable_blocked
+        ):
+            has_dispatchable = self._has_dispatchable_entries(frozen_queue)
+            if not has_dispatchable and dispatch_paused is False:
+                self._emit_event(
+                    "dispatcher",
+                    "GlobalDispatchCoordinator: dispatch paused "
+                    "(no actionable entries after scheduled refresh)",
+                )
+                return frozen_queue, True
         return frozen_queue, dispatch_paused
 
     async def consume_queue_dirty_signal(
