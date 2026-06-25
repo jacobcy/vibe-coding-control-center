@@ -17,7 +17,6 @@ from vibe3.prompts import PromptMaterialSpec
 from vibe3.ui.result_display import (  # noqa: F401
     display_codeagent_result,
     display_execution_result,
-    display_review_result,
 )
 
 if TYPE_CHECKING:

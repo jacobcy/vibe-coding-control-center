@@ -183,9 +183,9 @@ def test_review_base_dry_run_does_not_emit_legacy_actor_header() -> None:
     output = _strip_ansi(result.output)
     # Dry-run should not show legacy actor header
     assert "actor:" not in output
-    # Dry-run does not display detailed result (returns early from _emit_review_result)
-    assert "Backend:" not in output
-    assert "Model:" not in output
+    # Dry-run shows metadata through shared display_codeagent_result channel
+    assert "Backend: claude" in output
+    assert "Model: opus" in output
 
 
 def test_review_async_uses_shared_result_display() -> None:
@@ -491,10 +491,10 @@ def test_review_cli_option_propagates(
 
 
 class TestReviewOutputContract:
-    """Verify review output displays metadata in correct order."""
+    """Verify review output uses shared display_codeagent_result channel."""
 
-    def test_emit_review_result_shows_metadata_in_correct_order(self, capsys) -> None:
-        """_emit_review_result displays Backend -> Model -> Log -> Handoff -> Tmux."""
+    def test_emit_review_result_uses_shared_display_path(self, capsys) -> None:
+        """_emit_review_result delegates metadata to shared display_codeagent_result."""
         from vibe3.commands.review import _emit_review_result
         from vibe3.roles.review_helpers import ReviewRunResult
 
@@ -512,17 +512,13 @@ class TestReviewOutputContract:
         captured = capsys.readouterr()
         output = captured.out
 
-        # Verify field order matches plan/run
-        backend_idx = output.find("Backend:")
-        model_idx = output.find("Model:")
-        log_idx = output.find("Log path:")
-        handoff_idx = output.find("Handoff:")
-        tmux_idx = output.find("Tmux session:")
-
-        assert backend_idx >= 0
-        assert model_idx >= 0
-        assert log_idx >= 0
-        assert handoff_idx >= 0
-        assert tmux_idx >= 0
-        # Order check
-        assert backend_idx < model_idx < log_idx < handoff_idx < tmux_idx
+        # Shared display_codeagent_result shows metadata
+        assert "Backend: claude" in output
+        assert "Model: sonnet" in output
+        assert "Review Result" in output  # From shared display_codeagent_result
+        assert "✓ Completed successfully" in output
+        assert "Log path: temp/logs/review/42.log" in output
+        assert "Tmux session: vibe3-review-42" in output
+        # Review-specific additions
+        assert "=== Verdict: PASS ===" in output
+        assert "Review saved to:" in output

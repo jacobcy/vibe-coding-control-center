@@ -260,18 +260,14 @@ class TestDisplayExecutionResult:
         assert not any("Model:" in c for c in calls)
 
 
-class TestDisplayReviewResult:
-    """Tests for ReviewRunResult display (review command)."""
+class TestEmitReviewResult:
+    """Tests for _emit_review_result using shared display_codeagent_result."""
 
-    def test_display_review_result_field_order_matches_codeagent(self):
-        """display_review_result field order matches display_codeagent_result."""
-        from unittest.mock import MagicMock
-
+    def test_emit_review_result_uses_shared_display_path(self, capsys):
+        """_emit_review_result goes through shared display_codeagent_result."""
+        from vibe3.commands.review import _emit_review_result
         from vibe3.roles.review_helpers import ReviewRunResult
 
-        from vibe3.ui.scan_display import display_review_result
-
-        console = MagicMock()
         result = ReviewRunResult(
             verdict="PASS",
             handoff_file=".git/vibe3/handoff/review-42.md",
@@ -282,47 +278,60 @@ class TestDisplayReviewResult:
             tmux_session="vibe3-review-42",
         )
 
-        display_review_result(console, result)
-        calls = [str(c) for c in console.print.call_args_list]
+        _emit_review_result(result)
+        output = capsys.readouterr().out
 
-        # Verify field order: Backend -> Model -> Log path -> Handoff -> Tmux session
-        call_str = " ".join(calls)
-        backend_idx = next(
-            (i for i, c in enumerate(calls) if "Backend:" in c), -1
-        )
-        model_idx = next((i for i, c in enumerate(calls) if "Model:" in c), -1)
-        log_idx = next((i for i, c in enumerate(calls) if "Log path:" in c), -1)
-        handoff_idx = next(
-            (i for i, c in enumerate(calls) if "Handoff:" in c), -1
-        )
-        tmux_idx = next(
-            (i for i, c in enumerate(calls) if "Tmux session:" in c), -1
-        )
+        # Shared display_codeagent_result fields should appear
+        assert "Backend: claude" in output
+        assert "Model: sonnet" in output
+        assert "Review Result" in output  # Label from display_codeagent_result
+        assert "Log path: temp/logs/review/42.log" in output
+        assert "Tmux session: vibe3-review-42" in output
+        # Review-specific verdict should appear after shared display
+        assert "=== Verdict: PASS ===" in output
+        assert "Review saved to: .git/vibe3/handoff/review-42.md" in output
 
-        assert backend_idx >= 0 and model_idx >= 0 and log_idx >= 0
-        assert handoff_idx >= 0 and tmux_idx >= 0
-        # Order check
-        assert backend_idx < model_idx < log_idx < handoff_idx < tmux_idx
-
-    def test_display_review_result_handles_missing_fields(self):
-        """display_review_result handles missing metadata gracefully."""
+    def test_emit_review_result_handles_missing_fields(self, capsys):
+        """_emit_review_result handles missing metadata gracefully."""
+        from vibe3.commands.review import _emit_review_result
         from vibe3.roles.review_helpers import ReviewRunResult
 
-        from vibe3.ui.scan_display import display_review_result
-
-        console = MagicMock()
         result = ReviewRunResult(
             verdict="PASS",
             handoff_file=None,
             issue_number=42,
         )
 
-        display_review_result(console, result)
-        calls = [str(c) for c in console.print.call_args_list]
+        _emit_review_result(result)
+        output = capsys.readouterr().out
 
         # Should show verdict, not crash
-        assert any("Verdict:" in c for c in calls)
-        # Should not have metadata labels
-        assert not any("Backend:" in c for c in calls)
-        assert not any("Model:" in c for c in calls)
-        assert not any("Tmux session:" in c for c in calls)
+        assert "=== Verdict: PASS ===" in output
+        # Missing metadata should not produce labels
+        assert "Backend:" not in output
+        assert "Model:" not in output
+        assert "Tmux session:" not in output
+
+    def test_emit_review_result_async_skips_verdict(self, capsys):
+        """ASYNC verdict should show metadata but skip review-specific verdict."""
+        from vibe3.commands.review import _emit_review_result
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        result = ReviewRunResult(
+            verdict="ASYNC",
+            handoff_file=None,
+            issue_number=42,
+            backend="claude",
+            model="opus",
+            tmux_session="vibe3-review-42",
+        )
+
+        _emit_review_result(result)
+        output = capsys.readouterr().out
+
+        # Shared display should show metadata
+        assert "Backend: claude" in output
+        assert "Model: opus" in output
+        assert "Review Result" in output
+        # But should NOT show review-specific verdict (ASYNC skips it)
+        assert "=== Verdict:" not in output

@@ -4,7 +4,6 @@ from typing import Annotated, Optional
 
 import typer
 from loguru import logger
-from rich.console import Console
 
 from vibe3.commands.command_options import (
     _AGENT_OPT,
@@ -28,7 +27,7 @@ from vibe3.roles import (
 )
 from vibe3.roles.review_helpers import ReviewRunResult
 from vibe3.services.flow import FlowService, resolve_branch_arg
-from vibe3.ui import display_review_result
+from vibe3.ui import display_codeagent_result
 
 app = typer.Typer(
     name="review",
@@ -54,11 +53,35 @@ _YES_OPT = Annotated[
 
 
 def _emit_review_result(result: ReviewRunResult) -> None:
-    """Render review result summary consistently using UI layer."""
-    if result.verdict in {"ASYNC", "DRY_RUN"}:
-        return
+    """Render review result summary using shared display_codeagent_result.
+
+    Metadata (backend/model/log/tmux) goes through the shared display path
+    used by plan/run. Review-specific verdict and handoff file are shown on top.
+    """
+    from rich.console import Console
+
+    from vibe3.agents import CodeagentResult
+
     console = Console()
-    display_review_result(console, result)
+
+    # Unified metadata display — same channel as plan/run
+    display_codeagent_result(
+        console,
+        CodeagentResult(
+            success=result.verdict not in {"ERROR", "UNKNOWN"},
+            backend=result.backend,
+            model=result.model,
+            tmux_session=result.tmux_session,
+            log_path=result.log_path,
+        ),
+        "Review",
+    )
+
+    # Review-specific: verdict and handoff file
+    if result.verdict not in {"ASYNC", "DRY_RUN"}:
+        console.print(f"\n=== Verdict: {result.verdict} ===")
+        if result.handoff_file:
+            console.print(f"[cyan]-> Review saved to:[/cyan] {result.handoff_file}")
 
 
 def _check_report_ref(branch: str) -> bool:
