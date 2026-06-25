@@ -2,8 +2,8 @@
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import pytest
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.commands.plan import app as plan_app

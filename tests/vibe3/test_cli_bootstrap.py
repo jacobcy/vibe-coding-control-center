@@ -16,9 +16,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_PY = REPO_ROOT / "src" / "vibe3" / "cli.py"

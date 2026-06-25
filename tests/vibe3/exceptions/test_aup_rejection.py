@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,7 +12,6 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import AgentExecutionError
 from vibe3.exceptions.error_classification import (
     E_AUP_REJECTION,
-    classify_error,
     classify_error_hybrid,
     get_error_handling_contract,
 )
@@ -50,7 +48,7 @@ class TestAUPRejectionClassification:
     """Test AUP rejection error classification."""
 
     def test_aup_rejection_is_warning_no_failed_gate(self) -> None:
-        """Verify WARNING severity, gate_action='ignore', counts_toward_threshold=False."""
+        """Verify WARNING severity, gate_action=ignore, no threshold count."""
         contract = get_error_handling_contract(E_AUP_REJECTION)
 
         assert contract.severity == ErrorSeverity.WARNING
@@ -60,7 +58,7 @@ class TestAUPRejectionClassification:
         assert contract.max_retries == 3
 
     def test_aup_rejection_hybrid_classification(self) -> None:
-        """Verify classify_error_hybrid() with an AgentExecutionError containing AUP text."""
+        """Verify classify_error_hybrid() with AgentExecutionError + AUP text."""
         exc = AgentExecutionError(
             "API Error: Claude Code is unable to respond to this request, "
             "which appears to violate our Usage Policy"
@@ -137,9 +135,7 @@ class TestAUPRejectionRetryCounter:
         # Verify flow is still NOT blocked (threshold not reached)
         assert state.get("flow_status") == "active"
 
-    def test_aup_third_rejection_blocks_flow(
-        self, temp_store: SQLiteClient
-    ) -> None:
+    def test_aup_third_rejection_blocks_flow(self, temp_store: SQLiteClient) -> None:
         """Verify counter = 3, flow_status = 'blocked', blocked_reason populated."""
         branch = "test-branch"
 

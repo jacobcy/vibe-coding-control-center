@@ -266,10 +266,7 @@ def persist_execution_lifecycle_event(
         if error_contract and error_contract.issue_action == "record_only":
             # Only record timeline event, no state modifications
             pass
-        elif (
-            error_contract
-            and error_contract.issue_action == "block_after_retries"
-        ):
+        elif error_contract and error_contract.issue_action == "block_after_retries":
             # Defer state updates to the retry handler in codeagent_runner
             pass
         else:

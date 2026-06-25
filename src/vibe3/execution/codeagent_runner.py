@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -484,7 +485,7 @@ class CodeagentExecutionService:
                     "aup_rejection_count", 0
                 )
                 count = int(raw_count) + 1 if raw_count is not None else 1
-                now_iso = __import__("datetime").datetime.now().isoformat()
+                now_iso = datetime.now().isoformat()
                 ctx.store.update_flow_state(
                     ctx.branch,
                     aup_rejection_count=count,

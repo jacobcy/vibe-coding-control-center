@@ -105,16 +105,17 @@ class TestClassifyErrorUnchanged:
 
     def test_aup_rejection_usage_policy(self) -> None:
         """Test AUP rejection classification."""
-        assert classify_error(
-            "API Error: Claude Code is unable to respond to this request, "
-            "which appears to violate our Usage Policy"
-        ) == E_AUP_REJECTION
+        assert (
+            classify_error(
+                "API Error: Claude Code is unable to respond to this request, "
+                "which appears to violate our Usage Policy"
+            )
+            == E_AUP_REJECTION
+        )
 
     def test_aup_rejection_violate_policy(self) -> None:
         """Test AUP rejection classification variant."""
-        assert classify_error(
-            "violate our usage policy"
-        ) == E_AUP_REJECTION
+        assert classify_error("violate our usage policy") == E_AUP_REJECTION
 
 
 class TestIsPermanentCodeError:

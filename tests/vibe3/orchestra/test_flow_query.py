@@ -1,6 +1,7 @@
 """Tests for FlowManager query operations."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
