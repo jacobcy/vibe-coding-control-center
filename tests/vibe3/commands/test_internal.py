@@ -290,7 +290,6 @@ def test_internal_bootstrap_dispatch() -> None:
                                     "123",
                                     "--branch",
                                     "dev/issue-123",
-                                    "--worktree",
                                     "--related",
                                     "456",
                                     "--dependency",

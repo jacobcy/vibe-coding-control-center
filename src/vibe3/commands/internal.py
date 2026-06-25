@@ -233,13 +233,6 @@ def internal_bootstrap(
             help="Target flow branch (defaults to dev/issue-<id>)",
         ),
     ] = None,
-    use_worktree: Annotated[
-        bool,
-        typer.Option(
-            "--worktree",
-            help="Resolve or create worktree context for the target branch",
-        ),
-    ] = False,
     related_issue_numbers: Annotated[
         list[int] | None,
         typer.Option("--related", help="Bind additional related issue number"),
@@ -268,7 +261,14 @@ def internal_bootstrap(
         ),
     ] = False,
 ) -> None:
-    """Bootstrap a standardized flow scene through the shared service path."""
+    """Bootstrap a standardized flow scene through the shared service path.
+
+    Always creates a worktree for isolation: the standard path runs flow
+    creation, baseline snapshot, and handoff init inside the worktree so
+    concurrent bootstrap operations cannot leak file changes between flows.
+    Users who want a non-worktree flow should run `git checkout -b` manually
+    and skip bootstrap (no baseline will be created in that case).
+    """
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.orchestra import FlowOrchestratorService
 
@@ -296,7 +296,7 @@ def internal_bootstrap(
         slug=f"issue-{issue_info.number}",
         source=source,
         actor="system:bootstrap",
-        ensure_worktree=use_worktree,
+        ensure_worktree=True,
         reactivate_existing=reactivate_existing,
         related_issue_numbers=tuple(related_issue_numbers or ()),
         dependency_issue_numbers=tuple(dependency_issue_numbers or ()),

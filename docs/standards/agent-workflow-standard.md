@@ -160,7 +160,8 @@ codeagent-wrapper cleanup
 **推荐流程**：
 ```bash
 # 1. 使用 internal bootstrap 创建并注册 flow (自动完成 git checkout + flow update + bind)
-vibe3 internal bootstrap <issue_number> --branch feature/api-v2 --worktree
+#    Worktree 是强制的：bootstrap 总是创建隔离的 worktree 用于 flow/baseline/handoff
+vibe3 internal bootstrap <issue_number> --branch feature/api-v2
 
 # 2. 创建 plan
 vibe3 plan --branch <issue_number>
