@@ -15,6 +15,8 @@ from vibe3.roles.supervisor import (
     SUPERVISOR_APPLY_ROLE,
     SUPERVISOR_IDENTIFY_ROLE,
     build_supervisor_apply_request,
+    build_supervisor_cli_request,
+    build_supervisor_cli_sync_request,
     build_supervisor_handoff_payload,
     build_supervisor_task_string,
     get_supervisor_prompt_path,
@@ -73,7 +75,7 @@ class TestSupervisorRoleDefinitions:
     def test_apply_role(self):
         assert SUPERVISOR_APPLY_ROLE.name == "supervisor-apply"
         assert SUPERVISOR_APPLY_ROLE.registry_role == "supervisor"
-        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.NONE
+        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.TEMPORARY
 
 
 class TestBuildSupervisorTaskString:
@@ -413,10 +415,10 @@ class TestBuildSupervisorApplyRequest:
         assert req.role == "supervisor"
         assert req.target_branch == "task/issue-42"
         assert req.target_id == 42
-        # cwd is not set — coordinator resolves it via worktree_requirement=NONE
+        # cwd is not set — coordinator resolves it via worktree_requirement=TEMPORARY
         assert req.cwd is None
         assert req.mode == "async"
-        assert req.worktree_requirement == WorktreeRequirement.NONE
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
 
     @patch(
         "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
@@ -427,6 +429,71 @@ class TestBuildSupervisorApplyRequest:
         req = build_supervisor_apply_request(config, 42)
         assert req.env is not None
         assert req.env.get("VIBE3_ASYNC_CHILD") == "1"
+
+
+class TestBuildSupervisorCliRequest:
+    """Tests for build_supervisor_cli_request (async CLI invocation)."""
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_cli_request_uses_temporary_worktree(self, mock_opts):
+        """Async CLI invocation must use TEMPORARY worktree for isolation."""
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        req = build_supervisor_cli_request(config, 42, "Fix docs")
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
+        assert req.target_id == 42
+
+
+class TestBuildSupervisorCliSyncRequest:
+    """Tests for build_supervisor_cli_sync_request (sync CLI invocation)."""
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_sync_request_uses_temporary_worktree_when_not_dry_run(self, mock_opts):
+        """Sync execution path must use TEMPORARY worktree for isolation."""
+        from vibe3.models import IssueInfo
+
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        issue = IssueInfo(number=42, title="Fix docs", labels=[])
+        req = build_supervisor_cli_sync_request(
+            config,
+            issue,
+            "task/issue-42",
+            None,
+            None,
+            None,
+            "cli",
+            dry_run=False,
+            show_prompt=False,
+        )
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_sync_request_skips_worktree_when_dry_run(self, mock_opts):
+        """Dry-run mode must not create a real worktree."""
+        from vibe3.models import IssueInfo
+
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        issue = IssueInfo(number=42, title="Fix docs", labels=[])
+        req = build_supervisor_cli_sync_request(
+            config,
+            issue,
+            "task/issue-42",
+            None,
+            None,
+            None,
+            "cli",
+            dry_run=True,
+            show_prompt=False,
+        )
+        assert req.worktree_requirement == WorktreeRequirement.NONE
 
 
 class TestSupervisorIdentifiedEvents:

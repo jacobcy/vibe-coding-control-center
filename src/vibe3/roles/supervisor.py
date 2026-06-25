@@ -21,6 +21,7 @@ from vibe3.models import (
     IssueInfo,
     OrchestraConfig,
     SupervisorIssueIdentified,
+    WorktreeRequirement,
 )
 from vibe3.prompts import (
     DEFAULT_PROMPTS_PATH,
@@ -204,10 +205,13 @@ def build_supervisor_cli_request(
     branch: str | None = None,
     actor: str = "cli:supervisor",
 ) -> ExecutionRequest:
-    """Build supervisor apply request for CLI-driven invocation (no temp worktree).
+    """Build supervisor apply request for CLI-driven invocation.
 
-    Used by the `internal apply` command where the user explicitly invokes
-    the supervisor in their current workspace.
+    Used by the `internal apply` command. ExecutionCoordinator acquires
+    a temporary worktree (.worktrees/tmp/{issue_number}) based on
+    worktree_requirement=TEMPORARY (SUPERVISOR_APPLY_ROLE), isolating
+    concurrent supervisor apply tasks from each other and from the
+    parent process cwd.
 
     Args:
         config: Orchestra configuration
@@ -216,7 +220,7 @@ def build_supervisor_cli_request(
         actor: Actor string for lifecycle tracking
 
     Returns:
-        ExecutionRequest with worktree_requirement=NONE for CLI use.
+        ExecutionRequest with worktree_requirement=TEMPORARY.
     """
     import os
 
@@ -242,7 +246,7 @@ def build_supervisor_cli_request(
         refs={"task": task, "issue_number": str(issue_number)},
         actor=actor,
         mode="async",
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
+        worktree_requirement=SUPERVISOR_APPLY_ROLE.worktree,
     )
 
 
@@ -291,7 +295,9 @@ def build_supervisor_cli_sync_request(
         mode="sync",
         dry_run=dry_run,
         show_prompt=show_prompt,
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
+        worktree_requirement=(
+            WorktreeRequirement.NONE if dry_run else SUPERVISOR_APPLY_ROLE.worktree
+        ),
     )
 
 
