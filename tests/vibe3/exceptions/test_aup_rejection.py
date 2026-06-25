@@ -157,15 +157,16 @@ class TestAUPRejectionRetryCounter:
         # Verify counter reached threshold
         assert count == 3
 
-        # Simulate the blocking logic
-        from vibe3.services.flow.blocked_state_service import BlockedStateService
+        # Simulate the blocking logic — only write to DB cache, not GitHub.
+        # CI environments lack GitHub credentials, and the test only needs
+        # to verify that the database state correctly reflects the block.
+        from vibe3.services.flow import BlockedStateService
 
         reason = f"AUP rejection threshold reached ({count}/3 attempts)"
         BlockedStateService(store=temp_store).block_state_only(
             branch=branch,
             reason=reason,
             actor="test-actor",
-            issue_number=123,
         )
 
         # Verify flow is blocked
