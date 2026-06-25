@@ -352,7 +352,18 @@ class GlobalDispatchCoordinator:
         return False
 
     def _should_collect_after_dispatch(self, dispatched_count: int) -> bool:
-        """Whether this tick should rebuild active queue candidates."""
+        """Whether this tick should rebuild active queue candidates.
+
+        When dispatch is already paused, always allow collection so that
+        exhausted_refresh can re-verify and maintain the paused state.
+        Without this, a full capacity pool (available_slots <= 0) prevents
+        exhausted_refresh from triggering collection, which causes the
+        exhausted counter to reset — the server never auto-stops.
+        """
+        # If already paused, always collect to maintain paused state verification
+        if self._dispatch_paused:
+            return True
+
         status = self._capacity.get_capacity_status("manager")
         available_slots = status["remaining"]
         if available_slots <= 0:

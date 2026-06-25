@@ -331,6 +331,23 @@ class DispatchQueueMaintenanceService:
                 )
                 return new_frozen_queue, True
             return new_frozen_queue, False
+
+        # When collection was skipped (queue already refreshed this tick),
+        # still re-verify the paused state.  scheduled_refresh uses
+        # _has_dispatchable_entries which is a weaker check than the full
+        # dispatch preflight run by _dispatch_loop.  An entry that passes
+        # _has_dispatchable_entries may still fail dispatch preflight and
+        # be removed from the queue.  If nothing was dispatched and the
+        # queue now has no truly dispatchable entries, the pool is exhausted.
+        if dispatched_count == 0 and queue_refreshed:
+            has_dispatchable = self._has_dispatchable_entries(frozen_queue)
+            if not has_dispatchable and dispatch_paused is False:
+                self._emit_event(
+                    "dispatcher",
+                    "GlobalDispatchCoordinator: dispatch paused "
+                    "(no actionable entries after queue cleanup)",
+                )
+                return frozen_queue, True
         return frozen_queue, dispatch_paused
 
     async def consume_queue_dirty_signal(
