@@ -502,9 +502,7 @@ class CodeagentExecutionService:
 
                 max_retries = getattr(error_contract, "max_retries", None) or 3
                 if count >= max_retries:
-                    from vibe3.services.flow.blocked_state_service import (
-                        BlockedStateService,
-                    )
+                    from vibe3.services.flow import BlockedStateService
 
                     reason = (
                         f"AUP rejection threshold reached "

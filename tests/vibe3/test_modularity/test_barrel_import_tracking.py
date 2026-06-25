@@ -92,7 +92,8 @@ def test_exceptions_barrel_import_count() -> None:
 
     # Baseline established at issue #2848, updated to 162 after rebase onto main
     # Updated to 163 for issue #3072 (actor resolution in dry-run headers)
-    baseline = 163
+    # Updated to 164 for issue #3099 (E_AUP_REJECTION added to exceptions barrel)
+    baseline = 164
 
     # Hard gate: prevent growth beyond baseline
     assert len(imports) <= baseline, (
