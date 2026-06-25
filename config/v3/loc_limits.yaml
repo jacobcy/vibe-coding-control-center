@@ -104,8 +104,8 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
       - path: "src/vibe3/commands/scan.py"
-        limit: 480
-        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines)"
+        limit: 500
+        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines); Issue #3155 review follow-up expanded _run_supervisor_scan docstring to clarify dispatched_count semantics (+6 lines)"
       - path: "src/vibe3/commands/handoff_write.py"
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
@@ -117,8 +117,8 @@ code_limits:
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
-        limit: 565
-        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）"
+        limit: 580
+        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）；Issue #3155 review follow-up 扩展 force_baseline docstring，点明 baseline 幂等行为与 worktree context 前置条件（+4 行）"
       - path: "src/vibe3/services/orchestra/serve_status.py"
         limit: 530
         reason: "Serve status data aggregation for API endpoint and CLI display, includes daemon status, heartbeat, dispatch activity, FailedGate, error tracking, and job monitoring data; uses dynamic imports to avoid upward dependency and circular dependency detection (Issue #2787)"
