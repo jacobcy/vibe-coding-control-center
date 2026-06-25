@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions import AgentExecutionError
-from vibe3.exceptions.error_classification import (
+from vibe3.exceptions import (
     E_AUP_REJECTION,
+    AgentExecutionError,
+    ErrorSeverity,
     classify_error_hybrid,
     get_error_handling_contract,
 )
-from vibe3.exceptions.error_severity import ErrorSeverity
 
 if TYPE_CHECKING:
     pass

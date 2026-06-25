@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         is_permanent_code_error,
     )
     from vibe3.exceptions.error_codes import (
+        E_AUP_REJECTION,
         E_EXEC_AUTO_SCENE_RESET,
         is_api_error,
         is_model_error,
@@ -236,6 +237,7 @@ class InvalidBranchLinkError(SystemError):
 
 # Lazy imports to avoid circular dependencies
 _LAZY_IMPORTS = {
+    "E_AUP_REJECTION": "vibe3.exceptions.error_codes",
     "E_EXEC_AUTO_SCENE_RESET": "vibe3.exceptions.error_codes",
     "E_ISSUE_FAILED": "vibe3.exceptions.error_codes",
     "ErrorHandlingContract": "vibe3.exceptions.error_severity",
@@ -268,6 +270,7 @@ __all__ = [
     "CapacityDeferredError",
     "ConfigError",
     "DiagnosticContext",
+    "E_AUP_REJECTION",
     "E_EXEC_AUTO_SCENE_RESET",
     "E_ISSUE_FAILED",
     "ErrorHandlingContract",

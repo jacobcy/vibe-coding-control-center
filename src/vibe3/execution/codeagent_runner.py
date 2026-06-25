@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -479,18 +480,25 @@ class CodeagentExecutionService:
             # Get handling contract for severity-aware behavior
             error_contract = get_error_handling_contract(error_code)
 
-            # AUP rejection: increment counter, block if threshold reached
+            # AUP rejection: atomically increment counter, block if threshold reached
             if error_code == "E_AUP_REJECTION" and ctx.branch and ctx.store:
-                raw_count = (ctx.store.get_flow_state(ctx.branch) or {}).get(
-                    "aup_rejection_count", 0
-                )
-                count = int(raw_count) + 1 if raw_count is not None else 1
                 now_iso = datetime.now().isoformat()
-                ctx.store.update_flow_state(
-                    ctx.branch,
-                    aup_rejection_count=count,
-                    last_aup_rejection_at=now_iso,
-                )
+
+                # Atomic UPDATE to avoid read-modify-write race condition
+                # when concurrent dispatches trigger AUP rejection simultaneously
+                with sqlite3.connect(ctx.store.db_path) as conn:
+                    conn.execute(
+                        "UPDATE flow_state SET "
+                        "aup_rejection_count = COALESCE(aup_rejection_count, 0) + 1, "
+                        "last_aup_rejection_at = ? "
+                        "WHERE branch = ?",
+                        (now_iso, ctx.branch),
+                    )
+                    row = conn.execute(
+                        "SELECT aup_rejection_count FROM flow_state WHERE branch = ?",
+                        (ctx.branch,),
+                    ).fetchone()
+                    count = row[0] if row else 1
 
                 max_retries = getattr(error_contract, "max_retries", None) or 3
                 if count >= max_retries:
@@ -509,14 +517,18 @@ class CodeagentExecutionService:
                             actor=ctx.actor,
                             issue_number=command.issue_number,
                         )
+                        log.error(f"AUP rejection blocked flow: {reason}")
                     except Exception as block_exc:
                         log.bind(
                             domain="codeagent",
                             role=command.role,
                             issue_number=command.issue_number,
-                        ).error(f"Failed to block flow on AUP rejection: {block_exc}")
+                        ).error(
+                            f"AUP block partially failed "
+                            f"(DB cached, body/label may not be updated): "
+                            f"{block_exc}"
+                        )
 
-                    log.error(f"AUP rejection blocked flow: {reason}")
                     raise  # Still raise to propagate to coordinator
                 else:
                     log.warning(
