@@ -1,6 +1,8 @@
 # Vibe Coding 团队工程范式
 
 > 术语说明：本文定义的是文档流程层级，不是共享状态或运行时系统术语。`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等正式语义以 [glossary.md](glossary.md) 为准。
+>
+> V3 flow 执行模型说明：本文描述的 `Plan → Spec → Execution Plan → Test → Code → AI Audit Review` 方法论定义的是团队工程范式与质量策略。该策略在 V3 中通过 **Flow/Task** 生命周期（`vibe3 flow`、`vibe3 task`）实现编排，由 T1/T2/T3 三层架构承载执行。具体运行时术语（Flow、Task、Tier 1/2/3、state/*）以 [glossary.md](glossary.md) 和 [v3/command-standard.md](v3/command-standard.md) 的正式定义为准。
 
 `Plan` → `Spec` → `Execution Plan` → `Test` → `Code` → `AI Audit Review`
 

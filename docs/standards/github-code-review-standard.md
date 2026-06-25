@@ -6,8 +6,8 @@ category: standards
 status: active
 version: 1.0
 related_docs:
-  - .github/workflows/label.yml
-  - .github/workflows/code-review.yml
+  - .github/labeler.yml
+  - .github/workflows/ai-pr-review.yml
   - docs/standards/github-labels-standard.md
 ---
 
@@ -23,9 +23,12 @@ related_docs:
 
 | 标签类型 | 审查方式 | 触发条件 |
 |---------|---------|---------|
-| `type/feat` | **Codex AI 审查** | PR 创建或同步时自动触发 |
-| `type/fix` | **Copilot AI 审查** | PR 创建或同步时自动触发 |
-| `type/refactor` | **本地测试** | 自动运行 lint + pytest + bats |
+| `type/feature` + 高影响 scope/component | **Codex AI 审查** | 含 `scope/infrastructure`、`component/cli`、`component/flow` 等核心组件标签时自动触发 |
+| `type/feat` + 高影响 scope/component | **Codex AI 审查** | 同上 |
+| `type/fix` + 高影响 scope/component | **Copilot AI 审查** | 同上 |
+| `type/feature` + 普通范围 | **人工审查** | 不含高影响标签时由人工决定 |
+| `type/fix` + 普通范围 | **人工审查** | 同上 |
+| `type/refactor` | **跳过在线审查** | 已在本地完成 lint + pytest + bats，CI 自动跳过 |
 
 ### ⏸️ 手动审查
 
@@ -63,39 +66,42 @@ chore: 更新依赖版本
 
 ### 2. 自动标签
 
-PR 创建后，Labeler 会根据标题前缀自动添加对应的标签：
+Labeler 会根据 PR 分支名前缀自动添加对应的标签：
 
-- `feat:` → `type/feat`
-- `fix:` → `type/fix`
-- `refactor:` → `type/refactor`
-- `docs:` → `type/docs`
-- `test:` → `type/test`
-- `chore:` → `type/chore`
+| 分支前缀 | 标签 |
+|----------|------|
+| `feat/`, `feature/` | `type/feature` |
+| `fix/`, `bugfix/` | `type/fix` |
+| `refactor/` | `type/refactor` |
+| `docs/`, `documentation/` | `type/docs` |
+| `test/`, `testing/` | `type/test` |
+| `chore/` | `type/chore` |
+| `task/` | `type/task` |
+
+此外，Labeler 还会根据变更文件路径自动附加 `scope/*`、`component/*` 和 `breaking-change` 标签。详见 [labeler.yml](https://github.com/jacobcy/vibe-coding-control-center/blob/main/.github/labeler.yml)。
 
 ### 3. 自动审查流程
 
-根据标签，工作流会自动：
+根据标签组合，`ai-pr-review.yml` 自动裁定审查策略：
 
-#### Codex 审查 (feat)
+#### Codex 审查 (高影响 feature)
 
-1. 自动在 PR 中评论 `@codex review`
-2. Codex Cloud 接收请求并开始审查
-3. Codex 提交代码审查意见
+1. 当 PR 带 `type/feature` 或 `type/feat` + 高影响 scope/component 标签时触发
+2. `determine-strategy` 步骤裁定为 `codex`
+3. `codex-review` job 请求 Codex Cloud 开始审查
+4. Codex 提交代码审查意见
 
-#### Copilot 审查 (fix)
+#### Copilot 审查 (高影响 fix)
 
-1. 自动请求 Copilot 作为审查者
-2. Copilot 开始审查代码
-3. Copilot 提交审查意见
+1. 当 PR 带 `type/fix` + 高影响 scope/component 标签时触发
+2. `determine-strategy` 步骤裁定为 `copilot`
+3. `copilot-review` job 请求 Copilot 作为审查者
+4. Copilot 提交审查意见
 
-#### 本地测试 (refactor)
+#### 跳过在线审查 (refactor)
 
-1. 运行 Shell lint (shellcheck)
-2. 运行 Shell 测试 (bats)
-3. 运行 Python lint (ruff)
-4. 运行 Python 格式检查 (black)
-5. 运行 Python 类型检查 (mypy)
-6. 运行 Python 测试 (pytest)
+1. `determine-strategy` 步骤裁定为 `skip`
+2. CI 假定本地已运行 lint (shellcheck/ruff/black/mypy) 和测试 (bats/pytest)
 
 ---
 
@@ -116,13 +122,13 @@ PR 创建后，Labeler 会根据标题前缀自动添加对应的标签：
 
 ## 工作流文件
 
-### `.github/workflows/label.yml`
+### `.github/labeler.yml`
 
-自动根据 PR 标题添加标签。
+自动根据分支名前缀和文件路径添加标签。
 
-### `.github/workflows/code-review.yml`
+### `.github/workflows/ai-pr-review.yml`
 
-根据标签触发对应的审查策略。
+根据标签组合触发对应的审查策略（支持 `workflow_dispatch` 手动触发）。
 
 ---
 
