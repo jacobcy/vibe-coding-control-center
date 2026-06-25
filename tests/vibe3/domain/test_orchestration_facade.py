@@ -211,3 +211,57 @@ class TestOrchestrationFacade:
         await facade.on_supervisor_scan()
 
         mock_publish.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(
+        "vibe3.roles.supervisor.get_handoff_state_label", return_value="state/handoff"
+    )
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.clients.github_client.GitHubClient.list_issues")
+    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
+    async def test_on_supervisor_scan_throttles_to_max_dispatch_per_tick(
+        self,
+        mock_load_config: MagicMock,
+        mock_list_issues: MagicMock,
+        mock_publish: MagicMock,
+        mock_get_handoff_state_label: MagicMock,
+    ) -> None:
+        """on_supervisor_scan dispatches at most max_dispatch_per_tick events per tick.
+
+        Shares throttle semantics with the manual scan path
+        (commands.scan._run_supervisor_scan) via the shared
+        select_supervisor_events_for_dispatch helper.
+        """
+        mock_load_config.return_value = MagicMock(
+            repo="owner/repo",
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+                interval_ticks=1,
+                max_dispatch_per_tick=1,
+            ),
+        )
+        mock_list_issues.return_value = [
+            {
+                "number": 101,
+                "title": "Issue A",
+                "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+            },
+            {
+                "number": 102,
+                "title": "Issue B",
+                "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+            },
+            {
+                "number": 103,
+                "title": "Issue C",
+                "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+            },
+        ]
+
+        facade = OrchestrationFacade(flow_manager=MagicMock())
+        total, dispatched = await facade.on_supervisor_scan()
+
+        assert mock_publish.call_count == 1
+        assert total == 3
+        assert dispatched == 1

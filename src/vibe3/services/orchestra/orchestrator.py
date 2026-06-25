@@ -144,6 +144,10 @@ class FlowOrchestratorService:
 
         force_baseline forces an overwrite of any existing snapshot baseline
         (used by flow rebuild to discard the stale pre-rebuild baseline).
+        When False (default), baseline creation is idempotent: an existing
+        baseline is preserved rather than overwritten on every bootstrap or
+        reactivation. Baseline is only attempted when a worktree context is
+        established, since the process cwd is unreliable for snapshots.
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
@@ -226,14 +230,18 @@ class FlowOrchestratorService:
                     branch, worktree_path=str(worktree_ctx.path)
                 )
 
-            # Auto-create snapshot baseline on flow creation (best-effort)
-            if not skip_git:
+            # Auto-create snapshot baseline when worktree is established
+            # (best-effort). When ensure_worktree=False, baseline is skipped
+            # because process cwd is unreliable for snapshot context — users
+            # who skip worktree should manage baseline themselves.
+            if not skip_git and worktree_ctx is not None:
                 try:
                     from vibe3.analysis import snapshot_service
 
-                    repo_path = worktree_ctx.path if worktree_ctx else None
                     snapshot_service.save_branch_baseline(
-                        branch, force=True, repo_path=repo_path
+                        branch,
+                        force=force_baseline,
+                        repo_path=worktree_ctx.path,
                     )
                 except Exception:
                     pass

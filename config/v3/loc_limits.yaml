@@ -104,8 +104,8 @@ code_limits:
         limit: 450
         reason: "Plan 命令聚合，包含 spec 解析、sync/async dispatch、CLI 参数处理；新增 --agent/--backend/--model/--fresh-session 参数以匹配 run 命令接口，支持配置覆盖与会话管理后略微超标"
       - path: "src/vibe3/commands/scan.py"
-        limit: 475
-        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines)"
+        limit: 500
+        reason: "Scan command aggregation, covering governance/supervisor/all scan types with dry-run support, prompt composition display, and --show-prompt for full prompt preview with section markers; Issue #3067 extended governance dry-run to support --show-prompt flag (+10 lines); added supervisor --dry-run Prompt Composition display for consistency with governance (+24 lines); Issue #3135 unified display logic (+25 lines); Issue #3155 review follow-up expanded _run_supervisor_scan docstring to clarify dispatched_count semantics (+6 lines)"
       - path: "src/vibe3/commands/handoff_write.py"
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
@@ -117,8 +117,8 @@ code_limits:
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
-        limit: 560
-        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）"
+        limit: 580
+        reason: "Flow orchestrator 服务聚合，包含快照获取、flow 创建（bootstrap_issue_flow、create_flow_for_issue）、placeholder flow 创建（create_placeholder_flow）、PR 状态查询、worktree 管理等紧密耦合的 flow 生命周期管理逻辑；Issue #2621 新增 create_placeholder_flow 方法支持 blocked issue 入池（+37 行）；PR #2777 新增 merge-base guard 与 fetch/create helper，防止 stale branch 污染新 flow 基线；Issue #2762 新增 baseline auto-create on bootstrap（+10 行）；PR #2790 follow-up 修复 _validate_or_recreate_branch 返回值准确性和 creation_source 记录逻辑（+16 行，新增 branch_based_on_scene 状态追踪与 _validate_or_recreate_branch boolean 返回）；Issue #2762 follow-up 新增 force_baseline 参数贯穿 bootstrap_issue_flow，支持 flow rebuild 强制刷新 baseline snapshot（+4 行）；Issue #3155 review follow-up 扩展 force_baseline docstring，点明 baseline 幂等行为与 worktree context 前置条件（+4 行）"
       - path: "src/vibe3/services/orchestra/serve_status.py"
         limit: 530
         reason: "Serve status data aggregation for API endpoint and CLI display, includes daemon status, heartbeat, dispatch activity, FailedGate, error tracking, and job monitoring data; uses dynamic imports to avoid upward dependency and circular dependency detection (Issue #2787)"
@@ -192,6 +192,9 @@ code_limits:
       - path: "src/vibe3/roles/run_command.py"
         limit: 515
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）；Issue #3135 新增 dry_run_summary 构建和 provenance 收集（+90 行）"
+      - path: "src/vibe3/roles/supervisor.py"
+        limit: 425
+        reason: "Supervisor 角色聚合，包含 scan dispatch、apply 请求构建、handoff payload 构建、配置文件解析等紧密耦合的 supervisor 逻辑；Issue #3155 新增 throttled dispatch support 和临时 worktree isolation（+45 行）"
 
       - path: "src/vibe3/exceptions/error_classification.py"
         limit: 450
@@ -295,9 +298,6 @@ code_limits:
       - path: "tests/vibe3/commands/test_plan.py"
         limit: 580
         reason: "Plan command 测试集，覆盖 branch/issue/spec 多入口、dry_run、show_prompt、model/backend/agent/fresh_session 参数传递、config-backend + CLI-model 集成验证等紧密耦合场景；EDA 架构迁移后新增 lazy import cache mock 路径修复、_ensure_lazy_imports_populated 隔离辅助函数等（+105 行）"
-      - path: "tests/vibe3/commands/test_scan.py"
-        limit: 710
-        reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行），refactor 新增 async skip/throttled display 测试（+25 行）"
       - path: "tests/vibe3/commands/test_review.py"
         limit: 533
         reason: "Review command 测试集，覆盖 dry_run、show_prompt、base/branch review、exit codes、context builder、CLI option 传递、async dispatch 等紧密耦合场景；Issue #3135 新增 unified display 和 async dispatch 测试（+130 行）"
@@ -455,9 +455,6 @@ code_limits:
       - path: "tests/vibe3/domain/test_dispatch_coordinator.py"
         limit: 550
         reason: "GlobalDispatchCoordinator domain layer migration 测试集，覆盖 constructor DI verification、coordinate dispatch flow、queue lifecycle management、issue state handling、pool exhaustion detection 等紧密耦合场景；与源文件 dispatch_coordinator.py（limit 800）对应，测试 domain-first architecture 迁移后的协调器契约；PR #3101 新增 aborted flow exclusion 测试验证 pool exhaustion detection（+102 行含 integration test）"
-      - path: "tests/vibe3/roles/test_supervisor.py"
-        limit: 500
-        reason: "Supervisor role test suite covering handoff payload construction, task string generation, apply request building, identified events filtering, and profile resolution. Issue #3067 added annotate_sections parameter tests (2 tests, +186 LOC) to validate section marker wrapping. Original 293 + 186 = 479 LOC, exceeds limit by 79 lines."
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"

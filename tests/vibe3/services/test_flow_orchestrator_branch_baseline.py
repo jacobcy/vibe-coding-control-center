@@ -139,8 +139,13 @@ def test_bootstrap_issue_flow_skip_git_omits_creation_source() -> None:
     git.branch_exists.assert_not_called()
 
 
-def test_bootstrap_issue_flow_default_baseline_is_idempotent() -> None:
-    """Default bootstrap always rebuilds baseline with force=True and repo_path."""
+def test_bootstrap_issue_flow_skips_baseline_without_worktree() -> None:
+    """Bootstrap without worktree skips baseline creation (auto-degrade).
+
+    Rationale: when ensure_worktree=False, process cwd is unreliable for
+    snapshot context. Users who skip worktree should manage baseline
+    themselves via `git checkout -b` + manual snapshot commands.
+    """
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
@@ -160,17 +165,14 @@ def test_bootstrap_issue_flow_default_baseline_is_idempotent() -> None:
             IssueInfo(number=901, title="Default baseline"),
             branch="task/issue-901",
             source="skill",
+            ensure_worktree=False,
         )
 
-    # After fix: bootstrap always forces rebuild and passes repo_path=None
-    # when ensure_worktree is False (default)
-    mock_save_baseline.assert_called_once_with(
-        "task/issue-901", force=True, repo_path=None
-    )
+    mock_save_baseline.assert_not_called()
 
 
-def test_bootstrap_issue_flow_force_baseline_overwrites_existing() -> None:
-    """force_baseline parameter is now redundant - bootstrap always forces rebuild."""
+def test_bootstrap_issue_flow_force_baseline_with_worktree() -> None:
+    """force_baseline controls overwrite semantics when worktree is established."""
     config = load_orchestra_config()
     store = MagicMock()
     git = MagicMock()
@@ -183,18 +185,26 @@ def test_bootstrap_issue_flow_force_baseline_overwrites_existing() -> None:
         return_value=MagicMock(model_dump=lambda: {"branch": "task/issue-902"})
     )
 
-    with patch(
-        "vibe3.analysis.snapshot_service.save_branch_baseline"
-    ) as mock_save_baseline:
+    with (
+        patch("vibe3.services.orchestra.orchestrator.WorktreeManager") as mock_wt_cls,
+        patch(
+            "vibe3.analysis.snapshot_service.save_branch_baseline"
+        ) as mock_save_baseline,
+    ):
+        mock_wt_ctx = MagicMock()
+        mock_wt_ctx.path = "/tmp/worktree-902"
+        mock_wt_cls.return_value.resolve_bootstrap_worktree_context.return_value = (
+            mock_wt_ctx
+        )
+
         service.bootstrap_issue_flow(
             IssueInfo(number=902, title="Force baseline"),
             branch="task/issue-902",
             source="flow:rebuild",
+            ensure_worktree=True,
             force_baseline=True,
         )
 
-    # After fix: bootstrap always uses force=True regardless of force_baseline
-    # and passes repo_path=None when ensure_worktree is False
     mock_save_baseline.assert_called_once_with(
-        "task/issue-902", force=True, repo_path=None
+        "task/issue-902", force=True, repo_path="/tmp/worktree-902"
     )

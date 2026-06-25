@@ -183,6 +183,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "build_supervisor_task_string": "vibe3.roles.supervisor",
     "get_supervisor_prompt_path": "vibe3.roles.supervisor",
     "iter_supervisor_identified_events": "vibe3.roles.supervisor",
+    "select_supervisor_events_for_dispatch": "vibe3.roles.supervisor",
     # governance
     "GOVERNANCE_ROLE": "vibe3.roles.governance",
     "GOVERNANCE_TASK_PROMPT": "vibe3.roles.governance",
@@ -290,6 +291,7 @@ __all__ = [
     "build_supervisor_task_string",
     "get_supervisor_prompt_path",
     "iter_supervisor_identified_events",
+    "select_supervisor_events_for_dispatch",
     # governance (lazy)
     "GOVERNANCE_ROLE",
     "GOVERNANCE_TASK_PROMPT",

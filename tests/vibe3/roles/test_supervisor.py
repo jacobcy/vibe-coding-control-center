@@ -15,7 +15,8 @@ from vibe3.roles.supervisor import (
     SUPERVISOR_APPLY_ROLE,
     SUPERVISOR_IDENTIFY_ROLE,
     build_supervisor_apply_request,
-    build_supervisor_handoff_payload,
+    build_supervisor_cli_request,
+    build_supervisor_cli_sync_request,
     build_supervisor_task_string,
     get_supervisor_prompt_path,
     iter_supervisor_identified_events,
@@ -73,7 +74,7 @@ class TestSupervisorRoleDefinitions:
     def test_apply_role(self):
         assert SUPERVISOR_APPLY_ROLE.name == "supervisor-apply"
         assert SUPERVISOR_APPLY_ROLE.registry_role == "supervisor"
-        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.NONE
+        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.TEMPORARY
 
 
 class TestBuildSupervisorTaskString:
@@ -98,308 +99,6 @@ class TestBuildSupervisorTaskString:
         assert "org/repo" in task
 
 
-class TestBuildSupervisorHandoffPayload:
-    """Tests for build_supervisor_handoff_payload."""
-
-    def test_returns_tuple(self):
-        """After migration, supervisor handoff returns rendered prompt."""
-        config = _make_config()
-        prompt, options, task = build_supervisor_handoff_payload(
-            config, 42, "Test issue"
-        )
-        # Prompt is now rendered from recipe, not mocked
-        assert prompt is not None
-        assert len(prompt) > 0
-        assert options is not None
-        assert "#42" in task
-        assert "Test issue" in task
-
-    def test_default_recipe_renders_runtime_summary(self):
-        """Default provider-backed recipe should render snapshot values."""
-        config = _make_config()
-        prompt, _options, _task = build_supervisor_handoff_payload(
-            config, 42, "Test issue"
-        )
-
-        assert "- Server: running" in prompt
-        assert "- Running issues: 0" in prompt
-        assert "- Suggested issues: 0" in prompt
-        assert "- Active flows: 0" in prompt
-        assert "- Circuit breaker: closed (failures=0)" in prompt
-
-    def test_uses_supervisor_recipe(self, tmp_path, monkeypatch):
-        """After migration, supervisor handoff uses direct recipe."""
-        from vibe3.prompts import manifest
-
-        # Create recipe for supervisor handoff
-        recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text(
-            """
-recipes:
-  supervisor.handoff:
-    kind: template_recipe
-    template_key: orchestra.supervisor.apply
-    variables:
-      supervisor_name:
-        kind: literal
-        value: supervisor/apply.md
-      supervisor_content:
-        kind: literal
-        value: "APPLY BODY"
-      server_status:
-        kind: literal
-        value: running
-      active_count:
-        kind: literal
-        value: "0"
-      active_flows:
-        kind: literal
-        value: "0"
-      active_worktrees:
-        kind: literal
-        value: "0"
-      running_issue_count:
-        kind: literal
-        value: "0"
-      queued_issue_count:
-        kind: literal
-        value: "0"
-      suggested_issue_count:
-        kind: literal
-        value: "0"
-      circuit_breaker_state:
-        kind: literal
-        value: closed
-      circuit_breaker_failures:
-        kind: literal
-        value: "0"
-      issue_list:
-        kind: literal
-        value: ""
-      running_issue_details:
-        kind: literal
-        value: ""
-      suggested_issue_details:
-        kind: literal
-        value: ""
-      truncated_note:
-        kind: literal
-        value: ""
-""",
-            encoding="utf-8",
-        )
-
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-orchestra:
-  supervisor:
-    apply: |
-      Supervisor: {supervisor_name}
-      Content: {supervisor_content}
-      Status: {server_status}
-""",
-            encoding="utf-8",
-        )
-
-        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-
-        config = _make_config(
-            supervisor_handoff={"prompt_template": "orchestra.supervisor.apply"}
-        )
-        prompt, _options, _task = build_supervisor_handoff_payload(
-            config, 42, "Test issue", prompts_path=prompts_path
-        )
-
-        assert "APPLY BODY" in prompt
-
-    def test_annotate_sections_wraps_prompt_with_markers(self, tmp_path, monkeypatch):
-        """annotate_sections=True wraps prompt with section markers."""
-        from vibe3.prompts import manifest
-
-        recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text(
-            """
-recipes:
-  supervisor.handoff:
-    kind: template_recipe
-    template_key: orchestra.supervisor.apply
-    variables:
-      supervisor_name:
-        kind: literal
-        value: supervisor/apply.md
-      supervisor_content:
-        kind: literal
-        value: "APPLY BODY"
-      server_status:
-        kind: literal
-        value: running
-      active_count:
-        kind: literal
-        value: "0"
-      active_flows:
-        kind: literal
-        value: "0"
-      active_worktrees:
-        kind: literal
-        value: "0"
-      running_issue_count:
-        kind: literal
-        value: "0"
-      queued_issue_count:
-        kind: literal
-        value: "0"
-      suggested_issue_count:
-        kind: literal
-        value: "0"
-      circuit_breaker_state:
-        kind: literal
-        value: closed
-      circuit_breaker_failures:
-        kind: literal
-        value: "0"
-      issue_list:
-        kind: literal
-        value: ""
-      running_issue_details:
-        kind: literal
-        value: ""
-      suggested_issue_details:
-        kind: literal
-        value: ""
-      truncated_note:
-        kind: literal
-        value: ""
-""",
-            encoding="utf-8",
-        )
-
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-orchestra:
-  supervisor:
-    apply: |
-      Supervisor: {supervisor_name}
-      Content: {supervisor_content}
-""",
-            encoding="utf-8",
-        )
-
-        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-
-        config = _make_config(
-            supervisor_handoff={"prompt_template": "orchestra.supervisor.apply"}
-        )
-
-        # Test with annotate_sections=True
-        prompt, _options, _task = build_supervisor_handoff_payload(
-            config,
-            42,
-            "Test issue",
-            prompts_path=prompts_path,
-            annotate_sections=True,
-        )
-
-        # Verify section markers wrap the prompt
-        assert "<!-- section:supervisor.handoff -->" in prompt
-        assert "<!-- /section:supervisor.handoff -->" in prompt
-        assert prompt.startswith("<!-- section:supervisor.handoff -->")
-        assert prompt.endswith("<!-- /section:supervisor.handoff -->")
-
-    def test_annotate_sections_false_no_markers(self, tmp_path, monkeypatch):
-        """annotate_sections=False does not add section markers."""
-        from vibe3.prompts import manifest
-
-        recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text(
-            """
-recipes:
-  supervisor.handoff:
-    kind: template_recipe
-    template_key: orchestra.supervisor.apply
-    variables:
-      supervisor_name:
-        kind: literal
-        value: supervisor/apply.md
-      supervisor_content:
-        kind: literal
-        value: "APPLY BODY"
-      server_status:
-        kind: literal
-        value: running
-      active_count:
-        kind: literal
-        value: "0"
-      active_flows:
-        kind: literal
-        value: "0"
-      active_worktrees:
-        kind: literal
-        value: "0"
-      running_issue_count:
-        kind: literal
-        value: "0"
-      queued_issue_count:
-        kind: literal
-        value: "0"
-      suggested_issue_count:
-        kind: literal
-        value: "0"
-      circuit_breaker_state:
-        kind: literal
-        value: closed
-      circuit_breaker_failures:
-        kind: literal
-        value: "0"
-      issue_list:
-        kind: literal
-        value: ""
-      running_issue_details:
-        kind: literal
-        value: ""
-      suggested_issue_details:
-        kind: literal
-        value: ""
-      truncated_note:
-        kind: literal
-        value: ""
-""",
-            encoding="utf-8",
-        )
-
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(
-            """
-orchestra:
-  supervisor:
-    apply: |
-      Supervisor: {supervisor_name}
-      Content: {supervisor_content}
-""",
-            encoding="utf-8",
-        )
-
-        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-
-        config = _make_config(
-            supervisor_handoff={"prompt_template": "orchestra.supervisor.apply"}
-        )
-
-        # Test with annotate_sections=False (default)
-        prompt, _options, _task = build_supervisor_handoff_payload(
-            config,
-            42,
-            "Test issue",
-            prompts_path=prompts_path,
-            annotate_sections=False,
-        )
-
-        # Verify no section markers
-        assert "<!-- section:supervisor.handoff -->" not in prompt
-        assert "<!-- /section:supervisor.handoff -->" not in prompt
-
-
 class TestBuildSupervisorApplyRequest:
     """Tests for build_supervisor_apply_request."""
 
@@ -413,10 +112,10 @@ class TestBuildSupervisorApplyRequest:
         assert req.role == "supervisor"
         assert req.target_branch == "task/issue-42"
         assert req.target_id == 42
-        # cwd is not set — coordinator resolves it via worktree_requirement=NONE
+        # cwd is not set — coordinator resolves it via worktree_requirement=TEMPORARY
         assert req.cwd is None
         assert req.mode == "async"
-        assert req.worktree_requirement == WorktreeRequirement.NONE
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
 
     @patch(
         "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
@@ -427,6 +126,71 @@ class TestBuildSupervisorApplyRequest:
         req = build_supervisor_apply_request(config, 42)
         assert req.env is not None
         assert req.env.get("VIBE3_ASYNC_CHILD") == "1"
+
+
+class TestBuildSupervisorCliRequest:
+    """Tests for build_supervisor_cli_request (async CLI invocation)."""
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_cli_request_uses_temporary_worktree(self, mock_opts):
+        """Async CLI invocation must use TEMPORARY worktree for isolation."""
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        req = build_supervisor_cli_request(config, 42, "Fix docs")
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
+        assert req.target_id == 42
+
+
+class TestBuildSupervisorCliSyncRequest:
+    """Tests for build_supervisor_cli_sync_request (sync CLI invocation)."""
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_sync_request_uses_temporary_worktree_when_not_dry_run(self, mock_opts):
+        """Sync execution path must use TEMPORARY worktree for isolation."""
+        from vibe3.models import IssueInfo
+
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        issue = IssueInfo(number=42, title="Fix docs", labels=[])
+        req = build_supervisor_cli_sync_request(
+            config,
+            issue,
+            "task/issue-42",
+            None,
+            None,
+            None,
+            "cli",
+            dry_run=False,
+            show_prompt=False,
+        )
+        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
+
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
+    def test_sync_request_skips_worktree_when_dry_run(self, mock_opts):
+        """Dry-run mode must not create a real worktree."""
+        from vibe3.models import IssueInfo
+
+        mock_opts.return_value = MagicMock()
+        config = _make_config()
+        issue = IssueInfo(number=42, title="Fix docs", labels=[])
+        req = build_supervisor_cli_sync_request(
+            config,
+            issue,
+            "task/issue-42",
+            None,
+            None,
+            None,
+            "cli",
+            dry_run=True,
+            show_prompt=False,
+        )
+        assert req.worktree_requirement == WorktreeRequirement.NONE
 
 
 class TestSupervisorIdentifiedEvents:
