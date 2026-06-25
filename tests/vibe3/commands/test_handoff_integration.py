@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.services.task.show import TaskCommentSummary
+from vibe3.services.task import TaskCommentSummary
 
 runner = CliRunner()
 
@@ -74,9 +74,7 @@ class TestHandoffInitIssueContext:
         mock_handoff.storage.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_handoff_cls.return_value = mock_handoff
 
-        result = runner.invoke(
-            app, ["handoff", "init", "--branch", "task/test-branch"]
-        )
+        result = runner.invoke(app, ["handoff", "init", "--branch", "task/test-branch"])
 
         assert result.exit_code == 0
         # Verify issue context was appended (summary + human comment + CI status)
@@ -110,9 +108,7 @@ class TestHandoffInitIssueContext:
         mock_handoff.storage.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_handoff_cls.return_value = mock_handoff
 
-        result = runner.invoke(
-            app, ["handoff", "init", "--branch", "task/test-branch"]
-        )
+        result = runner.invoke(app, ["handoff", "init", "--branch", "task/test-branch"])
 
         # Non-critical failure: should still succeed
         assert result.exit_code == 0
@@ -142,9 +138,7 @@ class TestHandoffInitIssueContext:
         mock_handoff.storage.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_handoff_cls.return_value = mock_handoff
 
-        result = runner.invoke(
-            app, ["handoff", "init", "--branch", "task/test-branch"]
-        )
+        result = runner.invoke(app, ["handoff", "init", "--branch", "task/test-branch"])
 
         # Non-critical failure: should still succeed
         assert result.exit_code == 0
@@ -162,6 +156,4 @@ class TestHandoffInitIssueContext:
             )
 
             # Should complete without error
-            init(
-                force=False, branch="task/test-branch", trace=False, _quiet=True
-            )
+            init(force=False, branch="task/test-branch", trace=False, _quiet=True)
