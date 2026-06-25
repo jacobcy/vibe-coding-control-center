@@ -48,6 +48,8 @@ class SQLiteFlowStateRepo(_HasConnection):
         "creation_source",  # Static branch creation source (e.g., "origin/main")
         "noop_gate_github_retry_count",  # GitHub API retry counter
         "noop_gate_malformed_retry_count",  # Malformed response retry counter
+        "aup_rejection_count",  # AUP rejection retry counter
+        "last_aup_rejection_at",  # Last AUP rejection timestamp
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:

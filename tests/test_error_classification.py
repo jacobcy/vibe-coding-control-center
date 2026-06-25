@@ -7,6 +7,7 @@ from vibe3.exceptions.error_classification import (
     E_API_NETWORK,
     E_API_RATE_LIMIT,
     E_API_TIMEOUT,
+    E_AUP_REJECTION,
     E_EXEC_UNKNOWN,
     E_MODEL_CONFIG,
     E_MODEL_NOT_FOUND,
@@ -101,6 +102,19 @@ class TestClassifyErrorUnchanged:
     def test_unknown(self) -> None:
         """Test unknown error classification."""
         assert classify_error("something random") == E_EXEC_UNKNOWN
+
+    def test_aup_rejection_usage_policy(self) -> None:
+        """Test AUP rejection classification."""
+        assert classify_error(
+            "API Error: Claude Code is unable to respond to this request, "
+            "which appears to violate our Usage Policy"
+        ) == E_AUP_REJECTION
+
+    def test_aup_rejection_violate_policy(self) -> None:
+        """Test AUP rejection classification variant."""
+        assert classify_error(
+            "violate our usage policy"
+        ) == E_AUP_REJECTION
 
 
 class TestIsPermanentCodeError:

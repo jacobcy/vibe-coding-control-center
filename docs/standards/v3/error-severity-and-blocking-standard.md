@@ -191,6 +191,11 @@ Minimum required fields:
 - `issue_action`
 - `gate_action`
 
+`issue_action` values:
+
+- `record_only`: Record the error in logs/timeline, but do not modify flow state. Used for runtime diagnostics and infrastructure errors.
+- `block_after_retries`: Increment a retry counter; block the flow when threshold is reached. Used for transient content policy rejections.
+
 Prefix-only policies are forbidden for gate behavior.
 
 Forbidden examples:
@@ -254,6 +259,7 @@ These must remain distinguishable.
 
 - `E_EXEC_NO_OUTPUT`
 - `E_CAPACITY_SKIP`
+- `E_AUP_REJECTION`
 
 ### 8.4 Remaining `E_EXEC_*`
 

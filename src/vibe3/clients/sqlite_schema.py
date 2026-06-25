@@ -325,6 +325,18 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 f"Added {col} column to flow_state"
             )
 
+    # Migration: add AUP rejection counter fields
+    aup_columns = {
+        "aup_rejection_count": "INTEGER DEFAULT 0",
+        "last_aup_rejection_at": "TEXT",
+    }
+    for col, col_type in aup_columns.items():
+        if col not in existing:
+            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} {col_type}")
+            logger.bind(external="sqlite", operation="migration").info(
+                f"Added {col} column to flow_state"
+            )
+
     # Migration: add indicate_ref column for indicate handoff tracking
     if "indicate_ref" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN indicate_ref TEXT")
@@ -409,6 +421,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "E_CAPACITY_": "WARNING",
             "E_DISPATCH_CODE": "ERROR",  # Permanent code bugs (before E_DISPATCH_)
             "E_DISPATCH_": "WARNING",  # E_DISPATCH_FAILURE (transient infra)
+            "E_AUP_": "WARNING",  # E_AUP_REJECTION
             "E_CONFIG_": "WARNING",  # E_CONFIG_MISSING
             "E_INVALID_": "ERROR",
             "E_ISSUE_": "ERROR",

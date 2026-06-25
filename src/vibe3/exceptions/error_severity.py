@@ -65,6 +65,7 @@ class ErrorHandlingContract(BaseModel):
     counts_toward_threshold: bool
     record_in_error_log: bool
     write_timeline_event: bool
-    issue_action: Literal["record_only"]
+    issue_action: Literal["record_only", "block_after_retries"]
     gate_action: Literal["ignore", "threshold", "immediate"]
+    max_retries: int | None = None
     description: str = ""

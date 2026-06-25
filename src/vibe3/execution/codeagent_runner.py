@@ -477,6 +477,52 @@ class CodeagentExecutionService:
 
             # Get handling contract for severity-aware behavior
             error_contract = get_error_handling_contract(error_code)
+
+            # AUP rejection: increment counter, block if threshold reached
+            if error_code == "E_AUP_REJECTION" and ctx.branch and ctx.store:
+                raw_count = (ctx.store.get_flow_state(ctx.branch) or {}).get(
+                    "aup_rejection_count", 0
+                )
+                count = int(raw_count) + 1 if raw_count is not None else 1
+                now_iso = __import__("datetime").datetime.now().isoformat()
+                ctx.store.update_flow_state(
+                    ctx.branch,
+                    aup_rejection_count=count,
+                    last_aup_rejection_at=now_iso,
+                )
+
+                max_retries = getattr(error_contract, "max_retries", None) or 3
+                if count >= max_retries:
+                    from vibe3.services.flow.blocked_state_service import (
+                        BlockedStateService,
+                    )
+
+                    reason = (
+                        f"AUP rejection threshold reached "
+                        f"({count}/{max_retries} attempts)"
+                    )
+                    try:
+                        BlockedStateService(store=ctx.store).block_state_only(
+                            branch=ctx.branch,
+                            reason=reason,
+                            actor=ctx.actor,
+                            issue_number=command.issue_number,
+                        )
+                    except Exception as block_exc:
+                        log.bind(
+                            domain="codeagent",
+                            role=command.role,
+                            issue_number=command.issue_number,
+                        ).error(f"Failed to block flow on AUP rejection: {block_exc}")
+
+                    log.error(f"AUP rejection blocked flow: {reason}")
+                    raise  # Still raise to propagate to coordinator
+                else:
+                    log.warning(
+                        f"AUP rejection #{count}/{max_retries} "
+                        f"(will block at {max_retries})"
+                    )
+
             agent_metadata = (
                 exc.metadata if isinstance(exc, AgentExecutionError) else None
             )
@@ -550,6 +596,19 @@ class CodeagentExecutionService:
                         f"({error_contract.severity.value}) - "
                         "FailedGate controls dispatch, "
                         "noop_gate checks business progress"
+                    )
+                elif error_contract.issue_action == "block_after_retries":
+                    logger.bind(
+                        domain="codeagent",
+                        role=command.role,
+                        issue_number=command.issue_number,
+                        error_code=error_code,
+                        severity=error_contract.severity.value,
+                    ).info(
+                        f"AUP rejection recorded: {error_code} "
+                        f"({error_contract.severity.value}) - "
+                        "retry counter incremented, flow will block "
+                        "after threshold"
                     )
                 else:
                     # Should not reach here: all runtime errors
