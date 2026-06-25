@@ -76,9 +76,7 @@ def has_manager_assignee(
 # Label constants duplicated from services/shared/labels.py to avoid
 # cross-category imports. Keep these semantics in sync.
 ROADMAP_LIFECYCLE_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
-EXECUTION_STATES = frozenset(
-    {"merge-ready", "review", "in-progress", "claimed"}
-)
+EXECUTION_STATES = frozenset({"merge-ready", "review", "in-progress", "claimed"})
 STATE_PRIORITY_ORDER = (
     "blocked",
     "done",
