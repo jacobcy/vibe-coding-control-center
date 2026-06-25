@@ -4,6 +4,7 @@ from typing import Annotated, Optional
 
 import typer
 from loguru import logger
+from rich.console import Console
 
 from vibe3.commands.command_options import (
     _AGENT_OPT,
@@ -25,7 +26,9 @@ from vibe3.roles import (
     build_base_review_request,
     validate_review_prerequisites,
 )
+from vibe3.roles.review_helpers import ReviewRunResult
 from vibe3.services.flow import FlowService, resolve_branch_arg
+from vibe3.ui import display_review_result
 
 app = typer.Typer(
     name="review",
@@ -50,41 +53,12 @@ _YES_OPT = Annotated[
 ]
 
 
-def _emit_review_result(
-    verdict: str,
-    handoff_file: str | None,
-    backend: str | None = None,
-    model: str | None = None,
-    report_ref: str | None = None,
-    tmux_session: str | None = None,
-    log_path: str | None = None,
-) -> None:
-    """Render review result summary consistently.
-
-    All paths (sync, async, dry-run) use the shared display_codeagent_result
-    for metadata. Real execution additionally shows verdict and handoff file.
-    """
-    from rich.console import Console
-
-    from vibe3.agents import CodeagentResult
-    from vibe3.ui import display_codeagent_result
-
+def _emit_review_result(result: ReviewRunResult) -> None:
+    """Render review result summary consistently using UI layer."""
+    if result.verdict in {"ASYNC", "DRY_RUN"}:
+        return
     console = Console()
-
-    display_result = CodeagentResult(
-        success=verdict not in {"ERROR", "UNKNOWN"},
-        backend=backend,
-        model=model,
-        report_ref=report_ref,
-        tmux_session=tmux_session,
-        log_path=log_path,
-    )
-    display_codeagent_result(console, display_result, "Review")
-
-    if verdict not in {"ASYNC", "DRY_RUN"}:
-        console.print(f"\n=== Verdict: {verdict} ===")
-        if handoff_file:
-            console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
+    display_review_result(console, result)
 
 
 def _check_report_ref(branch: str) -> bool:
@@ -169,16 +143,7 @@ def _review_branch_impl(
     if result is None:
         typer.echo("Review dispatched (async mode)")
     else:
-        report_ref = _resolve_report_ref(branch)
-        _emit_review_result(
-            result.verdict,
-            result.handoff_file,
-            result.backend,
-            result.model,
-            report_ref,
-            result.tmux_session,
-            result.log_path,
-        )
+        _emit_review_result(result)
 
 
 @app.callback(invoke_without_command=True)
@@ -379,15 +344,7 @@ def base(
     if result is None:
         typer.echo("Review dispatched (async mode)")
     else:
-        report_ref = _resolve_report_ref(current_branch)
-        _emit_review_result(
-            result.verdict,
-            result.handoff_file,
-            result.backend,
-            result.model,
-            report_ref=report_ref,
-            tmux_session=result.tmux_session,
-            log_path=result.log_path,
-        )
+        # Sync mode: display result
+        _emit_review_result(result)
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)

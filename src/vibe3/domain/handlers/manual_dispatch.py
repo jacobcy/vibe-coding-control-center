@@ -308,7 +308,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
             effective = resolve_effective_agent_options(options)
 
             # Sync mode
-            run_issue_role_sync(
+            launch_result = run_issue_role_sync(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
                 fresh_session=event.fresh_session,
@@ -319,20 +319,31 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 backend=effective.backend or event.backend,
                 model=effective.model or event.model,
             )
+            # Create result for branch review
+            # Fill backend/model/tmux/log from launch_result when available
+            # (prefer event params as source of truth for CLI override)
+            backend_val = event.backend or (
+                launch_result.backend if launch_result else None
+            )
+            model_val = event.model or (launch_result.model if launch_result else None)
+            tmux_val = launch_result.tmux_session if launch_result else None
+            log_val = launch_result.log_path if launch_result else None
             verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
                 verdict,
                 None,
                 event.issue_number,
-                backend=effective.backend,
-                model=effective.model,
+                tmux_session=tmux_val,
+                log_path=log_val,
+                backend=backend_val,
+                model=model_val,
             )
             # Store for backward compat
             _pending_results["review"] = result
             return result
         else:
             # Async mode
-            launch = run_issue_role_async(
+            launch_result = run_issue_role_async(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
                 spec=REVIEW_SYNC_SPEC,
@@ -342,27 +353,19 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
                 fresh_session=event.fresh_session,
             )
-            resolved_backend = launch.backend if launch else None
-            resolved_model = launch.model if launch else None
-            if not resolved_backend or not resolved_model:
-                from vibe3.execution import resolve_command_agent_options
-
-                options = resolve_command_agent_options(
-                    config=config,
-                    section="review",
-                    agent=event.agent,
-                    backend=event.backend,
-                    model=event.model,
-                )
-                effective = resolve_effective_agent_options(options)
-                resolved_backend = resolved_backend or effective.backend
-                resolved_model = resolved_model or effective.model
+            # Return result with tmux/log/metadata from launch_result
+            backend_val = event.backend or (
+                launch_result.backend if launch_result else None
+            )
+            model_val = event.model or (launch_result.model if launch_result else None)
+            tmux_val = launch_result.tmux_session if launch_result else None
+            log_val = launch_result.log_path if launch_result else None
             return ReviewRunResult(
-                "ASYNC" if launch is None or launch.launched else "ERROR",
+                "ASYNC",
                 None,
                 event.issue_number,
-                tmux_session=launch.tmux_session if launch else None,
-                log_path=launch.log_path if launch else None,
-                backend=resolved_backend,
-                model=resolved_model,
+                tmux_session=tmux_val,
+                log_path=log_val,
+                backend=backend_val,
+                model=model_val,
             )

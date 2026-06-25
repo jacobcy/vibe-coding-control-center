@@ -6,7 +6,7 @@ here for backward compatibility.
 
 from __future__ import annotations
 
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from rich.console import Console
 from rich.table import Table
@@ -17,7 +17,11 @@ from vibe3.prompts import PromptMaterialSpec
 from vibe3.ui.result_display import (  # noqa: F401
     display_codeagent_result,
     display_execution_result,
+    display_review_result,
 )
+
+if TYPE_CHECKING:
+    pass
 
 
 def display_supervisor_dry_run(

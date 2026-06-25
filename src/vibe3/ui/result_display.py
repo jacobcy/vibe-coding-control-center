@@ -9,6 +9,7 @@ from rich.console import Console
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentResult
     from vibe3.models import ExecutionLaunchResult
+    from vibe3.roles.review_helpers import ReviewRunResult
 
 
 def display_codeagent_result(
@@ -97,4 +98,29 @@ def display_execution_result(
     if result.tmux_session:
         console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
 
+    console.print()  # Blank line for readability
+
+
+def display_review_result(
+    console: Console,
+    result: "ReviewRunResult",
+) -> None:
+    """Display ReviewRunResult from review command execution.
+
+    Args:
+        console: Rich Console instance
+        result: ReviewRunResult from review execution
+    """
+    if result.backend:
+        console.print(f"\n[cyan]Backend:[/cyan] {result.backend}")
+    if result.model:
+        console.print(f"[cyan]Model:[/cyan] {result.model}")
+    if result.log_path:
+        console.print(f"[cyan]Log path:[/cyan] {result.log_path}")
+    if result.handoff_file:
+        console.print(f"[cyan]Handoff:[/cyan] {result.handoff_file}")
+    if result.tmux_session:
+        console.print(f"[cyan]Tmux session:[/cyan] {result.tmux_session}")
+
+    console.print(f"\n[bold]=== Verdict: {result.verdict} ===[/bold]")
     console.print()  # Blank line for readability
