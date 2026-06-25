@@ -77,7 +77,7 @@ def has_manager_assignee(
 # cross-category imports. Keep these semantics in sync.
 ROADMAP_LIFECYCLE_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
 EXECUTION_STATES = frozenset(
-    {"merge-ready", "review", "in-progress", "handoff", "claimed"}
+    {"merge-ready", "review", "in-progress", "claimed"}
 )
 STATE_PRIORITY_ORDER = (
     "blocked",
