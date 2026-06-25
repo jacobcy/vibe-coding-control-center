@@ -31,13 +31,17 @@
 supervisor/governance/assignee-pool.md
 supervisor/governance/roadmap-intake.md
 supervisor/governance/cron-supervisor.md
+supervisor/governance/code-auditor.md
+supervisor/governance/audit-observation.md
+supervisor/governance/audit-suggestion.md
+supervisor/governance/audit-report.md
 ```
 
 注意区分：
 
 | 位置 | 类型 | 示例 |
 |------|------|------|
-| `supervisor/governance/<name>.md` | 治理材料 | `assignee-pool.md`, `roadmap-intake.md` |
+| `supervisor/governance/<name>.md` | 治理材料 | `assignee-pool.md`, `roadmap-intake.md`, `cron-supervisor.md`, `code-auditor.md`, `audit-observation.md` |
 | `supervisor/<name>.md` | 通用 supervisor 模板 | `apply.md`, `manager.md` |
 
 通用 supervisor 模板**不是**治理材料，它们通过其他 recipe（如 `manager.default`、`supervisor.handoff`）被加载。

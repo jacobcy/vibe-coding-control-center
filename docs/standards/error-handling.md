@@ -9,6 +9,8 @@
 > `blocked` 语义，不由本文档定义，统一以
 > [error-severity-and-blocking-standard.md](./v3/error-severity-and-blocking-standard.md)
 > 为准。
+>
+> **术语说明**：本文档使用 `Tier 1` / `Tier 2` / `Tier 3` 表示**错误分类层级**（SystemError / UserError / BatchError），与 [glossary.md](./glossary.md) §3 定义的架构分层 `Tier 1 (Shell Layer)` / `Tier 2 (Skill Layer)` / `Tier 3 (Cognitive/Governance Layer)` 是不同的维度。两者独立存在，不应混淆。
 
 ---
 
