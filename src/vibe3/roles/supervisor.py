@@ -251,7 +251,7 @@ def build_supervisor_cli_sync_request(
     issue: IssueInfo,
     branch: str,
     flow_state: dict[str, object] | None,
-    session_id: str | None,
+    _session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
@@ -278,7 +278,7 @@ def build_supervisor_cli_sync_request(
         refs={
             "task": task,
             "issue_number": str(issue.number),
-            **({"session_id": session_id} if session_id else {}),
+            # Supervisor always uses fresh session (no resume)
         },
         env={**os.environ},
         actor=actor,

@@ -73,7 +73,7 @@ class TestSupervisorRoleDefinitions:
     def test_apply_role(self):
         assert SUPERVISOR_APPLY_ROLE.name == "supervisor-apply"
         assert SUPERVISOR_APPLY_ROLE.registry_role == "supervisor"
-        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.TEMPORARY
+        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.NONE
 
 
 class TestBuildSupervisorTaskString:
@@ -413,10 +413,10 @@ class TestBuildSupervisorApplyRequest:
         assert req.role == "supervisor"
         assert req.target_branch == "task/issue-42"
         assert req.target_id == 42
-        # cwd is not set — coordinator resolves it via worktree_requirement=TEMPORARY
+        # cwd is not set — coordinator resolves it via worktree_requirement=NONE
         assert req.cwd is None
         assert req.mode == "async"
-        assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
+        assert req.worktree_requirement == WorktreeRequirement.NONE
 
     @patch(
         "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
