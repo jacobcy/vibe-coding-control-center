@@ -178,7 +178,10 @@ def _run_supervisor_scan() -> tuple[int, int]:
     """Execute supervisor scan once via event bus.
 
     Returns:
-        Tuple of (total_issues_scanned, matched_issues_found)
+        Tuple of (total_issues_scanned, dispatched_count) where
+        dispatched_count is capped by max_dispatch_per_tick and
+        reflects candidates actually dispatched this tick (not the
+        total matched count).
     """
     from vibe3.domain import register_event_handlers
     from vibe3.roles import fetch_supervisor_candidates
@@ -192,6 +195,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
 
     max_per_tick = config.supervisor_handoff.max_dispatch_per_tick
     candidates_to_dispatch = candidates[:max_per_tick]
+    dispatched_count = min(matched_count, max_per_tick)
 
     typer.echo("Supervisor scan completed")
     typer.echo(f"Scanned: {total_scanned} open issues")
@@ -208,7 +212,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
         results = _publish_and_wait_supervisor_events(candidates_to_dispatch)
         _display_execution_results(results)
 
-    return total_scanned, min(matched_count, max_per_tick)
+    return total_scanned, dispatched_count
 
 
 def _run_supervisor_scan_dry_run(show_prompt: bool = False) -> None:

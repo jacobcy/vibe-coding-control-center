@@ -144,6 +144,10 @@ class FlowOrchestratorService:
 
         force_baseline forces an overwrite of any existing snapshot baseline
         (used by flow rebuild to discard the stale pre-rebuild baseline).
+        When False (default), baseline creation is idempotent: an existing
+        baseline is preserved rather than overwritten on every bootstrap or
+        reactivation. Baseline is only attempted when a worktree context is
+        established, since the process cwd is unreliable for snapshots.
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
