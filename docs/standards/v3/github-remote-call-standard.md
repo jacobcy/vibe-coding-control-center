@@ -13,7 +13,7 @@ created: 2026-03-14
 last_updated: 2026-06-03
 related_docs:
   - docs/standards/v3/command-standard.md
-  - docs/standards/vibe3-handoff-store-standard.md
+  - docs/standards/v3/handoff-store-standard.md
   - docs/prds/vibe-session-governance.md
   - .agent/plans/2026-03-14-vibe3-data-model-design.md
 ---
