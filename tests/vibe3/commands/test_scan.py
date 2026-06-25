@@ -217,7 +217,12 @@ class TestFailedGateBlocking:
 
 
 def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
-    """Manual supervisor scan fetches candidates and publishes events."""
+    """Manual supervisor scan fetches candidates and publishes events.
+
+    With default max_dispatch_per_tick=1, only the first candidate is dispatched
+    even when multiple candidates are found. This shares throttle semantics
+    with the heartbeat path (OrchestrationFacade.on_supervisor_scan).
+    """
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
         patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
@@ -241,6 +246,44 @@ def test_supervisor_scan_fetches_candidates_and_publishes_events() -> None:
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
         mock_fetch.assert_called_once()
+        assert mock_publish_and_wait.call_count == 1
+        assert "Throttled" in result.output
+
+
+def test_supervisor_scan_respects_configured_max_per_tick() -> None:
+    """Manual supervisor scan honors configured max_dispatch_per_tick."""
+    from vibe3.models.orchestra_config import (
+        OrchestraConfig,
+        SupervisorHandoffConfig,
+    )
+
+    custom_config = OrchestraConfig.model_construct(
+        supervisor_handoff=SupervisorHandoffConfig(max_dispatch_per_tick=2)
+    )
+
+    with (
+        patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
+        patch("vibe3.commands.scan.load_orchestra_config", return_value=custom_config),
+    ):
+        mock_fetch.return_value = (
+            2,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+                {
+                    "number": 456,
+                    "title": "Issue B",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
+
+        result = runner.invoke(app, ["scan", "supervisor"])
+        assert result.exit_code == 0
         assert mock_publish_and_wait.call_count == 2
 
 
@@ -396,10 +439,24 @@ def test_scan_supervisor_does_not_call_roles_dispatch():
 
 
 def test_supervisor_scan_shows_candidate_list_and_execution_info() -> None:
-    """Manual supervisor scan shows candidate list and execution info."""
+    """Manual supervisor scan shows candidate list and execution info.
+
+    Uses max_dispatch_per_tick=2 so both candidates are dispatched and
+    their respective execution results are displayed.
+    """
+    from vibe3.models.orchestra_config import (
+        OrchestraConfig,
+        SupervisorHandoffConfig,
+    )
+
+    custom_config = OrchestraConfig.model_construct(
+        supervisor_handoff=SupervisorHandoffConfig(max_dispatch_per_tick=2)
+    )
+
     with (
         patch("vibe3.roles.fetch_supervisor_candidates") as mock_fetch,
         patch("vibe3.models.event_bus.publish_and_wait") as mock_publish_and_wait,
+        patch("vibe3.commands.scan.load_orchestra_config", return_value=custom_config),
     ):
         mock_fetch.return_value = (
             2,

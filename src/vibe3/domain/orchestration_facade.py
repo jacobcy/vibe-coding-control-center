@@ -302,7 +302,7 @@ class OrchestrationFacade(ServiceBase):
             )
             return (0, 0)
 
-        from vibe3.roles import iter_supervisor_identified_events
+        from vibe3.roles import select_supervisor_events_for_dispatch
 
         config = self._config
 
@@ -314,12 +314,9 @@ class OrchestrationFacade(ServiceBase):
         )
 
         total_scanned = len(raw_issues)
-        events = list(iter_supervisor_identified_events(config, raw_issues))
-        matched_count = len(events)
-
-        # Throttle dispatches: only emit N events per tick
-        max_per_tick = config.supervisor_handoff.max_dispatch_per_tick
-        events_to_dispatch = events[:max_per_tick]
+        events_to_dispatch, matched_count = select_supervisor_events_for_dispatch(
+            config, raw_issues
+        )
 
         for event in events_to_dispatch:
             logger.bind(
@@ -329,15 +326,15 @@ class OrchestrationFacade(ServiceBase):
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
             publish(event)
 
-        if matched_count > max_per_tick:
+        if matched_count > len(events_to_dispatch):
             logger.bind(
                 domain="orchestration_facade",
                 total_candidates=matched_count,
-                dispatched=max_per_tick,
-                remaining=matched_count - max_per_tick,
+                dispatched=len(events_to_dispatch),
+                remaining=matched_count - len(events_to_dispatch),
             ).info(
                 f"Supervisor scan throttled: {matched_count} candidates found, "
-                f"dispatching {max_per_tick} this tick"
+                f"dispatching {len(events_to_dispatch)} this tick"
             )
 
-        return (total_scanned, min(matched_count, max_per_tick))
+        return (total_scanned, len(events_to_dispatch))

@@ -390,3 +390,27 @@ def iter_supervisor_identified_events(
             )
         )
     return events
+
+
+def select_supervisor_events_for_dispatch(
+    config: OrchestraConfig,
+    raw_issues: Iterable[dict[str, object]],
+) -> tuple[list[SupervisorIssueIdentified], int]:
+    """Filter raw issues and apply per-tick dispatch throttle.
+
+    Centralizes supervisor candidate filtering + dispatch throttling so
+    heartbeat path (OrchestrationFacade.on_supervisor_scan) and manual
+    path (commands.scan._run_supervisor_scan) share identical semantics.
+
+    Args:
+        config: Orchestra configuration (provides max_dispatch_per_tick)
+        raw_issues: Raw GitHub issues from list_issues()
+
+    Returns:
+        Tuple of (events_to_dispatch, total_candidates).
+        events_to_dispatch is sliced to max_dispatch_per_tick.
+        total_candidates is the full match count before throttling.
+    """
+    all_events = list(iter_supervisor_identified_events(config, raw_issues))
+    max_per_tick = config.supervisor_handoff.max_dispatch_per_tick
+    return all_events[:max_per_tick], len(all_events)
