@@ -86,7 +86,7 @@ jobs:
       - name: Run unit tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src
-        run: uv run pytest tests/vibe3 -v -n 2 -m "not integration and not slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration
+        run: uv run pytest tests/vibe3 -v -n 4 -m "not integration and not slow" --ignore=tests/vibe3/test_modularity --ignore=tests/vibe3/integration
 
   test-quality:
     name: Quality Tests (Modularity + Integration)
