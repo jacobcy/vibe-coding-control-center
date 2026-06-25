@@ -58,8 +58,7 @@ def mock_plan_deps(monkeypatch: pytest.MonkeyPatch) -> dict:
     )
     # Mock at both layers for EDA
     monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
-    # Don't mock execute_spec_plan_sync in fixture - let individual tests control it
-    # The fixture is for setup, not for controlling execution behavior
+    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", MagicMock())
     # Mock in command's namespace (imported at module level)
     monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     # Mock at source (for lazy imports in handler)
@@ -160,6 +159,7 @@ def mock_review_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 # ==============================================================================
 
 
+@pytest.mark.slow
 def test_plan_no_branch_uses_current_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
@@ -175,6 +175,7 @@ def test_plan_no_branch_uses_current_branch(
     assert mock_resolve.call_args[0][0] is None
 
 
+@pytest.mark.slow
 def test_plan_issue_number_resolves_to_branch(
     monkeypatch: pytest.MonkeyPatch, mock_plan_deps: dict
 ) -> None:
@@ -222,6 +223,7 @@ def test_run_issue_number_resolves_to_branch(
     assert mock_resolve.call_args[0][0] == "42"
 
 
+@pytest.mark.slow
 def test_review_no_branch_shows_help() -> None:
     """vibe3 review without args fails — requires branch context."""
     result = runner.invoke(review_app, [])
@@ -230,6 +232,7 @@ def test_review_no_branch_shows_help() -> None:
     assert result.exception is not None
 
 
+@pytest.mark.slow
 def test_review_issue_number_resolves_to_branch(
     monkeypatch: pytest.MonkeyPatch, mock_review_deps: None
 ) -> None:
@@ -438,6 +441,7 @@ def test_run_sync_handler_failure_exits_nonzero(
     assert "run boom" in result.output
 
 
+@pytest.mark.slow
 def test_review_base_dry_run_returns_dry_run_verdict(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -569,6 +573,7 @@ def test_run_show_prompt_forwarded(
     assert mock_execute.call_args.kwargs.get("show_prompt") is True
 
 
+@pytest.mark.slow
 def test_review_show_prompt_forwarded(
     monkeypatch: pytest.MonkeyPatch, mock_review_deps: None
 ) -> None:

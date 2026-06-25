@@ -29,6 +29,7 @@ from vibe3.roles.run_helpers import (
     RUN_BRANCH_RESOLVER,
     resolve_run_options,
 )
+from vibe3.services.flow import FlowTimelineService
 from vibe3.services.issue import fail_executor_issue
 
 
@@ -213,5 +214,6 @@ RUN_SYNC_SPEC = IssueRoleSyncSpec(
         issue_number=issue_number,
         reason=reason,
         actor="agent:run",
+        flow_timeline_service=FlowTimelineService(),
     ),
 )

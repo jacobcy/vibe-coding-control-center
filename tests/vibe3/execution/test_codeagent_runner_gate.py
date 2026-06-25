@@ -1,6 +1,7 @@
 """Integration tests for execute_sync gate/callback invocation."""
 
 from unittest.mock import MagicMock, patch
+import pytest
 
 from vibe3.agents import CodeagentCommand
 from vibe3.exceptions import AgentExecutionError
@@ -83,6 +84,7 @@ class TestExecuteSyncGateIntegration:
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
 
+    @pytest.mark.slow
     def test_gate_skipped_without_issue_number_or_branch(self) -> None:
         """Gate does not fire when issue_number or branch is None."""
         # Test 1: No issue_number
@@ -404,6 +406,7 @@ class TestTransitionCountFlow:
 class TestSeverityAwareErrorHandling:
     """Test severity-based error handling in codeagent_runner."""
 
+    @pytest.mark.slow
     def test_agent_execution_metadata_is_recorded_on_failure(self) -> None:
         """Backend diagnostics should reach lifecycle refs.
 

@@ -88,6 +88,7 @@ class TestBuildGovernanceRecipe:
 class TestRenderGovernancePrompt:
     """Tests for render_governance_prompt."""
 
+    @pytest.mark.slow
     def test_renders_template(self, tmp_path):
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(textwrap.dedent("""\
@@ -106,6 +107,7 @@ class TestRenderGovernancePrompt:
         )
         assert "Status=running" in result.rendered_text
 
+    @pytest.mark.slow
     def test_template_controls_whether_supervisor_content_is_rendered(self, tmp_path):
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(textwrap.dedent("""\

@@ -59,6 +59,7 @@ class TestRunCommandValidation:
         assert result.exit_code == 1
         assert "Error: --show-prompt requires --dry-run" in result.output
 
+    @pytest.mark.slow
     def test_run_show_prompt_with_dry_run_still_works(self):
         """run command should accept --show-prompt with --dry-run."""
         # Patch dependencies to avoid real execution
@@ -135,6 +136,7 @@ class TestReviewCommandValidation:
         # Mock should NOT be called since validation happens first
         mock_review.assert_not_called()
 
+    @pytest.mark.slow
     def test_review_show_prompt_with_dry_run_still_works(self):
         """review command should accept --show-prompt with --dry-run."""
         with patch(

@@ -12,6 +12,7 @@ from vibe3.orchestra.global_dispatch_coordinator import QueueEntry
 
 class TestStateTransitions:
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_collect_order_prefers_higher_state_roles_first(
         self,
         make_issue,
@@ -58,6 +59,7 @@ class TestStateTransitions:
         assert emit_calls[0][1].number == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_capacity_limit_stops_dispatch(
         self,
         make_issue,
@@ -110,6 +112,7 @@ class TestStateTransitions:
         assert 372 not in dispatched_numbers
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_state_change_requeues_issue_to_front(
         self,
         make_issue,
@@ -159,6 +162,7 @@ class TestStateTransitions:
         assert len(emit_calls) == 2
         assert emit_calls[1][1].number == 1
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_terminal_state_removes_issue_from_queue(
         self,
@@ -207,6 +211,7 @@ class TestStateTransitions:
 
         assert len(emit_calls) == 1
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_blocked_issue_removed_from_queue_when_qualify_gate_fails(
         self,
@@ -250,6 +255,7 @@ class TestStateTransitions:
 
 
 class TestLoggingBehavior:
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_logs_dispatch_intent_instead_of_dispatch_success(
         self,
@@ -303,6 +309,7 @@ class TestLoggingBehavior:
             "dispatched #303 (planner)" in message for message in normalized_events
         )
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_logs_dispatch_intent_before_emit_side_effect(
         self,

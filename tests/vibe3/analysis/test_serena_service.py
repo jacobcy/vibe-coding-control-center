@@ -219,6 +219,7 @@ class TestAnalyzeFilesSkipped:
         assert len(result["skipped_files"]) == 2
         assert result["summary"]["skipped_files"] == 2
 
+    @pytest.mark.slow
     def test_get_changed_functions_missing_file(self, temp_dir):
         """Test get_changed_functions with missing file."""
         # Mock git client

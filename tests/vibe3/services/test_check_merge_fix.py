@@ -60,6 +60,7 @@ def cleanup_service(mock_store, mock_git_client):
 class TestMergedPRHandling:
     """Tests for merged PR handling."""
 
+    @pytest.mark.slow
     def test_merged_pr_returns_valid(
         self, check_service, mock_store, mock_github_client
     ):
@@ -94,6 +95,7 @@ class TestMergedPRHandling:
         # Branch cleanup is now deferred to --clean-branch
         check_service.git_client.delete_branch.assert_not_called()
 
+    @pytest.mark.slow
     def test_missing_local_branch_with_merged_pr_still_marks_done(
         self, check_service, mock_store, mock_github_client
     ):
@@ -126,6 +128,7 @@ class TestMergedPRHandling:
         # (FlowCompleted event is projected to flow_events by projection hook)
         mock_store.add_event.assert_not_called()
 
+    @pytest.mark.slow
     def test_merged_cleanup_still_attempts_branch_delete_when_worktree_cleanup_fails(
         self, check_service, mock_store, mock_github_client
     ):

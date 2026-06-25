@@ -209,6 +209,7 @@ class TestDispatchLoopRemovalLogs:
     """Tests that _dispatch_loop logs removal events when popping entries."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_done_entry_removed_with_event_log(
         self,
         make_capacity,

@@ -1,9 +1,11 @@
 """Tests for vibe inspect base subcommand.
 
+import pytest
 Tests CLI surface: argument validation, help output, exit codes.
 All external services are mocked.
 """
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -13,6 +15,7 @@ from vibe3.commands.inspect import app
 runner = CliRunner()
 
 
+@pytest.mark.slow
 def test_inspect_base_default_parent():
     """Test inspect base defaults to parent policy."""
     mock_git = MagicMock()
@@ -36,6 +39,7 @@ def test_inspect_base_default_parent():
     assert "No core files changed" in result.output
 
 
+@pytest.mark.slow
 def test_inspect_base_custom_base_branch():
     """Test inspect base with custom base branch."""
     mock_git = MagicMock()
@@ -56,6 +60,7 @@ def test_inspect_base_custom_base_branch():
     assert "No core files changed" in result.output
 
 
+@pytest.mark.slow
 def test_inspect_base_with_core_files():
     """Test inspect base with core files changed."""
     mock_git = MagicMock()
@@ -92,6 +97,7 @@ def test_inspect_base_with_core_files():
     assert "Impact scope (3 modules)" in result.output
 
 
+@pytest.mark.slow
 def test_inspect_base_json_output():
     """Test inspect base with JSON output."""
     mock_git = MagicMock()
@@ -147,6 +153,7 @@ def test_inspect_base_json_output():
     assert data["core_files"][0]["critical_path"] is True
 
 
+@pytest.mark.slow
 def test_inspect_base_json_custom_branch():
     """Test inspect base JSON output with custom base branch."""
     mock_git = MagicMock()
@@ -203,6 +210,7 @@ def test_inspect_base_help():
     assert "core" in result.output.lower() or "critical" in result.output.lower()
 
 
+@pytest.mark.slow
 def test_inspect_base_uses_shared_base_resolver():
     """inspect base should resolve branch through shared base resolver."""
     mock_git = MagicMock()
@@ -227,6 +235,7 @@ def test_inspect_base_uses_shared_base_resolver():
     )
 
 
+@pytest.mark.slow
 def test_inspect_base_json_includes_uncommitted_only_changes() -> None:
     """Uncommitted-only changes should affect score and changed symbols."""
     mock_git = MagicMock()

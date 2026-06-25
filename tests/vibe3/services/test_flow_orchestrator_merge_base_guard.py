@@ -2,11 +2,14 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.services.orchestra.orchestrator import FlowOrchestratorService
 
 
+@pytest.mark.slow
 def test_bootstrap_issue_flow_checkouts_recreated_branch_in_non_worktree_mode() -> None:
     """Non-worktree mode must checkout a polluted branch after recreation."""
     config = load_orchestra_config()

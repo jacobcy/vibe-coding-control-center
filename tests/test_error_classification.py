@@ -101,3 +101,49 @@ class TestClassifyErrorUnchanged:
     def test_unknown(self) -> None:
         """Test unknown error classification."""
         assert classify_error("something random") == E_EXEC_UNKNOWN
+
+
+class TestIsPermanentCodeError:
+    """Tests for is_permanent_code_error classification helper."""
+
+    def test_value_error_is_permanent(self) -> None:
+        """ValueError (missing argument, bad value) → permanent code bug."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert is_permanent_code_error(ValueError("missing required parameter"))
+
+    def test_type_error_is_permanent(self) -> None:
+        """TypeError (wrong type) → permanent code bug."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert is_permanent_code_error(TypeError("can't multiply"))
+
+    def test_attribute_error_is_permanent(self) -> None:
+        """AttributeError (missing attribute) → permanent code bug."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert is_permanent_code_error(AttributeError("no attribute"))
+
+    def test_import_error_is_permanent(self) -> None:
+        """ImportError (broken import) → permanent code bug."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert is_permanent_code_error(ImportError("No module named 'foo'"))
+
+    def test_os_error_is_transient(self) -> None:
+        """OSError (filesystem/IO) → transient, not permanent."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert not is_permanent_code_error(OSError("permission denied"))
+
+    def test_connection_error_is_transient(self) -> None:
+        """ConnectionError (network) → transient, not permanent."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert not is_permanent_code_error(ConnectionError("refused"))
+
+    def test_runtime_error_is_transient(self) -> None:
+        """RuntimeError (generic) → transient, not permanent."""
+        from vibe3.exceptions.error_classification import is_permanent_code_error
+
+        assert not is_permanent_code_error(RuntimeError("something went wrong"))

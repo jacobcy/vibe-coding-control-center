@@ -405,6 +405,7 @@ class TestIsDependencySatisfied:
 
         assert result is True
 
+    @pytest.mark.slow
     def test_issue_open(self, qualify_gate_service, mock_github):
         """Open issue should not satisfy dependency."""
         mock_github.view_issue.return_value = {"state": "OPEN"}

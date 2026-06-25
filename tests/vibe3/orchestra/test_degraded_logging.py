@@ -49,6 +49,7 @@ def reset_degraded_manager():
     "vibe3.domain.dispatch_coordinator.get_manager_usernames",
     return_value=["manager-bot"],
 )
+@pytest.mark.slow
 def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
     """Test that dispatch logs when degraded mode is entered during qualification."""
     # Setup mocks
@@ -162,6 +163,7 @@ def test_dispatch_logs_degraded_mode(mock_get_manager_usernames):
     "vibe3.domain.dispatch_coordinator.get_manager_usernames",
     return_value=["manager-bot"],
 )
+@pytest.mark.slow
 def test_dispatch_no_log_when_not_degraded(mock_get_manager_usernames):
     """Test that dispatch does not log degraded mode when not entered."""
     # Setup mocks

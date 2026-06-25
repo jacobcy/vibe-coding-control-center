@@ -187,12 +187,18 @@ code_limits:
         limit: 610
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成；Issue #3134 新增 dry_run 的 backend/model 透传（+6 行）"
       - path: "src/vibe3/roles/plan.py"
-        limit: 600
+        limit: 610
         reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑；Issue #3134 新增 async 路径 backend/model 透传和 dry_run 短 task 标签（+11 行）；Issue #3135 新增 spec_ref 解析和 provenance 收集（+45 行）"
       - path: "src/vibe3/roles/run_command.py"
         limit: 515
         reason: "Run command 角色聚合，包含 skill resolution、dispatch async/sync、publish path detection、tmux/log 输出等紧密耦合逻辑；Issue #3134 新增 AsyncDispatchResult 的 backend/model 字段（+4 行）；Issue #3135 新增 dry_run_summary 构建和 provenance 收集（+90 行）"
 
+      - path: "src/vibe3/exceptions/error_classification.py"
+        limit: 450
+        reason: "Error classification registry and helper functions (is_permanent_code_error, classify_error, ERROR_REGISTRY); Issue #3149 added E_DISPATCH_CODE_ERROR entry and is_permanent_code_error() classifier for permanent-vs-transient error distinction (+45 lines)"
+      - path: "tests/vibe3/orchestra/test_queue_maintenance_triggers.py"
+        limit: 401
+        reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发等场景"
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"
         limit: 620
@@ -293,7 +299,7 @@ code_limits:
         limit: 710
         reason: "Scan command 测试集，覆盖 governance/supervisor/all 扫描类型、输出格式（含 ANSI strip）、candidate 列表、execution info、no-issue、verify-model、dry-run、verbose 等参数变体及 backend/model 验证、call count 检查等紧密耦合场景；Issue #3067 新增 3 个回归测试（--show-prompt validation 和 supervisor dry-run summary display，+18 行）；Issue #3135 新增 display unification 测试（+230 行），refactor 新增 async skip/throttled display 测试（+25 行）"
       - path: "tests/vibe3/commands/test_review.py"
-        limit: 530
+        limit: 533
         reason: "Review command 测试集，覆盖 dry_run、show_prompt、base/branch review、exit codes、context builder、CLI option 传递、async dispatch 等紧密耦合场景；Issue #3135 新增 unified display 和 async dispatch 测试（+130 行）"
       - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
@@ -338,7 +344,7 @@ code_limits:
         limit: 450
         reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
       - path: "tests/vibe3/orchestra/test_dispatch_actionable_trigger.py"
-        limit: 500
+        limit: 502
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低；#2381 新增 test_dispatch_loop_rechecks_qualify_gate_for_ready_issue 测试验证 dispatch-time qualify gate recheck（+29 行）"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
         limit: 600
@@ -438,7 +444,7 @@ code_limits:
         limit: 600
         reason: "Snapshot baseline 测试集，覆盖 save_branch_baseline、load_branch_baseline、list_snapshots baseline filtering、baseline idempotency、repo_path forwarding、backfill_baseline_registry、DB failure logging 等 12 个紧密耦合场景，共享 baseline_dir fixture 和 mock setup，拆分收益低；Issue #3133 新增 3 个 backfill_baseline_registry 测试（test_backfill_baseline_registry_registers_files_with_baseline_for、test_backfill_baseline_registry_empty_dir、test_backfill_baseline_registry_handles_db_failure）验证 baseline DB recovery 逻辑（+161 行）；PR #3145 code review follow-up 新增 test_save_branch_baseline_logs_db_failure_details 测试验证异常日志记录（+61 行），从 495 行增至 556 行"
       - path: "tests/vibe3/analysis/test_serena_service.py"
-        limit: 667
+        limit: 668
         reason: "Serena service 测试集，覆盖 analyze_file/analyze_files/analyze_changes/scan_dead_code/analyze_symbol 等核心功能，包含完整的 mock setup 和参数化测试；PR #2744 新增 4 个 scan_dead_code 测试验证 line/loc 计算逻辑（+128 行）；PR #2905 新增 6 个 analyze_symbol 测试覆盖正常提取、空结果、异常处理、CLI 检测、多引用场景（+71 行）；PR #2905 code review follow-up 完善断言覆盖与新增多引用测试（+48 行）；#2932 新增 test_exception_class_detection_works 测试验证异常类检测逻辑（+66 行），从 596 行增至 667 行"
       - path: "tests/vibe3/analysis/test_dead_code_rules.py"
         limit: 458

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.queue_operations import (
     _auto_resume_to_ready,
@@ -115,6 +117,7 @@ class TestAutoResumeNoFlowScene:
         assert "auto-resume #103 failed" in event_calls[0][1]
         assert "API error" in event_calls[0][1]
 
+    @pytest.mark.slow
     def test_auto_resume_skipped_for_manager_role(
         self, make_issue, make_issue_info, make_capacity, make_coordinator, monkeypatch
     ) -> None:

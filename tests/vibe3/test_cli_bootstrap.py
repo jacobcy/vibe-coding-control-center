@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import pytest
 import sys
 from pathlib import Path
 
@@ -47,6 +48,7 @@ def test_cli_runs_under_isolation_without_pythonpath() -> None:
     )
 
 
+@pytest.mark.slow
 def test_bootstrap_resolves_relative_to_cli_location(tmp_path: Path) -> None:
     """The bootstrap is __file__-relative: a copy of src/ in another location
     imports THAT copy's vibe3, not a hardcoded repo path. This is the

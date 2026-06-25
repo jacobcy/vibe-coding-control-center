@@ -24,6 +24,7 @@ from vibe3.exceptions.error_codes import (
     E_API_UNKNOWN,
     E_CAPACITY_SKIP,
     E_CONFIG_MISSING,
+    E_DISPATCH_CODE_ERROR,
     E_DISPATCH_FAILURE,
     E_EXEC_FLOW_FAILURE,
     E_EXEC_NO_OUTPUT,
@@ -172,6 +173,36 @@ def classify_error(error_output: str) -> str:
     return E_EXEC_UNKNOWN
 
 
+def is_permanent_code_error(exc: BaseException) -> bool:
+    """Check if an exception indicates a permanent code bug (not transient).
+
+    Permanent code errors (beyond retry):
+        ValueError, TypeError, AttributeError, ImportError,
+        NameError, AssertionError, IndexError, KeyError,
+        NotImplementedError, ModuleNotFoundError
+
+    Transient infrastructure errors (may recover on retry):
+        OSError, IOError, ConnectionError, TimeoutError,
+        subprocess.CalledProcessError, etc.
+
+    Used to distinguish E_DISPATCH_CODE_ERROR (permanent) from
+    E_DISPATCH_FAILURE (transient) when recording dispatch errors.
+    """
+    _code_exc_types: tuple[type[BaseException], ...] = (
+        ValueError,
+        TypeError,
+        AttributeError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+        AssertionError,
+        IndexError,
+        KeyError,
+        NotImplementedError,
+    )
+    return isinstance(exc, _code_exc_types)
+
+
 # Error registry: maps error codes to handling contracts
 ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
     # WARNING: Configuration/asset missing errors - recorded to error_log
@@ -302,6 +333,19 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         description=(
             "Dispatch infrastructure failure (worktree/launch) "
             "— does not block orchestra"
+        ),
+    ),
+    E_DISPATCH_CODE_ERROR: ErrorHandlingContract(
+        code=E_DISPATCH_CODE_ERROR,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="threshold",
+        description=(
+            "Dispatch code error (permanent bug, not transient) "
+            "— counts toward FailedGate threshold"
         ),
     ),
     E_EXEC_FLOW_FAILURE: ErrorHandlingContract(

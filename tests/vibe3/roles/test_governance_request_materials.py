@@ -1,5 +1,6 @@
 """Tests for governance request building and material selection."""
 
+import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -52,6 +53,7 @@ class TestBuildGovernanceRequest:
         assert build_governance_request(config, 1, snapshot) is None
 
     @patch("vibe3.roles.governance._write_dry_run_plan")
+    @pytest.mark.slow
     def test_returns_none_when_dry_run(self, mock_write):
         mock_write.return_value = Path("/tmp/dry.md")
         snapshot = _make_snapshot()
@@ -60,6 +62,7 @@ class TestBuildGovernanceRequest:
         mock_write.assert_called_once()
 
     @patch("vibe3.roles.governance.resolve_governance_options")
+    @pytest.mark.slow
     def test_returns_execution_request(self, mock_opts):
         mock_opts.return_value = MagicMock()
         snapshot = _make_snapshot()
@@ -72,6 +75,7 @@ class TestBuildGovernanceRequest:
         assert req.mode == "async"
 
     @patch("vibe3.roles.governance.resolve_governance_options")
+    @pytest.mark.slow
     def test_request_has_correct_gates(self, mock_opts):
         mock_opts.return_value = MagicMock()
         snapshot = _make_snapshot()
@@ -214,6 +218,7 @@ class TestRoundRobinMaterialSelection:
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/audit-report.md"
 
+    @pytest.mark.slow
     def test_build_governance_request_uses_round_robin(self):
         """build_governance_request picks material per execution_count.
 

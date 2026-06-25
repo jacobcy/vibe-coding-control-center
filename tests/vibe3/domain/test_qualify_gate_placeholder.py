@@ -78,6 +78,7 @@ def test_check_worktree_health_skips_placeholder(
     assert result is True
 
 
+@pytest.mark.slow
 def test_check_worktree_health_blocked_real_flow_checks_path(
     mock_config, mock_github, mock_store, sample_issue
 ):

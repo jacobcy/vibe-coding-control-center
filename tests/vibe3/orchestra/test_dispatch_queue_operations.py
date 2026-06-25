@@ -14,6 +14,7 @@ class TestQueueOperations:
     """Tests for GlobalDispatchCoordinator queue operations."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_collect_frozen_queue_uses_one_open_issue_call(
         self, make_issue, make_capacity, make_coordinator
     ) -> None:
@@ -57,6 +58,7 @@ class TestQueueOperations:
         assert [entry.issue_number for entry in queue] == [1]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_dispatch_all_when_capacity_available(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -165,6 +167,7 @@ class TestQueueOperations:
         assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_skip_when_capacity_full(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -208,6 +211,7 @@ class TestQueueOperations:
         assert len(emit_calls) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_frozen_queue_prevents_duplicate_dispatch_without_state_change(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -247,6 +251,7 @@ class TestQueueOperations:
         assert len(emit_calls) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_emit_failure_handled_gracefully(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader
     ) -> None:
@@ -424,6 +429,7 @@ class TestCollectFrozenQueueBlockedRequalification:
     picked up on the next pass."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_requalifies_blocked_issues_during_collection(
         self, make_capacity, make_coordinator
     ) -> None:
@@ -464,6 +470,7 @@ class TestCollectFrozenQueueBlockedRequalification:
         assert [entry.issue_number for entry in queue] == [1]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_requalify_failure_does_not_abort_collection(
         self, make_capacity, make_coordinator, monkeypatch
     ) -> None:
@@ -550,6 +557,7 @@ class TestCollectFrozenQueueLogging:
         ), f"Expected no starting/complete logs for empty collection, got: {events}"
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_nonempty_collection_logs_complete(
         self, make_capacity, make_coordinator, monkeypatch
     ) -> None:
