@@ -6,7 +6,6 @@ covering normal flow, error handling, and quiet mode.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
