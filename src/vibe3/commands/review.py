@@ -22,10 +22,10 @@ from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.roles import (
+    ReviewRunResult,
     build_base_review_request,
     validate_review_prerequisites,
 )
-from vibe3.roles.review_helpers import ReviewRunResult
 from vibe3.services.flow import FlowService, resolve_branch_arg
 from vibe3.ui import display_codeagent_result
 
