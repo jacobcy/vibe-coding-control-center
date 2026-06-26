@@ -441,11 +441,12 @@ def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
 
     Reads report ledger from shared directory and provides aggregate
     statistics for the decision-maker to evaluate reports and create
-    supervisor decision issues.
+    the appropriate follow-up issues.
 
     The decision agent creates GitHub issues (not YAML files) so the
-    downstream scan supervisor → roadmap-intake → supervisor/apply
-    pipeline handles execution naturally.
+    downstream governance pipeline handles execution naturally:
+    supervisor fixes go through roadmap-intake → supervisor/apply,
+    while code/script fixes go through roadmap-intake → assignee-pool.
 
     The context does NOT read full report content - the agent reads
     selected ones via tools per the material's instructions.
@@ -495,10 +496,11 @@ def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
             f"- 检测到的证据强度："
             f"{', '.join(sorted(evidence_strengths)) or '无'}\n\n"
             "请读取 `.git/shared/reports/audit-report-*.md`，"
-            "按材料中的证据规则为每个 decision packet "
-            "创建 supervisor decision issue（不是 YAML 文件）。\n"
-            "Decision issue 使用 `supervisor` + `state/ready` 标签，"
-            "交由下游 scan supervisor / roadmap-intake / supervisor/apply 处理。"
+            "按材料中的证据规则、按材料中的路由规则，为每个 decision packet "
+            "创建对应的 follow-up issue（不是 YAML 文件）。\n"
+            "prompt/test/config 的简单修复走 supervisor 快速通道；"
+            "涉及 `src/vibe3/*` 或 `scripts/*` 的修复走常规 issue，"
+            "等待 roadmap-intake / assignee-pool 接手。"
             f"{'目前无报告，跳过本轮。' if report_count == 0 else ''}"
         ),
     )

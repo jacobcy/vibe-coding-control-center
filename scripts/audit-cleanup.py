@@ -12,10 +12,10 @@ Usage:
     uv run python scripts/audit-cleanup.py --issue 1234 --verbose
 
 The script traces the ID chain:
-    decision issue → linked_observation_ids + linked_suggestion_ids
+    decision issue → source report + linked_observation_ids + linked_suggestion_ids
         → grep .git/shared/observations/ for matching YAML files
         → grep .git/shared/suggestions/ for matching YAML files
-        → parse frontmatter of .git/shared/reports/ for matching files
+        → delete only the explicitly referenced report when available
 """
 
 from __future__ import annotations
@@ -89,6 +89,12 @@ def extract_ids_from_issue_body(body: str) -> tuple[list[str], list[str]]:
     return obs_ids, sug_ids
 
 
+def extract_report_refs_from_issue_body(body: str) -> list[str]:
+    """Extract explicitly referenced audit report filenames from issue body."""
+    report_pattern = re.compile(r"(audit-report-\d{8}T\d{6}\.md)")
+    return list(dict.fromkeys(report_pattern.findall(body)))
+
+
 def fetch_issue_body(issue_number: int) -> str:
     """Fetch issue body from GitHub via gh CLI."""
     try:
@@ -114,6 +120,8 @@ def find_matching_files(
     shared_dir: Path,
     obs_ids: list[str],
     sug_ids: list[str],
+    *,
+    report_refs: list[str] | None = None,
     verbose: bool = False,
 ) -> MatchedFiles:
     """Find all files in shared directory matching the given IDs.
@@ -121,7 +129,8 @@ def find_matching_files(
     Strategy:
         - observations/: glob *.yaml, grep content for observation IDs
         - suggestions/: glob *.yaml, grep content for suggestion IDs
-        - reports/: glob *.md, parse frontmatter for both ID types
+        - reports/: prefer explicit report refs from the decision issue body
+        - reports fallback: parse frontmatter for both ID types when no report ref
     """
     matched_obs: list[Path] = []
     matched_sug: list[Path] = []
@@ -160,27 +169,35 @@ def find_matching_files(
     # Match report files via frontmatter
     reports_dir = shared_dir / "reports"
     if reports_dir.exists():
-        for report_file in sorted(reports_dir.glob("audit-report-*.md")):
-            try:
-                content = report_file.read_text()
-                fm = parse_yaml_frontmatter(content)
-
-                linked_obs = fm.get("linked_observation_ids") or []
-                linked_sug = fm.get("linked_suggestion_ids") or []
-
-                # Check if any of our IDs match frontmatter
-                obs_match = bool(set(linked_obs) & set(obs_ids)) if obs_ids else False
-                sug_match = bool(set(linked_sug) & set(sug_ids)) if sug_ids else False
-
-                if obs_match or sug_match:
+        if report_refs:
+            for report_name in report_refs:
+                report_file = reports_dir / report_name
+                if report_file.exists():
                     matched_reports.append(report_file)
                     if verbose:
-                        print(
-                            f"  [report] matched: {report_file.name} "
-                            f"(obs={obs_match}, sug={sug_match})"
-                        )
-            except Exception:
-                continue
+                        print(f"  [report] matched explicit source report: {report_file.name}")
+        else:
+            for report_file in sorted(reports_dir.glob("audit-report-*.md")):
+                try:
+                    content = report_file.read_text()
+                    fm = parse_yaml_frontmatter(content)
+
+                    linked_obs = fm.get("linked_observation_ids") or []
+                    linked_sug = fm.get("linked_suggestion_ids") or []
+
+                    # Fallback for legacy issues that do not record Source report.
+                    obs_match = bool(set(linked_obs) & set(obs_ids)) if obs_ids else False
+                    sug_match = bool(set(linked_sug) & set(sug_ids)) if sug_ids else False
+
+                    if obs_match or sug_match:
+                        matched_reports.append(report_file)
+                        if verbose:
+                            print(
+                                f"  [report] matched legacy fallback: {report_file.name} "
+                                f"(obs={obs_match}, sug={sug_match})"
+                            )
+                except Exception:
+                    continue
 
     return MatchedFiles(
         observations=matched_obs,
@@ -246,22 +263,36 @@ def main() -> None:
     print(f"Fetching issue #{args.issue}...")
     body = fetch_issue_body(args.issue)
     obs_ids, sug_ids = extract_ids_from_issue_body(body)
+    report_refs = extract_report_refs_from_issue_body(body)
 
-    if not obs_ids and not sug_ids:
-        print("No linked observation or suggestion IDs found in issue body")
+    if not obs_ids and not sug_ids and not report_refs:
+        print("No linked observation, suggestion, or report refs found in issue body")
         sys.exit(0)
 
-    print(f"Found {len(obs_ids)} observation IDs, {len(sug_ids)} suggestion IDs")
+    print(
+        "Found "
+        f"{len(obs_ids)} observation IDs, "
+        f"{len(sug_ids)} suggestion IDs, "
+        f"{len(report_refs)} report refs"
+    )
 
     if args.verbose:
         for oid in obs_ids:
             print(f"  obs_id: {oid}")
         for sid in sug_ids:
             print(f"  sug_id: {sid}")
+        for report_ref in report_refs:
+            print(f"  report_ref: {report_ref}")
 
     # Find matching files
     print(f"\nSearching {shared_dir} ...")
-    matched = find_matching_files(shared_dir, obs_ids, sug_ids, verbose=args.verbose)
+    matched = find_matching_files(
+        shared_dir,
+        obs_ids,
+        sug_ids,
+        report_refs=report_refs,
+        verbose=args.verbose,
+    )
 
     total = len(matched.observations) + len(matched.suggestions) + len(matched.reports)
 

@@ -1,31 +1,21 @@
 #!/usr/bin/env python3
-"""Identify blocked/aborted flows caused by non-objective (prompt/process) factors.
+"""Collect blocked/aborted flow facts for audit observation.
 
-This script mines the flow event database to find flows that were blocked or
-aborted due to prompt ambiguity, scope mismatch, state machine errors, or other
-non-objective factors — as opposed to objective blocks like API errors, code
-bugs, CI failures, or infrastructure issues.
+This script stays in the mechanical layer:
+- reads blocked/aborted flow records
+- expands event timelines into raw signal tags
+- enriches with exact shared-ledger dedup signals
+- optionally fetches remote issue / PR facts
 
-Objective blocks (EXCLUDED from audit observation):
-    - codeagent_*_error: actual API/code errors
-    - capacity exceeded: infrastructure capacity
-    - required ref missing: tool chain / missing artifacts
-    - Worktree branch mismatch: environment issue
-    - branch no longer exists: infrastructure / cleanup
-    - PR closed without merge: external decision
-
-Non-objective blocks (INCLUDED for audit observation):
-    - state unchanged: process/prompt issue (state machine stuck)
-    - single-step limit exceeded: process design issue
-    - latest verdict missing: agent didn't produce output
-    - transition_count_exceeded: state machine design issue
-    - Blocked by issue #N where upstream is ALSO non-objective
+It does NOT decide whether a flow is a prompt problem, a human decision,
+an objective bug, or whether the candidate is worth observing. Those
+judgments belong to the governance agent and prompt material.
 
 Usage:
     # List all non-objective blocked flows
     uv run python scripts/audit-blocked-flows.py
 
-    # Show only flows ready for audit observation (applies all screening criteria)
+    # Show mechanically screened candidates for audit observation
     uv run python scripts/audit-blocked-flows.py --ready-for-audit
 
     # With GitHub enrichment (checks issue state, PR merge status online)
@@ -45,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -52,46 +43,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-# Objective block reason patterns
-OBJECTIVE_BLOCK_PATTERNS = [
-    "codeagent_manager_error",
-    "codeagent_run_error",
-    "codeagent_plan_error",
-    "codeagent_review_error",
-    "capacity exceeded",
-    "required ref missing",
-    "Worktree branch mismatch",
-    "no longer exists locally",
-    "no longer exists",
-    "closed without merge",
-    "cannot_verify_remote_state",
-    "PR #",
-]
-
-# Non-objective block reason patterns
-NON_OBJECTIVE_BLOCK_PATTERNS = [
+REASON_PATTERNS = [
     "state unchanged",
     "single-step limit exceeded",
     "latest verdict missing",
     "transition_count_exceeded",
-]
-
-# Ambiguous patterns — need deeper analysis to classify
-AMBIGUOUS_BLOCK_PATTERNS = [
-    "CLOSED",
-    "closed on GitHub",
+    "capacity exceeded",
+    "required ref missing",
+    "Worktree branch mismatch",
+    "closed without merge",
+    "cannot_verify_remote_state",
     "no PR found",
     "PR not found",
-]
-
-
-# Patterns indicating a human decision to defer/skip (NOT agent failure)
-HUMAN_DECISION_PATTERNS = [
-    "roadmap decision",
-    "deferred",
-    "low priority",
-    "not now",
-    "revisit later",
+    "closed on GitHub",
 ]
 
 
@@ -105,7 +69,9 @@ class BlockedFlow:
     last_event_type: str | None = None
     last_event_detail: str | None = None
     last_event_time: str | None = None
-    block_type: str = "unknown"  # "objective", "non-objective", "dependency", "ambiguous"
+    signal_tags: list[str] = field(default_factory=list)
+    reason_pattern_hits: list[str] = field(default_factory=list)
+    event_types: list[str] = field(default_factory=list)
     block_evidence: list[str] = field(default_factory=list)
     event_timeline: list[dict[str, Any]] = field(default_factory=list)
     # Screening fields populated by --ready-for-audit
@@ -115,41 +81,20 @@ class BlockedFlow:
     has_audit_ref: bool = False
     has_pr_ref: bool = False
     evidence_count: int = 0
-    is_human_decision: bool = False
     execution_age_days: int | None = None
     # GitHub enrichment (populated by --enrich)
     issue_state: str | None = None  # "OPEN" or "CLOSED"
     has_merged_pr: bool | None = None
     pr_number: int | None = None
-    screening_verdict: str = ""  # "ready", "historical", "human_decision", "insufficient_evidence"
+    screening_verdict: str = ""  # "candidate", "already_observed", "covered_by_open_decision"
 
 
-def classify_block_reason(reason: str) -> str:
-    """Classify a block reason as objective, non-objective, or ambiguous."""
+def collect_reason_pattern_hits(reason: str) -> list[str]:
+    """Collect exact reason-pattern hits without interpreting what they mean."""
     if not reason:
-        return "unknown"
-
-    for pattern in NON_OBJECTIVE_BLOCK_PATTERNS:
-        if pattern.lower() in reason.lower():
-            return "non-objective"
-
-    for pattern in AMBIGUOUS_BLOCK_PATTERNS:
-        if pattern.lower() in reason.lower():
-            return "ambiguous"
-
-    for pattern in OBJECTIVE_BLOCK_PATTERNS:
-        if pattern.lower() in reason.lower():
-            return "objective"
-
-    return "unknown"
-
-
-def is_human_decision(flow: BlockedFlow) -> bool:
-    """Check if flow was blocked by a human decision, not agent failure."""
-    all_text = f"{flow.blocked_reason or ''} {flow.last_event_detail or ''}"
-    for e in flow.event_timeline:
-        all_text += f" {e.get('detail', '')}"
-    return any(p.lower() in all_text.lower() for p in HUMAN_DECISION_PATTERNS)
+        return []
+    lower_reason = reason.lower()
+    return [pattern for pattern in REASON_PATTERNS if pattern.lower() in lower_reason]
 
 
 def count_evidence_sources(flow_data: dict[str, Any]) -> int:
@@ -248,28 +193,63 @@ def load_existing_observation_issues(shared_dir: Path) -> set[int]:
     return observed_issues
 
 
+def extract_affected_issue_numbers(body: str) -> set[int]:
+    """Extract exact source issue numbers from an Affected Issues markdown section."""
+    match = re.search(
+        r"^## Affected Issues\s*(.*?)(?=^## |\Z)",
+        body,
+        re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        return set()
+
+    return {
+        int(issue_number)
+        for issue_number in re.findall(r"^\s*-\s*#(\d+)\b", match.group(1), re.MULTILINE)
+    }
+
+
+def load_open_decision_covered_issues() -> set[int]:
+    """Load exact source issue numbers already covered by open audit decision issues."""
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--search",
+                '"[audit]"',
+                "--state",
+                "open",
+                "--limit",
+                "50",
+                "--json",
+                "body",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        issues = json.loads(result.stdout)
+    except Exception:
+        return set()
+
+    covered_issue_numbers: set[int] = set()
+    for item in issues:
+        body = str(item.get("body") or "")
+        covered_issue_numbers.update(extract_affected_issue_numbers(body))
+    return covered_issue_numbers
+
+
 def screen_flow(
     bf: BlockedFlow,
     flow_data: dict[str, Any],
     enrich: bool = False,
     observed_issues: set[int] | None = None,
+    covered_issue_numbers: set[int] | None = None,
 ) -> BlockedFlow:
-    """Apply all screening criteria to determine if flow is ready for audit.
-
-    Screening rules (ordered by priority):
-    1. Objective block → skip (code/infrastructure, not prompt)
-    2. Human decision (roadmap/deferred) → skip
-    3. Already observed → skip (existing observation covers this issue)
-    4. Insufficient evidence (< 2 sources) → skip
-    5. Stale (> 10 days since execution) → skip
-    6. All other non-objective/ambiguous/dependency → ready
-    """
-    # Rule 1: Objective blocks excluded
-    if bf.block_type == "objective":
-        bf.screening_verdict = "objective"
-        return bf
-
-    # Populate evidence fields
+    """Apply only mechanical screening and fact population."""
     bf.has_worktree = bool(flow_data.get("has_worktree"))
     bf.has_plan_ref = bool(flow_data.get("plan_ref"))
     bf.has_report_ref = bool(flow_data.get("report_ref"))
@@ -278,46 +258,25 @@ def screen_flow(
     bf.evidence_count = count_evidence_sources(flow_data)
     bf.execution_age_days = compute_execution_age(flow_data)
 
-    # Rule 2: Human decision
-    bf.is_human_decision = is_human_decision(bf)
-    if bf.is_human_decision:
-        bf.screening_verdict = "human_decision"
-        return bf
-
-    # Rule 3: Already observed (skip if existing observation covers this issue)
+    # Exact ledger dedup only.
     if observed_issues and bf.issue_number and bf.issue_number in observed_issues:
         bf.screening_verdict = "already_observed"
         return bf
 
-    # Rule 4: Enrich with GitHub data if requested
+    if covered_issue_numbers and bf.issue_number and bf.issue_number in covered_issue_numbers:
+        bf.screening_verdict = "covered_by_open_decision"
+        return bf
+
     if enrich and bf.issue_number:
         issue_info = fetch_github_issue_state(bf.issue_number)
         if issue_info:
             bf.issue_state = issue_info["state"]
-            if issue_info["state"] == "CLOSED":
-                pr_info = fetch_pr_info(bf.issue_number, bf.branch)
-                if pr_info:
-                    bf.pr_number = pr_info["number"]
-                    bf.has_merged_pr = pr_info["merged"]
-                # NOTE: issue CLOSED is NOT a hard filter. Closed issues may still
-                # reveal agent failures (e.g., agent didn't deliver, state machine gap).
-                # They are ranked lower in priority but remain observable.
+            pr_info = fetch_pr_info(bf.issue_number, bf.branch)
+            if pr_info:
+                bf.pr_number = pr_info["number"]
+                bf.has_merged_pr = pr_info["merged"]
 
-    # Rule 5: Evidence check (skip if can't even do basic analysis)
-    if bf.evidence_count < 2:
-        bf.screening_verdict = "insufficient_evidence"
-        return bf
-
-    # Rule 6: Age check (> 10 days → stale)
-    if bf.execution_age_days is not None and bf.execution_age_days > 10:
-        bf.screening_verdict = "stale"
-        return bf
-
-    # Rule 7: Ready for audit (includes CLOSED issues — ranked lower, not excluded)
-    if bf.block_type in ("non-objective", "ambiguous", "dependency"):
-        bf.screening_verdict = "ready"
-    else:
-        bf.screening_verdict = "insufficient_evidence"
+    bf.screening_verdict = "candidate"
 
     return bf
 
@@ -379,18 +338,14 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
 
         bf.event_timeline = events
 
-        # Analyze events to determine block type
+        event_types = sorted({e["event_type"] for e in events})
         block_events = [
             e for e in events
             if e["event_type"] in ("flow_blocked", "flow_auto_aborted", "blocked")
         ]
         error_events = [
             e for e in events
-            if "error" in e["event_type"] or "aborted" in e["event_type"]
-        ]
-        state_transitions = [
-            e for e in events
-            if e["event_type"] == "state_transitioned"
+            if "error" in e["event_type"]
         ]
         transition_exceeded = [
             e for e in events
@@ -401,96 +356,35 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
             bf.last_event_time = events[0].get("created_at", "")
             bf.last_event_type = events[0].get("event_type", "")
             bf.last_event_detail = events[0].get("detail", "")
-
-        # Classify based on events
+        bf.event_types = event_types
+        bf.reason_pattern_hits = collect_reason_pattern_hits(bf.blocked_reason or "")
+        bf.signal_tags = []
+        if error_events:
+            bf.signal_tags.append("has_error_events")
         if transition_exceeded:
-            bf.block_type = "non-objective"
-            bf.block_evidence.append("transition_count_exceeded: state machine design issue")
+            bf.signal_tags.append("transition_count_exceeded")
             bf.block_evidence.append(
-                f"detail: {transition_exceeded[0].get('detail', '')}"
+                f"transition_count_exceeded: {transition_exceeded[0].get('detail', '')[:120]}"
             )
-
-        if not bf.block_type or bf.block_type == "unknown":
-            # Check if there are error events
-            if error_events and all("error" in et for et in {e["event_type"] for e in error_events}):
-                bf.block_type = "objective"
-                bf.block_evidence.append(f"error events: {list({e['event_type'] for e in error_events})}")
-            elif error_events:
-                # Mixed error types - check auto-abort details
-                auto_aborts = [e for e in error_events if e["event_type"] == "flow_auto_aborted"]
-                if auto_aborts:
-                    for e in auto_aborts:
-                        detail = e.get("detail", "")
-                        classification = classify_block_reason(detail)
-                        if classification == "objective":
-                            bf.block_type = "objective"
-                            bf.block_evidence.append(f"auto-aborted: {detail[:120]}")
-                            break
-                        elif classification == "ambiguous":
-                            bf.block_type = "ambiguous"
-                            bf.block_evidence.append(f"auto-aborted (ambiguous): {detail[:120]}")
-                            break
-                    else:
-                        if "codeagent_manager_aborted" in {e["event_type"] for e in error_events}:
-                            bf.block_type = "non-objective"
-                            bf.block_evidence.append("manager aborted without error events — potential prompt issue")
-                        else:
-                            bf.block_type = "non-objective"
-                            bf.block_evidence.append("auto-aborted without clear objective reason")
-                elif "codeagent_manager_aborted" in {e["event_type"] for e in error_events} and not any(
-                    "error" in et for et in {e["event_type"] for e in error_events}
-                ):
-                    bf.block_type = "non-objective"
-                    bf.block_evidence.append("manager aborted without error events — potential prompt issue")
-                else:
-                    bf.block_type = "unknown"
-                    bf.block_evidence.append(f"mixed events: {list({e['event_type'] for e in error_events})}")
-
-        # Check block events for reason classification
-        if bf.block_type == "unknown":
-            for e in block_events:
-                detail = e.get("detail", "")
-                classification = classify_block_reason(detail)
-                if classification != "unknown":
-                    bf.block_type = classification
-                    bf.block_evidence.append(f"block event: {detail[:120]}")
-                    break
-
-        # Check blocked_reason
-        if bf.block_type == "unknown":
-            classification = classify_block_reason(bf.blocked_reason or "")
-            if classification != "unknown":
-                bf.block_type = classification
-                bf.block_evidence.append(f"blocked_reason: {bf.blocked_reason}")
-
-        # Check for state_transitioned -> blocked without preceding error
-        if bf.block_type == "unknown":
-            block_transitions = [
-                e for e in state_transitions
-                if "blocked" in str(e.get("refs", {}).get("after_state", "")).lower()
-            ]
-            if block_transitions and not error_events:
-                bf.block_type = "non-objective"
-                bf.block_evidence.append(
-                    "transitioned to blocked without preceding error events"
-                )
-                bf.block_evidence.append(
-                    f"transition: {block_transitions[0].get('detail', '')}"
-                )
-
-        # Dependency chain: blocked by another issue
-        if bf.block_type == "unknown" and bf.blocked_by_issue:
-            bf.block_type = "dependency"
-            bf.block_evidence.append(f"dependency: blocked by #{bf.blocked_by_issue}")
+        if bf.blocked_by_issue:
+            bf.signal_tags.append("blocked_by_issue")
+            bf.block_evidence.append(f"blocked_by_issue: #{bf.blocked_by_issue}")
+        if block_events:
+            bf.signal_tags.append("has_block_events")
+            bf.block_evidence.append(
+                f"block_event_detail: {(block_events[0].get('detail') or '')[:120]}"
+            )
+        if bf.reason_pattern_hits:
+            bf.block_evidence.append(
+                f"blocked_reason_patterns: {', '.join(bf.reason_pattern_hits)}"
+            )
 
         results.append(bf)
 
     return results
 
 
-def trace_dependency_chain(
-    issue_number: int, max_depth: int = 3
-) -> list[dict[str, Any]]:
+def trace_dependency_chain(issue_number: int, max_depth: int = 3) -> list[dict[str, Any]]:
     """Trace a dependency chain to find the root blocker."""
     from vibe3.clients.sqlite_client import SQLiteClient
 
@@ -520,14 +414,12 @@ def trace_dependency_chain(
         blocked_reason = flow.get("blocked_reason", "")
         flow_status = flow.get("flow_status", "")
 
-        classification = classify_block_reason(blocked_reason)
-
         chain.append({
             "issue": current,
             "status": flow_status,
             "blocked_by": blocked_by,
             "reason": blocked_reason,
-            "type": classification,
+            "reason_pattern_hits": collect_reason_pattern_hits(blocked_reason),
         })
 
         if not blocked_by or flow_status not in ("blocked", "aborted"):
@@ -538,36 +430,6 @@ def trace_dependency_chain(
     return chain
 
 
-def resolve_dependency_chain_type(chain: list[dict[str, Any]]) -> str:
-    """Resolve the type of a dependency chain."""
-    for entry in chain:
-        if entry["type"] == "non-objective":
-            return "non-objective"
-    for entry in chain:
-        if entry["type"] == "unknown":
-            return "unknown"
-    return "objective"
-
-
-def compute_priority(bf: BlockedFlow) -> str:
-    """Compute observation priority based on flow state and issue status.
-
-    Priority is a ranking signal, NOT a filter. All levels are observable;
-    higher priority means the issue is more likely to be a live problem.
-
-    - high:   flow is actively blocked + issue is OPEN (blocking execution queue)
-    - medium: flow blocked/aborted + issue OPEN (live problem, needs investigation)
-    - low:    issue CLOSED (may be historical, but still observable for patterns)
-    """
-    issue_open = bf.issue_state != "CLOSED"  # None (not checked) treated as potentially open
-
-    if bf.flow_status == "blocked" and bf.has_worktree and issue_open:
-        return "high"
-    if bf.flow_status in ("blocked", "aborted") and issue_open:
-        return "medium"
-    return "low"
-
-
 def print_results(
     flows: list[BlockedFlow],
     format_type: str = "text",
@@ -575,32 +437,21 @@ def print_results(
     ready_for_audit: bool = False,
 ) -> None:
     """Print results."""
-    non_obj = [f for f in flows if f.block_type == "non-objective"]
-    objective = [f for f in flows if f.block_type == "objective"]
-    dependency = [f for f in flows if f.block_type == "dependency"]
-    ambiguous = [f for f in flows if f.block_type == "ambiguous"]
-    unknown = [f for f in flows if f.block_type == "unknown"]
-
     if ready_for_audit:
-        ready = [f for f in flows if f.screening_verdict == "ready"]
-        historical = [f for f in flows if f.screening_verdict == "historical"]
-        human_dec = [f for f in flows if f.screening_verdict == "human_decision"]
+        ready = [f for f in flows if f.screening_verdict == "candidate"]
         already_observed = [f for f in flows if f.screening_verdict == "already_observed"]
-        insufficient = [f for f in flows if f.screening_verdict == "insufficient_evidence"]
-        stale = [f for f in flows if f.screening_verdict == "stale"]
-        objective_skipped = [f for f in flows if f.screening_verdict == "objective"]
+        covered_by_open_decision = [
+            f for f in flows if f.screening_verdict == "covered_by_open_decision"
+        ]
 
         if format_type == "json":
             output = {
                 "summary": {
                     "total_blocked_aborted": len(flows),
-                    "ready_for_audit": len(ready),
+                    "candidate_count": len(ready),
                     "excluded": {
-                        "objective": len(objective_skipped),
-                        "human_decision": len(human_dec),
                         "already_observed": len(already_observed),
-                        "insufficient_evidence": len(insufficient),
-                        "stale": len(stale),
+                        "covered_by_open_decision": len(covered_by_open_decision),
                     },
                 },
                 "audit_candidates": [
@@ -608,14 +459,15 @@ def print_results(
                         "branch": f.branch,
                         "issue_number": f.issue_number,
                         "flow_status": f.flow_status,
-                        "block_type": f.block_type,
+                        "signal_tags": f.signal_tags,
+                        "reason_pattern_hits": f.reason_pattern_hits,
+                        "event_types": f.event_types,
                         "block_evidence": f.block_evidence,
                         "evidence_count": f.evidence_count,
                         "has_worktree": f.has_worktree,
                         "execution_age_days": f.execution_age_days,
                         "issue_state": f.issue_state,
                         "has_merged_pr": f.has_merged_pr,
-                        "recommended_priority": compute_priority(f),
                     }
                     for f in ready
                 ],
@@ -623,34 +475,31 @@ def print_results(
             print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
             print(f"\n{'='*70}")
-            print(f"Audit-Ready Flow Candidates (script-screened)")
+            print(f"Audit Observation Facts (mechanically screened)")
             print(f"{'='*70}")
             print(f"Total blocked/aborted: {len(flows)}")
-            print(f"Ready for audit:     {len(ready)} 🔴")
+            print(f"Candidates:          {len(ready)}")
             print(f"Excluded:")
-            print(f"  Objective:         {len(objective_skipped)} (code/infrastructure)")
-            print(f"  Human decision:    {len(human_dec)} (roadmap/deferred)")
             print(f"  Already observed:  {len(already_observed)} (existing observation covers this issue)")
-            print(f"  Insufficient data: {len(insufficient)} (< 2 evidence sources)")
-            print(f"  Stale:             {len(stale)} (> 10 days since execution)")
+            print(f"  Open decision:     {len(covered_by_open_decision)} (exact issue already in open decision)")
 
             if ready:
                 print(f"\n{'─'*70}")
-                print(f"🔴 Audit Candidates — {len(ready)} flows ready for observation")
+                print(f"Facts for Agent Judgment — {len(ready)} flows")
                 print(f"{'─'*70}")
-                # Sort: HIGH first, then MEDIUM, then LOW
-                priority_order = {"high": 0, "medium": 1, "low": 2}
-                ready_sorted = sorted(ready, key=lambda f: priority_order.get(compute_priority(f), 99))
-                for f in ready_sorted:
-                    priority = compute_priority(f)
-                    print(f"\n  [{priority.upper()}] {f.branch}")
+                for f in ready:
+                    print(f"\n  {f.branch}")
                     print(f"  Issue:        #{f.issue_number}", end="")
                     if f.issue_state:
                         print(f" ({f.issue_state})", end="")
                         if f.has_merged_pr:
                             print(" [merged PR]", end="")
                     print()
-                    print(f"  Status:       {f.flow_status} | Type: {f.block_type}")
+                    print(f"  Status:       {f.flow_status}")
+                    if f.signal_tags:
+                        print(f"  Signal tags:  {', '.join(f.signal_tags)}")
+                    if f.reason_pattern_hits:
+                        print(f"  Reason hits:  {', '.join(f.reason_pattern_hits)}")
                     print(f"  Evidence:     {f.evidence_count} sources", end="")
                     sources = []
                     if f.has_worktree: sources.append("worktree")
@@ -664,9 +513,6 @@ def print_results(
                         print(f"  Age:          {f.execution_age_days} days since execution")
                     for ev in f.block_evidence[:2]:
                         print(f"  Evidence:     {ev[:100]}")
-            else:
-                print(f"\n  No flows meet all screening criteria.")
-                print(f"  Consider using --enrich to check GitHub for issue state.")
 
         return
 
@@ -675,105 +521,66 @@ def print_results(
         output = {
             "summary": {
                 "total_blocked_aborted": len(flows),
-                "non_objective": len(non_obj),
-                "objective": len(objective),
-                "dependency": len(dependency),
-                "ambiguous": len(ambiguous),
-                "unknown": len(unknown),
             },
-            "non_objective_flows": [
+            "flows": [
                 {
                     "branch": f.branch,
                     "issue_number": f.issue_number,
                     "flow_status": f.flow_status,
-                    "block_type": f.block_type,
+                    "signal_tags": f.signal_tags,
+                    "reason_pattern_hits": f.reason_pattern_hits,
+                    "event_types": f.event_types,
                     "evidence": f.block_evidence,
                     "last_event": f.last_event_detail,
                     "last_event_time": f.last_event_time,
                 }
-                for f in non_obj
-            ],
-            "dependency_flows": [],
-            "objective_flows": [
-                {
-                    "branch": f.branch,
-                    "issue_number": f.issue_number,
-                    "flow_status": f.flow_status,
-                    "block_type": f.block_type,
-                    "evidence": f.block_evidence,
-                }
-                for f in objective
-            ],
-            "unknown_flows": [
-                {
-                    "branch": f.branch,
-                    "issue_number": f.issue_number,
-                    "flow_status": f.flow_status,
-                    "block_type": f.block_type,
-                    "evidence": f.block_evidence,
-                }
-                for f in unknown
+                for f in flows
             ],
         }
 
         if trace_deps:
-            for f in dependency:
+            dependency_flows = [f for f in flows if f.blocked_by_issue]
+            output["dependency_chains"] = []
+            for f in dependency_flows:
                 chain = trace_dependency_chain(f.issue_number or 0)
-                chain_type = resolve_dependency_chain_type(chain)
-                output["dependency_flows"].append({
+                output["dependency_chains"].append({
                     "branch": f.branch,
                     "issue_number": f.issue_number,
                     "chain": chain,
-                    "resolved_type": chain_type,
                 })
 
         print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
         print(f"\n{'='*70}")
-        print(f"Blocked/Aborted Flow Analysis")
+        print(f"Blocked/Aborted Flow Facts")
         print(f"{'='*70}")
-        print(f"Total: {len(flows)} | Non-objective: {len(non_obj)} | Objective: {len(objective)} | Dependency: {len(dependency)} | Ambiguous: {len(ambiguous)} | Unknown: {len(unknown)}")
+        print(f"Total: {len(flows)}")
 
-        if non_obj:
-            print(f"\n{'─'*70}")
-            print(f"🔴 Non-Objective Blocks (candidates for audit observation) — {len(non_obj)} flows")
-            print(f"{'─'*70}")
-            for f in non_obj:
-                print(f"\n  Branch:      {f.branch}")
-                print(f"  Issue:       #{f.issue_number}")
-                print(f"  Status:      {f.flow_status}")
-                print(f"  Block type:  {f.block_type}")
-                for ev in f.block_evidence:
-                    print(f"  Evidence:    {ev[:120]}")
-                if f.last_event_detail:
-                    print(f"  Last event:  {f.last_event_detail[:120]}")
+        for f in flows:
+            print(f"\n  Branch:      {f.branch}")
+            print(f"  Issue:       #{f.issue_number}")
+            print(f"  Status:      {f.flow_status}")
+            if f.signal_tags:
+                print(f"  Signal tags: {', '.join(f.signal_tags)}")
+            if f.reason_pattern_hits:
+                print(f"  Reason hits: {', '.join(f.reason_pattern_hits)}")
+            for ev in f.block_evidence:
+                print(f"  Evidence:    {ev[:120]}")
+            if f.last_event_detail:
+                print(f"  Last event:  {f.last_event_detail[:120]}")
 
-        if ambiguous:
+        dependency_flows = [f for f in flows if f.blocked_by_issue]
+        if dependency_flows and trace_deps:
             print(f"\n{'─'*70}")
-            print(f"🟠 Ambiguous Blocks (need human review) — {len(ambiguous)} flows")
+            print(f"Dependency Chains — {len(dependency_flows)} flows")
             print(f"{'─'*70}")
-            for f in ambiguous:
-                print(f"  {f.branch:35s} #{str(f.issue_number):6s} {f.block_evidence[0][:80] if f.block_evidence else ''}")
-
-        if dependency and trace_deps:
-            print(f"\n{'─'*70}")
-            print(f"🟡 Dependency Chains — {len(dependency)} flows")
-            print(f"{'─'*70}")
-            for f in dependency:
+            for f in dependency_flows:
                 chain = trace_dependency_chain(f.issue_number or 0)
-                chain_type = resolve_dependency_chain_type(chain)
                 print(f"\n  Branch:        {f.branch}")
                 print(f"  Issue:         #{f.issue_number}")
-                print(f"  Chain type:    {chain_type}")
                 for entry in chain:
-                    print(f"    → #{entry['issue']}: {entry['type']} ({str(entry.get('reason',''))[:60]})")
-
-        if objective:
-            print(f"\n{'─'*70}")
-            print(f"🟢 Objective Blocks (excluded from audit) — {len(objective)} flows")
-            print(f"{'─'*70}")
-            for f in objective:
-                print(f"  {f.branch:35s} #{str(f.issue_number):6s} {f.block_evidence[0][:60] if f.block_evidence else ''}")
+                    hits = ", ".join(entry.get("reason_pattern_hits", [])) or "none"
+                    print(f"    → #{entry['issue']}: hits={hits} ({str(entry.get('reason',''))[:60]})")
 
 
 def show_flow_events(branch: str) -> None:
@@ -813,11 +620,11 @@ def show_flow_events(branch: str) -> None:
     print(f"Summary: {len(events)} events, {len(block_events)} block/abort events, {len(error_events)} error events")
 
     if block_events and not error_events:
-        print("🔴 Block/abort WITHOUT error events → potential non-objective block")
+        print("No error events observed before block/abort")
         for be in block_events:
             print(f"   {be.get('detail', '')[:120]}")
     elif error_events:
-        print("🟢 Block/abort WITH error events → likely objective block")
+        print("Error events observed before block/abort")
         for ee in error_events:
             print(f"   [{ee['event_type']}] {ee.get('detail', '')[:120]}")
 
@@ -836,12 +643,12 @@ def git_common_dir() -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Identify non-objective blocked flows for audit observation"
+        description="Collect blocked/aborted flow facts for audit observation"
     )
     parser.add_argument(
         "--ready-for-audit",
         action="store_true",
-        help="Apply all screening criteria: exclude objective/historical/human-decision/stale/insufficient-evidence flows",
+        help="Apply only mechanical ledger dedup and optional remote fact enrichment",
     )
     parser.add_argument(
         "--enrich",
@@ -856,7 +663,7 @@ def main() -> None:
     parser.add_argument(
         "--trace-deps",
         action="store_true",
-        help="Trace dependency chains to classify dependency-type blocks",
+        help="Trace dependency chains and print raw chain facts",
     )
     parser.add_argument(
         "--format",
@@ -905,10 +712,17 @@ def main() -> None:
         observed_issues = load_existing_observation_issues(
             git_common_dir() / "shared"
         )
+        covered_issue_numbers = load_open_decision_covered_issues()
 
         for bf in flows:
             fdata = flow_data_map.get(bf.branch, {})
-            screen_flow(bf, fdata, enrich=args.enrich, observed_issues=observed_issues)
+            screen_flow(
+                bf,
+                fdata,
+                enrich=args.enrich,
+                observed_issues=observed_issues,
+                covered_issue_numbers=covered_issue_numbers,
+            )
 
         print_results(flows, format_type=args.format, trace_deps=args.trace_deps, ready_for_audit=True)
     else:

@@ -68,29 +68,33 @@ uv run python src/vibe3/cli.py flow status --all --format json > /tmp/vibe-audit
 
 > 注意：`task status` 没有 `--all` 参数。用 `flow status --all` 获取所有 flow（包括 blocked/aborted/failed），task 信息可从 flow 输出中的 `task_issue_number` 字段获取。
 
-### Step 2: 筛选非客观因素导致的 blocked flow（脚本自动筛选）
+### Step 2: 收集 blocked/aborted flow 事实（脚本只做机械工作）
 
-**不要手动判断哪些 flow 值得观察**。用脚本一键输出 audit-ready 候选：
+不要手写 SQL 或手动拼接事件。先用脚本收集候选事实：
 
 ```bash
 uv run python scripts/audit-blocked-flows.py --ready-for-audit
 ```
 
-该脚本自动应用所有筛选标准：
-- ✅ 排除客观因素（codeagent_error、capacity exceeded、branch deleted 等）
-- ✅ 排除人工决策（roadmap decision、deferred、low priority）
-- ✅ 排除历史问题（--enrich 模式下检查 issue CLOSED + PR merged）
-- ✅ 排除证据不足（< 2 evidence sources 的 flow 无法形成高质量 observation）
-- ✅ 排除过时问题（execution 超过 30 天）
-- ✅ 保留非客观因素 + 模糊 + 依赖链（按 block_type 标记）
+该脚本当前**只做机械工作**：
+- ✅ 读取 blocked/aborted flow、事件时间线、shared ledger 状态
+- ✅ 跳过已有 observation 的 issue
+- ✅ 跳过已出现在 open decision issue `## Affected Issues` 中的 issue
+- ✅ 输出原始 signal tags、reason pattern hits、event types、evidence_count、execution_age_days
+- ❌ **不再判断** 客观/非客观/模糊/依赖链类型
+- ❌ **不再判断** 人工决策、历史问题、证据是否足够、是否 stale
+- ❌ **不再给出** recommended priority
 
-如需进一步检查 GitHub issue 状态（判断是"已完成的历史问题"还是"agent 未交付的现实问题"）：
+如需补充 GitHub 远端事实：
 
 ```bash
 uv run python scripts/audit-blocked-flows.py --ready-for-audit --enrich
 ```
 
-`--enrich` 模式通过 `gh issue view` 和 `gh pr list` 查询每个候选的 issue 是否 CLOSED、是否有 merged PR。Issue CLOSED + PR merged → 自动排除；Issue CLOSED + 无 merged PR → 标记为 audit 候选（agent 可能未交付）。
+`--enrich` 模式只补充：
+- issue state
+- 关联 PR 编号
+- 是否存在 merged PR
 
 如需查看某个 flow 的完整事件时间线，了解在哪个 transition 导致 blocked：
 
@@ -98,13 +102,14 @@ uv run python scripts/audit-blocked-flows.py --ready-for-audit --enrich
 uv run python scripts/audit-blocked-flows.py --show-events --branch task/issue-<N>
 ```
 
-### Step 3: 从脚本输出中选择样本
+### Step 3: Agent 从事实输出中选择样本
 
-脚本的 `--ready-for-audit` 已经做了所有硬筛选。agent 只需从输出的 audit candidates 中选择最多 `3` 个样本。优先级：
+脚本现在不做治理判断。agent 需要从输出的 candidate facts 中选择最多 `3` 个样本。推荐顺序：
 
-1. **recommended_priority = high**（has_worktree + flow blocked）。
-2. **recommended_priority = medium**（issue CLOSED 但无 merged PR——可能的 agent 未交付）。
-3. 有 issue、PR、handoff、commit 中多类证据可追溯的 flow（`evidence_count` 高）。
+1. 有 worktree、plan/report/audit/PR 多类证据的 flow。
+2. 事件时间线中出现 `transition_count_exceeded`、`state unchanged`、`latest verdict missing` 等模式命中的 flow。
+3. issue CLOSED 但无 merged PR 的 flow。
+4. 其余 blocked/aborted flow 由 agent 结合上下文决定是否观察。
 
 ### Step 4: 检查已有 decision issue 是否覆盖候选
 
@@ -122,9 +127,9 @@ gh issue list --search '"[audit]"' --state open --limit 20 --json number,title,s
 - `[audit]` 前缀 → 普通 task issue（类型 B，标签不含 `supervisor`）
 - 两种都是 audit-decision 的产出，都需要检查
 
-Agent 需要判断：
-1. 候选的 `issue_number` 是否已在 decision issue 的 Evidence Chain 中被引用？
-2. 候选的 target 文件（从 observation 推断）是否已被 decision issue 的 Bounded Edit Scope 覆盖？
+脚本层与 agent 层分工：
+1. 脚本会机械跳过两类对象：已有 observation 的 issue、以及已出现在 open decision issue `## Affected Issues` 中的 issue。
+2. Agent 仍需判断 target 文件（从 observation 推断）是否已被 decision issue 的 Bounded Edit Scope 覆盖。
 3. 如果被覆盖 → **跳过**。这是已处理的 flow，问题正在修复中。
 4. 如果没有被覆盖 → **进入观察**。
 

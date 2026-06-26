@@ -38,7 +38,7 @@
 | 修复范围 | Issue 类型 | Label | 下游流程 | 适用场景 |
 |---------|-----------|-------|---------|---------|
 | **仅 prompt/test** | supervisor issue | `supervisor` + `state/ready` | roadmap-intake → supervisor/apply | bounded_edit 到 `supervisor/policies/*`、`tests/*` |
-| **涉及代码/脚本** | 普通 task issue | `state/ready` | roadmap-intake → assignee-pool → plan/run/review | 修改 `src/vibe3/*`、新增/修改 `scripts/*` |
+| **涉及代码/脚本** | 普通 task issue | 常规 open issue（不直接设 `state/ready`） | roadmap-intake → assignee-pool → plan/run/review | 修改 `src/vibe3/*`、新增/修改 `scripts/*` |
 | **混合** | split → 两个 issue | 分别标记 | 各自走各自的流程 | prompt 修复 + 代码修复是独立的 |
 
 ### 判断标准
@@ -81,7 +81,7 @@
 ### Forbidden
 
 - 直接修改代码、prompt、policy、skill 或 supervisor material
-- 修改 state labels（除新建 issue 时设置 `supervisor` + `state/ready` 外）
+- 修改 state labels（除新建 supervisor issue 时设置 `supervisor` + `state/ready` 外）
 - 进入 plan/run/review 执行链
 - 写入 `.git/shared/decisions/` 目录（不再使用 YAML 文件）
 - 自动应用 decision（auto_apply=false 硬默认）
@@ -109,7 +109,7 @@
 10. **Produce decision**: 根据独立验证结果做出决策（accept/hold/reject/split），并确定 issue 类型
 11. **Create decision issues（直接发布，不等审核）**: 
     - 类型 A → `gh issue create --label "supervisor,state/ready" ...`
-    - 类型 B → `gh issue create --label "state/ready" ...`
+    - 类型 B → `gh issue create ...`（保持为常规 open issue，交给 roadmap-intake 判断是否纳入 assignee pool）
     - 类型 C → 创建两个 issue，body 中互相引用
     - 自修复 issue（如果有）→ 按实际情况创建
     - hold/reject → 输出到 stdout，不创建 issue
@@ -152,7 +152,7 @@
 ### accept_for_followup
 
 - **When**: Evidence 为 strong 或 medium，target refs 明确
-- **Action**: 创建 supervisor decision issue
+- **Action**: 按路由规则创建 follow-up issue（supervisor 或常规 issue）
 - **Issue 内容**: bounded edit scope、evidence chain、gate conditions
 
 ### hold_for_more_evidence
@@ -196,6 +196,9 @@
 ## Summary
 [Brief description of the decision and bounded edit]
 
+## Affected Issues
+- #<source-issue-number>
+
 ## Routing
 - **Issue type**: supervisor (simple fix — prompt/test only)
 - **Downstream**: roadmap-intake → supervisor/apply
@@ -222,12 +225,15 @@
 
 **Title**: `[audit] <简短描述>`
 
-**Labels**: `state/ready`（不加 `supervisor` 标签——走正常的 assignee-pool 流程）
+**Labels**: 不直接加 `state/ready`（保持常规 open issue，等待 roadmap-intake 分配 manager assignee 并决定是否入池）
 
 **Body**:
 ```markdown
 ## Summary
 [Brief description of the audit finding and recommended fix]
+
+## Affected Issues
+- #<source-issue-number>
 
 ## Routing
 - **Issue type**: normal task (complex fix — code/script changes)
@@ -427,7 +433,7 @@ Decision issue **必须直接创建**，不需要等待或人工确认：
 gh issue create --title "[audit-decision] accept: <描述>" --label "supervisor,state/ready" --body "..."
 
 # Task issue
-gh issue create --title "[audit] <描述>" --label "state/ready" --body "..."
+gh issue create --title "[audit] <描述>" --body "..."
 ```
 
 创建后立即运行 cleanup：

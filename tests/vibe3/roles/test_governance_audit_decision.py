@@ -36,6 +36,8 @@ class TestBuildAuditDecisionContext:
             assert result["new_since_last_run"] == 0
             assert result["evidence_strengths"] == []
             assert "目前无报告" in result["scope_note"]
+            assert "按材料中的路由规则" in result["scope_note"]
+            assert "supervisor decision issue" not in result["scope_note"]
 
     def test_build_context_with_count(self, tmp_path: Path) -> None:
         """Context reflects report count."""
