@@ -187,7 +187,7 @@ def test_internal_manager_async_skipped_uses_launch_result_display(monkeypatch):
     assert result.exit_code == 0
     mock_display.assert_called_once()
     assert mock_display.call_args.args[1] is launch
-    assert mock_display.call_args.args[2] == "Manager Dispatch"
+    assert mock_display.call_args.args[2] == "Manager"
     assert "Failed" not in result.output
 
 
@@ -494,19 +494,19 @@ def test_internal_manager_show_prompt_forces_sync_path(monkeypatch):
 
 
 class TestManagerDryRunResultDisplay:
-    """Manager --dry-run must use sync execution and display via
-    _handle_codeagent_result, consistent with plan/run/review commands."""
+    """Manager sync execution displays via display_execution_result, sharing
+    the unified ExecutionLaunchResult display path used by both sync and
+    async modes."""
 
-    @patch("vibe3.commands.common._handle_codeagent_result")
-    def test_manager_dry_run_uses_handle_codeagent_result(self, mock_handle):
-        """Manager --dry-run passes CodeagentResult to _handle_codeagent_result."""
-        from vibe3.agents import CodeagentResult
+    @patch("vibe3.ui.display_execution_result")
+    def test_manager_no_async_uses_display_execution_result(self, mock_display):
+        """Manager --no-async displays ExecutionLaunchResult via shared path."""
+        from vibe3.models import ExecutionLaunchResult
 
-        fake_result = CodeagentResult(
-            success=True,
+        fake_result = ExecutionLaunchResult(
+            launched=True,
             backend="anthropic",
             model="claude-opus-4-8",
-            issue_number=123,
         )
 
         with patch(
@@ -518,30 +518,28 @@ class TestManagerDryRunResultDisplay:
             ) as mock_async:
                 result = runner.invoke(
                     cli_app,
-                    ["internal", "manager", "123", "--dry-run", "--no-async", "--yes"],
+                    ["internal", "manager", "123", "--no-async", "--yes"],
                 )
 
         assert result.exit_code == 0
         mock_sync.assert_called_once()
         mock_async.assert_not_called()
-        mock_handle.assert_called_once()
-        call_args = mock_handle.call_args
-        result_arg = call_args[0][0]
-        assert result_arg.success is True
+        mock_display.assert_called_once()
+        result_arg = mock_display.call_args[0][1]
+        assert result_arg.launched is True
         assert result_arg.backend == "anthropic"
         assert result_arg.model == "claude-opus-4-8"
-        assert call_args[0][1] == "Manager"
+        assert mock_display.call_args[0][2] == "Manager"
 
-    @patch("vibe3.commands.common._handle_codeagent_result")
-    def test_manager_dry_run_forces_sync_execution(self, mock_handle):
+    @patch("vibe3.ui.display_execution_result")
+    def test_manager_dry_run_forces_sync_execution(self, mock_display):
         """Manager --dry-run (without --no-async) forces sync execution."""
-        from vibe3.agents import CodeagentResult
+        from vibe3.models import ExecutionLaunchResult
 
-        fake_result = CodeagentResult(
-            success=True,
+        fake_result = ExecutionLaunchResult(
+            launched=True,
             backend="openai",
             model="gpt-5",
-            issue_number=123,
         )
 
         with patch(
@@ -560,10 +558,8 @@ class TestManagerDryRunResultDisplay:
         # --dry-run forces sync execution, not async
         mock_sync.assert_called_once()
         mock_async.assert_not_called()
-        mock_handle.assert_called_once()
-        call_args = mock_handle.call_args
-        result_arg = call_args[0][0]
-        assert result_arg.success is True
+        mock_display.assert_called_once()
+        result_arg = mock_display.call_args[0][1]
+        assert result_arg.launched is True
         assert result_arg.backend == "openai"
         assert result_arg.model == "gpt-5"
-        assert call_args[0][1] == "Manager"

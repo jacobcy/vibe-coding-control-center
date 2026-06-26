@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import typer
 
 from vibe3.agents import CodeagentBackend
@@ -22,9 +20,6 @@ from vibe3.services.flow import resolve_branch_arg
 from vibe3.services.issue import load_issue_info
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import format_agent_actor, format_dry_run_header
-
-if TYPE_CHECKING:
-    from vibe3.models import ExecutionLaunchResult
 
 
 def run_issue_role_async(

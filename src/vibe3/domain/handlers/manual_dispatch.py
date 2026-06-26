@@ -27,6 +27,7 @@ from vibe3.services.shared import log_dispatch_error
 
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentResult
+    from vibe3.models import ExecutionLaunchResult
     from vibe3.roles import ReviewRunResult
 
 # Result sink for CLI commands that need return values (review verdict).
@@ -37,6 +38,22 @@ _pending_results: dict[str, Any] = {}
 def get_pending_result(key: str) -> Any | None:
     """Retrieve and clear a pending result stored by a handler."""
     return _pending_results.pop(key, None)
+
+
+def _resolve_review_metadata(
+    event: ManualReviewIntent,
+    launch_result: ExecutionLaunchResult | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Resolve backend/model/tmux/log for ReviewRunResult.
+
+    Event params (CLI overrides) take precedence; launch_result fills the rest.
+    Shared by sync and async branch-review paths to avoid field-drift.
+    """
+    backend = event.backend or (launch_result.backend if launch_result else None)
+    model = event.model or (launch_result.model if launch_result else None)
+    tmux = launch_result.tmux_session if launch_result else None
+    log = launch_result.log_path if launch_result else None
+    return backend, model, tmux, log
 
 
 @register_handler("ManualPlanIntent")
@@ -319,15 +336,9 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 backend=effective.backend or event.backend,
                 model=effective.model or event.model,
             )
-            # Create result for branch review
-            # Fill backend/model/tmux/log from launch_result when available
-            # (prefer event params as source of truth for CLI override)
-            backend_val = event.backend or (
-                launch_result.backend if launch_result else None
+            backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
+                event, launch_result
             )
-            model_val = event.model or (launch_result.model if launch_result else None)
-            tmux_val = launch_result.tmux_session if launch_result else None
-            log_val = launch_result.log_path if launch_result else None
             verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
                 verdict,
@@ -353,15 +364,16 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
                 fresh_session=event.fresh_session,
             )
-            # Return result with tmux/log/metadata from launch_result
-            backend_val = event.backend or (
-                launch_result.backend if launch_result else None
+            backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
+                event, launch_result
             )
-            model_val = event.model or (launch_result.model if launch_result else None)
-            tmux_val = launch_result.tmux_session if launch_result else None
-            log_val = launch_result.log_path if launch_result else None
+            verdict = (
+                "ASYNC"
+                if (launch_result is None or launch_result.launched)
+                else "ERROR"
+            )
             return ReviewRunResult(
-                "ASYNC",
+                verdict,
                 None,
                 event.issue_number,
                 tmux_session=tmux_val,

@@ -497,3 +497,39 @@ class TestBackendModelPropagation:
         assert result.model == "opus"  # event param preferred
         assert result.tmux_session == "vibe3-review-async-42"
         assert result.log_path == "temp/logs/review/async/42.log"
+
+    def test_handle_manual_review_branch_async_failure_returns_error(self) -> None:
+        """Branch review async launch failure must surface ERROR verdict.
+
+        Regression guard: the async verdict must not be hardcoded to ASYNC.
+        When launch_result.launched is False, downstream consumers (review.py
+        exit-code gating) rely on ERROR to signal failure.
+        """
+        from vibe3.models import ExecutionLaunchResult
+
+        mock_launch = ExecutionLaunchResult(
+            launched=False,
+            backend="codex",
+            model="gpt-5.4",
+            reason="tmux session conflict",
+            reason_code="launch_failed",
+        )
+
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=False,
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.execution.run_issue_role_async",
+                return_value=mock_launch,
+            ),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "ERROR"

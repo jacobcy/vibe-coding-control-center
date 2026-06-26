@@ -97,13 +97,6 @@ def _check_report_ref(branch: str) -> bool:
     return False
 
 
-def _resolve_report_ref(branch: str | None) -> str | None:
-    """Get report_ref from flow state, or None if unavailable."""
-    from vibe3.services.flow import resolve_flow_ref
-
-    return resolve_flow_ref(branch, "report_ref")
-
-
 def _review_branch_impl(
     branch: str,
     trace: bool,
