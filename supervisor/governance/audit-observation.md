@@ -50,6 +50,16 @@ uv run python src/vibe3/cli.py scan governance --role audit-observation --dry-ru
 
 先用稳定命令收集候选，不要从 `.git/vibe3` 目录结构推断状态。
 
+### Step 0: 清理违规和过期文件（前置）
+
+旧 observation 文件（多 document YAML、格式损坏）会阻塞 `audit-ledger-summary.py` 和去重逻辑。在收集候选前必须清理：
+
+```bash
+uv run python scripts/audit-validate.py --prune --delete
+```
+
+脚本只做机械清理：YAML 解析失败 + 超过 10 天的文件。不做语义判断。
+
 ### Step 1: 获取所有 flow 状态
 
 ```bash
@@ -95,7 +105,30 @@ uv run python scripts/audit-blocked-flows.py --show-events --branch task/issue-<
 1. **recommended_priority = high**（has_worktree + flow blocked）。
 2. **recommended_priority = medium**（issue CLOSED 但无 merged PR——可能的 agent 未交付）。
 3. 有 issue、PR、handoff、commit 中多类证据可追溯的 flow（`evidence_count` 高）。
-4. 同类 symptom 反复出现的 flow（多个 flow 有相同的 block_type）。
+
+### Step 4: 检查已有 decision issue 是否覆盖候选
+
+脚本不做语义排重——它只输出"哪些 flow 可能值得观察"。**agent 自己判断候选是否已被已有 decision issue 覆盖**。
+
+获取已有 decision issue 的原始数据：
+
+```bash
+# 搜索所有 audit 相关的 issue（包括 supervisor 和 task 类型）
+gh issue list --search "[audit]" --state open --limit 20 --json number,title,state,labels,body
+```
+
+注意：
+- `[audit-decision]` 前缀 → supervisor issue（类型 A）
+- `[audit]` 前缀 → 普通 task issue（类型 B）
+- 两种都算"已有 decision"
+
+Agent 需要判断：
+1. 候选的 `issue_number` 是否已在 decision issue 的 Evidence Chain 中被引用？
+2. 候选的 target 文件（从 observation 推断）是否已被 decision issue 的 Bounded Edit Scope 覆盖？
+3. 如果被覆盖 → **跳过**。这是已处理的 flow，问题正在修复中。
+4. 如果没有被覆盖 → **进入观察**。
+
+> 这个判断是语义级别的——脚本做不了，必须 agent 来做。
 
 如果没有候选，仍输出空观察摘要并记录 `candidate_count: 0`。
 
