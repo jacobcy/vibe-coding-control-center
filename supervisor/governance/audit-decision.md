@@ -172,6 +172,17 @@
 
 ## Decision Issue 格式
 
+### Title 前缀约定（硬性规则）
+
+所有 audit-decision 创建的 issue **必须**使用以下前缀之一，确保下游和未来的 audit 轮次可以通过 `gh issue list --search` 统一发现：
+
+| Issue 类型 | Title 前缀 | 搜索命令 |
+|-----------|-----------|---------|
+| 类型 A（supervisor） | `[audit-decision]` | `gh issue list --search "[audit-decision]"` |
+| 类型 B（普通 task） | `[audit]` | `gh issue list --search "[audit]"` |
+
+> `gh issue list --search "[audit]"` 会同时匹配 `[audit]` 和 `[audit-decision]`（因为 `[audit-decision]` 包含 `[audit]` 子串）。**必须使用其中一种前缀，禁止不加前缀。**
+
 ### 类型 A: Supervisor Issue（简单修复 — prompt/test/config）
 
 用于 bounded_edit 到 `supervisor/policies/*`、`tests/*`、`config/*` 的修复。

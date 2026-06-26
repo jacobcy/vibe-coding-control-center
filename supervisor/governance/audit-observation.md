@@ -113,14 +113,14 @@ uv run python scripts/audit-blocked-flows.py --show-events --branch task/issue-<
 获取已有 decision issue 的原始数据：
 
 ```bash
-# 搜索所有 audit 相关的 issue（包括 supervisor 和 task 类型）
-gh issue list --search "[audit]" --state open --limit 20 --json number,title,state,labels,body
+# 所有 audit decision issue（supervisor + task）
+gh issue list --search '"[audit]"' --state open --limit 20 --json number,title,state,labels,body
 ```
 
-注意：
-- `[audit-decision]` 前缀 → supervisor issue（类型 A）
-- `[audit]` 前缀 → 普通 task issue（类型 B）
-- 两种都算"已有 decision"
+注意 Title 前缀约定（定义在 `audit-decision.md`）：
+- `[audit-decision]` 前缀 → supervisor issue（类型 A，标签含 `supervisor`）
+- `[audit]` 前缀 → 普通 task issue（类型 B，标签不含 `supervisor`）
+- 两种都是 audit-decision 的产出，都需要检查
 
 Agent 需要判断：
 1. 候选的 `issue_number` 是否已在 decision issue 的 Evidence Chain 中被引用？
