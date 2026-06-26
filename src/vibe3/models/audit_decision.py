@@ -15,7 +15,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 _ISSUE_BODY_TEMPLATE = """## Summary
 
 {rationale}
@@ -185,13 +184,19 @@ class AuditDecision(BaseModel):
             evidence_strength: Evidence strength label (strong/medium/weak/inconclusive)
             report_ref: Reference to the source report file name
         """
-        observation_list = "\n".join(
-            f"- {oid}: [linked observation]" for oid in self.linked_observation_ids
-        ) or "- (none)"
+        observation_list = (
+            "\n".join(
+                f"- {oid}: [linked observation]" for oid in self.linked_observation_ids
+            )
+            or "- (none)"
+        )
 
-        suggestion_list = "\n".join(
-            f"- {sid}: [linked suggestion]" for sid in self.linked_suggestion_ids
-        ) or "- (none)"
+        suggestion_list = (
+            "\n".join(
+                f"- {sid}: [linked suggestion]" for sid in self.linked_suggestion_ids
+            )
+            or "- (none)"
+        )
 
         if self.bounded_edit_scope:
             bounded_edit_section = "\n".join(
@@ -206,8 +211,7 @@ class AuditDecision(BaseModel):
 
         if self.gate_conditions:
             gate_conditions_section = "\n".join(
-                f"- **{key}**: {value}"
-                for key, value in self.gate_conditions.items()
+                f"- **{key}**: {value}" for key, value in self.gate_conditions.items()
             )
             gate_conditions_section += (
                 "\n- **Verification status**: not yet automated — manual check required"
@@ -221,7 +225,9 @@ class AuditDecision(BaseModel):
             suggestion_list=suggestion_list,
             decision=self.decision,
             evidence_strength=evidence_strength,
-            requires_human_confirmation="yes" if self.requires_human_confirmation else "no",
+            requires_human_confirmation=(
+                "yes" if self.requires_human_confirmation else "no"
+            ),
             bounded_edit_section=bounded_edit_section,
             gate_conditions_section=gate_conditions_section,
         )
