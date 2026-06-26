@@ -398,9 +398,7 @@ def test_append_event_with_color_none(tmp_path: Path, enable_event_log, monkeypa
     assert "[test_component] test message\n" in content
 
 
-def test_append_event_with_unknown_color(
-    tmp_path: Path, enable_event_log, monkeypatch
-):
+def test_append_event_with_unknown_color(tmp_path: Path, enable_event_log, monkeypatch):
     """append_orchestra_event silently degrades unknown color name to plain output."""
     # Mock stdout.isatty() to return True
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
