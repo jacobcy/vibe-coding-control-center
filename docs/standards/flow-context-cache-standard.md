@@ -53,7 +53,7 @@ Cache 是优化层，不是真源
 示例流程：
 
 ```
-1. vibe3 flow start task/issue-436
+1. vibe3 flow update --branch task/issue-436
    → flow_state 创建
    → 缓存为空
 
