@@ -60,7 +60,7 @@ def _should_transition_aborted_to_done(
     try:
         prs = github.list_prs_for_branch(branch)
         for pr in prs:
-            if hasattr(pr, 'merged_at') and pr.merged_at is not None:
+            if hasattr(pr, "merged_at") and pr.merged_at is not None:
                 return True
     except Exception:
         pass
