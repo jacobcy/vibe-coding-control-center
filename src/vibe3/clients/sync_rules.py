@@ -89,7 +89,7 @@ class LocalSyncRules(BaseModel):
     )
     aborted_flow_done_reconcile: SyncRule = Field(
         default_factory=SyncRule,
-        description="Transition aborted flows to done when all phases complete and delivery confirmed",
+        description="Reconcile aborted→done when delivery confirmed",
     )
     stale_blocked_sync: SyncRule = Field(
         default_factory=SyncRule,
