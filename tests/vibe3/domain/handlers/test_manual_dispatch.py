@@ -8,6 +8,7 @@ fire-and-forget success (exit 0), breaking CI gating.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from vibe3.agents import CodeagentResult
@@ -29,6 +30,22 @@ from vibe3.roles import ReviewRunResult
 
 def _make_review_request() -> ReviewRequest:
     return ReviewRequest(scope=ReviewScope.for_base("main"))
+
+
+def _make_review_config(
+    backend: str | None = None, model: str | None = None
+) -> SimpleNamespace:
+    """Create a minimal config mock with review agent_config section."""
+    return SimpleNamespace(
+        review=SimpleNamespace(
+            agent_config=SimpleNamespace(
+                agent=None,
+                backend=backend,
+                model=model,
+                timeout_seconds=3600,
+            )
+        )
+    )
 
 
 class TestManualReviewIntentErrorPaths:
@@ -482,7 +499,10 @@ class TestBackendModelPropagation:
         )
 
         with (
-            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.config.load_config_for_role",
+                return_value=_make_review_config(backend="claude", model="opus"),
+            ),
             patch(
                 "vibe3.execution.run_issue_role_async",
                 return_value=mock_launch,
@@ -523,7 +543,10 @@ class TestBackendModelPropagation:
         )
 
         with (
-            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.config.load_config_for_role",
+                return_value=_make_review_config(backend="claude", model="opus"),
+            ),
             patch(
                 "vibe3.execution.run_issue_role_async",
                 return_value=mock_launch,

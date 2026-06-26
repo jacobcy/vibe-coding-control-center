@@ -43,14 +43,26 @@ def get_pending_result(key: str) -> Any | None:
 def _resolve_review_metadata(
     event: ManualReviewIntent,
     launch_result: ExecutionLaunchResult | None,
+    effective_backend: str | None = None,
+    effective_model: str | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None]:
     """Resolve backend/model/tmux/log for ReviewRunResult.
 
-    Event params (CLI overrides) take precedence; launch_result fills the rest.
+    Priority: event (CLI override) > launch_result (coordinator)
+    > effective (config default). All three levels are covered so that
+    dry-run (no launch_result) still shows backend/model from config.
     Shared by sync and async branch-review paths to avoid field-drift.
     """
-    backend = event.backend or (launch_result.backend if launch_result else None)
-    model = event.model or (launch_result.model if launch_result else None)
+    backend = (
+        event.backend
+        or (launch_result.backend if launch_result else None)
+        or effective_backend
+    )
+    model = (
+        event.model
+        or (launch_result.model if launch_result else None)
+        or effective_model
+    )
     tmux = launch_result.tmux_session if launch_result else None
     log = launch_result.log_path if launch_result else None
     return backend, model, tmux, log
@@ -337,7 +349,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=effective.model or event.model,
             )
             backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
-                event, launch_result
+                event, launch_result, effective.backend, effective.model
             )
             verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
@@ -354,6 +366,20 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
             return result
         else:
             # Async mode
+            from vibe3.execution import resolve_command_agent_options
+
+            # Resolve effective options up front (same as sync path)
+            # so config defaults are available as fallback when launch_result
+            # lacks backend/model (async tmux launch doesn't propagate them).
+            options = resolve_command_agent_options(
+                config=config,
+                section="review",
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+            )
+            effective = resolve_effective_agent_options(options)
+
             launch_result = run_issue_role_async(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
@@ -365,7 +391,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 fresh_session=event.fresh_session,
             )
             backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
-                event, launch_result
+                event, launch_result, effective.backend, effective.model
             )
             verdict = (
                 "ASYNC"

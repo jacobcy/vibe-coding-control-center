@@ -52,11 +52,15 @@ _YES_OPT = Annotated[
 ]
 
 
-def _emit_review_result(result: ReviewRunResult) -> None:
+def _emit_review_result(result: ReviewRunResult, report_ref: str | None = None) -> None:
     """Render review result summary using shared display_codeagent_result.
 
     Metadata (backend/model/log/tmux) goes through the shared display path
     used by plan/run. Review-specific verdict and handoff file are shown on top.
+
+    report_ref is resolved from flow state (the run report being reviewed)
+    and passed through the shared metadata channel so it appears alongside
+    backend/model/log/tmux in the same section as plan/run.
     """
     from rich.console import Console
 
@@ -71,6 +75,7 @@ def _emit_review_result(result: ReviewRunResult) -> None:
             success=result.verdict not in {"ERROR", "UNKNOWN"},
             backend=result.backend,
             model=result.model,
+            report_ref=report_ref,
             tmux_session=result.tmux_session,
             log_path=result.log_path,
         ),
@@ -82,6 +87,17 @@ def _emit_review_result(result: ReviewRunResult) -> None:
         console.print(f"\n=== Verdict: {result.verdict} ===")
         if result.handoff_file:
             console.print(f"[cyan]-> Review saved to:[/cyan] {result.handoff_file}")
+
+
+def _resolve_report_ref(branch: str | None) -> str | None:
+    """Get report_ref from flow state, or None if unavailable.
+
+    report_ref is set by vibe3 run (the run report). Review needs it to
+    tell the user which run report is being reviewed.
+    """
+    from vibe3.services.flow import resolve_flow_ref
+
+    return resolve_flow_ref(branch, "report_ref")
 
 
 def _check_report_ref(branch: str) -> bool:
@@ -159,7 +175,8 @@ def _review_branch_impl(
     if result is None:
         typer.echo("Review dispatched (async mode)")
     else:
-        _emit_review_result(result)
+        report_ref = _resolve_report_ref(branch)
+        _emit_review_result(result, report_ref)
 
 
 @app.callback(invoke_without_command=True)
@@ -361,6 +378,7 @@ def base(
         typer.echo("Review dispatched (async mode)")
     else:
         # Sync mode: display result
-        _emit_review_result(result)
+        report_ref = _resolve_report_ref(current_branch)
+        _emit_review_result(result, report_ref)
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)
