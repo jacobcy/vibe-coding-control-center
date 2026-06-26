@@ -69,7 +69,7 @@ VibeConfig (根配置)
 ```
 config/settings.yaml
        ↓
-   loader.py (load_config, load_config_with_env_override)
+   loader.py (load_config, get_config_with_env_override)
        ↓
    settings.py (VibeConfig 验证)
        ↓
@@ -110,6 +110,7 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 - **CodeLimitsConfig**: 代码限制配置
 - **TestPathsConfig**: 测试路径配置
 - **ReviewScopeConfig**: Review 范围配置
+- **ReviewConfig**: Review 配置
 - **QualityConfig**: 质量配置
 - **MergeGateConfig**: Merge gate 配置
 - **PRScoringConfig**: PR 评分配置
@@ -161,7 +162,7 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 - **get_config**: 获取全局配置实例（带缓存）
 - **load_config**: 从文件加载配置
 - **reload_config**: 强制重新加载配置
-- **load_config_with_env_override**: 加载配置并应用环境变量覆盖
+- **get_config_with_env_override**: 加载配置并应用环境变量覆盖
 - **load_runtime_config**: 加载运行时配置
 - **load_keys_env_fallback**: 加载密钥（环境变量 fallback）
 - **load_orchestra_config**: 加载 Orchestra 配置

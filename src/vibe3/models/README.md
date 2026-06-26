@@ -20,6 +20,7 @@ Pydantic 领域数据模型，定义系统中流转的核心数据结构。
 | pr.py | 185 | PR 请求/响应模型（CreatePRRequest、PRState） |
 | adapter_manifest.py | 82 | Adapter 清单模型 |
 | review.py | 81 | Review 模型、ReviewResult |
+| review_runner.py | 53 | Agent 选项、Agent 结果 |
 | coordination_truth.py | 108 | 协调真值模型 |
 | audit_suggestion.py | 155 | 审计建议模型 |
 | plan.py | 71 | Plan 模型、PlanSpecInput |
@@ -47,7 +48,7 @@ Pydantic 领域数据模型，定义系统中流转的核心数据结构。
 | branch_convention.py | 86 | BranchConvention |
 | __init__.py | 424 | 公共 API 导出（lazy import） |
 
-截至 2026-06，总计 42 文件，约 4468 行代码。
+截至 2026-06，总计 41 文件，约 4468 行代码。
 
 ## 架构说明
 
