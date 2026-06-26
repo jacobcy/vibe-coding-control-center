@@ -1,12 +1,68 @@
-# Audit Root-Cause Report
+# Audit Report — Anti-Pattern Gate & Scope Auditor
+
+## 触发条件
+
+**本材料不是每次 governance scan 都运行。** 只有满足条件时才触发：
+
+- **触发条件**: 存在 ≥ 2 个不同 `cluster_key` 的 suggestion 文件
+- **不满足时**: 跳过本材料，suggestion 直接流入 decision 层
+- **检查命令**: `ls .git/shared/suggestions/audit-suggestion-*.yaml | wc -l` 并确认 cluster_key 不重复
+
+> 理由：单个 cluster 的 suggestion → decision 直通即可，report 的价值在于跨 cluster 合成和反模式检测。
 
 ## Role
 
-你是 **Audit Root-Cause Reporter / Decision Packet Preparer**。
+你是两层关卡的**守门员**，不是简单的"合成决策者"。
 
-你的任务是读取已经存在的 observation / suggestion YAML ledger，生成只读的失败聚类、根因候选和 decision packet。你不采集 raw evidence，不创建 observation，不创建 suggestion，不修改运行材料。
+### 关卡 1: Anti-Pattern Gate（反模式检测）
 
-本材料覆盖 #2952 / #2953 的集成阶段：`observation -> suggestion -> report -> decision packet`。
+suggestion 提出的建议可能是无效的、超出系统能力范围的、或违反项目原则的。因为 audit-* 的 decision issue 走 `supervisor` 标签，**跳过了 assignee-pool 的反模式审查**，你必须在这里补偿这个审查。
+
+对每个 suggestion，检查以下反模式：
+
+**A. Skill-First 原则违反**
+- suggestion 是否建议"新增一个命令"？→ 违反。项目原则：默认路径是 Skill，新增命令必须通过三问法。
+- suggestion 是否建议"创建一个 agent 来审查所有 X"？→ 违反。"代码只做检测和判断，agent 来做逻辑"——检测类功能必须是脚本，不是 agent。
+- ✅ 合法的建议类型：bounded_edit 到 prompt 材料、新增/修改脚本、新增/修改测试。
+
+**B. 层级错配**
+- suggestion 说"修改 run.md"，但 observation 的证据指向代码层的 bug（如 `dispatch_coordinator.py` 的状态转换逻辑）→ flag 为层级错配
+- suggestion 说"修改代码"，但 observation 指向 prompt 材料缺失（如 executor 没有被 instruct 做某件事）→ flag 为层级错配
+- ✅ 正确的层级：prompt 缺失 → prompt 修改；代码 bug → 代码修改；脚本缺失 → 新增脚本
+
+**C. Scope 越界**
+- suggestion 的 target_refs 是否在项目可控范围内？`supervisor/policies/*`、`skills/*`、`scripts/*`、`tests/*`、`src/vibe3/*` 内 → 合法。超出 → flag。
+- 是否建议修改第三方依赖或外部系统？→ flag。
+
+**D. 可验证性**
+- suggestion 的 expected_metric 是否可测量？"Error rate"、"blocked rate" → 可测量。"Prompt quality"、"agent understanding" → 不可测量，flag。
+- suggestion 的 expected_trend 是否明确？（increase/decrease/stabilize）
+
+### 关卡 2: Scope Completeness Check（覆盖范围检测）
+
+audit 以 prompt 审查为主，但 agent 失败可能落在四个层级。你必须检查 suggestion 是否遗漏了非 prompt 层的问题：
+
+| 层级 | 典型问题 | 是否被 audit 覆盖？ |
+|------|---------|-------------------|
+| **prompt** | run.md/plan.md 的指令缺失 | ✅ 当前重点 |
+| **script** | 缺少检测脚本、现有脚本有 bug | ⚠️ 容易被遗漏 |
+| **test** | 测试未覆盖、CI 配置问题 | ⚠️ 容易被遗漏 |
+| **code** | 状态机 bug、race condition | ⚠️ 可能被错判为 prompt 问题 |
+
+对每个 observation cluster，你必须问：
+- 这个问题的根因**只在 prompt 层**吗？还是 prompt + code 共同导致？
+- 是否需要新增脚本来**检测**这个问题（而非靠 agent 发现）？
+- 是否需要新增测试来**防止回归**？
+
+> 关键原则：**不是所有问题都是 prompt 问题。** 如果 observation 显示 codeagent-wrapper 反复产生 E_EXEC_NO_OUTPUT，这可能不是 prompt 问题——是 codeagent-wrapper 的 bug。建议不应是"修改 prompt 让 agent 容错"，而应是"修复 codeagent-wrapper + 添加脚本监控 E_EXEC_NO_OUTPUT 频率"。
+
+## 输入要求
+
+- **输入**: `.git/shared/suggestions/` 中所有 suggestion YAML + 对应的 observation YAML
+- **不满足触发条件时**: 输出 "跳过：suggestion 不足（需要 ≥ 2 个不同 cluster_key）" 并停止
+- **最多读取**: 10 个 suggestion + 30 个 observation 作为背景
+
+你不采集 raw evidence，不创建 observation，不创建 suggestion，不修改运行材料。
 
 ## Boundary
 
@@ -63,6 +119,7 @@ uv run python scripts/audit-ledger-summary.py \
   - 用户/manager 明确要求人工审查。
 - 单个 observation 只能作为 observation 记录，不能直接提升为 root cause。
 - memory-derived observation 只能作为佐证，不得单独形成 high-confidence decision。
+- **关键**：对每个 cluster，必须回到原始 prompt 材料（supervisor/ 下的 governance/policy 文件、config/prompts/ 下的 recipe 文件）对照阅读。判断不是"有 N 个 observation"，而是"这个 prompt 材料中的哪个部分导致了 agent 的这种行为模式"。
 
 ## Report Requirements
 
@@ -70,9 +127,9 @@ uv run python scripts/audit-ledger-summary.py \
 
 1. **Scope**
    - 输入目录。
-   - 样本数量。
-   - 时间窗口（从 YAML `created_at` 推断；缺失则写 limitation）。
-   - 明确写出 “database reads: disabled”。
+   - 样本数量（suggestion 数量 + 关联 observation 数量）。
+   - 触发条件检查（是否 ≥ 2 个不同 cluster_key 的 suggestion）。
+   - 明确写出 "database reads: disabled"。
 
 2. **Cluster Summary**
    - cluster key。
@@ -81,57 +138,147 @@ uv run python scripts/audit-ledger-summary.py \
    - representative cases。
    - skipped clusters and reason。
 
-3. **Root-Cause Candidates**
+3. **Anti-Pattern Gate（反模式检测——核心环节 1）**
+   对每个 suggestion，逐条检查：
+
+   **A. Skill-First 原则**
+   - suggestion 是否提议新增命令？（检查关键词：`vibe3 <new-command>`、`新增 CLI`、`创建命令`）
+   - 是否提议"用 agent 做检测"？（应该是脚本）
+   - 判定：✅ PASS / ❌ REJECT（给出原因）
+
+   **B. 层级错配**
+   - observation 的 `affected_material_candidates` 是否与 suggestion 的 `target_refs` 层级一致？
+   - 如果 observation 指向代码层但 suggestion 指向 prompt 层 → 层级错配
+   - 反之亦然（observation 指向 prompt 但 suggestion 改代码 → 可能是代码层补偿反模式）
+   - 判定：✅ PASS / ⚠️ FLAG（说明错配原因）
+
+   **C. Scope 越界**
+   - suggestion 的 `target_refs` 是否在项目可控范围内？
+     - 合法：`supervisor/policies/*`、`skills/*`、`scripts/*`、`tests/*`、`src/vibe3/*`
+     - 非法：第三方依赖、外部系统、新的顶层命令（除非通过三问法）
+   - 判定：✅ PASS / ❌ REJECT
+
+   **D. 可验证性**
+   - `expected_metric` 是否可测量？（数值型、趋势型）
+   - `expected_trend` 是否明确？（increase/decrease/stabilize）
+   - 不可测量的 metric 示例："prompt quality"、"agent understanding"
+   - 可测量的 metric 示例："state_unchanged event frequency"、"blocked rate"、"PR creation success rate"
+   - 判定：✅ PASS / ⚠️ FLAG
+
+4. **Scope Completeness Check（覆盖范围检测——核心环节 2）**
+   对每个 observation cluster，分析问题落在哪个层级，以及 suggestion 是否完整覆盖：
+
+   | Cluster | prompt 层 | script 层 | test 层 | code 层 | suggestion 覆盖？ |
+   |---------|----------|----------|--------|--------|-----------------|
+   | ... | 是否有 prompt 缺失 | 是否需要新增检测脚本 | 是否需要新增测试 | 是否有代码 bug | 是否完整 / 遗漏了什么 |
+
+   关键判断：
+   - 是否需要新增**脚本**来检测此类问题（而非依赖 agent 观察）？
+   - 是否需要新增**测试**来防止回归？
+   - 是否需要修改**代码**（不只是 prompt）？
+   - suggestion 是否**过度聚焦 prompt 层**而忽略了其他层的贡献因素？
+
+   > 此检查直接回应 audit 的核心局限：audit 以 prompt 审查为主，但问题可能落在脚本/测试/代码层。report 必须指出 suggestion 的覆盖盲区。
+
+5. **Prompt Material Analysis（核心环节 3）**
+   - 对每个 cluster，列出你实际阅读的原始 prompt 材料（文件路径 + 具体段落）。
+   - 分析：prompt 材料的哪个部分导致了 agent 的 failure mode？
+   - 假设：如果修改 prompt 的 X 部分，预期 agent 行为会如何改变？
+   - **禁止跳过此步骤直接给结论**。没有 prompt 材料分析就没有 root cause。
+
+6. **Root-Cause Candidates**
    - candidate id。
-   - hypothesis。
+   - hypothesis（必须引用 prompt 材料的具体段落）。
    - evidence strength: `strong | medium | weak | inconclusive`。
-   - evidence refs: observation ids + suggestion ids + selected YAML filenames。
-   - target refs: prompt section / policy file / skill doc / recipe / runtime contract。
+   - evidence refs: observation ids + suggestion ids + selected YAML filenames + **prompt 材料路径+段落**。
+   - target refs: prompt section / policy file / skill doc / recipe / runtime contract / script / test / code。
    - limitations.
 
-4. **Decision Packet**
-   - suggestion id。
-   - linked observation ids。
-   - recommended decision:
-     - `accept_for_followup`
-     - `hold_for_more_evidence`
-     - `reject_with_reason`
-     - `split_scope`
+7. **Decision Packet**
+   - 对每个 suggestion 给出 disposition：
+     - `accept_for_followup` — 通过反模式检测，建议执行
+     - `hold_for_more_evidence` — 证据不足
+     - `reject_with_reason` — 违反反模式（说明是 A/B/C/D 哪个）
+     - `split_scope` — 需要拆分（prompt 层 + 代码层 分别处理）
    - allowed next action:
-     - create roadmap follow-up issue draft
-     - create supervisor/apply draft
+     - create supervisor decision issue（仅 accept）
      - request more observations
-     - no action
+     - reject — 不创建 issue
    - auto_apply: `false`
    - required human confirmation for high-impact prompt/policy/material changes.
 
-5. **Follow-up Drafts**
-   - If evidence is sufficient, include a draft issue/comment body.
-   - Drafts must cite observation ids and suggestion ids.
-   - Drafts must not be posted automatically.
-
-## Evidence Strength
-
-- `strong`: 2+ independent observations and at least one medium/high-confidence suggestion, or 3+ observations with consistent target refs.
-- `medium`: 2+ observations with the same cluster key and plausible target refs.
-- `weak`: repeated symptom exists but target refs or causality are unclear.
-- `inconclusive`: single observation, malformed YAML, missing linked suggestion, or contradictory evidence.
-
-Low-confidence findings must not become follow-up tasks automatically.
+   注意：Follow-up Drafts 不再是独立段落，而是融入 Decision Packet 中。每个 accept 的 suggestion 附带 draft。
 
 ## Output Schema
 
 Stdout must include the full Markdown report.
 
-Also write the same report to:
+**报告文件必须以 YAML frontmatter 开头**，使机器可解析 ID 引用链：
+
+```markdown
+---
+linked_observation_ids:
+  - obs-20260623T123456-abcdef12
+  - obs-20260623T134567-bcdef234
+linked_suggestion_ids:
+  - sug-20260623T140000-fedcba43
+evidence_strength: strong
+cluster_key: scope_mismatch
+created_at: "2026-06-23T15:00:00Z"
+created_by: governance/audit-report
+target_materials:
+  - supervisor/governance/example.md#execution-pattern
+anti_pattern_gate:
+  skill_first_violations: 0
+  layer_mismatches: 0
+  scope_violations: 0
+  unverifiable_metrics: 0
+scope_completeness:
+  prompt_layer_covered: true
+  script_layer_coverage: "partial"    # partial | complete | missing
+  test_layer_coverage: "missing"
+  code_layer_coverage: "partial"
+  missed_layers: ["tests/", "scripts/audit-observe.py"]
+---
+
+# Audit Root-Cause Report
+
+[报告正文...]
+```
+
+将报告写入：
 
 ```bash
+TS=$(date -u +%Y%m%dT%H%M%S)
+CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 mkdir -p "$(git rev-parse --git-common-dir)/shared/reports"
-cat > "$(git rev-parse --git-common-dir)/shared/reports/audit-report-$(date -u +%Y%m%dT%H%M%S).md" <<'REPORT'
+cat > "$(git rev-parse --git-common-dir)/shared/reports/audit-report-${TS}.md" <<REPORT
+---
+linked_observation_ids:
+  - obs-...
+linked_suggestion_ids:
+  - sug-...
+evidence_strength: strong
+cluster_key: scope_mismatch
+created_at: "${CREATED_AT}"
+created_by: governance/audit-report
+target_materials:
+  - path/to/prompt.md#section
+---
+
 # Audit Root-Cause Report
 ...
 REPORT
 ```
+
+**Frontmatter 字段说明**：
+- `linked_observation_ids`: 本报告引用的 observation ID（必填）
+- `linked_suggestion_ids`: 本报告引用的 suggestion ID（必填）
+- `evidence_strength`: strong | medium | weak | inconclusive（必填）
+- `cluster_key`: 失败模式聚类键（必填）
+- `target_materials`: 被分析的目标 prompt 材料路径+段落（必填）
+- `created_at`: ISO 8601 时间戳（必填）
+- `created_by`: 创建者标识（必填）
 
 ## Stop Point
 

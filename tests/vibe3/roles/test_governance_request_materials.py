@@ -176,23 +176,57 @@ class TestRoundRobinMaterialSelection:
         assert val == "supervisor/governance/cron-supervisor.md"
 
     def test_tick_wraps_around(self):
-        """execution_count wraps around material catalog.
+        """execution_count wraps around material catalog via modulo.
 
-        (7 materials, count 7 -> index 0).
+        Dynamically computes catalog size and verifies wrapping.
         """
-        recipe = build_governance_recipe(
-            _make_config(), tick_count=0, execution_count=7
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        catalog_count = len(catalog)
+        assert catalog_count > 0
+
+        recipe0 = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=0
         )
-        val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/assignee-pool.md"
+        val0 = recipe0.variables["supervisor_name"].value
+
+        # execution_count == catalog_count should wrap to the same as index 0
+        recipe_wrap = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=catalog_count
+        )
+        val_wrap = recipe_wrap.variables["supervisor_name"].value
+        assert val_wrap == val0, (
+            f"execution_count={catalog_count} should wrap to first material "
+            f"(got {val_wrap}, expected {val0})"
+        )
 
     def test_large_tick_uses_modulo(self):
-        """execution_count=13 wraps around 7 materials to index 6 (audit-report)."""
+        """Large execution_count uses modulo to stay within catalog bounds.
+
+        Verifies the modulo mechanism without hardcoding material indices.
+        """
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        catalog_count = len(catalog)
+        assert catalog_count > 0
+
+        large_count = catalog_count * 7 + 3
+        expected_index = large_count % catalog_count
+
         recipe = build_governance_recipe(
-            _make_config(), tick_count=0, execution_count=13
+            _make_config(), tick_count=0, execution_count=large_count
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/audit-report.md"
+
+        # Verify the result is in the catalog
+        material_names = [m.name for m in catalog]
+        assert val in material_names, f"{val} not in material catalog"
+
+        # Verify it matches the expected index
+        expected_material = material_names[expected_index]
+        assert val == expected_material
 
     def test_tick_4_selects_audit_observation(self):
         """execution_count=4 selects audit-observation from recipe catalog."""
@@ -217,6 +251,14 @@ class TestRoundRobinMaterialSelection:
         )
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/audit-report.md"
+
+    def test_tick_7_selects_audit_decision(self):
+        """execution_count=7 selects audit-decision from recipe catalog."""
+        recipe = build_governance_recipe(
+            _make_config(), tick_count=0, execution_count=7
+        )
+        val = recipe.variables["supervisor_name"].value
+        assert val == "supervisor/governance/audit-decision.md"
 
     @pytest.mark.slow
     def test_build_governance_request_uses_round_robin(self):

@@ -364,40 +364,110 @@ def build_audit_suggestion_context(snapshot: Any) -> dict[str, Any]:
     return result
 
 
+def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-report material.
+
+    Reads observation and suggestion ledgers from shared directories and
+    provides aggregate statistics for the reporter. The material owns the
+    actual analysis through audit-ledger-summary.py.
+    """
+    from vibe3.utils import get_git_common_dir
+
+    try:
+        git_common_dir = get_git_common_dir()
+        shared_dir = Path(git_common_dir) / "shared"
+    except Exception:
+        shared_dir = Path(".git/shared")
+
+    observations_dir = shared_dir / "observations"
+    suggestions_dir = shared_dir / "suggestions"
+
+    observation_count = 0
+    suggestion_count = 0
+    observed_failure_modes: set[str] = set()
+
+    if observations_dir.exists():
+        obs_files = sorted(observations_dir.glob("audit-observation-*.yaml"))
+        observation_count = len(obs_files)
+        for obs_file in obs_files[:20]:
+            try:
+                content = obs_file.read_text()
+                if "observed_failure_mode:" in content:
+                    for line in content.split("\n"):
+                        if "observed_failure_mode:" in line:
+                            mode = line.split(":", 1)[1].strip().strip('"').strip("'")
+                            if mode:
+                                observed_failure_modes.add(mode)
+                            break
+            except Exception:
+                continue
+
+    if suggestions_dir.exists():
+        sug_files = sorted(suggestions_dir.glob("audit-suggestion-*.yaml"))
+        suggestion_count = len(sug_files)
+
+    result = build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="root-cause report generation",
+        scope_note=(
+            f"审计报告上下文：\n"
+            f"- 可用观察记录：{observation_count}\n"
+            f"- 可用建议记录：{suggestion_count}\n"
+            f"- 检测到的失败模式："
+            f"{', '.join(sorted(observed_failure_modes)) or '无'}\n\n"
+            "请运行 `uv run python scripts/audit-ledger-summary.py` "
+            "获取机械摘要，然后深度读取满足条件的 cluster "
+            "（2+ observation 或有明确 suggestion 引用），"
+            "生成 root-cause 报告并写入 `.git/shared/reports/`。"
+            f"{'目前无观察/建议记录，跳过本轮。' if observation_count == 0 else ''}"
+        ),
+    )
+
+    result["observation_count"] = observation_count
+    result["suggestion_count"] = suggestion_count
+    result["observed_failure_modes"] = sorted(observed_failure_modes)
+
+    return result
+
+
 def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
     """Build context for audit-decision material.
 
     Reads report ledger from shared directory and provides aggregate
-    statistics for the decision-maker to determine if there are new
-    decision packets requiring formal decisions.
+    statistics for the decision-maker to evaluate reports and create
+    supervisor decision issues.
+
+    The decision agent creates GitHub issues (not YAML files) so the
+    downstream scan supervisor → roadmap-intake → supervisor/apply
+    pipeline handles execution naturally.
 
     The context does NOT read full report content - the agent reads
     selected ones via tools per the material's instructions.
     """
-    # Get shared reports directory path (cross-worktree shared location)
     from vibe3.utils import get_git_common_dir
 
     try:
         git_common_dir = get_git_common_dir()
         reports_dir = Path(git_common_dir) / "shared" / "reports"
     except Exception:
-        # Fallback: use relative path from current working tree
         reports_dir = Path(".git/shared/reports")
 
-    # Count report files
     report_count = 0
     evidence_strengths: set[str] = set()
 
     if reports_dir.exists():
-        # Read report files (up to 5 for context stats)
         report_files = sorted(reports_dir.glob("audit-report-*.md"))
         report_count = len(report_files)
 
-        # Quick parse to extract evidence strength (don't read full content)
         for report_file in report_files[:5]:
             try:
                 content = report_file.read_text()
-                # Extract evidence strength from Markdown (simple pattern match)
                 if "evidence strength:" in content.lower():
                     for line in content.split("\n"):
                         if "evidence strength:" in line.lower():
@@ -424,17 +494,17 @@ def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
             f"- 可用报告数：{report_count}\n"
             f"- 检测到的证据强度："
             f"{', '.join(sorted(evidence_strengths)) or '无'}\n\n"
-            "请使用 Read 工具读取 `.git/shared/reports/"
-            "audit-report-*.md` 文件，"
-            "按材料中的证据评估规则分析，为每个 decision packet"
-            "生成正式决策（accept/hold/reject/split）。"
+            "请读取 `.git/shared/reports/audit-report-*.md`，"
+            "按材料中的证据规则为每个 decision packet "
+            "创建 supervisor decision issue（不是 YAML 文件）。\n"
+            "Decision issue 使用 `supervisor` + `state/ready` 标签，"
+            "交由下游 scan supervisor / roadmap-intake / supervisor/apply 处理。"
             f"{'目前无报告，跳过本轮。' if report_count == 0 else ''}"
         ),
     )
 
-    # Add decision-specific fields for programmatic access
     result["report_count"] = report_count
-    result["new_since_last_run"] = report_count  # Simplified: assume all are new
+    result["new_since_last_run"] = report_count
     result["evidence_strengths"] = sorted(evidence_strengths)
 
     return result

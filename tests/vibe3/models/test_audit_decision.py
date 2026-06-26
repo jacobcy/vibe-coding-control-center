@@ -207,3 +207,100 @@ def test_audit_decision_decision_type_validation():
             linked_suggestion_ids=["sug-001"],
             linked_observation_ids=["obs-001"],
         )
+
+
+def test_format_issue_title():
+    """Test that format_issue_title produces valid GitHub issue title."""
+    decision = AuditDecision.create(
+        decision="accept_for_followup",
+        rationale="Strong evidence",
+        linked_suggestion_ids=["sug-001"],
+        linked_observation_ids=["obs-001", "obs-002"],
+        bounded_edit_scope={
+            "target_file": "supervisor/governance/example.md",
+            "max_lines": 50,
+        },
+        evidence_strength="strong",
+    )
+    title = decision.format_issue_title()
+    assert title.startswith("[audit-decision]")
+    assert "accept" in title
+    assert "supervisor/governance/example.md" in title
+
+
+def test_format_issue_title_no_target():
+    """format_issue_title without bounded_edit_scope."""
+    decision = AuditDecision.create(
+        decision="hold_for_more_evidence",
+        rationale="Weak evidence",
+        linked_suggestion_ids=["sug-001"],
+        linked_observation_ids=["obs-001"],
+    )
+    title = decision.format_issue_title()
+    assert title.startswith("[audit-decision]")
+    assert "hold" in title
+
+
+def test_format_issue_body_accept():
+    """format_issue_body produces complete issue body for accept decision."""
+    decision = AuditDecision.create(
+        decision="accept_for_followup",
+        rationale="Strong evidence from 3 observations, clear target refs",
+        linked_suggestion_ids=["sug-001", "sug-002"],
+        linked_observation_ids=["obs-001", "obs-002", "obs-003"],
+        bounded_edit_scope={
+            "target_file": "supervisor/governance/example.md",
+            "target_section": "## Execution Pattern",
+            "max_lines": 50,
+        },
+        gate_conditions={
+            "verification_window_days": 7,
+            "rollback_trigger": "blocked rate > 10%",
+            "success_metric": "flow blocked rate",
+        },
+        evidence_strength="strong",
+    )
+    body = decision.format_issue_body(
+        evidence_strength="strong",
+        report_ref="audit-report-20260623T120000.md",
+    )
+
+    # Verify key sections are present
+    assert "## Summary" in body
+    assert "Strong evidence" in body
+    assert "## Evidence Chain" in body
+    assert "obs-001" in body
+    assert "sug-001" in body
+    assert "## Decision" in body
+    assert "accept_for_followup" in body
+    assert "## Bounded Edit Scope" in body
+    assert "target_file" in body
+    assert "## Gate Conditions" in body
+    assert "verification_window_days" in body
+    assert "not yet automated" in body
+    assert "audit-report-20260623T120000.md" in body
+
+
+def test_format_issue_body_no_gate_conditions():
+    """format_issue_body handles missing gate_conditions."""
+    decision = AuditDecision.create(
+        decision="hold_for_more_evidence",
+        rationale="Weak evidence, need more observations",
+        linked_suggestion_ids=["sug-001"],
+        linked_observation_ids=["obs-001"],
+    )
+    body = decision.format_issue_body(evidence_strength="weak")
+    assert "## Gate Conditions" in body
+    assert "N/A" in body
+
+
+def test_format_issue_body_empty_linked_ids():
+    """format_issue_body handles empty linked IDs gracefully."""
+    decision = AuditDecision.create(
+        decision="reject_with_reason",
+        rationale="Inconclusive evidence, contradictory observations",
+        linked_suggestion_ids=[],
+        linked_observation_ids=[],
+    )
+    body = decision.format_issue_body(evidence_strength="inconclusive")
+    assert "(none)" in body
