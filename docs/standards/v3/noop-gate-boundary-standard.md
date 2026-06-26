@@ -16,7 +16,7 @@ related_docs:
   - ../vibe3-orchestra-runtime-standard.md
   - architecture-convergence-standard.md
   - supervisor/manager.md
-  - config/settings.yaml
+  - config/v3/settings.yaml
 ---
 
 # Vibe3 No-Op Gate Boundary Standard

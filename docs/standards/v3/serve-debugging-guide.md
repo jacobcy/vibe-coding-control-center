@@ -217,7 +217,7 @@ lsof -i :8080
 cat .git/vibe3/orchestra.pid
 
 # 检查配置
-cat config/settings.yaml | grep -A 20 orchestra
+cat config/v3/settings.yaml | grep -A 20 orchestra
 
 # 查看错误日志
 tail -f temp/logs/orchestra/events.log
