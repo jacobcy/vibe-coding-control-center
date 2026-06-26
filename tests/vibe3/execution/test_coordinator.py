@@ -545,3 +545,47 @@ def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch)
 
     assert result.launched is True
     mock_start.assert_called_once()
+
+
+def test_sync_propagates_metadata_from_codeagent_result(mock_dependencies):
+    """Sync execution should propagate backend/model/tmux/log from CodeagentResult."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config, store=store, backend=backend, capacity=capacity
+    )
+
+    request = ExecutionRequest(
+        role="reviewer",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-reviewer-issue-42",
+        prompt="review",
+        options=MagicMock(),
+        mode="sync",
+    )
+
+    with patch(
+        "vibe3.execution.coordinator.CodeagentExecutionService"
+    ) as mock_service_cls:
+        mock_result = MagicMock(
+            success=True,
+            stdout="review output",
+            stderr="",
+            backend="claude",
+            model="sonnet",
+            tmux_session="vibe3-review-42",
+            log_path="temp/logs/review/42.log",
+        )
+        mock_service = mock_service_cls.return_value
+        mock_service.execute_sync_request.return_value = mock_result
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    assert result.stdout == "review output"
+    assert result.backend == "claude"
+    assert result.model == "sonnet"
+    assert result.tmux_session == "vibe3-review-42"
+    assert result.log_path == "temp/logs/review/42.log"

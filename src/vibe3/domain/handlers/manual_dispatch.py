@@ -27,6 +27,7 @@ from vibe3.services.shared import log_dispatch_error
 
 if TYPE_CHECKING:
     from vibe3.agents import CodeagentResult
+    from vibe3.models import ExecutionLaunchResult
     from vibe3.roles import ReviewRunResult
 
 # Result sink for CLI commands that need return values (review verdict).
@@ -37,6 +38,34 @@ _pending_results: dict[str, Any] = {}
 def get_pending_result(key: str) -> Any | None:
     """Retrieve and clear a pending result stored by a handler."""
     return _pending_results.pop(key, None)
+
+
+def _resolve_review_metadata(
+    event: ManualReviewIntent,
+    launch_result: ExecutionLaunchResult | None,
+    effective_backend: str | None = None,
+    effective_model: str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Resolve backend/model/tmux/log for ReviewRunResult.
+
+    Priority: event (CLI override) > launch_result (coordinator)
+    > effective (config default). All three levels are covered so that
+    dry-run (no launch_result) still shows backend/model from config.
+    Shared by sync and async branch-review paths to avoid field-drift.
+    """
+    backend = (
+        event.backend
+        or (launch_result.backend if launch_result else None)
+        or effective_backend
+    )
+    model = (
+        event.model
+        or (launch_result.model if launch_result else None)
+        or effective_model
+    )
+    tmux = launch_result.tmux_session if launch_result else None
+    log = launch_result.log_path if launch_result else None
+    return backend, model, tmux, log
 
 
 @register_handler("ManualPlanIntent")
@@ -308,7 +337,7 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
             effective = resolve_effective_agent_options(options)
 
             # Sync mode
-            run_issue_role_sync(
+            launch_result = run_issue_role_sync(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
                 fresh_session=event.fresh_session,
@@ -319,20 +348,39 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 backend=effective.backend or event.backend,
                 model=effective.model or event.model,
             )
+            backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
+                event, launch_result, effective.backend, effective.model
+            )
             verdict = "DRY_RUN" if event.dry_run else "OK"
             result = ReviewRunResult(
                 verdict,
                 None,
                 event.issue_number,
-                backend=effective.backend,
-                model=effective.model,
+                tmux_session=tmux_val,
+                log_path=log_val,
+                backend=backend_val,
+                model=model_val,
             )
             # Store for backward compat
             _pending_results["review"] = result
             return result
         else:
             # Async mode
-            launch = run_issue_role_async(
+            from vibe3.execution import resolve_command_agent_options
+
+            # Resolve effective options up front (same as sync path)
+            # so config defaults are available as fallback when launch_result
+            # lacks backend/model (async tmux launch doesn't propagate them).
+            options = resolve_command_agent_options(
+                config=config,
+                section="review",
+                agent=event.agent,
+                backend=event.backend,
+                model=event.model,
+            )
+            effective = resolve_effective_agent_options(options)
+
+            launch_result = run_issue_role_async(
                 issue_number=event.issue_number,
                 dry_run=event.dry_run,
                 spec=REVIEW_SYNC_SPEC,
@@ -342,27 +390,20 @@ def handle_manual_review_intent(event: ManualReviewIntent, /) -> ReviewRunResult
                 model=event.model,
                 fresh_session=event.fresh_session,
             )
-            resolved_backend = launch.backend if launch else None
-            resolved_model = launch.model if launch else None
-            if not resolved_backend or not resolved_model:
-                from vibe3.execution import resolve_command_agent_options
-
-                options = resolve_command_agent_options(
-                    config=config,
-                    section="review",
-                    agent=event.agent,
-                    backend=event.backend,
-                    model=event.model,
-                )
-                effective = resolve_effective_agent_options(options)
-                resolved_backend = resolved_backend or effective.backend
-                resolved_model = resolved_model or effective.model
+            backend_val, model_val, tmux_val, log_val = _resolve_review_metadata(
+                event, launch_result, effective.backend, effective.model
+            )
+            verdict = (
+                "ASYNC"
+                if (launch_result is None or launch_result.launched)
+                else "ERROR"
+            )
             return ReviewRunResult(
-                "ASYNC" if launch is None or launch.launched else "ERROR",
+                verdict,
                 None,
                 event.issue_number,
-                tmux_session=launch.tmux_session if launch else None,
-                log_path=launch.log_path if launch else None,
-                backend=resolved_backend,
-                model=resolved_model,
+                tmux_session=tmux_val,
+                log_path=log_val,
+                backend=backend_val,
+                model=model_val,
             )

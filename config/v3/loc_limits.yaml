@@ -41,6 +41,9 @@ code_limits:
       - path: "src/vibe3/domain/event_rules.py"
         limit: 550
         reason: "Event rules 引擎核心聚合，包含规则加载、模板展开、规则评估、action handler 构建（9 个 handler，含 enqueue_command_job、refresh_queue_priority、reload_material、governance_scan 等业务动作）等紧密耦合逻辑；handler 函数与 build_action_handlers 工厂内聚性强，拆分会破坏注册一致性"
+      - path: "src/vibe3/domain/handlers/manual_dispatch.py"
+        limit: 410
+        reason: "Manual dispatch handler 聚合，包含 plan/run/review intent handlers、ReviewRunResult backend/model/tmux/log field resolution（_resolve_review_metadata）、sync/async 双路径 branches review 元数据填充等紧密耦合逻辑；Issue #3137 review display unification 新增 metadata resolver 和 branch review 同步路径后超标（409 行）"
       - path: "src/vibe3/services/handoff/service.py"
         limit: 650
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
@@ -290,8 +293,8 @@ code_limits:
         limit: 450
         reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递"
       - path: "tests/vibe3/domain/handlers/test_manual_dispatch.py"
-        limit: 470
-        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类（4 个测试方法，+120 行）验证 backend/model 字段在 handler 层的正确传播；Issue #3135 新增 async 路径 backend/model 回填测试（+20 行）"
+        limit: 560
+        reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28+ 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类；Issue #3135 新增 async 路径 backend/model 回填测试；Issue #3137 新增 sync/async branch review metadata 填充测试（+58 行，558 行 total）"
       - path: "tests/vibe3/commands/test_command_params_unified.py"
         limit: 700
         reason: "Unified command parameter behavior test matrix (17 tests, 669 lines), covering --branch default resolution, --dry-run, --show-prompt, and config/CLI override behavior across plan/run/review/internal-manager commands; tightly-coupled test suite with strong cohesion, splitting would reduce readability of unified parameter behavior verification; original test file had VibeConfig path bug (now fixed)"

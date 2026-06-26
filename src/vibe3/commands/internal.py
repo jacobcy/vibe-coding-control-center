@@ -77,7 +77,7 @@ def internal_manager_dispatch(
     validate_show_prompt_dependency(dry_run, show_prompt)
 
     # --show-prompt and --dry-run require sync execution
-    # (async path cannot render prompt composition or return CodeagentResult)
+    # (async path launches tmux; sync needed for prompt display and dry-run)
     if show_prompt or dry_run:
         no_async = True
 
@@ -140,7 +140,7 @@ def internal_manager_dispatch(
             branch=branch,
         )
     else:
-        result = run_issue_role_async(  # type: ignore[assignment]
+        result = run_issue_role_async(
             issue_number=issue,
             dry_run=dry_run,
             spec=MANAGER_SYNC_SPEC,
@@ -148,17 +148,12 @@ def internal_manager_dispatch(
         )
 
     if result is not None:
-        if no_async:
-            from vibe3.commands.common import _handle_codeagent_result
+        from rich.console import Console
 
-            _handle_codeagent_result(result, "Manager")  # type: ignore[arg-type]
-        else:
-            from rich.console import Console
+        from vibe3.ui import display_execution_result
 
-            from vibe3.ui import display_execution_result
-
-            console = Console()
-            display_execution_result(console, result, "Manager Dispatch")  # type: ignore[arg-type]
+        console = Console()
+        display_execution_result(console, result, "Manager")
 
 
 @app.command("apply")

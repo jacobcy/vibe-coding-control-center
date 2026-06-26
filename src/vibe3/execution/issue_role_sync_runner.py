@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import typer
 
 from vibe3.agents import CodeagentBackend
@@ -17,14 +15,11 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import load_session_id
+from vibe3.models import ExecutionLaunchResult
 from vibe3.services.flow import resolve_branch_arg
 from vibe3.services.issue import load_issue_info
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import format_agent_actor, format_dry_run_header
-
-if TYPE_CHECKING:
-    from vibe3.agents import CodeagentResult
-    from vibe3.models import ExecutionLaunchResult
 
 
 def run_issue_role_async(
@@ -37,7 +32,7 @@ def run_issue_role_async(
     backend: str | None = None,
     model: str | None = None,
     fresh_session: bool = False,
-) -> "ExecutionLaunchResult | None":
+) -> ExecutionLaunchResult | None:
     """Run a role asynchronously via tmux wrapper.
 
     Launches tmux session and returns immediately.
@@ -46,6 +41,10 @@ def run_issue_role_async(
 
     CLI override params are appended to the child self-invocation so the
     no-async child resolves the same runtime configuration.
+
+    Returns:
+        ExecutionLaunchResult with tmux_session/log_path/metadata on success,
+        None on skip/failure (for backward compatibility with exit handlers).
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
@@ -104,8 +103,11 @@ def run_issue_role_async(
                 typer.echo(
                     f"{spec.role_name} dispatch queued/throttled: {result.reason}"
                 )
-                return result
+                return None
 
+            typer.echo(f"-> {spec.role_name} run: issue #{issue_number}")
+            typer.echo(f"tmux session: {result.tmux_session}")
+            typer.echo(f"log: {result.log_path}")
             return result
         except Exception as exc:
             record_dispatch_failure_if_unexpected(
@@ -149,7 +151,7 @@ def run_issue_role_sync(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
-) -> "CodeagentResult | None":
+) -> ExecutionLaunchResult | None:
     """Run a role synchronously (direct execution without tmux wrapper).
 
     Orchestrated process runs the agent synchronously and waits for completion.
@@ -160,6 +162,10 @@ def run_issue_role_sync(
     Agent configuration overrides (agent/backend/model) are passed into role
     option resolution so command-layer overrides are reflected in the
     ExecutionRequest options.
+
+    Returns:
+        ExecutionLaunchResult with stdout/metadata on success,
+        None on skip/failure (for backward compatibility with exit handlers).
     """
     repo = resolve_orchestra_repo_root()
     config = load_orchestra_config(target_repo=repo)
@@ -208,25 +214,7 @@ def run_issue_role_sync(
     )
 
     if dry_run:
-        from vibe3.agents import CodeagentResult
-        from vibe3.config import resolve_repo_agent_preset
-
-        # Resolve model from agent preset when backend is already set
-        # (resolve_effective_agent_options short-circuits when backend
-        # is truthy, which it always is for roles going through
-        # ExecutionRolePolicyService.resolve_backend).
-        model = options.model
-        if not model and options.agent:
-            preset = resolve_repo_agent_preset(options.agent)
-            if preset:
-                _, model = preset
-
-        return CodeagentResult(
-            success=sync_result.launched,
-            backend=options.backend or sync_result.backend,
-            model=model or sync_result.model,
-            issue_number=issue_number,
-        )
+        return None
 
     if not sync_result.launched:
         # Soft-skip reason codes: coordinator intentionally declined, not a failure
@@ -243,4 +231,4 @@ def run_issue_role_sync(
             )
         raise typer.Exit(1)
 
-    return None
+    return sync_result

@@ -22,10 +22,12 @@ from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.roles import (
+    ReviewRunResult,
     build_base_review_request,
     validate_review_prerequisites,
 )
 from vibe3.services.flow import FlowService, resolve_branch_arg
+from vibe3.ui import display_codeagent_result
 
 app = typer.Typer(
     name="review",
@@ -50,41 +52,52 @@ _YES_OPT = Annotated[
 ]
 
 
-def _emit_review_result(
-    verdict: str,
-    handoff_file: str | None,
-    backend: str | None = None,
-    model: str | None = None,
-    report_ref: str | None = None,
-    tmux_session: str | None = None,
-    log_path: str | None = None,
-) -> None:
-    """Render review result summary consistently.
+def _emit_review_result(result: ReviewRunResult, report_ref: str | None = None) -> None:
+    """Render review result summary using shared display_codeagent_result.
 
-    All paths (sync, async, dry-run) use the shared display_codeagent_result
-    for metadata. Real execution additionally shows verdict and handoff file.
+    Metadata (backend/model/log/tmux) goes through the shared display path
+    used by plan/run. Review-specific verdict and handoff file are shown on top.
+
+    report_ref is resolved from flow state (the run report being reviewed)
+    and passed through the shared metadata channel so it appears alongside
+    backend/model/log/tmux in the same section as plan/run.
     """
     from rich.console import Console
 
     from vibe3.agents import CodeagentResult
-    from vibe3.ui import display_codeagent_result
 
     console = Console()
 
-    display_result = CodeagentResult(
-        success=verdict not in {"ERROR", "UNKNOWN"},
-        backend=backend,
-        model=model,
-        report_ref=report_ref,
-        tmux_session=tmux_session,
-        log_path=log_path,
+    # Unified metadata display — same channel as plan/run
+    display_codeagent_result(
+        console,
+        CodeagentResult(
+            success=result.verdict not in {"ERROR", "UNKNOWN"},
+            backend=result.backend,
+            model=result.model,
+            report_ref=report_ref,
+            tmux_session=result.tmux_session,
+            log_path=result.log_path,
+        ),
+        "Review",
     )
-    display_codeagent_result(console, display_result, "Review")
 
-    if verdict not in {"ASYNC", "DRY_RUN"}:
-        console.print(f"\n=== Verdict: {verdict} ===")
-        if handoff_file:
-            console.print(f"[cyan]-> Review saved to:[/cyan] {handoff_file}")
+    # Review-specific: verdict and handoff file
+    if result.verdict not in {"ASYNC", "DRY_RUN"}:
+        console.print(f"\n=== Verdict: {result.verdict} ===")
+        if result.handoff_file:
+            console.print(f"[cyan]-> Review saved to:[/cyan] {result.handoff_file}")
+
+
+def _resolve_report_ref(branch: str | None) -> str | None:
+    """Get report_ref from flow state, or None if unavailable.
+
+    report_ref is set by vibe3 run (the run report). Review needs it to
+    tell the user which run report is being reviewed.
+    """
+    from vibe3.services.flow import resolve_flow_ref
+
+    return resolve_flow_ref(branch, "report_ref")
 
 
 def _check_report_ref(branch: str) -> bool:
@@ -98,13 +111,6 @@ def _check_report_ref(branch: str) -> bool:
     if flow and flow.report_ref:
         return True
     return False
-
-
-def _resolve_report_ref(branch: str | None) -> str | None:
-    """Get report_ref from flow state, or None if unavailable."""
-    from vibe3.services.flow import resolve_flow_ref
-
-    return resolve_flow_ref(branch, "report_ref")
 
 
 def _review_branch_impl(
@@ -170,15 +176,7 @@ def _review_branch_impl(
         typer.echo("Review dispatched (async mode)")
     else:
         report_ref = _resolve_report_ref(branch)
-        _emit_review_result(
-            result.verdict,
-            result.handoff_file,
-            result.backend,
-            result.model,
-            report_ref,
-            result.tmux_session,
-            result.log_path,
-        )
+        _emit_review_result(result, report_ref)
 
 
 @app.callback(invoke_without_command=True)
@@ -379,15 +377,8 @@ def base(
     if result is None:
         typer.echo("Review dispatched (async mode)")
     else:
+        # Sync mode: display result
         report_ref = _resolve_report_ref(current_branch)
-        _emit_review_result(
-            result.verdict,
-            result.handoff_file,
-            result.backend,
-            result.model,
-            report_ref=report_ref,
-            tmux_session=result.tmux_session,
-            log_path=result.log_path,
-        )
+        _emit_review_result(result, report_ref)
         if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "UNKNOWN", "ERROR"}:
             raise typer.Exit(1)

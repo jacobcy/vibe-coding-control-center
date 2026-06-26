@@ -200,3 +200,94 @@ def test_sync_runner_applies_cli_overrides_to_resolved_options(monkeypatch) -> N
         backend=None,
         model=None,
     )
+
+
+def test_sync_runner_returns_execution_launch_result(monkeypatch) -> None:
+    """run_issue_role_sync returns ExecutionLaunchResult on success."""
+    _patch_runner_boundaries(monkeypatch)
+    monkeypatch.setattr(
+        "vibe3.execution.issue_role_sync_runner.load_session_id",
+        lambda _role, branch=None: None,
+    )
+
+    def resolve_options(_config: object, cli_overrides: dict[str, str] | None = None):
+        return AgentOptions(agent="reviewer", backend=None, model=None)
+
+    def build_sync_request(
+        _config: object,
+        issue: IssueInfo,
+        branch: str,
+        _flow_state: dict[str, object] | None,
+        _session_id: str | None,
+        options: AgentOptions,
+        _actor: str,
+        _dry_run: bool,
+        _show_prompt: bool,
+    ) -> ExecutionRequest:
+        return ExecutionRequest(
+            role="reviewer",
+            target_branch=branch,
+            target_id=issue.number,
+            execution_name="reviewer",
+            options=options,
+            mode="sync",
+        )
+
+    spec = IssueRoleSyncSpec(
+        role_name="reviewer",
+        resolve_options=resolve_options,
+        resolve_branch=lambda _store, _issue, _current: "task/issue-42",
+        build_async_request=lambda *_args: None,
+        build_sync_request=build_sync_request,
+    )
+
+    result = run_issue_role_sync(
+        issue_number=42,
+        dry_run=False,
+        fresh_session=True,
+        show_prompt=False,
+        spec=spec,
+        branch="42",
+    )
+
+    assert result is not None
+    assert isinstance(result, ExecutionLaunchResult)
+    assert result.launched is True
+
+
+def test_async_runner_returns_execution_launch_result(monkeypatch) -> None:
+    """run_issue_role_async returns ExecutionLaunchResult on success."""
+    _patch_runner_boundaries(monkeypatch)
+
+    def build_async_request(
+        _config: object,
+        issue: IssueInfo,
+        _actor: str,
+        branch: str,
+    ) -> ExecutionRequest:
+        return ExecutionRequest(
+            role="reviewer",
+            target_branch=branch,
+            target_id=issue.number,
+            execution_name="reviewer",
+            cmd=["vibe3", "review", "--branch", branch, "--no-async"],
+        )
+
+    spec = IssueRoleSyncSpec(
+        role_name="reviewer",
+        resolve_options=lambda _config, _cli_overrides=None: AgentOptions(),
+        resolve_branch=lambda _store, _issue, _current: "task/issue-42",
+        build_async_request=build_async_request,
+        build_sync_request=lambda *_args: None,
+    )
+
+    result = run_issue_role_async(
+        issue_number=42,
+        dry_run=False,
+        spec=spec,
+        branch="42",
+    )
+
+    assert result is not None
+    assert isinstance(result, ExecutionLaunchResult)
+    assert result.launched is True

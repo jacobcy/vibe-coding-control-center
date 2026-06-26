@@ -258,3 +258,80 @@ class TestDisplayExecutionResult:
         # Should not have Backend/Model labels
         assert not any("Backend:" in c for c in calls)
         assert not any("Model:" in c for c in calls)
+
+
+class TestEmitReviewResult:
+    """Tests for _emit_review_result using shared display_codeagent_result."""
+
+    def test_emit_review_result_uses_shared_display_path(self, capsys):
+        """_emit_review_result goes through shared display_codeagent_result."""
+        from vibe3.commands.review import _emit_review_result
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file=".git/vibe3/handoff/review-42.md",
+            issue_number=42,
+            backend="claude",
+            model="sonnet",
+            log_path="temp/logs/review/42.log",
+            tmux_session="vibe3-review-42",
+        )
+
+        _emit_review_result(result)
+        output = capsys.readouterr().out
+
+        # Shared display_codeagent_result fields should appear
+        assert "Backend: claude" in output
+        assert "Model: sonnet" in output
+        assert "Review Result" in output  # Label from display_codeagent_result
+        assert "Log path: temp/logs/review/42.log" in output
+        assert "Tmux session: vibe3-review-42" in output
+        # Review-specific verdict should appear after shared display
+        assert "=== Verdict: PASS ===" in output
+        assert "Review saved to: .git/vibe3/handoff/review-42.md" in output
+
+    def test_emit_review_result_handles_missing_fields(self, capsys):
+        """_emit_review_result handles missing metadata gracefully."""
+        from vibe3.commands.review import _emit_review_result
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file=None,
+            issue_number=42,
+        )
+
+        _emit_review_result(result)
+        output = capsys.readouterr().out
+
+        # Should show verdict, not crash
+        assert "=== Verdict: PASS ===" in output
+        # Missing metadata should not produce labels
+        assert "Backend:" not in output
+        assert "Model:" not in output
+        assert "Tmux session:" not in output
+
+    def test_emit_review_result_async_skips_verdict(self, capsys):
+        """ASYNC verdict should show metadata but skip review-specific verdict."""
+        from vibe3.commands.review import _emit_review_result
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        result = ReviewRunResult(
+            verdict="ASYNC",
+            handoff_file=None,
+            issue_number=42,
+            backend="claude",
+            model="opus",
+            tmux_session="vibe3-review-42",
+        )
+
+        _emit_review_result(result)
+        output = capsys.readouterr().out
+
+        # Shared display should show metadata
+        assert "Backend: claude" in output
+        assert "Model: opus" in output
+        assert "Review Result" in output
+        # But should NOT show review-specific verdict (ASYNC skips it)
+        assert "=== Verdict:" not in output

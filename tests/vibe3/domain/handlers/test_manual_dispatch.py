@@ -32,6 +32,22 @@ def _make_review_request() -> ReviewRequest:
     return ReviewRequest(scope=ReviewScope.for_base("main"))
 
 
+def _make_review_config(
+    backend: str | None = None, model: str | None = None
+) -> SimpleNamespace:
+    """Create a minimal config mock with review agent_config section."""
+    return SimpleNamespace(
+        review=SimpleNamespace(
+            agent_config=SimpleNamespace(
+                agent=None,
+                backend=backend,
+                model=model,
+                timeout_seconds=3600,
+            )
+        )
+    )
+
+
 class TestManualReviewIntentErrorPaths:
     """Sync/dry-run failure paths must store an ERROR ReviewRunResult."""
 
@@ -423,11 +439,101 @@ class TestBackendModelPropagation:
         assert result.model == "opus"
         assert result.issue_number == 42
 
-    def test_handle_manual_review_branch_async_fills_backend_model_from_config(
-        self,
-    ) -> None:
-        """Branch review async metadata should not depend on launcher fields."""
+    def test_handle_manual_review_branch_sync_fills_from_launch_result(self) -> None:
+        """Branch review sync path fills metadata from launch_result."""
         from vibe3.models import ExecutionLaunchResult
+
+        mock_launch = ExecutionLaunchResult(
+            launched=True,
+            backend="codex",
+            model="gpt-5.4",
+            tmux_session="vibe3-review-42",
+            log_path="temp/logs/review/42.log",
+        )
+
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=True,
+            backend="claude",  # event param
+            model="opus",  # event param
+        )
+
+        with (
+            patch("vibe3.config.load_config_for_role", return_value=object()),
+            patch(
+                "vibe3.execution.run_issue_role_sync",
+                return_value=mock_launch,
+            ),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "OK"
+        # Metadata from launch_result when available
+        assert result.backend == "claude"  # event param preferred
+        assert result.model == "opus"  # event param preferred
+        assert result.tmux_session == "vibe3-review-42"
+        assert result.log_path == "temp/logs/review/42.log"
+
+    def test_handle_manual_review_branch_async_fills_from_launch_result(self) -> None:
+        """Branch review async path fills metadata from launch_result."""
+        from vibe3.models import ExecutionLaunchResult
+
+        mock_launch = ExecutionLaunchResult(
+            launched=True,
+            backend="codex",
+            model="gpt-5.4",
+            tmux_session="vibe3-review-async-42",
+            log_path="temp/logs/review/async/42.log",
+        )
+
+        event = ManualReviewIntent(
+            issue_number=42,
+            branch="task/issue-42",
+            is_base_review=False,
+            no_async=False,  # async mode
+            backend="claude",
+            model="opus",
+        )
+
+        with (
+            patch(
+                "vibe3.config.load_config_for_role",
+                return_value=_make_review_config(backend="claude", model="opus"),
+            ),
+            patch(
+                "vibe3.execution.run_issue_role_async",
+                return_value=mock_launch,
+            ),
+        ):
+            result = handle_manual_review_intent(event)
+
+        assert result is not None
+        assert result.verdict == "ASYNC"
+        # Metadata from launch_result
+        assert result.backend == "claude"  # event param preferred
+        assert result.model == "opus"  # event param preferred
+        assert result.tmux_session == "vibe3-review-async-42"
+        assert result.log_path == "temp/logs/review/async/42.log"
+
+    def test_handle_manual_review_branch_async_failure_returns_error(self) -> None:
+        """Branch review async launch failure must surface ERROR verdict.
+
+        Regression guard: the async verdict must not be hardcoded to ASYNC.
+        When launch_result.launched is False, downstream consumers (review.py
+        exit-code gating) rely on ERROR to signal failure.
+        """
+        from vibe3.models import ExecutionLaunchResult
+
+        mock_launch = ExecutionLaunchResult(
+            launched=False,
+            backend="codex",
+            model="gpt-5.4",
+            reason="tmux session conflict",
+            reason_code="launch_failed",
+        )
 
         event = ManualReviewIntent(
             issue_number=42,
@@ -435,31 +541,18 @@ class TestBackendModelPropagation:
             is_base_review=False,
             no_async=False,
         )
-        config = SimpleNamespace(
-            review=SimpleNamespace(
-                agent_config=SimpleNamespace(
-                    agent=None,
-                    backend="claude",
-                    model="opus",
-                    timeout_seconds=3600,
-                )
-            )
-        )
-        launch = ExecutionLaunchResult(
-            launched=True,
-            tmux_session="vibe3-reviewer-issue-42",
-            log_path="temp/logs/review.log",
-            backend=None,
-            model=None,
-        )
 
         with (
-            patch("vibe3.config.load_config_for_role", return_value=config),
-            patch("vibe3.execution.run_issue_role_async", return_value=launch),
+            patch(
+                "vibe3.config.load_config_for_role",
+                return_value=_make_review_config(backend="claude", model="opus"),
+            ),
+            patch(
+                "vibe3.execution.run_issue_role_async",
+                return_value=mock_launch,
+            ),
         ):
             result = handle_manual_review_intent(event)
 
         assert result is not None
-        assert result.verdict == "ASYNC"
-        assert result.backend == "claude"
-        assert result.model == "opus"
+        assert result.verdict == "ERROR"

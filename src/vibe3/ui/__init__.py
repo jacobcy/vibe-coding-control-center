@@ -110,9 +110,10 @@ __all__ = [
     "render_pr_ready",
     "render_local_review_summary",
     "render_pr_details",
-    # Scan display
+    # Result display
     "display_execution_result",
     "display_codeagent_result",
+    # Scan display
     "display_supervisor_dry_run",
     "display_material_list",
     # Task UI

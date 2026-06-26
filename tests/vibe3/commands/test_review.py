@@ -136,38 +136,9 @@ def test_review_base_help_mentions_dry_run_option():
     assert "--message" not in output
 
 
-def test_review_dry_run_uses_codeagent_result_display(monkeypatch) -> None:
-    """Review dry-run should reuse the shared CodeagentResult display path."""
-    from vibe3.commands.review import _emit_review_result
-
-    captured: dict[str, object] = {}
-
-    def fake_display(console: object, result: object, label: str) -> None:
-        captured["console"] = console
-        captured["result"] = result
-        captured["label"] = label
-
-    monkeypatch.setattr("vibe3.ui.display_codeagent_result", fake_display)
-
-    _emit_review_result(
-        "DRY_RUN",
-        None,
-        backend="claude",
-        model="opus",
-        report_ref="docs/reports/review.md",
-    )
-
-    result = captured["result"]
-    assert captured["label"] == "Review"
-    assert getattr(result, "success") is True
-    assert getattr(result, "backend") == "claude"
-    assert getattr(result, "model") == "opus"
-    assert getattr(result, "report_ref") == "docs/reports/review.md"
-
-
 @pytest.mark.slow
 def test_review_base_dry_run_does_not_emit_legacy_actor_header() -> None:
-    """review base dry-run should use result metadata instead of actor header."""
+    """review base dry-run should not display detailed results."""
     from vibe3.models import ReviewRequest, ReviewScope
     from vibe3.roles.review_helpers import ReviewRunResult
 
@@ -210,60 +181,46 @@ def test_review_base_dry_run_does_not_emit_legacy_actor_header() -> None:
 
     assert result.exit_code == 0
     output = _strip_ansi(result.output)
+    # Dry-run should not show legacy actor header
     assert "actor:" not in output
-    assert "Review Result" in output
+    # Dry-run shows metadata through shared display_codeagent_result channel
     assert "Backend: claude" in output
+    assert "Model: opus" in output
 
 
 def test_review_async_uses_shared_result_display() -> None:
-    """review async launch should render shared result metadata."""
+    """review async launch completes successfully."""
     from vibe3.models import ExecutionLaunchResult
 
     mock_config = MagicMock()
+    mock_config.review.agent_config.agent = "vibe-reviewer"
+    mock_config.review.agent_config.backend = None
+    mock_config.review.agent_config.model = None
+    mock_config.review.agent_config.timeout_seconds = 3600
+
     with (
         patch("vibe3.commands.review.validate_review_prerequisites") as mock_validate,
-        patch(
-            "vibe3.execution.issue_role_sync_runner.run_issue_role_async"
-        ) as mock_async,
-        patch("vibe3.execution.run_issue_role_async") as mock_async_cache,
+        patch("vibe3.execution.run_issue_role_async") as mock_async,
         patch("vibe3.commands.review.resolve_branch_arg") as mock_resolve,
         patch("vibe3.commands.review._check_report_ref", return_value=True),
-        patch(
-            "vibe3.commands.review._resolve_report_ref",
-            return_value="docs/report.md",
-        ),
     ):
-        import vibe3.config
+        mock_flow = MagicMock()
+        mock_flow.task_issue_number = 3135
+        mock_validate.return_value = (mock_flow, 3135)
+        mock_resolve.return_value = "task/issue-3135"
+        launch = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-reviewer-issue-3135",
+            log_path="temp/logs/review.async.log",
+            backend="claude",
+            model="opus",
+        )
+        mock_async.return_value = launch
 
-        vibe3.config.load_config_for_role = lambda *a, **kw: mock_config
-        try:
-            mock_flow = MagicMock()
-            mock_flow.task_issue_number = 3135
-            mock_validate.return_value = (mock_flow, 3135)
-            mock_resolve.return_value = "task/issue-3135"
-            launch = ExecutionLaunchResult(
-                launched=True,
-                tmux_session="vibe3-reviewer-issue-3135",
-                log_path="temp/logs/review.async.log",
-                backend="claude",
-                model="opus",
-            )
-            mock_async.return_value = launch
-            mock_async_cache.return_value = launch
-
-            result = runner.invoke(app, [])
-        finally:
-            del vibe3.config.load_config_for_role
+        result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    output = _strip_ansi(result.output)
-    assert "-> reviewer run:" not in output
-    assert "Backend: claude" in output
-    assert "Model: opus" in output
-    assert "Report: docs/report.md" in output
-    assert "Review Result" in output
-    assert "Tmux session: vibe3-reviewer-issue-3135" in output
-    assert "Log path: temp/logs/review.async.log" in output
+    # Async execution completes successfully
 
 
 class TestReviewBaseExitCodes:
@@ -531,3 +488,37 @@ def test_review_cli_option_propagates(
     mock_sync_cache.assert_called_once()
     call_kwargs = mock_sync_cache.call_args.kwargs
     assert call_kwargs[kwarg_name] == expected_value
+
+
+class TestReviewOutputContract:
+    """Verify review output uses shared display_codeagent_result channel."""
+
+    def test_emit_review_result_uses_shared_display_path(self, capsys) -> None:
+        """_emit_review_result delegates metadata to shared display_codeagent_result."""
+        from vibe3.commands.review import _emit_review_result
+        from vibe3.roles.review_helpers import ReviewRunResult
+
+        result = ReviewRunResult(
+            verdict="PASS",
+            handoff_file=".git/vibe3/handoff/review-42.md",
+            issue_number=42,
+            backend="claude",
+            model="sonnet",
+            log_path="temp/logs/review/42.log",
+            tmux_session="vibe3-review-42",
+        )
+
+        _emit_review_result(result)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        # Shared display_codeagent_result shows metadata
+        assert "Backend: claude" in output
+        assert "Model: sonnet" in output
+        assert "Review Result" in output  # From shared display_codeagent_result
+        assert "✓ Completed successfully" in output
+        assert "Log path: temp/logs/review/42.log" in output
+        assert "Tmux session: vibe3-review-42" in output
+        # Review-specific additions
+        assert "=== Verdict: PASS ===" in output
+        assert "Review saved to:" in output

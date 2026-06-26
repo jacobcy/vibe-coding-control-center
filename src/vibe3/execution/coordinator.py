@@ -410,6 +410,10 @@ class ExecutionCoordinator:
                     return ExecutionLaunchResult(
                         launched=True,
                         stdout=result.stdout,
+                        backend=result.backend,
+                        model=result.model,
+                        tmux_session=result.tmux_session,
+                        log_path=result.log_path,
                     )
                 error_msg = result.stderr or "Execution failed"
                 append_orchestra_event(
