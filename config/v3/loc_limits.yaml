@@ -261,8 +261,8 @@ code_limits:
         limit: 750
         reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录、actor 生命周期管理（实时监控层，与 ExecutionLifecycleService 持久记录层互补）等紧密耦合的统一调度入口逻辑；#2172 集成 actor supervision（+60 行），#2177 新增版本元数据追踪（adapter_hash/policy_hash/material_hash 计算与持久化，+130 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 680
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查；Issue #3099 新增 AUP rejection retry counter 与原子 SQL UPDATE 阈值阻塞逻辑（+50 行）"
+        limit: 700
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查；Issue #3099 新增 AUP rejection retry counter 与原子 SQL UPDATE 阈值阻塞逻辑（+50 行），后续 code review 修复新增 record_error 显式写入 error_log（WARNING 可观测）、移除提前 raise 以保留 timeline event、成功执行时重置计数器（+2 行超 680 阈值）"
       - path: "src/vibe3/services/orchestra/status.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多；Issue #2106 Phase 3-2 迁移至 orchestra/status.py"
