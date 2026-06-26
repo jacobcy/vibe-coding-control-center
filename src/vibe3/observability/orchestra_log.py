@@ -57,6 +57,70 @@ _COLOR_MAP: dict[str, str] = {
 _COLOR_RESET = "\033[0m"
 
 
+def governance_scans_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for governance scan logs."""
+    path = governance_log_dir(repo_root) / "scans"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def supervisor_log_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for supervisor logs."""
+    path = orchestra_log_dir(repo_root) / "supervisor"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def supervisor_events_log_path(repo_root: Path | None = None) -> Path:
+    """Return the path to supervisor.log."""
+    return supervisor_log_dir(repo_root) / "supervisor.log"
+
+
+def tick_log_dir(
+    date_str: str | None = None, repo_root: Path | None = None
+) -> Path:
+    """Return the directory for per-tick event snapshots.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format. Defaults to today.
+        repo_root: Optional repository root path.
+
+    Returns:
+        Path like orchestra_log_dir / "by-tick" / "2026-06-27"
+    """
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    path = orchestra_log_dir(repo_root) / "by-tick" / date_str
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def tick_log_path(
+    tick_count: int,
+    *,
+    date_str: str | None = None,
+    repo_root: Path | None = None,
+) -> Path:
+    """Return the path for a specific tick's event log.
+
+    Args:
+        tick_count: Tick number
+        date_str: Date string in YYYY-MM-DD format. Defaults to today.
+        repo_root: Optional repository root path.
+
+    Returns:
+        Path like orchestra_log_dir / "by-tick" / "2026-06-27" / "tick-0004.log"
+    """
+    return tick_log_dir(date_str, repo_root) / f"tick-{tick_count:04d}.log"
+
+
+def issues_log_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for issue execution logs under orchestra."""
+    path = orchestra_log_dir(repo_root) / "issues"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 # Module-level persistent file handle for events.log
 # Avoids opening/closing on every tick, preventing FD exhaustion
 _events_handle: IO[str] | None = None
@@ -205,6 +269,21 @@ def append_governance_event(
         handle.write(f"[{timestamp}] {message}\n")
     # Delegate to append_orchestra_event to use persistent handle
     append_orchestra_event("governance", message, repo_root=repo_root, color=color)
+    return path
+
+
+def append_supervisor_event(message: str, *, repo_root: Path | None = None) -> Path:
+    """Append a supervisor event to both supervisor.log and events.log.
+
+    Mirrors append_governance_event implementation: writes to component-specific
+    log file and delegates to append_orchestra_event for events.log.
+    """
+    path = supervisor_events_log_path(repo_root)
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(f"[{timestamp}] {message}\n")
+    # Delegate to append_orchestra_event to use persistent handle
+    append_orchestra_event("supervisor", message, repo_root=repo_root)
     return path
 
 

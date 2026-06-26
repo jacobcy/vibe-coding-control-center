@@ -98,6 +98,7 @@ def handle_governance_scan_started(
     )
     from vibe3.observability import append_governance_event
     from vibe3.roles import build_governance_execution_name
+    from vibe3.roles.governance import _resolve_governance_material
 
     config = load_orchestra_config()
 
@@ -149,7 +150,15 @@ def handle_governance_scan_started(
             reason_code="circuit_breaker_open",
         )
 
-    execution_name = build_governance_execution_name(event.tick_count)
+    # Resolve material: use override if provided, otherwise rotate from catalog
+    resolved_material = (
+        event.material_override
+        if event.material_override
+        else _resolve_governance_material(config, event.execution_count)
+    )
+    execution_name = build_governance_execution_name(
+        event.tick_count, material=resolved_material
+    )
 
     # Build CLI self-invocation request (cmd field, no prompt)
     # This ensures the tmux wrapper calls 'internal governance <tick> <execution_count>'

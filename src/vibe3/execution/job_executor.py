@@ -495,10 +495,22 @@ class JobExecutor:
         repo = resolve_orchestra_repo_root()
         config = load_orchestra_config(target_repo=repo)
 
-        # Build execution name and CLI self-invocation command
-        tick_count = envelope.governance_tick_count
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
-        execution_name = f"governance-{tick_count}-{timestamp}"
+        # Resolve material: use override if provided, otherwise rotate from catalog
+        from vibe3.roles.governance import (
+            _resolve_governance_material,
+            build_governance_execution_name,
+        )
+
+        resolved_material = (
+            envelope.governance_material_override
+            if envelope.governance_material_override
+            else _resolve_governance_material(
+                config, envelope.governance_execution_count
+            )
+        )
+        execution_name = build_governance_execution_name(
+            envelope.governance_tick_count, material=resolved_material
+        )
 
         command_root = resolve_async_cli_project_root(repo)
         cmd = [
@@ -511,7 +523,7 @@ class JobExecutor:
             str((command_root / "src" / "vibe3" / "cli.py").resolve()),
             "internal",
             "governance",
-            str(tick_count),
+            str(envelope.governance_tick_count),
             str(envelope.governance_execution_count),
         ]
 
@@ -537,7 +549,7 @@ class JobExecutor:
             repo_path=str(repo),
             env=env,
             refs={
-                "tick": str(tick_count),
+                "tick": str(envelope.governance_tick_count),
                 "execution_count": str(envelope.governance_execution_count),
             },
             actor=envelope.actor,

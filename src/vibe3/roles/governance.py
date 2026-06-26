@@ -381,9 +381,29 @@ def resolve_governance_options(config: OrchestraConfig) -> Any:
     return ExecutionRolePolicyService(config).resolve_agent_options("governance")
 
 
-def build_governance_execution_name(tick_count: int) -> str:
-    """Build unique execution name for a governance scan tick."""
+def build_governance_execution_name(
+    tick_count: int, material: str | None = None
+) -> str:
+    """Build unique execution name for a governance scan tick.
+
+    If material is provided, extracts the material slug (stem) and embeds it
+    in the execution name to enable material-specific log paths.
+
+    Args:
+        tick_count: Current tick count
+        material: Optional material path
+            (e.g., "supervisor/governance/cron-supervisor.md")
+
+    Returns:
+        Execution name string
+            (e.g., "vibe3-governance-cron-supervisor-20260627-010215-t8")
+    """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if material:
+        # Extract material slug from path
+        # (e.g. "supervisor/governance/cron-supervisor.md" -> "cron-supervisor")
+        material_slug = Path(material).stem
+        return f"vibe3-governance-{material_slug}-{timestamp}-t{tick_count}"
     return f"vibe3-governance-scan-{timestamp}-t{tick_count}"
 
 
@@ -470,7 +490,9 @@ def build_governance_request(
         role="governance",
         target_branch="governance",
         target_id=1,
-        execution_name=build_governance_execution_name(tick_count),
+        execution_name=build_governance_execution_name(
+            tick_count, material=current_material
+        ),
         prompt=plan_content,
         options=options,
         refs={"task": GOVERNANCE_TASK_PROMPT},

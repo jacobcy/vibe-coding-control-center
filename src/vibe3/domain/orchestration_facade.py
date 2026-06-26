@@ -148,7 +148,7 @@ class OrchestrationFacade(ServiceBase):
         Args:
             tick_id: Current tick number from HeartbeatServer (default: 0)
         """
-        from vibe3.observability import append_orchestra_event
+        from vibe3.observability import append_supervisor_event
 
         self.on_heartbeat_tick()
 
@@ -156,8 +156,7 @@ class OrchestrationFacade(ServiceBase):
         try:
             await self.on_supervisor_scan()
         except Exception as exc:
-            append_orchestra_event(
-                "server",
+            append_supervisor_event(
                 f"tick #{self._tick_count} supervisor scan failed: {exc}",
                 color="red_bold",
             )
@@ -188,6 +187,8 @@ class OrchestrationFacade(ServiceBase):
                 self._registry.mark_worker_sessions_done_when_tmux_gone()
                 self._registry.reconcile_live_state()
             except Exception as exc:
+                from vibe3.observability import append_orchestra_event
+
                 append_orchestra_event(
                     "server",
                     f"tick #{self._tick_count} session reconciliation failed: {exc}",
