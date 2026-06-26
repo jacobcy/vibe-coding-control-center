@@ -300,12 +300,12 @@ PR closed (GitHub webhook)
 
 **与 GitHub 原生关闭关键字的区别**：
 
-GitHub 原生关闭关键字（`closes #N`、`fixes #N` 在 PR body 中）与 vibe3 flow done 是**两个独立机制**：
+GitHub 原生关闭关键字（`closes #N`、`fixes #N` 在 PR body 中）与 `/vibe-done (skill)` 是**两个独立机制**：
 
 | 机制 | 触发时机 | 控制方式 |
 |------|----------|----------|
 | GitHub 原生关键字 | PR merge 时自动触发 | PR body 中的关键字 |
-| vibe3 flow done（PR merge 后由 `vibe3 check` 触发） | `vibe3 check` 检测到 merged PR | `close_issue_if_open` API 调用 |
+| `/vibe-done`（PR merge 后由 `vibe3 check` 触发） | `vibe3 check` 检测到 merged PR | `close_issue_if_open` API 调用 |
 
 两者**互不干扰**：
 - PR body 不会被 vibe3 修改以注入关闭关键字
