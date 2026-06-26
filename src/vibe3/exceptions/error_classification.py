@@ -134,18 +134,21 @@ def classify_error(error_output: str) -> str:
         return E_MODEL_CONFIG
 
     # AUP/content policy rejection (check before generic API errors).
-    # Anthropic returns "violate our Usage Policy" — match the full phrase
-    # and its formal expansion "Acceptable Use Policy" to handle future
-    # message format changes.  The combined "violate our usage policy"
-    # phrase is specific enough to avoid false positives on standalone
-    # "usage" mentions in unrelated error messages.
-    if (
-        "violate our usage policy" in output_lower
-        or "unable to respond" in output_lower
-        and "usage policy" in output_lower
+    # Require co-occurrence of a policy phrase AND a refusal signal so that
+    # agent output which merely *discusses* content policies (reviewing a
+    # PR about AUP, writing compliance docs, etc.) is not misclassified.
+    policy_phrase = (
+        "usage policy" in output_lower
         or "acceptable use policy" in output_lower
-        or "content policy violation" in output_lower
-    ):
+        or "content policy" in output_lower
+    )
+    refusal_signal = (
+        "violate our" in output_lower
+        or "unable to respond" in output_lower
+        or "unable to complete" in output_lower
+        or "refus" in output_lower
+    )
+    if policy_phrase and refusal_signal:
         return E_AUP_REJECTION
 
     # API errors

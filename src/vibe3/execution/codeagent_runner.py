@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -325,6 +323,16 @@ class CodeagentExecutionService:
                 event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
             )
 
+            # Reset AUP rejection counter on successful execution so that
+            # intermittent AUP issues do not accumulate across recoveries.
+            flow_state_for_reset = ctx.store.get_flow_state(ctx.branch) or {}
+            if int(flow_state_for_reset.get("aup_rejection_count", 0) or 0) > 0:
+                ctx.store.update_flow_state(
+                    ctx.branch,
+                    aup_rejection_count=0,
+                    last_aup_rejection_at=None,
+                )
+
             # Read flow state ONCE here, used by both gate check and passive recording
             flow_state = ctx.store.get_flow_state(ctx.branch) if ctx.store else {}
 
@@ -480,27 +488,30 @@ class CodeagentExecutionService:
             # Get handling contract for severity-aware behavior
             error_contract = get_error_handling_contract(error_code)
 
-            # AUP rejection: atomically increment counter, block if threshold reached
+            # AUP rejection: record to error_log (WARNING severity, auto-inferred
+            # from registry) for observability, increment counter, block at
+            # threshold. No early raise — fall through to the common timeline
+            # recording path below, then the final raise propagates.
             if error_code == "E_AUP_REJECTION" and ctx.branch and ctx.store:
-                now_iso = datetime.now().isoformat()
+                try:
+                    from vibe3.services.orchestra import record_error
 
-                # Atomic UPDATE to avoid read-modify-write race condition
-                # when concurrent dispatches trigger AUP rejection simultaneously
-                with sqlite3.connect(ctx.store.db_path) as conn:
-                    conn.execute(
-                        "UPDATE flow_state SET "
-                        "aup_rejection_count = COALESCE(aup_rejection_count, 0) + 1, "
-                        "last_aup_rejection_at = ? "
-                        "WHERE branch = ?",
-                        (now_iso, ctx.branch),
+                    record_error(
+                        error_code=error_code,
+                        error_message=str(exc),
+                        tick_id=command.tick_id,
+                        issue_number=command.issue_number,
+                        branch=ctx.branch,
+                        store=ctx.store,
                     )
-                    row = conn.execute(
-                        "SELECT aup_rejection_count FROM flow_state WHERE branch = ?",
-                        (ctx.branch,),
-                    ).fetchone()
-                    count = row[0] if row else 1
+                except Exception as record_exc:
+                    log.warning(
+                        f"Failed to record AUP rejection to error_log: " f"{record_exc}"
+                    )
 
-                max_retries = getattr(error_contract, "max_retries", None) or 3
+                count = ctx.store.increment_aup_rejection(ctx.branch)
+                max_retries = error_contract.max_retries or 3
+
                 if count >= max_retries:
                     from vibe3.services.flow import BlockedStateService
 
@@ -526,8 +537,6 @@ class CodeagentExecutionService:
                             f"(DB cached, body/label may not be updated): "
                             f"{block_exc}"
                         )
-
-                    raise  # Still raise to propagate to coordinator
                 else:
                     log.warning(
                         f"AUP rejection #{count}/{max_retries} "

@@ -174,3 +174,40 @@ class TestAUPRejectionRetryCounter:
         assert state is not None
         assert state.get("flow_status") == "blocked"
         assert "AUP rejection threshold reached" in (state.get("blocked_reason") or "")
+
+
+class TestAUPRejectionStoreMethod:
+    """Test the client-layer increment_aup_rejection method."""
+
+    def test_increment_returns_new_count(self, temp_store: SQLiteClient) -> None:
+        """increment_aup_rejection atomically returns the new count."""
+        branch = "test-branch"
+
+        count1 = temp_store.increment_aup_rejection(branch)
+        assert count1 == 1
+
+        count2 = temp_store.increment_aup_rejection(branch)
+        assert count2 == 2
+
+        state = temp_store.get_flow_state(branch)
+        assert state is not None
+        assert state.get("aup_rejection_count") == 2
+        assert state.get("last_aup_rejection_at") is not None
+
+    def test_reset_on_success_clears_counter(self, temp_store: SQLiteClient) -> None:
+        """Counter reset via update_flow_state clears the fields."""
+        branch = "test-branch"
+
+        temp_store.increment_aup_rejection(branch)
+        temp_store.increment_aup_rejection(branch)
+        assert temp_store.get_flow_state(branch)["aup_rejection_count"] == 2
+
+        temp_store.update_flow_state(
+            branch,
+            aup_rejection_count=0,
+            last_aup_rejection_at=None,
+        )
+
+        state = temp_store.get_flow_state(branch)
+        assert state["aup_rejection_count"] == 0
+        assert state["last_aup_rejection_at"] is None

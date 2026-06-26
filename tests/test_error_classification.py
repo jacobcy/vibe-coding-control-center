@@ -117,6 +117,25 @@ class TestClassifyErrorUnchanged:
         """Test AUP rejection classification variant."""
         assert classify_error("violate our usage policy") == E_AUP_REJECTION
 
+    def test_aup_rejection_no_false_positive_on_discussion(self) -> None:
+        """Agent output that merely discusses AUP must NOT classify as AUP rejection."""
+        assert (
+            classify_error(
+                "TypeError: bad argument\n"
+                "Agent reviewed the Acceptable Use Policy documentation"
+            )
+            == E_EXEC_UNKNOWN
+        )
+
+    def test_aup_rejection_no_false_positive_on_content_policy_mention(self) -> None:
+        """Mentioning 'content policy violation' without refusal is not AUP."""
+        assert (
+            classify_error(
+                "Network error while reviewing a content policy violation fix"
+            )
+            == E_API_NETWORK
+        )
+
 
 class TestIsPermanentCodeError:
     """Tests for is_permanent_code_error classification helper."""

@@ -131,6 +131,25 @@ class SQLiteFlowStateRepo(_HasConnection):
             fields=fields,
         ).debug("Updated flow state")
 
+    def increment_aup_rejection(self, branch: str) -> int:
+        """Atomically increment AUP rejection counter and return new count."""
+        now = _utcnow_iso()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_state SET "
+                "aup_rejection_count = COALESCE(aup_rejection_count, 0) + 1, "
+                "last_aup_rejection_at = ? "
+                "WHERE branch = ?",
+                (now, branch),
+            )
+            row = cursor.execute(
+                "SELECT aup_rejection_count FROM flow_state WHERE branch = ?",
+                (branch,),
+            ).fetchone()
+        return int(row[0]) if row else 1
+
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         # Use UTC-aware datetime for consistency
         now = _utcnow_iso()
