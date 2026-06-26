@@ -24,10 +24,45 @@
 
 ## 核心原则
 
-- **不自动应用修改**：decision issue 必须经过 roadmap-intake 审查和 supervisor/apply 执行，不能跳过人类审查环节
+- **不自动应用修改**：decision issue 必须经过审查，不能跳过人类审查环节
 - **不直接修改代码**：decision maker 只创建 issue 和 draft 修改建议，不直接写入文件
 - **不创建 YAML 文件**：不再写入 `.git/shared/decisions/` 目录。决策以 GitHub issue 为载体
-- **不重复派单**：创建 issue 前先检查是否已有 open 的 supervisor issue 覆盖同一目标
+- **不重复派单**：创建 issue 前先检查是否已有 open issue 覆盖同一目标
+
+## Issue 路由决策（关键）
+
+**不是所有 audit 发现都应该走 supervisor issue。** 根据 report 的 `anti_pattern_gate` 和 `scope_completeness` 分析，决定 issue 类型：
+
+### 路由规则
+
+| 修复范围 | Issue 类型 | Label | 下游流程 | 适用场景 |
+|---------|-----------|-------|---------|---------|
+| **仅 prompt/test** | supervisor issue | `supervisor` + `state/ready` | roadmap-intake → supervisor/apply | bounded_edit 到 `supervisor/policies/*`、`tests/*` |
+| **涉及代码/脚本** | 普通 task issue | `state/ready` | roadmap-intake → assignee-pool → plan/run/review | 修改 `src/vibe3/*`、新增/修改 `scripts/*` |
+| **混合** | split → 两个 issue | 分别标记 | 各自走各自的流程 | prompt 修复 + 代码修复是独立的 |
+
+### 判断标准
+
+**简单修复 → supervisor issue：**
+- target 文件在 `supervisor/policies/*`、`supervisor/governance/*`、`tests/*`、`config/*`
+- 修改类型是 bounded_edit（单文件、单段落、<=100 行）
+- 不需要新增脚本、不需要修改主代码
+- report 的 `anti_pattern_gate.layer_mismatches = 0`
+- 示例：给 `run.md` 添加 PR 创建后的状态转换指令
+
+**复杂修复 → 普通 task issue：**
+- target 文件在 `src/vibe3/*`（主代码）
+- 需要新增脚本（`scripts/*`）
+- 需要多个文件的协调修改
+- report 的 `scope_completeness.code_layer_coverage != "missing"` 且建议包含代码修改
+- report 的 `anti_pattern_gate.layer_mismatches > 0` 指示了代码层的贡献因素
+- 示例：修复 `dispatch_coordinator.py` 的状态转换逻辑 + 添加 `scripts/gate-check.py`
+
+**混合 → 拆分为两个 issue：**
+- prompt 层修复可以独立执行（不依赖代码修改）
+- 代码层修复可以独立执行（不依赖 prompt 修改）
+- 各发各的 issue，在 body 中互相引用
+- 示例：prompt issue（改 `run.md`）+ code issue（改 `dispatch_coordinator.py`）
 
 ## Boundary
 
@@ -62,11 +97,19 @@
 4. **Trace back to source materials**: 根据 report 的 `linked_observation_ids` 和 `linked_suggestion_ids`，读取对应的 observation 和 suggestion YAML 文件，验证 evidence chain
 5. **Read original prompt materials**: 读取 report 中 `target_materials` 引用的原始 prompt/policy/skill 文件，验证 hypothesis 是否合理
 6. **Evaluate evidence strength**: 独立判断（不是简单接受 report 的结论），基于 observation 事实 + prompt 材料分析
-7. **查重**: 搜索现有 open 的 `supervisor` issue，检查是否已有覆盖同一目标的 issue
-8. **Produce decision**: 根据独立验证结果做出决策（accept/hold/reject/split）
-9. **Create decision issue**: 对 accept_for_followup 创建 supervisor issue；对 hold/reject/split 输出到 stdout
-10. **Cleanup**: 对 accept_for_followup，运行 `uv run python scripts/audit-cleanup.py --issue <新issue号> --delete` 回收已处理的 observation/suggestion/report 文件
-11. **Output summary**: 输出本轮决策摘要
+7. **Determine issue routing**: 根据 report 的 `anti_pattern_gate` 和 `scope_completeness` 字段：
+   - `layer_mismatches = 0` 且 target 仅在 prompt/test/config → supervisor issue（类型 A）
+   - `code_layer_coverage != "missing"` 或 target 包含 `src/vibe3/*`/`scripts/*` → 普通 task issue（类型 B）
+   - 两者都需要 → split 为两个 issue（类型 C）
+8. **查重**: 搜索现有 open issue，检查是否已有覆盖同一目标的 issue（supervisor 和 task 都查）
+9. **Produce decision**: 根据独立验证结果做出决策（accept/hold/reject/split），并确定 issue 类型
+10. **Create decision issue**: 
+    - 类型 A → 创建 supervisor issue（`supervisor` + `state/ready`）
+    - 类型 B → 创建普通 task issue（仅 `state/ready`，不加 `supervisor`）
+    - 类型 C → 创建两个 issue，body 中互相引用
+    - hold/reject → 输出到 stdout，不创建 issue
+11. **Cleanup**: 对创建的 issue，运行 `uv run python scripts/audit-cleanup.py --issue <新issue号> --delete` 回收已处理的 observation/suggestion/report 文件
+12. **Output summary**: 输出本轮决策摘要
 
 ## Input Limits
 
@@ -124,48 +167,89 @@
 
 ## Decision Issue 格式
 
-创建的 decision issue 必须包含：
+### 类型 A: Supervisor Issue（简单修复 — prompt/test/config）
+
+用于 bounded_edit 到 `supervisor/policies/*`、`tests/*`、`config/*` 的修复。
 
 **Title**: `[audit-decision] <decision_type>: <简短描述>`
 
-**Labels**:
-- `supervisor`
-- `state/ready`
+**Labels**: `supervisor`, `state/ready`
 
 **Body**:
-
 ```markdown
 ## Summary
-
 [Brief description of the decision and bounded edit]
 
-## Evidence Chain
+## Routing
+- **Issue type**: supervisor (simple fix — prompt/test only)
+- **Downstream**: roadmap-intake → supervisor/apply
+- **Why not normal issue**: 修改仅涉及 prompt/test 文件，不涉及主代码或脚本
 
+## Evidence Chain
+[同现有格式...]
+
+## Decision
+- **Type**: accept_for_followup
+- **Evidence strength**: [strong/medium]
+- **Requires human confirmation**: [yes/no]
+
+## Bounded Edit Scope
+[同现有格式...]
+
+## Gate Conditions
+[同现有格式...]
+```
+
+### 类型 B: 普通 Task Issue（复杂修复 — 代码/脚本）
+
+用于修改 `src/vibe3/*`、新增 `scripts/*` 的修复。需要完整的 plan-run-review 周期。
+
+**Title**: `[audit] <简短描述>`
+
+**Labels**: `state/ready`（不加 `supervisor` 标签——走正常的 assignee-pool 流程）
+
+**Body**:
+```markdown
+## Summary
+[Brief description of the audit finding and recommended fix]
+
+## Routing
+- **Issue type**: normal task (complex fix — code/script changes)
+- **Downstream**: roadmap-intake → assignee-pool → plan → run → review
+- **Why not supervisor issue**: 涉及主代码/脚本修改，需要完整 review 周期
+
+## Evidence Chain
 **Observations**:
-- obs-<id>: [symptom]
 - obs-<id>: [symptom]
 
 **Suggestions**:
 - sug-<id>: [hypothesis]
 
 **Report**:
-- audit-report-<timestamp>.md: evidence strength = strong/medium
+- audit-report-<timestamp>.md
 
-## Decision
+## Recommended Approach
+[High-level guidance, not a bounded_edit contract. Agent 在 plan 阶段自行设计实现方案]
 
-- **Type**: accept_for_followup
-- **Rationale**: [why this decision was made]
-- **Evidence strength**: [strong/medium]
-- **Requires human confirmation**: [yes/no]
+## Success Criteria
+- [Expected metric and trend]
 
-## Bounded Edit Scope
+## Related Supervisor Issues
+- #<number>: [如果同时创建了 supervisor issue 处理 prompt 部分，在此引用]
+```
 
-- **Target file**: [path]
-- **Target section**: [heading]
-- **Max lines**: [<=100]
-- **Edit type**: bounded_edit
+### 类型 C: Split（混合修复）
 
-### Diff
+当同一个 root cause 需要 prompt 修复 + code 修复时，创建两个独立 issue：
+
+1. **Supervisor issue**（prompt 部分）：`[audit-decision] accept: <prompt fix>`
+2. **Normal task issue**（code 部分）：`[audit] <code fix>`
+
+两个 issue body 中互相引用：
+```markdown
+## Related Issues
+- Supervisor issue #<N>: prompt-level fix for <target>
+- Task issue #<M>: code-level fix for <target>
 
 ```diff
 --- a/[target_file]
