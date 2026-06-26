@@ -226,6 +226,12 @@ code_limits:
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+      - path: "scripts/audit-blocked-flows.py"
+        limit: 920
+        reason: "审计阻塞流程分析脚本，Issue #2953 四层审计管线的一部分；包含 blocked flow detection、decision issue 搜索（通过 gh CLI）、观察记录生成、YAML 文件读写等紧密耦合的审计工具逻辑，与 audit-validate.py 互补"
+      - path: "scripts/audit-validate.py"
+        limit: 720
+        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补"
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"
