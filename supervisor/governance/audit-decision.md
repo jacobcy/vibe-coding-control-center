@@ -101,15 +101,20 @@
    - `layer_mismatches = 0` 且 target 仅在 prompt/test/config → supervisor issue（类型 A）
    - `code_layer_coverage != "missing"` 或 target 包含 `src/vibe3/*`/`scripts/*` → 普通 task issue（类型 B）
    - 两者都需要 → split 为两个 issue（类型 C）
-8. **查重**: 搜索现有 open issue，检查是否已有覆盖同一目标的 issue（supervisor 和 task 都查）
-9. **Produce decision**: 根据独立验证结果做出决策（accept/hold/reject/split），并确定 issue 类型
-10. **Create decision issue**: 
-    - 类型 A → 创建 supervisor issue（`supervisor` + `state/ready`）
-    - 类型 B → 创建普通 task issue（仅 `state/ready`，不加 `supervisor`）
+8. **Self-audit（检查 audit 管线自身）**:
+   - 搜索 `state/blocked` 的 supervisor issue，读取拒绝原因
+   - 检查 observation/suggestion/report 的质量是否暴露 audit 材料缺陷
+   - 如果有缺陷，准备自修复 issue
+9. **查重**: 搜索现有 open issue，检查是否已有覆盖同一目标的 issue（supervisor 和 task 都查）
+10. **Produce decision**: 根据独立验证结果做出决策（accept/hold/reject/split），并确定 issue 类型
+11. **Create decision issues（直接发布，不等审核）**: 
+    - 类型 A → `gh issue create --label "supervisor,state/ready" ...`
+    - 类型 B → `gh issue create --label "state/ready" ...`
     - 类型 C → 创建两个 issue，body 中互相引用
+    - 自修复 issue（如果有）→ 按实际情况创建
     - hold/reject → 输出到 stdout，不创建 issue
-11. **Cleanup**: 对创建的 issue，运行 `uv run python scripts/audit-cleanup.py --issue <新issue号> --delete` 回收已处理的 observation/suggestion/report 文件
-12. **Output summary**: 输出本轮决策摘要
+12. **Cleanup**: 对每个创建的 issue，运行 `uv run python scripts/audit-cleanup.py --issue <新issue号> --delete` 回收已处理的 observation/suggestion/report 文件
+13. **Output summary**: 输出本轮决策摘要
 
 ## Input Limits
 
@@ -314,6 +319,13 @@
 ### 读取的报告
 - <列出读取的 report 文件>
 
+### Self-Audit 结果
+- state/blocked 反馈: <N> 个被拒绝的 decision，<发现了什么问题>
+- Observation 质量: <PASS/发现 N 个问题>
+- Suggestion 质量: <PASS/发现 N 个问题>
+- Report 质量: <PASS/发现 N 个问题>
+- 自修复 issue: <#number or "无需修复">
+
 ### 决策结果
 - accept_for_followup: <N> (创建 issue #<numbers>)
 - hold_for_more_evidence: <N>
@@ -321,20 +333,102 @@
 - split_scope: <N>
 
 ### 创建的 Decision Issues
-- #<number>: <title> (evidence: strong/medium, target: <file>)
+- #<number>: <title> (type: supervisor/task, evidence: strong/medium, target: <file>)
 
 ### 未创建 Issue 的 Report
 - <report>: <为什么没有创建 issue>
 
 ### 查重结果
 - <列出已覆盖的 supervisor issue>
+
+### Cleanup 结果
+- 已清理 <N> 个 observation/suggestion/report 文件
 ```
 
 如果本轮没有读取到新报告，也必须输出上述结构，说明"本轮无新报告，跳过"。
 
+## Self-Audit: 检查 Audit 管线自身的问题
+
+在产出 decision issue 之前，必须对 audit-* 管线自身做一轮检查。因为你看到的 observation/suggestion/report 可能暴露 audit 材料本身的缺陷。
+
+### Step 1: 检查被拒绝的 Decision（state/blocked 反馈）
+
+搜索带有 `state/blocked` 标签的 supervisor issue，这些是之前被 roadmap-intake 拒绝的 decision：
+
+```bash
+gh issue list --label supervisor,state/blocked --limit 10 --json number,title,body,comments
+```
+
+对每个 blocked issue，读取 comment 中的拒绝原因：
+- 是否因为 bounded_edit scope 超出 supervisor/apply 能力？
+- 是否因为 evidence 不足被 downgrade？
+- 是否因为 anti-pattern 被 reject？
+- 是否因为层级错配（应该发 task issue 但发了 supervisor issue）？
+
+**这是一个关键的反馈回路**：blocked decision → 说明 audit 判断有误 → 需要修复 audit-* 材料。
+
+### Step 2: 检查 Audit 材料自身的缺陷
+
+基于本轮 observation/suggestion/report 的执行质量，检查 audit-* 材料是否需要修复：
+
+1. **Observation 质量检查**：
+   - 本轮 observation 是否 schema 合规？（运行 `audit-validate.py --observations`）
+   - observation 的 `affected_material_candidates` 是否合理？是否过度聚焦 prompt 层而忽略代码/脚本层？
+   - 如果有 observation 被 observation 材料要求跳过（如 < 2 evidence），但事实上有足够证据 → observation 材料的阈值需要调整
+
+2. **Suggestion 质量检查**：
+   - suggestion 是否过度拟合单个 cluster 而忽略跨 cluster 的根因？
+   - suggestion 的 `target_refs` 是否总是 prompt 材料？是否合理排除了代码层的问题？
+   - anti_bloat_check 是否实质性填写还是敷衍了事？
+
+3. **Report 质量检查**：
+   - report 的 anti_pattern_gate 是否发现了真实问题？是否漏检了？
+   - scope_completeness 是否准确反映了覆盖率？
+   - report 是否在单 cluster 场景下被触发（违反触发条件）？
+
+4. **Decision 质量检查（自指）**：
+   - 本轮的 issue 路由决策是否合理？
+   - 是否有应该 split 但没有 split 的 suggestion？
+   - 是否有应该发 task issue 但发了 supervisor issue 的？
+
+### Step 3: 产出 Audit 自修复 Issue（如果发现缺陷）
+
+如果 Step 1 或 Step 2 发现了 audit-* 材料或脚本的缺陷，**必须单独创建修复 issue**：
+
+- 简单修复（audit-* prompt 调整）→ 直接修改 `supervisor/governance/audit-*.md`
+- 脚本修复（audit-validate.py, audit-blocked-flows.py 等）→ 创建 task issue
+- 代码修复（governance.py, governance_utils.py 路由逻辑）→ 创建 task issue
+
+> 自修复 issue 和 decision issue 是**独立的两组产出**。decision issue 是对外的（修复被审计的目标），自修复 issue 是对内的（修复 audit 管线自身）。
+
+## Issue 创建：直接发布，不等审核
+
+Decision issue **必须直接创建**，不需要等待或人工确认：
+
+- issue 创建后会经过 roadmap-intake 三级审查——那里才是审核关口
+- 如果 decision 判断有误，roadmap-intake 会用 `state/blocked` 标记反馈
+- 下一轮 audit-decision 的 Self-Audit Step 1 会读取 blocked issue 并修正
+- **创建 issue 不是为了"一次性完美"，而是为了启动反馈回路**
+
+创建命令：
+```bash
+# Supervisor issue
+gh issue create --title "[audit-decision] accept: <描述>" --label "supervisor,state/ready" --body "..."
+
+# Task issue
+gh issue create --title "[audit] <描述>" --label "state/ready" --body "..."
+```
+
+创建后立即运行 cleanup：
+```bash
+uv run python scripts/audit-cleanup.py --issue <新issue号> --delete
+```
+
 ## Stop Point
 
-创建 decision issue 并输出 stdout 总结后停止。不要进入 plan/run/review 执行链，不要直接修改代码。
+创建 decision issue（和自修复 issue，如果有），运行 cleanup，输出 stdout 总结后停止。
+
+不要进入 plan/run/review 执行链，不要直接修改代码。
 
 ## Gate Verification（后续探讨）
 
