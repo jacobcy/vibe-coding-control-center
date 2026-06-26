@@ -430,6 +430,13 @@ git diff -- '*.py' | grep -E '^-\s*(async\s+)?def |^-\s*(async\s+)?class ' || ec
 - 使用 `vibe3 pr create` 时，默认已创建正式 PR（非 draft）
 - 如果 PR 已经是 draft 状态，使用 `gh pr edit <number> --draft=false` 修正
 
+### PR 创建后的状态转换
+
+PR 创建成功后：
+- 将 flow 状态从 merge-ready 转换为 HANDOFF
+- 使用 `vibe3 flow update --state handoff` 或等效命令
+- 如果状态转换失败，通过 handoff append 记录 finding
+
 ### 分支同步策略（rebase 优先）
 
 同步 main 分支更新时，优先使用 rebase 保持线性历史：
