@@ -12,10 +12,12 @@ if TYPE_CHECKING:
         normalize_actor,
     )
     from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
+    from vibe3.models.audit_decision import AuditDecision
     from vibe3.models.audit_observation import (
         AuditObservation,
         ObservationSourceWindow,
     )
+    from vibe3.models.audit_suggestion import AuditSuggestion
     from vibe3.models.branch_convention import BranchConvention
     from vibe3.models.change_source import (
         BranchSource,
@@ -149,7 +151,9 @@ if TYPE_CHECKING:
 
 # Lazy imports
 _LAZY_IMPORTS = {
+    "AuditDecision": "vibe3.models.audit_decision",
     "AuditObservation": "vibe3.models.audit_observation",
+    "AuditSuggestion": "vibe3.models.audit_suggestion",
     "ObservationSourceWindow": "vibe3.models.audit_observation",
     "ControlPlaneEventPublished": "vibe3.models.domain_events",
     "DomainEvent": "vibe3.models.domain_events",
@@ -293,7 +297,9 @@ __all__: list[str] = [
     "AgentResult",
     "ALLOWED_TRANSITIONS",
     "AsyncExecutionHandle",
+    "AuditDecision",
     "AuditObservation",
+    "AuditSuggestion",
     "BranchConvention",
     "BranchSource",
     "CallNode",

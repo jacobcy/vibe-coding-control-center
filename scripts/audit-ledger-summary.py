@@ -67,13 +67,19 @@ def _observation_summary(path: Path) -> dict[str, Any]:
 
 def _suggestion_summary(path: Path) -> dict[str, Any]:
     data = _load_yaml(path, "audit_suggestion")
+    evidence_summary = _dict(data.get("evidence_summary"))
     return {
         "suggestion_id": str(data.get("suggestion_id") or path.stem),
+        "suggestion_source": str(
+            data.get("suggestion_source") or "runtime_observation"
+        ),
         "linked_observation_ids": [
             str(item) for item in _list(data.get("linked_observation_ids"))
         ],
         "recommended_action": str(data.get("recommended_action") or "evaluate_more"),
         "target_refs": [str(item) for item in _list(data.get("target_refs"))],
+        "cluster_key": str(evidence_summary.get("cluster_key") or "unknown"),
+        "evidence_ref_count": len(_list(data.get("evidence_refs"))),
     }
 
 
@@ -154,6 +160,10 @@ def main() -> None:
         args.observations_dir, args.limit
     )
     suggestions, suggestion_limits = _read_suggestions(args.suggestions_dir, args.limit)
+    suggestion_sources: dict[str, int] = {}
+    for suggestion in suggestions:
+        source = str(suggestion.get("suggestion_source") or "runtime_observation")
+        suggestion_sources[source] = suggestion_sources.get(source, 0) + 1
 
     print(
         json.dumps(
@@ -163,6 +173,7 @@ def main() -> None:
                 "suggestions_dir": str(args.suggestions_dir),
                 "observation_count": len(observations),
                 "suggestion_count": len(suggestions),
+                "suggestion_sources": suggestion_sources,
                 "clusters": _clusters(observations),
                 "suggestions": suggestions,
                 "limitations": observation_limits + suggestion_limits,

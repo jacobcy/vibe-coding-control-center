@@ -178,11 +178,11 @@ code_limits:
 
       # Roles 层 —— 允许 480-600
       - path: "src/vibe3/roles/governance_utils.py"
-        limit: 420
-        reason: "Governance utilities aggregation, includes build_issue_context (snapshot context), build_code_auditor_context (module selection for audit), build_audit_observation_context (observation collection), build_audit_suggestion_context (observation cluster analysis), and material name normalization; Issue #2957 added build_audit_suggestion_context for audit-suggestion governance material (+74 lines)"
+        limit: 610
+        reason: "Governance utilities aggregation, includes build_issue_context (snapshot context), build_code_auditor_context (module selection for audit), build_audit_observation_context (observation collection), build_audit_suggestion_context (observation cluster analysis), build_audit_report_context (report generation context), build_audit_decision_context (decision packet analysis), and material name normalization; Issue #2957 added build_audit_suggestion_context (+74 lines); Issue #2953 added build_audit_decision_context (+76 lines), build_audit_report_context (+70 lines), and _build_scope_note helper"
       - path: "src/vibe3/roles/governance.py"
-        limit: 490
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines)"
+        limit: 500
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines); Issue #2953 added build_audit_decision_context import, audit-report.md routing, and build_audit_report_context import (+11 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -232,6 +232,12 @@ code_limits:
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+      - path: "scripts/audit-blocked-flows.py"
+        limit: 920
+        reason: "审计阻塞流程分析脚本，Issue #2953 四层审计管线的一部分；包含 blocked flow detection、decision issue 搜索（通过 gh CLI）、观察记录生成、YAML 文件读写等紧密耦合的审计工具逻辑，与 audit-validate.py 互补"
+      - path: "scripts/audit-validate.py"
+        limit: 760
+        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补"
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"

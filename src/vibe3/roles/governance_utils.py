@@ -364,6 +364,195 @@ def build_audit_suggestion_context(snapshot: Any) -> dict[str, Any]:
     return result
 
 
+def _build_scope_note(
+    observation_count: int,
+    suggestion_count: int,
+    suggestion_source_counts: dict[str, int],
+    observed_failure_modes: set[str],
+) -> str:
+    """Build scope note for audit report context."""
+    src_stats = (
+        ", ".join(f"{k}={v}" for k, v in sorted(suggestion_source_counts.items()))
+        or "无"
+    )
+    failure_modes = ", ".join(sorted(observed_failure_modes)) or "无"
+    skip_note = "目前无观察/建议记录，跳过本轮。" if observation_count == 0 else ""
+    return (
+        f"审计报告上下文：\n"
+        f"- 可用观察记录：{observation_count}\n"
+        f"- 可用建议记录：{suggestion_count}\n"
+        f"- 建议来源统计：{src_stats}\n"
+        f"- 检测到的失败模式：{failure_modes}\n\n"
+        "请运行 `uv run python scripts/audit-ledger-summary.py` "
+        "获取机械摘要，然后深度读取满足条件的 cluster "
+        "（2+ observation、单条 code_auditor suggestion，"
+        "或有明确 suggestion 引用），"
+        "生成 root-cause 报告并写入 `.git/shared/reports/`。"
+        f"{skip_note}"
+    )
+
+
+def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-report material.
+
+    Reads observation and suggestion ledgers from shared directories and
+    provides aggregate statistics for the reporter. The material owns the
+    actual analysis through audit-ledger-summary.py.
+    """
+    from vibe3.utils import get_git_common_dir
+
+    try:
+        git_common_dir = get_git_common_dir()
+        shared_dir = Path(git_common_dir) / "shared"
+    except Exception:
+        shared_dir = Path(".git/shared")
+
+    observations_dir = shared_dir / "observations"
+    suggestions_dir = shared_dir / "suggestions"
+
+    observation_count = 0
+    suggestion_count = 0
+    suggestion_source_counts: dict[str, int] = {}
+    observed_failure_modes: set[str] = set()
+
+    if observations_dir.exists():
+        obs_files = sorted(observations_dir.glob("audit-observation-*.yaml"))
+        observation_count = len(obs_files)
+        for obs_file in obs_files[:20]:
+            try:
+                content = obs_file.read_text()
+                if "observed_failure_mode:" in content:
+                    for line in content.split("\n"):
+                        if "observed_failure_mode:" in line:
+                            mode = line.split(":", 1)[1].strip().strip('"').strip("'")
+                            if mode:
+                                observed_failure_modes.add(mode)
+                            break
+            except Exception:
+                continue
+
+    if suggestions_dir.exists():
+        sug_files = sorted(suggestions_dir.glob("audit-suggestion-*.yaml"))
+        suggestion_count = len(sug_files)
+        for sug_file in sug_files[:20]:
+            try:
+                content = sug_file.read_text()
+                source = "runtime_observation"
+                if "suggestion_source:" in content:
+                    for line in content.split("\n"):
+                        if "suggestion_source:" in line:
+                            source = (
+                                line.split(":", 1)[1].strip().strip('"').strip("'")
+                                or "runtime_observation"
+                            )
+                            break
+                suggestion_source_counts[source] = (
+                    suggestion_source_counts.get(source, 0) + 1
+                )
+            except Exception:
+                continue
+
+    result = build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="root-cause report generation",
+        scope_note=_build_scope_note(
+            observation_count,
+            suggestion_count,
+            suggestion_source_counts,
+            observed_failure_modes,
+        ),
+    )
+
+    result["observation_count"] = observation_count
+    result["suggestion_count"] = suggestion_count
+    result["suggestion_source_counts"] = suggestion_source_counts
+    result["observed_failure_modes"] = sorted(observed_failure_modes)
+
+    return result
+
+
+def build_audit_decision_context(snapshot: Any) -> dict[str, Any]:
+    """Build context for audit-decision material.
+
+    Reads report ledger from shared directory and provides aggregate
+    statistics for the decision-maker to evaluate reports and create
+    the appropriate follow-up issues.
+
+    The decision agent creates GitHub issues (not YAML files) so the
+    downstream governance pipeline handles execution naturally:
+    supervisor fixes go through roadmap-intake → supervisor/apply,
+    while code/script fixes go through roadmap-intake → assignee-pool.
+
+    The context does NOT read full report content - the agent reads
+    selected ones via tools per the material's instructions.
+    """
+    from vibe3.utils import get_git_common_dir
+
+    try:
+        git_common_dir = get_git_common_dir()
+        reports_dir = Path(git_common_dir) / "shared" / "reports"
+    except Exception:
+        reports_dir = Path(".git/shared/reports")
+
+    report_count = 0
+    evidence_strengths: set[str] = set()
+
+    if reports_dir.exists():
+        report_files = sorted(reports_dir.glob("audit-report-*.md"))
+        report_count = len(report_files)
+
+        for report_file in report_files[:5]:
+            try:
+                content = report_file.read_text()
+                if "evidence strength:" in content.lower():
+                    for line in content.split("\n"):
+                        if "evidence strength:" in line.lower():
+                            strength = (
+                                line.split(":", 1)[1].strip().strip('"').strip("'")
+                            )
+                            if strength in ["strong", "medium", "weak", "inconclusive"]:
+                                evidence_strengths.add(strength)
+                            break
+            except Exception:
+                continue
+
+    result = build_issue_context(
+        (),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="decision packet analysis",
+        scope_note=(
+            f"决策包统计：\n"
+            f"- 可用报告数：{report_count}\n"
+            f"- 检测到的证据强度："
+            f"{', '.join(sorted(evidence_strengths)) or '无'}\n\n"
+            "请读取 `.git/shared/reports/audit-report-*.md`，"
+            "按材料中的证据规则、按材料中的路由规则，为每个 decision packet "
+            "创建对应的 follow-up issue（不是 YAML 文件）。\n"
+            "prompt/test/config 的简单修复走 supervisor 快速通道；"
+            "涉及 `src/vibe3/*` 或 `scripts/*` 的修复走常规 issue，"
+            "等待 roadmap-intake / assignee-pool 接手。"
+            f"{'目前无报告，跳过本轮。' if report_count == 0 else ''}"
+        ),
+    )
+
+    result["report_count"] = report_count
+    result["new_since_last_run"] = report_count
+    result["evidence_strengths"] = sorted(evidence_strengths)
+
+    return result
+
+
 def normalize_material_name(material_name: str) -> str:
     """Normalize material name to canonical form for comparison.
 

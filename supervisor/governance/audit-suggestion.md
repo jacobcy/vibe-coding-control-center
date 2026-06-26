@@ -2,7 +2,14 @@
 
 ## Role
 
-Observation → Suggestion analyzer. Reads observation ledger, produces structured suggestions from clusters.
+Observation → Suggestion analyzer。读取 observation ledger，不仅做聚类，更要**回到原始 prompt 材料**，理解 agent 失败模式与 prompt 设计之间的关系，产出 hypothesis-driven suggestion。
+
+本材料只产出 **runtime / governance 侧 suggestion**。代码静态审计产生的 suggestion 由 `code-auditor.md` 负责，但两者都写入统一的 `audit_suggestion` YAML schema，并在 `audit-report` 汇合。
+
+关键原则：
+- **不是"有 N 个 observation 就发一个 suggestion"**。数量是必要条件，不是充分条件。
+- **每个 suggestion 必须对照原始 prompt 材料**。判断这个 observation 模式指向了 prompt 的什么问题——是指令不清晰？边界条件缺失？步骤顺序有问题？
+- 单个 observation 不能形成 suggestion（anti-bloat 规则），但 2+ observation 也不自动等于 suggestion——必须有 prompt 层面的 hypothesis。
 
 ## Boundary
 
@@ -26,9 +33,11 @@ Observation → Suggestion analyzer. Reads observation ledger, produces structur
 2. **Skip if insufficient**: If fewer than minimum cluster size (default 2), skip with empty output
 3. **Read observations**: Read observation YAML files, parse content
 4. **Group by cluster**: Group observations by `observed_failure_mode` or `next_stage_input.suggested_cluster_key`
-5. **Produce suggestions**: For clusters meeting confidence/repetition thresholds, create suggestion
-6. **Write suggestions**: Output to `.git/shared/suggestions/` directory
-7. **Output summary**: Write structured summary to stdout
+5. **Read original prompt materials**: For clusters meeting the minimum size, read the target prompt/policy/skill materials referenced in observations' `affected_material_candidates`
+6. **Form hypothesis**: Based on observation patterns AND prompt material analysis, form a hypothesis about what in the prompt caused the agent failure — not just "there were N failures"
+7. **Produce suggestions**: For clusters where prompt material analysis supports a concrete hypothesis, create suggestion
+8. **Write suggestions**: Output to `.git/shared/suggestions/` directory
+9. **Output summary**: Write structured summary to stdout
 
 ## Input Limits
 
@@ -66,6 +75,7 @@ Observation → Suggestion analyzer. Reads observation ledger, produces structur
 audit_suggestion:
   schema_version: 1
   suggestion_id: "sug-<iso8601>-<hash>"
+  suggestion_source: "runtime_observation"
   linked_observation_ids:
     - "obs-20260623T123456-abcdef12"
     - "obs-20260623T134567-bcdef234"
@@ -80,6 +90,9 @@ audit_suggestion:
   regression_risk: "low"
   created_by: "governance/audit-suggestion"
   created_at: "<iso8601>"
+  evidence_refs:
+    - "obs-20260623T123456-abcdef12"
+    - "obs-20260623T134567-bcdef234"
   evidence_summary:
     observation_count: 3
     cluster_key: "scope_mismatch"
@@ -151,8 +164,56 @@ Minimum requirements for creating a suggestion:
 - If YAML parsing fails: Skip that file, log warning
 - If cluster analysis fails: Skip that cluster, continue with others
 
+## Affected Layer 枚举值
+
+`suggestion` 中的 `affected_layer` 必须是以下值之一：
+
+| 值 | 含义 |
+|-----|-----|
+| `prompt_material` | supervisor/ 下的 governance/policy 材料 |
+| `governance_policy` | supervisor/policies/ 下的策略文件（high-impact） |
+| `code_module` | `src/vibe3/*` 等主代码模块 |
+| `script` | `scripts/*` 下的脚本 |
+| `test_suite` | `tests/*` 下的测试 |
+| `prompt_recipe` | config/prompts/ 下的 recipe 文件（high-impact） |
+| `skill_contract` | skills/ 下的 skill 定义（high-impact） |
+| `runtime_config` | 运行时配置（loc_limits 等） |
+| `unknown` | 无法确定具体 layer |
+
+> 标注为 high-impact 的 layer 会在 decision 阶段触发 `requires_human_confirmation: true`。
+
+## Output Contract
+
+**强制 stdout 输出要求**：必须在标准输出中打印本轮工作的完整总结。
+
+```
+## Suggestion Round Summary
+
+### Observations Processed
+- Total: <N>
+- Clusters found: <N>
+
+### Suggestions Created
+- sug-<id>: <hypothesis summary> (cluster: <key>, confidence: <level>)
+- sug-<id>: <hypothesis summary> (cluster: <key>, confidence: <level>)
+
+### Skipped Clusters
+- <cluster_key>: <reason> (observation_count: <N>)
+
+### Limitations
+- <missing data, parse errors, etc.>
+```
+
+如果本轮 observation 不足（cluster size < 2），也应输出上述结构，说明"本轮无足够样本形成 suggestion，跳过"。
+
 ## Integration Notes
 
 This material runs as part of the `governance.scan` rotation, alongside `audit-observation.md`.
 
 The material itself defines skip logic to achieve lower effective frequency without changing the rotation mechanism.
+
+`audit-report` 会同时读取：
+- `suggestion_source: runtime_observation`
+- `suggestion_source: code_auditor`
+
+但本材料自身**只负责前者**，不要在这里做静态代码体检。

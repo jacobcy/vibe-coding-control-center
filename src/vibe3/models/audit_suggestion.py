@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +22,10 @@ class AuditSuggestion(BaseModel):
 
     # === Identity ===
     suggestion_id: str = Field(description="Unique identifier: sug-<timestamp>-<hash>")
+    suggestion_source: Literal["runtime_observation", "code_auditor"] = Field(
+        default="runtime_observation",
+        description="Which audit track produced this suggestion",
+    )
     linked_observation_ids: list[str] = Field(
         default_factory=list,
         description="Observation YAML filenames or observation_ids",
@@ -33,6 +37,9 @@ class AuditSuggestion(BaseModel):
     )
     affected_layer: Literal[
         "runtime",
+        "code_module",
+        "script",
+        "test_suite",
         "prompt_recipe",
         "prompt_material",
         "skill_contract",
@@ -43,6 +50,15 @@ class AuditSuggestion(BaseModel):
     target_refs: list[str] = Field(
         default_factory=list,
         description="Paths, section keys, recipe/skill/policy names",
+    )
+    evidence_refs: list[str] = Field(
+        default_factory=list,
+        description="Verifiable file/issue/observation refs supporting the suggestion",
+    )
+    evidence_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Mechanical clustering/evidence metadata "
+        "consumed by downstream audit",
     )
 
     # === Action ===
@@ -85,6 +101,9 @@ class AuditSuggestion(BaseModel):
         linked_observation_ids: list[str],
         affected_layer: Literal[
             "runtime",
+            "code_module",
+            "script",
+            "test_suite",
             "prompt_recipe",
             "prompt_material",
             "skill_contract",
@@ -104,6 +123,11 @@ class AuditSuggestion(BaseModel):
         confidence: Literal["high", "medium", "low"],
         regression_risk: Literal["high", "medium", "low"],
         created_by: str = "governance/audit-suggestion",
+        suggestion_source: Literal["runtime_observation", "code_auditor"] = (
+            "runtime_observation"
+        ),
+        evidence_refs: list[str] | None = None,
+        evidence_summary: dict[str, Any] | None = None,
     ) -> "AuditSuggestion":
         """Factory method to create suggestion with auto-generated IDs."""
         created_at = datetime.now(timezone.utc).isoformat()
@@ -114,10 +138,13 @@ class AuditSuggestion(BaseModel):
 
         return cls(
             suggestion_id=suggestion_id,
+            suggestion_source=suggestion_source,
             linked_observation_ids=linked_observation_ids,
             hypothesis=hypothesis,
             affected_layer=affected_layer,
             target_refs=target_refs,
+            evidence_refs=evidence_refs or [],
+            evidence_summary=evidence_summary or {},
             recommended_action=recommended_action,
             expected_metric=expected_metric,
             expected_trend=expected_trend,

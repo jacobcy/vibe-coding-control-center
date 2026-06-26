@@ -270,6 +270,15 @@ class TestBuildGovernanceSnapshotContextAuditObservation:
         mock_github.assert_not_called()
 
 
+def test_code_auditor_material_writes_yaml_suggestion_not_issue() -> None:
+    content = Path("supervisor/governance/code-auditor.md").read_text(encoding="utf-8")
+
+    assert ".git/shared/suggestions/" in content
+    assert "audit_suggestion:" in content
+    assert "audit-validate.py --suggestions" in content
+    assert "对每个确认问题创建 issue" not in content
+
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
