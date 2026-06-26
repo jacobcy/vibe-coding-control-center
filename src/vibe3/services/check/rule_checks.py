@@ -112,6 +112,55 @@ def rule_closed_issue_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     )
 
 
+def rule_aborted_flow_done_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | None:
+    """Reconcile aborted flows: transition to done when all phases complete
+    and PR merged."""
+    if not svc._sync_rules.local.aborted_flow_done_reconcile.enabled:
+        return None
+    if ctx.flow_status != "aborted":
+        return None
+
+    # Phase check: all must be done
+    planner = ctx.flow_data.get("planner_status")
+    executor = ctx.flow_data.get("executor_status")
+    reviewer = ctx.flow_data.get("reviewer_status")
+    if not all(s == "done" for s in (planner, executor, reviewer)):
+        return None
+
+    # Delivery confirmation: PR merged (explicit evidence only)
+    pr_merged = False
+    pr_number = None
+
+    # Fast path: pr_ref stored in flow record
+    if ctx.flow_data.get("pr_ref"):
+        pr_merged = True
+        pr_number = ctx.flow_data.get("pr_number")
+    elif ctx.branch_pr and ctx.branch_pr.merged_at:
+        pr_merged = True
+        pr_number = ctx.branch_pr.number
+
+    if not pr_merged:
+        return None
+
+    from vibe3.services.check.service import CheckResult
+
+    svc._flow_status_service.transition_aborted_to_done(
+        ctx.branch,
+        "All phases complete, delivery confirmed — post-merge done transition",
+        pr_number=pr_number,
+    )
+
+    return CheckResult(
+        is_valid=True,
+        branch=ctx.branch,
+        issues=[],
+        warnings=[
+            f"Flow '{ctx.branch}' transitioned aborted→done "
+            "(phases complete, delivery confirmed)"
+        ],
+    )
+
+
 def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     """Auto-resume flow when remote state/blocked label removed."""
     if not svc._sync_rules.local.stale_blocked_sync.enabled:
@@ -474,6 +523,7 @@ def rule_label_constraint_enforcement(
 RULES = [
     rule_pr_terminal_state,
     rule_closed_issue_sync,
+    rule_aborted_flow_done_reconcile,  # NEW
     rule_stale_blocked_sync,
     rule_blocked_label_sync,
     rule_stale_ready_rebuild,

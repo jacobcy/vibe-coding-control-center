@@ -322,3 +322,114 @@ class TestQualifyGateGitHubClosed:
             terminate_sessions=True,
             keep_flow_record=True,
         )
+
+    def test_closed_issue_aborted_all_phases_done_pr_merged_transitions_to_done(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """aborted + all phases done + PR merged → transition to done."""
+        # Setup flow_state with aborted status, all phases done, and pr_ref
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={
+                "flow_status": "aborted",
+                "planner_status": "done",
+                "executor_status": "done",
+                "reviewer_status": "done",
+                "pr_ref": "refs/pull/110/head",
+                "pr_number": 110,
+            }
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 110, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted is NOT called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+
+        # Verify transition_aborted_to_done IS called
+        mock_flow_status_svc.return_value.transition_aborted_to_done.assert_called_once_with(
+            "task/issue-110",
+            "Issue #110 closed, all phases complete, PR merged",
+            pr_number=110,
+        )
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-110",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_aborted_partial_phases_stays_aborted(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """aborted + incomplete phases → stays aborted (legitimate abort preserved)."""
+        # Setup flow_state with aborted status, partial phases done
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={
+                "flow_status": "aborted",
+                "planner_status": "done",
+                "executor_status": "running",  # Still running
+                "reviewer_status": "done",
+            }
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 111, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted is NOT called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+
+        # Verify transition_aborted_to_done is NOT called (partial phases)
+        mock_flow_status_svc.return_value.transition_aborted_to_done.assert_not_called()
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-111",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_aborted_no_pr_stays_aborted(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """aborted + all phases done + no PR → stays aborted."""
+        # Setup flow_state with aborted status, all phases done, but no pr_ref
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={
+                "flow_status": "aborted",
+                "planner_status": "done",
+                "executor_status": "done",
+                "reviewer_status": "done",
+                # No pr_ref, no pr_number
+            }
+        )
+        # Mock GitHub to return no merged PRs
+        qualify_gate_service._github.list_prs_for_branch = Mock(return_value=[])
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 112, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+
+        # Verify mark_flow_aborted is NOT called
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+
+        # Verify transition_aborted_to_done is NOT called (no delivery confirmation)
+        mock_flow_status_svc.return_value.transition_aborted_to_done.assert_not_called()
+
+        # Verify cleanup_flow_scene is still called
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-112",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )

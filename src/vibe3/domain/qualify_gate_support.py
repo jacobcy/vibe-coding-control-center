@@ -30,6 +30,43 @@ def _append_orchestra_event(channel: str, message: str) -> None:
     append_orchestra_event(channel, message)
 
 
+def _should_transition_aborted_to_done(
+    flow_state: dict[str, object],
+    issue: "IssueInfo",
+    branch: str,
+    github: "GitHubClient",
+) -> bool:
+    """Heuristic: all lifecycle phases done + delivery confirmed.
+
+    Returns True when:
+    - planner_status, executor_status, reviewer_status are all "done"
+    - AND (flow has pr_ref OR a merged PR is found for the branch)
+
+    This ensures legitimate abort scenarios (manual abort, critical error abort)
+    are not incorrectly transitioned to done.
+    """
+    # Phase check: all must be done
+    phase_statuses = (
+        flow_state.get("planner_status"),
+        flow_state.get("executor_status"),
+        flow_state.get("reviewer_status"),
+    )
+    if not all(s == "done" for s in phase_statuses):
+        return False
+    # Delivery check: pr_ref stored in flow record (fast path)
+    if flow_state.get("pr_ref"):
+        return True
+    # Delivery check: query GitHub for merged PR (slow path)
+    try:
+        prs = github.list_prs_for_branch(branch)
+        for pr in prs:
+            if hasattr(pr, 'merged_at') and pr.merged_at is not None:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def terminalize_closed_issue(
     *,
     issue: "IssueInfo",
@@ -57,6 +94,18 @@ def terminalize_closed_issue(
             git_client=flow_manager.git,
             github_client=github,
         ).mark_flow_aborted(branch, f"Issue #{issue.number} closed on GitHub")
+    elif current_status == "aborted" and flow_state:
+        # Heuristic: all phases done + PR merged → transition to done
+        if _should_transition_aborted_to_done(flow_state, issue, branch, github):
+            flow_status_service_cls(
+                store=store,
+                git_client=flow_manager.git,
+                github_client=github,
+            ).transition_aborted_to_done(
+                branch,
+                f"Issue #{issue.number} closed, all phases complete, PR merged",
+                pr_number=flow_state.get("pr_number"),
+            )
 
     flow_cleanup_service_cls(store=store).cleanup_flow_scene(
         branch,

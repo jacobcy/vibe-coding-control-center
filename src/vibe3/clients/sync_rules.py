@@ -87,6 +87,10 @@ class LocalSyncRules(BaseModel):
         default_factory=SyncRule,
         description="Handle closed task issue → mark flow aborted",
     )
+    aborted_flow_done_reconcile: SyncRule = Field(
+        default_factory=SyncRule,
+        description="Transition aborted flows to done when all phases complete and delivery confirmed",
+    )
     stale_blocked_sync: SyncRule = Field(
         default_factory=SyncRule,
         description="Auto-resume flow when remote state/blocked label removed",

@@ -204,3 +204,40 @@ class FlowStatusService:
         self.mark_flow_status(
             branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
+
+    def transition_aborted_to_done(
+        self,
+        branch: str,
+        reason: str,
+        pr_number: int | None = None,
+    ) -> None:
+        """Transition an aborted flow to done with phase-level cleanup.
+
+        Unlike mark_flow_done, this method:
+        - Does NOT auto-close the issue (already closed)
+        - Does NOT save branch snapshot (branch may be cleaned up)
+        - DOES clean up stale planner_status, executor_status, reviewer_status
+        - Records a flow_auto_transitioned event
+        """
+        self.store.update_flow_state(
+            branch,
+            flow_status="done",
+            planner_status="done",
+            executor_status="done",
+            reviewer_status="done",
+        )
+        detail = f"Aborted flow transitioned to done: {reason}"
+        if pr_number:
+            detail += f" (PR #{pr_number})"
+        self.store.add_event(
+            branch,
+            "flow_auto_transitioned",
+            "system",
+            detail,
+        )
+        logger.bind(
+            domain="flow",
+            action="transition_aborted_to_done",
+            branch=branch,
+            pr_number=pr_number,
+        ).success(f"Transitioned aborted flow to done: {reason}")

@@ -241,6 +241,13 @@ class CheckPRService:
         Returns:
             Tuple of (handled=True, issues, warnings).
         """
+        # Guard: Skip aborted flows - let rule_aborted_flow_done_reconcile handle them
+        flow_state = self.store.get_flow_state(branch)
+        if flow_state and flow_state.get("flow_status") == "aborted":
+            # Don't transition aborted flows here; populate PR cache only
+            self._update_pr_cache(branch, pr)
+            return (False, [], [])  # Let reconciliation rule handle the transition
+
         warnings: list[str] = []
 
         suggestions = self._flow_status_service.mark_flow_done(
