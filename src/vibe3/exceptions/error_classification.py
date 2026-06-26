@@ -22,6 +22,7 @@ from vibe3.exceptions.error_codes import (
     E_API_TIMEOUT,
     E_API_UNAVAILABLE,
     E_API_UNKNOWN,
+    E_AUP_REJECTION,
     E_CAPACITY_SKIP,
     E_CONFIG_MISSING,
     E_DISPATCH_CODE_ERROR,
@@ -131,6 +132,24 @@ def classify_error(error_output: str) -> str:
         return E_MODEL_PERMISSION
     if "invalid api key" in output_lower:
         return E_MODEL_CONFIG
+
+    # AUP/content policy rejection (check before generic API errors).
+    # Require co-occurrence of a policy phrase AND a refusal signal so that
+    # agent output which merely *discusses* content policies (reviewing a
+    # PR about AUP, writing compliance docs, etc.) is not misclassified.
+    policy_phrase = (
+        "usage policy" in output_lower
+        or "acceptable use policy" in output_lower
+        or "content policy" in output_lower
+    )
+    refusal_signal = (
+        "violate our" in output_lower
+        or "unable to respond" in output_lower
+        or "unable to complete" in output_lower
+        or "refus" in output_lower
+    )
+    if policy_phrase and refusal_signal:
+        return E_AUP_REJECTION
 
     # API errors
     if (
@@ -398,6 +417,18 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         issue_action="record_only",
         gate_action="ignore",
         description="Test artifact leak (MagicMock passed to Path operations)",
+    ),
+    # WARNING: AUP rejection - content policy violation
+    E_AUP_REJECTION: ErrorHandlingContract(
+        code=E_AUP_REJECTION,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_after_retries",
+        gate_action="ignore",
+        max_retries=3,
+        description="Content policy rejection (AUP)",
     ),
 }
 

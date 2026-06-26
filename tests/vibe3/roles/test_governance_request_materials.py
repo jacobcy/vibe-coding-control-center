@@ -1,8 +1,9 @@
 """Tests for governance request building and material selection."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.roles.governance import (

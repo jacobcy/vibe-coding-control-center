@@ -1,7 +1,8 @@
 """Tests for pre-push incremental test selector."""
 
-from vibe3.analysis.pre_push_test_selector import select_pre_push_tests
 import pytest
+
+from vibe3.analysis.pre_push_test_selector import select_pre_push_tests
 
 
 def test_selects_changed_test_files_incrementally() -> None:

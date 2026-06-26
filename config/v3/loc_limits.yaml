@@ -50,8 +50,8 @@ code_limits:
         limit: 450
         reason: "Git status operations infrastructure module，包含 get_changed_files/get_diff/get_numstat/get_name_status 等 4 个统一接口 + _filter_unified_diff_by_paths 辅助函数（PR #3019 pathspec filtering）+ _numstat_via_merge_base/_name_status_via_merge_base merge-base helpers（Issue #3009 A/M/D file classification）；职责单一（git diff/status operations）且遵循既定模式（get_numstat → get_name_status mirror），拆分收益低"
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 580
-        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化；Issue #3085 新增内联 severity 推断逻辑（+18 行）消除跨层函数导入"
+        limit: 600
+        reason: "Schema DDL 与迁移聚合，包含 10 个表定义（含 snapshot_registry）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑、baseline_for 列迁移，DDL 字符串和迁移逻辑紧密耦合不宜拆分；Issue #2845 新增 snapshot_registry 表与索引定义（+23 行）支持 DB-backed snapshot lookup；Issue #2831 新增 baseline_for 列迁移（+9 行）支持 baseline 元数据持久化；Issue #3085 新增内联 severity 推断逻辑（+18 行）消除跨层函数导入；Issue #3099 新增 AUP rejection 计数器字段迁移（aup_rejection_count, last_aup_rejection_at，+13 行）"
       - path: "src/vibe3/clients/git_client.py"
         limit: 650
         reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330），新增 get_remote_url() 支持 ConventionResolver 重构（Issue #2346）；Issue #2926 新增 _resolve_base_ref/_resolve_source 实现 origin/main 自动解析与 5 分钟 fetch 缓存（+59 行）"
@@ -197,8 +197,8 @@ code_limits:
         reason: "Supervisor 角色聚合，包含 scan dispatch、apply 请求构建、handoff payload 构建、配置文件解析等紧密耦合的 supervisor 逻辑；Issue #3155 新增 throttled dispatch support 和临时 worktree isolation（+45 行）"
 
       - path: "src/vibe3/exceptions/error_classification.py"
-        limit: 450
-        reason: "Error classification registry and helper functions (is_permanent_code_error, classify_error, ERROR_REGISTRY); Issue #3149 added E_DISPATCH_CODE_ERROR entry and is_permanent_code_error() classifier for permanent-vs-transient error distinction (+45 lines)"
+        limit: 480
+        reason: "Error classification registry and helper functions (is_permanent_code_error, classify_error, ERROR_REGISTRY); Issue #3149 added E_DISPATCH_CODE_ERROR entry and is_permanent_code_error() classifier for permanent-vs-transient error distinction (+45 lines); Issue #3099 added E_AUP_REJECTION registry entry with block_after_retries contract and AUP text detection patterns (+30 lines)"
       - path: "tests/vibe3/orchestra/test_queue_maintenance_triggers.py"
         limit: 500
         reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发、scheduled refresh 完整生命周期（tick-based trigger、dirty signal consumer、queue rebuild verification）、pool exhaustion detection 等紧密耦合场景；Issue #3148 新增 exhausted queue rebuild 集成测试后从 401 行增至 481 行"
@@ -264,8 +264,8 @@ code_limits:
         limit: 750
         reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录、actor 生命周期管理（实时监控层，与 ExecutionLifecycleService 持久记录层互补）等紧密耦合的统一调度入口逻辑；#2172 集成 actor supervision（+60 行），#2177 新增版本元数据追踪（adapter_hash/policy_hash/material_hash 计算与持久化，+130 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 630
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查"
+        limit: 700
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查；Issue #3099 新增 AUP rejection retry counter 与原子 SQL UPDATE 阈值阻塞逻辑（+50 行），后续 code review 修复新增 record_error 显式写入 error_log（WARNING 可观测）、移除提前 raise 以保留 timeline event、成功执行时重置计数器（+2 行超 680 阈值）"
       - path: "src/vibe3/services/orchestra/status.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多；Issue #2106 Phase 3-2 迁移至 orchestra/status.py"

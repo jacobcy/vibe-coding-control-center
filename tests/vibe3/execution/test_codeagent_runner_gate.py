@@ -1,6 +1,7 @@
 """Integration tests for execute_sync gate/callback invocation."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from vibe3.agents import CodeagentCommand

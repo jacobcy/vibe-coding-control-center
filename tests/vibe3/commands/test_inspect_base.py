@@ -5,9 +5,9 @@ Tests CLI surface: argument validation, help output, exit codes.
 All external services are mocked.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.commands.inspect import app

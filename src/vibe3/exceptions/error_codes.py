@@ -39,6 +39,9 @@ E_ISSUE_FAILED: Final[str] = "E_ISSUE_FAILED"
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
 
+# AUP rejection - content policy violation
+E_AUP_REJECTION: Final[str] = "E_AUP_REJECTION"
+
 # Test quality - test artifact leaks
 E_TEST_ARTIFACT_LEAK: Final[str] = "E_TEST_ARTIFACT_LEAK"
 

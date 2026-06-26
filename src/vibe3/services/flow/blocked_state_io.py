@@ -133,18 +133,23 @@ class BlockedStateIO:
         """Clear blocked state from database cache.
 
         Also resets transition counters to allow flow to continue after
-        being blocked by loop protection.
+        being blocked by loop protection or AUP rejection threshold.
         """
         if not self.store:
             return
 
-        # Reset transition_count to allow flow to continue
+        # Reset transition_count and aup_rejection_count to allow flow
+        # to continue after unblock. Without resetting aup_rejection_count,
+        # the next AUP rejection would immediately re-block the flow since
+        # the counter is already at or above the threshold.
         self.store.update_flow_state(
             branch,
             flow_status="active",
             blocked_reason=None,
             blocked_by_issue=None,
             transition_count=0,  # Reset loop protection counter
+            aup_rejection_count=0,  # Reset AUP rejection counter
+            last_aup_rejection_at=None,  # Clear AUP rejection timestamp
             latest_actor=actor,
         )
 
