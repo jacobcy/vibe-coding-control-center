@@ -473,6 +473,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_internal.py"
         limit: 575
         reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行），新增 async skip/throttled display 测试（+28 行）"
+      - path: "tests/vibe3/observability/test_orchestra_log.py"
+        limit: 420
+        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior 等 24 个测试（20 existing + 4 new）；Issue #3192 新增 4 个 color behavior 测试（TTY on/off、color=None、unknown color degradation）验证 ANSI escape codes 嵌入逻辑（+83 行），从 336 行增至 419 行；测试围绕 append_orchestra_event/append_governance_event 统一接口，拆分会破坏测试场景完整性"
 
 
   total_file_loc:
