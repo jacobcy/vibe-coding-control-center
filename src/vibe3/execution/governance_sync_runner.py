@@ -223,7 +223,7 @@ def run_governance_async(
         resolve_orchestra_repo_root,
     )
     from vibe3.observability import append_governance_event
-    from vibe3.roles.governance import _resolve_governance_material
+    from vibe3.prompts import resolve_governance_material
     from vibe3.services.orchestra import OrchestraStatusService
 
     repo = resolve_orchestra_repo_root()
@@ -272,7 +272,7 @@ def run_governance_async(
     resolved_material = (
         material_override
         if material_override
-        else _resolve_governance_material(config, execution_count)
+        else resolve_governance_material(config, execution_count)
     )
     execution_name = build_execution_name(tick_count, resolved_material)
 

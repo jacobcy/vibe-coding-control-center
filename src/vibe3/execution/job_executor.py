@@ -496,15 +496,15 @@ class JobExecutor:
         config = load_orchestra_config(target_repo=repo)
 
         # Resolve material: use override if provided, otherwise rotate from catalog
-        from vibe3.roles.governance import (
-            _resolve_governance_material,
+        from vibe3.prompts import (
             build_governance_execution_name,
+            resolve_governance_material,
         )
 
         resolved_material = (
             envelope.governance_material_override
             if envelope.governance_material_override
-            else _resolve_governance_material(
+            else resolve_governance_material(
                 config, envelope.governance_execution_count
             )
         )

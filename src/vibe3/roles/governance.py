@@ -23,14 +23,15 @@ from vibe3.prompts import (
     DEFAULT_PROMPTS_PATH,
     PromptAssembler,
     PromptManifest,
-    PromptMaterialSpec,
     PromptRecipe,
-    PromptRecipeDefinition,
     PromptRenderResult,
     PromptVariableSource,
     ProviderRegistry,
     VariableSourceKind,
+    build_governance_execution_name,
     collect_dry_run_provenance,
+    load_governance_material_catalog,
+    resolve_governance_material,
 )
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
@@ -92,34 +93,6 @@ def _compute_material_hash() -> str | None:
     return compute_hash_from_loader(material_loader, materials_dir)
 
 
-def _resolve_governance_material(
-    config: OrchestraConfig,
-    execution_count: int,
-) -> str:
-    _ = config
-    catalog = load_governance_material_catalog()
-    return catalog[execution_count % len(catalog)].name
-
-
-def _load_governance_recipe_definition() -> PromptRecipeDefinition:
-    return PromptManifest.load_default().recipe("governance.scan")
-
-
-def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
-    """Load the governance material catalog from prompt manifest.
-
-    Returns:
-        Tuple of PromptMaterialSpec objects for governance materials.
-    """
-    recipe_def = _load_governance_recipe_definition()
-    if not recipe_def.loaded_definition:
-        raise ValueError("governance.scan recipe not properly loaded")
-    catalog = recipe_def.loaded_definition.material_catalog
-    if not catalog:
-        raise ValueError("governance.scan recipe requires material_catalog")
-    return catalog
-
-
 def build_governance_snapshot_context(
     snapshot: Any,
     *,
@@ -140,7 +113,7 @@ def build_governance_snapshot_context(
             )
         current_material = selected.name
     else:
-        current_material = _resolve_governance_material(config, execution_count)
+        current_material = resolve_governance_material(config, execution_count)
     material_name = Path(current_material).name
 
     # Compute material hash from disk so config/material changes are
@@ -379,32 +352,6 @@ def resolve_governance_options(config: OrchestraConfig) -> Any:
     Resolution happens in CodeagentBackend.run() to preserve original agent info.
     """
     return ExecutionRolePolicyService(config).resolve_agent_options("governance")
-
-
-def build_governance_execution_name(
-    tick_count: int, material: str | None = None
-) -> str:
-    """Build unique execution name for a governance scan tick.
-
-    If material is provided, extracts the material slug (stem) and embeds it
-    in the execution name to enable material-specific log paths.
-
-    Args:
-        tick_count: Current tick count
-        material: Optional material path
-            (e.g., "supervisor/governance/cron-supervisor.md")
-
-    Returns:
-        Execution name string
-            (e.g., "vibe3-governance-cron-supervisor-20260627-010215-t8")
-    """
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    if material:
-        # Extract material slug from path
-        # (e.g. "supervisor/governance/cron-supervisor.md" -> "cron-supervisor")
-        material_slug = Path(material).stem
-        return f"vibe3-governance-{material_slug}-{timestamp}-t{tick_count}"
-    return f"vibe3-governance-scan-{timestamp}-t{tick_count}"
 
 
 def build_governance_request(
