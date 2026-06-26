@@ -30,8 +30,8 @@ code_limits:
         limit: 680
         reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器；#2912 新增 enforce_label_constraints_remote 方法（+116 行）实现远程 issue 标签约束扫描"
       - path: "src/vibe3/services/check/rule_checks.py"
-        limit: 500
-        reason: "Check 规则实现文件，含 12 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）实现标签约束自动修复"
+        limit: 550
+        reason: "Check 规则实现文件，含 13 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）实现标签约束自动修复；#3167 新增 rule_aborted_flow_done_reconcile（+47 行）实现 aborted→done 流状态转换协调"
 
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层
@@ -367,6 +367,9 @@ code_limits:
       - path: "tests/vibe3/domain/test_qualify_gate_open_pr.py"
         limit: 400
         reason: "Qualify gate open PR 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0b: open PR + running planner/executor → review、no worker → skip、already review/done → skip、no PR → skip 等 6 个紧密耦合场景，共享 fixture"
+      - path: "tests/vibe3/domain/test_qualify_gate_closed.py"
+        limit: 450
+        reason: "Qualify gate closed issue 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0: GitHub state CLOSED 检测、flow state terminalization、aborted→done transition 等 12 个紧密耦合场景；Issue #3167 新增 3 个 aborted→done transition 测试验证 post-merge 流状态修复（+111 行）"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 700
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试、placeholder flow 创建等紧密耦合场景，共享 fixture；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）；Issue #2762 follow-up 将分支校验与 baseline snapshot 相关测试（_validate_or_recreate_branch、creation_source、force_baseline，共 8 个测试）拆分至 test_flow_orchestrator_branch_baseline.py（802→674 行）"
