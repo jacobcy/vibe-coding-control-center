@@ -1,6 +1,7 @@
 """Comprehensive unit tests for orchestra_log.py."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -333,3 +334,86 @@ def test_governance_event_format(tmp_path: Path, enable_event_log):
     assert "[governance]" not in content
     # But it should have a timestamp
     assert content.startswith("[")
+
+
+# Step 7: Test color parameter behavior (4 tests)
+
+
+def test_append_event_with_color_enabled(tmp_path: Path, enable_event_log, monkeypatch):
+    """append_orchestra_event embeds ANSI codes when color passed and isatty=True."""
+    # Mock stdout.isatty() to return True (terminal environment)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="green", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # ANSI green: \033[32m, reset: \033[0m
+    assert "\033[32m" in content
+    assert "\033[0m" in content
+    # Should still contain the message
+    assert "test message" in content
+
+
+def test_append_event_with_color_disabled_no_tty(
+    tmp_path: Path, enable_event_log, monkeypatch
+):
+    """append_orchestra_event does NOT embed ANSI when isatty=False (CI environment)."""
+    # Mock stdout.isatty() to return False (CI environment)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="green", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes
+    assert "\033[32m" not in content
+    assert "\033[0m" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content
+
+
+def test_append_event_with_color_none(tmp_path: Path, enable_event_log, monkeypatch):
+    """append_orchestra_event with color=None does NOT embed ANSI (baseline behavior)."""
+    # Even if isatty=True, color=None should produce plain output
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color=None, repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes
+    assert "\033[32m" not in content
+    assert "\033[0m" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content
+
+
+def test_append_event_with_unknown_color(
+    tmp_path: Path, enable_event_log, monkeypatch
+):
+    """append_orchestra_event silently degrades unknown color name to plain output."""
+    # Mock stdout.isatty() to return True
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    # Use a color name not in _COLOR_MAP
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="nonexistent_color", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes (silently degraded)
+    assert "\033[" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content

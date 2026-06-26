@@ -157,8 +157,8 @@ class GlobalDispatchCoordinator:
         self._remote_check_interval = remote_check_interval
         self._last_remote_check_tick: int = 0
 
-        def _emit(category: str, message: str) -> None:
-            append_orchestra_event(category, message)
+        def _emit(category: str, message: str, *, color: str | None = None) -> None:
+            append_orchestra_event(category, message, color=color)
 
         self._dispatch_health = DispatchHealthService(
             check_service=lambda: self._check_service,
@@ -397,6 +397,7 @@ class GlobalDispatchCoordinator:
             append_orchestra_event(
                 "dispatcher",
                 "GlobalDispatchCoordinator: capacity full",
+                color="yellow",
             )
             return 0
 
@@ -411,6 +412,7 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
                     f"skipped remaining (capacity or hard limit reached)",
+                    color="yellow",
                 )
                 return dispatched_count
 
@@ -421,6 +423,7 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
                     "from queue (issue not found or state missing)",
+                    color="yellow",
                 )
                 self._frozen_queue.pop(index)
                 continue
@@ -435,6 +438,7 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: removed #{issue.number} "
                     "from queue (supervisor or assignee check failed)",
+                    color="yellow",
                 )
                 self._frozen_queue.pop(index)
                 continue
@@ -485,17 +489,17 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: removed #{issue.number} "
                     f"from queue (no role for state {preflight.target_state})",
+                    color="yellow",
                 )
                 self._frozen_queue.pop(index)
                 continue
             entry.collected_state = preflight.target_state.value
 
-            green = "\033[32m"
-            reset = "\033[0m"
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
+                f"GlobalDispatchCoordinator: dispatch-intent "
                 f"#{issue.number} ({role.registry_role})",
+                color="green",
             )
             self._emit_dispatch_intent(role, issue, tick_id)
             entry.waiting_state = entry.collected_state
@@ -512,12 +516,10 @@ class GlobalDispatchCoordinator:
             index += 1
 
         if dispatched_count > 0:
-            green = "\033[32m"
-            reset = "\033[0m"
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: {green}dispatch-intent="
-                f"{dispatched_count}{reset}",
+                f"GlobalDispatchCoordinator: dispatch-intent={dispatched_count}",
+                color="green",
             )
 
         return dispatched_count
@@ -592,6 +594,7 @@ class GlobalDispatchCoordinator:
                 "GlobalDispatchCoordinator: dispatch paused "
                 "(blocked entries pending, no qualifiable candidates"
                 " — skipping collection)",
+                color="yellow",
             )
             return
 

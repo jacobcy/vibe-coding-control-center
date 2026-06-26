@@ -28,7 +28,7 @@ class DispatchHealthService:
         store: "SQLiteClient",
         flow_blocker: FlowServiceProtocol,
         flow_context: Callable[[int], tuple[str, dict[str, object] | None]],
-        emit_event: Callable[[str, str], None],
+        emit_event: Callable[..., None],
     ) -> None:
         self._check_service = check_service
         self._store = store
@@ -64,6 +64,7 @@ class DispatchHealthService:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: skipped #{issue.number} "
                     f"(missing flow context for {state_value})",
+                    color="gray",
                 )
                 return False
             return True
@@ -83,6 +84,7 @@ class DispatchHealthService:
                 "dispatcher",
                 f"GlobalDispatchCoordinator: skipped #{issue.number} "
                 f"(flow is {flow_status})",
+                color="gray",
             )
             return False
 
