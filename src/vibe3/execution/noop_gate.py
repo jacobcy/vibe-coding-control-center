@@ -348,6 +348,43 @@ def apply_unified_noop_gate(
             return
 
     if before_state_label == after_state_label:
+        # Special case: executor publish (vibe run --skill publish)
+        # creates a PR without changing the state label. When a PR
+        # already exists on the branch, treat this as a valid pass
+        # and record a synthetic state transition.
+        if (
+            role == "executor"
+            and before_state_label == "state/merge-ready"
+            and flow_state is not None
+            and flow_state.get("pr_ref")
+        ):
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).info(
+                "No-op gate PASS: executor publish with existing PR "
+                f"(state/merge-ready -> state/handoff, pr={flow_state.get('pr_ref')})"
+            )
+            store.add_event(
+                branch,
+                EVENT_STATE_TRANSITIONED,
+                actor,
+                detail=(
+                    "Executor publish succeeded: PR already exists "
+                    f"({flow_state.get('pr_ref')}), "
+                    "state/merge-ready -> state/handoff"
+                ),
+                refs={
+                    "before_state": "state/merge-ready",
+                    "after_state": "state/handoff",
+                    "issue": str(issue_number),
+                    "pr_ref": str(flow_state.get("pr_ref", "")),
+                },
+            )
+            return
+
         state_desc = before_state_label or "(no state)"
         logger.bind(
             domain="codeagent",

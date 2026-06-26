@@ -403,14 +403,14 @@ recipes:
     kind: template_recipe
     template_key: orchestra.governance.plan
     material_catalog:
-      - name: supervisor/governance/assignee-pool.md
-        source:
-          kind: file
-          path: supervisor/governance/assignee-pool.md
       - name: supervisor/governance/roadmap-intake.md
         source:
           kind: file
           path: supervisor/governance/roadmap-intake.md
+      - name: supervisor/governance/assignee-pool.md
+        source:
+          kind: file
+          path: supervisor/governance/assignee-pool.md
       - name: supervisor/governance/cron-supervisor.md
         source:
           kind: file
@@ -423,18 +423,18 @@ recipes:
         source:
           kind: file
           path: supervisor/governance/audit-observation.md
-      - name: supervisor/governance/audit-suggestion.md
-        source:
-          kind: file
-          path: supervisor/governance/audit-suggestion.md
-      - name: supervisor/governance/audit-report.md
-        source:
-          kind: file
-          path: supervisor/governance/audit-report.md
       - name: supervisor/governance/audit-decision.md
         source:
           kind: file
           path: supervisor/governance/audit-decision.md
+      - name: supervisor/governance/audit-report.md
+        source:
+          kind: file
+          path: supervisor/governance/audit-report.md
+      - name: supervisor/governance/audit-suggestion.md
+        source:
+          kind: file
+          path: supervisor/governance/audit-suggestion.md
     variables:
       server_status:
         kind: provider
