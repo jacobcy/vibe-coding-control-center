@@ -364,6 +364,34 @@ def build_audit_suggestion_context(snapshot: Any) -> dict[str, Any]:
     return result
 
 
+def _build_scope_note(
+    observation_count: int,
+    suggestion_count: int,
+    suggestion_source_counts: dict[str, int],
+    observed_failure_modes: set[str],
+) -> str:
+    """Build scope note for audit report context."""
+    src_stats = (
+        ", ".join(f"{k}={v}" for k, v in sorted(suggestion_source_counts.items()))
+        or "无"
+    )
+    failure_modes = ", ".join(sorted(observed_failure_modes)) or "无"
+    skip_note = "目前无观察/建议记录，跳过本轮。" if observation_count == 0 else ""
+    return (
+        f"审计报告上下文：\n"
+        f"- 可用观察记录：{observation_count}\n"
+        f"- 可用建议记录：{suggestion_count}\n"
+        f"- 建议来源统计：{src_stats}\n"
+        f"- 检测到的失败模式：{failure_modes}\n\n"
+        "请运行 `uv run python scripts/audit-ledger-summary.py` "
+        "获取机械摘要，然后深度读取满足条件的 cluster "
+        "（2+ observation、单条 code_auditor suggestion，"
+        "或有明确 suggestion 引用），"
+        "生成 root-cause 报告并写入 `.git/shared/reports/`。"
+        f"{skip_note}"
+    )
+
+
 def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
     """Build context for audit-report material.
 
@@ -384,6 +412,7 @@ def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
 
     observation_count = 0
     suggestion_count = 0
+    suggestion_source_counts: dict[str, int] = {}
     observed_failure_modes: set[str] = set()
 
     if observations_dir.exists():
@@ -405,6 +434,23 @@ def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
     if suggestions_dir.exists():
         sug_files = sorted(suggestions_dir.glob("audit-suggestion-*.yaml"))
         suggestion_count = len(sug_files)
+        for sug_file in sug_files[:20]:
+            try:
+                content = sug_file.read_text()
+                source = "runtime_observation"
+                if "suggestion_source:" in content:
+                    for line in content.split("\n"):
+                        if "suggestion_source:" in line:
+                            source = (
+                                line.split(":", 1)[1].strip().strip('"').strip("'")
+                                or "runtime_observation"
+                            )
+                            break
+                suggestion_source_counts[source] = (
+                    suggestion_source_counts.get(source, 0) + 1
+                )
+            except Exception:
+                continue
 
     result = build_issue_context(
         (),
@@ -415,22 +461,17 @@ def build_audit_report_context(snapshot: Any) -> dict[str, Any]:
         circuit_breaker_state=snapshot.circuit_breaker_state,
         circuit_breaker_failures=snapshot.circuit_breaker_failures,
         issue_scope_name="root-cause report generation",
-        scope_note=(
-            f"审计报告上下文：\n"
-            f"- 可用观察记录：{observation_count}\n"
-            f"- 可用建议记录：{suggestion_count}\n"
-            f"- 检测到的失败模式："
-            f"{', '.join(sorted(observed_failure_modes)) or '无'}\n\n"
-            "请运行 `uv run python scripts/audit-ledger-summary.py` "
-            "获取机械摘要，然后深度读取满足条件的 cluster "
-            "（2+ observation 或有明确 suggestion 引用），"
-            "生成 root-cause 报告并写入 `.git/shared/reports/`。"
-            f"{'目前无观察/建议记录，跳过本轮。' if observation_count == 0 else ''}"
+        scope_note=_build_scope_note(
+            observation_count,
+            suggestion_count,
+            suggestion_source_counts,
+            observed_failure_modes,
         ),
     )
 
     result["observation_count"] = observation_count
     result["suggestion_count"] = suggestion_count
+    result["suggestion_source_counts"] = suggestion_source_counts
     result["observed_failure_modes"] = sorted(observed_failure_modes)
 
     return result

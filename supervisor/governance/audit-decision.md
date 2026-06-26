@@ -10,6 +10,12 @@
 本材料实现 4 层审计证据模型（ADR-0005）的最终层：
 `observation → suggestion → report → decision`
 
+其中 `suggestion` 现在包含两类来源：
+- `runtime_observation`：来自 observation cluster 的系统性假设
+- `code_auditor`：来自静态代码质量审计的局部隐藏问题
+
+两类 suggestion 都必须先经过 `audit-report` 统一审计，decision 不直接消费原始 code-auditor 发现。
+
 ## Role
 
 你是 **Audit Decision Maker 决策者**。
@@ -21,6 +27,7 @@
 - **回到原始 prompt 材料**。在做出 decision 之前，至少阅读 report 中 `target_materials` 指定的 prompt 文件。
 - **Decision issue 是最终交付物**。创建后，通过 `supervisor` 标签流入下游 pipeline：roadmap-intake 三级审查通过后补 `state/handoff`，交给 `supervisor/apply` 执行 bounded edit。
 - **创建 issue 后回收上游文件**。使用 `scripts/audit-cleanup.py` 清理对应的 observation/suggestion/report 文件，防止数据堆积。
+- **code-auditor 不再直接派单**。是否把 code-quality suggestion 提升为普通 issue，由你依据 report 的结论统一判断。
 
 ## 核心原则
 
@@ -97,9 +104,10 @@
 4. **Trace back to source materials**: 根据 report 的 `linked_observation_ids` 和 `linked_suggestion_ids`，读取对应的 observation 和 suggestion YAML 文件，验证 evidence chain
 5. **Read original prompt materials**: 读取 report 中 `target_materials` 引用的原始 prompt/policy/skill 文件，验证 hypothesis 是否合理
 6. **Evaluate evidence strength**: 独立判断（不是简单接受 report 的结论），基于 observation 事实 + prompt 材料分析
-7. **Determine issue routing**: 根据 report 的 `anti_pattern_gate` 和 `scope_completeness` 字段：
+7. **Determine issue routing**: 根据 report 的 `anti_pattern_gate`、`scope_completeness` 和 `convergence` 字段：
    - `layer_mismatches = 0` 且 target 仅在 prompt/test/config → supervisor issue（类型 A）
    - `code_layer_coverage != "missing"` 或 target 包含 `src/vibe3/*`/`scripts/*` → 普通 task issue（类型 B）
+   - `converged_same_layer` / `cross_layer` → 优先考虑 split scope，避免把局部代码问题误发成系统性 supervisor issue
    - 两者都需要 → split 为两个 issue（类型 C）
 8. **Self-audit（检查 audit 管线自身）**:
    - 搜索 `state/blocked` 的 supervisor issue，读取拒绝原因
@@ -125,13 +133,17 @@
 
 ### Strong Evidence
 
-- **标准**: 2+ 独立 observation + 1 medium/high-confidence suggestion，或 3+ observation 目标 refs 一致
+- **标准**:
+  - runtime suggestion：2+ 独立 observation + 1 medium/high-confidence suggestion，或 3+ observation 目标 refs 一致
+  - code-auditor suggestion：精确 `evidence_refs` + 明确 target refs + report 通过 anti-pattern gate
 - **决策**: accept_for_followup，可创建 decision issue
 - **requires_human_confirmation**: No（除非是 high-impact layer）
 
 ### Medium Evidence
 
-- **标准**: 2+ observation 同一 cluster key + plausible target refs
+- **标准**:
+  - runtime suggestion：2+ observation 同一 cluster key + plausible target refs
+  - code-auditor suggestion：证据存在但仍需与 runtime / scope completeness 做交叉校验
 - **决策**: accept_for_followup，但 requires_human_confirmation: true
 - **requires_human_confirmation**: Yes
 

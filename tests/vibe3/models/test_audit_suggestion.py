@@ -145,10 +145,33 @@ def test_compute_suggestion_id():
     assert "20260623T120000" in suggestion_id.replace(":", "").replace("-", "")
 
 
+def test_code_auditor_suggestion_supports_distinct_source_and_code_evidence():
+    suggestion = AuditSuggestion.create(
+        hypothesis="Flow service still uses full-table filtering",
+        linked_observation_ids=[],
+        affected_layer="code_module",
+        target_refs=["src/vibe3/services/flow_service.py"],
+        recommended_action="create_followup",
+        expected_metric="full table scan frequency",
+        expected_trend="decrease",
+        confidence="high",
+        regression_risk="low",
+        suggestion_source="code_auditor",
+        evidence_refs=["src/vibe3/services/flow_service.py:42"],
+    )
+
+    assert suggestion.suggestion_source == "code_auditor"
+    assert suggestion.affected_layer == "code_module"
+    assert suggestion.evidence_refs == ["src/vibe3/services/flow_service.py:42"]
+
+
 def test_all_affected_layers():
     """Test all valid affected layer values."""
     valid_layers = [
         "runtime",
+        "code_module",
+        "script",
+        "test_suite",
         "prompt_recipe",
         "prompt_material",
         "skill_contract",

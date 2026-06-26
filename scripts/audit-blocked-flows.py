@@ -21,9 +21,6 @@ Usage:
     # With GitHub enrichment (checks issue state, PR merge status online)
     uv run python scripts/audit-blocked-flows.py --ready-for-audit --enrich
 
-    # Include dependency chain analysis
-    uv run python scripts/audit-blocked-flows.py --trace-deps
-
     # Output as JSON
     uv run python scripts/audit-blocked-flows.py --format json
 
@@ -39,7 +36,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -66,7 +63,6 @@ class BlockedFlow:
     flow_status: str
     blocked_by_issue: int | None = None
     blocked_reason: str | None = None
-    last_event_type: str | None = None
     last_event_detail: str | None = None
     last_event_time: str | None = None
     signal_tags: list[str] = field(default_factory=list)
@@ -79,7 +75,6 @@ class BlockedFlow:
     has_plan_ref: bool = False
     has_report_ref: bool = False
     has_audit_ref: bool = False
-    has_pr_ref: bool = False
     evidence_count: int = 0
     execution_age_days: int | None = None
     # GitHub enrichment (populated by --enrich)
@@ -142,7 +137,7 @@ def fetch_github_issue_state(issue_number: int) -> dict[str, Any] | None:
         return None
 
 
-def fetch_pr_info(issue_number: int, branch: str) -> dict[str, Any] | None:
+def fetch_pr_info(issue_number: int) -> dict[str, Any] | None:
     """Check if issue has associated merged PR."""
     try:
         # Search for PRs that reference this issue
@@ -244,20 +239,11 @@ def load_open_decision_covered_issues() -> set[int]:
 
 def screen_flow(
     bf: BlockedFlow,
-    flow_data: dict[str, Any],
     enrich: bool = False,
     observed_issues: set[int] | None = None,
     covered_issue_numbers: set[int] | None = None,
 ) -> BlockedFlow:
     """Apply only mechanical screening and fact population."""
-    bf.has_worktree = bool(flow_data.get("has_worktree"))
-    bf.has_plan_ref = bool(flow_data.get("plan_ref"))
-    bf.has_report_ref = bool(flow_data.get("report_ref"))
-    bf.has_audit_ref = bool(flow_data.get("audit_ref"))
-    bf.has_pr_ref = bool(flow_data.get("pr_ref") or flow_data.get("pr_number"))
-    bf.evidence_count = count_evidence_sources(flow_data)
-    bf.execution_age_days = compute_execution_age(flow_data)
-
     # Exact ledger dedup only.
     if observed_issues and bf.issue_number and bf.issue_number in observed_issues:
         bf.screening_verdict = "already_observed"
@@ -271,7 +257,7 @@ def screen_flow(
         issue_info = fetch_github_issue_state(bf.issue_number)
         if issue_info:
             bf.issue_state = issue_info["state"]
-            pr_info = fetch_pr_info(bf.issue_number, bf.branch)
+            pr_info = fetch_pr_info(bf.issue_number)
             if pr_info:
                 bf.pr_number = pr_info["number"]
                 bf.has_merged_pr = pr_info["merged"]
@@ -325,7 +311,6 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
             has_plan_ref=bool(flow.get("plan_ref")),
             has_report_ref=bool(flow.get("report_ref")),
             has_audit_ref=bool(flow.get("audit_ref")),
-            has_pr_ref=bool(flow.get("pr_ref") or flow.get("pr_number")),
             evidence_count=count_evidence_sources(flow),
             execution_age_days=compute_execution_age(flow),
         )
@@ -354,7 +339,6 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
 
         if bf.last_event_time is None and events:
             bf.last_event_time = events[0].get("created_at", "")
-            bf.last_event_type = events[0].get("event_type", "")
             bf.last_event_detail = events[0].get("detail", "")
         bf.event_types = event_types
         bf.reason_pattern_hits = collect_reason_pattern_hits(bf.blocked_reason or "")
@@ -384,56 +368,79 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
     return results
 
 
-def trace_dependency_chain(issue_number: int, max_depth: int = 3) -> list[dict[str, Any]]:
-    """Trace a dependency chain to find the root blocker."""
-    from vibe3.clients.sqlite_client import SQLiteClient
+def flow_to_dict(bf: BlockedFlow) -> dict[str, Any]:
+    """Serialize a flow into the shared fact shape used by outputs."""
+    return {
+        "branch": bf.branch,
+        "issue_number": bf.issue_number,
+        "flow_status": bf.flow_status,
+        "signal_tags": bf.signal_tags,
+        "reason_pattern_hits": bf.reason_pattern_hits,
+        "event_types": bf.event_types,
+        "block_evidence": bf.block_evidence,
+        "evidence_count": bf.evidence_count,
+        "has_worktree": bf.has_worktree,
+        "execution_age_days": bf.execution_age_days,
+        "issue_state": bf.issue_state,
+        "has_merged_pr": bf.has_merged_pr,
+        "pr_number": bf.pr_number,
+        "last_event": bf.last_event_detail,
+        "last_event_time": bf.last_event_time,
+    }
 
-    client = SQLiteClient()
-    chain: list[dict[str, Any]] = []
-    visited: set[int] = set()
-    current = issue_number
 
-    for _ in range(max_depth):
-        if current in visited:
-            chain.append({"issue": current, "reason": "circular dependency", "type": "circular"})
-            break
-        visited.add(current)
+def flow_sources(bf: BlockedFlow) -> list[str]:
+    """Return the names of evidence sources available for a flow."""
+    sources: list[str] = []
+    if bf.has_worktree:
+        sources.append("worktree")
+    if bf.has_plan_ref:
+        sources.append("plan")
+    if bf.has_report_ref:
+        sources.append("report")
+    if bf.has_audit_ref:
+        sources.append("audit")
+    if bf.pr_number is not None or bf.has_merged_pr is not None:
+        sources.append("pr")
+    return sources
 
-        try:
-            flows = client.get_flows_by_issue(current, role="task")
-        except Exception:
-            chain.append({"issue": current, "reason": "flow not found", "type": "unknown"})
-            break
 
-        if not flows:
-            chain.append({"issue": current, "reason": "no flow data", "type": "unknown"})
-            break
+def print_flow_fact_lines(bf: BlockedFlow) -> None:
+    """Print a compact fact block for one flow."""
+    print(f"\n  {bf.branch}")
+    print(f"  Issue:        #{bf.issue_number}", end="")
+    if bf.issue_state:
+        print(f" ({bf.issue_state})", end="")
+        if bf.has_merged_pr:
+            print(" [merged PR]", end="")
+    print()
+    print(f"  Status:       {bf.flow_status}")
+    if bf.signal_tags:
+        print(f"  Signal tags:  {', '.join(bf.signal_tags)}")
+    if bf.reason_pattern_hits:
+        print(f"  Reason hits:  {', '.join(bf.reason_pattern_hits)}")
+    sources = flow_sources(bf)
+    print(f"  Evidence:     {bf.evidence_count} sources", end="")
+    if sources:
+        print(f" ({', '.join(sources)})", end="")
+    print()
+    if bf.execution_age_days is not None:
+        print(f"  Age:          {bf.execution_age_days} days since execution")
+    for ev in bf.block_evidence[:2]:
+        print(f"  Evidence:     {ev[:100]}")
 
-        flow = flows[0]
-        blocked_by = flow.get("blocked_by_issue")
-        blocked_reason = flow.get("blocked_reason", "")
-        flow_status = flow.get("flow_status", "")
 
-        chain.append({
-            "issue": current,
-            "status": flow_status,
-            "blocked_by": blocked_by,
-            "reason": blocked_reason,
-            "reason_pattern_hits": collect_reason_pattern_hits(blocked_reason),
-        })
-
-        if not blocked_by or flow_status not in ("blocked", "aborted"):
-            break
-
-        current = blocked_by
-
-    return chain
+def format_event_line(event: dict[str, Any]) -> str:
+    """Format one raw flow event as a plain fact row."""
+    ts = str(event.get("created_at", ""))[:19].replace("T", " ")
+    event_type = str(event.get("event_type", ""))
+    detail = str(event.get("detail") or "")[:100]
+    return f"{ts:22s} {event_type:35s} {detail}"
 
 
 def print_results(
     flows: list[BlockedFlow],
     format_type: str = "text",
-    trace_deps: bool = False,
     ready_for_audit: bool = False,
 ) -> None:
     """Print results."""
@@ -454,23 +461,7 @@ def print_results(
                         "covered_by_open_decision": len(covered_by_open_decision),
                     },
                 },
-                "audit_candidates": [
-                    {
-                        "branch": f.branch,
-                        "issue_number": f.issue_number,
-                        "flow_status": f.flow_status,
-                        "signal_tags": f.signal_tags,
-                        "reason_pattern_hits": f.reason_pattern_hits,
-                        "event_types": f.event_types,
-                        "block_evidence": f.block_evidence,
-                        "evidence_count": f.evidence_count,
-                        "has_worktree": f.has_worktree,
-                        "execution_age_days": f.execution_age_days,
-                        "issue_state": f.issue_state,
-                        "has_merged_pr": f.has_merged_pr,
-                    }
-                    for f in ready
-                ],
+                "audit_candidates": [flow_to_dict(f) for f in ready],
             }
             print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
@@ -488,31 +479,7 @@ def print_results(
                 print(f"Facts for Agent Judgment — {len(ready)} flows")
                 print(f"{'─'*70}")
                 for f in ready:
-                    print(f"\n  {f.branch}")
-                    print(f"  Issue:        #{f.issue_number}", end="")
-                    if f.issue_state:
-                        print(f" ({f.issue_state})", end="")
-                        if f.has_merged_pr:
-                            print(" [merged PR]", end="")
-                    print()
-                    print(f"  Status:       {f.flow_status}")
-                    if f.signal_tags:
-                        print(f"  Signal tags:  {', '.join(f.signal_tags)}")
-                    if f.reason_pattern_hits:
-                        print(f"  Reason hits:  {', '.join(f.reason_pattern_hits)}")
-                    print(f"  Evidence:     {f.evidence_count} sources", end="")
-                    sources = []
-                    if f.has_worktree: sources.append("worktree")
-                    if f.has_plan_ref: sources.append("plan")
-                    if f.has_report_ref: sources.append("report")
-                    if f.has_audit_ref: sources.append("audit")
-                    if f.has_pr_ref: sources.append("pr")
-                    if sources: print(f" ({', '.join(sources)})", end="")
-                    print()
-                    if f.execution_age_days is not None:
-                        print(f"  Age:          {f.execution_age_days} days since execution")
-                    for ev in f.block_evidence[:2]:
-                        print(f"  Evidence:     {ev[:100]}")
+                    print_flow_fact_lines(f)
 
         return
 
@@ -522,32 +489,8 @@ def print_results(
             "summary": {
                 "total_blocked_aborted": len(flows),
             },
-            "flows": [
-                {
-                    "branch": f.branch,
-                    "issue_number": f.issue_number,
-                    "flow_status": f.flow_status,
-                    "signal_tags": f.signal_tags,
-                    "reason_pattern_hits": f.reason_pattern_hits,
-                    "event_types": f.event_types,
-                    "evidence": f.block_evidence,
-                    "last_event": f.last_event_detail,
-                    "last_event_time": f.last_event_time,
-                }
-                for f in flows
-            ],
+            "flows": [flow_to_dict(f) for f in flows],
         }
-
-        if trace_deps:
-            dependency_flows = [f for f in flows if f.blocked_by_issue]
-            output["dependency_chains"] = []
-            for f in dependency_flows:
-                chain = trace_dependency_chain(f.issue_number or 0)
-                output["dependency_chains"].append({
-                    "branch": f.branch,
-                    "issue_number": f.issue_number,
-                    "chain": chain,
-                })
 
         print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
@@ -557,30 +500,7 @@ def print_results(
         print(f"Total: {len(flows)}")
 
         for f in flows:
-            print(f"\n  Branch:      {f.branch}")
-            print(f"  Issue:       #{f.issue_number}")
-            print(f"  Status:      {f.flow_status}")
-            if f.signal_tags:
-                print(f"  Signal tags: {', '.join(f.signal_tags)}")
-            if f.reason_pattern_hits:
-                print(f"  Reason hits: {', '.join(f.reason_pattern_hits)}")
-            for ev in f.block_evidence:
-                print(f"  Evidence:    {ev[:120]}")
-            if f.last_event_detail:
-                print(f"  Last event:  {f.last_event_detail[:120]}")
-
-        dependency_flows = [f for f in flows if f.blocked_by_issue]
-        if dependency_flows and trace_deps:
-            print(f"\n{'─'*70}")
-            print(f"Dependency Chains — {len(dependency_flows)} flows")
-            print(f"{'─'*70}")
-            for f in dependency_flows:
-                chain = trace_dependency_chain(f.issue_number or 0)
-                print(f"\n  Branch:        {f.branch}")
-                print(f"  Issue:         #{f.issue_number}")
-                for entry in chain:
-                    hits = ", ".join(entry.get("reason_pattern_hits", [])) or "none"
-                    print(f"    → #{entry['issue']}: hits={hits} ({str(entry.get('reason',''))[:60]})")
+            print_flow_fact_lines(f)
 
 
 def show_flow_events(branch: str) -> None:
@@ -600,33 +520,7 @@ def show_flow_events(branch: str) -> None:
     print(f"{'─'*70}")
 
     for e in events:
-        ts = e.get("created_at", "")[:19].replace("T", " ")
-        event_type = e["event_type"]
-        detail = (e.get("detail") or "")[:100]
-        marker = ""
-        if "error" in event_type:
-            marker = " 🔴"
-        elif "blocked" in event_type or "aborted" in event_type:
-            marker = " 🟡"
-        elif "state_transitioned" in event_type:
-            marker = " 🔵"
-        print(f"{ts:22s} {event_type:35s}{marker} {detail}")
-
-    # Summarize classification
-    block_events = [e for e in events if "block" in e["event_type"].lower() or "abort" in e["event_type"].lower()]
-    error_events = [e for e in events if "error" in e["event_type"]]
-
-    print(f"\n{'─'*70}")
-    print(f"Summary: {len(events)} events, {len(block_events)} block/abort events, {len(error_events)} error events")
-
-    if block_events and not error_events:
-        print("No error events observed before block/abort")
-        for be in block_events:
-            print(f"   {be.get('detail', '')[:120]}")
-    elif error_events:
-        print("Error events observed before block/abort")
-        for ee in error_events:
-            print(f"   [{ee['event_type']}] {ee.get('detail', '')[:120]}")
+        print(format_event_line(e))
 
 
 def git_common_dir() -> Path:
@@ -659,11 +553,6 @@ def main() -> None:
         "--active-only",
         action="store_true",
         help="Show only currently blocked/aborted flows",
-    )
-    parser.add_argument(
-        "--trace-deps",
-        action="store_true",
-        help="Trace dependency chains and print raw chain facts",
     )
     parser.add_argument(
         "--format",
@@ -700,14 +589,6 @@ def main() -> None:
 
     # Apply screening if --ready-for-audit
     if args.ready_for_audit:
-        from vibe3.clients.sqlite_client import SQLiteClient
-
-        client = SQLiteClient()
-        all_flows = client.get_all_flows()
-        flow_data_map: dict[str, dict] = {}
-        for f in all_flows:
-            flow_data_map[f.get("branch", "")] = f
-
         # Load existing observation issues for dedup
         observed_issues = load_existing_observation_issues(
             git_common_dir() / "shared"
@@ -715,18 +596,16 @@ def main() -> None:
         covered_issue_numbers = load_open_decision_covered_issues()
 
         for bf in flows:
-            fdata = flow_data_map.get(bf.branch, {})
             screen_flow(
                 bf,
-                fdata,
                 enrich=args.enrich,
                 observed_issues=observed_issues,
                 covered_issue_numbers=covered_issue_numbers,
             )
 
-        print_results(flows, format_type=args.format, trace_deps=args.trace_deps, ready_for_audit=True)
+        print_results(flows, format_type=args.format, ready_for_audit=True)
     else:
-        print_results(flows, format_type=args.format, trace_deps=args.trace_deps)
+        print_results(flows, format_type=args.format)
 
 
 if __name__ == "__main__":

@@ -40,13 +40,21 @@ def test_audit_report_material_requires_frontmatter() -> None:
     assert "---" in content  # YAML frontmatter delimiter
 
 
-def test_audit_report_material_requires_prompt_material_analysis() -> None:
-    """Report must analyze original prompt materials, not just cluster observations."""
+def test_audit_report_material_requires_target_material_analysis() -> None:
+    """Report must analyze original target materials, not just cluster observations."""
     content = Path("supervisor/governance/audit-report.md").read_text(encoding="utf-8")
 
-    assert "Prompt Material Analysis" in content
+    assert "Target Material Analysis" in content
     assert "禁止跳过此步骤直接给结论" in content
-    assert "prompt 材料" in content
+    assert "目标材料" in content or "prompt 材料" in content
+
+
+def test_audit_report_material_distinguishes_suggestion_sources() -> None:
+    content = Path("supervisor/governance/audit-report.md").read_text(encoding="utf-8")
+
+    assert "runtime_observation" in content
+    assert "code_auditor" in content
+    assert "单条" in content and "code_auditor" in content
 
 
 def test_audit_report_routing_exists() -> None:

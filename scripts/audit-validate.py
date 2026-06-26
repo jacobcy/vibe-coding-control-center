@@ -346,7 +346,7 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
 
     required_fields = [
         "suggestion_id",
-        "linked_observation_ids",
+        "suggestion_source",
         "hypothesis",
         "recommended_action",
         "confidence",
@@ -362,14 +362,46 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
                 )
             )
 
+    source = str(sug.get("suggestion_source") or "runtime_observation")
     linked = sug.get("linked_observation_ids", [])
-    if isinstance(linked, list) and len(linked) < 2:
-        result.warnings.append(
+    evidence_refs = sug.get("evidence_refs", [])
+
+    if source == "runtime_observation":
+        if "linked_observation_ids" not in sug:
+            result.errors.append(
+                ValidationError(
+                    file=str(path),
+                    severity="error",
+                    field="linked_observation_ids",
+                    message="Runtime suggestion must include audit_suggestion.linked_observation_ids",
+                )
+            )
+        elif isinstance(linked, list) and len(linked) < 2:
+            result.warnings.append(
+                ValidationError(
+                    file=str(path),
+                    severity="warning",
+                    field="linked_observation_ids",
+                    message=f"Anti-bloat rule: runtime suggestion should have >= 2 linked observations, got {len(linked)}",
+                )
+            )
+    elif source == "code_auditor":
+        if "evidence_refs" not in sug or not isinstance(evidence_refs, list) or not evidence_refs:
+            result.errors.append(
+                ValidationError(
+                    file=str(path),
+                    severity="error",
+                    field="evidence_refs",
+                    message="Code-auditor suggestion must include non-empty audit_suggestion.evidence_refs",
+                )
+            )
+    else:
+        result.errors.append(
             ValidationError(
                 file=str(path),
-                severity="warning",
-                field="linked_observation_ids",
-                message=f"Anti-bloat rule: suggestion should have >= 2 linked observations, got {len(linked)}",
+                severity="error",
+                field="suggestion_source",
+                message="Invalid suggestion_source. Must be 'runtime_observation' or 'code_auditor'",
             )
         )
 
@@ -437,13 +469,13 @@ def validate_report_file(path: Path) -> ValidationResult:
         )
 
     # Check for required sections
-    if "Prompt Material Analysis" not in content:
+    if "Target Material Analysis" not in content:
         result.errors.append(
             ValidationError(
                 file=str(path),
                 severity="error",
                 field="content",
-                message="Missing required section 'Prompt Material Analysis'. Report must analyze original prompt materials, not just cluster observations.",
+                message="Missing required section 'Target Material Analysis'. Report must analyze original target materials, not just cluster observations.",
             )
         )
 
