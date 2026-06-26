@@ -33,6 +33,10 @@ local:
     enabled: true
     description: "Handle closed task issue → mark flow aborted"
 
+  aborted_flow_done_reconcile:
+    enabled: true
+    description: "Transition aborted flows to done when all phases complete and delivery confirmed"
+
   stale_blocked_sync:
     enabled: true
     description: "Auto-resume flow when remote state/blocked label removed"

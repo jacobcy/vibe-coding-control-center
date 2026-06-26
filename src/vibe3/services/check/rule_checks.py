@@ -112,6 +112,39 @@ def rule_closed_issue_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     )
 
 
+def rule_aborted_flow_done_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | None:
+    """Reconcile aborted flows: transition to done when all phases complete
+    and PR merged."""
+    if not svc._sync_rules.local.aborted_flow_done_reconcile.enabled:
+        return None
+    if ctx.flow_status != "aborted":
+        return None
+
+    eligible, pr_number = svc._flow_status_service.evaluate_aborted_to_done_eligibility(
+        ctx.flow_data, ctx.branch, cached_pr=ctx.branch_pr
+    )
+    if not eligible:
+        return None
+
+    svc._flow_status_service.transition_aborted_to_done(
+        ctx.branch,
+        "All phases complete, delivery confirmed — post-merge done transition",
+        pr_number=pr_number,
+    )
+
+    from vibe3.services.check.service import CheckResult
+
+    return CheckResult(
+        is_valid=True,
+        branch=ctx.branch,
+        issues=[],
+        warnings=[
+            f"Flow '{ctx.branch}' transitioned aborted→done "
+            "(phases complete, delivery confirmed)"
+        ],
+    )
+
+
 def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     """Auto-resume flow when remote state/blocked label removed."""
     if not svc._sync_rules.local.stale_blocked_sync.enabled:
@@ -474,6 +507,7 @@ def rule_label_constraint_enforcement(
 RULES = [
     rule_pr_terminal_state,
     rule_closed_issue_sync,
+    rule_aborted_flow_done_reconcile,  # NEW
     rule_stale_blocked_sync,
     rule_blocked_label_sync,
     rule_stale_ready_rebuild,

@@ -127,11 +127,11 @@ def test_check_closed_issue_with_closed_pr_aborts_and_cleans_flow(
     closed_pr = PRResponse(
         number=78,
         title="Closed PR for closed issue",
-        state=PRState.CLOSED,
         head_branch="task/issue-1001",
         base_branch="main",
         url="https://github.com/test/pr/78",
         draft=False,
+        state=PRState.CLOSED,
     )
     store, service, branch = _make_service(tmp_path, issue_number=1001, pr=closed_pr)
 
@@ -140,3 +140,118 @@ def test_check_closed_issue_with_closed_pr_aborts_and_cleans_flow(
     assert result is not None
     assert result.is_valid is True
     assert store.get_flow_state(branch) is None
+
+
+def test_check_aborted_flow_with_merged_pr_transitions_to_done(tmp_path: Path) -> None:
+    """Aborted flow with all phases done + merged PR transitions to done."""
+    merged_pr = PRResponse(
+        number=79,
+        title="Merged PR for aborted flow",
+        state=PRState.MERGED,
+        head_branch="task/issue-1002",
+        base_branch="main",
+        url="https://github.com/test/pr/79",
+        merged_at="2026-06-07T00:00:00Z",
+        draft=False,
+        is_ready=True,
+        ci_passed=True,
+    )
+    store, service, branch = _make_service(tmp_path, issue_number=1002, pr=merged_pr)
+
+    # Setup aborted flow with all phases done
+    store.update_flow_state(
+        branch,
+        flow_slug="issue_1002",
+        flow_status="aborted",
+        planner_status="done",
+        executor_status="done",
+        reviewer_status="done",
+    )
+
+    # Simulate closed issue
+    service.github_client.view_issue.return_value = {
+        "state": "CLOSED",
+        "title": "Closed issue",
+        "body": "Description",
+        "labels": [],
+    }
+
+    service.verify_current_flow()
+
+    flow = store.get_flow_state(branch)
+    assert flow is not None
+    assert flow["flow_status"] == "done"
+    assert flow["planner_status"] == "done"
+    assert flow["executor_status"] == "done"
+    assert flow["reviewer_status"] == "done"
+
+
+def test_check_aborted_flow_partial_phases_stays_aborted(tmp_path: Path) -> None:
+    """Aborted flow with running phases stays aborted (legitimate abort preserved)."""
+    merged_pr = PRResponse(
+        number=80,
+        title="Merged PR for partial aborted flow",
+        state=PRState.MERGED,
+        head_branch="task/issue-1003",
+        base_branch="main",
+        url="https://github.com/test/pr/80",
+        merged_at="2026-06-07T00:00:00Z",
+        draft=False,
+        is_ready=True,
+        ci_passed=True,
+    )
+    store, service, branch = _make_service(tmp_path, issue_number=1003, pr=merged_pr)
+
+    # Setup aborted flow with partial phases
+    store.update_flow_state(
+        branch,
+        flow_slug="issue_1003",
+        flow_status="aborted",
+        planner_status="done",
+        executor_status="running",  # Still running
+        reviewer_status="done",
+    )
+
+    # Simulate closed issue
+    service.github_client.view_issue.return_value = {
+        "state": "CLOSED",
+        "title": "Closed issue",
+        "body": "Description",
+        "labels": [],
+    }
+
+    service.verify_current_flow()
+
+    flow = store.get_flow_state(branch)
+    assert flow is not None
+    assert flow["flow_status"] == "aborted"  # Should stay aborted
+    assert flow["executor_status"] == "running"
+
+
+def test_check_aborted_flow_no_merged_pr_stays_aborted(tmp_path: Path) -> None:
+    """Aborted flow with all phases done but no merged PR stays aborted."""
+    store, service, branch = _make_service(tmp_path, issue_number=1004, pr=None)
+
+    # Setup aborted flow with all phases done
+    store.update_flow_state(
+        branch,
+        flow_slug="issue_1004",
+        flow_status="aborted",
+        planner_status="done",
+        executor_status="done",
+        reviewer_status="done",
+    )
+
+    # Simulate closed issue
+    service.github_client.view_issue.return_value = {
+        "state": "CLOSED",
+        "title": "Closed issue",
+        "body": "Description",
+        "labels": [],
+    }
+
+    service.verify_current_flow()
+
+    flow = store.get_flow_state(branch)
+    assert flow is not None
+    assert flow["flow_status"] == "aborted"  # Should stay aborted

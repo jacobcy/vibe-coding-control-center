@@ -57,6 +57,22 @@ def terminalize_closed_issue(
             git_client=flow_manager.git,
             github_client=github,
         ).mark_flow_aborted(branch, f"Issue #{issue.number} closed on GitHub")
+    elif current_status == "aborted" and flow_state:
+        # Heuristic: all phases done + PR merged → transition to done
+        flow_status_service = flow_status_service_cls(
+            store=store,
+            git_client=flow_manager.git,
+            github_client=github,
+        )
+        eligible, pr_number = flow_status_service.evaluate_aborted_to_done_eligibility(
+            flow_state, branch
+        )
+        if eligible:
+            flow_status_service.transition_aborted_to_done(
+                branch,
+                f"Issue #{issue.number} closed, all phases complete, PR merged",
+                pr_number=pr_number,
+            )
 
     flow_cleanup_service_cls(store=store).cleanup_flow_scene(
         branch,

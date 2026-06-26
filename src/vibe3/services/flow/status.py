@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 from vibe3.models import IssueState
+
+if TYPE_CHECKING:
+    from vibe3.models import PRResponse
 
 
 class FlowStatusService:
@@ -204,3 +209,99 @@ class FlowStatusService:
         self.mark_flow_status(
             branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
+
+    def transition_aborted_to_done(
+        self,
+        branch: str,
+        reason: str,
+        pr_number: int | None = None,
+    ) -> None:
+        """Transition an aborted flow to done with phase-level cleanup.
+
+        Unlike mark_flow_done, this method:
+        - Does NOT auto-close the issue (already closed)
+        - Does NOT save branch snapshot (branch may be cleaned up)
+        - DOES clean up stale planner_status, executor_status, reviewer_status
+        - Records a flow_auto_transitioned event
+        """
+        self.store.update_flow_state(
+            branch,
+            flow_status="done",
+            planner_status="done",
+            executor_status="done",
+            reviewer_status="done",
+        )
+        detail = f"Aborted flow transitioned to done: {reason}"
+        if pr_number:
+            detail += f" (PR #{pr_number})"
+        self.store.add_event(
+            branch,
+            "flow_auto_transitioned",
+            "system",
+            detail,
+        )
+        logger.bind(
+            domain="flow",
+            action="transition_aborted_to_done",
+            branch=branch,
+            pr_number=pr_number,
+        ).success(f"Transitioned aborted flow to done: {reason}")
+
+    def evaluate_aborted_to_done_eligibility(
+        self,
+        flow_state: dict[str, object] | None,
+        branch: str,
+        cached_pr: PRResponse | None = None,
+    ) -> tuple[bool, int | None]:
+        """Centralized heuristic: is an aborted flow eligible for done transition?
+
+        Shared by qualify_gate and check reconcile rule to avoid logic drift.
+        Returns ``(eligible, pr_number)``.
+
+        Eligibility requires BOTH:
+        - All lifecycle phases done (planner/executor/reviewer)
+        - Delivery confirmed: ``pr_ref`` cached in flow record, ``cached_pr``
+          merged, or a merged PR found via GitHub lookup
+
+        Pass ``cached_pr`` to skip the GitHub API call when the caller already
+        has PR data (e.g., CheckContext.branch_pr).
+        """
+        if not flow_state:
+            return (False, None)
+
+        phase_statuses = (
+            flow_state.get("planner_status"),
+            flow_state.get("executor_status"),
+            flow_state.get("reviewer_status"),
+        )
+        if not all(s == "done" for s in phase_statuses):
+            return (False, None)
+
+        # Fast path: pr_ref cached in flow record
+        if flow_state.get("pr_ref"):
+            return (True, _coerce_pr_number(flow_state.get("pr_number")))
+
+        # Cached PR from caller (e.g., CheckContext.branch_pr)
+        if cached_pr is not None and cached_pr.merged_at is not None:
+            return (True, cached_pr.number)
+
+        # Slow path: query GitHub for merged PR
+        try:
+            prs = self.github_client.list_prs_for_branch(branch)
+            for pr in prs:
+                if pr.merged_at is not None:
+                    return (True, pr.number)
+        except Exception as e:
+            logger.warning(
+                f"PR lookup failed for aborted→done eligibility on {branch}: {e}"
+            )
+        return (False, None)
+
+
+def _coerce_pr_number(value: object) -> int | None:
+    """Coerce a flow_state pr_number value to int | None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
