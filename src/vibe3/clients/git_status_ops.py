@@ -211,6 +211,12 @@ def _get_branch_files(
     return [f for f in output.splitlines() if f.strip()]
 
 
+def _validate_merge_base(merge_base: str) -> None:
+    """Validate merge-base SHA format."""
+    if not re.match(r"^[a-f0-9]{40}$", merge_base):
+        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
+
+
 def _numstat_via_merge_base(
     run: Callable[[list[str]], str],
     get_merge_base: Callable[[str, str], str],
@@ -219,8 +225,7 @@ def _numstat_via_merge_base(
 ) -> str:
     """Get numstat via merge-base resolution."""
     merge_base = get_merge_base(head, base)
-    if not re.match(r"^[a-f0-9]{40}$", merge_base):
-        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
+    _validate_merge_base(merge_base)
     return run(["diff", "--numstat", f"{merge_base}...{head}"])
 
 
@@ -232,8 +237,7 @@ def _name_status_via_merge_base(
 ) -> str:
     """Get name-status via merge-base resolution."""
     merge_base = get_merge_base(head, base)
-    if not re.match(r"^[a-f0-9]{40}$", merge_base):
-        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
+    _validate_merge_base(merge_base)
     return run(["diff", "--name-status", f"{merge_base}...{head}"])
 
 
