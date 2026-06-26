@@ -13,7 +13,7 @@ class SQLiteFlowStateRepo(_HasConnection):
 
     db_path: str
 
-    VALID_FLOW_STATUSES = {"active", "blocked", "done", "stale"}
+    VALID_FLOW_STATUSES = {"active", "blocked", "done", "stale", "review", "failed", "aborted"}
 
     VALID_FLOW_STATE_FIELDS = {
         "branch",

@@ -371,6 +371,23 @@ def test_get_flows_by_status_raises_on_invalid_status() -> None:
             store.get_flows_by_status("invalid_status")
 
 
+def test_get_flows_by_status_accepts_review_failed_aborted() -> None:
+    """Test get_flows_by_status accepts review/failed/aborted as valid statuses."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        for status in ("review", "failed", "aborted"):
+            store.update_flow_state(
+                f"task/issue-{status}", flow_slug=f"issue_{status}", flow_status=status
+            )
+
+        for status in ("review", "failed", "aborted"):
+            result = store.get_flows_by_status(status)
+            assert len(result) == 1
+            assert result[0]["flow_status"] == status
+
+
 def test_get_flows_by_status_uses_sql_where_clause() -> None:
     """Verify get_flows_by_status executes SQL WHERE clause efficiently."""
     with tempfile.TemporaryDirectory() as tmpdir:

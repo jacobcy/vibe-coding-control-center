@@ -90,7 +90,7 @@ class FlowState(BaseModel):
     )
     blocked_reason: str | None = None  # Block reason text
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
+    flow_status: Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"] = "active"
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
     # "failed" removed (migrated to "active" or use blocked_reason field).
@@ -245,7 +245,7 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
+    flow_status: Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"]
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
     # "failed" removed (migrated to "active" or use blocked_reason field).

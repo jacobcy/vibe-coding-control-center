@@ -204,6 +204,7 @@ class StatusQueryService:
         flows: list[FlowStatusResponse],
         queued_set: set[int],
         stale_flows: list[FlowStatusResponse] | None = None,
+        extra_flows: list[FlowStatusResponse] | None = None,
         manager_usernames: tuple[str, ...] | None = None,
         supervisor_label: str | None = None,
     ) -> list[dict[str, object]]:
@@ -223,6 +224,13 @@ class StatusQueryService:
         # stale flows first, active flows overwrite (active priority)
         issue_to_flow: dict[int, FlowStatusResponse] = {}
         for f in stale_flows or []:
+            if f.task_issue_number:
+                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
+                    issue_to_flow.get(f.task_issue_number),
+                    f,
+                )
+        # Extra (review/failed/aborted) flows — between stale and active in priority
+        for f in extra_flows or []:
             if f.task_issue_number:
                 issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
                     issue_to_flow.get(f.task_issue_number),
