@@ -55,7 +55,7 @@ class DispatchQueueMaintenanceService:
         merge_queue_fn: Callable[
             [list[QueueEntry], list[QueueEntry]], list[QueueEntry]
         ],
-        should_collect_fn: Callable[[int], bool],
+        should_collect_fn: Callable[[int, int], bool],
         collect_frozen_queue_fn: Callable[[], Awaitable[list[QueueEntry]]],
         emit_event: Callable[[str, str], None],
     ) -> None:
@@ -226,6 +226,11 @@ class DispatchQueueMaintenanceService:
     ) -> tuple[bool, list[QueueEntry], bool]:
         """Run scheduled full queue refresh if tick matches interval.
 
+        Sleep mode behavior:
+        - Skip scheduled refresh during sleep (dispatch_paused=True)
+        - Exception: allow refresh on wake-up ticks to check for new work
+        - Wake-up ticks occur every sleep_check_interval_ticks
+
         Returns:
             Tuple of (was_refreshed, new_frozen_queue, new_dispatch_paused).
         """
@@ -235,6 +240,13 @@ class DispatchQueueMaintenanceService:
             and queue_refresh.enabled
             and tick_id % queue_refresh.interval_ticks == 0
         ):
+            # Sleep mode: skip scheduled refresh except on wake-up ticks
+            if dispatch_paused:
+                sleep_interval = self._config.pool_exhaustion.sleep_check_interval_ticks
+                if tick_id % sleep_interval != 0:
+                    # Not a wake-up tick, skip refresh during sleep
+                    return False, frozen_queue, dispatch_paused
+
             logger.bind(
                 domain="global_dispatch", trigger="scheduled_queue_refresh"
             ).debug("Running scheduled full queue refresh")
@@ -281,6 +293,7 @@ class DispatchQueueMaintenanceService:
         frozen_queue: list[QueueEntry],
         dispatch_paused: bool,
         *,
+        tick_id: int = 0,
         unpaused_for_qualifiable_blocked: bool = False,
     ) -> tuple[list[QueueEntry], bool]:
         """Rebuild queue when actionable candidates are exhausted after dispatch.
@@ -304,7 +317,7 @@ class DispatchQueueMaintenanceService:
         Returns:
             Tuple of (new_frozen_queue, new_dispatch_paused).
         """
-        need_collect = not queue_refreshed and self._should_collect_fn(dispatched_count)
+        need_collect = not queue_refreshed and self._should_collect_fn(dispatched_count, tick_id)
         if need_collect:
             logger.bind(domain="global_dispatch", trigger="queue_exhausted").debug(
                 "Queue exhausted after dispatch, rebuilding for next tick"

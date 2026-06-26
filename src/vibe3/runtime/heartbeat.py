@@ -93,6 +93,7 @@ class HeartbeatServer:
         self._actor_cleanup: Callable[[], list[str]] | None = actor_cleanup
         self._dispatch_coordinator: object | None = dispatch_coordinator
         self._exhausted_ticks = 0  # Consecutive ticks with exhausted pool
+        self._sleep_cycles = 0  # Wake-up cycles during sleep mode
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -422,13 +423,27 @@ class HeartbeatServer:
                     )
                     self.stop()
 
-                # Check pool exhaustion (new logic)
-                self._exhausted_ticks = check_pool_exhaustion(
+                # Check pool exhaustion (sleep mode logic)
+                self._exhausted_ticks, self._sleep_cycles = check_pool_exhaustion(
                     self._dispatch_coordinator,
                     self.config,
                     self._exhausted_ticks,
+                    self._sleep_cycles,
                     self.stop,
                 )
+
+                # Tick 1 cold-start: detect already-exhausted pool
+                # If coordinate() set dispatch_paused on first tick, initialize counter
+                # Only applies when auto_stop_on_exhaustion is enabled
+                if (
+                    tick_number == 1
+                    and self._dispatch_coordinator is not None
+                    and self._exhausted_ticks == 0
+                    and self.config.pool_exhaustion.auto_stop_on_exhaustion
+                ):
+                    if hasattr(self._dispatch_coordinator, "is_dispatch_paused"):
+                        if self._dispatch_coordinator.is_dispatch_paused():  # type: ignore[union-attr]
+                            self._exhausted_ticks = 1
             finally:
                 _current_tick_id.reset(token)
 

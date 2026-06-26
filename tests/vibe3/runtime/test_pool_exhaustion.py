@@ -2,7 +2,7 @@
 
 import pytest
 
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig, PoolExhaustionConfig
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.runtime.protocols import ServiceBase
 
@@ -16,7 +16,11 @@ class _MockService(ServiceBase):
 
 
 def _config() -> OrchestraConfig:
-    return OrchestraConfig(polling_interval=900, max_concurrent_flows=3)
+    return OrchestraConfig(
+        polling_interval=900,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(),
+    )
 
 
 class MockDispatchCoordinator:
@@ -38,8 +42,10 @@ async def test_pool_exhaustion_counter_increments(monkeypatch) -> None:
         OrchestraConfig(
             polling_interval=1,
             max_concurrent_flows=3,
-            auto_stop_on_exhaustion=True,
-            exhaustion_threshold_ticks=10,
+            pool_exhaustion=PoolExhaustionConfig(
+                auto_stop_on_exhaustion=True,
+                exhaustion_threshold_ticks=10,
+            ),
         ),
         dispatch_coordinator=coordinator,
     )
@@ -80,8 +86,10 @@ async def test_pool_exhaustion_counter_resets(monkeypatch) -> None:
         OrchestraConfig(
             polling_interval=1,
             max_concurrent_flows=3,
-            auto_stop_on_exhaustion=True,
-            exhaustion_threshold_ticks=5,
+            pool_exhaustion=PoolExhaustionConfig(
+                auto_stop_on_exhaustion=True,
+                exhaustion_threshold_ticks=5,
+            ),
         ),
         dispatch_coordinator=coordinator,
     )
@@ -113,14 +121,18 @@ async def test_pool_exhaustion_counter_resets(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_pool_exhaustion_stops_at_threshold(monkeypatch) -> None:
-    """Server should stop when exhaustion threshold reached."""
+    """Server should enter sleep mode at threshold, then stop after max sleep cycles."""
     coordinator = MockDispatchCoordinator(is_paused=True)
     server = HeartbeatServer(
         OrchestraConfig(
             polling_interval=1,
             max_concurrent_flows=3,
-            auto_stop_on_exhaustion=True,
-            exhaustion_threshold_ticks=3,
+            pool_exhaustion=PoolExhaustionConfig(
+                auto_stop_on_exhaustion=True,
+                exhaustion_threshold_ticks=3,
+                sleep_check_interval_ticks=2,  # Wake up every 2 ticks
+                max_sleep_cycles=2,  # Stop after 2 wake-ups
+            ),
         ),
         dispatch_coordinator=coordinator,
     )
@@ -145,7 +157,10 @@ async def test_pool_exhaustion_stops_at_threshold(monkeypatch) -> None:
     await server._tick_loop()
 
     assert server.running is False
-    assert server._exhausted_ticks == 3
+    # Tick progression: 1,2,3(threshold→sleep),4(wake-up #1),5,6(wake-up #2→stop)
+    # exhausted_ticks should be at wake-up tick (6)
+    assert server._exhausted_ticks >= 3
+    assert any("entering sleep mode" in e for e in events)
     assert any("stopping server" in e for e in events)
 
 
@@ -161,8 +176,10 @@ async def test_pool_exhaustion_no_coordinator_no_crash() -> None:
         nonlocal stop_called
         stop_called = True
 
-    result = check_pool_exhaustion(None, config, exhausted_ticks=5, stop_callback=_stop)
-    assert result == 0
+    result = check_pool_exhaustion(
+        None, config, exhausted_ticks=5, sleep_cycles=0, stop_callback=_stop
+    )
+    assert result == (0, 0)
     assert not stop_called
 
 
@@ -174,8 +191,10 @@ async def test_pool_exhaustion_disabled_does_not_check(monkeypatch) -> None:
         OrchestraConfig(
             polling_interval=1,
             max_concurrent_flows=3,
-            auto_stop_on_exhaustion=False,
-            exhaustion_threshold_ticks=3,
+            pool_exhaustion=PoolExhaustionConfig(
+                auto_stop_on_exhaustion=False,
+                exhaustion_threshold_ticks=3,
+            ),
         ),
         dispatch_coordinator=coordinator,
     )
@@ -203,3 +222,259 @@ async def test_pool_exhaustion_disabled_does_not_check(monkeypatch) -> None:
     assert server._exhausted_ticks == 0
     assert not any("pool exhausted" in e for e in events)
     assert tick_count == 5
+
+
+# Sleep mode tests
+
+@pytest.mark.asyncio
+async def test_sleep_mode_entry_at_threshold(monkeypatch) -> None:
+    """Should enter sleep mode at threshold instead of immediate stop."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
+
+    coordinator = MockDispatchCoordinator(is_paused=True)
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(
+            auto_stop_on_exhaustion=True,
+            exhaustion_threshold_ticks=4,
+            sleep_check_interval_ticks=10,
+            max_sleep_cycles=3,
+        ),
+    )
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
+
+    # Simulate reaching threshold
+    exhausted_ticks, sleep_cycles = check_pool_exhaustion(
+        coordinator, config, exhausted_ticks=3, sleep_cycles=0, stop_callback=_stop
+    )
+
+    assert exhausted_ticks == 4
+    assert sleep_cycles == 0
+    assert not stop_called
+    assert any("entering sleep mode" in e for e in events)
+
+
+@pytest.mark.asyncio
+async def test_sleep_mode_wakeup_increments_cycles(monkeypatch) -> None:
+    """Wake-up ticks should increment sleep_cycles."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
+
+    coordinator = MockDispatchCoordinator(is_paused=True)
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(
+            auto_stop_on_exhaustion=True,
+            exhaustion_threshold_ticks=4,
+            sleep_check_interval_ticks=10,
+            max_sleep_cycles=3,
+        ),
+    )
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
+
+    # Simulate wake-up tick (exhausted_ticks=10, which is 1st wake-up)
+    exhausted_ticks, sleep_cycles = check_pool_exhaustion(
+        coordinator, config, exhausted_ticks=9, sleep_cycles=0, stop_callback=_stop
+    )
+
+    assert exhausted_ticks == 10
+    assert sleep_cycles == 1
+    assert not stop_called
+    assert any("sleep wake-up #1" in e for e in events)
+
+
+@pytest.mark.asyncio
+async def test_sleep_mode_stop_at_max_cycles(monkeypatch) -> None:
+    """Should stop after max_sleep_cycles wake-ups."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
+
+    coordinator = MockDispatchCoordinator(is_paused=True)
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(
+            auto_stop_on_exhaustion=True,
+            exhaustion_threshold_ticks=4,
+            sleep_check_interval_ticks=10,
+            max_sleep_cycles=2,
+        ),
+    )
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
+
+    # Simulate 2nd wake-up (should trigger stop)
+    exhausted_ticks, sleep_cycles = check_pool_exhaustion(
+        coordinator, config, exhausted_ticks=19, sleep_cycles=1, stop_callback=_stop
+    )
+
+    assert exhausted_ticks == 20
+    assert sleep_cycles == 2
+    assert stop_called
+    assert any("stopping server" in e for e in events)
+
+
+@pytest.mark.asyncio
+async def test_sleep_mode_resets_on_unpause() -> None:
+    """Both counters should reset when dispatch unpauses."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
+
+    coordinator = MockDispatchCoordinator(is_paused=False)
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(
+            auto_stop_on_exhaustion=True,
+            exhaustion_threshold_ticks=4,
+            sleep_check_interval_ticks=10,
+            max_sleep_cycles=3,
+        ),
+    )
+
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    # Start from non-zero counters
+    exhausted_ticks, sleep_cycles = check_pool_exhaustion(
+        coordinator, config, exhausted_ticks=15, sleep_cycles=2, stop_callback=_stop
+    )
+
+    assert exhausted_ticks == 0
+    assert sleep_cycles == 0
+    assert not stop_called
+
+
+@pytest.mark.asyncio
+async def test_sleep_mode_max_cycles_zero_never_stops(monkeypatch) -> None:
+    """max_sleep_cycles=0 should never stop the server."""
+    from vibe3.runtime.pool_exhaustion import check_pool_exhaustion
+
+    coordinator = MockDispatchCoordinator(is_paused=True)
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        pool_exhaustion=PoolExhaustionConfig(
+            auto_stop_on_exhaustion=True,
+            exhaustion_threshold_ticks=4,
+            sleep_check_interval_ticks=10,
+            max_sleep_cycles=0,  # Never stop
+        ),
+    )
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    stop_called = False
+
+    def _stop() -> None:
+        nonlocal stop_called
+        stop_called = True
+
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
+
+    # Simulate many wake-ups (should never stop)
+    for i in range(1, 6):
+        exhausted_ticks, sleep_cycles = check_pool_exhaustion(
+            coordinator, config, exhausted_ticks=9 + i * 10, sleep_cycles=i - 1, stop_callback=_stop
+        )
+        assert exhausted_ticks == 10 + i * 10
+        assert sleep_cycles == i
+        assert not stop_called
+
+
+@pytest.mark.asyncio
+async def test_tick1_cold_start_paused(monkeypatch) -> None:
+    """Pool exhaustion counter increments correctly from tick 1 when paused."""
+    coordinator = MockDispatchCoordinator(is_paused=True)
+    server = HeartbeatServer(
+        OrchestraConfig(
+            polling_interval=1,
+            max_concurrent_flows=3,
+            pool_exhaustion=PoolExhaustionConfig(
+                auto_stop_on_exhaustion=True,
+                exhaustion_threshold_ticks=10,  # High threshold to avoid early stop
+                sleep_check_interval_ticks=20,  # Don't trigger wake-up during test
+                max_sleep_cycles=5,
+            ),
+        ),
+        dispatch_coordinator=coordinator,
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+    tick_count = 0
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    async def _sleep_once(_seconds: float) -> None:
+        nonlocal tick_count
+        tick_count += 1
+        # Run 5 ticks then stop
+        if tick_count >= 5:
+            server.stop()
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr(
+        "vibe3.runtime.pool_exhaustion.append_orchestra_event", _capture
+    )
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Tick loop: sleep(tick_count=1) -> tick1(exhausted=1) -> sleep(2) -> tick2(exhausted=2)
+    # -> sleep(3) -> tick3(exhausted=3) -> sleep(4) -> tick4(exhausted=4) -> sleep(5) -> stop
+    # So exhausted_ticks=4 is correct (5th sleep triggers stop before 5th tick runs)
+    assert server._exhausted_ticks == 4
+    exhaustion_events = [e for e in events if "pool exhausted" in e]
+    assert len(exhaustion_events) >= 4

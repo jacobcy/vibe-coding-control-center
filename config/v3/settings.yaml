@@ -363,3 +363,14 @@ orchestra:
     #   覆盖最终模型；但执行入口仍以 agent 优先
     backend:
     model:
+
+  # Pool exhaustion sleep mode configuration
+  pool_exhaustion:
+    # Enable auto-stop when pool remains exhausted after sleep cycles
+    auto_stop_on_exhaustion: true
+    # Enter sleep mode after N consecutive exhausted ticks (lowered from 10 to 4)
+    exhaustion_threshold_ticks: 4
+    # Wake up every N ticks during sleep to check for new work
+    sleep_check_interval_ticks: 10
+    # Stop after N consecutive wake-up cycles with no work (0 = never stop)
+    max_sleep_cycles: 3

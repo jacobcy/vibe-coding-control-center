@@ -90,6 +90,7 @@ class GlobalDispatchCoordinator:
     _last_remote_check_tick: int
     _dispatch_health: DispatchHealthService
     _dispatch_preflight: DispatchPreflightService
+    _current_tick_id: int
 
     def __init__(
         self,
@@ -156,6 +157,7 @@ class GlobalDispatchCoordinator:
         self._remote_check_runner = remote_check_runner
         self._remote_check_interval = remote_check_interval
         self._last_remote_check_tick: int = 0
+        self._current_tick_id: int = 0
 
         def _emit(category: str, message: str) -> None:
             append_orchestra_event(category, message)
@@ -186,7 +188,7 @@ class GlobalDispatchCoordinator:
                 entries
             ),
             merge_queue_fn=lambda existing, fresh: self._merge_queue(existing, fresh),
-            should_collect_fn=lambda count: self._should_collect_after_dispatch(count),
+            should_collect_fn=lambda count, tick_id=0: self._should_collect_after_dispatch(count),
             collect_frozen_queue_fn=lambda: self._collect_frozen_queue(),
             emit_event=_emit,
         )
@@ -354,15 +356,21 @@ class GlobalDispatchCoordinator:
     def _should_collect_after_dispatch(self, dispatched_count: int) -> bool:
         """Whether this tick should rebuild active queue candidates.
 
-        When dispatch is already paused, always allow collection so that
-        exhausted_refresh can re-verify and maintain the paused state.
-        Without this, a full capacity pool (available_slots <= 0) prevents
-        exhausted_refresh from triggering collection, which causes the
-        exhausted counter to reset — the server never auto-stops.
+        Sleep mode behavior:
+        - When dispatch is paused (sleep mode), skip collection except on wake-up ticks
+        - Wake-up ticks occur every sleep_check_interval_ticks to check for new work
+        - On wake-up ticks, allow collection to re-verify and maintain the paused state
+
+        Normal mode behavior:
+        - If already paused, this shouldn't happen (sleep mode covers this)
+        - If capacity full, skip collection (no slots available)
+        - If dispatched enough, skip collection (max intents reached)
+        - Otherwise collect if no actionable entries remain
         """
-        # If already paused, always collect to maintain paused state verification
+        # Sleep mode: skip collection except on wake-up ticks
         if self._dispatch_paused:
-            return True
+            interval = self._config.pool_exhaustion.sleep_check_interval_ticks
+            return self._current_tick_id % interval == 0
 
         status = self._capacity.get_capacity_status("manager")
         available_slots = status["remaining"]
@@ -532,6 +540,9 @@ class GlobalDispatchCoordinator:
             Only collect fresh queue when actionable (non-blocked) candidates
             are exhausted AFTER dispatch. This avoids wasted GitHub API calls.
         """
+        # Store tick_id for sleep mode wake-up checks
+        self._current_tick_id = tick_id
+
         # Step 1: Restore from persistence on cold start
         self._queue_startup_restore()
 
@@ -602,6 +613,7 @@ class GlobalDispatchCoordinator:
                 queue_refreshed,
                 self._frozen_queue or [],
                 self._dispatch_paused,
+                tick_id=tick_id,
                 unpaused_for_qualifiable_blocked=unpaused_for_qualifiable_blocked,
             )
         )

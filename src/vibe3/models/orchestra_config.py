@@ -206,6 +206,36 @@ class QueueRefreshConfig(BaseModel):
     )
 
 
+class PoolExhaustionConfig(BaseModel):
+    """Configuration for pool exhaustion and sleep mode.
+
+    When dispatch is paused due to an empty queue, the system enters sleep mode
+    instead of immediately stopping. It wakes up periodically to check for new work
+    and only stops after a configurable number of consecutive wake-up cycles with
+    no dispatchable items.
+    """
+
+    auto_stop_on_exhaustion: bool = Field(
+        default=True,
+        description="Enable auto-stop behavior when pool remains exhausted",
+    )
+    exhaustion_threshold_ticks: int = Field(
+        default=4,
+        ge=1,
+        description="Enter sleep mode after N consecutive exhausted ticks",
+    )
+    sleep_check_interval_ticks: int = Field(
+        default=10,
+        ge=1,
+        description="Wake up every N ticks during sleep mode to check for new work",
+    )
+    max_sleep_cycles: int = Field(
+        default=3,
+        ge=0,
+        description="Stop after N wake-up cycles with no work (0 = never stop)",
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -217,15 +247,6 @@ class OrchestraConfig(BaseModel):
     debug_polling_interval: int = Field(default=60, ge=1)
     debug_max_ticks: int = Field(default=10, ge=1)
     debug: bool = False
-    auto_stop_on_exhaustion: bool = Field(
-        default=True,
-        description="Auto-stop server when pool exhausted for consecutive ticks",
-    )
-    exhaustion_threshold_ticks: int = Field(
-        default=10,
-        ge=1,
-        description="Stop server after N consecutive exhausted ticks",
-    )
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
@@ -292,6 +313,9 @@ class OrchestraConfig(BaseModel):
     )
     periodic_check: PeriodicCheckConfig = Field(default_factory=PeriodicCheckConfig)
     queue_refresh: QueueRefreshConfig = Field(default_factory=QueueRefreshConfig)
+    pool_exhaustion: PoolExhaustionConfig = Field(
+        default_factory=PoolExhaustionConfig
+    )
     max_retry_budget: int = Field(
         default=3,
         ge=1,
@@ -312,6 +336,7 @@ __all__ = [
     "SupervisorHandoffConfig",
     "PeriodicCheckConfig",
     "QueueRefreshConfig",
+    "PoolExhaustionConfig",
     "OrchestraConfig",
     "default_pid_file",
 ]
