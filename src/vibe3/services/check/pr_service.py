@@ -241,12 +241,25 @@ class CheckPRService:
         Returns:
             Tuple of (handled=True, issues, warnings).
         """
-        # Guard: Skip aborted flows - let rule_aborted_flow_done_reconcile handle them
+        # Aborted flows: route through transition_aborted_to_done (with phase
+        # cleanup) when eligible; otherwise preserve the legitimate abort.
+        # Self-contained — does NOT depend on rule_aborted_flow_done_reconcile
+        # being enabled, so disabling the reconcile rule cannot strand flows.
         flow_state = self.store.get_flow_state(branch)
         if flow_state and flow_state.get("flow_status") == "aborted":
-            # Don't transition aborted flows here; populate PR cache only
+            eligible, eligible_pr_number = (
+                self._flow_status_service.evaluate_aborted_to_done_eligibility(
+                    flow_state, branch, cached_pr=pr
+                )
+            )
+            if eligible:
+                self._flow_status_service.transition_aborted_to_done(
+                    branch,
+                    f"PR #{pr.number} merged, all phases complete",
+                    pr_number=eligible_pr_number,
+                )
             self._update_pr_cache(branch, pr)
-            return (False, [], [])  # Let reconciliation rule handle the transition
+            return (True, [], [])
 
         warnings: list[str] = []
 

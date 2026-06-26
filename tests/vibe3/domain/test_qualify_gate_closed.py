@@ -74,11 +74,15 @@ class TestQualifyGateGitHubClosed:
         state: IssueState,
         labels: list[str],
         explicit_branch: str = "auto",
+        eligibility_result: tuple[bool, int | None] = (False, None),
     ) -> tuple[object, Mock, Mock]:
         """Run qualify gate for a CLOSED issue.
 
         Returns (result, mock_cleanup_svc, mock_flow_status_svc).
         Pass explicit_branch="" to test the empty-branch code path.
+        eligibility_result controls the mocked shared heuristic so the
+        terminalize_closed_issue eligibility branch is deterministic and
+        decoupled from FlowStatusService.evaluate_aborted_to_done_eligibility.
         """
         effective_branch = (
             f"task/issue-{issue_number}"
@@ -98,6 +102,10 @@ class TestQualifyGateGitHubClosed:
             ) as mock_flow_status_svc,
             patch("vibe3.services.FlowCleanupService") as mock_cleanup_svc,
         ):
+            mock_status = mock_flow_status_svc.return_value
+            mock_status.evaluate_aborted_to_done_eligibility.return_value = (
+                eligibility_result
+            )
             result = qualify_gate_service.run_qualify_gate(
                 issue=closed_issue,
                 branch=effective_branch,
@@ -340,7 +348,11 @@ class TestQualifyGateGitHubClosed:
         )
 
         result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
-            qualify_gate_service, 110, IssueState.READY, ["state/ready"]
+            qualify_gate_service,
+            110,
+            IssueState.READY,
+            ["state/ready"],
+            eligibility_result=(True, 110),
         )
 
         assert result is None
