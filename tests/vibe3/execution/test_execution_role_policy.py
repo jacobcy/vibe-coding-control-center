@@ -7,11 +7,11 @@ import pytest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.models import (
     AgentOptions,
-    AssigneeDispatchConfig,
     GovernanceConfig,
     OrchestraConfig,
     SupervisorHandoffConfig,
 )
+from vibe3.models.orchestra_config import AssigneeDispatchConfig
 
 
 @pytest.fixture

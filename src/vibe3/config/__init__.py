@@ -37,7 +37,6 @@ if TYPE_CHECKING:
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.models import OrchestraConfig
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.config.role_gates import (
         EXECUTOR_GATE_CONFIG,
@@ -71,7 +70,8 @@ if TYPE_CHECKING:
         DEFAULT_COMMENT_POLICY,
         TimelineCommentPolicy,
     )
-    
+    from vibe3.models import OrchestraConfig
+
 __all__ = [
     "AIConfig",
     "AgentPromptConfig",

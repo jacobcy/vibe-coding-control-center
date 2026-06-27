@@ -12,8 +12,7 @@ from vibe3.services.shared import LabelService
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.models import OrchestraConfig
-    from vibe3.models import CoordinationTruth, IssueInfo
+    from vibe3.models import CoordinationTruth, IssueInfo, OrchestraConfig
 
 
 def check_worktree_health(

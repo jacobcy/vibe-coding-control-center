@@ -22,8 +22,8 @@ from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
-    from vibe3.models import OrchestraConfig
     from vibe3.environment import SessionRegistryService
+    from vibe3.models import OrchestraConfig
     from vibe3.services.orchestra import OrchestraStatusService
 
 

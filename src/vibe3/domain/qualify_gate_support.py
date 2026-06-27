@@ -19,9 +19,8 @@ from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.models import OrchestraConfig
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
-    from vibe3.models import CoordinationTruth, IssueInfo
+    from vibe3.models import CoordinationTruth, IssueInfo, OrchestraConfig
 
 
 def _append_orchestra_event(channel: str, message: str) -> None:
