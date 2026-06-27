@@ -57,7 +57,7 @@ uv tool install -e .
 ```bash
 bin/vibe check       # 环境诊断（Legacy / V2）
 vibe3 task status    # [Active] 推荐：全局任务面板与 Flow 状态
-vibe3 snapshot show  # [Active] V3 项目健康度、指标与 LOC 限制度量
+vibe3 inspect base  # [Active] V3 项目结构、依赖关系与 LOC 限制度量
 vibe3 check          # [Active] V3 Handoff 存储一致性与共享状态审计
 bats tests/          # 运行 V2 测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
@@ -202,7 +202,7 @@ bats tests/
 随时运行以下命令查看项目健康状态：
 
 ```bash
-vibe3 snapshot show           # V3 核心仪表盘（替换旧的 check --metrics）
+vibe3 inspect base           # V3 核心仪表盘（查看项目结构概览）
 bash scripts/tools/metrics.sh  # V2 Legacy 仪表盘
 ```
 
@@ -232,7 +232,7 @@ bash scripts/tools/metrics.sh  # V2 Legacy 仪表盘
 1. **创建工作区**: 使用 `wtnew <branch>` 或 `git worktree add`。
 2. **初始化**: `vibe3 internal bootstrap` && `vibe3 flow update`。
 3. **执行**: 使用 `/vibe-task` 等技能，并运行 `vibe3 task status` 监控状态。
-4. **验证**: `pytest tests/vibe3` + `vibe3 snapshot show`。
+4. **验证**: `pytest tests/vibe3` + `vibe3 inspect base`。
 5. **清理**: `git worktree remove .`。
 
 ---
@@ -307,8 +307,7 @@ vibe3 serve status      # 查看 Orchestra 服务状态与门禁
 vibe3 task status       # [推荐] 总览全局任务面板与 Flow 状态
 vibe3 task show         # 查看当前任务详情
 vibe3 check             # V3 Handoff 存储一致性与共享状态审计
-vibe3 snapshot show     # [推荐] 查看项目健康度、指标与结构变更 (persistence-based)
-vibe3 snapshot diff     # 比较当前结构与基准快照
+vibe3 inspect base     # [推荐] 查看项目结构、依赖关系与 LOC 限制
 
 # Flow 与协作
 vibe3 flow show         # 查看当前 flow 上下文与绑定信息
