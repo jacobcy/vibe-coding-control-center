@@ -61,10 +61,10 @@ def extract_material_from_log(job: Any) -> str | None:
     log_path = getattr(job, "log_path", None)
     if not log_path:
         return None
-    filename = str(log_path).rsplit("/", 1)[-1]
+    filename = Path(log_path).name
     # Match material slugs with hyphens: roadmap-intake, cron-supervisor, etc.
-    match = re.match(
-        r"^([a-z]+(?:-[a-z]+)*)-\d{8}-\d{6}-t\d+\.log$",
+    match = re.fullmatch(
+        r"([a-z]+(?:-[a-z]+)*)-\d{8}-\d{6}-t\d+\.log",
         filename,
     )
     if match:

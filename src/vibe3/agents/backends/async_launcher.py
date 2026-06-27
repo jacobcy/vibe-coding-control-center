@@ -210,8 +210,8 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
 
     # Governance scan logs with new naming: {material_slug}-{timestamp}-t{tick}
     # e.g., cron-supervisor-20260627-010215-t8, roadmap-intake-20260627-010215-t8
-    governance_new_match = re.match(
-        r"^([a-z]+(?:-[a-z]+)*)-(\d{8}-\d{6})-t(\d+)$",
+    governance_new_match = re.fullmatch(
+        r"([a-z]+(?:-[a-z]+)*)-(\d{8}-\d{6})-t(\d+)",
         execution_name,
     )
     if governance_new_match:
@@ -226,8 +226,8 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
 
     # Backward compatibility: legacy governance naming with material
     # e.g., vibe3-governance-cron-supervisor-20260627-010215-t8
-    governance_material_match = re.match(
-        r"^vibe3-governance-([a-z-]+)-(\d{8}-\d{6})-t(\d+)$",
+    governance_material_match = re.fullmatch(
+        r"vibe3-governance-([a-z-]+)-(\d{8}-\d{6})-t(\d+)",
         execution_name,
     )
     if governance_material_match:
@@ -241,8 +241,8 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
         )
 
     # Backward compatibility: old governance execution names (no material)
-    governance_match = re.match(
-        r"^vibe3-governance-(.+)$",
+    governance_match = re.fullmatch(
+        r"vibe3-governance-(.+)",
         execution_name,
     )
     if governance_match:
