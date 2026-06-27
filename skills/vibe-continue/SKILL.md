@@ -239,7 +239,7 @@ PR 未创建      → vibe3 run --publish
 4. **直接在当前 session 继续实现**：按 plan 的剩余步骤执行
 5. 完成后手动记录 `vibe3 handoff append`
 
-**Fallback**：如果接管后实现遇到困难（上下文不足、能力限制），建议重新执行 `vibe3 run`（可能需要先 `vibe3 snapshot save` 保存当前状态），而不是继续在当前 session 硬撑。
+**Fallback**：如果接管后实现遇到困难（上下文不足、能力限制），建议重新执行 `vibe3 run`（可能需要手动保存当前状态），而不是继续在当前 session 硬撑。
 
 **原则**：vibe3 run 是便利工具，不是必须依赖。主 agent 有能力直接实现。
 

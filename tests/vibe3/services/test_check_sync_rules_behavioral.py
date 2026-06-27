@@ -5,11 +5,8 @@ blocks when disabled, using behavioral integration tests that call
 verify_current_flow() and assert via mock assertions or store state.
 """
 
-from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from vibe3.clients import (
     LocalSyncRules,
@@ -22,13 +19,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check.service import CheckService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-
-@pytest.fixture(autouse=True)
-def _mock_snapshot() -> Generator[None, None, None]:
-    """Mock snapshot service to avoid real git operations in tests."""
-    with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
-        yield
 
 
 class TestCheckSyncRulesBehavioral:

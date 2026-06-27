@@ -78,7 +78,6 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
         initiated_by="flow:rebuild",
         ensure_worktree=True,
         reactivate_existing=False,
-        force_baseline=True,
     )
     timeline.record_timeline_event.assert_called_once_with(
         branch="task/issue-303",

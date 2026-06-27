@@ -79,12 +79,10 @@ uv run python src/vibe3/cli.py <subcommand>
   - 识别文件形状：LOC、函数数、导入关系、是否存在”迁移后仍很重”的模块。
 - `vibe3 inspect symbols <file>:<symbol> --json`
   - 验证具体符号的真实调用面，确认兼容入口、helper、旧路径是否仍被实际引用。
-- `vibe3 snapshot show <file> --json`
-  - 补充文件级结构信息，用于说明模块复杂度和函数分布。
 
 补充说明：
 
-- `inspect files` / `snapshot show` 适合发现”形状异常”和”分层仍过厚”的嫌疑点。
+- `inspect files` 适合发现”形状异常”和”分层仍过厚”的嫌疑点。
 - `inspect symbols` 更适合作为二次验证器，而不是唯一发现器。
 - `inspect base` 用来回答”这次重构是否同时新增新路径但未回收旧路径”。
 
