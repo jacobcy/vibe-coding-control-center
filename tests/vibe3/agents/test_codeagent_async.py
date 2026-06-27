@@ -49,7 +49,7 @@ class TestStartAsyncCommand:
     ) -> None:
         """When a log file exists, allocate_log_path returns a new unique path."""
         log_dir = tmp_path / "temp" / "logs"
-        stale_log = log_dir / "orchestra" / "issues" / "issue-372" / "manager.async.log"
+        stale_log = log_dir / "orchestra" / "issues" / "issue-372" / "manager.log"
         stale_log.parent.mkdir(parents=True)
         stale_log.write_text("SESSION_ID: stale_session\n")
 
@@ -103,7 +103,7 @@ class TestStartAsyncCommand:
         assert stale_log.exists()
         # The new log should be under orchestra/issues/ with a -2 suffix
         assert (
-            handle.log_path == log_dir / "orchestra" / "issues" / "issue-372" / "manager-2.async.log"
+            handle.log_path == log_dir / "orchestra" / "issues" / "issue-372" / "manager-2.log"
         )
 
     def test_start_async_command_embeds_env_overrides_in_tmux_command(

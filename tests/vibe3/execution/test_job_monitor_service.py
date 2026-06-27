@@ -123,7 +123,7 @@ class TestJobMonitorService:
             status="stopped",
             started_at="2026-06-18T09:44:54",
             ended_at="2026-06-18T09:45:12",
-            log_path="/tmp/logs/issues/issue-2983/manager.async.log",
+            log_path="/tmp/logs/orchestra/issues/issue-2983/manager.log",
         )
 
         svc = JobMonitorService(store=store)
@@ -136,7 +136,7 @@ class TestJobMonitorService:
         assert job.runtime_status == "stopped"
         assert job.status == ActorStatus.DEAD
         assert job.issue_number == 2983
-        assert job.log_path == "/tmp/logs/issues/issue-2983/manager.async.log"
+        assert job.log_path == "/tmp/logs/orchestra/issues/issue-2983/manager.log"
 
     def test_running_actor_appears_in_active_jobs(self) -> None:
         """RUNNING actors appear in active_jobs."""

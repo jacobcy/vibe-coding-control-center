@@ -215,7 +215,7 @@ class TestCodeagentBackend:
             "vibe3-plan-issue-419",
         )
 
-        assert log_path == Path("/tmp/logs/orchestra/issues/issue-419/plan.async.log")
+        assert log_path == Path("/tmp/logs/orchestra/issues/issue-419/plan.log")
 
     def test_run_uses_repo_models_mapping_for_agent_preset(
         self, tmp_path: Path

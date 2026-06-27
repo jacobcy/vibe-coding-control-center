@@ -205,7 +205,7 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
             / "orchestra"
             / "issues"
             / f"issue-{issue_number}"
-            / f"{file_name}.async.log"
+            / f"{file_name}.log"
         )
 
     # Governance scan logs with material: vibe3-governance-{material}-{ts}-t{tick}
@@ -274,17 +274,23 @@ def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
         pass
 
     # If file exists, find the next suffix using atomic creation
-    # e.g. manager.async.log -> manager-2.async.log
+    # e.g. manager.log -> manager-2.log (new naming)
+    # e.g. manager.async.log -> manager-2.async.log (backward compat)
     name = base_path.name
-    if not name.endswith(".async.log"):
+    if name.endswith(".async.log"):
+        suffix_len = len(".async.log")
+    elif name.endswith(".log"):
+        suffix_len = len(".log")
+    else:
         # Fallback: just return the base path even though it exists
         # This shouldn't happen but provides graceful degradation
         return base_path
 
-    base_name = name[: -len(".async.log")]
+    base_name = name[:-suffix_len]
+    log_ext = name[-suffix_len:]
     counter = 2
     while True:
-        candidate = base_path.parent / f"{base_name}-{counter}.async.log"
+        candidate = base_path.parent / f"{base_name}-{counter}{log_ext}"
         try:
             # Atomic creation attempt for each candidate
             fd = os.open(

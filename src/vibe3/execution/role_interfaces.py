@@ -45,7 +45,7 @@ class GovernanceFunctions(Protocol):
         """Resolve agent options for governance execution."""
         ...
 
-    def build_execution_name(self, tick_count: int) -> str:
+    def build_execution_name(self, tick_count: int, material: str | None = None) -> str:
         """Build execution name for governance run."""
         ...
 
