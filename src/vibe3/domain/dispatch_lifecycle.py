@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DispatchState(Enum):
@@ -24,6 +24,8 @@ class DispatchState(Enum):
 
 class DispatchLifecycleConfig(BaseModel):
     """Configuration for the DispatchLifecycle FSM."""
+
+    model_config = ConfigDict(frozen=True)
 
     refresh_interval_ticks: int = Field(
         default=10,
@@ -95,8 +97,3 @@ class DispatchLifecycle:
         empty; this method only encodes the periodic schedule.
         """
         return tick_id % self._config.refresh_interval_ticks == 0
-
-    def reset(self) -> None:
-        """Return the FSM to its initial ACTIVE state with zero idle ticks."""
-        self._state = DispatchState.ACTIVE
-        self._idle_ticks = 0

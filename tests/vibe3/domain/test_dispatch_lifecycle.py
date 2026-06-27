@@ -97,6 +97,17 @@ class TestSleepingTransitions:
             fsm.on_tick(0)
         assert fsm.is_sleeping is True
 
+    def test_idle_ticks_keeps_growing_in_sleeping(self) -> None:
+        """idle_ticks is the consecutive idle count; keeps growing in SLEEPING."""
+        fsm = DispatchLifecycle()
+        for _ in range(4):
+            fsm.on_tick(0)
+        assert fsm.idle_ticks == 4
+        fsm.on_tick(0)
+        fsm.on_tick(0)
+        assert fsm.idle_ticks == 6
+        assert fsm.state is DispatchState.SLEEPING
+
 
 class TestShouldCollect:
     """Scheduled full-collect tick gate."""
@@ -116,20 +127,6 @@ class TestShouldCollect:
         assert fsm.should_collect(5) is True
         assert fsm.should_collect(10) is True
         assert fsm.should_collect(7) is False
-
-
-class TestReset:
-    """Manual reset returns initial state."""
-
-    def test_reset_returns_to_active_with_zero_idle(self) -> None:
-        fsm = DispatchLifecycle()
-        for _ in range(4):
-            fsm.on_tick(0)
-        assert fsm.is_sleeping is True
-        fsm.reset()
-        assert fsm.state is DispatchState.ACTIVE
-        assert fsm.idle_ticks == 0
-        assert fsm.is_sleeping is False
 
 
 class TestConfigValidation:
