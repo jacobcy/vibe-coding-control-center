@@ -253,8 +253,8 @@ code_limits:
 
       # 基础设施核心模块
       - path: "src/vibe3/runtime/heartbeat.py"
-        limit: 500
-        reason: "Heartbeat server 核心运行时，包含 tick loop、FailedGate 检查、error tracking cleanup、actor registry cleanup 等紧密耦合逻辑；Issue #3022 新增 tick_id contextvar 传播（+10 行 net）和 5 处 heartbeat 错误记录修复（+82 行，显式传入 tick_number 到 record_error）"
+        limit: 520
+        reason: "Heartbeat server 核心运行时，包含 tick loop、FailedGate 检查、error tracking cleanup、actor registry cleanup 等紧密耦合逻辑；Issue #3022 新增 tick_id contextvar 传播（+10 行 net）和 5 处 heartbeat 错误记录修复（+82 行，显式传入 tick_number 到 record_error）；Issue #3190 新增 sleep mode 逻辑（+6 行）"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 495
         reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持；Issue #3074 新增 env override 路径分支（original_options/effective_options 分离）和诊断日志；Issue #3135 新增 agent preset model 解析 fallback（+15 行）"

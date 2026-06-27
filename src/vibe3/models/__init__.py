@@ -261,6 +261,7 @@ _LAZY_IMPORTS = {
     "PoolExhaustionConfig": "vibe3.models.orchestra_config",
     "PRReviewDispatchConfig": "vibe3.models.orchestra_config",
     "QueueRefreshConfig": "vibe3.models.orchestra_config",
+    "StateLabelDispatchConfig": "vibe3.models.orchestra_config",
     "publish": "vibe3.models.event_bus",
     "publish_and_wait": "vibe3.models.event_bus",
     "subscribe": "vibe3.models.event_bus",
