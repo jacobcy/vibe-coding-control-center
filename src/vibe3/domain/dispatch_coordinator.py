@@ -25,6 +25,7 @@ from vibe3.clients import GitHubClient
 from vibe3.config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.dispatch_health import DispatchHealthService
+from vibe3.domain.dispatch_lifecycle import DispatchLifecycle
 from vibe3.domain.dispatch_preflight import (
     DispatchPreflightDecision,
     DispatchPreflightService,
@@ -151,6 +152,7 @@ class GlobalDispatchCoordinator:
             self._label_dispatcher = label_dispatcher
 
         self._dispatch_paused = False
+        self._dispatch_lifecycle = DispatchLifecycle()
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
         self._remote_check_runner = remote_check_runner
@@ -582,6 +584,7 @@ class GlobalDispatchCoordinator:
 
         # Step 5: Dispatch actionable entries
         dispatched_count = self._dispatch_loop(tick_id)
+        self._dispatch_lifecycle.on_tick(dispatched_count)
 
         # Step 6: Persist queue state
         self._queue_persistence.frozen_queue = self._frozen_queue
