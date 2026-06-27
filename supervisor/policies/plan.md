@@ -74,6 +74,13 @@ issue 满足任一条件即为代码层补偿反模式：
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动
 - **如果是命名一致性/文档同步/API 签名变更任务**：使用 `inspect symbols` 和 `rg` 搜索所有层（service/UI/command/tests/docs），确认需要同步更新的完整文件列表，再圈定 plan 范围
+- **如果变更涉及 Literal 类型常量集合的扩展或修改**：必须执行跨 Repository / Model / Service 三层的一致性检查，包括：
+  - **Repository 层**：查找常量集合定义（如 `VALID_FLOW_STATUSES`、`VALID_XXX`），确认是否需要同步更新
+  - **Model 层**：查找 Pydantic 模型中的 `Literal[...]` 字段注解（如 `flow_status: Literal["active", ...]`），确认 Literal 的合法值集合是否覆盖新增值
+  - **Service 层**：查找方法签名中的 `Literal[...]` 类型注解（如 `def list_flows(status: Literal[...])`），确认参数约束是否同步
+  - 使用 `grep -rn "Literal\[" --include="*.py" | grep -i "<related-term>"` 定位所有相关 Literal 类型定义点
+  - **如果 Pydantic 模型层也需要修改**：该变更属于强制必需的同步变更（运行时 Pydantic 验证会拒绝未在 Literal 中声明的新值），不得列入"禁止的变更类型"
+  - **如果任意一层遗漏更新**：必须在 plan 中完整列出需要同步变更的所有文件，不得遗漏
 - **检查 ADR 约束**：先读取 `docs/decisions/INDEX.md`，再读取相关 `accepted` ADR 正文，确认计划不违反任何当前有效 ADR。若需偏离，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号及理由），而非静默违反。
 - **验证 plan 目标的技术可行性**：如果 plan 涉及激活/启用功能，必须先用实际命令验证前提条件（如 import 测试、测试运行、依赖检查）。验证命令示例：`uv run python -c "from vibe3.<module> import <Symbol>"` 或 `uv run pytest <test_path> -k <test_name>`。发现障碍立即标注为 `REQUIRED:BEFORE_CODING` 或记录为 blocker。
 
