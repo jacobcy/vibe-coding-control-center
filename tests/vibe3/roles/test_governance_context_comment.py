@@ -52,7 +52,9 @@ class TestBuildSnapshotContext:
         mock_github_cls.return_value = mock_github
 
         snapshot = _make_snapshot()
-        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        ctx = build_governance_snapshot_context(
+            snapshot, config=_make_config(), execution_count=1
+        )
         assert ctx["server_status"] == "running"
         assert ctx["issue_scope_name"] == "assignee issue pool"
         assert ctx["active_count"] == 0
@@ -100,7 +102,9 @@ class TestBuildSnapshotContext:
             active_flows=1,
             active_worktrees=1,
         )
-        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        ctx = build_governance_snapshot_context(
+            snapshot, config=_make_config(), execution_count=1
+        )
         assert ctx["active_count"] == 2
         assert ctx["running_issue_count"] == 1
         assert ctx["suggested_issue_count"] == 1
@@ -114,7 +118,9 @@ class TestBuildSnapshotContext:
         mock_github_cls.return_value = mock_github
 
         snapshot = _make_snapshot(server_running=False)
-        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        ctx = build_governance_snapshot_context(
+            snapshot, config=_make_config(), execution_count=1
+        )
         assert ctx["server_status"] == "stopped"
 
     @patch("vibe3.roles.governance.GitHubClient")
@@ -140,13 +146,15 @@ class TestBuildSnapshotContext:
             for i in range(25)
         )
         snapshot = _make_snapshot(active_issues=issues)
-        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        ctx = build_governance_snapshot_context(
+            snapshot, config=_make_config(), execution_count=1
+        )
         assert "已截断" in ctx["truncated_note"]
 
     @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
-        # tick_count=1 selects roadmap-intake from recipe catalog
+        # execution_count=0 selects roadmap-intake from recipe catalog (now index 0)
         config = _make_config()
         mock_github = MagicMock()
         mock_github.list_issues.return_value = [
@@ -170,7 +178,7 @@ class TestBuildSnapshotContext:
         mock_github_cls.return_value = mock_github
 
         ctx = build_governance_snapshot_context(
-            snapshot, config=config, tick_count=0, execution_count=1
+            snapshot, config=config, tick_count=0, execution_count=0
         )
 
         assert ctx["issue_scope_name"] == "broader repo issue pool"
@@ -291,7 +299,9 @@ class TestBuildSnapshotContext:
         )
         snapshot = _make_snapshot(active_issues=(reviewed, normal))
 
-        ctx = build_governance_snapshot_context(snapshot, config=config)
+        ctx = build_governance_snapshot_context(
+            snapshot, config=config, execution_count=1
+        )
 
         # Only non-orchestra issue should appear
         assert ctx["active_count"] == 1
@@ -357,9 +367,9 @@ class TestBuildSnapshotContext:
         ]
         mock_github_cls.return_value = mock_github
 
-        # Use roadmap-intake material (execution_count=1)
+        # Use roadmap-intake material (execution_count=0, now index 0)
         ctx = build_governance_snapshot_context(
-            snapshot, config=config, tick_count=0, execution_count=1
+            snapshot, config=config, tick_count=0, execution_count=0
         )
 
         assert ctx["issue_scope_name"] == "broader repo issue pool"
@@ -446,6 +456,7 @@ class TestBuildSnapshotContext:
         ctx = build_governance_snapshot_context(
             snapshot,
             config=_make_config(manager_usernames=("local-manager",)),
+            execution_count=1,
         )
 
         assert ctx["active_count"] == 1

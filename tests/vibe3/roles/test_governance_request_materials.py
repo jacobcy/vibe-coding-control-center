@@ -158,7 +158,7 @@ class TestRoundRobinMaterialSelection:
             _make_config(), tick_count=0, execution_count=0
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/assignee-pool.md"
+        assert val == "supervisor/governance/roadmap-intake.md"
 
     def test_tick_1_selects_second(self):
         """execution_count=1 selects second material from recipe catalog."""
@@ -166,7 +166,7 @@ class TestRoundRobinMaterialSelection:
             _make_config(), tick_count=0, execution_count=1
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/roadmap-intake.md"
+        assert val == "supervisor/governance/assignee-pool.md"
 
     def test_tick_2_selects_third(self):
         """execution_count=2 selects third material from recipe catalog."""
@@ -238,12 +238,12 @@ class TestRoundRobinMaterialSelection:
         assert val == "supervisor/governance/audit-observation.md"
 
     def test_tick_5_selects_audit_suggestion(self):
-        """execution_count=5 selects audit-suggestion from recipe catalog."""
+        """execution_count=5 selects audit-decision from recipe catalog."""
         recipe = build_governance_recipe(
             _make_config(), tick_count=0, execution_count=5
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/audit-suggestion.md"
+        assert val == "supervisor/governance/audit-decision.md"
 
     def test_tick_6_selects_audit_report(self):
         """execution_count=6 selects audit-report from recipe catalog."""
@@ -253,13 +253,13 @@ class TestRoundRobinMaterialSelection:
         val = recipe.variables["supervisor_name"].value
         assert val == "supervisor/governance/audit-report.md"
 
-    def test_tick_7_selects_audit_decision(self):
-        """execution_count=7 selects audit-decision from recipe catalog."""
+    def test_tick_7_selects_audit_suggestion(self):
+        """execution_count=7 selects audit-suggestion from recipe catalog."""
         recipe = build_governance_recipe(
             _make_config(), tick_count=0, execution_count=7
         )
         val = recipe.variables["supervisor_name"].value
-        assert val == "supervisor/governance/audit-decision.md"
+        assert val == "supervisor/governance/audit-suggestion.md"
 
     @pytest.mark.slow
     def test_build_governance_request_uses_round_robin(self):
