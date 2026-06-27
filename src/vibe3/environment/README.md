@@ -11,32 +11,58 @@
 
 ## 文件列表
 
-统计时间：2026-05-02
+统计时间：2026-06-27
 
 ### Worktree 管理文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| worktree.py | 421 | Worktree 生命周期管理主入口 |
+| worktree.py | 364 | Worktree 管理主入口（acquire/release） |
 | worktree_context.py | 17 | Worktree 上下文管理器 |
-| worktree_pr_mixin.py | 287 | Worktree PR 相关操作 mixin |
-| worktree_support.py | 266 | Worktree 辅助函数（查找、初始化、回收） |
+| worktree_lifecycle.py | 500 | Worktree 生命周期编排（创建、验证、回收） |
+| worktree_pr_mixin.py | 283 | Worktree PR 相关操作 mixin |
+| worktree_support.py | 302 | Worktree 辅助函数（查找、初始化、回收） |
 
 ### Session 管理文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| session.py | 216 | Tmux session 创建与销毁 |
+| session.py | 217 | Session 创建与销毁（tmux/codeagent） |
 | session_naming.py | 15 | Session 命名规则 |
-| session_registry.py | 465 | Session 注册表，维护 session 与 worktree 映射 |
+| session_registry.py | 481 | Session 注册表，维护 session 与 worktree 映射 |
 
 ### 其他文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| __init__.py | 17 | 模块导出 |
+| __init__.py | 56 | 模块导出（延迟加载） |
 
-**总计**：8 文件，1704 行
+**总计**：8 文件，约 2235 行
+
+## 公共 API
+
+从 `__init__.py` 的 `__all__` 导出的 9 个符号，按功能分组：
+
+### Session 管理
+
+- `SessionManager` — Session 创建与销毁主入口
+- `TmuxSessionContext` — Tmux session 上下文
+- `CodeagentSessionContext` — Codeagent session 上下文
+- `get_manager_session_name` — 获取 manager session 名称
+
+### Session 注册表
+
+- `SessionRegistryService` — Session 注册表服务（持久化 session 与 worktree 映射）
+
+### Worktree 管理
+
+- `WorktreeManager` — Worktree 管理主入口（acquire/release）
+- `WorktreeContext` — Worktree 上下文（路径、分支、issue）
+
+### Worktree 辅助
+
+- `find_worktree_by_path` — 按路径查找 worktree
+- `find_worktree_for_branch` — 按分支查找 worktree
 
 ## 依赖关系
 
@@ -83,6 +109,81 @@ Worktree Manager
 ├─ acquire_issue_worktree() → L3 worktree
 └─ acquire_temporary_worktree() → L2 worktree
 ```
+
+### Worktree 生命周期
+
+Worktree 完整生命周期分为四个阶段：
+
+1. **创建阶段**
+   - `WorktreeLifecycle.create_issue_worktree()` — 创建 issue-bound worktree
+   - `WorktreeLifecycle.create_temporary_worktree()` — 创建 temporary worktree
+   - 路径生成规则：`issue-{number}-{hash}` (L3) 或 `temp-{hash}` (L2)
+   - 前置清理：`git worktree prune` 清理 stale references
+
+2. **分配阶段**
+   - `WorktreeManager.acquire_issue_worktree()` — 分配 L3 worktree（支持复用）
+   - `WorktreeManager.acquire_temporary_worktree()` — 分配 L2 worktree（不复用）
+   - Flow 绑定：调用 `FlowStatePort.update_flow_metadata()` 记录 worktree 路径
+
+3. **使用阶段**
+   - `WorktreeContext` — 描述当前 worktree 状态（路径、分支、issue）
+   - 环境隔离：不同 worktree 独立 git state，支持并发开发
+   - Session 绑定：`SessionRegistryService` 维护 session → worktree 映射
+
+4. **回收阶段**
+   - `WorktreeManager.release_issue_worktree()` — 回收 L3 worktree（可选，保留用于恢复）
+   - `WorktreeManager.release_temporary_worktree()` — 回收 L2 worktree（强制清理）
+   - 清理操作：`git worktree remove --force` + `shutil.rmtree()`
+
+**L2 vs L3 生命周期对比**：
+
+| 特性 | L3 Issue Worktree | L2 Temporary Worktree |
+|------|-------------------|----------------------|
+| 绑定对象 | GitHub issue | 无绑定（临时任务） |
+| 路径规则 | `issue-{number}-{hash}` | `temp-{hash}` |
+| 支持复用 | ✅ Issue 重新激活时可复用 | ❌ 每次全新创建 |
+| 回收策略 | 可选（保留供恢复） | 强制（立即清理） |
+| 适用场景 | 长期开发、跨 session 持久化 | 短期任务（governance、supervisor） |
+
+### Session 生命周期
+
+Session 完整生命周期分为四个阶段：
+
+1. **创建阶段**
+   - `SessionManager.create_tmux_session()` — 创建纯 tmux session（L3 manager）
+   - `SessionManager.create_codeagent_session()` — 创建 codeagent session（可选 tmux wrapper）
+   - 命名规则：`vibe3_{prefix}_{timestamp}`（如 `vibe3_manager_20260627101234`）
+   - 日志路径：`.git/vibe3/logs/{session_id}.log`
+
+2. **绑定阶段**
+   - `SessionRegistryService.register_session()` — 注册 session 与 worktree 映射
+   - 持久化：写入 `runtime_session` 表（session_id、worktree_path、flow_id）
+   - 并发安全：同一 worktree 不会被多个 session 同时占用
+
+3. **执行阶段**
+   - `SessionManager.attach_session()` — Attach 到运行中的 session
+   - `TmuxSessionContext.keep_alive_seconds` — Session 保活时间（异步执行）
+   - `CodeagentSessionContext.sync_mode` — 区分同步/异步执行模式
+
+4. **销毁阶段**
+   - `SessionManager.destroy_tmux_session()` — 销毁 tmux session
+   - `SessionManager.destroy_codeagent_session()` — 销毁 codeagent session
+   - `SessionRegistryService.unregister_session()` — 从注册表移除
+   - 日志保留：session log 保留供事后排查
+
+**Session naming 规则**（`session_naming.py`）：
+
+- 格式：`vibe3_{prefix}_{timestamp}`
+- Prefix：角色标识（如 `manager`、`plan`、`run`）
+- Timestamp：YYYYMMDDHHMMSS（避免冲突）
+- 示例：`vibe3_manager_20260627101234`
+
+**Session 注册表持久化**（`session_registry.py`）：
+
+- 表：`runtime_session`
+- 字段：session_id、worktree_path、flow_id、created_at
+- 查询：`get_session_for_worktree()`、`get_session_for_flow()`
+- 清理：自动清理超过 keep_alive 时间的 session
 
 ### 关键设计
 
