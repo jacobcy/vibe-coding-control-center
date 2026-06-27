@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.config import PeriodicCheckConfig
+from vibe3.models import PeriodicCheckConfig
 from vibe3.observability import append_orchestra_event
 
 if TYPE_CHECKING:

@@ -14,7 +14,6 @@ if TYPE_CHECKING:
         resolve_repo_agent_preset,
         resolve_repo_agent_preset_name,
     )
-    from vibe3.config.branch_convention import BranchConvention
     from vibe3.config.cli_overrides import (
         ROLE_CONFIG_SECTIONS,
         RoleCliOverrides,
@@ -32,22 +31,14 @@ if TYPE_CHECKING:
         get_config,
         get_config_with_env_override,
         load_config,
-        load_keys_env_fallback,
         load_runtime_config,
-        reload_config,
     )
     from vibe3.config.manager_config import (
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.config.orchestra_config import (
-        OrchestraConfig,
-        PeriodicCheckConfig,
-        QueueRefreshConfig,
-    )
+    from vibe3.config.orchestra_config import OrchestraConfig
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.config.profile_config import ProfileConfig
-    from vibe3.config.profile_convention import LabelsConvention, ProfileConvention
     from vibe3.config.role_gates import (
         EXECUTOR_GATE_CONFIG,
         GOVERNANCE_GATE_CONFIG,
@@ -87,6 +78,7 @@ if TYPE_CHECKING:
         DEFAULT_COMMENT_POLICY,
         TimelineCommentPolicy,
     )
+    from vibe3.models import BranchConvention
 
 __all__ = [
     "AIConfig",
@@ -99,17 +91,12 @@ __all__ = [
     "EXECUTOR_GATE_CONFIG",
     "FlowConfig",
     "GOVERNANCE_GATE_CONFIG",
-    "LabelsConvention",
     "MANAGER_GATE_CONFIG",
     "MergeGateConfig",
-    "PeriodicCheckConfig",
     "PLANNER_GATE_CONFIG",
     "PlanConfig",
     "PRScoringConfig",
-    "ProfileConfig",
-    "ProfileConvention",
     "QualityConfig",
-    "QueueRefreshConfig",
     "REVIEWER_GATE_CONFIG",
     "ROLE_CONFIG_SECTIONS",
     "SUPERVISOR_APPLY_GATE_CONFIG",
@@ -143,11 +130,9 @@ __all__ = [
     "has_agent_env_override",
     "load_config",
     "load_config_for_role",
-    "load_keys_env_fallback",
     "load_orchestra_config",
     "load_runtime_config",
     "read_models_json",
-    "reload_config",
     "repo_models_json_path",
     "resolve_effective_agent_options",
     "resolve_repo_agent_preset",
@@ -158,24 +143,19 @@ __all__ = [
 _SYMBOL_MODULES = {
     "AIConfig": "vibe3.config.settings",
     "AgentPromptConfig": "vibe3.config.settings",
-    "BranchConvention": "vibe3.config.branch_convention",
+    "BranchConvention": "vibe3.models.branch_convention",
     "CodeLimitsConfig": "vibe3.config.settings",
     "CodePathsConfig": "vibe3.config.settings",
     "ConventionResolver": "vibe3.config.convention_resolver",
     "EXECUTOR_GATE_CONFIG": "vibe3.config.role_gates",
     "FlowConfig": "vibe3.config.settings",
     "GOVERNANCE_GATE_CONFIG": "vibe3.config.role_gates",
-    "LabelsConvention": "vibe3.config.profile_convention",
     "MANAGER_GATE_CONFIG": "vibe3.config.role_gates",
     "MergeGateConfig": "vibe3.config.settings",
-    "PeriodicCheckConfig": "vibe3.config.orchestra_config",
     "PLANNER_GATE_CONFIG": "vibe3.config.role_gates",
     "PlanConfig": "vibe3.config.settings",
-    "ProfileConfig": "vibe3.config.profile_config",
-    "ProfileConvention": "vibe3.config.profile_convention",
     "PRScoringConfig": "vibe3.config.settings",
     "QualityConfig": "vibe3.config.settings",
-    "QueueRefreshConfig": "vibe3.config.orchestra_config",
     "REVIEWER_GATE_CONFIG": "vibe3.config.role_gates",
     "ROLE_CONFIG_SECTIONS": "vibe3.config.cli_overrides",
     "SUPERVISOR_APPLY_GATE_CONFIG": "vibe3.config.role_gates",
@@ -210,11 +190,9 @@ _SYMBOL_MODULES = {
     "has_agent_env_override": "vibe3.config.agent_preset",
     "load_config": "vibe3.config.loader",
     "load_config_for_role": "vibe3.config.config_loader",
-    "load_keys_env_fallback": "vibe3.config.loader",
     "load_orchestra_config": "vibe3.config.orchestra_settings",
     "load_runtime_config": "vibe3.config.loader",
     "read_models_json": "vibe3.config.agent_preset",
-    "reload_config": "vibe3.config.loader",
     "repo_models_json_path": "vibe3.config.agent_preset",
     "resolve_effective_agent_options": "vibe3.config.agent_preset",
     "resolve_repo_agent_preset": "vibe3.config.agent_preset",
