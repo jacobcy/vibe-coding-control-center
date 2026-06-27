@@ -15,6 +15,11 @@ if TYPE_CHECKING:
         MAX_INTENTS_PER_TICK,
         GlobalDispatchCoordinator,
     )
+    from vibe3.domain.dispatch_lifecycle import (
+        DispatchLifecycle,
+        DispatchLifecycleConfig,
+        DispatchState,
+    )
     from vibe3.domain.event_rules import (
         EventRule,
         build_action_handlers,
@@ -117,6 +122,9 @@ _LAZY_IMPORTS: dict[str, str] = {
     "GateResult": "vibe3.domain.failed_gate",
     "GateStatus": "vibe3.domain.failed_gate",
     "MAX_INTENTS_PER_TICK": "vibe3.domain.dispatch_coordinator",
+    "DispatchLifecycle": "vibe3.domain.dispatch_lifecycle",
+    "DispatchLifecycleConfig": "vibe3.domain.dispatch_lifecycle",
+    "DispatchState": "vibe3.domain.dispatch_lifecycle",
     "OrchestrationFacade": "vibe3.domain.orchestration_facade",
     "QualifyGateService": "vibe3.domain.qualify_gate",
     "find_role_for_state": "vibe3.domain.role_resolver",
@@ -187,6 +195,9 @@ __all__ = [
     "GateResult",
     "GateStatus",
     "MAX_INTENTS_PER_TICK",
+    "DispatchLifecycle",
+    "DispatchLifecycleConfig",
+    "DispatchState",
     "OrchestrationFacade",
     "QualifyGateService",
     "find_role_for_state",
