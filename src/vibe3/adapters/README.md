@@ -24,18 +24,13 @@
 
 ## 公共 API
 
-### Adapter Registry (`__init__.py`)
-
-从 `__all__` 导出的 3 个符号：
+从 `__init__.py` 的 `__all__` 导出的 3 个符号：
 
 - `register_adapter(manifest)` — 注册 adapter manifest
 - `get_adapter(name)` — 获取 adapter（支持 lazy loading）
 - `list_adapters()` — 列出所有注册的 adapter 名称
 
-### Resource Root Resolution (`resource_root.py`)
-
-- `resolve_resource_root()` — 解析资源根路径
-- `ResourceRootNotFoundError` — 资源根解析失败异常
+注：`resource_root.py` 的 `resolve_resource_root()` 和 `ResourceRootNotFoundError` 为内部实现，未从 `adapters` 重导出。
 
 ## 架构说明
 
