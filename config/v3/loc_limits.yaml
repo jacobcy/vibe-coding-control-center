@@ -320,8 +320,8 @@ code_limits:
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/roles/test_governance_context_comment.py"
-        limit: 630
-        reason: "Governance snapshot context and comment format contract tests, covering 11 test methods across TestBuildSnapshotContext and TestCommentFormatContract classes; includes PR #1783 comment format regression tests; split from original test_governance.py (#1803); Issue #1925 adds keys.env partial loading, layered markers, and local manager boundary tests (3 new test methods)"
+        limit: 520
+        reason: "Governance snapshot context tests, 11 test methods in TestBuildSnapshotContext; split from original test_governance.py (#1803); TestCommentFormatContract (text content tests) removed as they verify static .md file text rather than logic"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 520
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标"
@@ -332,8 +332,8 @@ code_limits:
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/execution/test_noop_gate_unit.py"
-        limit: 480
-        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测等紧密耦合场景，新增测试后略微超标"
+        limit: 520
+        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测、executor publish with existing PR 等紧密耦合场景，新增测试后略微超标"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
         limit: 680
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"

@@ -348,6 +348,93 @@ def apply_unified_noop_gate(
             return
 
     if before_state_label == after_state_label:
+        # Special case: executor publish (vibe run --skill publish)
+        # creates a PR without changing the state label. When a PR
+        # already exists on the branch, treat this as a valid pass
+        # and record a synthetic state transition.
+        if (
+            role == "executor"
+            and before_state_label == "state/merge-ready"
+            and flow_state is not None
+            and flow_state.get("pr_ref")
+        ):
+            # pr_ref existence is checked for truthiness only (not
+            # validated against GitHub). This is intentional: the
+            # publish step is idempotent, and stale pr_ref cleanup
+            # is handled by the broader flow lifecycle (PR close
+            # detection, check cleanup). Adding a GitHub API call
+            # here would introduce latency and a retry surface for
+            # a scenario that self-corrects on the next cycle.
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).info(
+                "No-op gate PASS: executor publish with existing PR "
+                f"(state/merge-ready -> state/handoff, pr={flow_state.get('pr_ref')})"
+            )
+            store.add_event(
+                branch,
+                EVENT_STATE_TRANSITIONED,
+                actor,
+                detail=(
+                    "Executor publish succeeded: PR already exists "
+                    f"({flow_state.get('pr_ref')}), "
+                    "state/merge-ready -> state/handoff"
+                ),
+                refs={
+                    "before_state": "state/merge-ready",
+                    "after_state": "state/handoff",
+                    "issue": str(issue_number),
+                    "pr_ref": str(flow_state.get("pr_ref", "")),
+                },
+            )
+
+            # Record this synthetic transition in transition_history
+            # for single-step loop prevention consistency. All state
+            # transitions — including synthetic ones — should be
+            # tracked so that the SINGLE_STEP_LIMIT check can detect
+            # repeated executor publish cycles.
+            if hasattr(store, "db_path") and hasattr(store, "record_transition"):
+                import sqlite3
+
+                try:
+                    with sqlite3.connect(store.db_path) as conn:
+                        cursor = conn.cursor()
+                        row = cursor.execute(
+                            """
+                            SELECT id FROM flow_events
+                            WHERE branch = ? AND event_type = 'state_transitioned'
+                            ORDER BY id DESC LIMIT 1
+                            """,
+                            (branch,),
+                        ).fetchone()
+
+                        event_id = row[0] if row else None
+
+                        store.record_transition(
+                            conn=conn,
+                            branch=branch,
+                            from_state="state/merge-ready",
+                            to_state="state/handoff",
+                            actor=actor,
+                            event_id=event_id,
+                        )
+                        conn.commit()
+                except sqlite3.Error as e:
+                    logger.bind(
+                        domain="codeagent",
+                        role=role,
+                        issue_number=issue_number,
+                        branch=branch,
+                    ).warning(
+                        "Synthetic transition recording skipped: "
+                        f"database error ({e})"
+                    )
+
+            return
+
         state_desc = before_state_label or "(no state)"
         logger.bind(
             domain="codeagent",
