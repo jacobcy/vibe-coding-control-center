@@ -1,61 +1,41 @@
-"""Facade for snapshot diff with automatic fallback chain."""
+"""Git-only diff summary for PR change summaries."""
 
 from loguru import logger
 
-from vibe3.analysis.snapshot_service import (
-    build_snapshot,
-    load_branch_baseline,
-)
 from vibe3.clients import GitClient
 from vibe3.models import BranchSource, ChangeSource, DiffSummary, UncommittedSource
-from vibe3.utils import DEFAULT_MODULE_GROWTH_THRESHOLD
 
 
-def get_diff_summary(
+def get_git_diff_summary(
     branch: str,
     base_branch: str = "main",
-    module_growth_threshold: int | None = None,
 ) -> DiffSummary:
-    """Return a DiffSummary with fallback chain.
-
-    1. Snapshot diff: if baseline exists → full structural comparison
-    2. Git numstat: no baseline → per-file LOC + file counts
-    3. Empty summary: extreme fallback → file count only
-    """
-    baseline = load_branch_baseline(branch)
-    if baseline is not None:
-        current = build_snapshot()
-        from vibe3.analysis.snapshot_diff import compute_diff
-
-        threshold = (
-            module_growth_threshold
-            if module_growth_threshold is not None
-            else DEFAULT_MODULE_GROWTH_THRESHOLD
-        )
-        structure_diff = compute_diff(baseline, current, threshold)
-        return structure_diff.summary
-
-    try:
-        git = GitClient()
-        return _diff_via_git(git, branch, base_branch)
-    except Exception as e:
-        logger.bind(
-            domain="snapshot",
-            action="diff_fallback",
-            branch=branch,
-        ).warning(f"Git diff fallback failed: {e}")
-
-    return DiffSummary()
-
-
-def _diff_via_git(git: GitClient, branch: str, base_branch: str) -> DiffSummary:
-    """Build DiffSummary from git numstat + name-status (fallback when no baseline).
+    """Build DiffSummary from git numstat + name-status.
 
     Collects both committed (branch vs base) and uncommitted (working tree vs HEAD)
     changes, matching inspect base behavior.
-    """
 
-    committed_source = BranchSource(branch=branch, base=base_branch)
+    The committed diff is computed from the merge-base of base_branch and HEAD,
+    ensuring accurate comparison point for PR change summaries.
+    """
+    git = GitClient()
+
+    # Resolve merge-base for accurate diff baseline
+    merge_base = None
+    try:
+        merge_base = git.get_merge_base(base_branch, branch)
+    except Exception as e:
+        logger.bind(
+            domain="snapshot",
+            action="git_merge_base",
+            branch=branch,
+            base=base_branch,
+        ).warning(f"Failed to resolve merge-base: {e}")
+
+    # Use merge-base if available, otherwise fall back to base_branch
+    effective_base = merge_base if merge_base else base_branch
+
+    committed_source = BranchSource(branch=branch, base=effective_base)
     uncommitted_source = UncommittedSource()
 
     loc_delta = 0

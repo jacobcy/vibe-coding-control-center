@@ -33,7 +33,7 @@ app = typer.Typer(
     name="review",
     help="Code review with two modes:\n\n"
     "  --branch <b> - Review issue implementation (orchestra-driven)\n"
-    "  base [branch] - Review local changes vs base branch (compares snapshots)",
+    "  base [branch] - Review local changes vs base branch",
     rich_markup_mode="rich",
 )
 
@@ -268,11 +268,10 @@ def base(
     model: _MODEL_OPT = None,
     fresh_session: _FRESH_SESSION_OPT = False,
 ) -> None:
-    """Review local branch changes against a base branch (compares codebase snapshots).
+    """Review local branch changes against a base branch.
 
     This command compares your current local branch state against a base branch.
     It analyzes:
-    - Structure diff (file/module/dependency changes)
     - Changed symbols (function-level impact)
     - Impacted modules (DAG upstream dependencies)
 

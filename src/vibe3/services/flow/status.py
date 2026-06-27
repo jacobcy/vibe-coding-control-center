@@ -123,13 +123,6 @@ class FlowStatusService:
             Dict with suggestions, e.g., {"issue_to_close": 123}
             where issue_to_close is set only when auto-close was needed.
         """
-        try:
-            from vibe3.analysis import snapshot_service
-
-            snapshot_service.save_branch_baseline(branch)
-        except Exception as e:
-            logger.warning(f"Failed to save branch baseline on auto-complete: {e}")
-
         self.mark_flow_status(
             branch,
             "done",

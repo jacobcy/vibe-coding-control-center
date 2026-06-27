@@ -10,8 +10,6 @@ These models enforce contract stability and prevent parameter drift.
 from dataclasses import dataclass
 from typing import Literal
 
-from vibe3.models.snapshot import StructureDiff
-
 
 @dataclass(frozen=True)
 class ReviewScope:
@@ -78,4 +76,3 @@ class ReviewRequest:
     changed_symbols: dict[str, list[str]] | None = None
     symbol_dag: dict[str, list[str]] | None = None
     task_guidance: str | None = None
-    structure_diff: StructureDiff | None = None

@@ -105,16 +105,16 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
         )
         result = linked_section + body + signature
 
-    # Append change summary
+    # Append change summary (git-only, no snapshot dependency)
     if metadata.branch:
         try:
-            from vibe3.analysis import get_diff_summary
+            from vibe3.analysis.git_diff_summary import get_git_diff_summary
 
-            diff_summary = get_diff_summary(metadata.branch)
+            diff_summary = get_git_diff_summary(metadata.branch)
             result += "\n\n---\n\n" + _format_diff_summary(diff_summary)
         except Exception:
             logger.bind(domain="pr", branch=metadata.branch).warning(
-                "Failed to get diff summary, skipping change summary section"
+                "Failed to get git diff summary, skipping change summary section"
             )
 
     return result
@@ -162,11 +162,10 @@ def check_upstream_conflicts(
 
 
 def _format_diff_summary(summary: DiffSummary) -> str:
-    """Render DiffSummary as a Markdown table."""
+    """Render DiffSummary as a Markdown table (git-based fields only)."""
     lines = [
         "## Change Summary",
         "",
-        "### Structure Changes",
         "| Category | Change |",
         "|----------|--------|",
     ]
@@ -180,19 +179,5 @@ def _format_diff_summary(summary: DiffSummary) -> str:
         files_parts.append(f"~{summary.files_modified} modified")
     lines.append(f"| Files | {', '.join(files_parts) if files_parts else '0'} |")
     lines.append(f"| LOC | {summary.total_loc_delta:+d} |")
-
-    if (
-        summary.total_functions_delta
-        or summary.dependencies_added
-        or summary.dependencies_removed
-    ):
-        lines.append(f"| Functions | {summary.total_functions_delta:+d} |")
-        dep_parts = []
-        if summary.dependencies_added:
-            dep_parts.append(f"+{summary.dependencies_added}")
-        if summary.dependencies_removed:
-            dep_parts.append(f"-{summary.dependencies_removed}")
-        if dep_parts:
-            lines.append(f"| Dependencies | {', '.join(dep_parts)} |")
 
     return "\n".join(lines)

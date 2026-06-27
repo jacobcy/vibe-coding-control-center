@@ -15,7 +15,6 @@ from typing import Literal
 
 from loguru import logger
 
-from vibe3.analysis import build_snapshot_diff_section
 from vibe3.config import VibeConfig, get_resolver
 from vibe3.models import PromptContextMode, ReviewRequest
 from vibe3.prompts import (
@@ -154,9 +153,6 @@ def _build_review_prompt_providers(
         "review.policy@project": project_review_policy,
         "common.rules": common_rules_section,
         "common.rules@project": project_common_rules_section,
-        "review.snapshot_diff": lambda: build_snapshot_diff_section(
-            request.structure_diff
-        ),
         "review.ast_analysis": lambda: _build_ast_analysis_section(
             request.changed_symbols, request.symbol_dag
         ),

@@ -39,7 +39,7 @@ def suggest_next_step(context: str, quiet: bool = False) -> None:
         return
 
     suggestions: dict[str, str] = {
-        "inspect_base": ("\n→ vibe3 snapshot diff [base]  (see project-level changes)"),
+        "inspect_base": ("\n→ vibe3 inspect files <path>  (see file details)"),
         "inspect_files": (
             "\n→ vibe3 inspect symbols <file>:<func>  (see symbol usage)"
         ),
@@ -47,8 +47,6 @@ def suggest_next_step(context: str, quiet: bool = False) -> None:
         "inspect_dead_code": (
             "\n→ vibe3 inspect symbols <file>:<func>  (verify findings)"
         ),
-        "snapshot_diff": ("\n→ vibe3 inspect base [base]  (see code-level impact)"),
-        "snapshot_show": ("\n→ vibe3 inspect files <path>  (see file details)"),
     }
 
     if context in suggestions:

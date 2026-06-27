@@ -130,7 +130,6 @@ class FlowOrchestratorService:
         dependency_issue_numbers: tuple[int, ...] = (),
         blocked_reason: str | None = None,
         skip_git: bool = False,
-        force_baseline: bool = False,
     ) -> dict[str, Any]:
         """Create or reactivate a standardized flow scene for an issue.
 
@@ -140,14 +139,7 @@ class FlowOrchestratorService:
         - intake placeholder flow creation (skip_git=True)
 
         It centralizes branch preparation, flow creation/reactivation, issue binding,
-        optional worktree resolution, and compatible related/dependency linkage.
-
-        force_baseline forces an overwrite of any existing snapshot baseline
-        (used by flow rebuild to discard the stale pre-rebuild baseline).
-        When False (default), baseline creation is idempotent: an existing
-        baseline is preserved rather than overwritten on every bootstrap or
-        reactivation. Baseline is only attempted when a worktree context is
-        established, since the process cwd is unreliable for snapshots.
+        and optional worktree resolution and compatible related/dependency linkage.
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
@@ -229,22 +221,6 @@ class FlowOrchestratorService:
                 self.store.update_flow_state(
                     branch, worktree_path=str(worktree_ctx.path)
                 )
-
-            # Auto-create snapshot baseline when worktree is established
-            # (best-effort). When ensure_worktree=False, baseline is skipped
-            # because process cwd is unreliable for snapshot context — users
-            # who skip worktree should manage baseline themselves.
-            if not skip_git and worktree_ctx is not None:
-                try:
-                    from vibe3.analysis import snapshot_service
-
-                    snapshot_service.save_branch_baseline(
-                        branch,
-                        force=force_baseline,
-                        repo_path=worktree_ctx.path,
-                    )
-                except Exception:
-                    pass
 
             return result
         except Exception as exc:
