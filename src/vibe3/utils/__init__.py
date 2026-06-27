@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     )
     from vibe3.utils.serve_helpers import (
         ORCHESTRA_TMUX_SESSION,
+        extract_material_from_log,
         job_to_dict,
         orchestra_tmux_session_exists,
         validate_pid_file,
@@ -124,6 +125,7 @@ _LAZY_IMPORTS = {
     "write_instance_info": "vibe3.utils.orchestra_instance",
     "check_branch_behind": "vibe3.utils.branch_compare",
     "ORCHESTRA_TMUX_SESSION": "vibe3.utils.serve_helpers",
+    "extract_material_from_log": "vibe3.utils.serve_helpers",
     "job_to_dict": "vibe3.utils.serve_helpers",
     "orchestra_tmux_session_exists": "vibe3.utils.serve_helpers",
     "validate_pid_file": "vibe3.utils.serve_helpers",
@@ -189,6 +191,7 @@ __all__ = [
     "validate_instance",
     "write_instance_info",
     "ORCHESTRA_TMUX_SESSION",
+    "extract_material_from_log",
     "job_to_dict",
     "orchestra_tmux_session_exists",
     "validate_pid_file",

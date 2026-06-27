@@ -7,6 +7,7 @@ server (L2) and services (L3). Both layers can legally import from utils (L6).
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -51,9 +52,29 @@ def orchestra_tmux_session_exists() -> bool:
     return result.returncode == 0
 
 
+def extract_material_from_log(job: Any) -> str | None:
+    """Extract governance material slug from log path filename.
+
+    Log filename format: {material_slug}-{timestamp}-t{tick}.log
+    Example: "roadmap-intake-20260628-010215-t5.log" -> "roadmap-intake"
+    """
+    log_path = getattr(job, "log_path", None)
+    if not log_path:
+        return None
+    filename = Path(log_path).name
+    # Match material slugs with hyphens: roadmap-intake, cron-supervisor, etc.
+    match = re.fullmatch(
+        r"([a-z]+(?:-[a-z]+)*)-\d{8}-\d{6}-t\d+\.log",
+        filename,
+    )
+    if match:
+        return match.group(1)
+    return None
+
+
 def job_to_dict(job: Any) -> dict[str, Any]:
     """Serialize an ActiveJob to a JSON-safe dictionary."""
-    return {
+    d = {
         "actor_id": job.actor_id,
         "job_type": job.job_type.value,
         "status": job.runtime_status or job.status.value,
@@ -64,3 +85,9 @@ def job_to_dict(job: Any) -> dict[str, Any]:
         "pid": job.pid,
         "log_path": job.log_path,
     }
+    # For governance jobs, include material name for API consumers
+    if job.job_type.value == "governance" and job.log_path:
+        material = extract_material_from_log(job)
+        if material:
+            d["material"] = material
+    return d

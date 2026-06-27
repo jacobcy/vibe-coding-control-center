@@ -96,6 +96,17 @@ class TestBuildExecutionName:
         assert name.startswith("vibe3-governance-scan-")
         assert name.endswith("-t7")
 
+    def test_format_with_material(self):
+        """Test new naming format with material parameter."""
+        name = build_governance_execution_name(
+            7, material="supervisor/governance/roadmap-intake.md"
+        )
+        # Should match: roadmap-intake-{timestamp}-t7
+        assert name.startswith("roadmap-intake-")
+        assert name.endswith("-t7")
+        # Should NOT have the old vibe3-governance- prefix
+        assert not name.startswith("vibe3-governance-")
+
 
 class TestGovernanceMaterials:
     """Tests for GovernanceConfig defaults after migration."""

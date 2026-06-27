@@ -16,6 +16,7 @@ from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 from vibe3.utils import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
+    extract_material_from_log,
     format_age_aware_time,
     job_to_dict,
     orchestra_tmux_session_exists,
@@ -500,8 +501,15 @@ def _job_status_display(job: Any) -> str:
 
 def _job_target_display(job: Any) -> str:
     """Return compact target label for a job row."""
+
     if job.issue_number > 0:
         return f"#{job.issue_number}"
+    # For governance jobs, show material name instead of "governance"
+    if job.job_type.value == "governance":
+        material = extract_material_from_log(job)
+        if material:
+            return material.replace("-", " ").title()
+        return str(job.branch or "-")
     return str(job.branch or "-")
 
 

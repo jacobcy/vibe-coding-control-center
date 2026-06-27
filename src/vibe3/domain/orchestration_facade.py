@@ -185,6 +185,7 @@ class OrchestrationFacade(ServiceBase):
                 # Uses the registry instance from constructor injection instead of
                 # creating a new SQLiteClient + SessionRegistryService per tick.
                 self._registry.mark_worker_sessions_done_when_tmux_gone()
+                self._registry.mark_governance_sessions_done_when_tmux_gone()
                 self._registry.reconcile_live_state()
             except Exception as exc:
                 from vibe3.observability import append_orchestra_event
