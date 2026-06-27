@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from vibe3.prompts.governance_material import build_governance_execution_name
+from vibe3.prompts import build_governance_execution_name
 from vibe3.roles.governance import (
     build_governance_snapshot_context,
     render_governance_prompt,
