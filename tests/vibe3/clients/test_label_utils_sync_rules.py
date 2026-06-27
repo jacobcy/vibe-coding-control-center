@@ -106,3 +106,61 @@ class TestLabelUtilsSyncRules:
 
         assert len(anomalies) == 1
         assert "roadmap_conflict" in anomalies[0].rule
+
+    # ---- Supervisor label protection regression (#3208) ----
+
+    def test_supervisor_multi_state_not_removed(self):
+        """Supervisor issues with multiple state labels skip multi_state rule.
+
+        Supervisor issues independently manage their own state labels (e.g.,
+        state/handoff) and must not have them stripped by label normalization.
+        Regression test for #3208.
+        """
+        labels = ["supervisor", "state/blocked", "state/handoff"]
+
+        anomalies = collect_label_anomalies(
+            labels,
+            issue_number=3160,
+            has_local_flow=False,
+            is_manager_issue=False,
+        )
+
+        # multi_state must NOT trigger for supervisor issues
+        multi_state = [a for a in anomalies if "multi_state" in a.rule]
+        assert (
+            not multi_state
+        ), f"multi_state triggered for supervisor issue: {multi_state}"
+
+    def test_non_supervisor_multi_state_still_triggers(self):
+        """Non-supervisor issues with multiple state labels trigger multi_state."""
+        labels = ["bug", "state/blocked", "state/handoff"]
+
+        anomalies = collect_label_anomalies(
+            labels,
+            issue_number=9999,
+            has_local_flow=False,
+            is_manager_issue=False,
+        )
+
+        # multi_state SHOULD trigger for non-supervisor issues
+        multi_state = [a for a in anomalies if "multi_state" in a.rule]
+        assert multi_state, "multi_state should trigger for non-supervisor issues"
+        # handoff has lower priority, should be removed
+        assert "state/handoff" in multi_state[0].removed
+        # blocked has highest priority, should be kept
+        assert "state/blocked" not in multi_state[0].removed
+
+    def test_supervisor_with_single_state_no_anomaly(self):
+        """Supervisor issue with a single state label produces no anomalies."""
+        labels = ["supervisor", "state/handoff"]
+
+        anomalies = collect_label_anomalies(
+            labels,
+            issue_number=3160,
+            has_local_flow=False,
+            is_manager_issue=False,
+        )
+
+        assert (
+            len(anomalies) == 0
+        ), f"Expected no anomalies for single-state supervisor issue, got: {anomalies}"

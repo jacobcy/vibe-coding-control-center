@@ -89,11 +89,17 @@ STATE_PRIORITY_ORDER = (
 )
 
 ORCHESTRA_GOVERNED_LABEL = "orchestra-governed"
+SUPERVISOR_LABEL = "supervisor"
 
 
 def has_roadmap_label(labels: list[str]) -> bool:
     """Check if issue has an RFC or epic roadmap lifecycle label."""
     return bool(ROADMAP_LIFECYCLE_LABELS & set(labels))
+
+
+def has_supervisor_label(labels: list[str]) -> bool:
+    """Check if issue has the supervisor label."""
+    return SUPERVISOR_LABEL in labels
 
 
 def has_execution_state(labels: list[str]) -> bool:
@@ -156,7 +162,9 @@ def collect_label_anomalies(
 
     Returns list of anomalies (empty = no issues found).
     Rules evaluated in priority order; roadmap_conflict suppresses
-    multi_state and orphan_execution rules.
+    multi_state and orphan_execution rules. Supervisor-labeled issues
+    skip the multi_state rule — they independently manage their own
+    state labels (e.g., state/handoff).
 
     Args:
         labels: List of label strings
@@ -182,7 +190,11 @@ def collect_label_anomalies(
 
     if "roadmap_conflict" not in rules_found:
         # Rule 2: multiple state labels
-        if rules is None or rules.remote.multi_state.enabled:
+        # Skip multi_state for supervisor issues — supervisor issues
+        # independently manage their own state labels (e.g., state/handoff)
+        # and must not have them stripped by normalization (#3208).
+        multi_state_enabled = rules is None or rules.remote.multi_state.enabled
+        if multi_state_enabled and not has_supervisor_label(labels):
             conflicts = get_conflicting_states(labels)
             if conflicts:
                 removed.extend(conflicts)

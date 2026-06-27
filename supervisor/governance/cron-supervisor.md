@@ -145,15 +145,24 @@ Forbidden:
 
 任何写入 issue 的评论必须遵循 marker 规则：
 
-- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
+- 第一行行首必须是 `[governance suggest][cron-supervisor]`（前面只允许空白字符）
 - Marker 与正文之间至少一个空格或换行
 - 不要用人话代替 marker（"Cron Supervisor 派单"无法被人类指令解析器识别）
-- 派单类 routing 评论建议用 `[governance suggest]`，明确表达"这是建议而非强制结论"
+- 与其它 governance 材料保持一致：评论标记必须包含材料名后缀以区分来源
 
 合规示例：
 ```
-[governance suggest] Routed 3 stale docs to supervisor issue #482; see scope below.
+[governance suggest][cron-supervisor] Routed 3 stale docs to supervisor issue #482; see scope below.
 ```
+
+**去重规则（强制）**：
+
+- 写评论前必须读取该 issue 的最近 3 条评论
+- 若最近评论已有 `[governance suggest][cron-supervisor]` 且内容未实质变化，跳过（不重复写评论）
+- 只有在你修改上一条 suggest 时才允许写新评论。允许写新评论的条件（满足任一即可）：
+  - 建议的文档列表有增减
+  - 对齐目标或 scope 发生变化
+  - 上次评论距今超过 24 小时且 issue 状态已变化
 
 ## Output Contract
 
