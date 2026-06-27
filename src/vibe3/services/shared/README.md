@@ -10,14 +10,12 @@
 - 分支命名与解析
 - Actor 格式化与角色提取
 - Artifact 解析
-- Binding guard（任务绑定验证）
+- Binding guard（任务绑定验证、事件发射、角色辅助）
 - Context caching（Flow 上下文缓存）
 - Dependency resolution（依赖解析）
-- Event emission（事件发射）
 - File loader（配置/material/policy 加载）
 - LOC 分析
 - Queue dirty flag（队列脏标记）
-- Role helpers（角色辅助函数）
 - Signature service（签名管理）
 - Spec ref service（规格引用管理）
 - Status query service（状态查询）
@@ -48,21 +46,19 @@
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | errors.py | 75 | 错误记录与查询工具 |
-| events.py | 22 | Issue 失败事件发射 |
 
 ### Actor 与角色
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | actors.py | 102 | Actor 格式化与角色提取 |
-| roles.py | 17 | Role 辅助函数 |
 
 ### 其他服务
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | artifacts.py | 82 | Artifact 解析器 |
-| binding_guard.py | 42 | Task-Issue 绑定验证 |
+| binding_guard.py | 92 | 任务绑定验证、事件发射、角色辅助 |
 | comment.py | 86 | Comment 类型检测 |
 | context_cache.py | 96 | Flow 上下文缓存服务 |
 | dependency_resolution.py | 117 | 依赖解析服务 |
@@ -75,11 +71,11 @@
 | timeline.py | 89 | Timeline 解析工具 |
 | versions.py | 121 | 版本管理服务 |
 
-**总计**：22 文件，3381 行
+**总计**：20 文件，3334 行
 
 ## 公共 API
 
-从 `__init__.py` 导出的 55 个符号：
+从 `__init__.py` 导出的 54 个符号：
 
 ### Label 体系（13 个）
 
@@ -137,7 +133,6 @@
 - `mark_queue_dirty` - 标记队列脏
 - `clear_queue_dirty` - 清除队列脏标记
 - `SignatureService` - 签名管理服务
-- `SpecRefInfo` - Spec 引用信息模型
 - `SpecRefService` - Spec 引用服务
 - `StatusQueryService` - 状态查询服务
 - `is_auto_task_branch` - 检查是否 auto task 分支

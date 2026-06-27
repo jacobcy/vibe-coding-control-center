@@ -102,18 +102,19 @@ if TYPE_CHECKING:
     from vibe3.services.pr.service import PRService
     from vibe3.services.pr.verdict_service import VerdictService
     from vibe3.services.shared.actors import format_agent_actor
+
+    # Functions used in domain/execution/roles
     from vibe3.services.shared.binding_guard import (
         MissingTaskIssueError,
         build_bind_task_hint,
+        emit_issue_failed,
+        get_role_block_function,
     )
     from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
     from vibe3.services.shared.errors import (
         has_recent_specific_error,
         log_dispatch_error,
     )
-
-    # Functions used in domain/execution/roles
-    from vibe3.services.shared.events import emit_issue_failed
     from vibe3.services.shared.file_loader import (
         material_loader,
         policy_loader,
@@ -134,7 +135,6 @@ if TYPE_CHECKING:
         resolve_ref_path,
         sanitize_event_detail_paths,
     )
-    from vibe3.services.shared.roles import get_role_block_function
     from vibe3.services.shared.signatures import SignatureService
     from vibe3.services.shared.spec_ref import SpecRefService
     from vibe3.services.shared.status_query import (
@@ -321,7 +321,7 @@ _SYMBOL_MODULES = {
     "classify_flow": "vibe3.services.flow.classifier",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     "create_flow_manager": "vibe3.services.flow.factory",
-    "emit_issue_failed": "vibe3.services.shared.events",
+    "emit_issue_failed": "vibe3.services.shared.binding_guard",
     "fail_executor_issue": "vibe3.services.issue.failure",
     "fail_issue": "vibe3.services.issue.failure",
     "fail_manager_issue": "vibe3.services.issue.failure",
@@ -339,7 +339,7 @@ _SYMBOL_MODULES = {
     "get_pr_changed_files": "vibe3.services.pr.analysis",
     "get_pr_commit_count": "vibe3.services.pr.analysis",
     "get_recent_commits": "vibe3.services.pr.analysis",
-    "get_role_block_function": "vibe3.services.shared.roles",
+    "get_role_block_function": "vibe3.services.shared.binding_guard",
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "has_orchestra_governed": "vibe3.services.shared.labels",
     "has_roadmap_label": "vibe3.services.shared.labels",

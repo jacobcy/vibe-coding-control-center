@@ -12,7 +12,7 @@ Public API Contract:
 - FlowContextCacheService: Context caching
 - DependencyResolution, DependencyResolutionService: Dependency resolution
 - log_dispatch_error, has_recent_specific_error: Error utilities
-- emit_issue_failed: Event emission
+- emit_issue_failed, get_role_block_function: Flow execution helpers
 - material_loader, policy_loader: File loading
 - LabelService: Label management
 - classify_dispatch_eligibility, get_state_labels, has_roadmap_label,
@@ -23,9 +23,8 @@ Public API Contract:
 - GitPathProtocol, check_ref_exists, get_git_common_dir, get_worktree_root,
   ref_to_handoff_cmd, sanitize_event_detail_paths, resolve_ref_path:
   Path utilities
-- get_role_block_function: Role helpers
 - SignatureService: Signature management
-- SpecRefInfo, SpecRefService: Spec reference management
+- SpecRefService: Spec reference management
 - StatusQueryService, is_auto_task_branch, is_dev_collab_branch: Status query
 - TIMELINE_DISPLAY_MAP, parse_timeline_from_comments: Timeline utilities
 - VersionService: Version management
@@ -45,7 +44,9 @@ if TYPE_CHECKING:
     from vibe3.services.shared.binding_guard import (
         MissingTaskIssueError,
         build_bind_task_hint,
+        emit_issue_failed,
         ensure_task_issue_bound,
+        get_role_block_function,
     )
     from vibe3.services.shared.branch_resolver import resolve_issue_branch_input
     from vibe3.services.shared.comment import is_human_comment
@@ -58,7 +59,6 @@ if TYPE_CHECKING:
         has_recent_specific_error,
         log_dispatch_error,
     )
-    from vibe3.services.shared.events import emit_issue_failed
     from vibe3.services.shared.file_loader import material_loader, policy_loader
     from vibe3.services.shared.label_service import LabelService
     from vibe3.services.shared.labels import (
@@ -88,9 +88,8 @@ if TYPE_CHECKING:
         is_queue_dirty,
         mark_queue_dirty,
     )
-    from vibe3.services.shared.roles import get_role_block_function
     from vibe3.services.shared.signatures import SignatureService
-    from vibe3.services.shared.spec_ref import SpecRefInfo, SpecRefService
+    from vibe3.services.shared.spec_ref import SpecRefService
     from vibe3.services.shared.status_query import (
         StatusQueryService,
         is_auto_task_branch,
@@ -114,7 +113,6 @@ __all__ = [
     "MissingTaskIssueError",
     "ORCHESTRA_GOVERNED_LABEL",
     "SignatureService",
-    "SpecRefInfo",
     "SpecRefService",
     "StatusQueryService",
     "TIMELINE_DISPLAY_MAP",
@@ -167,7 +165,6 @@ _SYMBOL_MODULES = {
     "MissingTaskIssueError": "vibe3.services.shared.binding_guard",
     "ORCHESTRA_GOVERNED_LABEL": "vibe3.services.shared.labels",
     "SignatureService": "vibe3.services.shared.signatures",
-    "SpecRefInfo": "vibe3.services.shared.spec_ref",
     "SpecRefService": "vibe3.services.shared.spec_ref",
     "StatusQueryService": "vibe3.services.shared.status_query",
     "TIMELINE_DISPLAY_MAP": "vibe3.services.shared.timeline",
@@ -177,13 +174,13 @@ _SYMBOL_MODULES = {
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
     "clear_queue_dirty": "vibe3.services.shared.queue_dirty",
-    "emit_issue_failed": "vibe3.services.shared.events",
+    "emit_issue_failed": "vibe3.services.shared.binding_guard",
     "ensure_task_issue_bound": "vibe3.services.shared.binding_guard",
     "extract_role_from_actor": "vibe3.services.shared.actors",
     "format_agent_actor": "vibe3.services.shared.actors",
     "format_dry_run_header": "vibe3.services.shared.actors",
     "get_git_common_dir": "vibe3.services.shared.paths",
-    "get_role_block_function": "vibe3.services.shared.roles",
+    "get_role_block_function": "vibe3.services.shared.binding_guard",
     "get_state_labels": "vibe3.services.shared.labels",
     "get_worktree_root": "vibe3.services.shared.paths",
     "has_manager_assignee": "vibe3.services.shared.labels",

@@ -124,11 +124,3 @@ def material_loader(base_dir: Path) -> FileLoader[MaterialEntry]:
 def policy_loader(base_dir: Path) -> FileLoader[PolicyEntry]:
     """Create a loader for governance policy files (.yaml/.yml)."""
     return FileLoader(base_dir, suffixes=(".yaml", ".yml"), parser=_parse_policy)
-
-
-def resolve_manager_usernames() -> tuple[str, ...]:
-    """Resolve manager usernames from the same config source as ``vibe3 status``."""
-    from vibe3.config import get_config_with_env_override, get_manager_usernames
-
-    config = get_config_with_env_override()
-    return get_manager_usernames(config.orchestra)

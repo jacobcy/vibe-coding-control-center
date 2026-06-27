@@ -49,7 +49,7 @@
 
 ## 公共 API
 
-从 `__init__.py` 导出的 16 个符号：
+从 `__init__.py` 导出的 14 个符号：
 
 ### 编排服务（4 个）
 
@@ -79,27 +79,6 @@
 ### 协调（1 个）
 
 - `CoordinationResolver` - 协调状态解析器
-
-### Config Passthrough（2 个 - 已知反模式）
-
-- `get_manager_usernames` - 获取 manager 用户名列表
-- `get_handoff_state_label` - 获取 handoff 状态标签
-
-## 已知反模式
-
-### Passthrough Re-export
-
-`get_manager_usernames` 和 `get_handoff_state_label` 仅为 config 模块的 passthrough re-export，无额外逻辑：
-
-```python
-# 来自 __init__.py
-"get_manager_usernames": "vibe3.config",
-"get_handoff_state_label": "vibe3.config",
-```
-
-**影响**：增加 `services/orchestra` 的公共 API 复杂度，实际应由消费方直接从 `vibe3.config` 导入。
-
-**建议**：在 follow-up issue 中移除这两个 re-export，更新消费方导入路径。
 
 ## 内部依赖
 

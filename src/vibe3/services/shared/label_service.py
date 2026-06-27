@@ -152,10 +152,12 @@ class LabelService:
 
     def _get_all_state_labels(self, issue_number: int) -> list[str]:
         """Get all state/* labels of an issue."""
+        from vibe3.services.shared.labels import get_state_labels
+
         labels = self.issue_port.get_issue_labels(issue_number)
         if labels is None:
             return []
-        return [name for name in labels if name.startswith("state/")]
+        return get_state_labels(labels)
 
     def has_label(self, issue_number: int, label: str) -> bool:
         """Check whether an issue currently has the given label."""
