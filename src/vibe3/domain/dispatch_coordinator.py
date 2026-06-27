@@ -188,7 +188,7 @@ class GlobalDispatchCoordinator:
                 entries
             ),
             merge_queue_fn=lambda existing, fresh: self._merge_queue(existing, fresh),
-            should_collect_fn=lambda count, tick_id=0: (  # type: ignore[misc]
+            should_collect_fn=lambda count, tick_id=0: (  # type: ignore[misc]  # _tick_id unused
                 self._should_collect_after_dispatch(count)
             ),
             collect_frozen_queue_fn=lambda: self._collect_frozen_queue(),

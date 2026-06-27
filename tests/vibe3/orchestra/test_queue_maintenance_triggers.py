@@ -132,6 +132,55 @@ class TestQueueScheduledRefresh:
         assert len(collect_called) == 0
 
     @pytest.mark.asyncio
+    async def test_scheduled_refresh_skipped_during_sleep_mode(
+        self,
+        make_capacity,
+        make_coordinator,
+    ) -> None:
+        """scheduled_refresh skips collection on non-wakeup ticks during sleep.
+
+        When dispatch_paused=True, scheduled_refresh should only allow
+        collection on wake-up ticks (tick_id % sleep_check_interval_ticks == 0).
+        On other ticks, it should return early without calling collect_frozen_queue.
+        """
+        capacity = make_capacity(remaining=2)
+        coordinator = make_coordinator(
+            "planner", capacity=capacity, with_branches=True, mock_health_check=True
+        )
+
+        # Fire every 5 ticks, but sleep mode only wakes every 10 ticks
+        coordinator._config.queue_refresh.enabled = True
+        coordinator._config.queue_refresh.interval_ticks = 5
+        coordinator._config.pool_exhaustion.sleep_check_interval_ticks = 10
+
+        coordinator._dispatch_paused = True
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="ready")
+        ]
+
+        collect_called = []
+
+        async def mock_collect():
+            collect_called.append(True)
+            return [QueueEntry(issue_number=2, collected_state="handoff")]
+
+        coordinator._collect_frozen_queue = mock_collect
+        coordinator._has_dispatchable_entries = lambda _entries: False
+        coordinator._has_actionable_entries = MagicMock(return_value=False)
+
+        # Tick 5: queue_refresh fires but sleep mode should skip it
+        await coordinator.coordinate(tick_id=5)
+        assert (
+            len(collect_called) == 0
+        ), "scheduled_refresh should skip collection on non-wakeup tick during sleep"
+
+        # Tick 10: both queue_refresh and sleep mode wake-up tick — should fire
+        await coordinator.coordinate(tick_id=10)
+        assert (
+            len(collect_called) == 1
+        ), "scheduled_refresh should allow collection on wake-up tick during sleep"
+
+    @pytest.mark.asyncio
     async def test_scheduled_refresh_preserves_paused_when_nothing_dispatchable(
         self,
         make_capacity,
