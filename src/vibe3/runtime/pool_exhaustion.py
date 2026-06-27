@@ -48,6 +48,11 @@ def check_pool_exhaustion(
             append_orchestra_event("server", "entering sleep mode")
 
         # Wake-up check: every sleep_check_interval_ticks of being paused
+        # Note: This exhausted_ticks-based wake-up check may not align perfectly
+        # with tick_id-based collection wake-ups in dispatch_coordinator.
+        # exhausted_ticks measures wall-clock time since exhaustion started,
+        # while tick_id is the absolute server tick count. These counters
+        # can diverge when pause doesn't start at a multiple of the interval.
         if exhausted_ticks % pc.sleep_check_interval_ticks == 0:
             sleep_cycles += 1
             append_orchestra_event(

@@ -423,18 +423,11 @@ class HeartbeatServer:
                     )
                     self.stop()
 
-                # Check pool exhaustion (sleep mode logic)
-                self._exhausted_ticks, self._sleep_cycles = check_pool_exhaustion(
-                    self._dispatch_coordinator,
-                    self.config,
-                    self._exhausted_ticks,
-                    self._sleep_cycles,
-                    self.stop,
-                )
-
                 # Tick 1 cold-start: detect already-exhausted pool
                 # If coordinate() set dispatch_paused on first tick, initialize counter
                 # Only applies when auto_stop_on_exhaustion is enabled
+                # Must run BEFORE check_pool_exhaustion() so counter is initialized
+                # before that function increments it
                 if (
                     tick_number == 1
                     and self._dispatch_coordinator is not None
@@ -444,6 +437,15 @@ class HeartbeatServer:
                     if hasattr(self._dispatch_coordinator, "is_dispatch_paused"):
                         if self._dispatch_coordinator.is_dispatch_paused():  # type: ignore[union-attr]
                             self._exhausted_ticks = 1
+
+                # Check pool exhaustion (sleep mode logic)
+                self._exhausted_ticks, self._sleep_cycles = check_pool_exhaustion(
+                    self._dispatch_coordinator,
+                    self.config,
+                    self._exhausted_ticks,
+                    self._sleep_cycles,
+                    self.stop,
+                )
             finally:
                 _current_tick_id.reset(token)
 

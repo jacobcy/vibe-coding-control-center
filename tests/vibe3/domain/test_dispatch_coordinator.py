@@ -514,3 +514,77 @@ async def test_exhausted_refresh_pauses_on_aborted_only_queue():
         "when queue contains only aborted flows"
     )
     assert len(new_queue) == 1, "Queue should contain the collected aborted entry"
+
+
+def test_should_collect_after_dispatch_sleep_mode():
+    """Verify _should_collect_after_dispatch respects sleep mode wake-up ticks.
+
+    Plan requirement (Step 3): Unit test verifying sleep mode behavior:
+    - Returns False on non-wakeup ticks when dispatch_paused=True
+    - Returns True on wake-up ticks
+    """
+    from unittest.mock import MagicMock
+
+    from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.models import OrchestraConfig, PoolExhaustionConfig
+
+    # Create mock config with sleep mode enabled
+    mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.max_concurrent_flows = 1
+    mock_config.supervisor_handoff = MagicMock()
+    mock_config.supervisor_handoff.issue_label = "supervisor"
+    mock_config.pool_exhaustion = PoolExhaustionConfig(
+        auto_stop_on_exhaustion=True,
+        exhaustion_threshold_ticks=4,
+        sleep_check_interval_ticks=10,
+        max_sleep_cycles=3,
+    )
+
+    mock_capacity = MagicMock()
+    mock_github = MagicMock()
+    mock_store = MagicMock()
+    mock_flow_manager = MagicMock()
+    mock_flow_blocker = MagicMock()
+    mock_queue_persistence = MagicMock()
+    mock_issue_loader = MagicMock()
+    mock_flow_context_resolver = MagicMock()
+    mock_queue_selector = MagicMock()
+    mock_check_service = MagicMock()
+
+    # Create coordinator
+    coordinator = GlobalDispatchCoordinator(
+        config=mock_config,
+        capacity=mock_capacity,
+        github=mock_github,
+        store=mock_store,
+        flow_manager=mock_flow_manager,
+        flow_blocker=mock_flow_blocker,
+        queue_persistence=mock_queue_persistence,
+        issue_loader=mock_issue_loader,
+        flow_context_resolver=mock_flow_context_resolver,
+        queue_selector=mock_queue_selector,
+        check_service=mock_check_service,
+    )
+
+    # Set sleep mode state
+    coordinator._dispatch_paused = True
+
+    # Test: Non-wakeup tick (tick 7, interval 10)
+    coordinator._current_tick_id = 7
+    result = coordinator._should_collect_after_dispatch(dispatched_count=0)
+    assert result is False, "Should skip collection on non-wakeup tick during sleep"
+
+    # Test: Wake-up tick (tick 10, interval 10)
+    coordinator._current_tick_id = 10
+    result = coordinator._should_collect_after_dispatch(dispatched_count=0)
+    assert result is True, "Should allow collection on wake-up tick during sleep"
+
+    # Test: Another non-wakeup tick (tick 15, interval 10)
+    coordinator._current_tick_id = 15
+    result = coordinator._should_collect_after_dispatch(dispatched_count=0)
+    assert result is False, "Should skip collection on non-wakeup tick during sleep"
+
+    # Test: Another wake-up tick (tick 20, interval 10)
+    coordinator._current_tick_id = 20
+    result = coordinator._should_collect_after_dispatch(dispatched_count=0)
+    assert result is True, "Should allow collection on wake-up tick during sleep"
