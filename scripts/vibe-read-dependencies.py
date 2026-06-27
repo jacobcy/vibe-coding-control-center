@@ -129,7 +129,6 @@ def format_summary_output(config: dict[str, Any]) -> str:
 def format_json_output(config: dict[str, Any]) -> str:
     """输出 JSON 格式（供调试使用）"""
     import json
-
     return json.dumps(config, indent=2)
 
 

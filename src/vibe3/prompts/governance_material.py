@@ -11,9 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from vibe3.models import OrchestraConfig
-from vibe3.prompts import PromptManifest
-from vibe3.prompts.manifest import PromptRecipeDefinition
-from vibe3.prompts.models import PromptMaterialSpec
+from vibe3.prompts import PromptManifest, PromptMaterialSpec, PromptRecipeDefinition
 
 
 def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
