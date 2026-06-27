@@ -24,7 +24,7 @@
 
 ## 文件列表
 
-统计时间：2026-06-27
+统计时间：2026-06-28
 
 ### Label 体系
 
@@ -62,8 +62,8 @@
 | comment.py | 86 | Comment 类型检测 |
 | context_cache.py | 96 | Flow 上下文缓存服务 |
 | dependency_resolution.py | 117 | 依赖解析服务 |
-| file_loader.py | 134 | Material/Policy 文件加载器 |
-| loc.py | 154 | LOC 分析服务 |
+| file_loader.py | 126 | Material/Policy 文件加载器 |
+| loc.py | 141 | LOC 分析服务 |
 | queue_dirty.py | 72 | Queue dirty flag 管理 |
 | signatures.py | 127 | 签名管理服务 |
 | spec_ref.py | 271 | Spec 引用管理服务 |
@@ -71,7 +71,7 @@
 | timeline.py | 89 | Timeline 解析工具 |
 | versions.py | 121 | 版本管理服务 |
 
-**总计**：20 文件，3334 行
+**总计**：20 文件，3136 行
 
 ## 公共 API
 
@@ -102,18 +102,17 @@
 - `sanitize_event_detail_paths` - 规范化事件详情路径
 - `resolve_issue_branch_input` - 解析 issue branch 输入
 
-### 错误与事件（4 个）
+### 错误与事件（3 个）
 
 - `log_dispatch_error` - 记录分发错误
 - `has_recent_specific_error` - 检查最近特定错误
-- `emit_issue_failed` - 发射 issue 失败事件
+- `emit_issue_failed` - 发射 issue 失败事件（已合并到 binding_guard.py）
 
-### Actor 与角色（4 个）
+### Actor 与角色（3 个）
 
 - `format_agent_actor` - 格式化 agent actor
 - `format_dry_run_header` - 格式化 dry run header
 - `extract_role_from_actor` - 从 actor 提取角色
-- `get_role_block_function` - 获取角色 block 函数
 
 ### 其他服务（26 个）
 

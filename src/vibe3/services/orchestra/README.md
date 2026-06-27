@@ -13,14 +13,14 @@
 
 ## 文件列表
 
-统计时间：2026-06-27
+统计时间：2026-06-28
 
 ### 核心服务
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | orchestrator.py | 566 | FlowOrchestratorService - 主编排服务 |
-| status.py | 577 | OrchestraStatusService, IssueStatusEntry, OrchestraSnapshot - 状态聚合 |
+| status.py | 568 | OrchestraStatusService, IssueStatusEntry, OrchestraSnapshot - 状态聚合 |
 | serve_status.py | 524 | ServeStatusService - 服务状态展示 |
 | cleanup.py | 625 | 过期资源清理（branches, worktrees, handoff files）|
 
@@ -45,7 +45,7 @@
 | error_tracking/queries.py | 338 | 错误查询与分析 |
 | error_tracking/cleanup.py | 51 | 错误记录清理 |
 
-**总计**：12 文件，3427 行
+**总计**：12 文件，3418 行
 
 ## 公共 API
 
@@ -58,7 +58,7 @@
 - `OrchestraSnapshot` - 编排快照模型
 - `IssueStatusEntry` - Issue 状态条目模型
 
-### 错误处理（3 个）
+### 错误处理（4 个）
 
 - `ErrorTrackingService` - 错误追踪服务
 - `record_error` - 错误记录包装器
