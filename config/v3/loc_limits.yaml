@@ -136,8 +136,8 @@ code_limits:
         limit: 500
         reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低；Issue #2575 Protocol/DI 重构后新增公共 flow_service 属性（+5 行）供测试访问"
       - path: "src/vibe3/services/task/status.py"
-        limit: 460
-        reason: "Task status data aggregation for API endpoint and CLI display, includes system snapshot fetch, server status rendering, runtime versions, and configuration analysis (Issue #2787)"
+        limit: 480
+        reason: "Task status data aggregation for API endpoint and CLI display, includes system snapshot fetch, server status rendering, runtime versions, and configuration analysis (Issue #2787); Issue #3189 added terminal flow filtering in classify_task_issues_for_rendering (+8 lines)"
       - path: "src/vibe3/services/handoff/resolution.py"
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
