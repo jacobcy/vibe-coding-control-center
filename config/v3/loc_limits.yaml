@@ -236,8 +236,8 @@ code_limits:
         limit: 920
         reason: "审计阻塞流程分析脚本，Issue #2953 四层审计管线的一部分；包含 blocked flow detection、decision issue 搜索（通过 gh CLI）、观察记录生成、YAML 文件读写等紧密耦合的审计工具逻辑，与 audit-validate.py 互补"
       - path: "scripts/audit-validate.py"
-        limit: 760
-        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补"
+        limit: 770
+        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补；Issue #3194 新增 E501 noqa 注释后从 760 行增至 765 行"
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"
