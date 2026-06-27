@@ -56,7 +56,7 @@ Models 模块按职责分为多个类别：
 
 ### 1. 编排与配置（Orchestration & Config）
 
-- **orchestra_config.py**: 执行策略、并发控制、manager 配置（OrchestraConfig, CircuitBreakerConfig, GovernanceConfig 等）
+- **orchestra_config.py**: 执行策略、并发控制、manager 配置（OrchestraConfig, GovernanceConfig 等）
 - **orchestration.py**: IssueInfo、IssueState、StateTransition、ALLOWED_TRANSITIONS
 - **plan.py**: PlanRequest、PlanScope、PlanSpecInput
 
@@ -78,7 +78,7 @@ Models 模块按职责分为多个类别：
 ### 5. 审计（Audit）
 
 - **audit_decision.py**: AuditDecision
-- **audit_observation.py**: AuditObservation、ObservationSourceWindow
+- **audit_observation.py**: AuditObservation（ObservationSourceWindow 为内部模型）
 - **audit_suggestion.py**: AuditSuggestion
 
 ### 6. Job
@@ -131,21 +131,15 @@ Models 模块按职责分为多个类别：
 
 ## 公共 API
 
-`__init__.py` 导出以下 128 个符号（通过 lazy import）：
+`__init__.py` 导出以下 121 个符号（通过 lazy import）：
 
 ### 编排与配置
 
 - **OrchestraConfig**: Orchestra 主配置
-- **AssigneeDispatchConfig**: Assignee dispatch 配置
-- **CircuitBreakerConfig**: Circuit breaker 配置
 - **GovernanceConfig**: Governance 配置
 - **PeriodicCheckConfig**: Periodic check 配置
-- **PollingConfig**: Polling 配置
-- **PRReviewDispatchConfig**: PR review dispatch 配置
 - **QueueRefreshConfig**: Queue refresh 配置
-- **StateLabelDispatchConfig**: State label dispatch 配置
 - **SupervisorHandoffConfig**: Supervisor handoff 配置
-- **default_pid_file**: 默认 PID 文件路径
 - **IssueInfo**: Issue 信息模型
 - **IssueState**: Issue 状态枚举
 - **StateTransition**: 状态转换记录
@@ -209,7 +203,6 @@ Models 模块按职责分为多个类别：
 - **AuditDecision**: 审计决策
 - **AuditObservation**: 审计观察
 - **AuditSuggestion**: 审计建议
-- **ObservationSourceWindow**: 观察源窗口
 
 ### Job
 

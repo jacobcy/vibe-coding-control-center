@@ -19,7 +19,7 @@ from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
     from vibe3.models import CoordinationTruth, IssueInfo
 

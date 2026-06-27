@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
-from vibe3.config.orchestra_config import OrchestraConfig
+from vibe3.models import OrchestraConfig
 from vibe3.config.settings_check_cleanup import CheckCleanupSettings
 from vibe3.config.settings_pr import (
     FileChangeWeights,

@@ -37,7 +37,7 @@ if TYPE_CHECKING:
         get_handoff_state_label,
         get_manager_usernames,
     )
-    from vibe3.config.orchestra_config import OrchestraConfig
+    from vibe3.models import OrchestraConfig
     from vibe3.config.orchestra_settings import load_orchestra_config
     from vibe3.config.role_gates import (
         EXECUTOR_GATE_CONFIG,
@@ -78,12 +78,10 @@ if TYPE_CHECKING:
         DEFAULT_COMMENT_POLICY,
         TimelineCommentPolicy,
     )
-    from vibe3.models import BranchConvention
-
+    
 __all__ = [
     "AIConfig",
     "AgentPromptConfig",
-    "BranchConvention",
     "CodeLimitsConfig",
     "CodePathsConfig",
     "ConventionResolver",
@@ -143,7 +141,6 @@ __all__ = [
 _SYMBOL_MODULES = {
     "AIConfig": "vibe3.config.settings",
     "AgentPromptConfig": "vibe3.config.settings",
-    "BranchConvention": "vibe3.models.branch_convention",
     "CodeLimitsConfig": "vibe3.config.settings",
     "CodePathsConfig": "vibe3.config.settings",
     "ConventionResolver": "vibe3.config.convention_resolver",
@@ -172,7 +169,7 @@ _SYMBOL_MODULES = {
     "DEFAULT_COMMENT_POLICY": "vibe3.config.timeline_comment_policy",
     "VibeConfig": "vibe3.config.settings",
     "OVERRIDE_RULES": "vibe3.config.env_override",
-    "OrchestraConfig": "vibe3.config.orchestra_config",
+    "OrchestraConfig": "vibe3.models.orchestra_config",
     "PathsConfig": "vibe3.config.settings",
     "build_role_cli_overrides": "vibe3.config.cli_overrides",
     "diagnose_profile": "vibe3.config.convention_resolver",
