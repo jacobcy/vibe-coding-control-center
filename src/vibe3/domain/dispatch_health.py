@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
@@ -18,6 +18,17 @@ if TYPE_CHECKING:
 _TRANSIENT_ERROR_PREFIXES = ("Cannot verify", "No flow record")
 
 
+class EmitEventCallable(Protocol):
+    """Protocol for orchestra event emission callables.
+
+    Accepts category, message, and optional color keyword for ANSI highlighting.
+    """
+
+    def __call__(
+        self, category: str, message: str, *, color: str | None = None
+    ) -> None: ...
+
+
 class DispatchHealthService:
     """Pre-dispatch health check for branch and flow state."""
 
@@ -28,7 +39,7 @@ class DispatchHealthService:
         store: "SQLiteClient",
         flow_blocker: FlowServiceProtocol,
         flow_context: Callable[[int], tuple[str, dict[str, object] | None]],
-        emit_event: Callable[..., None],
+        emit_event: EmitEventCallable,
     ) -> None:
         self._check_service = check_service
         self._store = store

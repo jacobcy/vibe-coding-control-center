@@ -356,8 +356,8 @@ code_limits:
         limit: 502
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低；#2381 新增 test_dispatch_loop_rechecks_qualify_gate_for_ready_issue 测试验证 dispatch-time qualify gate recheck（+29 行）"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
-        limit: 600
-        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2765 新增 BLOCKED 重资格化和空队列日志抑制回归测试（+50 行）"
+        limit: 620
+        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2765 新增 BLOCKED 重资格化和空队列日志抑制回归测试（+50 行）；Issue #3192 新增 color 参数兼容的 capture_event mock（3 处 **kwargs 签名更新，+12 行），从 591 行增至 603 行"
       - path: "tests/vibe3/orchestra/test_queue_collection_ordering.py"
         limit: 410
         reason: "Queue collection ordering 测试集 (#2870)，覆盖 collection order、blocked requalification、merge behavior 三类测试，验证 state-first ordering semantics、exception handling、waiting_state preservation 等紧密耦合场景，11 个测试共享 fixture，拆分收益低"

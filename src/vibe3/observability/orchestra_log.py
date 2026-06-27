@@ -144,19 +144,15 @@ def append_orchestra_event(
     timestamp = datetime.now().isoformat(timespec="seconds")
 
     # Apply ANSI color if requested and stdout is a TTY
-    if color is not None and sys.stdout.isatty() and color in _COLOR_MAP:
+    if not message:
+        handle.write("\n")
+    elif color is not None and sys.stdout.isatty() and color in _COLOR_MAP:
         color_code = _COLOR_MAP[color]
-        if not message:
-            handle.write("\n")
-        else:
-            handle.write(
-                f"{color_code}[{timestamp}] [{component}] {message}{_COLOR_RESET}\n"
-            )
+        handle.write(
+            f"{color_code}[{timestamp}] [{component}] {message}{_COLOR_RESET}\n"
+        )
     else:
-        if not message:
-            handle.write("\n")
-        else:
-            handle.write(f"[{timestamp}] [{component}] {message}\n")
+        handle.write(f"[{timestamp}] [{component}] {message}\n")
 
     handle.flush()
     assert _events_path is not None
