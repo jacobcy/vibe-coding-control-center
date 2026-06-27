@@ -159,6 +159,7 @@ class OrchestrationFacade(ServiceBase):
             append_orchestra_event(
                 "server",
                 f"tick #{self._tick_count} supervisor scan failed: {exc}",
+                color="red_bold",
             )
             logger.bind(domain="orchestration_facade").error(
                 f"Supervisor scan failed: {exc}"
@@ -190,6 +191,7 @@ class OrchestrationFacade(ServiceBase):
                 append_orchestra_event(
                     "server",
                     f"tick #{self._tick_count} session reconciliation failed: {exc}",
+                    color="red_bold",
                 )
                 logger.bind(domain="orchestration_facade").error(
                     f"Session reconciliation failed: {exc}"

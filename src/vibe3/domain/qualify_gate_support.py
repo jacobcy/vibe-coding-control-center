@@ -24,10 +24,12 @@ if TYPE_CHECKING:
     from vibe3.models import CoordinationTruth, IssueInfo
 
 
-def _append_orchestra_event(channel: str, message: str) -> None:
+def _append_orchestra_event(
+    channel: str, message: str, *, color: str | None = None
+) -> None:
     from vibe3.observability import append_orchestra_event
 
-    append_orchestra_event(channel, message)
+    append_orchestra_event(channel, message, color=color)
 
 
 def terminalize_closed_issue(

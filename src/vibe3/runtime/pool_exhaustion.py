@@ -28,11 +28,13 @@ def check_pool_exhaustion(
         append_orchestra_event(
             "server",
             f"pool exhausted for {exhausted_ticks} consecutive tick(s)",
+            color="red",
         )
         if exhausted_ticks >= config.exhaustion_threshold_ticks:
             append_orchestra_event(
                 "server",
                 f"pool exhausted for {exhausted_ticks} ticks, stopping server",
+                color="red",
             )
             stop_callback()
     else:
