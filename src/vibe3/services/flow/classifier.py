@@ -59,7 +59,7 @@ def get_flow_state(flow: FlowStatusResponse) -> FlowState:
     """Get flow execution state for display grouping.
 
     Blocked status is inferred from blocked_reason presence rather than
-    flow_status, since blocked/failed were removed from flow_status literal.
+    flow_status, since blocked is not a flow_status value (Issue #3189).
 
     Args:
         flow: Flow status response

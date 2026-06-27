@@ -74,12 +74,17 @@ class FlowQueryProtocol(Protocol):
         ...
 
     def list_flows(
-        self, status: "Literal['active', 'blocked', 'done', 'stale'] | None" = None
+        self,
+        status: (
+            "Literal['active', 'blocked', 'done', 'stale',"
+            " 'review', 'failed', 'aborted'] | None"
+        ) = None,
     ) -> list["FlowStatusResponse"]:
         """List all flows, optionally filtered by status.
 
         Args:
-            status: Optional status filter (e.g., "active", "done", "blocked", "stale")
+            status: Optional status filter (e.g., "active", "done", "blocked", "stale",
+                "review", "failed", "aborted")
 
         Returns:
             List of flow status responses

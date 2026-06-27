@@ -266,7 +266,9 @@ def auto_resume_blocked(
         branch=branch,
         flow_slug=str(flow_state.get("flow_slug") or branch) if flow_state else branch,
         flow_status=cast(
-            Literal["active", "blocked", "done", "stale", "aborted"],
+            Literal[
+                "active", "blocked", "done", "stale", "review", "failed", "aborted"
+            ],
             flow_status_value,
         ),
         latest_actor="orchestra:qualify",

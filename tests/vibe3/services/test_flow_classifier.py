@@ -27,31 +27,45 @@ class TestGetFlowState:
 
     def test_existing_status_mappings_unchanged(self):
         """Existing status mappings should remain correct."""
-        assert get_flow_state(
-            FlowStatusResponse(
-                branch="t/active", flow_slug="s-active", flow_status="active"
+        assert (
+            get_flow_state(
+                FlowStatusResponse(
+                    branch="t/active", flow_slug="s-active", flow_status="active"
+                )
             )
-        ) == FlowState.ACTIVE
-        assert get_flow_state(
-            FlowStatusResponse(
-                branch="t/done", flow_slug="s-done", flow_status="done"
+            == FlowState.ACTIVE
+        )
+        assert (
+            get_flow_state(
+                FlowStatusResponse(
+                    branch="t/done", flow_slug="s-done", flow_status="done"
+                )
             )
-        ) == FlowState.DONE
-        assert get_flow_state(
-            FlowStatusResponse(
-                branch="t/stale", flow_slug="s-stale", flow_status="stale"
+            == FlowState.DONE
+        )
+        assert (
+            get_flow_state(
+                FlowStatusResponse(
+                    branch="t/stale", flow_slug="s-stale", flow_status="stale"
+                )
             )
-        ) == FlowState.STALE
-        assert get_flow_state(
-            FlowStatusResponse(
-                branch="t/aborted", flow_slug="s-aborted", flow_status="aborted"
+            == FlowState.STALE
+        )
+        assert (
+            get_flow_state(
+                FlowStatusResponse(
+                    branch="t/aborted", flow_slug="s-aborted", flow_status="aborted"
+                )
             )
-        ) == FlowState.ABORTED
+            == FlowState.ABORTED
+        )
 
     def test_blocked_inferred_from_blocked_reason(self):
         """Blocked status should be inferred from blocked_reason, not flow_status."""
         flow = FlowStatusResponse(
-            branch="t/blocked", flow_slug="s-blocked", flow_status="active",
+            branch="t/blocked",
+            flow_slug="s-blocked",
+            flow_status="active",
             blocked_reason="waiting for review",
         )
         assert get_flow_state(flow) == FlowState.BLOCKED

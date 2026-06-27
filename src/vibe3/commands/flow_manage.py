@@ -57,7 +57,7 @@ NameOption = Annotated[
     ),
 ]
 StatusFilterOption = Annotated[
-    Literal["active", "blocked", "done", "stale"] | None,
+    Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"] | None,
     typer.Option("--status", help="Filter by status"),
 ]
 BindRoleOption = Annotated[
