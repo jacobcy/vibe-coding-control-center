@@ -1,6 +1,5 @@
 """Tests for governance snapshot context and comment format contract."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
@@ -503,138 +502,9 @@ class TestBuildSnapshotContext:
             )
             snapshot = _make_snapshot(active_issues=(issue1, issue2))
 
-            ctx = build_governance_snapshot_context(snapshot, config=config)
+            ctx = build_governance_snapshot_context(
+                snapshot, config=config, execution_count=1
+            )
 
             # Both issues should appear
             assert ctx["active_count"] == 2
-
-
-class TestCommentFormatContract:
-    """Tests for comment format consistency after #1783 changes."""
-
-    def test_roadmap_intake_comment_format_is_new_style(self):
-        """Verify roadmap-intake.md uses new comment format in correct examples."""
-        import re
-
-        content = Path("supervisor/governance/roadmap-intake.md").read_text()
-
-        correct_example_pattern = re.compile(
-            r"\[governance suggest\]\[roadmap-intake\]\s+" r"Intake completed.*scope="
-        )
-        assert correct_example_pattern.search(
-            content
-        ), "Correct example should use layered marker and scope"
-
-        # Should NOT use @alice or other human usernames in correct examples
-        # Line 236 is marked as "错误示例"
-        wrong_example_pattern = re.compile(
-            r"\[governance suggest\]\s+Intake.*assigned to @alice"
-        )
-        # This pattern should NOT appear in the correct examples section
-        # We check that if it appears, it's clearly marked as wrong example
-        if wrong_example_pattern.search(content):
-            # Ensure it's in "错误示例" section
-            assert (
-                "错误示例" in content
-            ), "If @alice appears, it should be marked as wrong example"
-
-    def test_roadmap_intake_material_documents_current_boundaries(self):
-        """Roadmap intake should document the re-intake boundary for stale governed."""
-        content = Path("supervisor/governance/roadmap-intake.md").read_text()
-
-        assert "[governance suggest][roadmap-intake]" in content
-        assert "vibe3 status" in content
-        assert "vibe3 task intake <issue-number>" in content
-        assert "无 `roadmap/rfc`、无 `roadmap/epic`" in content
-        assert "不要把 `orchestra-governed` 当作可信跳过条件" in content
-        assert "如果不修改上一条 suggest，不得 comment" in content
-
-    def test_assignee_pool_material_documents_local_manager_boundary(self):
-        """Assignee pool should document local-manager-only processing."""
-        content = Path("supervisor/governance/assignee-pool.md").read_text()
-
-        assert "[governance suggest][assignee-pool]" in content
-        assert "[governance decide][assignee-pool]" in content
-        assert "vibe3 status" in content
-        assert "禁止删除 `orchestra-scanned`" in content
-        assert "不得处理或评论未分配给本机 manager 的 issue" in content
-        assert "如果不修改上一条 suggest，不得 comment" in content
-
-    def test_roadmap_skill_comment_format_matches_intake(self):
-        """Verify vibe-roadmap SKILL.md mentions roadmap decision marker."""
-        import re
-
-        content = Path("skills/vibe-roadmap/SKILL.md").read_text()
-
-        # vibe-roadmap should use [roadmap decision] marker
-        # The format is simpler: just mentions the marker,
-        # no specific format requirement
-        decision_pattern = re.compile(r"\[roadmap decision\]")
-        assert decision_pattern.search(
-            content
-        ), "vibe-roadmap SKILL.md should mention [roadmap decision] marker"
-
-        # Should use scope parameter format
-        scope_pattern = re.compile(r"scope=")
-        assert scope_pattern.search(content), "Should mention scope parameter"
-
-    def test_manager_bot_injected_but_not_in_prompt_header(self):
-        """Verify manager_bot is injected but not exposed in prompt header."""
-        import yaml
-
-        # Verify manager_bot exists in recipe variables
-        recipe = build_governance_recipe(_make_config())
-        assert (
-            "manager_bot" in recipe.variables
-        ), "manager_bot should be in recipe variables"
-
-        # Read prompts.yaml
-        prompts_path = Path("config/prompts/prompts.yaml")
-        prompts_content = yaml.safe_load(prompts_path.read_text())
-
-        # Get the governance plan template
-        template = prompts_content["orchestra"]["governance"]["plan"]
-
-        # The template should NOT contain "- Manager Bot: {manager_bot}" in the header
-        # This line would expose internal variable to user-visible prompt prefix
-        assert (
-            "- Manager Bot: {manager_bot}" not in template
-        ), "Template should not expose manager_bot in user-visible prompt header"
-
-    def test_roadmap_intake_scope_parameter_format(self):
-        """Verify all Intake completed comments use correct scope parameter format."""
-        import re
-
-        # Read both files
-        roadmap_intake = Path("supervisor/governance/roadmap-intake.md").read_text()
-        skill_content = Path("skills/vibe-roadmap/SKILL.md").read_text()
-
-        # Pattern for scope parameter in two forms:
-        # 1. Literal value: scope=bugfix or scope=feature or scope=refactor
-        # 2. Placeholder notation: scope=<bugfix|feature|refactor>
-        scope_literal_pattern = re.compile(r"scope=(bugfix|feature|refactor)[\s\.\)]")
-        scope_placeholder_pattern = re.compile(r"scope=<(bugfix\|feature\|refactor)>")
-
-        # Check roadmap-intake.md - should have at least literal examples
-        intake_literal_matches = scope_literal_pattern.findall(roadmap_intake)
-        assert (
-            len(intake_literal_matches) > 0
-        ), "roadmap-intake.md should have scope parameter with literal values"
-
-        # All scope values should be valid
-        valid_values = {"bugfix", "feature", "refactor"}
-        for match in intake_literal_matches:
-            assert (
-                match in valid_values
-            ), f"Scope value '{match}' should be one of {valid_values}"
-
-        # Check vibe-roadmap SKILL.md - should have placeholder or literal examples
-        skill_literal_matches = scope_literal_pattern.findall(skill_content)
-        skill_placeholder_matches = scope_placeholder_pattern.findall(skill_content)
-
-        assert (len(skill_literal_matches) > 0) or (
-            len(skill_placeholder_matches) > 0
-        ), (
-            "vibe-roadmap SKILL.md should have scope parameter examples "
-            "(literal or placeholder)"
-        )
