@@ -204,8 +204,8 @@ code_limits:
         limit: 480
         reason: "Error classification registry and helper functions (is_permanent_code_error, classify_error, ERROR_REGISTRY); Issue #3149 added E_DISPATCH_CODE_ERROR entry and is_permanent_code_error() classifier for permanent-vs-transient error distinction (+45 lines); Issue #3099 added E_AUP_REJECTION registry entry with block_after_retries contract and AUP text detection patterns (+30 lines)"
       - path: "tests/vibe3/orchestra/test_queue_maintenance_triggers.py"
-        limit: 500
-        reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发、scheduled refresh 完整生命周期（tick-based trigger、dirty signal consumer、queue rebuild verification）、pool exhaustion detection 等紧密耦合场景；Issue #3148 新增 exhausted queue rebuild 集成测试后从 401 行增至 481 行"
+        limit: 550
+        reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发、scheduled refresh 完整生命周期（tick-based trigger、dirty signal consumer、queue rebuild verification）、pool exhaustion detection 等紧密耦合场景；Issue #3148 新增 exhausted queue rebuild 集成测试后从 401 行增至 481 行；Issue #3190 新增 test_scheduled_refresh_skipped_during_sleep_mode 测试验证 sleep mode 下 scheduled_refresh 早期返回（+49 行）"
       - path: "tests/vibe3/services/test_flow_status.py"
         limit: 500
         reason: "Flow status 测试集，包含 TestDoneEligibility 终端状态配送确认测试（pr_ref fast-path removal、PRState.MERGED 支持、cached PR delivery confirmation等）；Issue #3189 新增 TestDoneEligibility 测试类（+99 行），当前 474 行"
@@ -389,6 +389,9 @@ code_limits:
       - path: "tests/vibe3/runtime/test_heartbeat.py"
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
+      - path: "tests/vibe3/runtime/test_pool_exhaustion.py"
+        limit: 520
+        reason: "Pool exhaustion 测试集，覆盖 counter increment/reset、threshold stop、sleep mode entry/wakeup/cycle counting/max cycles stop/unpause reset 等 11 个紧密耦合场景（7 sleep mode + 4 legacy）；Issue #3190 新增 sleep mode 测试后从 175 行增至 495 行（+320 行）"
 
       - path: "tests/vibe3/test_modularity/test_services_reexport_surface.py"
         limit: 500
@@ -472,8 +475,8 @@ code_limits:
         limit: 450
         reason: "Ask command 测试集，覆盖 input validation（4 tests）、forbidden patterns（6 tests）、execution logic with mocked backend（7 tests）、branch parameter（4 tests）等紧密耦合场景；新增 --branch 参数测试后从 299 行增至 443 行（+144 行）；所有测试围绕 ask 命令功能，拆分会降低可读性；仅超限 43 行（443 vs 400），符合 test exception 策略"
       - path: "tests/vibe3/domain/test_dispatch_coordinator.py"
-        limit: 550
-        reason: "GlobalDispatchCoordinator domain layer migration 测试集，覆盖 constructor DI verification、coordinate dispatch flow、queue lifecycle management、issue state handling、pool exhaustion detection 等紧密耦合场景；与源文件 dispatch_coordinator.py（limit 800）对应，测试 domain-first architecture 迁移后的协调器契约；PR #3101 新增 aborted flow exclusion 测试验证 pool exhaustion detection（+102 行含 integration test）"
+        limit: 600
+        reason: "GlobalDispatchCoordinator domain layer migration 测试集，覆盖 constructor DI verification、coordinate dispatch flow、queue lifecycle management、issue state handling、pool exhaustion detection 等紧密耦合场景；与源文件 dispatch_coordinator.py（limit 800）对应，测试 domain-first architecture 迁移后的协调器契约；PR #3101 新增 aborted flow exclusion 测试验证 pool exhaustion detection（+102 行含 integration test）；Issue #3190 新增 _should_collect_after_dispatch sleep mode 测试验证 wake-up tick 行为（+74 行）"
       - path: "src/vibe3/commands/status_render.py"
         limit: 450
         reason: "Status 渲染层，新增 render_missing_state_items 函数（+24行），显示缺少 state label 的 issue 列表，与其他渲染函数共享 console/config 依赖，拆分收益低"
