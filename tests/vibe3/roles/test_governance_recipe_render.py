@@ -137,9 +137,9 @@ class TestRenderGovernancePrompt:
             """),
             encoding="utf-8",
         )
-        material_path = tmp_path / "supervisor/governance/roadmap-intake.md"
+        material_path = tmp_path / "supervisor/governance/assignee-pool.md"
         material_path.parent.mkdir(parents=True)
-        material_path.write_text("GLOBAL ROADMAP INTAKE MATERIAL", encoding="utf-8")
+        material_path.write_text("GLOBAL ASSIGNEE POOL MATERIAL", encoding="utf-8")
         external_repo = tmp_path / "agent-mesh"
         external_repo.mkdir()
         monkeypatch.setenv("VIBE3_RUNTIME_ASSETS_ROOT", str(tmp_path))
@@ -156,14 +156,14 @@ class TestRenderGovernancePrompt:
             ctx,
             prompts_path,
             tick_count=0,
-            execution_count=0,
+            execution_count=1,
         )
 
         assert (
-            "Supervisor=supervisor/governance/roadmap-intake.md" in result.rendered_text
+            "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
         )
         # Materials load from disk via file source (issue #2167)
-        assert "GLOBAL ROADMAP INTAKE MATERIAL" in result.rendered_text
+        assert "GLOBAL ASSIGNEE POOL MATERIAL" in result.rendered_text
 
 
 class TestCrossRepoMaterialResolution:
