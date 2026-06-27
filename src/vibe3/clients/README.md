@@ -76,7 +76,7 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| runtime_assets.py | 167 | 运行时资源路径解析 |
+| runtime_assets.py | 132 | 运行时资源路径解析 |
 | store_context.py | 28 | Store context 上下文管理 |
 | sync_rules.py | 177 | 同步规则加载 |
 
@@ -96,13 +96,13 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| __init__.py | 186 | 模块导出（延迟加载） |
+| __init__.py | 183 | 模块导出（延迟加载） |
 
-**总计**：44 文件（37 主目录文件 + 7 protocols 子目录文件），约 8728 行
+**总计**：44 文件（37 主目录文件 + 7 protocols 子目录文件），约 8690 行
 
 ## 公共 API
 
-从 `__init__.py` 的 `__all__` 导出的 49 个符号，按功能分组：
+从 `__init__.py` 的 `__all__` 导出的 48 个符号，按功能分组：
 
 ### Git 客户端
 
@@ -167,7 +167,6 @@
 ### 运行时资源
 
 - `bundled_project_root` — Bundled 项目根路径
-- `check_runtime_asset` — 检查运行时资源
 - `resolve_prompt_config` — 解析 prompt config
 - `resolve_runtime_asset` — 解析运行时资源路径
 - `runtime_assets_root` — 运行时资源根路径
