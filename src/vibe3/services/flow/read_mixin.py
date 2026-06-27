@@ -169,7 +169,10 @@ class FlowReadMixin:
 
     def list_flows(
         self: Self,
-        status: Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"] | None = None,
+        status: Literal[
+            "active", "blocked", "done", "stale", "review", "failed", "aborted"
+        ]
+        | None = None,
     ) -> list[FlowStatusResponse]:
         """List flows with optional status filter."""
         logger.bind(

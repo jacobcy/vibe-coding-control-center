@@ -90,10 +90,12 @@ class FlowState(BaseModel):
     )
     blocked_reason: str | None = None  # Block reason text
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"] = "active"
+    flow_status: Literal[
+        "active", "blocked", "done", "stale", "review", "failed", "aborted"
+    ] = "active"
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
-    # "failed" removed (migrated to "active" or use blocked_reason field).
+    # "review", "failed", "aborted" are terminal states with PRs.
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -245,10 +247,12 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"]
+    flow_status: Literal[
+        "active", "blocked", "done", "stale", "review", "failed", "aborted"
+    ]
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
-    # "failed" removed (migrated to "active" or use blocked_reason field).
+    # "review", "failed", "aborted" are terminal states with PRs.
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
