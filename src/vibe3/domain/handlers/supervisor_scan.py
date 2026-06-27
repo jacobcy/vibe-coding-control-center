@@ -29,7 +29,7 @@ def handle_supervisor_issue_identified(
     """Dispatch supervisor apply via CLI self-invocation."""
     from vibe3.config import resolve_repo_agent_preset
     from vibe3.execution import build_issue_async_cli_request
-    from vibe3.observability import append_orchestra_event
+    from vibe3.observability import append_supervisor_event
     from vibe3.roles import SUPERVISOR_APPLY_ROLE
 
     config = load_orchestra_config()
@@ -40,8 +40,7 @@ def handle_supervisor_issue_identified(
         ).info("Dry run: skipping supervisor apply dispatch")
         return None
 
-    append_orchestra_event(
-        "supervisor",
+    append_supervisor_event(
         f"dispatch-intent #{event.issue_number} (supervisor)",
     )
 
@@ -90,14 +89,12 @@ def handle_supervisor_issue_identified(
                 )
                 # Append orchestra events for observability
                 if result and result.launched:
-                    append_orchestra_event(
-                        "supervisor",
+                    append_supervisor_event(
                         f"dispatched #{event.issue_number} "
                         f"session={result.tmux_session}",
                     )
                 elif result:
-                    append_orchestra_event(
-                        "supervisor",
+                    append_supervisor_event(
                         f"supervisor dispatch skipped: issue=#{event.issue_number} "
                         f"reason={result.reason}",
                     )
@@ -131,14 +128,12 @@ def handle_supervisor_issue_identified(
             )
             # Append orchestra events for observability
             if result and result.launched:
-                append_orchestra_event(
-                    "supervisor",
+                append_supervisor_event(
                     f"dispatched #{event.issue_number} "
                     f"session={result.tmux_session}",
                 )
             elif result:
-                append_orchestra_event(
-                    "supervisor",
+                append_supervisor_event(
                     f"supervisor dispatch skipped: issue=#{event.issue_number} "
                     f"reason={result.reason}",
                 )

@@ -1,6 +1,7 @@
 """Comprehensive unit tests for orchestra_log.py."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -331,5 +332,147 @@ def test_governance_event_format(tmp_path: Path, enable_event_log):
     assert "test message\n" in content
     # Check that it doesn't include [component] like events.log does
     assert "[governance]" not in content
+    # But it should have a timestamp
+    assert content.startswith("[")
+
+
+# Step 7: Test color parameter behavior (4 tests)
+
+
+def test_append_event_with_color_enabled(tmp_path: Path, enable_event_log, monkeypatch):
+    """append_orchestra_event embeds ANSI codes when color passed and isatty=True."""
+    # Mock stdout.isatty() to return True (terminal environment)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="green", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # ANSI green: \033[32m, reset: \033[0m
+    assert "\033[32m" in content
+    assert "\033[0m" in content
+    # Should still contain the message
+    assert "test message" in content
+
+
+def test_append_event_with_color_disabled_no_tty(
+    tmp_path: Path, enable_event_log, monkeypatch
+):
+    """append_orchestra_event does NOT embed ANSI when isatty=False (CI environment)."""
+    # Mock stdout.isatty() to return False (CI environment)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="green", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes
+    assert "\033[32m" not in content
+    assert "\033[0m" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content
+
+
+def test_append_event_with_color_none(tmp_path: Path, enable_event_log, monkeypatch):
+    """append_orchestra_event with color=None omits ANSI (baseline behavior)."""
+    # Even if isatty=True, color=None should produce plain output
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color=None, repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes
+    assert "\033[32m" not in content
+    assert "\033[0m" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content
+
+
+def test_append_event_with_unknown_color(tmp_path: Path, enable_event_log, monkeypatch):
+    """append_orchestra_event silently degrades unknown color name to plain output."""
+    # Mock stdout.isatty() to return True
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+
+    # Use a color name not in _COLOR_MAP
+    result = mod.append_orchestra_event(
+        "test_component", "test message", color="nonexistent_color", repo_root=tmp_path
+    )
+
+    assert result.exists()
+    content = result.read_text()
+
+    # Should NOT contain ANSI codes (silently degraded)
+    assert "\033[" not in content
+    # Should contain plain message
+    assert "[test_component] test message\n" in content
+
+
+# Step 8: Test supervisor log functions (4 tests)
+
+
+def test_supervisor_log_dir_and_events_path(tmp_path: Path):
+    """supervisor_log_dir returns subdirectory under orchestra dir.
+
+    supervisor_events_log_path returns supervisor.log inside the supervisor directory.
+    """
+    orchestra_dir = mod.orchestra_log_dir(repo_root=tmp_path)
+    supervisor_dir = mod.supervisor_log_dir(repo_root=tmp_path)
+
+    assert supervisor_dir == orchestra_dir / "supervisor"
+    assert supervisor_dir.exists()
+    assert supervisor_dir.is_dir()
+
+    events_path = mod.supervisor_events_log_path(repo_root=tmp_path)
+    assert events_path == supervisor_dir / "supervisor.log"
+
+
+def test_governance_scans_dir(tmp_path: Path):
+    """governance_scans_dir returns orchestra_log_dir / governance / scans.
+
+    The directory is created if it doesn't exist.
+    """
+    result = mod.governance_scans_dir(repo_root=tmp_path)
+    orchestra_dir = mod.orchestra_log_dir(repo_root=tmp_path)
+
+    assert result == orchestra_dir / "governance" / "scans"
+    assert result.exists()
+    assert result.is_dir()
+
+
+def test_supervisor_event_writes_to_both_files(tmp_path: Path, enable_event_log):
+    """append_supervisor_event writes to both supervisor.log and events.log."""
+    result = mod.append_supervisor_event("supervisor message", repo_root=tmp_path)
+
+    # Check supervisor.log
+    assert result.exists()
+    supervisor_content = result.read_text()
+    assert "supervisor message" in supervisor_content
+
+    # Check events.log (via delegation to append_orchestra_event)
+    events_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    assert events_path.exists()
+    events_content = events_path.read_text()
+    assert "supervisor message" in events_content
+    assert "[supervisor] supervisor message" in events_content
+
+
+def test_supervisor_event_format(tmp_path: Path, enable_event_log):
+    """append_supervisor_event writes [timestamp] message format to supervisor.log."""
+    result = mod.append_supervisor_event("test message", repo_root=tmp_path)
+
+    content = result.read_text()
+    assert "test message\n" in content
+    # Check that it doesn't include [component] like events.log does
+    assert "[supervisor]" not in content
     # But it should have a timestamp
     assert content.startswith("[")

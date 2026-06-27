@@ -22,8 +22,8 @@ from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
-    from vibe3.config import OrchestraConfig
     from vibe3.environment import SessionRegistryService
+    from vibe3.models import OrchestraConfig
     from vibe3.services.orchestra import OrchestraStatusService
 
 
@@ -97,7 +97,10 @@ def handle_governance_scan_started(
         resolve_orchestra_repo_root,
     )
     from vibe3.observability import append_governance_event
-    from vibe3.roles import build_governance_execution_name
+    from vibe3.prompts import (
+        build_governance_execution_name,
+        resolve_governance_material,
+    )
 
     config = load_orchestra_config()
 
@@ -149,7 +152,15 @@ def handle_governance_scan_started(
             reason_code="circuit_breaker_open",
         )
 
-    execution_name = build_governance_execution_name(event.tick_count)
+    # Resolve material: use override if provided, otherwise rotate from catalog
+    resolved_material = (
+        event.material_override
+        if event.material_override
+        else resolve_governance_material(config, event.execution_count)
+    )
+    execution_name = build_governance_execution_name(
+        event.tick_count, material=resolved_material
+    )
 
     # Build CLI self-invocation request (cmd field, no prompt)
     # This ensures the tmux wrapper calls 'internal governance <tick> <execution_count>'

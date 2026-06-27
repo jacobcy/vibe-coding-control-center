@@ -187,11 +187,11 @@ _LAZY_IMPORTS: dict[str, str] = {
     # governance
     "GOVERNANCE_ROLE": "vibe3.roles.governance",
     "GOVERNANCE_TASK_PROMPT": "vibe3.roles.governance",
-    "build_governance_execution_name": "vibe3.roles.governance",
+    "build_governance_execution_name": "vibe3.prompts.governance_material",
     "build_governance_recipe": "vibe3.roles.governance",
     "build_governance_request": "vibe3.roles.governance",
     "build_governance_snapshot_context": "vibe3.roles.governance",
-    "load_governance_material_catalog": "vibe3.roles.governance",
+    "load_governance_material_catalog": "vibe3.prompts.governance_material",
     "render_governance_prompt": "vibe3.roles.governance",
     "resolve_governance_options": "vibe3.roles.governance",
     # governance factory & utils

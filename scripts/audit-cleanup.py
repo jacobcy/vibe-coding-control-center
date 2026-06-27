@@ -175,7 +175,9 @@ def find_matching_files(
                 if report_file.exists():
                     matched_reports.append(report_file)
                     if verbose:
-                        print(f"  [report] matched explicit source report: {report_file.name}")
+                        print(
+                            f"  [report] matched explicit source report: {report_file.name}"  # noqa: E501
+                        )
         else:
             for report_file in sorted(reports_dir.glob("audit-report-*.md")):
                 try:
@@ -186,14 +188,18 @@ def find_matching_files(
                     linked_sug = fm.get("linked_suggestion_ids") or []
 
                     # Fallback for legacy issues that do not record Source report.
-                    obs_match = bool(set(linked_obs) & set(obs_ids)) if obs_ids else False
-                    sug_match = bool(set(linked_sug) & set(sug_ids)) if sug_ids else False
+                    obs_match = (
+                        bool(set(linked_obs) & set(obs_ids)) if obs_ids else False
+                    )
+                    sug_match = (
+                        bool(set(linked_sug) & set(sug_ids)) if sug_ids else False
+                    )
 
                     if obs_match or sug_match:
                         matched_reports.append(report_file)
                         if verbose:
                             print(
-                                f"  [report] matched legacy fallback: {report_file.name} "
+                                f"  [report] matched legacy fallback: {report_file.name} "  # noqa: E501
                                 f"(obs={obs_match}, sug={sug_match})"
                             )
                 except Exception:
@@ -230,9 +236,7 @@ def main() -> None:
     parser.add_argument(
         "--delete", action="store_true", help="Delete matched files (default: dry-run)"
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument(
         "--shared-dir",
         type=Path,
@@ -302,10 +306,14 @@ def main() -> None:
 
     # Print summary
     print(f"\n{'=== DRY RUN ===' if not args.delete else '=== DELETE ==='}")
-    print(f"Observations to {'delete' if args.delete else 'remove'}: {len(matched.observations)}")
+    print(
+        f"Observations to {'delete' if args.delete else 'remove'}: {len(matched.observations)}"  # noqa: E501
+    )
     for f in matched.observations:
         print(f"  {f}")
-    print(f"Suggestions to {'delete' if args.delete else 'remove'}: {len(matched.suggestions)}")
+    print(
+        f"Suggestions to {'delete' if args.delete else 'remove'}: {len(matched.suggestions)}"  # noqa: E501
+    )
     for f in matched.suggestions:
         print(f"  {f}")
     print(f"Reports to {'delete' if args.delete else 'remove'}: {len(matched.reports)}")

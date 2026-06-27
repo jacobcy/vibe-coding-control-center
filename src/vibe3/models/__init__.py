@@ -13,10 +13,7 @@ if TYPE_CHECKING:
     )
     from vibe3.models.adapter_manifest import AdapterManifest, AdapterResource
     from vibe3.models.audit_decision import AuditDecision
-    from vibe3.models.audit_observation import (
-        AuditObservation,
-        ObservationSourceWindow,
-    )
+    from vibe3.models.audit_observation import AuditObservation
     from vibe3.models.audit_suggestion import AuditSuggestion
     from vibe3.models.branch_convention import BranchConvention
     from vibe3.models.change_source import (
@@ -81,11 +78,8 @@ if TYPE_CHECKING:
         JobContext,
         JobEnvelope,
         JobResult,
-        JobSource,
     )
     from vibe3.models.orchestra_config import (
-        AssigneeDispatchConfig,
-        CircuitBreakerConfig,
         GovernanceConfig,
         OrchestraConfig,
         PeriodicCheckConfig,
@@ -95,7 +89,6 @@ if TYPE_CHECKING:
         QueueRefreshConfig,
         StateLabelDispatchConfig,
         SupervisorHandoffConfig,
-        default_pid_file,
     )
     from vibe3.models.orchestration import (
         ALLOWED_TRANSITIONS,
@@ -155,7 +148,6 @@ _LAZY_IMPORTS = {
     "AuditDecision": "vibe3.models.audit_decision",
     "AuditObservation": "vibe3.models.audit_observation",
     "AuditSuggestion": "vibe3.models.audit_suggestion",
-    "ObservationSourceWindow": "vibe3.models.audit_observation",
     "ControlPlaneEventPublished": "vibe3.models.domain_events",
     "DomainEvent": "vibe3.models.domain_events",
     "ExecutorDispatchIntent": "vibe3.models.domain_events",
@@ -256,9 +248,6 @@ _LAZY_IMPORTS = {
     "ACTOR_ALIAS_MAP": "vibe3.models.actor_utils",
     "AdapterManifest": "vibe3.models.adapter_manifest",
     "AdapterResource": "vibe3.models.adapter_manifest",
-    "AssigneeDispatchConfig": "vibe3.models.orchestra_config",
-    "CircuitBreakerConfig": "vibe3.models.orchestra_config",
-    "default_pid_file": "vibe3.models.orchestra_config",
     "DISPLAY_PLACEHOLDER_ACTORS": "vibe3.models.actor_utils",
     "EventHandler": "vibe3.models.event_bus",
     "EventPublisher": "vibe3.models.event_bus",
@@ -274,7 +263,6 @@ _LAZY_IMPORTS = {
     "QueueRefreshConfig": "vibe3.models.orchestra_config",
     "publish": "vibe3.models.event_bus",
     "publish_and_wait": "vibe3.models.event_bus",
-    "StateLabelDispatchConfig": "vibe3.models.orchestra_config",
     "subscribe": "vibe3.models.event_bus",
     "CommandType": "vibe3.models.job",
     "JobContext": "vibe3.models.job",
@@ -341,6 +329,7 @@ __all__: list[str] = [
     "FlowStatusResponse",
     "FORBIDDEN_TRANSITIONS",
     "FunctionSnapshot",
+    "GovernanceConfig",
     "IssueFailed",
     "IssueInfo",
     "IssueLink",
@@ -348,7 +337,6 @@ __all__: list[str] = [
     "JobContext",
     "JobEnvelope",
     "JobResult",
-    "JobSource",
     "LayerCoverage",
     "MainBranchProtectedError",
     "ManagerDispatchIntent",
@@ -359,7 +347,7 @@ __all__: list[str] = [
     "ModuleSnapshot",
     "normalize_actor",
     "OrchestraConfig",
-    "ObservationSourceWindow",
+    "PeriodicCheckConfig",
     "PRCriticalAnalysis",
     "PRMetadata",
     "PRMerged",
@@ -403,12 +391,10 @@ __all__: list[str] = [
     "ACTOR_ALIAS_MAP",
     "AdapterManifest",
     "AdapterResource",
-    "AssigneeDispatchConfig",
-    "CircuitBreakerConfig",
-    "default_pid_file",
     "DISPLAY_PLACEHOLDER_ACTORS",
     "EventHandler",
     "EventPublisher",
+    "PLACEHOLDER_ACTORS",
     "PublishHook",
     "format_result_entries",
     "get_publisher",
@@ -419,9 +405,9 @@ __all__: list[str] = [
     "PoolExhaustionConfig",
     "PRReviewDispatchConfig",
     "QueueRefreshConfig",
+    "StateLabelDispatchConfig",
     "publish",
     "publish_and_wait",
-    "StateLabelDispatchConfig",
     "subscribe",
     "validate_transition",
 ]

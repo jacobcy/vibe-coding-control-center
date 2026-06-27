@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import IO
@@ -38,6 +39,82 @@ def governance_events_log_path(repo_root: Path | None = None) -> Path:
 
 def governance_dry_run_dir(repo_root: Path | None = None) -> Path:
     path = governance_log_dir(repo_root) / "dry-run"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# ANSI color codes for terminal event highlighting
+_COLOR_MAP: dict[str, str] = {
+    "green": "\033[32m",
+    "yellow": "\033[33m",
+    "red": "\033[31m",
+    "magenta": "\033[35m",
+    "cyan": "\033[36m",
+    "blue": "\033[34m",
+    "gray": "\033[90m",
+    "red_bold": "\033[1;31m",
+}
+_COLOR_RESET = "\033[0m"
+
+
+def governance_scans_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for governance scan logs."""
+    path = governance_log_dir(repo_root) / "scans"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def supervisor_log_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for supervisor logs."""
+    path = orchestra_log_dir(repo_root) / "supervisor"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def supervisor_events_log_path(repo_root: Path | None = None) -> Path:
+    """Return the path to supervisor.log."""
+    return supervisor_log_dir(repo_root) / "supervisor.log"
+
+
+def tick_log_dir(date_str: str | None = None, repo_root: Path | None = None) -> Path:
+    """Return the directory for per-tick event snapshots.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format. Defaults to today.
+        repo_root: Optional repository root path.
+
+    Returns:
+        Path like orchestra_log_dir / "by-tick" / "2026-06-27"
+    """
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    path = orchestra_log_dir(repo_root) / "by-tick" / date_str
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def tick_log_path(
+    tick_count: int,
+    *,
+    date_str: str | None = None,
+    repo_root: Path | None = None,
+) -> Path:
+    """Return the path for a specific tick's event log.
+
+    Args:
+        tick_count: Tick number
+        date_str: Date string in YYYY-MM-DD format. Defaults to today.
+        repo_root: Optional repository root path.
+
+    Returns:
+        Path like orchestra_log_dir / "by-tick" / "2026-06-27" / "tick-0004.log"
+    """
+    return tick_log_dir(date_str, repo_root) / f"tick-{tick_count:04d}.log"
+
+
+def issues_log_dir(repo_root: Path | None = None) -> Path:
+    """Return the directory for issue execution logs under orchestra."""
+    path = orchestra_log_dir(repo_root) / "issues"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -95,6 +172,7 @@ def append_orchestra_event(
     *,
     level: str = "INFO",
     repo_root: Path | None = None,
+    color: str | None = None,
 ) -> Path:
     """Append an event to the orchestra events log.
 
@@ -103,6 +181,14 @@ def append_orchestra_event(
 
     Uses a module-level persistent file handle to avoid FD exhaustion
     from repeated open/close on every heartbeat tick.
+
+    Args:
+        component: Component name (e.g., 'dispatcher', 'server')
+        message: Event message
+        level: Log level (DEBUG, INFO, WARNING, ERROR)
+        repo_root: Optional repository root path
+        color: Optional color name for ANSI highlighting (green, yellow, red, etc.)
+               Only applied when stdout is a TTY (terminal environment)
 
     Returns:
         Path to the events.log file (consistent return type)
@@ -118,10 +204,18 @@ def append_orchestra_event(
 
     handle = _ensure_events_handle(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
+
+    # Apply ANSI color if requested and stdout is a TTY
     if not message:
         handle.write("\n")
+    elif color is not None and sys.stdout.isatty() and color in _COLOR_MAP:
+        color_code = _COLOR_MAP[color]
+        handle.write(
+            f"{color_code}[{timestamp}] [{component}] {message}{_COLOR_RESET}\n"
+        )
     else:
         handle.write(f"[{timestamp}] [{component}] {message}\n")
+
     handle.flush()
     assert _events_path is not None
     return _events_path
@@ -151,18 +245,53 @@ def append_orchestra_run_separator(
     return _events_path
 
 
-def append_governance_event(message: str, *, repo_root: Path | None = None) -> Path:
+def append_governance_event(
+    message: str, *, repo_root: Path | None = None, color: str | None = None
+) -> Path:
     """Append a governance event to both governance.log and events.log.
 
     Uses append mode and delegates to append_orchestra_event for events.log
     to benefit from persistent file handle.
+
+    Args:
+        message: Governance event message
+        repo_root: Optional repository root path
+        color: Optional color for events.log (governance.log remains plain text)
+
+    Returns:
+        Path to the governance.log file
     """
     path = governance_events_log_path(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{timestamp}] {message}\n")
     # Delegate to append_orchestra_event to use persistent handle
-    append_orchestra_event("governance", message, repo_root=repo_root)
+    append_orchestra_event("governance", message, repo_root=repo_root, color=color)
+    return path
+
+
+def append_supervisor_event(
+    message: str, *, repo_root: Path | None = None, color: str | None = None
+) -> Path:
+    """Append a supervisor event to both supervisor.log and events.log.
+
+    Mirrors append_governance_event implementation: writes to component-specific
+    log file and delegates to append_orchestra_event for events.log.
+
+    Args:
+        message: Supervisor event message
+        repo_root: Optional repository root path
+        color: Optional color for events.log (supervisor.log remains plain text)
+
+    Returns:
+        Path to the supervisor.log file
+    """
+    path = supervisor_events_log_path(repo_root)
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(f"[{timestamp}] {message}\n")
+    # Delegate to append_orchestra_event to use persistent handle
+    append_orchestra_event("supervisor", message, repo_root=repo_root, color=color)
     return path
 
 

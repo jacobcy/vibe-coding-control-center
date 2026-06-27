@@ -496,3 +496,90 @@ class TestClosedPRIdempotency:
             # ASSERT: Should handle
             assert handled is True
             mock_reset.assert_called_once()
+
+
+class TestMergedPRPreservesTerminalState:
+    """Issue #3189: PR-backed terminal states (review/failed) must route through
+    the phase-completion eligibility check on PR merge, not be blindly marked done.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _mock_snapshot(self):
+        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
+            yield
+
+    def _make_pr_service(self, tmp_path):
+        from vibe3.clients.git_client import GitClient
+        from vibe3.services.check.pr_service import CheckPRService
+        from vibe3.services.flow.status import FlowStatusService
+
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        git_client = MagicMock(spec=GitClient)
+        github_client = MagicMock(spec=GitHubClient)
+        flow_status_service = FlowStatusService(
+            store, git_client=git_client, github_client=github_client
+        )
+        service = CheckPRService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+            flow_status_service=flow_status_service,
+        )
+        return store, service
+
+    def _merged_pr(self) -> PRResponse:
+        return PRResponse(
+            number=42,
+            title="Merged PR",
+            state=PRState.MERGED,
+            head_branch="task/issue-3189",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            merged_at="2026-06-27T00:00:00Z",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+
+    def test_failed_flow_merged_pr_incomplete_phases_preserved(self, tmp_path):
+        """failed + merged PR + incomplete phases → stays failed (Issue #3189).
+
+        Must NOT be blindly marked done without the phase-completion check.
+        """
+        store, service = self._make_pr_service(tmp_path)
+        store.update_flow_state(
+            "task/issue-3189",
+            flow_slug="issue_3189",
+            flow_status="failed",
+            planner_status="done",
+            executor_status="running",  # incomplete
+            reviewer_status="done",
+        )
+
+        handled, _issues, _warnings = service.handle_pr_terminal_state(
+            "task/issue-3189", self._merged_pr()
+        )
+
+        assert handled is True
+        flow = store.get_flow_state("task/issue-3189")
+        assert flow["flow_status"] == "failed"
+
+    def test_review_flow_merged_pr_all_phases_done_transitions_to_done(self, tmp_path):
+        """review + merged PR + all phases done → transitions to done (Issue #3189)."""
+        store, service = self._make_pr_service(tmp_path)
+        store.update_flow_state(
+            "task/issue-3189",
+            flow_slug="issue_3189",
+            flow_status="review",
+            planner_status="done",
+            executor_status="done",
+            reviewer_status="done",
+        )
+
+        handled, _issues, _warnings = service.handle_pr_terminal_state(
+            "task/issue-3189", self._merged_pr()
+        )
+
+        assert handled is True
+        flow = store.get_flow_state("task/issue-3189")
+        assert flow["flow_status"] == "done"

@@ -47,8 +47,9 @@ def _migrate_flow_status_value(v: str | None) -> str | None:
     if v == "merged":
         return "done"
     # "blocked" restored for remote sync semantics
-    # Legacy "failed" and "waiting" migrated to "active"
-    if v in ("failed", "waiting"):
+    # Issue #3189: "failed" is now a valid terminal state (with PRs)
+    # Legacy "waiting" migrated to "active"
+    if v == "waiting":
         return "active"
     return v
 
@@ -90,10 +91,12 @@ class FlowState(BaseModel):
     )
     blocked_reason: str | None = None  # Block reason text
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
+    flow_status: Literal[
+        "active", "blocked", "done", "stale", "review", "failed", "aborted"
+    ] = "active"
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
-    # "failed" removed (migrated to "active" or use blocked_reason field).
+    # "review", "failed", "aborted" are terminal states with PRs.
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -245,10 +248,12 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
+    flow_status: Literal[
+        "active", "blocked", "done", "stale", "review", "failed", "aborted"
+    ]
     # Note: "blocked" restored for remote sync semantics.
     # Blocked state is tracked in flow_status (not just inferred from label).
-    # "failed" removed (migrated to "active" or use blocked_reason field).
+    # "review", "failed", "aborted" are terminal states with PRs.
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation

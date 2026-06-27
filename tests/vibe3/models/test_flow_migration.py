@@ -30,13 +30,32 @@ class TestFlowStatusMigration:
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="blocked")
         assert flow.flow_status == "blocked"
 
-    def test_failed_status_migrated_to_active(self):
-        """Test that 'failed' status is migrated to 'active'.
+    def test_failed_status_preserved(self):
+        """Test that 'failed' status is preserved as a valid terminal state.
 
-        Failed unified to blocked (2026-04-28).
+        Issue #3189: 'failed' is now a valid flow_status for flows with PRs.
+        The legacy migration (failed→active) has been removed.
         """
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="failed")
-        assert flow.flow_status == "active"
+        assert flow.flow_status == "failed"
+
+    def test_failed_status_preserved_in_from_state(self):
+        """Test that 'failed' status is preserved through from_state (DB read path).
+
+        This verifies the fix for Issue #3189 Critical #1: the field_validator
+        no longer converts 'failed' to 'active' when reading from the database.
+        """
+        from vibe3.models.flow import FlowStatusResponse
+
+        response = FlowStatusResponse.from_state(
+            {
+                "branch": "task/issue-fail",
+                "flow_slug": "issue-fail",
+                "flow_status": "failed",
+                "task_issue_number": 12345,
+            }
+        )
+        assert response.flow_status == "failed"
 
     def test_done_status_unchanged(self):
         """Test that 'done' status is not modified."""

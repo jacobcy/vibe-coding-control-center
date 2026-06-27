@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from vibe3.config.branch_convention import BranchConvention
 from vibe3.config.profile_convention import LabelsConvention, ProfileConvention
+from vibe3.models import BranchConvention
 
 
 def test_labels_convention_minimal_defaults():

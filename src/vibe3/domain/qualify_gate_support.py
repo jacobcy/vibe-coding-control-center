@@ -19,15 +19,16 @@ from vibe3.services.task import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.clients import GitHubClient, SQLiteClient
-    from vibe3.config import OrchestraConfig
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
-    from vibe3.models import CoordinationTruth, IssueInfo
+    from vibe3.models import CoordinationTruth, IssueInfo, OrchestraConfig
 
 
-def _append_orchestra_event(channel: str, message: str) -> None:
+def _append_orchestra_event(
+    channel: str, message: str, *, color: str | None = None
+) -> None:
     from vibe3.observability import append_orchestra_event
 
-    append_orchestra_event(channel, message)
+    append_orchestra_event(channel, message, color=color)
 
 
 def terminalize_closed_issue(
@@ -51,13 +52,15 @@ def terminalize_closed_issue(
 
     flow_state = store.get_flow_state(branch)
     current_status = flow_state.get("flow_status") if flow_state else None
-    if current_status not in ("done", "aborted"):
+    # Issue #3189: review/failed are PR-backed terminal states — preserve them
+    # like aborted (route through eligibility heuristic instead of overwriting).
+    if current_status not in ("done", "aborted", "review", "failed"):
         flow_status_service_cls(
             store=store,
             git_client=flow_manager.git,
             github_client=github,
         ).mark_flow_aborted(branch, f"Issue #{issue.number} closed on GitHub")
-    elif current_status == "aborted" and flow_state:
+    elif current_status in ("aborted", "review", "failed") and flow_state:
         # Heuristic: all phases done + PR merged → transition to done
         flow_status_service = flow_status_service_cls(
             store=store,
@@ -265,7 +268,15 @@ def auto_resume_blocked(
         branch=branch,
         flow_slug=str(flow_state.get("flow_slug") or branch) if flow_state else branch,
         flow_status=cast(
-            Literal["active", "blocked", "done", "stale", "aborted"],
+            Literal[
+                "active",
+                "blocked",
+                "done",
+                "stale",
+                "review",
+                "failed",
+                "aborted",
+            ],
             flow_status_value,
         ),
         latest_actor="orchestra:qualify",

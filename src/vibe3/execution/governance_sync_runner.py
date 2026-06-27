@@ -199,8 +199,9 @@ def run_governance_sync(
 def run_governance_async(
     *,
     tick_count: int = 0,
+    execution_count: int = 0,
     material_override: str | None = None,
-    build_execution_name: Callable[[int], str],
+    build_execution_name: Callable[[int, str | None], str],
 ) -> None:
     """Run governance scan in background tmux session (async).
 
@@ -210,8 +211,10 @@ def run_governance_async(
 
     Args:
         tick_count: Tick number for governance material rotation
+        execution_count: Execution count for material rotation
         material_override: Optional governance role to override material rotation
-        build_execution_name: Injected execution name builder (required)
+        build_execution_name: Injected execution name builder
+            (required, accepts tick and optional material)
     """
     from vibe3.environment import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
@@ -220,6 +223,7 @@ def run_governance_async(
         resolve_orchestra_repo_root,
     )
     from vibe3.observability import append_governance_event
+    from vibe3.prompts import resolve_governance_material
     from vibe3.services.orchestra import OrchestraStatusService
 
     repo = resolve_orchestra_repo_root()
@@ -264,7 +268,13 @@ def run_governance_async(
         echo("Governance dispatch skipped: circuit breaker is OPEN")
         return
 
-    execution_name = build_execution_name(tick_count)
+    # Resolve material: use override if provided, otherwise rotate from catalog
+    resolved_material = (
+        material_override
+        if material_override
+        else resolve_governance_material(config, execution_count)
+    )
+    execution_name = build_execution_name(tick_count, resolved_material)
 
     # Build CLI self-invocation command
     command_root = resolve_async_cli_project_root(root)

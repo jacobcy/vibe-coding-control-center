@@ -41,6 +41,7 @@ def check_pool_exhaustion(
         append_orchestra_event(
             "server",
             f"pool exhausted for {exhausted_ticks} consecutive tick(s)",
+            color="red",
         )
 
         # Enter sleep mode at threshold (no immediate stop)
@@ -58,11 +59,15 @@ def check_pool_exhaustion(
             append_orchestra_event(
                 "server",
                 f"sleep wake-up #{sleep_cycles}: still exhausted",
+                color="yellow",
             )
             if pc.max_sleep_cycles > 0 and sleep_cycles >= pc.max_sleep_cycles:
                 append_orchestra_event(
                     "server",
-                    f"max sleep cycles reached ({pc.max_sleep_cycles}), stopping server",
+                    (
+                        f"max sleep cycles reached ({pc.max_sleep_cycles}), "
+                        "stopping server"
+                    ),
                 )
                 stop_callback()
     else:

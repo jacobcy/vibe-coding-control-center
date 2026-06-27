@@ -233,7 +233,9 @@ class TestDispatchLoopRemovalLogs:
 
         events: list[str] = []
 
-        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+        def capture_event(
+            _category: str, message: str, level: str = "INFO", **kwargs
+        ) -> None:
             _ = level
             events.append(message)
 
@@ -288,7 +290,9 @@ class TestDispatchLoopRemovalLogs:
 
         events: list[str] = []
 
-        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+        def capture_event(
+            _category: str, message: str, level: str = "INFO", **kwargs
+        ) -> None:
             _ = level
             events.append(message)
 

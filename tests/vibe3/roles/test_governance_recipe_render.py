@@ -103,7 +103,7 @@ class TestRenderGovernancePrompt:
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
         assert (
-            "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
+            "Supervisor=supervisor/governance/roadmap-intake.md" in result.rendered_text
         )
         assert "Status=running" in result.rendered_text
 
@@ -156,7 +156,7 @@ class TestRenderGovernancePrompt:
             ctx,
             prompts_path,
             tick_count=0,
-            execution_count=1,
+            execution_count=0,
         )
 
         assert (

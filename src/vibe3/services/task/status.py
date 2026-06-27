@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     pass
 
 
+NON_ACTIVE_TASK_FLOW_STATUSES = frozenset({"done", "review", "failed", "aborted"})
+
+
 @dataclass
 class TaskStatusData:
     """Container for all data needed by task status dashboard."""
@@ -92,6 +95,13 @@ def fetch_task_status_data(
 
     stale_flows = service.list_flows(status="stale") if not all_flows else []
 
+    # Fetch review/failed/aborted flows for issue-to-flow mapping.
+    # Batched into one SQL WHERE flow_status IN (...) round-trip (Issue #3189).
+    # These are terminal states with PRs that should show in "Flows with PRs" section.
+    extra_flows: list[FlowStatusResponse] = []
+    if not all_flows:
+        extra_flows = service.list_flows(statuses=["review", "failed", "aborted"])
+
     # Fetch orchestrated issues
     queued_set = set(orch_snapshot.queued_issues)
     query_service = StatusQueryService(repo=config.repo)
@@ -99,6 +109,7 @@ def fetch_task_status_data(
         flows,
         queued_set,
         stale_flows=stale_flows,
+        extra_flows=extra_flows,
         manager_usernames=get_manager_usernames(config),
         supervisor_label=config.supervisor_handoff.issue_label,
     )
@@ -264,6 +275,9 @@ def classify_task_issues_for_rendering(
     }
     for item in non_remote_items:
         state = cast(IssueState | None, item["state"])
+        flow = cast(FlowStatusResponse | None, item.get("flow"))
+        if flow and flow.flow_status in NON_ACTIVE_TASK_FLOW_STATUSES:
+            continue
         if state == IssueState.DONE:
             continue
         # Blocked issues have dedicated section, skip bucketing

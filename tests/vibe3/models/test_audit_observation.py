@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from vibe3.models import AuditObservation, ObservationSourceWindow
+from vibe3.models import AuditObservation
+from vibe3.models.audit_observation import ObservationSourceWindow
 
 
 class TestObservationSourceWindow:

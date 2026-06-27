@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients import GitClient, GitHubClient, SQLiteClient
-from vibe3.models import IssueState
+from vibe3.models import IssueState, PRState
 
 if TYPE_CHECKING:
     from vibe3.models import PRResponse
@@ -260,8 +260,8 @@ class FlowStatusService:
 
         Eligibility requires BOTH:
         - All lifecycle phases done (planner/executor/reviewer)
-        - Delivery confirmed: ``pr_ref`` cached in flow record, ``cached_pr``
-          merged, or a merged PR found via GitHub lookup
+        - Delivery confirmed by a merged cached PR or a merged PR found via
+          GitHub lookup. ``pr_ref`` only proves that a PR was created.
 
         Pass ``cached_pr`` to skip the GitHub API call when the caller already
         has PR data (e.g., CheckContext.branch_pr).
@@ -277,31 +277,20 @@ class FlowStatusService:
         if not all(s == "done" for s in phase_statuses):
             return (False, None)
 
-        # Fast path: pr_ref cached in flow record
-        if flow_state.get("pr_ref"):
-            return (True, _coerce_pr_number(flow_state.get("pr_number")))
-
         # Cached PR from caller (e.g., CheckContext.branch_pr)
-        if cached_pr is not None and cached_pr.merged_at is not None:
+        if cached_pr is not None and (
+            cached_pr.merged_at is not None or cached_pr.state == PRState.MERGED
+        ):
             return (True, cached_pr.number)
 
         # Slow path: query GitHub for merged PR
         try:
             prs = self.github_client.list_prs_for_branch(branch)
             for pr in prs:
-                if pr.merged_at is not None:
+                if pr.merged_at is not None or pr.state == PRState.MERGED:
                     return (True, pr.number)
         except Exception as e:
             logger.warning(
                 f"PR lookup failed for aborted→done eligibility on {branch}: {e}"
             )
         return (False, None)
-
-
-def _coerce_pr_number(value: object) -> int | None:
-    """Coerce a flow_state pr_number value to int | None."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    return None

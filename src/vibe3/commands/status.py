@@ -30,6 +30,10 @@ from vibe3.utils import format_age_aware_time
 if TYPE_CHECKING:
     from vibe3.services.orchestra import OrchestraSnapshot
 
+# Issue #3189: review/failed are PR-backed terminal states shown in completed.
+# "merged" is a historical status migrated to "done" by FlowState.
+COMPLETED_FLOW_STATUSES = frozenset({"done", "aborted", "merged", "review", "failed"})
+
 
 def _resolve_server_label(
     config: OrchestraConfig, snapshot_found: bool, server_running: bool
@@ -403,7 +407,7 @@ def _full_status_dashboard(
         completed_flows = [
             flow
             for flow in data.flows
-            if getattr(flow, "flow_status", "active") in {"done", "aborted", "merged"}
+            if getattr(flow, "flow_status", "active") in COMPLETED_FLOW_STATUSES
         ]
         render_completed_flows(completed_flows)
 

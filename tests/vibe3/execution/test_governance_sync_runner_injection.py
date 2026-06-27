@@ -265,7 +265,9 @@ class TestGovernanceAsyncRunnerWithInjection:
 
             run_governance_async(
                 tick_count=0,
-                build_execution_name=lambda tick: f"governance-tick-{tick}",
+                build_execution_name=(
+                    lambda tick, material=None: f"governance-tick-{tick}"
+                ),
             )
 
         # append_governance_event is a local import inside run_governance_async
@@ -327,7 +329,9 @@ class TestGovernanceAsyncRunnerWithInjection:
 
             run_governance_async(
                 tick_count=5,
-                build_execution_name=lambda tick: f"governance-tick-{tick}",
+                build_execution_name=(
+                    lambda tick, material=None: f"governance-tick-{tick}"
+                ),
             )
 
         # append_governance_event is a local import inside run_governance_async

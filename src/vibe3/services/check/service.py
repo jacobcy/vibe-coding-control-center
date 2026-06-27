@@ -43,7 +43,8 @@ class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
     # Flow statuses that should be skipped for handoff/ref checks
-    INACTIVE_FLOW_STATUSES = ("done", "aborted", "stale")
+    # Issue #3189: review/failed are PR-backed terminal states — treat as inactive.
+    INACTIVE_FLOW_STATUSES = ("done", "aborted", "stale", "review", "failed")
     # Threshold for orphaned flow detection (commits behind main)
     ORPHAN_FLOW_BEHIND_THRESHOLD = 100
 

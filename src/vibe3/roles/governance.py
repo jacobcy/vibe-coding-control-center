@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,14 +22,15 @@ from vibe3.prompts import (
     DEFAULT_PROMPTS_PATH,
     PromptAssembler,
     PromptManifest,
-    PromptMaterialSpec,
     PromptRecipe,
-    PromptRecipeDefinition,
     PromptRenderResult,
     PromptVariableSource,
     ProviderRegistry,
     VariableSourceKind,
+    build_governance_execution_name,
     collect_dry_run_provenance,
+    load_governance_material_catalog,
+    resolve_governance_material,
 )
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.roles.governance_utils import (
@@ -92,34 +92,6 @@ def _compute_material_hash() -> str | None:
     return compute_hash_from_loader(material_loader, materials_dir)
 
 
-def _resolve_governance_material(
-    config: OrchestraConfig,
-    execution_count: int,
-) -> str:
-    _ = config
-    catalog = load_governance_material_catalog()
-    return catalog[execution_count % len(catalog)].name
-
-
-def _load_governance_recipe_definition() -> PromptRecipeDefinition:
-    return PromptManifest.load_default().recipe("governance.scan")
-
-
-def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
-    """Load the governance material catalog from prompt manifest.
-
-    Returns:
-        Tuple of PromptMaterialSpec objects for governance materials.
-    """
-    recipe_def = _load_governance_recipe_definition()
-    if not recipe_def.loaded_definition:
-        raise ValueError("governance.scan recipe not properly loaded")
-    catalog = recipe_def.loaded_definition.material_catalog
-    if not catalog:
-        raise ValueError("governance.scan recipe requires material_catalog")
-    return catalog
-
-
 def build_governance_snapshot_context(
     snapshot: Any,
     *,
@@ -140,7 +112,7 @@ def build_governance_snapshot_context(
             )
         current_material = selected.name
     else:
-        current_material = _resolve_governance_material(config, execution_count)
+        current_material = resolve_governance_material(config, execution_count)
     material_name = Path(current_material).name
 
     # Compute material hash from disk so config/material changes are
@@ -278,7 +250,7 @@ def build_governance_recipe(
     material_override: str | None = None,
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
-    recipe_def = _load_governance_recipe_definition()
+    recipe_def = PromptManifest.load_default().recipe("governance.scan")
     if not recipe_def.loaded_definition:
         raise ValueError("governance.scan recipe not properly loaded")
     catalog = recipe_def.loaded_definition.material_catalog
@@ -381,12 +353,6 @@ def resolve_governance_options(config: OrchestraConfig) -> Any:
     return ExecutionRolePolicyService(config).resolve_agent_options("governance")
 
 
-def build_governance_execution_name(tick_count: int) -> str:
-    """Build unique execution name for a governance scan tick."""
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"vibe3-governance-scan-{timestamp}-t{tick_count}"
-
-
 def build_governance_request(
     config: OrchestraConfig,
     tick_count: int,
@@ -421,7 +387,7 @@ def build_governance_request(
         execution_count=execution_count,
     )
     plan_content = render_result.rendered_text
-    current_material = _resolve_governance_material(config, execution_count)
+    current_material = resolve_governance_material(config, execution_count)
 
     if config.governance.dry_run:
         root = repo_path or resolve_orchestra_repo_root()
@@ -470,7 +436,9 @@ def build_governance_request(
         role="governance",
         target_branch="governance",
         target_id=1,
-        execution_name=build_governance_execution_name(tick_count),
+        execution_name=build_governance_execution_name(
+            tick_count, material=current_material
+        ),
         prompt=plan_content,
         options=options,
         refs={"task": GOVERNANCE_TASK_PROMPT},

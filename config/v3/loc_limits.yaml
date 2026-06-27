@@ -65,7 +65,7 @@ code_limits:
         limit: 510
         reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
-        limit: 600
+        limit: 640
         reason: |
           Repo 层职责内聚，包含：
           - 基础 CRUD 操作（10 个 get 方法）
@@ -87,6 +87,7 @@ code_limits:
           PR #2409 新增 status 验证逻辑，提升类型安全和 fail-fast 行为（+18 行）
           PR #2542 新增 bulk retrieval 方法，修复 N+1 查询模式，减少 100x 数据库查询（+62 行）
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
+          Issue #3189 新增 get_flows_by_statuses 批量状态查询方法（WHERE flow_status IN (...)，+40 行），减少串行查询次数
 
       - path: "src/vibe3/commands/snapshot.py"
         limit: 520
@@ -113,10 +114,10 @@ code_limits:
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
 
-      # Models 层 —— 允许 410
+      # Models 层 —— 允许 410-420
       - path: "src/vibe3/models/flow.py"
-        limit: 410
-        reason: "Flow 模型聚合，包含 FlowState/FlowStatusResponse/IssueLink/TimelineEvent 等核心模型、legacy 状态迁移逻辑、verdict 解析、issue role 迁移等紧密耦合逻辑；Issue #2734 新增 scene completeness 字段（has_branch/has_worktree/is_placeholder）修复占位 flow 显示错误（+10 行）"
+        limit: 420
+        reason: "Flow 模型聚合，包含 FlowState/FlowStatusResponse/IssueLink/TimelineEvent 等核心模型、legacy 状态迁移逻辑、verdict 解析、issue role 迁移等紧密耦合逻辑；Issue #2734 新增 scene completeness 字段（has_branch/has_worktree/is_placeholder）修复占位 flow 显示错误（+10 行）；Issue #3189 扩展 flow_status Literal 类型支持 review/failed/aborted，multi-line formatting for E501 compliance（+3 行）"
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
@@ -135,8 +136,8 @@ code_limits:
         limit: 500
         reason: "Task 服务聚合，包含 issue link/reclassify、superseded flow 降级、分支解析、issue comment 查询等紧密耦合的核心 task 状态管理逻辑；职责单一（task state lifecycle）但方法较多，拆分收益低；Issue #2575 Protocol/DI 重构后新增公共 flow_service 属性（+5 行）供测试访问"
       - path: "src/vibe3/services/task/status.py"
-        limit: 460
-        reason: "Task status data aggregation for API endpoint and CLI display, includes system snapshot fetch, server status rendering, runtime versions, and configuration analysis (Issue #2787)"
+        limit: 480
+        reason: "Task status data aggregation for API endpoint and CLI display, includes system snapshot fetch, server status rendering, runtime versions, and configuration analysis (Issue #2787); Issue #3189 added terminal flow filtering in classify_task_issues_for_rendering (+8 lines)"
       - path: "src/vibe3/services/handoff/resolution.py"
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
@@ -181,8 +182,8 @@ code_limits:
         limit: 610
         reason: "Governance utilities aggregation, includes build_issue_context (snapshot context), build_code_auditor_context (module selection for audit), build_audit_observation_context (observation collection), build_audit_suggestion_context (observation cluster analysis), build_audit_report_context (report generation context), build_audit_decision_context (decision packet analysis), and material name normalization; Issue #2957 added build_audit_suggestion_context (+74 lines); Issue #2953 added build_audit_decision_context (+76 lines), build_audit_report_context (+70 lines), and _build_scope_note helper"
       - path: "src/vibe3/roles/governance.py"
-        limit: 500
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines); Issue #2953 added build_audit_decision_context import, audit-report.md routing, and build_audit_report_context import (+11 lines)"
+        limit: 530
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines); Issue #2953 added build_audit_decision_context import, audit-report.md routing, and build_audit_report_context import (+11 lines); Issue #3194 updated build_governance_execution_name signature to accept optional material parameter (+21 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -205,6 +206,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_queue_maintenance_triggers.py"
         limit: 500
         reason: "Queue maintenance triggers 测试集，覆盖 queue exhausted rebuild、refresh 触发、scheduled refresh 完整生命周期（tick-based trigger、dirty signal consumer、queue rebuild verification）、pool exhaustion detection 等紧密耦合场景；Issue #3148 新增 exhausted queue rebuild 集成测试后从 401 行增至 481 行"
+      - path: "tests/vibe3/services/test_flow_status.py"
+        limit: 500
+        reason: "Flow status 测试集，包含 TestDoneEligibility 终端状态配送确认测试（pr_ref fast-path removal、PRState.MERGED 支持、cached PR delivery confirmation等）；Issue #3189 新增 TestDoneEligibility 测试类（+99 行），当前 474 行"
       # Server —— 允许 450-520
       - path: "src/vibe3/server/app.py"
         limit: 620
@@ -236,8 +240,8 @@ code_limits:
         limit: 920
         reason: "审计阻塞流程分析脚本，Issue #2953 四层审计管线的一部分；包含 blocked flow detection、decision issue 搜索（通过 gh CLI）、观察记录生成、YAML 文件读写等紧密耦合的审计工具逻辑，与 audit-validate.py 互补"
       - path: "scripts/audit-validate.py"
-        limit: 760
-        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补"
+        limit: 770
+        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补；Issue #3194 新增 E501 noqa 注释后从 760 行增至 765 行"
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"
@@ -255,8 +259,8 @@ code_limits:
         limit: 495
         reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持；Issue #3074 新增 env override 路径分支（original_options/effective_options 分离）和诊断日志；Issue #3135 新增 agent preset model 解析 fallback（+15 行）"
       - path: "src/vibe3/agents/backends/async_launcher.py"
-        limit: 420
-        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；Issue #3074 新增 VIBE_BACKEND_*/VIBE_MODEL_* 到 CRITICAL_ENV_PASSTHROUGH（+8 行）确保环境变量覆盖传递到 async 子进程"
+        limit: 460
+        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；Issue #3074 新增 VIBE_BACKEND_*/VIBE_MODEL_* 到 CRITICAL_ENV_PASSTHROUGH（+8 行）确保环境变量覆盖传递到 async 子进程；Issue #3194 新增 governance scan log 命名 regex、supervisor apply log regex、issues path 迁移至 orchestra/issues/（+33 行）"
       - path: "src/vibe3/environment/worktree_lifecycle.py"
         limit: 500
         reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
@@ -320,8 +324,8 @@ code_limits:
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/roles/test_governance_context_comment.py"
-        limit: 630
-        reason: "Governance snapshot context and comment format contract tests, covering 11 test methods across TestBuildSnapshotContext and TestCommentFormatContract classes; includes PR #1783 comment format regression tests; split from original test_governance.py (#1803); Issue #1925 adds keys.env partial loading, layered markers, and local manager boundary tests (3 new test methods)"
+        limit: 520
+        reason: "Governance snapshot context tests, 11 test methods in TestBuildSnapshotContext; split from original test_governance.py (#1803); TestCommentFormatContract (text content tests) removed as they verify static .md file text rather than logic"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 520
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标"
@@ -332,8 +336,8 @@ code_limits:
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/execution/test_noop_gate_unit.py"
-        limit: 480
-        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测等紧密耦合场景，新增测试后略微超标"
+        limit: 520
+        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测、executor publish with existing PR 等紧密耦合场景，新增测试后略微超标"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
         limit: 680
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"
@@ -356,8 +360,8 @@ code_limits:
         limit: 502
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低；#2381 新增 test_dispatch_loop_rechecks_qualify_gate_for_ready_issue 测试验证 dispatch-time qualify gate recheck（+29 行）"
       - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
-        limit: 600
-        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2765 新增 BLOCKED 重资格化和空队列日志抑制回归测试（+50 行）"
+        limit: 620
+        reason: "Queue operations 测试集，覆盖 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合场景，每个测试需要完整 mock setup；Issue #2765 新增 BLOCKED 重资格化和空队列日志抑制回归测试（+50 行）；Issue #3192 新增 color 参数兼容的 capture_event mock（3 处 **kwargs 签名更新，+12 行），从 591 行增至 603 行"
       - path: "tests/vibe3/orchestra/test_queue_collection_ordering.py"
         limit: 410
         reason: "Queue collection ordering 测试集 (#2870)，覆盖 collection order、blocked requalification、merge behavior 三类测试，验证 state-first ordering semantics、exception handling、waiting_state preservation 等紧密耦合场景，11 个测试共享 fixture，拆分收益低"
@@ -377,8 +381,8 @@ code_limits:
         limit: 400
         reason: "Qualify gate open PR 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0b: open PR + running planner/executor → review、no worker → skip、already review/done → skip、no PR → skip 等 6 个紧密耦合场景，共享 fixture"
       - path: "tests/vibe3/domain/test_qualify_gate_closed.py"
-        limit: 450
-        reason: "Qualify gate closed issue 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0: GitHub state CLOSED 检测、flow state terminalization、aborted→done transition 等 12 个紧密耦合场景；Issue #3167 新增 3 个 aborted→done transition 测试验证 post-merge 流状态修复（+111 行）"
+        limit: 550
+        reason: "Qualify gate closed issue 检测测试集（从 test_qualify_gate.py 拆分），覆盖 Step 0: GitHub state CLOSED 检测、flow state terminalization、aborted→done transition 等 12 个紧密耦合场景；Issue #3167 新增 3 个 aborted→done transition 测试验证 post-merge 流状态修复（+111 行）；Issue #3189/PR #3201 新增 review/failed/aborted 状态兼容测试（+87 行）"
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 700
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理、Git ref lock 冲突重试、placeholder flow 创建等紧密耦合场景，共享 fixture；Issue #2143 新增 2 个 retry 测试（test_bootstrap_issue_flow_retries_fetch_on_ref_lock_conflict, test_bootstrap_issue_flow_raises_after_exhausted_retries）后略微超标；Issue #2621 新增 3 个 placeholder flow 测试（test_create_placeholder_flow_creates_db_only_flow, test_create_placeholder_flow_with_dependency, test_create_placeholder_flow_returns_flow_dict）验证 DB-only flow 创建（+125 行）；Issue #2762 follow-up 将分支校验与 baseline snapshot 相关测试（_validate_or_recreate_branch、creation_source、force_baseline，共 8 个测试）拆分至 test_flow_orchestrator_branch_baseline.py（802→674 行）"
@@ -447,8 +451,11 @@ code_limits:
         limit: 500
         reason: "IssueFlowService 测试集，覆盖 convention injection、branch naming、flow lookup、resolve_best_flow 优先级逻辑与 protected branch guard 等紧密耦合场景；PR #2581 新增 8 个 resolve_best_flow 测试（优先级逻辑 5 个 + protected branch guard 3 个）从 297 行增至 465 行"
       - path: "tests/vibe3/clients/test_sqlite_flow_state_repo.py"
-        limit: 450
-        reason: "SQLite flow state repo 测试集，覆盖 flow CRUD、soft-delete、cascade delete、status validation、bulk retrieval optimization、restore flow deadlock fix 等紧密耦合场景，与 sqlite_flow_state_repo.py 源文件（limit 540）对应；Issue #2537 新增 test_restore_flow_resets_aborted_status 测试验证 aborted flow deadlock fix（+41 行）"
+        limit: 455
+        reason: "SQLite flow state repo 测试集，覆盖 flow CRUD、soft-delete、cascade delete、status validation、bulk retrieval optimization、restore flow deadlock fix 等紧密耦合场景，与 sqlite_flow_state_repo.py 源文件（limit 540）对应；Issue #2537 新增 test_restore_flow_resets_aborted_status 测试验证 aborted flow deadlock fix（+41 行）；Issue #3189 新增 test_get_flows_by_status_accepts_review_failed_aborted 测试验证 review/failed/aborted 状态扩展（+18 行）"
+      - path: "tests/vibe3/services/test_status_query_utils.py"
+        limit: 425
+        reason: "Status query service 测试集，覆盖 issue priority sorting、branch classification helpers、remote field calculation、fetch_orchestrated_issues with manager detection、blocked state handling、dispatch exclusion、handoff/merge-ready state、dev collab flow pass-through 等紧密耦合场景；Issue #3189 新增 test_fetch_orchestrated_issues_extra_flows_mapping 测试验证 extra_flows 参数映射逻辑（+28 行）"
       - path: "tests/vibe3/analysis/test_snapshot_service.py"
         limit: 650
         reason: "Snapshot service 测试集，覆盖 find_snapshot_by_branch（8 个测试含 branch 查找、origin/ 前缀归一化、glob 预过滤验证、非常规文件名回退扫描）、build_snapshot（1 个测试）、baseline 操作（5 个测试含 save/load/not found/no baseline dir/list excludes/save for diff）、list_snapshots DB 优化（2 个测试含 DB path 和 fallback 验证）、repo_path forwarding（1 个测试验证 worktree-aware baseline）等 17 个紧密耦合场景，共享 snapshot_dir fixture 和 mock setup，拆分收益低；Issue #2616 新增 test_find_snapshot_by_branch_glob_filters_candidates 和 test_find_snapshot_by_branch_fallback_for_nonconforming_filename 验证 glob 预过滤与回退扫描行为（+94 行）；Issue #2926 新增 test_list_snapshots_from_db 和 test_list_snapshots_db_empty_fallsback 验证 DB-first 查询逻辑（+40 行）；Issue #2928 新增 test_get_git_common_dir_cached_reuses_cached_value 验证缓存行为（+43 行）；Issue #3087 新增 test_build_snapshot_forwards_repo_path_to_git_client 验证 worktree-aware baseline（+27 行）"
@@ -473,6 +480,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_internal.py"
         limit: 575
         reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行），新增 async skip/throttled display 测试（+28 行）"
+      - path: "tests/vibe3/observability/test_orchestra_log.py"
+        limit: 480
+        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior、supervisor log functions 等 28 个测试（20 existing + 4 color tests + 4 supervisor tests）；Issue #3192 新增 4 个 color behavior 测试（TTY on/off、color=None、unknown color degradation）验证 ANSI escape codes 嵌入逻辑（+83 行）；Issue #3194 新增 4 个 supervisor log 测试（supervisor_log_dir/supervisor_events_log_path/governance_scans_dir/supervisor_event dual logging），以及 governance_scans_dir 测试（+81 行），从 419 行增至 478 行；测试围绕 append_orchestra_event/append_governance_event/append_supervisor_event 统一接口，拆分会破坏测试场景完整性"
 
 
   total_file_loc:

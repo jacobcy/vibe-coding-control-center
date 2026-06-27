@@ -32,6 +32,11 @@ if TYPE_CHECKING:
         ProviderNotFoundError,
         TemplateNotFoundError,
     )
+    from vibe3.prompts.governance_material import (
+        build_governance_execution_name,
+        load_governance_material_catalog,
+        resolve_governance_material,
+    )
     from vibe3.prompts.manifest import (
         PromptManifest,
         PromptProvider,
@@ -125,6 +130,9 @@ _LAZY_IMPORTS = {
     "PromptValidationService": "vibe3.prompts.validation",
     "ValidationIssue": "vibe3.prompts.validation",
     "collect_dry_run_provenance": "vibe3.prompts.provenance",
+    "load_governance_material_catalog": "vibe3.prompts.governance_material",
+    "resolve_governance_material": "vibe3.prompts.governance_material",
+    "build_governance_execution_name": "vibe3.prompts.governance_material",
 }
 
 
@@ -192,4 +200,8 @@ __all__ = [
     "discover_project_scope_overlays",
     # Provenance
     "collect_dry_run_provenance",
+    # Governance material
+    "load_governance_material_catalog",
+    "resolve_governance_material",
+    "build_governance_execution_name",
 ]

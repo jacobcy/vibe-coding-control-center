@@ -1,9 +1,36 @@
 """Tests for global runtime asset resolution."""
 
+import os
 import subprocess
 from pathlib import Path
 
 from vibe3.clients.runtime_assets import resolve_runtime_asset, runtime_assets_root
+
+
+def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run a git command with environment isolation from parent worktree repos.
+
+    Clears GIT_DIR, GIT_WORK_TREE, GIT_PREFIX, and GIT_COMMON_DIR so that
+    git uses normal repository discovery starting from ``cwd`` instead of
+    inheriting the parent worktree's git environment.
+
+    Without this isolation, git commands run from a temp directory inside a
+    worktree (e.g. during pre-push hook test execution) would operate on the
+    parent worktree repo, creating destructive init commits.
+    """
+    env = dict(os.environ)
+    env.pop("GIT_DIR", None)
+    env.pop("GIT_WORK_TREE", None)
+    env.pop("GIT_PREFIX", None)
+    env.pop("GIT_COMMON_DIR", None)
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
 
 
 def test_runtime_assets_root_uses_env_override(monkeypatch, tmp_path: Path) -> None:
@@ -70,27 +97,12 @@ def test_resolve_vibe_project_asset_from_repo_root(monkeypatch, tmp_path: Path) 
     vibe_file.write_text("project policy", encoding="utf-8")
 
     # Initialize git repo with initial commit to ensure it's a valid repo
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    _run_git(["init"], cwd=tmp_path)
+    _run_git(["config", "user.email", "test@test.com"], cwd=tmp_path)
+    _run_git(["config", "user.name", "Test"], cwd=tmp_path)
     # Add initial commit to make the repo valid (skip hooks)
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    _run_git(["add", "."], cwd=tmp_path)
+    _run_git(["-c", "core.hooksPath=", "commit", "-m", "init"], cwd=tmp_path)
 
     # Change to repo root
     monkeypatch.chdir(tmp_path)
@@ -119,26 +131,11 @@ def test_resolve_vibe_project_asset_from_subdirectory(
     vibe_file.write_text("project policy", encoding="utf-8")
 
     # Initialize git repo with initial commit
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    _run_git(["init"], cwd=tmp_path)
+    _run_git(["config", "user.email", "test@test.com"], cwd=tmp_path)
+    _run_git(["config", "user.name", "Test"], cwd=tmp_path)
+    _run_git(["add", "."], cwd=tmp_path)
+    _run_git(["-c", "core.hooksPath=", "commit", "-m", "init"], cwd=tmp_path)
 
     # Create a subdirectory and change to it
     subdir = tmp_path / "src" / "vibe3"
@@ -184,29 +181,14 @@ def test_resolve_vibe_project_graceful_missing(monkeypatch, tmp_path: Path) -> N
     The caller (_read_file) will handle missing files gracefully by returning None.
     """
     # Create a git repo WITHOUT .vibe/policies with initial commit
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    _run_git(["init"], cwd=tmp_path)
+    _run_git(["config", "user.email", "test@test.com"], cwd=tmp_path)
+    _run_git(["config", "user.name", "Test"], cwd=tmp_path)
     # Create a dummy file and commit to make repo valid
     dummy = tmp_path / "README.md"
     dummy.write_text("test", encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-c", "core.hooksPath=", "commit", "-m", "init"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
+    _run_git(["add", "."], cwd=tmp_path)
+    _run_git(["-c", "core.hooksPath=", "commit", "-m", "init"], cwd=tmp_path)
 
     monkeypatch.chdir(tmp_path)
 

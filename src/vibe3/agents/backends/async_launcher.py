@@ -165,8 +165,27 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
     Returns:
         Resolved log path (not guaranteed to be unique)
     """
+    # Supervisor apply logs: vibe3-supervisor-issue-{n} or
+    # vibe3-supervisor-issue-{n}-{suffix}
+    # Must be checked before general issue pattern to avoid
+    # matching "supervisor" role
+    supervisor_apply_match = re.match(
+        r"^vibe3-supervisor-issue-(\d+)(?:-(\d+))?$",
+        execution_name,
+    )
+    if supervisor_apply_match:
+        issue_number, suffix = supervisor_apply_match.groups()
+        file_name = "apply" if suffix is None else f"apply-{suffix}"
+        return (
+            log_dir
+            / "orchestra"
+            / "supervisor"
+            / f"issue-{issue_number}"
+            / f"{file_name}.log"
+        )
+
     issue_match = re.match(
-        r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
+        r"^vibe3-(manager|planner|executor|reviewer|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
         execution_name,
     )
     if issue_match:
@@ -176,14 +195,36 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
             "planner": "plan",
             "executor": "run",
             "reviewer": "review",
-            "supervisor": "supervisor",
             "plan": "plan",
             "run": "run",
             "review": "review",
         }[role]
         file_name = role_name if suffix is None else f"{role_name}-{suffix}"
-        return log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
+        return (
+            log_dir
+            / "orchestra"
+            / "issues"
+            / f"issue-{issue_number}"
+            / f"{file_name}.log"
+        )
 
+    # Governance scan logs with material: vibe3-governance-{material}-{ts}-t{tick}
+    # e.g., vibe3-governance-cron-supervisor-20260627-010215-t8
+    governance_material_match = re.match(
+        r"^vibe3-governance-([a-z-]+)-(\d{8}-\d{6})-t(\d+)$",
+        execution_name,
+    )
+    if governance_material_match:
+        material_slug, timestamp, tick = governance_material_match.groups()
+        return (
+            log_dir
+            / "orchestra"
+            / "governance"
+            / "scans"
+            / f"{material_slug}-{timestamp}-t{tick}.log"
+        )
+
+    # Backward compatibility: old governance execution names (no material)
     governance_match = re.match(
         r"^vibe3-governance-(.+)$",
         execution_name,
@@ -233,17 +274,23 @@ def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
         pass
 
     # If file exists, find the next suffix using atomic creation
-    # e.g. manager.async.log -> manager-2.async.log
+    # e.g. manager.log -> manager-2.log (new naming)
+    # e.g. manager.async.log -> manager-2.async.log (backward compat)
     name = base_path.name
-    if not name.endswith(".async.log"):
+    if name.endswith(".async.log"):
+        suffix_len = len(".async.log")
+    elif name.endswith(".log"):
+        suffix_len = len(".log")
+    else:
         # Fallback: just return the base path even though it exists
         # This shouldn't happen but provides graceful degradation
         return base_path
 
-    base_name = name[: -len(".async.log")]
+    base_name = name[:-suffix_len]
+    log_ext = name[-suffix_len:]
     counter = 2
     while True:
-        candidate = base_path.parent / f"{base_name}-{counter}.async.log"
+        candidate = base_path.parent / f"{base_name}-{counter}{log_ext}"
         try:
             # Atomic creation attempt for each candidate
             fd = os.open(

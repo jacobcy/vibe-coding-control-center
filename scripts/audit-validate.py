@@ -12,7 +12,8 @@ Usage:
     uv run python scripts/audit-validate.py --observations
 
     # Generate a compliant observation from existing non-compliant data
-    uv run python scripts/audit-validate.py --fix obs-20260626-bad.yaml --output audit-observation-20260626.yaml
+    uv run python scripts/audit-validate.py --fix obs-20260626-bad.yaml \
+        --output audit-observation-20260626.yaml
 
     # JSON output for machine consumption
     uv run python scripts/audit-validate.py --all --format json
@@ -64,7 +65,9 @@ VALID_FAILURE_MODES = {
 VALID_CONFIDENCES = {"high", "medium", "low"}
 OBSERVATION_ID_PATTERN = re.compile(r"^obs-\d{8}T\d{6}-[a-f0-9]{8}$")
 OBS_FILENAME_PATTERN = re.compile(r"^audit-observation-\d{8}T\d{6}\.ya?ml$")
-SUG_FILENAME_PATTERN = re.compile(r"^audit-suggestion-\d{8}T\d{6}-[a-zA-Z0-9_-]+\.ya?ml$")
+SUG_FILENAME_PATTERN = re.compile(
+    r"^audit-suggestion-\d{8}T\d{6}-[a-zA-Z0-9_-]+\.ya?ml$"
+)
 REPORT_FILENAME_PATTERN = re.compile(r"^audit-report-\d{8}T\d{6}\.md$")
 
 
@@ -126,7 +129,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="filename",
-                message=f"Filename must match audit-observation-YYYYMMDDTHHMMSS.yaml, got: {path.name}",
+                message=f"Filename must match audit-observation-YYYYMMDDTHHMMSS.yaml, got: {path.name}",  # noqa: E501
             )
         )
 
@@ -150,7 +153,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="root_key",
-                message="Missing required root key 'audit_observation:'. File must start with 'audit_observation:' as the top-level YAML key.",
+                message="Missing required root key 'audit_observation:'. File must start with 'audit_observation:' as the top-level YAML key.",  # noqa: E501
             )
         )
         return result
@@ -187,7 +190,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="warning",
                 field="observation_id",
-                message=f"observation_id '{obs_id}' does not match pattern obs-YYYYMMDDTHHMMSS-XXXXXXXX",
+                message=f"observation_id '{obs_id}' does not match pattern obs-YYYYMMDDTHHMMSS-XXXXXXXX",  # noqa: E501
             )
         )
 
@@ -201,7 +204,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                         file=str(path),
                         severity="warning",
                         field=f"subject.{field_name}",
-                        message=f"Missing field: audit_observation.subject.{field_name}",
+                        message=f"Missing field: audit_observation.subject.{field_name}",  # noqa: E501
                     )
                 )
 
@@ -215,7 +218,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                         file=str(path),
                         severity="warning",
                         field=f"observation.{field_name}",
-                        message=f"Missing field: audit_observation.observation.{field_name}",
+                        message=f"Missing field: audit_observation.observation.{field_name}",  # noqa: E501
                     )
                 )
         fm = observation.get("observed_failure_mode", "")
@@ -225,7 +228,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                     file=str(path),
                     severity="warning",
                     field="observation.observed_failure_mode",
-                    message=f"Unknown failure mode '{fm}'. Valid values: {sorted(VALID_FAILURE_MODES)}",
+                    message=f"Unknown failure mode '{fm}'. Valid values: {sorted(VALID_FAILURE_MODES)}",  # noqa: E501
                 )
             )
         conf = observation.get("confidence", "")
@@ -235,7 +238,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                     file=str(path),
                     severity="warning",
                     field="observation.confidence",
-                    message=f"Invalid confidence '{conf}'. Must be one of: {sorted(VALID_CONFIDENCES)}",
+                    message=f"Invalid confidence '{conf}'. Must be one of: {sorted(VALID_CONFIDENCES)}",  # noqa: E501
                 )
             )
 
@@ -288,7 +291,7 @@ def validate_observation_file(path: Path) -> ValidationResult:
                     file=str(path),
                     severity="error",
                     field="content",
-                    message="Multi-document YAML detected. Only one YAML document per file is allowed. audit-ledger-summary.py cannot parse multi-document files.",
+                    message="Multi-document YAML detected. Only one YAML document per file is allowed. audit-ledger-summary.py cannot parse multi-document files.",  # noqa: E501
                 )
             )
 
@@ -305,7 +308,7 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="warning",
                 field="filename",
-                message=f"Expected filename pattern audit-suggestion-YYYYMMDDTHHMMSS-<suffix>.yaml, got: {path.name}",
+                message=f"Expected filename pattern audit-suggestion-YYYYMMDDTHHMMSS-<suffix>.yaml, got: {path.name}",  # noqa: E501
             )
         )
 
@@ -373,7 +376,7 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
                     file=str(path),
                     severity="error",
                     field="linked_observation_ids",
-                    message="Runtime suggestion must include audit_suggestion.linked_observation_ids",
+                    message="Runtime suggestion must include audit_suggestion.linked_observation_ids",  # noqa: E501
                 )
             )
         elif isinstance(linked, list) and len(linked) < 2:
@@ -382,17 +385,21 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
                     file=str(path),
                     severity="warning",
                     field="linked_observation_ids",
-                    message=f"Anti-bloat rule: runtime suggestion should have >= 2 linked observations, got {len(linked)}",
+                    message=f"Anti-bloat rule: runtime suggestion should have >= 2 linked observations, got {len(linked)}",  # noqa: E501
                 )
             )
     elif source == "code_auditor":
-        if "evidence_refs" not in sug or not isinstance(evidence_refs, list) or not evidence_refs:
+        if (
+            "evidence_refs" not in sug
+            or not isinstance(evidence_refs, list)
+            or not evidence_refs
+        ):
             result.errors.append(
                 ValidationError(
                     file=str(path),
                     severity="error",
                     field="evidence_refs",
-                    message="Code-auditor suggestion must include non-empty audit_suggestion.evidence_refs",
+                    message="Code-auditor suggestion must include non-empty audit_suggestion.evidence_refs",  # noqa: E501
                 )
             )
     else:
@@ -401,7 +408,7 @@ def validate_suggestion_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="suggestion_source",
-                message="Invalid suggestion_source. Must be 'runtime_observation' or 'code_auditor'",
+                message="Invalid suggestion_source. Must be 'runtime_observation' or 'code_auditor'",  # noqa: E501
             )
         )
 
@@ -418,7 +425,7 @@ def validate_report_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="warning",
                 field="filename",
-                message=f"Expected filename pattern audit-report-YYYYMMDDTHHMMSS.md, got: {path.name}",
+                message=f"Expected filename pattern audit-report-YYYYMMDDTHHMMSS.md, got: {path.name}",  # noqa: E501
             )
         )
 
@@ -431,7 +438,7 @@ def validate_report_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="frontmatter",
-                message="Missing YAML frontmatter (--- ... ---). Required for machine-parseable ID chains.",
+                message="Missing YAML frontmatter (--- ... ---). Required for machine-parseable ID chains.",  # noqa: E501
             )
         )
         return result
@@ -464,7 +471,7 @@ def validate_report_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="frontmatter.evidence_strength",
-                message=f"Invalid evidence_strength '{es}'. Must be: {sorted(valid_strengths)}",
+                message=f"Invalid evidence_strength '{es}'. Must be: {sorted(valid_strengths)}",  # noqa: E501
             )
         )
 
@@ -475,7 +482,7 @@ def validate_report_file(path: Path) -> ValidationResult:
                 file=str(path),
                 severity="error",
                 field="content",
-                message="Missing required section 'Target Material Analysis'. Report must analyze original target materials, not just cluster observations.",
+                message="Missing required section 'Target Material Analysis'. Report must analyze original target materials, not just cluster observations.",  # noqa: E501
             )
         )
 
@@ -542,14 +549,18 @@ def prune_files(
 
                 # Check 1b: Multi-document YAML
                 content = path.read_text(encoding="utf-8")
-                doc_count = len(re.findall(r"^(?:---\s*$|\\.\\.\\.\s*$)", content, re.MULTILINE))
+                doc_count = len(
+                    re.findall(r"^(?:---\s*$|\\.\\.\\.\s*$)", content, re.MULTILINE)
+                )
                 if doc_count > 1:
                     to_delete.append((path, f"multi-document YAML ({doc_count} docs)"))
 
             # Check 2: File age
             age = file_age_days(path)
             if age is not None and age > max_age_days:
-                to_delete.append((path, f"expired ({age} days old, max {max_age_days})"))
+                to_delete.append(
+                    (path, f"expired ({age} days old, max {max_age_days})")
+                )
 
     # Deduplicate (a file might match multiple conditions)
     seen: set[str] = set()
@@ -561,14 +572,14 @@ def prune_files(
             unique.append((p, reason))
 
     if dry_run:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"PRUNE DRY-RUN — {len(unique)} files would be deleted")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         for p, reason in unique:
             print(f"  {p.name:50s} {reason}")
         if not unique:
             print("  (nothing to prune)")
-        print(f"\nRun with --prune --delete to actually delete.")
+        print("\nRun with --prune --delete to actually delete.")
     else:
         deleted = 0
         for p, reason in unique:
@@ -609,9 +620,7 @@ def find_audit_files(shared_dir: Path) -> dict[str, list[Path]]:
     return files
 
 
-def print_results(
-    results: list[ValidationResult], format_type: str = "text"
-) -> int:
+def print_results(results: list[ValidationResult], format_type: str = "text") -> int:
     """Print validation results. Returns count of errors."""
     total_errors = 0
     total_warnings = 0
@@ -648,14 +657,16 @@ def print_results(
                 print(f"  ⚠️  [{w.field}] {w.message}")
                 total_warnings += 1
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(
-            f"Summary: {len(results)} files, {total_errors} errors, {total_warnings} warnings"
+            f"Summary: {len(results)} files, {total_errors} errors, {total_warnings} warnings"  # noqa: E501
         )
         if total_errors == 0:
             print("✅ All files pass validation")
         else:
-            print(f"❌ {total_errors} error(s) found — downstream tools may not parse these files")
+            print(
+                f"❌ {total_errors} error(s) found — downstream tools may not parse these files"  # noqa: E501
+            )
 
     return total_errors
 
@@ -665,8 +676,12 @@ def main() -> None:
         description="Validate audit observation/suggestion/report files"
     )
     parser.add_argument("--all", action="store_true", help="Validate all audit files")
-    parser.add_argument("--observations", action="store_true", help="Validate only observations")
-    parser.add_argument("--suggestions", action="store_true", help="Validate only suggestions")
+    parser.add_argument(
+        "--observations", action="store_true", help="Validate only observations"
+    )
+    parser.add_argument(
+        "--suggestions", action="store_true", help="Validate only suggestions"
+    )
     parser.add_argument("--reports", action="store_true", help="Validate only reports")
     parser.add_argument("--file", type=Path, help="Validate a specific file")
     parser.add_argument(
@@ -683,7 +698,7 @@ def main() -> None:
     parser.add_argument(
         "--prune",
         action="store_true",
-        help="Prune non-compliant and expired files (dry-run by default, add --delete to execute)",
+        help="Prune non-compliant and expired files (dry-run by default, add --delete to execute)",  # noqa: E501
     )
     parser.add_argument(
         "--delete",
@@ -702,8 +717,10 @@ def main() -> None:
 
     if args.prune:
         prune_files(
-            shared_dir, max_age_days=args.max_age,
-            dry_run=not args.delete, verbose=args.delete,
+            shared_dir,
+            max_age_days=args.max_age,
+            dry_run=not args.delete,
+            verbose=args.delete,
         )
         return
 

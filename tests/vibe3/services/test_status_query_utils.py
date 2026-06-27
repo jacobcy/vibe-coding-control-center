@@ -378,3 +378,44 @@ class TestRemoteField:
         assert len(result) == 1
         assert result[0]["number"] == 2122
         assert result[0]["flow"].branch == "dev/issue-2122"
+
+    def test_fetch_orchestrated_issues_extra_flows_mapping(self) -> None:
+        """Extra flows (review/failed/aborted) should be mapped to issue_to_flow."""
+        from vibe3.models.flow import FlowStatusResponse
+
+        service = self._make_mock_service()
+
+        # Create a review-status flow with task_issue_number
+        review_flow = FlowStatusResponse(
+            branch="task/issue-3167",
+            flow_slug="issue-3167",
+            flow_status="review",
+            task_issue_number=3167,
+        )
+
+        active_flows = []  # No active flows
+        extra_flows = [review_flow]
+
+        # Set up GitHub to return the corresponding issue
+        service.github.list_issues.return_value = [
+            {
+                "number": 3167,
+                "title": "Test Issue 3167",
+                "labels": [{"name": "state/review"}],
+                "assignees": [],
+                "milestone": None,
+                "body": None,
+            }
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=active_flows,
+            queued_set=set(),
+            extra_flows=extra_flows,
+        )
+
+        # Issue 3167 should have flow (non-None) and not be remote
+        issue_3167 = next((i for i in result if i["number"] == 3167), None)
+        assert issue_3167 is not None, "Issue 3167 should be in results"
+        assert issue_3167["flow"] is not None, "Issue 3167 should have non-None flow"
+        assert issue_3167["remote"] is False, "Issue 3167 should not be remote"
