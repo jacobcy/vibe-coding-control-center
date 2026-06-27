@@ -113,10 +113,10 @@ code_limits:
         limit: 550
         reason: "Handoff write commands 聚合，覆盖 init/append/plan/report/indicate/audit/next_step/verdict 八个操作；init 通过 TaskShowService 获取 issue comment（Issue #3119，+60 行），bootstrap 调用 init 实现自动初始化；Issue #3139 集成 flow update/handoff init/bootstrap 初始化链后超标至 507 行"
 
-      # Models 层 —— 允许 410
+      # Models 层 —— 允许 410-420
       - path: "src/vibe3/models/flow.py"
-        limit: 410
-        reason: "Flow 模型聚合，包含 FlowState/FlowStatusResponse/IssueLink/TimelineEvent 等核心模型、legacy 状态迁移逻辑、verdict 解析、issue role 迁移等紧密耦合逻辑；Issue #2734 新增 scene completeness 字段（has_branch/has_worktree/is_placeholder）修复占位 flow 显示错误（+10 行）"
+        limit: 420
+        reason: "Flow 模型聚合，包含 FlowState/FlowStatusResponse/IssueLink/TimelineEvent 等核心模型、legacy 状态迁移逻辑、verdict 解析、issue role 迁移等紧密耦合逻辑；Issue #2734 新增 scene completeness 字段（has_branch/has_worktree/is_placeholder）修复占位 flow 显示错误（+10 行）；Issue #3189 扩展 flow_status Literal 类型支持 review/failed/aborted，multi-line formatting for E501 compliance（+3 行）"
 
       # Services 层 —— 允许 410-540
       - path: "src/vibe3/services/orchestra/orchestrator.py"
