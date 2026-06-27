@@ -24,6 +24,8 @@ class FlowState(str, Enum):
     ACTIVE = "active"
     BLOCKED = "blocked"  # Inferred from blocked_reason presence
     DONE = "done"
+    REVIEW = "review"  # Issue #3189: terminal state with PR
+    FAILED = "failed"  # Issue #3189: terminal state with PR
     ABORTED = "aborted"
     STALE = "stale"
 
@@ -74,6 +76,8 @@ def get_flow_state(flow: FlowStatusResponse) -> FlowState:
     status_to_state = {
         "active": FlowState.ACTIVE,
         "done": FlowState.DONE,
+        "review": FlowState.REVIEW,
+        "failed": FlowState.FAILED,
         "aborted": FlowState.ABORTED,
         "stale": FlowState.STALE,
     }

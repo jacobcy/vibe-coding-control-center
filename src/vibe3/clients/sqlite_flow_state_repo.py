@@ -311,7 +311,8 @@ class SQLiteFlowStateRepo(_HasConnection):
         """Get flows filtered by status (excludes soft-deleted flows).
 
         Args:
-            status: Must be one of 'active', 'blocked', 'done', 'stale'
+            status: Must be one of 'active', 'blocked', 'done', 'stale', 'review',
+                'failed', 'aborted'
 
         Returns:
             List of flow dictionaries matching the status

@@ -47,8 +47,9 @@ def _migrate_flow_status_value(v: str | None) -> str | None:
     if v == "merged":
         return "done"
     # "blocked" restored for remote sync semantics
-    # Legacy "failed" and "waiting" migrated to "active"
-    if v in ("failed", "waiting"):
+    # Issue #3189: "failed" is now a valid terminal state (with PRs)
+    # Legacy "waiting" migrated to "active"
+    if v == "waiting":
         return "active"
     return v
 
