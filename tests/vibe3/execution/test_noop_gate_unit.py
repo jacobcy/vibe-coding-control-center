@@ -431,3 +431,44 @@ class TestApplyUnifiedNoopGate:
         assert event_args[0][1] == "state_transitioned"
         assert "closed" in event_args[1]["detail"]
         assert "terminal transition" in event_args[1]["detail"]
+
+    def test_passes_executor_publish_with_existing_pr(self) -> None:
+        """Executor publish with existing PR on merge-ready branch passes gate.
+
+        When vibe run --skill publish creates a PR without changing the
+        state label (stays state/merge-ready), the no-op gate must not
+        block — creating a PR is the intended result of the publish step.
+        Instead, record a synthetic state_transitioned event
+        (merge-ready -> handoff).
+        """
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue.failure.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/merge-ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/merge-ready",
+                flow_state={
+                    "pr_ref": "https://github.com/owner/repo/pull/123",
+                },
+            )
+
+        # Should NOT block — executor publish is a valid outcome
+        mock_block.assert_not_called()
+        # Should record synthetic state transition
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+        assert "state/merge-ready" in event_args[1]["detail"]
+        assert "state/handoff" in event_args[1]["detail"]
