@@ -156,7 +156,7 @@ class TestRenderGovernancePrompt:
             ctx,
             prompts_path,
             tick_count=0,
-            execution_count=0,
+            execution_count=1,
         )
 
         assert (
