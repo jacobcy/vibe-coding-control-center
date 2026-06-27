@@ -76,9 +76,7 @@ def supervisor_events_log_path(repo_root: Path | None = None) -> Path:
     return supervisor_log_dir(repo_root) / "supervisor.log"
 
 
-def tick_log_dir(
-    date_str: str | None = None, repo_root: Path | None = None
-) -> Path:
+def tick_log_dir(date_str: str | None = None, repo_root: Path | None = None) -> Path:
     """Return the directory for per-tick event snapshots.
 
     Args:
@@ -272,18 +270,28 @@ def append_governance_event(
     return path
 
 
-def append_supervisor_event(message: str, *, repo_root: Path | None = None) -> Path:
+def append_supervisor_event(
+    message: str, *, repo_root: Path | None = None, color: str | None = None
+) -> Path:
     """Append a supervisor event to both supervisor.log and events.log.
 
     Mirrors append_governance_event implementation: writes to component-specific
     log file and delegates to append_orchestra_event for events.log.
+
+    Args:
+        message: Supervisor event message
+        repo_root: Optional repository root path
+        color: Optional color for events.log (supervisor.log remains plain text)
+
+    Returns:
+        Path to the supervisor.log file
     """
     path = supervisor_events_log_path(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{timestamp}] {message}\n")
     # Delegate to append_orchestra_event to use persistent handle
-    append_orchestra_event("supervisor", message, repo_root=repo_root)
+    append_orchestra_event("supervisor", message, repo_root=repo_root, color=color)
     return path
 
 

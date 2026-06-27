@@ -380,7 +380,7 @@ def test_append_event_with_color_disabled_no_tty(
 
 
 def test_append_event_with_color_none(tmp_path: Path, enable_event_log, monkeypatch):
-    """append_orchestra_event with color=None does NOT embed ANSI (baseline behavior)."""
+    """append_orchestra_event with color=None omits ANSI (baseline behavior)."""
     # Even if isatty=True, color=None should produce plain output
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 

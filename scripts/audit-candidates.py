@@ -34,8 +34,10 @@ def _sort_key(flow: dict) -> str:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: python scripts/audit-candidates.py <flow-status.json> [limit]",
-              file=sys.stderr)
+        print(
+            "Usage: python scripts/audit-candidates.py <flow-status.json> [limit]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     path = Path(sys.argv[1])

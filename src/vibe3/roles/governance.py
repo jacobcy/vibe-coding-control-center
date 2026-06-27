@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -251,7 +250,7 @@ def build_governance_recipe(
     material_override: str | None = None,
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
-    recipe_def = _load_governance_recipe_definition()
+    recipe_def = PromptManifest.load_default().recipe("governance.scan")
     if not recipe_def.loaded_definition:
         raise ValueError("governance.scan recipe not properly loaded")
     catalog = recipe_def.loaded_definition.material_catalog
@@ -388,7 +387,7 @@ def build_governance_request(
         execution_count=execution_count,
     )
     plan_content = render_result.rendered_text
-    current_material = _resolve_governance_material(config, execution_count)
+    current_material = resolve_governance_material(config, execution_count)
 
     if config.governance.dry_run:
         root = repo_path or resolve_orchestra_repo_root()

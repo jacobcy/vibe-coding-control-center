@@ -103,7 +103,8 @@ class TestStartAsyncCommand:
         assert stale_log.exists()
         # The new log should be under orchestra/issues/ with a -2 suffix
         assert (
-            handle.log_path == log_dir / "orchestra" / "issues" / "issue-372" / "manager-2.log"
+            handle.log_path
+            == log_dir / "orchestra" / "issues" / "issue-372" / "manager-2.log"
         )
 
     def test_start_async_command_embeds_env_overrides_in_tmux_command(
@@ -333,7 +334,11 @@ class TestStartAsyncCommand:
                 )
 
         assert handle.log_path == (
-            log_dir / "orchestra" / "governance" / "scans" / "scan-20260405-114913-t1.log"
+            log_dir
+            / "orchestra"
+            / "governance"
+            / "scans"
+            / "scan-20260405-114913-t1.log"
         )
 
     def test_start_async_command_pipe_pane_uses_filtered_log_capture(

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.roles.governance import (
-    build_governance_recipe,
     build_governance_snapshot_context,
 )
 from vibe3.services.orchestra.status import (

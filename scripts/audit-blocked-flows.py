@@ -81,7 +81,9 @@ class BlockedFlow:
     issue_state: str | None = None  # "OPEN" or "CLOSED"
     has_merged_pr: bool | None = None
     pr_number: int | None = None
-    screening_verdict: str = ""  # "candidate", "already_observed", "covered_by_open_decision"
+    screening_verdict: str = (
+        ""  # "candidate", "already_observed", "covered_by_open_decision"
+    )
 
 
 def collect_reason_pattern_hits(reason: str) -> list[str]:
@@ -129,7 +131,10 @@ def fetch_github_issue_state(issue_number: int) -> dict[str, Any] | None:
     try:
         result = subprocess.run(
             ["gh", "issue", "view", str(issue_number), "--json", "state,number,title"],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
         )
         data = json.loads(result.stdout)
         return {"state": data.get("state", "UNKNOWN"), "number": data["number"]}
@@ -142,17 +147,36 @@ def fetch_pr_info(issue_number: int) -> dict[str, Any] | None:
     try:
         # Search for PRs that reference this issue
         result = subprocess.run(
-            ["gh", "pr", "list", "--search", str(issue_number),
-             "--json", "number,state,mergedAt,headRefName",
-             "--limit", "3"],
-            capture_output=True, text=True, check=True, timeout=10,
+            [
+                "gh",
+                "pr",
+                "list",
+                "--search",
+                str(issue_number),
+                "--json",
+                "number,state,mergedAt,headRefName",
+                "--limit",
+                "3",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
         )
         prs = json.loads(result.stdout)
         for pr in prs:
             if pr.get("mergedAt"):
-                return {"merged": True, "number": pr["number"], "branch": pr.get("headRefName", "")}
+                return {
+                    "merged": True,
+                    "number": pr["number"],
+                    "branch": pr.get("headRefName", ""),
+                }
         if prs:
-            return {"merged": False, "number": prs[0]["number"], "branch": prs[0].get("headRefName", "")}
+            return {
+                "merged": False,
+                "number": prs[0]["number"],
+                "branch": prs[0].get("headRefName", ""),
+            }
         return None
     except Exception:
         return None
@@ -200,7 +224,9 @@ def extract_affected_issue_numbers(body: str) -> set[int]:
 
     return {
         int(issue_number)
-        for issue_number in re.findall(r"^\s*-\s*#(\d+)\b", match.group(1), re.MULTILINE)
+        for issue_number in re.findall(
+            r"^\s*-\s*#(\d+)\b", match.group(1), re.MULTILINE
+        )
     }
 
 
@@ -249,7 +275,11 @@ def screen_flow(
         bf.screening_verdict = "already_observed"
         return bf
 
-    if covered_issue_numbers and bf.issue_number and bf.issue_number in covered_issue_numbers:
+    if (
+        covered_issue_numbers
+        and bf.issue_number
+        and bf.issue_number in covered_issue_numbers
+    ):
         bf.screening_verdict = "covered_by_open_decision"
         return bf
 
@@ -274,11 +304,17 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
     client = SQLiteClient()
 
     if active_only:
-        flows = client.get_flows_by_status("blocked") + client.get_flows_by_status("aborted")
+        flows = client.get_flows_by_status("blocked") + client.get_flows_by_status(
+            "aborted"
+        )
     else:
         flows = client.get_all_flows()
-        flows = [f for f in flows if f.get("flow_status") in ("blocked", "aborted")
-                 and f.get("branch") != "main"]  # main branch is a test artifact, not a real flow
+        flows = [
+            f
+            for f in flows
+            if f.get("flow_status") in ("blocked", "aborted")
+            and f.get("branch") != "main"
+        ]  # main branch is a test artifact, not a real flow
 
     results: list[BlockedFlow] = []
     for flow in flows:
@@ -289,7 +325,9 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
             issue_number = flow["task_issue_number"]
         elif branch.startswith("task/issue-") or branch.startswith("dev/issue-"):
             try:
-                issue_number = int(branch.split("issue-")[1].split("/")[0].split("-")[0])
+                issue_number = int(
+                    branch.split("issue-")[1].split("/")[0].split("-")[0]
+                )
             except (ValueError, IndexError):
                 pass
         if issue_number is None:
@@ -325,16 +363,13 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
 
         event_types = sorted({e["event_type"] for e in events})
         block_events = [
-            e for e in events
+            e
+            for e in events
             if e["event_type"] in ("flow_blocked", "flow_auto_aborted", "blocked")
         ]
-        error_events = [
-            e for e in events
-            if "error" in e["event_type"]
-        ]
+        error_events = [e for e in events if "error" in e["event_type"]]
         transition_exceeded = [
-            e for e in events
-            if e["event_type"] == "transition_count_exceeded"
+            e for e in events if e["event_type"] == "transition_count_exceeded"
         ]
 
         if bf.last_event_time is None and events:
@@ -348,7 +383,7 @@ def get_blocked_flows(active_only: bool = False) -> list[BlockedFlow]:
         if transition_exceeded:
             bf.signal_tags.append("transition_count_exceeded")
             bf.block_evidence.append(
-                f"transition_count_exceeded: {transition_exceeded[0].get('detail', '')[:120]}"
+                f"transition_count_exceeded: {transition_exceeded[0].get('detail', '')[:120]}"  # noqa: E501
             )
         if bf.blocked_by_issue:
             bf.signal_tags.append("blocked_by_issue")
@@ -446,7 +481,9 @@ def print_results(
     """Print results."""
     if ready_for_audit:
         ready = [f for f in flows if f.screening_verdict == "candidate"]
-        already_observed = [f for f in flows if f.screening_verdict == "already_observed"]
+        already_observed = [
+            f for f in flows if f.screening_verdict == "already_observed"
+        ]
         covered_by_open_decision = [
             f for f in flows if f.screening_verdict == "covered_by_open_decision"
         ]
@@ -465,19 +502,23 @@ def print_results(
             }
             print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
-            print(f"\n{'='*70}")
-            print(f"Audit Observation Facts (mechanically screened)")
-            print(f"{'='*70}")
+            print(f"\n{'=' * 70}")
+            print("Audit Observation Facts (mechanically screened)")
+            print(f"{'=' * 70}")
             print(f"Total blocked/aborted: {len(flows)}")
             print(f"Candidates:          {len(ready)}")
-            print(f"Excluded:")
-            print(f"  Already observed:  {len(already_observed)} (existing observation covers this issue)")
-            print(f"  Open decision:     {len(covered_by_open_decision)} (exact issue already in open decision)")
+            print("Excluded:")
+            print(
+                f"  Already observed:  {len(already_observed)} (existing observation covers this issue)"  # noqa: E501
+            )
+            print(
+                f"  Open decision:     {len(covered_by_open_decision)} (exact issue already in open decision)"  # noqa: E501
+            )
 
             if ready:
-                print(f"\n{'─'*70}")
+                print(f"\n{'─' * 70}")
                 print(f"Facts for Agent Judgment — {len(ready)} flows")
-                print(f"{'─'*70}")
+                print(f"{'─' * 70}")
                 for f in ready:
                     print_flow_fact_lines(f)
 
@@ -494,9 +535,9 @@ def print_results(
 
         print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
-        print(f"\n{'='*70}")
-        print(f"Blocked/Aborted Flow Facts")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print("Blocked/Aborted Flow Facts")
+        print(f"{'=' * 70}")
         print(f"Total: {len(flows)}")
 
         for f in flows:
@@ -515,9 +556,9 @@ def show_flow_events(branch: str) -> None:
         return
 
     print(f"\nEvent timeline for {branch}")
-    print(f"{'─'*70}")
+    print(f"{'─' * 70}")
     print(f"{'Time':22s} {'Event Type':35s} Detail")
-    print(f"{'─'*70}")
+    print(f"{'─' * 70}")
 
     for e in events:
         print(format_event_line(e))
@@ -528,7 +569,9 @@ def git_common_dir() -> Path:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
-            check=True, text=True, capture_output=True,
+            check=True,
+            text=True,
+            capture_output=True,
         )
         return Path(result.stdout.strip())
     except (OSError, subprocess.CalledProcessError):
@@ -547,7 +590,7 @@ def main() -> None:
     parser.add_argument(
         "--enrich",
         action="store_true",
-        help="Fetch GitHub issue state and PR merge status (requires gh CLI and network)",
+        help="Fetch GitHub issue state and PR merge status (requires gh CLI and network)",  # noqa: E501
     )
     parser.add_argument(
         "--active-only",
@@ -590,9 +633,7 @@ def main() -> None:
     # Apply screening if --ready-for-audit
     if args.ready_for_audit:
         # Load existing observation issues for dedup
-        observed_issues = load_existing_observation_issues(
-            git_common_dir() / "shared"
-        )
+        observed_issues = load_existing_observation_issues(git_common_dir() / "shared")
         covered_issue_numbers = load_open_decision_covered_issues()
 
         for bf in flows:

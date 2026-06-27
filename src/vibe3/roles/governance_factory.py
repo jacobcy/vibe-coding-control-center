@@ -66,7 +66,9 @@ def build_default_governance_fns() -> GovernanceFunctions:
         def resolve_options(self, config: Any) -> Any:
             return resolve_governance_options(config)
 
-        def build_execution_name(self, tick_count: int, material: str | None = None) -> str:
+        def build_execution_name(
+            self, tick_count: int, material: str | None = None
+        ) -> str:
             return build_governance_execution_name(tick_count, material=material)
 
     return _DefaultGovernanceFns()

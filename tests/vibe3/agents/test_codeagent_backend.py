@@ -209,7 +209,7 @@ class TestCodeagentBackend:
         assert default_log_dir() == Path("/tmp/orchestra-logs").resolve()
 
     def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
-        """Plan issue async logs should live under temp/logs/orchestra/issues/issue-N."""
+        """Plan issue logs should live under temp/logs/orchestra/issues/issue-N."""
         log_path = resolve_async_log_path(
             Path("/tmp/logs"),
             "vibe3-plan-issue-419",

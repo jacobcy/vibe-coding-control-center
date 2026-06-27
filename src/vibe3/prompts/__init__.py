@@ -32,6 +32,11 @@ if TYPE_CHECKING:
         ProviderNotFoundError,
         TemplateNotFoundError,
     )
+    from vibe3.prompts.governance_material import (
+        build_governance_execution_name,
+        load_governance_material_catalog,
+        resolve_governance_material,
+    )
     from vibe3.prompts.manifest import (
         PromptManifest,
         PromptProvider,
@@ -56,11 +61,6 @@ if TYPE_CHECKING:
         VariableSourceKind,
     )
     from vibe3.prompts.provenance import collect_dry_run_provenance
-    from vibe3.prompts.governance_material import (
-        load_governance_material_catalog,
-        resolve_governance_material,
-        build_governance_execution_name,
-    )
     from vibe3.prompts.provider_registry import ProviderRegistry
     from vibe3.prompts.sections import (
         build_common_rules_section,
