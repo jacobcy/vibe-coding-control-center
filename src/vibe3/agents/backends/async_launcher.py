@@ -208,7 +208,23 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
             / f"{file_name}.log"
         )
 
-    # Governance scan logs with material: vibe3-governance-{material}-{ts}-t{tick}
+    # Governance scan logs with new naming: {material_slug}-{timestamp}-t{tick}
+    # e.g., cron-supervisor-20260627-010215-t8, roadmap-intake-20260627-010215-t8
+    governance_new_match = re.match(
+        r"^([a-z]+(?:-[a-z]+)*)-(\d{8}-\d{6})-t(\d+)$",
+        execution_name,
+    )
+    if governance_new_match:
+        material_slug, timestamp, tick = governance_new_match.groups()
+        return (
+            log_dir
+            / "orchestra"
+            / "governance"
+            / "scans"
+            / f"{material_slug}-{timestamp}-t{tick}.log"
+        )
+
+    # Backward compatibility: legacy governance naming with material
     # e.g., vibe3-governance-cron-supervisor-20260627-010215-t8
     governance_material_match = re.match(
         r"^vibe3-governance-([a-z-]+)-(\d{8}-\d{6})-t(\d+)$",

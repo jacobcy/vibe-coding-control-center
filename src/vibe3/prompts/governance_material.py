@@ -55,8 +55,8 @@ def build_governance_execution_name(
 ) -> str:
     """Build unique execution name for a governance scan tick.
 
-    If material is provided, extracts the material slug (stem) and embeds it
-    in the execution name to enable material-specific log paths.
+    If material is provided, extracts the material slug (stem) and uses it
+    as the execution name prefix for material-specific log paths.
 
     Args:
         tick_count: Current tick count
@@ -65,14 +65,17 @@ def build_governance_execution_name(
 
     Returns:
         Execution name string
-            (e.g., "vibe3-governance-cron-supervisor-20260627-010215-t8")
+            (e.g., "cron-supervisor-20260627-010215-t8" with material,
+                   "vibe3-governance-scan-20260627-010215-t8" without)
     """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     if material:
         # Extract material slug from path
         # (e.g. "supervisor/governance/cron-supervisor.md" -> "cron-supervisor")
         material_slug = Path(material).stem
-        return f"vibe3-governance-{material_slug}-{timestamp}-t{tick_count}"
+        # New format: {material_slug}-{timestamp}-t{tick}
+        return f"{material_slug}-{timestamp}-t{tick_count}"
+    # Backward compat: keep legacy prefix when no material info
     return f"vibe3-governance-scan-{timestamp}-t{tick_count}"
 
 
