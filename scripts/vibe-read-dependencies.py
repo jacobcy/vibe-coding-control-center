@@ -38,13 +38,17 @@ def format_shell_output(config: dict[str, Any]) -> str:
     lines.append("# REQUIRED_TOOLS")
     if "tools" in config and "required" in config["tools"]:
         for tool in config["tools"]["required"]:
-            lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
+            lines.append(
+                f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}"
+            )
 
     # OPTIONAL_TOOLS
     lines.append("# OPTIONAL_TOOLS")
     if "tools" in config and "optional" in config["tools"]:
         for tool in config["tools"]["optional"]:
-            lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
+            lines.append(
+                f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}"
+            )
 
     # REQUIRED_PLUGINS
     lines.append("# REQUIRED_PLUGINS")
@@ -116,7 +120,7 @@ def format_summary_output(config: dict[str, Any]) -> str:
         recommended_count = len(config["plugins"].get("recommended", []))
         optional_count = len(config["plugins"].get("optional", []))
         lines.append(
-            f"Plugins: {required_count} required, {recommended_count} recommended, {optional_count} optional"
+            f"Plugins: {required_count} required, {recommended_count} recommended, {optional_count} optional"  # noqa: E501
         )
 
     return "\n".join(lines)

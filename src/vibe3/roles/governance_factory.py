@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from vibe3.prompts import build_governance_execution_name
 from vibe3.roles.governance import (
-    build_governance_execution_name,
     build_governance_snapshot_context,
     render_governance_prompt,
     resolve_governance_options,
@@ -66,7 +66,9 @@ def build_default_governance_fns() -> GovernanceFunctions:
         def resolve_options(self, config: Any) -> Any:
             return resolve_governance_options(config)
 
-        def build_execution_name(self, tick_count: int) -> str:
-            return build_governance_execution_name(tick_count)
+        def build_execution_name(
+            self, tick_count: int, material: str | None = None
+        ) -> str:
+            return build_governance_execution_name(tick_count, material=material)
 
     return _DefaultGovernanceFns()

@@ -181,8 +181,8 @@ code_limits:
         limit: 610
         reason: "Governance utilities aggregation, includes build_issue_context (snapshot context), build_code_auditor_context (module selection for audit), build_audit_observation_context (observation collection), build_audit_suggestion_context (observation cluster analysis), build_audit_report_context (report generation context), build_audit_decision_context (decision packet analysis), and material name normalization; Issue #2957 added build_audit_suggestion_context (+74 lines); Issue #2953 added build_audit_decision_context (+76 lines), build_audit_report_context (+70 lines), and _build_scope_note helper"
       - path: "src/vibe3/roles/governance.py"
-        limit: 500
-        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines); Issue #2953 added build_audit_decision_context import, audit-report.md routing, and build_audit_report_context import (+11 lines)"
+        limit: 530
+        reason: "Core governance aggregation file with tightly coupled responsibilities (material rotation via execution_count, snapshot context building, prompt rendering, request building) - splitting would harm cohesion and readability; Issue #2949 added dry-run provenance collection (+17 lines); rebase added import updates for modularity compliance (+5 lines); Issue #3028 added prompts_path parameter for provenance manifest loading (+2 lines); Issue #3074 added VIBE_BACKEND_GOVERNANCE/VIBE_MODEL_GOVERNANCE env override logic with diagnostic logging (+15 lines); Issue #2953 added build_audit_decision_context import, audit-report.md routing, and build_audit_report_context import (+11 lines); Issue #3194 updated build_governance_execution_name signature to accept optional material parameter (+21 lines)"
       - path: "src/vibe3/roles/manager.py"
         limit: 480
         reason: "Manager 角色聚合，包含 request builder、sync request 构建、dry_run_summary 生成（variant 解析、session 管理、sections 提取）等紧密耦合逻辑；新增 dry_run_summary 支持后略微超标（#2038）"
@@ -236,8 +236,8 @@ code_limits:
         limit: 920
         reason: "审计阻塞流程分析脚本，Issue #2953 四层审计管线的一部分；包含 blocked flow detection、decision issue 搜索（通过 gh CLI）、观察记录生成、YAML 文件读写等紧密耦合的审计工具逻辑，与 audit-validate.py 互补"
       - path: "scripts/audit-validate.py"
-        limit: 760
-        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补"
+        limit: 770
+        reason: "审计验证脚本，Issue #2953 四层审计管线的一部分；包含多文档 YAML 解析、observation 验证与清理、反模式检测、生命周期管理等紧密耦合的审计验证逻辑，与 audit-blocked-flows.py 互补；Issue #3194 新增 E501 noqa 注释后从 760 行增至 765 行"
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"
@@ -255,8 +255,8 @@ code_limits:
         limit: 495
         reason: "Codeagent backend 核心执行引擎，包含命令构建、session 管理、错误处理、prompt 元数据日志、prompt size 诊断等紧密耦合逻辑；Issue #1897 新增条件性 prompt size 诊断和结构化 metadata 支持；Issue #3074 新增 env override 路径分支（original_options/effective_options 分离）和诊断日志；Issue #3135 新增 agent preset model 解析 fallback（+15 行）"
       - path: "src/vibe3/agents/backends/async_launcher.py"
-        limit: 420
-        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；Issue #3074 新增 VIBE_BACKEND_*/VIBE_MODEL_* 到 CRITICAL_ENV_PASSTHROUGH（+8 行）确保环境变量覆盖传递到 async 子进程"
+        limit: 460
+        reason: "Async launcher 聚合，包含 tmux session 管理、log path 分配、env passthrough 等紧密耦合逻辑；Issue #3074 新增 VIBE_BACKEND_*/VIBE_MODEL_* 到 CRITICAL_ENV_PASSTHROUGH（+8 行）确保环境变量覆盖传递到 async 子进程；Issue #3194 新增 governance scan log 命名 regex、supervisor apply log regex、issues path 迁移至 orchestra/issues/（+33 行）"
       - path: "src/vibe3/environment/worktree_lifecycle.py"
         limit: 500
         reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
@@ -474,8 +474,8 @@ code_limits:
         limit: 575
         reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行），新增 async skip/throttled display 测试（+28 行）"
       - path: "tests/vibe3/observability/test_orchestra_log.py"
-        limit: 420
-        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior 等 24 个测试（20 existing + 4 new）；Issue #3192 新增 4 个 color behavior 测试（TTY on/off、color=None、unknown color degradation）验证 ANSI escape codes 嵌入逻辑（+83 行），从 336 行增至 419 行；测试围绕 append_orchestra_event/append_governance_event 统一接口，拆分会破坏测试场景完整性"
+        limit: 480
+        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior、supervisor log functions 等 28 个测试（20 existing + 4 color tests + 4 supervisor tests）；Issue #3192 新增 4 个 color behavior 测试（TTY on/off、color=None、unknown color degradation）验证 ANSI escape codes 嵌入逻辑（+83 行）；Issue #3194 新增 4 个 supervisor log 测试（supervisor_log_dir/supervisor_events_log_path/governance_scans_dir/supervisor_event dual logging），以及 governance_scans_dir 测试（+81 行），从 419 行增至 478 行；测试围绕 append_orchestra_event/append_governance_event/append_supervisor_event 统一接口，拆分会破坏测试场景完整性"
 
 
   total_file_loc:

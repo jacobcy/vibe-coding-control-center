@@ -18,8 +18,8 @@ class LocException:
 
 @dataclass(frozen=True)
 class LocSettings:
-    warning_threshold: int      # 超标触发 WARNING（建议重构）
-    ci_block_threshold: int     # 超标触发 CI ERROR（阻塞 pipeline）
+    warning_threshold: int  # 超标触发 WARNING（建议重构）
+    ci_block_threshold: int  # 超标触发 CI ERROR（阻塞 pipeline）
     total_v2_shell: int
     total_v3_python: int
     warning_threshold_percent: int
@@ -42,7 +42,9 @@ def _normalize_value(raw: str) -> str:
     return value
 
 
-def _parse_settings(path: Path) -> tuple[dict[str, str], dict[str, list[str]], dict[str, list[dict[str, str]]]]:
+def _parse_settings(
+    path: Path,
+) -> tuple[dict[str, str], dict[str, list[str]], dict[str, list[dict[str, str]]]]:
     scalars: dict[str, str] = {}
     string_lists: dict[str, list[str]] = {}
     object_lists: dict[str, list[dict[str, str]]] = {}
@@ -163,14 +165,18 @@ def load_loc_settings(config_path: str | None = None) -> LocSettings:
     )
 
 
-def find_exception(exceptions: tuple[LocException, ...], relative_path: str) -> LocException | None:
+def find_exception(
+    exceptions: tuple[LocException, ...], relative_path: str
+) -> LocException | None:
     for entry in exceptions:
         if entry.path == relative_path:
             return entry
     return None
 
 
-def is_in_warning_zone(current_loc: int, limit: int, warning_threshold_percent: int) -> bool:
+def is_in_warning_zone(
+    current_loc: int, limit: int, warning_threshold_percent: int
+) -> bool:
     """Check if current LOC is in warning zone (between threshold and limit)."""
     warning_threshold = limit * warning_threshold_percent / 100
     return warning_threshold <= current_loc < limit
