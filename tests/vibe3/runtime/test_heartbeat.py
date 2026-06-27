@@ -350,7 +350,7 @@ def test_no_shutdown_callback_cleanup_still_runs() -> None:
 @pytest.mark.asyncio
 async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
     """Cleanup should trigger on tick number that is a multiple of interval_ticks."""
-    from vibe3.config.orchestra_config import PeriodicCheckConfig
+    from vibe3.models import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,
@@ -394,7 +394,7 @@ async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -> None:
     """Cleanup failure should not prevent service dispatch."""
-    from vibe3.config.orchestra_config import PeriodicCheckConfig
+    from vibe3.models import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,
@@ -438,7 +438,7 @@ async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -
 @pytest.mark.asyncio
 async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
     """Cleanup should not run when disabled in config."""
-    from vibe3.config.orchestra_config import PeriodicCheckConfig
+    from vibe3.models import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,

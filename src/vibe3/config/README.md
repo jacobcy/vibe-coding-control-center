@@ -23,12 +23,10 @@
 | utils.py | 59 | 配置工具函数 |
 | config_loader.py | 58 | 按角色加载配置（load_config_for_role） |
 | settings_check_cleanup.py | 42 | Check cleanup 配置 |
-| orchestra_config.py | 34 | Orchestra 配置 re-export（OrchestraConfig、PeriodicCheckConfig、QueueRefreshConfig） |
 | orchestra_settings.py | 22 | Orchestra 配置辅助（load_orchestra_config） |
 | role_gates.py | 11 | 角色 gate 常量（MANAGER_GATE_CONFIG、PLANNER_GATE_CONFIG 等） |
-| branch_convention.py | 9 | Branch 约定 re-export（BranchConvention） |
 
-截至 2026-06，总计 21 文件，约 2980 行代码。
+截至 2026-06，总计 19 文件，约 2947 行代码。
 
 ## 架构说明
 
@@ -99,38 +97,25 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 
 ## 公共 API
 
-`__init__.py` 导出以下 63 个符号：
+`__init__.py` 导出以下 48 个符号：
 
 ### 配置模型（Config Classes）
 
 - **VibeConfig**: 根配置模型
 - **AIConfig**: AI 配置模型
 - **AgentPromptConfig**: Agent prompt 配置
-- **CodePathsConfig**: 代码路径配置
-- **CodeLimitsConfig**: 代码限制配置
-- **TestPathsConfig**: 测试路径配置
-- **ReviewScopeConfig**: Review 范围配置
-- **ReviewConfig**: Review 配置
-- **QualityConfig**: 质量配置
+- **FlowConfig**: Flow 配置
 - **MergeGateConfig**: Merge gate 配置
 - **PRScoringConfig**: PR 评分配置
-- **PlanConfig**: Plan 配置
-- **FlowConfig**: Flow 配置
-- **RunConfig**: Run 配置
 - **PathsConfig**: 路径配置
-- **SingleFileLocConfig**: 单文件行数配置
-- **TotalFileLocConfig**: 总行数配置
-- **OrchestraConfig**: Orchestra 配置（re-export）
-- **PeriodicCheckConfig**: Periodic check 配置（re-export）
-- **QueueRefreshConfig**: Queue refresh 配置（re-export）
+- **PlanConfig**: Plan 配置
+- **ReviewConfig**: Review 配置
+- **RunConfig**: Run 配置
+- **OrchestraConfig**: Orchestra 配置（re-export from models）
 
 ### 约定与 Profile
 
 - **ConventionResolver**: 约定解析器
-- **ProfileConvention**: Profile 约定模型
-- **ProfileConfig**: Profile 配置模型
-- **LabelsConvention**: Labels 约定模型
-- **BranchConvention**: Branch 约定模型
 
 ### 角色相关
 
@@ -161,10 +146,9 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 
 - **get_config**: 获取全局配置实例（带缓存）
 - **load_config**: 从文件加载配置
-- **reload_config**: 强制重新加载配置
 - **get_config_with_env_override**: 加载配置并应用环境变量覆盖
 - **load_runtime_config**: 加载运行时配置
-- **load_keys_env_fallback**: 加载密钥（环境变量 fallback）
+- **load_keys_env_fallback**: [内部函数] 加载密钥（环境变量 fallback）
 - **load_orchestra_config**: 加载 Orchestra 配置
 - **load_config_for_role**: 按角色加载配置
 
@@ -200,10 +184,9 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 config/
 ├── loader.py → settings.py (VibeConfig)
 ├── settings.py → settings_pr.py (PRScoringConfig)
-├── settings.py → models.orchestra_config (OrchestraConfig)
-├── orchestra_config.py → models.orchestra_config (re-export)
+├── settings.py → models (OrchestraConfig)
 ├── orchestra_settings.py → settings.py (VibeConfig)
-├── orchestra_settings.py → models.orchestra_config (OrchestraConfig)
+├── orchestra_settings.py → models (OrchestraConfig)
 ├── convention_resolver.py → profile_convention.py (ProfileConvention)
 ├── convention_resolver.py → profile_config.py (ProfileConfig)
 ├── agent_preset.py → models.adapter_manifest (AdapterManifest)
@@ -215,7 +198,7 @@ config/
 **循环依赖检查**: ✅ 无循环依赖
 
 **跨模块依赖**:
-- `settings.py`, `orchestra_config.py`, `orchestra_settings.py` 依赖 `models.orchestra_config`（OrchestraConfig 在 models 层定义并在 config 层 re-export）
+- `settings.py`, `orchestra_settings.py` 依赖 `models`（OrchestraConfig）
 - `agent_preset.py` 依赖 `models.adapter_manifest`
 
 ## 外部依赖

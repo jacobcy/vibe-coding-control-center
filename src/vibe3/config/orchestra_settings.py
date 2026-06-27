@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vibe3.config.orchestra_config import OrchestraConfig
+from vibe3.models import OrchestraConfig
 
 
 def load_orchestra_config(*, target_repo: Path | None = None) -> OrchestraConfig:
