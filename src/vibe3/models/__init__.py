@@ -78,13 +78,11 @@ if TYPE_CHECKING:
         JobContext,
         JobEnvelope,
         JobResult,
-        JobSource,
     )
     from vibe3.models.orchestra_config import (
         GovernanceConfig,
         OrchestraConfig,
         PeriodicCheckConfig,
-        QueueRefreshConfig,
         SupervisorHandoffConfig,
     )
     from vibe3.models.orchestration import (
@@ -331,7 +329,6 @@ __all__: list[str] = [
     "JobContext",
     "JobEnvelope",
     "JobResult",
-    "JobSource",
     "LayerCoverage",
     "MainBranchProtectedError",
     "ManagerDispatchIntent",
@@ -356,7 +353,6 @@ __all__: list[str] = [
     "PRState",
     "PromptContextMode",
     "QueueEntry",
-    "QueueRefreshConfig",
     "ReviewerDispatchIntent",
     "ReviewRequest",
     "ReviewScope",
@@ -390,10 +386,10 @@ __all__: list[str] = [
     "DISPLAY_PLACEHOLDER_ACTORS",
     "EventHandler",
     "EventPublisher",
+    "PLACEHOLDER_ACTORS",
     "PublishHook",
     "format_result_entries",
     "get_publisher",
-    "PLACEHOLDER_ACTORS",
     "publish",
     "publish_and_wait",
     "subscribe",

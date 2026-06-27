@@ -131,14 +131,13 @@ Models 模块按职责分为多个类别：
 
 ## 公共 API
 
-`__init__.py` 导出以下 121 个符号（通过 lazy import）：
+`__init__.py` 导出以下 119 个符号（通过 lazy import）：
 
 ### 编排与配置
 
 - **OrchestraConfig**: Orchestra 主配置
 - **GovernanceConfig**: Governance 配置
 - **PeriodicCheckConfig**: Periodic check 配置
-- **QueueRefreshConfig**: Queue refresh 配置
 - **SupervisorHandoffConfig**: Supervisor handoff 配置
 - **IssueInfo**: Issue 信息模型
 - **IssueState**: Issue 状态枚举
@@ -210,7 +209,6 @@ Models 模块按职责分为多个类别：
 - **JobContext**: Job 上下文
 - **JobEnvelope**: Job 信封
 - **JobResult**: Job 结果
-- **JobSource**: Job 来源
 
 ### 代码分析
 

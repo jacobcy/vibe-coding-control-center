@@ -97,33 +97,25 @@ vibe.profile.yaml (或 VIBE_PROFILE 环境变量)
 
 ## 公共 API
 
-`__init__.py` 导出以下 55 个符号：
+`__init__.py` 导出以下 48 个符号：
 
 ### 配置模型（Config Classes）
 
 - **VibeConfig**: 根配置模型
 - **AIConfig**: AI 配置模型
 - **AgentPromptConfig**: Agent prompt 配置
-- **CodePathsConfig**: 代码路径配置
-- **CodeLimitsConfig**: 代码限制配置
-- **TestPathsConfig**: 测试路径配置
-- **ReviewScopeConfig**: Review 范围配置
-- **ReviewConfig**: Review 配置
-- **QualityConfig**: 质量配置
+- **FlowConfig**: Flow 配置
 - **MergeGateConfig**: Merge gate 配置
 - **PRScoringConfig**: PR 评分配置
-- **PlanConfig**: Plan 配置
-- **FlowConfig**: Flow 配置
-- **RunConfig**: Run 配置
 - **PathsConfig**: 路径配置
-- **SingleFileLocConfig**: 单文件行数配置
-- **TotalFileLocConfig**: 总行数配置
+- **PlanConfig**: Plan 配置
+- **ReviewConfig**: Review 配置
+- **RunConfig**: Run 配置
 - **OrchestraConfig**: Orchestra 配置（re-export from models）
 
 ### 约定与 Profile
 
 - **ConventionResolver**: 约定解析器
-- **BranchConvention**: Branch 约定模型（re-export from models）
 
 ### 角色相关
 
