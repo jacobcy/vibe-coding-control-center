@@ -23,7 +23,7 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 | collection.py | 38 | Issue collection 服务（re-export） |
 | __init__.py | 126 | 公共 API 导出（lazy import） |
 
-截至 2026-06，总计 7 文件，约 1351 行代码（不含 `__init__.py`）。
+截至 2026-06，总计 7 文件，约 1351 行代码（含 `__init__.py`）。不含 `__init__.py` 为 1225 行。
 
 ## 架构说明
 

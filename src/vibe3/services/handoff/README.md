@@ -52,7 +52,7 @@ HandoffService 维护以下事件类型集合：
 **Handoff 事件类型**（`_HANDOFF_EVENT_TYPES`）：
 - `handoff_plan`、`handoff_report`、`handoff_run`（legacy）
 - `handoff_audit`、`handoff_indicate`
-- `next_step_set`、`plan_recorded`、`report_recorded`、`audit_recorded`
+- `next_step_set`、`plan_recorded`、`report_recorded`、`run_recorded`（legacy）、`audit_recorded`
 - `handoff_ci_status`、`handoff_pr_comment`
 
 **成功 handoff 事件类型**（`_SUCCESS_HANDOFF_EVENT_TYPES`）：
