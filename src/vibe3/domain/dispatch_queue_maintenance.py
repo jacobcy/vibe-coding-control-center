@@ -317,7 +317,9 @@ class DispatchQueueMaintenanceService:
         Returns:
             Tuple of (new_frozen_queue, new_dispatch_paused).
         """
-        need_collect = not queue_refreshed and self._should_collect_fn(dispatched_count, tick_id)
+        need_collect = not queue_refreshed and self._should_collect_fn(
+            dispatched_count, tick_id
+        )
         if need_collect:
             logger.bind(domain="global_dispatch", trigger="queue_exhausted").debug(
                 "Queue exhausted after dispatch, rebuilding for next tick"

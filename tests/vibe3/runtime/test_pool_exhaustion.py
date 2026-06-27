@@ -231,6 +231,7 @@ async def test_pool_exhaustion_disabled_does_not_check(monkeypatch) -> None:
 
 # Sleep mode tests
 
+
 @pytest.mark.asyncio
 async def test_sleep_mode_entry_at_threshold(monkeypatch) -> None:
     """Should enter sleep mode at threshold instead of immediate stop."""
@@ -428,7 +429,11 @@ async def test_sleep_mode_max_cycles_zero_never_stops(monkeypatch) -> None:
     # Simulate many wake-ups (should never stop)
     for i in range(1, 6):
         exhausted_ticks, sleep_cycles = check_pool_exhaustion(
-            coordinator, config, exhausted_ticks=9 + i * 10, sleep_cycles=i - 1, stop_callback=_stop
+            coordinator,
+            config,
+            exhausted_ticks=9 + i * 10,
+            sleep_cycles=i - 1,
+            stop_callback=_stop,
         )
         assert exhausted_ticks == 10 + i * 10
         assert sleep_cycles == i
@@ -478,11 +483,13 @@ async def test_tick1_cold_start_paused(monkeypatch) -> None:
     await server._tick_loop()
 
     # Tick progression:
-    # - sleep(1) -> tick 1 runs (cold-start sets to 1, check_pool_exhaustion increments to 2)
+    # - sleep(1) -> tick 1 runs (cold-start sets to 1,
+    #   check_pool_exhaustion increments to 2)
     # - sleep(2) -> tick 2 runs (check_pool_exhaustion increments to 3)
     # - sleep(3) -> stop() called before tick 3 runs
     # Final counter: 3 (cold-start + 2 increments from check_pool_exhaustion)
-    # If cold-start were dead code, counter would be 2 (only 2 increments from check_pool_exhaustion)
+    # If cold-start were dead code, counter would be 2
+    # (only 2 increments from check_pool_exhaustion)
     assert server._exhausted_ticks == 3
     exhaustion_events = [e for e in events if "pool exhausted" in e]
     assert len(exhaustion_events) >= 2

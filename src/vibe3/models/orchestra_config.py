@@ -313,9 +313,7 @@ class OrchestraConfig(BaseModel):
     )
     periodic_check: PeriodicCheckConfig = Field(default_factory=PeriodicCheckConfig)
     queue_refresh: QueueRefreshConfig = Field(default_factory=QueueRefreshConfig)
-    pool_exhaustion: PoolExhaustionConfig = Field(
-        default_factory=PoolExhaustionConfig
-    )
+    pool_exhaustion: PoolExhaustionConfig = Field(default_factory=PoolExhaustionConfig)
     max_retry_budget: int = Field(
         default=3,
         ge=1,
