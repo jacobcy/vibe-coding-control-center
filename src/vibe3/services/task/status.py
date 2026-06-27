@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     pass
 
 
+NON_ACTIVE_TASK_FLOW_STATUSES = frozenset({"done", "review", "failed", "aborted"})
+
+
 @dataclass
 class TaskStatusData:
     """Container for all data needed by task status dashboard."""
@@ -272,6 +275,9 @@ def classify_task_issues_for_rendering(
     }
     for item in non_remote_items:
         state = cast(IssueState | None, item["state"])
+        flow = cast(FlowStatusResponse | None, item.get("flow"))
+        if flow and flow.flow_status in NON_ACTIVE_TASK_FLOW_STATUSES:
+            continue
         if state == IssueState.DONE:
             continue
         # Blocked issues have dedicated section, skip bucketing

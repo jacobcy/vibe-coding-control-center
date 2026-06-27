@@ -207,14 +207,19 @@ class FlowManager:
             None,
         )
         if existing_canonical:
+            existing_status = str(existing_canonical.get("flow_status") or "active")
+            if existing_status in {"done", "review", "failed"}:
+                raise RuntimeError(
+                    f"Cannot auto-reactivate issue #{issue.number}: "
+                    f"flow is {existing_status}"
+                )
+
             # Placeholder flow detection: blocked + no git branch
-            if str(
-                existing_canonical.get("flow_status") or ""
-            ) == "blocked" and not self.git.branch_exists(branch):
+            if existing_status == "blocked" and not self.git.branch_exists(branch):
                 log.info(f"Upgrading placeholder flow for #{issue.number} to real flow")
                 return self._upgrade_placeholder(issue, branch)
 
-            if str(existing_canonical.get("flow_status") or "") == "stale":
+            if existing_status == "stale":
                 log.info(f"Rebuilding stale canonical flow for issue #{issue.number}")
                 return self._bootstrap_service.rebuild_stale_issue_flow(
                     issue,

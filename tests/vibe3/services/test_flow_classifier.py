@@ -69,3 +69,14 @@ class TestGetFlowState:
             blocked_reason="waiting for review",
         )
         assert get_flow_state(flow) == FlowState.BLOCKED
+
+    def test_blocked_status_maps_to_blocked_without_reason(self):
+        """Persisted blocked state must not depend on optional reason text."""
+        flow = FlowStatusResponse(
+            branch="t/blocked-status",
+            flow_slug="s-blocked-status",
+            flow_status="blocked",
+            blocked_reason=None,
+        )
+
+        assert get_flow_state(flow) == FlowState.BLOCKED

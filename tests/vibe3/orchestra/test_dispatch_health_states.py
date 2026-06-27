@@ -4,6 +4,8 @@ Tests for terminal states, aborted flow recovery, missing flow context,
 and entry-state edge cases.
 """
 
+import pytest
+
 from tests.vibe3.orchestra.helpers.dispatch_health import (
     make_check_result,
     make_health_coordinator,
@@ -56,6 +58,28 @@ class TestPreDispatchHealthStates:
         result = coord._check_dispatch_health(issue)
 
         assert result is True, "Aborted should return True for flow_manager recovery"
+
+    @pytest.mark.parametrize("flow_status", ["review", "failed"])
+    def test_health_check_rejects_pr_terminal_states(
+        self,
+        flow_status: str,
+    ) -> None:
+        """PR-backed terminal flows must not emit new dispatch work."""
+        coord, mocks = make_health_coordinator(
+            store_flow_state={
+                "branch": "task/issue-3189",
+                "flow_status": flow_status,
+            },
+        )
+
+        issue = make_issue(
+            3189,
+            state=IssueState.READY,
+            labels=["state/ready", "orchestra-governed"],
+        )
+
+        assert coord._check_dispatch_health(issue) is False
+        mocks["flow_blocker"].block_flow.assert_not_called()
 
     def test_health_check_rejects_missing_flow_context(self) -> None:
         """Empty branch + non-entry state should skip dispatch."""

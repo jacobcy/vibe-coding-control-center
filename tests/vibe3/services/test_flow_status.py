@@ -172,6 +172,105 @@ class TestFlowStatus:
         assert result.issues[1].issue_number == 200
 
 
+class TestDoneEligibility:
+    """Tests for terminal-flow delivery confirmation."""
+
+    def test_pr_ref_without_merged_pr_is_not_delivery_confirmation(self) -> None:
+        """A PR reference proves creation, not merge delivery."""
+        from vibe3.services.flow.status import FlowStatusService
+
+        github = MagicMock()
+        github.list_prs_for_branch.return_value = []
+        service = FlowStatusService(
+            store=MagicMock(),
+            git_client=MagicMock(),
+            github_client=github,
+        )
+        flow_state = {
+            "planner_status": "done",
+            "executor_status": "done",
+            "reviewer_status": "done",
+            "pr_ref": "https://github.com/example/repo/pull/99",
+            "pr_number": 99,
+        }
+
+        result = service.evaluate_aborted_to_done_eligibility(
+            flow_state,
+            "task/issue-99",
+        )
+
+        assert result == (False, None)
+        github.list_prs_for_branch.assert_called_once_with("task/issue-99")
+
+    def test_remote_merged_pr_confirms_delivery(self) -> None:
+        """A merged PR discovered by branch confirms delivery."""
+        from vibe3.services.flow.status import FlowStatusService
+
+        merged_pr = MagicMock(number=42, merged_at="2026-06-27T00:00:00Z")
+        github = MagicMock()
+        github.list_prs_for_branch.return_value = [merged_pr]
+        service = FlowStatusService(MagicMock(), MagicMock(), github)
+        flow_state = {
+            "planner_status": "done",
+            "executor_status": "done",
+            "reviewer_status": "done",
+            "pr_ref": "https://github.com/example/repo/pull/42",
+        }
+
+        result = service.evaluate_aborted_to_done_eligibility(
+            flow_state,
+            "task/issue-42",
+        )
+
+        assert result == (True, 42)
+
+    def test_cached_merged_pr_avoids_remote_lookup(self) -> None:
+        """A caller-provided merged PR is sufficient delivery evidence."""
+        from vibe3.services.flow.status import FlowStatusService
+
+        github = MagicMock()
+        service = FlowStatusService(MagicMock(), MagicMock(), github)
+        cached_pr = MagicMock(number=43, merged_at="2026-06-27T00:00:00Z")
+        flow_state = {
+            "planner_status": "done",
+            "executor_status": "done",
+            "reviewer_status": "done",
+        }
+
+        result = service.evaluate_aborted_to_done_eligibility(
+            flow_state,
+            "task/issue-43",
+            cached_pr=cached_pr,
+        )
+
+        assert result == (True, 43)
+        github.list_prs_for_branch.assert_not_called()
+
+    def test_cached_merged_state_confirms_delivery_without_timestamp(self) -> None:
+        """GitHub's explicit MERGED state is authoritative without merged_at."""
+        from vibe3.models import PRState
+        from vibe3.services.flow.status import FlowStatusService
+
+        github = MagicMock()
+        github.list_prs_for_branch.return_value = []
+        service = FlowStatusService(MagicMock(), MagicMock(), github)
+        cached_pr = MagicMock(number=44, merged_at=None, state=PRState.MERGED)
+        flow_state = {
+            "planner_status": "done",
+            "executor_status": "done",
+            "reviewer_status": "done",
+        }
+
+        result = service.evaluate_aborted_to_done_eligibility(
+            flow_state,
+            "task/issue-44",
+            cached_pr=cached_pr,
+        )
+
+        assert result == (True, 44)
+        github.list_prs_for_branch.assert_not_called()
+
+
 class TestFlowList:
     """Tests for listing flows."""
 
