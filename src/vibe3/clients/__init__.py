@@ -17,9 +17,11 @@ if TYPE_CHECKING:
     from vibe3.clients.github_issues_ops import parse_blocked_by, parse_linked_issues
     from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
     from vibe3.clients.label_utils import (
+        SUPERVISOR_LABEL,
         LabelAnomaly,
         collect_label_anomalies,
         has_manager_assignee,
+        has_supervisor_label,
         normalize_assignees,
         normalize_labels,
     )
@@ -78,6 +80,7 @@ _LAZY_IMPORTS = {
     "GitPathProtocol": "vibe3.clients.protocols.git",
     "IssueLabelPort": "vibe3.clients.github_labels",
     "LabelAnomaly": "vibe3.clients.label_utils",
+    "SUPERVISOR_LABEL": "vibe3.clients.label_utils",
     "LocalSyncRules": "vibe3.clients.sync_rules",
     "MergedPRCache": "vibe3.clients.merged_pr_cache",
     "get_merged_pr_for_issue": "vibe3.clients.pr_status_checker",
@@ -99,6 +102,7 @@ _LAZY_IMPORTS = {
     "find_repo_root": "vibe3.clients.git_client",
     "get_store": "vibe3.clients.store_context",
     "has_manager_assignee": "vibe3.clients.label_utils",
+    "has_supervisor_label": "vibe3.clients.label_utils",
     "init_schema": "vibe3.clients.sqlite_schema",
     "load_sync_rules": "vibe3.clients.sync_rules",
     "normalize_assignees": "vibe3.clients.label_utils",
@@ -152,6 +156,7 @@ __all__ = [
     "MergedPRCache",
     "RecentPRCache",
     "RemoteSyncRules",
+    "SUPERVISOR_LABEL",
     "SerenaClient",
     "SQLiteClient",
     "SyncRule",
@@ -167,6 +172,7 @@ __all__ = [
     "find_repo_root",
     "get_store",
     "has_manager_assignee",
+    "has_supervisor_label",
     "init_schema",
     "load_sync_rules",
     "normalize_assignees",
