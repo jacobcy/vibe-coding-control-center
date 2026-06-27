@@ -159,7 +159,10 @@ Forbidden:
 
 - 写评论前必须读取该 issue 的最近 3 条评论
 - 若最近评论已有 `[governance suggest][cron-supervisor]` 且内容未实质变化，跳过（不重复写评论）
-- 只有在你修改上一条 suggest（有新证据/新范围）时才允许写新评论
+- 只有在你修改上一条 suggest 时才允许写新评论。允许写新评论的条件（满足任一即可）：
+  - 建议的文档列表有增减
+  - 对齐目标或 scope 发生变化
+  - 上次评论距今超过 24 小时且 issue 状态已变化
 
 ## Output Contract
 

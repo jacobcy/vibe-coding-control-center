@@ -162,7 +162,9 @@ def collect_label_anomalies(
 
     Returns list of anomalies (empty = no issues found).
     Rules evaluated in priority order; roadmap_conflict suppresses
-    multi_state and orphan_execution rules.
+    multi_state and orphan_execution rules. Supervisor-labeled issues
+    skip the multi_state rule — they independently manage their own
+    state labels (e.g., state/handoff).
 
     Args:
         labels: List of label strings
