@@ -242,3 +242,12 @@ class TestTaskStatusExcludesSystemStatus:
         # Verify Orchestra Status and Vibe3 Configuration are NOT in output
         assert "Orchestra Status" not in result.output
         assert "Vibe3 Configuration" not in result.output
+
+
+def test_completed_flow_statuses_includes_pr_backed_terminal_states() -> None:
+    """Issue #3189: review/failed must render in completed flows section."""
+    from vibe3.commands.status import COMPLETED_FLOW_STATUSES
+
+    assert "review" in COMPLETED_FLOW_STATUSES
+    assert "failed" in COMPLETED_FLOW_STATUSES
+    assert "active" not in COMPLETED_FLOW_STATUSES

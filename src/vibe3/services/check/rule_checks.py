@@ -249,7 +249,10 @@ def rule_missing_branch_cleanup(ctx: CheckContext, svc: Any) -> CheckResult | No
         return None
     if not ctx.branch_missing:
         return None
-    if ctx.flow_status == "blocked":
+    # Issue #3189: terminal states (done/aborted/review/failed) and blocked
+    # flows must not be overwritten to aborted on branch deletion. Branch
+    # deletion is normal post-PR housekeeping for terminal-with-PR flows.
+    if ctx.flow_status in ("blocked", "done", "aborted", "review", "failed"):
         return None
 
     from vibe3.services.check.service import CheckResult

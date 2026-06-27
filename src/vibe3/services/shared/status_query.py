@@ -221,22 +221,18 @@ class StatusQueryService:
             Sorted list of issue dicts with number, title, state, flow, queued, remote
         """
 
-        # stale flows first, active flows overwrite (active priority)
+        # Build issue_to_flow mapping. _select_preferred_issue_flow promotes
+        # active and orchestra-managed flows regardless of iteration order, so
+        # order only breaks ties between non-active same-managed-ness flows.
+        # Process PR-backed terminal states (review/failed/aborted) before
+        # stale so they win ties; active flows go last to override everything.
+        # Issue #3189.
         issue_to_flow: dict[int, FlowStatusResponse] = {}
-        for f in stale_flows or []:
-            if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
-                    issue_to_flow.get(f.task_issue_number),
-                    f,
-                )
-        # Extra (review/failed/aborted) flows — between stale and active in priority
-        for f in extra_flows or []:
-            if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
-                    issue_to_flow.get(f.task_issue_number),
-                    f,
-                )
-        for f in flows:
+        for f in (
+            *(extra_flows or []),
+            *(stale_flows or []),
+            *flows,
+        ):
             if f.task_issue_number:
                 issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
                     issue_to_flow.get(f.task_issue_number),

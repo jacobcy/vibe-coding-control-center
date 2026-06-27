@@ -168,3 +168,38 @@ def test_upgrade_placeholder_transitions_to_active():
     assert call_args[1]["latest_actor"] == "dispatch:upgrade_placeholder"
 
     assert result is not None
+
+
+def test_is_reusable_auto_flow_rejects_terminal_statuses():
+    """Terminal statuses are not reusable for dispatch (Issue #3189).
+
+    review/failed are PR-backed terminal states and must not be treated as
+    reusable active flows.
+    """
+    from vibe3.domain.flow_manager import FlowManager
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    git.branch_exists.return_value = True
+    github = MagicMock()
+    registry = MagicMock()
+
+    manager = FlowManager(
+        config, store=store, git=git, github=github, registry=registry
+    )
+    manager.issue_flow_service.canonical_branch_name = MagicMock(
+        return_value="task/issue-3189"
+    )
+
+    for status in ("done", "aborted", "stale", "review", "failed"):
+        flow = {"branch": "task/issue-3189", "flow_status": status}
+        assert (
+            manager._is_reusable_auto_flow(flow, 3189) is False
+        ), f"{status} should not be reusable"
+
+    for status in ("active", "blocked"):
+        flow = {"branch": "task/issue-3189", "flow_status": status}
+        assert (
+            manager._is_reusable_auto_flow(flow, 3189) is True
+        ), f"{status} should be reusable"

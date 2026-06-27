@@ -173,14 +173,22 @@ class FlowReadMixin:
             Literal["active", "blocked", "done", "stale", "review", "failed", "aborted"]
             | None
         ) = None,
+        *,
+        statuses: list[str] | None = None,
     ) -> list[FlowStatusResponse]:
-        """List flows with optional status filter."""
+        """List flows with optional status filter.
+
+        Pass ``statuses`` for a batched multi-status query (single SQL
+        ``WHERE flow_status IN (...)`` round-trip).
+        """
         logger.bind(
             domain="flow",
             action="list",
             status=status,
         ).debug("Listing flows")
-        if status:
+        if statuses:
+            flows_data = self.store.get_flows_by_statuses(statuses)
+        elif status:
             flows_data = self.store.get_flows_by_status(status)
         else:
             flows_data = self.store.get_all_flows()

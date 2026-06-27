@@ -342,6 +342,46 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved flows by status")
         return flows
 
+    def get_flows_by_statuses(self, statuses: list[str]) -> list[dict[str, Any]]:
+        """Get flows filtered by multiple statuses (excludes soft-deleted flows).
+
+        Single ``WHERE flow_status IN (...)`` round-trip instead of one query
+        per status. Issue #3189.
+
+        Args:
+            statuses: List of valid flow statuses
+
+        Returns:
+            List of flow dictionaries matching any of the statuses
+
+        Raises:
+            ValueError: If any status is not a valid flow status value
+        """
+        if not statuses:
+            return []
+        invalid = [s for s in statuses if s not in self.VALID_FLOW_STATUSES]
+        if invalid:
+            raise ValueError(
+                f"Invalid flow status(es): {', '.join(invalid)}. "
+                f"Must be one of: {', '.join(sorted(self.VALID_FLOW_STATUSES))}"
+            )
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ", ".join(["?"] * len(statuses))
+        cursor.execute(
+            f"SELECT * FROM flow_state WHERE flow_status IN ({placeholders}) "
+            "AND deleted_at IS NULL",
+            tuple(statuses),
+        )
+        flows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_flows_by_statuses",
+            count=len(flows),
+        ).debug("Retrieved flows by statuses")
+        return flows
+
     def get_active_flow_count(self) -> int:
         """Get count of active flows (excludes soft-deleted flows)."""
         conn = self._get_connection()

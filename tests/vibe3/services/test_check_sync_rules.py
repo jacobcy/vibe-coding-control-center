@@ -190,3 +190,11 @@ class TestCheckServiceSyncRules:
 
         # Remote truth must remain untouched — sync is cache-only.
         github_client.update_issue_body.assert_not_called()
+
+
+def test_inactive_flow_statuses_includes_pr_backed_terminal_states() -> None:
+    """Issue #3189: review/failed must be treated as inactive by CheckService."""
+    assert "review" in CheckService.INACTIVE_FLOW_STATUSES
+    assert "failed" in CheckService.INACTIVE_FLOW_STATUSES
+    assert "active" not in CheckService.INACTIVE_FLOW_STATUSES
+    assert "blocked" not in CheckService.INACTIVE_FLOW_STATUSES

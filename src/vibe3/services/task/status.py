@@ -92,12 +92,12 @@ def fetch_task_status_data(
 
     stale_flows = service.list_flows(status="stale") if not all_flows else []
 
-    # Fetch review/failed/aborted flows for issue-to-flow mapping
-    # These are terminal states with PRs that should show in "Flows with PRs" section
+    # Fetch review/failed/aborted flows for issue-to-flow mapping.
+    # Batched into one SQL WHERE flow_status IN (...) round-trip (Issue #3189).
+    # These are terminal states with PRs that should show in "Flows with PRs" section.
     extra_flows: list[FlowStatusResponse] = []
     if not all_flows:
-        for status in ("review", "failed", "aborted"):
-            extra_flows.extend(service.list_flows(status=status))
+        extra_flows = service.list_flows(statuses=["review", "failed", "aborted"])
 
     # Fetch orchestrated issues
     queued_set = set(orch_snapshot.queued_issues)

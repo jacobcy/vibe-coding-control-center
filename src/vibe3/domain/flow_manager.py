@@ -94,6 +94,8 @@ class FlowManager:
             "done",
             "aborted",
             "stale",
+            "review",
+            "failed",
         }
 
     def _reactivate_canonical_flow(

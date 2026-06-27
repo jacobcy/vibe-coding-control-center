@@ -241,12 +241,18 @@ class CheckPRService:
         Returns:
             Tuple of (handled=True, issues, warnings).
         """
-        # Aborted flows: route through transition_aborted_to_done (with phase
-        # cleanup) when eligible; otherwise preserve the legitimate abort.
-        # Self-contained — does NOT depend on rule_aborted_flow_done_reconcile
-        # being enabled, so disabling the reconcile rule cannot strand flows.
+        # Aborted/review/failed flows: route through transition_aborted_to_done
+        # (with phase-completion cleanup) when eligible; otherwise preserve the
+        # legitimate terminal state. Self-contained — does NOT depend on
+        # rule_aborted_flow_done_reconcile being enabled, so disabling the
+        # reconcile rule cannot strand flows. Issue #3189: review/failed are
+        # PR-backed terminal states and need the same phase-check as aborted.
         flow_state = self.store.get_flow_state(branch)
-        if flow_state and flow_state.get("flow_status") == "aborted":
+        if flow_state and flow_state.get("flow_status") in (
+            "aborted",
+            "review",
+            "failed",
+        ):
             eligible, eligible_pr_number = (
                 self._flow_status_service.evaluate_aborted_to_done_eligibility(
                     flow_state, branch, cached_pr=pr
