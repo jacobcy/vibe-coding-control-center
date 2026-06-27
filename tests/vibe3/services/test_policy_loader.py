@@ -2,10 +2,9 @@
 
 from pathlib import Path
 
-import pytest
 import yaml
 
-from vibe3.services.shared.file_loader import policy_loader, resolve_manager_usernames
+from vibe3.services.shared.file_loader import policy_loader
 
 
 class TestPolicyLoader:
@@ -146,35 +145,3 @@ class TestPolicyLoader:
         assert entry is not None
         assert entry.path.is_absolute()
         assert entry.path.name == "policy.yaml"
-
-
-class TestResolveManagerUsernames:
-    """Tests for resolve_manager_usernames function."""
-
-    def test_resolve_manager_usernames_returns_tuple(self) -> None:
-        """Test that resolve_manager_usernames returns a tuple."""
-        usernames = resolve_manager_usernames()
-
-        assert isinstance(usernames, tuple)
-        assert len(usernames) > 0
-        assert all(isinstance(u, str) for u in usernames)
-
-    def test_resolve_manager_usernames_uses_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Test that resolve_manager_usernames uses config."""
-        from vibe3.models import OrchestraConfig
-
-        mock_orchestra_config = OrchestraConfig(
-            manager_usernames=("test-manager-1", "test-manager-2")
-        )
-        mock_config = type("MockConfig", (), {"orchestra": mock_orchestra_config})()
-
-        monkeypatch.setattr(
-            "vibe3.config.get_config_with_env_override",
-            lambda: mock_config,
-        )
-
-        usernames = resolve_manager_usernames()
-
-        assert usernames == ("test-manager-1", "test-manager-2")

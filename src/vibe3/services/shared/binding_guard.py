@@ -1,8 +1,19 @@
-"""Shared guard utilities for flow task-binding checks."""
+"""Shared guard and helper utilities for flow execution.
 
-from typing import Any
+This module combines:
+- Task binding guards (MissingTaskIssueError, ensure_task_issue_bound)
+- Role block function helpers (get_role_block_function)
+- Issue failure event emission (emit_issue_failed)
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
 
 from vibe3.exceptions import UserError
+from vibe3.models import IssueFailed, publish
+
+# -- Task binding guards ------------------------------------------------
 
 
 class MissingTaskIssueError(UserError):
@@ -40,3 +51,35 @@ def ensure_task_issue_bound(
     if yes or has_task_issue(flow_status):
         return
     raise MissingTaskIssueError(build_missing_task_issue_message(force_command))
+
+
+# -- Role block functions -----------------------------------------------
+
+
+def get_role_block_function(role: str) -> Callable[..., None]:
+    """Get the block function for a given role."""
+    import importlib
+
+    _failure = importlib.import_module("vibe3.services.issue.failure")
+    block_fns: dict[str, Callable[..., None]] = {
+        "manager": _failure.block_manager_noop_issue,
+        "planner": _failure.block_planner_noop_issue,
+        "executor": _failure.block_executor_noop_issue,
+        "reviewer": _failure.block_reviewer_noop_issue,
+    }
+    return block_fns[role]
+
+
+# -- Event emission helpers --------------------------------------------
+
+
+def emit_issue_failed(
+    issue_number: int,
+    reason: str,
+    actor: str = "system",
+    role: str | None = None,
+) -> None:
+    """Publish an IssueFailed domain event."""
+    publish(
+        IssueFailed(issue_number=issue_number, reason=reason, actor=actor, role=role)
+    )

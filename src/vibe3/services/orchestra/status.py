@@ -536,15 +536,6 @@ class OrchestraStatusService:
             logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
             return {}
 
-    def get_active_flow_count(self) -> int:
-        try:
-            return self._orchestrator.get_active_flow_count()
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to count active flows: {exc}"
-            )
-            return 0
-
     @staticmethod
     def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
         """Get manager usernames for orchestra operations.

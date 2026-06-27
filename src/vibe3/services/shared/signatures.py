@@ -5,7 +5,6 @@ from typing import Any
 from vibe3.clients import GitClient
 from vibe3.utils import normalize_actor as _normalize_actor_for_display
 
-WORKFLOW_ACTOR = "workflow"
 AI_ASSISTANT_ACTORS = {"ai-assistant", "ai_assistant"}
 
 ORCHESTRA_MANAGER = "orchestra:manager"

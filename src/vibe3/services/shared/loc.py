@@ -6,7 +6,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient
 from vibe3.config import VibeConfig
-from vibe3.models import BranchSource, ChangeSource, PRSource
+from vibe3.models import ChangeSource, PRSource
 
 
 @dataclass(frozen=True)
@@ -52,19 +52,6 @@ class LocService:
             LOCStats with added/deleted/total counts for core code paths
         """
         source = PRSource(pr_number=pr_number)
-        return self._compute_loc_stats(source)
-
-    def get_branch_loc_stats(self, branch: str, base: str = "main") -> LOCStats:
-        """Get LOC stats for branch diff, filtered by core code paths.
-
-        Args:
-            branch: Branch name
-            base: Base branch to compare against
-
-        Returns:
-            LOCStats with added/deleted/total counts for core code paths
-        """
-        source = BranchSource(branch=branch, base=base)
         return self._compute_loc_stats(source)
 
     def _compute_loc_stats(self, source: ChangeSource) -> LOCStats:

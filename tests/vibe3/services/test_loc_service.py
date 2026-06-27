@@ -82,19 +82,6 @@ class TestLocService:
         assert stats.deleted == 5
         assert stats.files_count == 1
 
-    def test_get_branch_loc_stats(self) -> None:
-        """Test that branch diff works."""
-        service = LocService()
-        service.git_client = MagicMock()
-        service.git_client.get_numstat.return_value = "15\t8\tsrc/vibe3/new_file.py"
-
-        stats = service.get_branch_loc_stats("feature-branch", "main")
-
-        assert stats.added == 15
-        assert stats.deleted == 8
-        assert stats.total == 23
-        assert stats.files_count == 1
-
     def test_handles_binary_files(self) -> None:
         """Test that binary files (shown as - in numstat) are handled."""
         service = LocService()
