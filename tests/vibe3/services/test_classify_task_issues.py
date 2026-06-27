@@ -2,7 +2,11 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
+from vibe3.models import FlowStatusResponse
 from vibe3.models.orchestration import IssueState
+from vibe3.services.task.classifier import TaskStatusBucket
 from vibe3.services.task.status import classify_task_issues_for_rendering
 
 
@@ -10,6 +14,7 @@ def _make_config() -> MagicMock:
     """Create a minimal mock OrchestraConfig."""
     config = MagicMock()
     config.supervisor_handoff.issue_label = "supervisor"
+    config.manager_usernames = ("manager",)
     return config
 
 
@@ -164,3 +169,28 @@ def test_blocked_items_includes_blocked_reason_field():
         "blocked_reason" in issue_2_dict
     ), "blocked_reason field should exist even if None"
     assert issue_2_dict.get("blocked_reason") is None, "blocked_reason should be None"
+
+
+@pytest.mark.parametrize("flow_status", ["review", "failed", "aborted"])
+def test_terminal_flow_with_ready_issue_stays_out_of_ready_queue(
+    flow_status: str,
+) -> None:
+    """Terminal local truth must override a stale remote READY label."""
+    flow = FlowStatusResponse(
+        branch="task/issue-3189",
+        flow_slug="issue-3189",
+        flow_status=flow_status,  # type: ignore[arg-type]
+        task_issue_number=3189,
+        pr_ref="https://github.com/example/repo/pull/3201",
+    )
+    item = {
+        **_issue(3189, IssueState.READY),
+        "flow": flow,
+        "assignee": "manager",
+        "remote": False,
+    }
+
+    result = classify_task_issues_for_rendering([item], _make_config())
+
+    assert item not in result["bucketed_items"][TaskStatusBucket.READY_QUEUE]
+    assert item in result["pr_ref_items"]

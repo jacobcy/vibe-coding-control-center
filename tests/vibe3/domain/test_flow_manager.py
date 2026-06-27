@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 
@@ -168,3 +170,68 @@ def test_upgrade_placeholder_transitions_to_active():
     assert call_args[1]["latest_actor"] == "dispatch:upgrade_placeholder"
 
     assert result is not None
+
+
+def test_is_reusable_auto_flow_rejects_terminal_statuses():
+    """Terminal statuses are not reusable for dispatch (Issue #3189).
+
+    review/failed are PR-backed terminal states and must not be treated as
+    reusable active flows.
+    """
+    from vibe3.domain.flow_manager import FlowManager
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    git.branch_exists.return_value = True
+    github = MagicMock()
+    registry = MagicMock()
+
+    manager = FlowManager(
+        config, store=store, git=git, github=github, registry=registry
+    )
+    manager.issue_flow_service.canonical_branch_name = MagicMock(
+        return_value="task/issue-3189"
+    )
+
+    for status in ("done", "aborted", "stale", "review", "failed"):
+        flow = {"branch": "task/issue-3189", "flow_status": status}
+        assert (
+            manager._is_reusable_auto_flow(flow, 3189) is False
+        ), f"{status} should not be reusable"
+
+    for status in ("active", "blocked"):
+        flow = {"branch": "task/issue-3189", "flow_status": status}
+        assert (
+            manager._is_reusable_auto_flow(flow, 3189) is True
+        ), f"{status} should be reusable"
+
+
+@pytest.mark.parametrize("flow_status", ["done", "review", "failed"])
+def test_create_flow_for_issue_does_not_reactivate_pr_terminal_flow(
+    flow_status: str,
+) -> None:
+    """The public creation entrypoint must enforce terminal-state semantics."""
+    from vibe3.domain.flow_manager import FlowManager
+
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    git.branch_exists.return_value = True
+    branch = "task/issue-3189"
+    terminal_flow = {"branch": branch, "flow_status": flow_status}
+    store.get_flows_by_issue.return_value = [terminal_flow]
+
+    manager = FlowManager(
+        config,
+        store=store,
+        git=git,
+        github=MagicMock(),
+        registry=MagicMock(),
+    )
+    manager._bootstrap_service.bootstrap_issue_flow = MagicMock()
+
+    with pytest.raises(RuntimeError, match=f"flow is {flow_status}"):
+        manager.create_flow_for_issue(IssueInfo(number=3189, title="Terminal flow"))
+
+    manager._bootstrap_service.bootstrap_issue_flow.assert_not_called()

@@ -445,3 +445,90 @@ class TestQualifyGateGitHubClosed:
             terminate_sessions=True,
             keep_flow_record=True,
         )
+
+    def test_closed_issue_review_flow_not_overwritten(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """flow_status=review → mark_flow_aborted NOT called (Issue #3189).
+
+        review is a PR-backed terminal state; closing the issue must not
+        overwrite it to aborted.
+        """
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={"flow_status": "review"}
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 3189, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-3189",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_failed_flow_not_overwritten(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """flow_status=failed → mark_flow_aborted NOT called (Issue #3189)."""
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={"flow_status": "failed"}
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service, 3190, IssueState.READY, ["state/ready"]
+        )
+
+        assert result is None
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-3190",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )
+
+    def test_closed_issue_review_flow_eligible_transitions_to_done(
+        self, qualify_gate_service: QualifyGateService
+    ) -> None:
+        """review + all phases done + PR merged → transition to done (Issue #3189).
+
+        PR-backed terminal states route through the same eligibility heuristic
+        as aborted flows.
+        """
+        qualify_gate_service._store.get_flow_state = Mock(
+            return_value={
+                "flow_status": "review",
+                "planner_status": "done",
+                "executor_status": "done",
+                "reviewer_status": "done",
+                "pr_ref": "refs/pull/3191/head",
+                "pr_number": 3191,
+            }
+        )
+
+        result, mock_cleanup_svc, mock_flow_status_svc = self._run_with_closed_issue(
+            qualify_gate_service,
+            3191,
+            IssueState.READY,
+            ["state/ready"],
+            eligibility_result=(True, 3191),
+        )
+
+        assert result is None
+        mock_flow_status_svc.return_value.mark_flow_aborted.assert_not_called()
+        mock_flow_status_svc.return_value.transition_aborted_to_done.assert_called_once_with(
+            "task/issue-3191",
+            "Issue #3191 closed, all phases complete, PR merged",
+            pr_number=3191,
+        )
+        mock_cleanup_svc.return_value.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-3191",
+            include_remote=False,
+            terminate_sessions=True,
+            keep_flow_record=True,
+        )

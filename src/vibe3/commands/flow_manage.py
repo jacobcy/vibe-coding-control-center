@@ -56,10 +56,6 @@ NameOption = Annotated[
         help="Flow 名称/Slug (默认从 branch 推断)",
     ),
 ]
-StatusFilterOption = Annotated[
-    Literal["active", "blocked", "done", "stale"] | None,
-    typer.Option("--status", help="Filter by status"),
-]
 BindRoleOption = Annotated[
     Literal["task", "related", "dependency"],
     typer.Option("--role", help="Issue role (task, related, or dependency)"),

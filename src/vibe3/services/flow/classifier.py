@@ -24,6 +24,8 @@ class FlowState(str, Enum):
     ACTIVE = "active"
     BLOCKED = "blocked"  # Inferred from blocked_reason presence
     DONE = "done"
+    REVIEW = "review"  # Issue #3189: terminal state with PR
+    FAILED = "failed"  # Issue #3189: terminal state with PR
     ABORTED = "aborted"
     STALE = "stale"
 
@@ -56,8 +58,8 @@ def classify_flow(flow: FlowStatusResponse) -> FlowCategory:
 def get_flow_state(flow: FlowStatusResponse) -> FlowState:
     """Get flow execution state for display grouping.
 
-    Blocked status is inferred from blocked_reason presence rather than
-    flow_status, since blocked/failed were removed from flow_status literal.
+    Blocked state may be represented by persisted ``flow_status`` or by
+    ``blocked_reason`` metadata while remote label synchronization converges.
 
     Args:
         flow: Flow status response
@@ -73,7 +75,10 @@ def get_flow_state(flow: FlowStatusResponse) -> FlowState:
     # Map flow_status to display state
     status_to_state = {
         "active": FlowState.ACTIVE,
+        "blocked": FlowState.BLOCKED,
         "done": FlowState.DONE,
+        "review": FlowState.REVIEW,
+        "failed": FlowState.FAILED,
         "aborted": FlowState.ABORTED,
         "stale": FlowState.STALE,
     }

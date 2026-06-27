@@ -90,7 +90,7 @@ class DispatchHealthService:
         # Terminal state: skip dispatch cleanly
         # Exception: "aborted" needs recovery check by flow_manager
         # (rebuild if branch missing)
-        if flow_status in ("done", "stale", "review"):
+        if flow_status in ("done", "stale", "review", "failed"):
             self._emit_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: skipped #{issue.number} "

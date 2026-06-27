@@ -275,7 +275,9 @@ def render_flows_status_dashboard(
         state_order = [
             FlowState.ACTIVE,
             FlowState.BLOCKED,
+            FlowState.REVIEW,
             FlowState.DONE,
+            FlowState.FAILED,
             FlowState.STALE,
             FlowState.ABORTED,
         ]
