@@ -459,8 +459,8 @@ class GitClient:
             common.append("--cached")
         common.append("--find-renames")
         revisions = [ref for ref in (base, head) if ref is not None]
-        name_status = self._run([*common, "--name-status", *revisions])
-        numstat = self._run([*common, "--numstat", *revisions])
+        name_status = self._run([*common, "--name-status", "-z", *revisions])
+        numstat = self._run([*common, "--numstat", "-z", *revisions])
         return name_status, numstat
 
     def branch_exists(self, branch_name: str) -> bool:

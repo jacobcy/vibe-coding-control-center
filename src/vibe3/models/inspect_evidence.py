@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class KernelImpact(StrEnum):
@@ -30,6 +30,13 @@ class SourceRange(BaseModel):
     start_line: int = Field(ge=1)
     end_line: int = Field(ge=1)
 
+    @model_validator(mode="after")
+    def validate_order(self) -> Self:
+        """Reject ranges that cannot point to real source text."""
+        if self.end_line < self.start_line:
+            raise ValueError("end_line must be greater than or equal to start_line")
+        return self
+
 
 class Diagnostic(BaseModel):
     """Explicit failure, skip, or limitation evidence."""
@@ -45,7 +52,7 @@ class ChangedFileFact(BaseModel):
 
     path: str
     old_path: str | None = None
-    status: Literal["A", "M", "D", "R"]
+    status: Literal["A", "C", "D", "M", "R", "T", "U", "X", "B"]
     additions: int | None = Field(default=None, ge=0)
     deletions: int | None = Field(default=None, ge=0)
     binary: bool = False

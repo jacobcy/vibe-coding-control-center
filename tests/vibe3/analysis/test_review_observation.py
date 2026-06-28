@@ -5,10 +5,16 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 import yaml
 
-from vibe3.analysis.review_observation import build_review_observation
+from vibe3.analysis.review_observation import (
+    _parse_changed_files,
+    _partition_summary,
+    build_review_observation,
+)
 from vibe3.clients import GitClient
 
 
@@ -199,3 +205,74 @@ def test_committed_rename_and_binary_numstat_are_explicit(tmp_path: Path) -> Non
     assert facts["binary.bin"].deletions is None
     assert result.changes.summary.committed.additions is None
     assert result.changes.summary.committed.deletions is None
+
+
+def test_nul_metadata_preserves_special_paths_and_git_statuses() -> None:
+    facts = _parse_changed_files(
+        "M\0a => b.py\0T\0typed.py\0C100\0source.py\0copy.py\0",
+        "3\t2\ta => b.py\0-\t-\ttyped.py\0" "4\t0\t\0source.py\0copy.py\0",
+    )
+
+    by_path = {fact.path: fact for fact in facts}
+    assert by_path["a => b.py"].additions == 3
+    assert by_path["a => b.py"].deletions == 2
+    assert by_path["typed.py"].status == "T"
+    assert by_path["typed.py"].binary is True
+    assert by_path["copy.py"].status == "C"
+    assert by_path["copy.py"].old_path == "source.py"
+    assert by_path["copy.py"].additions == 4
+
+
+def test_missing_numstat_is_unknown_not_zero() -> None:
+    fact = _parse_changed_files("M\0missing.py\0", "")[0]
+
+    assert fact.additions is None
+    assert fact.deletions is None
+    assert fact.binary is False
+    assert _partition_summary([fact]).additions is None
+    assert _partition_summary([fact]).deletions is None
+
+
+def test_malformed_nul_metadata_is_not_silently_dropped() -> None:
+    with pytest.raises(ValueError, match="name-status"):
+        _parse_changed_files("M\0", "")
+
+
+def test_invalid_git_metadata_returns_error_observation(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    git = GitClient(cwd=repo)
+
+    with patch.object(git, "get_diff_metadata", return_value=("M\0", "")):
+        result = build_review_observation(
+            requested_base="main",
+            resolved_base="main",
+            git=git,
+            manifest_path=_manifest(repo, "base.txt"),
+        )
+
+    assert result.status == "error"
+    assert result.diagnostics[0].code == "git_metadata_invalid"
+
+
+def test_real_git_preserves_numstat_for_arrow_in_filename(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write(repo, "a => b.py", "value = 0\n")
+    _git(repo, "add", "a => b.py")
+    _git(repo, "commit", "-m", "add special path")
+    _git(repo, "branch", "-f", "main", "HEAD")
+
+    _write(repo, "a => b.py", "value = 1\nextra = 2\n")
+    _git(repo, "add", "a => b.py")
+    _git(repo, "commit", "-m", "modify special path")
+
+    result = build_review_observation(
+        requested_base="main",
+        resolved_base="main",
+        git=GitClient(cwd=repo),
+        manifest_path=_manifest(repo, "base.txt"),
+    )
+
+    fact = result.changes.committed[0]
+    assert fact.path == "a => b.py"
+    assert fact.additions == 2
+    assert fact.deletions == 1

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from vibe3.analysis.review_kernel import (
     ReviewKernelConfigError,
@@ -15,8 +16,6 @@ def _write_manifest(
     root: Path,
     entries: list[dict[str, object]],
 ) -> Path:
-    import yaml
-
     path = root / "config" / "v3" / "review_kernel.yaml"
     path.parent.mkdir(parents=True)
     path.write_text(
@@ -138,3 +137,29 @@ def test_manifest_rejects_missing_file(tmp_path: Path) -> None:
 
     with pytest.raises(ReviewKernelConfigError, match="does not exist"):
         load_review_kernel(manifest_path)
+
+
+def test_manifest_outside_config_uses_current_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    relative_path = "src/vibe3/config/loader.py"
+    _touch(repo_root, relative_path)
+    manifest_path = tmp_path / "review-kernel.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "architecture_packages": ["runtime", "orchestra"],
+                "entries": [_entry(relative_path)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(repo_root)
+
+    manifest = load_review_kernel(manifest_path)
+
+    assert manifest.entries[0].path == relative_path

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import yaml
 from typer.testing import CliRunner
 
 from vibe3.commands.inspect import app
@@ -107,6 +108,16 @@ def test_inspect_base_json_emits_versioned_evidence_contract() -> None:
     }
     assert "score" not in payload
     assert "impacted_modules" not in payload
+
+
+def test_inspect_base_yaml_emits_versioned_evidence_contract() -> None:
+    result, _ = _invoke_with_observation(["base", "--yaml"], _observation())
+
+    assert result.exit_code == 0
+    payload = yaml.safe_load(result.output)
+    assert payload["schema_version"] == 1
+    assert payload["comparison"]["merge_base_sha"] == "b" * 40
+    assert payload["kernel"]["impact"] == "large"
 
 
 def test_inspect_base_human_output_explains_kernel_evidence() -> None:

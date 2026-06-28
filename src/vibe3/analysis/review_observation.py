@@ -26,30 +26,56 @@ from vibe3.models import (
 )
 
 
-def _normalize_numstat_path(path: str) -> str:
-    """Return the destination path from Git's human-readable rename form."""
-    if " => " not in path:
-        return path
-    if "{" in path and "}" in path:
-        prefix, remainder = path.split("{", 1)
-        change, suffix = remainder.split("}", 1)
-        destination = change.split(" => ", 1)[1]
-        return f"{prefix}{destination}{suffix}"
-    return path.split(" => ", 1)[1]
+class GitMetadataParseError(ValueError):
+    """Raised when Git metadata cannot be represented without guessing."""
+
+
+_GIT_STATUSES = frozenset({"A", "C", "D", "M", "R", "T", "U", "X", "B"})
+
+
+def _nul_tokens(output: str, *, label: str) -> list[str]:
+    if not output:
+        return []
+    if not output.endswith("\0"):
+        raise GitMetadataParseError(f"Malformed {label}: missing NUL terminator")
+    return output[:-1].split("\0")
 
 
 def _parse_numstat(output: str) -> dict[str, tuple[int | None, int | None, bool]]:
     stats: dict[str, tuple[int | None, int | None, bool]] = {}
-    for line in output.splitlines():
-        parts = line.split("\t", 2)
+    tokens = _nul_tokens(output, label="numstat")
+    index = 0
+    while index < len(tokens):
+        record = tokens[index]
+        index += 1
+        parts = record.split("\t", 2)
         if len(parts) != 3:
-            continue
-        added, deleted, raw_path = parts
-        path = _normalize_numstat_path(raw_path)
+            raise GitMetadataParseError("Malformed numstat record")
+        added, deleted, path = parts
+        if not path:
+            if index + 1 >= len(tokens):
+                raise GitMetadataParseError("Malformed numstat rename/copy record")
+            _old_path, path = tokens[index], tokens[index + 1]
+            index += 2
+        if not path:
+            raise GitMetadataParseError("Malformed numstat record: empty path")
         binary = added == "-" or deleted == "-"
+        if binary and (added, deleted) != ("-", "-"):
+            raise GitMetadataParseError("Malformed numstat binary record")
+        if path in stats:
+            raise GitMetadataParseError(f"Duplicate numstat path: {path}")
+        try:
+            additions = None if binary else int(added)
+            deletions = None if binary else int(deleted)
+        except ValueError as exc:
+            raise GitMetadataParseError("Malformed numstat line counts") from exc
+        if (additions is not None and additions < 0) or (
+            deletions is not None and deletions < 0
+        ):
+            raise GitMetadataParseError("Malformed numstat negative line count")
         stats[path] = (
-            None if binary else int(added),
-            None if binary else int(deleted),
+            additions,
+            deletions,
             binary,
         )
     return stats
@@ -58,20 +84,36 @@ def _parse_numstat(output: str) -> dict[str, tuple[int | None, int | None, bool]
 def _parse_changed_files(name_status: str, numstat: str) -> list[ChangedFileFact]:
     stats = _parse_numstat(numstat)
     facts: list[ChangedFileFact] = []
-    for line in name_status.splitlines():
-        parts = line.split("\t")
-        if len(parts) < 2:
-            continue
-        raw_status = parts[0]
+    tokens = _nul_tokens(name_status, label="name-status")
+    index = 0
+    while index < len(tokens):
+        raw_status = tokens[index]
+        index += 1
+        if not raw_status:
+            raise GitMetadataParseError("Malformed name-status record: empty status")
         status = raw_status[:1]
-        if status not in {"A", "M", "D", "R"}:
-            continue
-        old_path: str | None = None
-        if status == "R" and len(parts) >= 3:
-            old_path, path = parts[1], parts[2]
+        if status not in _GIT_STATUSES:
+            raise GitMetadataParseError(f"Unknown name-status code: {raw_status}")
+        if status in {"R", "C"}:
+            if not raw_status[1:].isdigit():
+                raise GitMetadataParseError(
+                    f"Malformed name-status similarity score: {raw_status}"
+                )
+            if index + 1 >= len(tokens):
+                raise GitMetadataParseError("Malformed name-status rename/copy record")
+            old_path, path = tokens[index], tokens[index + 1]
+            index += 2
         else:
-            path = parts[1]
-        additions, deletions, binary = stats.get(path, (0, 0, False))
+            if raw_status != status or index >= len(tokens):
+                raise GitMetadataParseError(
+                    f"Malformed name-status record: {raw_status}"
+                )
+            old_path = None
+            path = tokens[index]
+            index += 1
+        if not path or (old_path is not None and not old_path):
+            raise GitMetadataParseError("Malformed name-status record: empty path")
+        additions, deletions, binary = stats.get(path, (None, None, False))
         facts.append(
             ChangedFileFact(
                 path=path,
@@ -86,7 +128,7 @@ def _parse_changed_files(name_status: str, numstat: str) -> list[ChangedFileFact
 
 
 def _partition_summary(facts: list[ChangedFileFact]) -> ChangePartitionSummary:
-    if any(fact.binary for fact in facts):
+    if any(fact.additions is None or fact.deletions is None for fact in facts):
         additions: int | None = None
         deletions: int | None = None
     else:
@@ -156,10 +198,15 @@ def build_review_observation(
             resolved_base=resolved_base,
             merge_base_sha=merge_base,
         )
-    except GitError as exc:
+    except (GitError, GitMetadataParseError) as exc:
+        code = (
+            "git_metadata_invalid"
+            if isinstance(exc, GitMetadataParseError)
+            else "git_comparison_failed"
+        )
         return ReviewObservation(
             status="error",
-            diagnostics=[Diagnostic(code="git_comparison_failed", message=str(exc))],
+            diagnostics=[Diagnostic(code=code, message=str(exc))],
         )
 
     changed_paths = _changed_path_sources(changes)
