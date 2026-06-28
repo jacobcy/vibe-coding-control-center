@@ -108,7 +108,7 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
     # Append change summary (git-only, no snapshot dependency)
     if metadata.branch:
         try:
-            from vibe3.analysis.git_diff_summary import get_git_diff_summary
+            from vibe3.analysis import get_git_diff_summary
 
             diff_summary = get_git_diff_summary(metadata.branch)
             result += "\n\n---\n\n" + _format_diff_summary(diff_summary)
