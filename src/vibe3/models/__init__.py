@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
     from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+    from vibe3.models.diff_summary import DiffSummary
     from vibe3.models.dispatch import DispatchExclusion
     from vibe3.models.domain_events import (
         ControlPlaneEventPublished,
@@ -113,20 +114,6 @@ if TYPE_CHECKING:
     from vibe3.models.review import ReviewRequest, ReviewScope
     from vibe3.models.review_runner import AgentOptions, AgentResult
     from vibe3.models.session_types import SessionRole
-    from vibe3.models.snapshot import (
-        DependencyChange,
-        DependencyEdge,
-        DiffSummary,
-        DiffWarning,
-        FileChange,
-        FileSnapshot,
-        FunctionSnapshot,
-        ModuleChange,
-        ModuleSnapshot,
-        StructureDiff,
-        StructureMetrics,
-        StructureSnapshot,
-    )
     from vibe3.models.state_machine import (
         STATE_LABEL_META,
         VIBE_TASK_LABEL,
@@ -217,18 +204,7 @@ _LAZY_IMPORTS = {
     "AgentOptions": "vibe3.models.review_runner",
     "AgentResult": "vibe3.models.review_runner",
     "SessionRole": "vibe3.models.session_types",
-    "DependencyChange": "vibe3.models.snapshot",
-    "DependencyEdge": "vibe3.models.snapshot",
-    "DiffSummary": "vibe3.models.snapshot",
-    "DiffWarning": "vibe3.models.snapshot",
-    "FileChange": "vibe3.models.snapshot",
-    "FileSnapshot": "vibe3.models.snapshot",
-    "FunctionSnapshot": "vibe3.models.snapshot",
-    "ModuleChange": "vibe3.models.snapshot",
-    "ModuleSnapshot": "vibe3.models.snapshot",
-    "StructureDiff": "vibe3.models.snapshot",
-    "StructureMetrics": "vibe3.models.snapshot",
-    "StructureSnapshot": "vibe3.models.snapshot",
+    "DiffSummary": "vibe3.models.diff_summary",
     "ExecutionStep": "vibe3.models.trace",
     "TraceOutput": "vibe3.models.trace",
     "UpdatePRRequest": "vibe3.models.pr",
@@ -301,18 +277,13 @@ __all__: list[str] = [
     "DataSource",
     "DeadCodeFinding",
     "DeadCodeReport",
-    "DependencyChange",
+    "DiffSummary",
     "DispatchExclusion",
     "DomainEvent",
-    "DependencyEdge",
-    "DiffSummary",
-    "DiffWarning",
     "ExecutionLaunchResult",
     "ExecutionRequest",
     "ExecutionStep",
     "ExecutorDispatchIntent",
-    "FileChange",
-    "FileSnapshot",
     "FlowBlocked",
     "FlowCompleted",
     "FlowEvent",
@@ -320,7 +291,6 @@ __all__: list[str] = [
     "FlowStateProjection",
     "FlowStatusResponse",
     "FORBIDDEN_TRANSITIONS",
-    "FunctionSnapshot",
     "GovernanceConfig",
     "IssueFailed",
     "IssueInfo",
@@ -335,8 +305,6 @@ __all__: list[str] = [
     "ManualPlanIntent",
     "ManualRunIntent",
     "ManualReviewIntent",
-    "ModuleChange",
-    "ModuleSnapshot",
     "normalize_actor",
     "OrchestraConfig",
     "PeriodicCheckConfig",
@@ -359,9 +327,6 @@ __all__: list[str] = [
     "SessionRole",
     "STATE_LABEL_META",
     "StateTransition",
-    "StructureDiff",
-    "StructureMetrics",
-    "StructureSnapshot",
     "SupervisorHandoffConfig",
     "SupervisorIssueIdentified",
     "TimelineEvent",

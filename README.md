@@ -34,14 +34,14 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 - `vibe3 handoff show` / `status` / `append` — Agent 协作上下文
 - `vibe3 plan` / `run` / `review` — Agent 执行入口
 - `vibe3 serve` / `scan` / `check` — 基础设施与治理服务
-- `vibe3 snapshot` / `inspect` / `ask` — 项目分析与知识检索
+- `vibe3 inspect` / `ask` — 项目分析与知识检索
 
 ## 快速开始
 
 ```bash
 # 1. 查看 V3 运行时与任务状态 (这是 Agent 的首选入口)
 vibe3 task status      # 全局任务面板（推荐，覆盖 Tier 3/2 概览）
-vibe3 snapshot show    # 查看项目健康度仪表盘 (Tier 1)
+vibe3 inspect base      # 查看项目结构概览 (Tier 1)
 vibe3 flow show        # 查看当前分支 Flow 详情 (Tier 2)
 ```
 

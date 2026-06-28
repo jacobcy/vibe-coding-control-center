@@ -38,9 +38,6 @@ Subcommands:
   dead-code [<root>]         Find unused functions
   commands [<cmd> <subcmd>]  Static analysis of CLI command structure
 
-For project-level structure snapshots → use:
-  vibe3 snapshot             (persistent structure tracking)
-
 Examples:
   vibe3 inspect files src/vibe3/services/
   vibe3 inspect symbols src/vibe3/cli.py:app

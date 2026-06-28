@@ -7,7 +7,7 @@ This module provides a unified public API for the analysis layer, including:
 - Change scope classification (classify_changed_files, is_test_file)
 - PR scoring (PRDimensions, RiskLevel, calculate_risk_score, generate_score_report)
 - Output adapters (as_list, as_mapping, score, impact, dag)
-- Snapshot diff (compute_diff)
+- Git-based diff summary (get_git_diff_summary)
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         build_module_graph,
         expand_impacted_modules,
     )
+    from vibe3.analysis.git_diff_summary import get_git_diff_summary
 
     # Output adapters
     from vibe3.analysis.inspect_output_adapter import (
@@ -59,30 +60,6 @@ if TYPE_CHECKING:
         generate_score_report,
     )
     from vibe3.analysis.serena_service import SerenaService
-
-    # Snapshot baseline operations
-    from vibe3.analysis.snapshot_baseline import (
-        backfill_baseline_registry,
-        load_branch_baseline,
-        save_branch_baseline,
-    )
-
-    # Snapshot diff
-    from vibe3.analysis.snapshot_diff import compute_diff
-
-    # Snapshot diff facade
-    from vibe3.analysis.snapshot_diff_facade import get_diff_summary
-
-    # Snapshot diff section
-    from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
-
-    # Snapshot service
-    from vibe3.analysis.snapshot_service import (
-        SnapshotError,
-        build_snapshot,
-        build_snapshot_diff,
-        find_snapshot_by_branch,
-    )
 
 # Lazy imports
 _LAZY_IMPORTS = {
@@ -114,19 +91,9 @@ _LAZY_IMPORTS = {
     "impact": "vibe3.analysis.inspect_output_adapter",
     "dag": "vibe3.analysis.inspect_output_adapter",
     "pr_analysis_summary": "vibe3.analysis.inspect_output_adapter",
-    "compute_diff": "vibe3.analysis.snapshot_diff",
-    "get_diff_summary": "vibe3.analysis.snapshot_diff_facade",
+    "get_git_diff_summary": "vibe3.analysis.git_diff_summary",
     "find_latest_prepush_report": "vibe3.analysis.local_review_report",
     "LocalReviewReport": "vibe3.analysis.local_review_report",
-    "SnapshotError": "vibe3.analysis.snapshot_service",
-    "build_snapshot": "vibe3.analysis.snapshot_service",
-    "build_snapshot_diff": "vibe3.analysis.snapshot_service",
-    "find_snapshot_by_branch": "vibe3.analysis.snapshot_service",
-    "save_branch_baseline": "vibe3.analysis.snapshot_baseline",
-    "load_branch_baseline": "vibe3.analysis.snapshot_baseline",
-    "backfill_baseline_registry": "vibe3.analysis.snapshot_baseline",
-    "build_snapshot_diff_section": "vibe3.analysis.snapshot_diff_section",
-    "snapshot_service": "vibe3.analysis.snapshot_service",
     "structure_service": "vibe3.analysis.structure_service",
 }
 
@@ -177,19 +144,9 @@ __all__ = [
     "impact",
     "dag",
     "pr_analysis_summary",
-    # Snapshot diff
-    "compute_diff",
-    "get_diff_summary",
+    # Git-based diff summary
+    "get_git_diff_summary",
     "find_latest_prepush_report",
     "LocalReviewReport",
-    "SnapshotError",
-    "build_snapshot",
-    "build_snapshot_diff",
-    "find_snapshot_by_branch",
-    "save_branch_baseline",
-    "load_branch_baseline",
-    "backfill_baseline_registry",
-    "build_snapshot_diff_section",
-    "snapshot_service",
     "structure_service",
 ]

@@ -270,10 +270,6 @@ recipes:
             source:
               kind: provider
               provider: common.rules@project
-          - key: review.snapshot_diff
-            source:
-              kind: provider
-              provider: review.snapshot_diff
           - key: review.ast_analysis
             source:
               kind: provider
@@ -305,10 +301,6 @@ recipes:
             source:
               kind: provider
               provider: common.rules@project
-          - key: review.snapshot_diff
-            source:
-              kind: provider
-              provider: review.snapshot_diff
           - key: review.ast_analysis
             source:
               kind: provider

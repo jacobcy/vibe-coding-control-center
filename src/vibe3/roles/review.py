@@ -14,7 +14,7 @@ from vibe3.agents import (
     describe_review_sections,
     make_review_context_builder,
 )
-from vibe3.analysis import build_change_analysis, build_snapshot_diff, changed_symbols
+from vibe3.analysis import build_change_analysis, changed_symbols
 
 # public-api: pending upstream export
 from vibe3.config import (
@@ -43,7 +43,6 @@ from vibe3.models import (
     OrchestraConfig,
     ReviewRequest,
     ReviewScope,
-    StructureDiff,
     WorktreeRequirement,
 )
 from vibe3.observability import write_prompt_provenance
@@ -342,14 +341,12 @@ def build_manual_review_request_payload(
     head_branch: str | None = None,
     source_type: str,
     identifier: str,
-    structure_diff: StructureDiff | None = None,
     analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
 ) -> tuple[ReviewRequest, int | None, str | None]:
     """Consolidated factory for manual review request payloads (PR and Base)."""
     request = ReviewRequest(
         scope=scope,
         changed_symbols=changed_symbols(analysis_runner(source_type, identifier)),
-        structure_diff=structure_diff,
     )
     return request, issue_number, head_branch
 
@@ -360,22 +357,15 @@ def build_base_review_request(
     *,
     flow_service: FlowService | None = None,
     analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
-    snapshot_diff_builder: Callable[
-        [str, str | None], object | None
-    ] = build_snapshot_diff,
 ) -> tuple[ReviewRequest, int | None, str | None]:
     """Build request payload for base-branch review."""
     service = flow_service or FlowService()
     flow = service.get_flow_status(current_branch)
-    raw_diff = snapshot_diff_builder(base_branch, current_branch)
     return build_manual_review_request_payload(
         scope=ReviewScope.for_base(base_branch),
         issue_number=flow.task_issue_number if flow else None,
         source_type="branch",
         identifier=base_branch,
-        structure_diff=(
-            cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
-        ),
         analysis_runner=analysis_runner,
     )
 

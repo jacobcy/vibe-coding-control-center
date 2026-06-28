@@ -34,7 +34,6 @@ from vibe3.commands import (  # noqa: E402
     review,
     run,
     scan,
-    snapshot,
     status,
     task,
 )
@@ -70,7 +69,7 @@ Command groups by tier:
     flow, task
 
   Shell Layer (capabilities):
-    handoff, inspect, pr, snapshot, ask
+    handoff, inspect, pr, ask
 
   Agent Execution:
     run, plan, review
@@ -103,7 +102,6 @@ app.add_typer(review.app, name="review")
 app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(scan.app, name="scan")
-app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
 app.add_typer(mcp.app, name="mcp")

@@ -1,9 +1,7 @@
 """Tests for check handling of closed task issues with branch PR status."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
@@ -11,13 +9,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check.service import CheckService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-
-@pytest.fixture(autouse=True)
-def _mock_snapshot():
-    """Mock snapshot service to avoid real git operations in tests."""
-    with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
-        yield
 
 
 def _make_service(

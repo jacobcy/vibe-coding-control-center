@@ -198,23 +198,8 @@ vibe3 pr ready                        # 标记 PR 为 ready for review
 
 ```bash
 vibe3 review --branch <branch>         # 审查 issue 实现（orchestra-driven）
-vibe3 review base origin/main          # 审查本地变更 vs base branch（对比快照）
+vibe3 review base origin/main          # 审查本地变更 vs base branch
 ```
-
-#### snapshot - 项目级结构跟踪（持久化）
-
-```bash
-vibe3 snapshot build                    # 构建当前结构（仅内存）
-vibe3 snapshot save --as-baseline       # 持久化结构并设为基线
-vibe3 snapshot list                     # 列出所有保存的快照
-vibe3 snapshot show                     # 显示快照详情
-vibe3 snapshot diff                     # 与基线比较结构
-```
-
-补充语义：
-
-- 用于跟踪项目结构演进、模块/依赖/LOC 增长。
-- 单文件分析优先使用 `vibe3 inspect`。
 
 #### scan - 治理和监督扫描
 

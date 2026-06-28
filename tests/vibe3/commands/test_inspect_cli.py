@@ -26,8 +26,8 @@ def test_inspect_help_flag(cli_runner, inspect_app_fixture):
     result = cli_runner.invoke(inspect_app_fixture, ["--help"])
     assert result.exit_code == 0
     assert "metrics" not in result.output
-    assert "uncommit" in result.output
-    assert "pr" in result.output
+    assert "dead-code" in result.output
+    assert "pr" not in result.output
 
 
 # ========== Commands Tests (from test_inspect_commands.py) ==========

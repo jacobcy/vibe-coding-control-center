@@ -103,7 +103,6 @@ class FlowRebuildUsecase:
             initiated_by=source,
             ensure_worktree=ensure_worktree,
             reactivate_existing=False,
-            force_baseline=True,
         )
         assert_rebuild_postconditions(
             branch=branch,

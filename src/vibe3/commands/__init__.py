@@ -15,7 +15,6 @@ _SYMBOL_MODULES = {
     "pr": "vibe3.commands.pr",
     "review": "vibe3.commands.review",
     "run": "vibe3.commands.run",
-    "snapshot": "vibe3.commands.snapshot",
 }
 
 # Lazy import mapping for function re-exports from submodules
@@ -84,7 +83,6 @@ __all__ = [
     "pr",
     "review",
     "run",
-    "snapshot",
     "suggest_next_step",
     "render_blocked_items",
     "render_completed_flows",

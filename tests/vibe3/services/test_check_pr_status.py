@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRResponse, PRState
@@ -13,12 +11,6 @@ from vibe3.services.check.service import CheckService
 
 class TestPRStatusDetection:
     """Test PR status detection and flow auto-completion."""
-
-    @pytest.fixture(autouse=True)
-    def _mock_snapshot(self):
-        """Mock snapshot service to avoid real git operations in tests."""
-        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
-            yield
 
     def test_check_marks_flow_done_when_merged(self, tmp_path):
         """Should mark flow as done when PR is merged."""
@@ -502,11 +494,6 @@ class TestMergedPRPreservesTerminalState:
     """Issue #3189: PR-backed terminal states (review/failed) must route through
     the phase-completion eligibility check on PR merge, not be blindly marked done.
     """
-
-    @pytest.fixture(autouse=True)
-    def _mock_snapshot(self):
-        with patch("vibe3.analysis.snapshot_service.save_branch_baseline"):
-            yield
 
     def _make_pr_service(self, tmp_path):
         from vibe3.clients.git_client import GitClient
