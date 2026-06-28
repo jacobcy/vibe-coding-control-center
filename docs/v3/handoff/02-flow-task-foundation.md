@@ -93,7 +93,7 @@ The PR command surface has been simplified to focus only on delivery-carrier act
 
 **Public PR Commands (Final)**:
 - `pr create` - Create draft PR with project context (task, flow, spec metadata)
-- `pr ready` - Mark PR as ready with quality gates (coverage, risk score)
+- `pr ready` - Mark PR as ready with configured quality gates
 - `pr show` - Show PR status with change analysis and risk summary
 
 **Removed from Public CLI**:

@@ -293,7 +293,7 @@ Planner 必须在 plan 中显式回答以下问题之一：
 
 2. **本计划包含死代码清理，范围为：`<具体文件:符号列表>`**
    - 必须列出具体的符号名（函数、类、方法）
-   - 必须提供验证依据：`inspect symbols` 引用计数为零的证据
+   - 必须提供独立验证依据；`inspect symbols` 的零观察不能证明 unused
    - 清理范围仅限于 plan 中显式列出的符号，不得扩展
 
 **禁止事项**：
@@ -310,8 +310,8 @@ Planner 必须在 plan 中显式回答以下问题之一：
 
 - [ ] 本计划不包含死代码清理
 - [x] 本计划包含死代码清理，范围为：
-  - `<module>/old_module.py:deprecated_function`（引用计数：0，验证命令：`vibe3 inspect symbols <module>/old_module.py:deprecated_function`）
-  - `<module>/legacy_service.py:OldClass`（引用计数：0，验证命令：`vibe3 inspect symbols <module>/legacy_service.py:OldClass`）
+  - `<module>/old_module.py:deprecated_function`（验证：显式入口审计、精确搜索、目标测试）
+  - `<module>/legacy_service.py:OldClass`（验证：显式入口审计、精确搜索、目标测试）
 ```
 
 ### 治理与 prompt 改动
@@ -328,7 +328,7 @@ Planner 必须在 plan 中显式回答以下问题之一：
 如果计划涉及工具选择或分析流程调整，额外要求：
 - 用当前 CLI 实际帮助输出确认 inspect 子命令是否存在
 - 把 `inspect files` 视为单文件结构工具，而不是影响面分析替代品
-- 仅在需要理解命令静态拓扑时才纳入 `inspect commands`
+- 公共 inspect 子命令只有 `base`、`files`、`symbols`，不得规划不存在的分析能力
 
 ### 风险较高改动
 

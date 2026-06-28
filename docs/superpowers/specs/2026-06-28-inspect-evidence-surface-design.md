@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-28
 **Issue:** #3218
-**Status:** Draft for user review
+**Status:** Implemented; pending branch publication
 
 ## 1. Context
 

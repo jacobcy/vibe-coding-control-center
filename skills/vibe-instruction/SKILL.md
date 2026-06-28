@@ -181,9 +181,9 @@ vibe3 handoff append "..." --kind note    # 记录关键发现或里程碑
 #### inspect - 代码智能分析
 
 ```bash
-vibe3 inspect symbols <file>:<symbol> # 跨文件查找符号引用
-vibe3 inspect base origin/main        # 分析当前分支与主干的结构差异
-vibe3 inspect files <path>            # 统计文件 LOC、方法数与内部依赖
+vibe3 inspect symbols <file>:<symbol> # 查看经范围校验的静态引用证据
+vibe3 inspect base origin/main        # 查看精确 Git 改动与 Kernel review 等级
+vibe3 inspect files <file.py>         # 查看单个 Python 文件的 AST 事实
 ```
 
 #### pr - Pull Request 管理

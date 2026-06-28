@@ -103,9 +103,9 @@ related_docs:
   - 显示执行步骤
   - **预估**: 3-4 小时
 
-- [ ] **`vibe3 inspect pr 42 --trace`**
-  - 输出调用链路
-  - 显示数据流
+- [x] **`vibe3 inspect base origin/main --trace`**
+  - 输出命令执行调试追踪
+  - 不作为源码影响分析结果
   - **预估**: 3-4 小时
 
 ### 2.3 文档
@@ -304,7 +304,7 @@ Orchestra ready queue 使用三级排序：
 ### Phase 2 验收
 
 - [ ] `vibe3 review pr 42 --trace` 输出调用链路
-- [ ] `vibe3 inspect pr 42 --trace` 输出调用链路
+- [x] `vibe3 inspect base origin/main --trace` 输出命令执行调试追踪（不表示影响分析）
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 

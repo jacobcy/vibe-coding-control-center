@@ -1,5 +1,9 @@
 # Vibe Center 质量控制系统改进计划
 
+> **状态**：历史计划，已被 2026-06-28 的 Inspect Evidence Surface 设计取代。
+> 本文中的 snapshot、risk score、DAG、旧 inspect 子命令和服务路径仅用于历史追溯，不代表当前接口或实现。
+> 当前真源见 `docs/v3/architecture/analysis-semantics.md`。
+>
 > **文档定位**：本计划基于审计报告和三个设计文档，制定务实、分阶段的改进方案
 > **核心原则**：解决实际问题，不过度工程化，优先利用已有能力
 

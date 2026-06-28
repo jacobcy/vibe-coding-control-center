@@ -282,7 +282,7 @@ def help(
     Examples:
         vibe3 help
         vibe3 help flow
-        vibe3 help inspect pr
+        vibe3 help inspect base
     """
     import click
 

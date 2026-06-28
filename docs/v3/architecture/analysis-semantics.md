@@ -1,70 +1,49 @@
-# Inspect 分析语义
+# Inspect 证据语义
 
-> **Updated**: 2026-06-28 - Issue #3215 快照子系统退役
+> **Updated**: 2026-06-28 — Issue #3218
 
-本文档说明 Vibe 3.0 中 `inspect` 分析工具的职责和语义。
+`vibe3 inspect` 是 PR/review 的补充观察窗口，只输出可回指 Git object、当前文件内容或有效源码范围的证据。它不预测运行时影响，不计算风险分数，也不判断 dead code。
 
-## 概述
-
-`inspect` 是 Vibe 3.0 的核心分析能力，服务于 `review` 流程，提供单次改动的语义分析。
-
-## Inspect（单次改动分析）
-
-### 职责
-
-- **changed_symbols**: 改动涉及的符号列表（函数、类、方法）
-- **风险评分**: 基于 symbols 的风险等级评估
-- **函数级影响分析**: 调用链路追踪、依赖关系分析
-
-### 入口
+## 公共命令
 
 ```bash
-vibe3 inspect base        # 分析当前分支与 base 的差异
-vibe3 inspect uncommit    # 分析未提交的改动
-vibe3 inspect symbols     # 查找符号引用
-vibe3 inspect files       # 统计文件形状
+vibe3 inspect base [<base>] --json
+vibe3 inspect files <file.py> --json
+vibe3 inspect symbols <file.py>:<symbol> --json
 ```
 
-### 消费方
+只保留 `base`、`files`、`symbols`。`pr`、`commit`、`uncommit`、`commands`、`dead-code` 不属于公共接口。
 
-- `review base`: 消费 `inspect base` 输出
-- `review pr`: 消费 `inspect pr` 输出
+## `inspect base`
 
-## Review 中的消费契约
+Schema version 为 `1`。Git 比较范围是 `merge-base(resolved_base, HEAD)..HEAD`，并分别报告：
 
-`review base` 和 `review pr` 的输入契约不同：
+- committed、staged、unstaged、untracked；
+- HEAD、resolved base、exact merge-base SHA；
+- rename、delete、binary、numstat；
+- Architecture/Review Kernel 精确文件命中；
+- 最低 review depth：`normal`、`focused`、`repeated`。
 
-### review base
+`kernel.impact` 只有 `none`、`small`、`large`，表示对仓库定义核心文件的命中程度，不是运行时影响预测。`impact_analysis.status` 固定为 `disabled`，原因是现有 benchmark 未通过可靠性门槛。
 
-```python
-ReviewRequest(
-    changed_symbols=inspect_output.changed_symbols,  # ← inspect 输出
-    ...
-)
-```
+## `inspect files`
 
-- 使用 `inspect` 输出
-- Base review 分析当前分支相对于 base 的所有提交累积
+只接受一个 Python 文件，输出 content SHA256、总行数、AST declaration 的 1-based inclusive range 和直接 imports。不扫描目录，不生成 imported-by 或依赖扩散。
 
-### review pr
+## `inspect symbols`
 
-```python
-ReviewRequest(
-    changed_symbols=inspect_output.changed_symbols,  # ← inspect 输出
-    ...
-)
-```
+只接受显式 `<file>:<symbol>`。输出经校验的 definition 和静态 provider 观察到的正向引用，范围统一为 1-based inclusive。
 
-- 使用 `inspect` 输出
-- PR diff 已隐含结构变化（新增文件、删除文件等）
+`observed_reference_count: 0` 不等于 unused；`complete` 固定为 `false`。provider 不可用或范围无效时返回 `partial`/`disabled`/`unknowns`，不得伪造空成功。
 
-## 参考实现
+## Review 消费契约
 
-源代码位置：
+`ReviewRequest.observation` 复用同一个 `ReviewObservation` model。PR show/create 和 reviewer briefing 仅在当前 worktree 能提供精确 Git 比较时消费它；无法验证时省略或明确 unavailable，不回退到旧评分或 DAG 数据。
 
-- `src/vibe3/roles/review.py`: `build_base_review_request`, `build_pr_review_request`
-- `src/vibe3/analysis/git_diff_summary.py`: Git diff 分析实现
+## 真源
 
----
-
-**维护者**: Vibe Team
+- Git change truth：`src/vibe3/analysis/review_observation.py`
+- Review Kernel：`config/v3/review_kernel.yaml`
+- Architecture Kernel taxonomy：`src/vibe3/runtime/taxonomy.py`
+- 单文件 AST：`src/vibe3/analysis/python_file_inspector.py`
+- symbol provider adapter：`src/vibe3/analysis/symbol_reference_service.py`

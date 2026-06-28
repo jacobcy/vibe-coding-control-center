@@ -97,7 +97,7 @@
 3. **发现 plan 外的死代码**：
    - 始终用 `handoff append --kind finding` 记录
    - 不执行删除，无论是否「很明显该清理」
-   - 记录内容：符号名、位置、引用计数为零的证据（`inspect symbols` 输出）
+   - 记录内容：符号名、位置、已检查入口和验证限制；`inspect symbols` 的零观察不能证明 unused
 
 **验证方式**：
 

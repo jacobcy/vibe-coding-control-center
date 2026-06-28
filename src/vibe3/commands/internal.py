@@ -259,10 +259,9 @@ def internal_bootstrap(
     """Bootstrap a standardized flow scene through the shared service path.
 
     Always creates a worktree for isolation: the standard path runs flow
-    creation, baseline snapshot, and handoff init inside the worktree so
-    concurrent bootstrap operations cannot leak file changes between flows.
-    Users who want a non-worktree flow should run `git checkout -b` manually
-    and skip bootstrap (no baseline will be created in that case).
+    creation and handoff init inside the worktree so concurrent bootstrap
+    operations cannot leak file changes between flows. Users who want a
+    non-worktree flow should run `git checkout -b` manually and skip bootstrap.
     """
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
     from vibe3.services.orchestra import FlowOrchestratorService

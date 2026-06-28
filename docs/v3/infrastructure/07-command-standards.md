@@ -66,7 +66,7 @@ vibe3                          ← 全局层（Global）
 - 不加任何参数 → 显示帮助（`no_args_is_help=True`）
 - 命令组本身不执行逻辑，只路由到子命令
 
-### 子命令层（`flow update` / `inspect pr` / `review pr` 等）
+### 子命令层（`flow update` / `inspect base` / `review pr` 等）
 
 | 参数 | 短选项 | 长选项 | 类型 | 默认值 | 用途 |
 |------|--------|--------|------|--------|------|
@@ -107,7 +107,7 @@ vibe3                          ← 全局层（Global）
 **使用场景**:
 ```bash
 vibe3 -v flow status          # INFO 日志
-vibe3 -vv inspect pr 42     # DEBUG 日志
+vibe3 -vv inspect base origin/main     # DEBUG 日志
 ```
 
 ---
@@ -124,7 +124,7 @@ vibe3 -vv inspect pr 42     # DEBUG 日志
 **使用场景**:
 ```bash
 vibe3 review pr 42 --trace
-vibe3 inspect pr 42 --trace
+vibe3 inspect base origin/main --trace
 ```
 
 **与 `-vv` 的区别**:
@@ -149,7 +149,7 @@ vibe3 inspect pr 42 --trace
 
 **使用场景**:
 ```bash
-vibe3 inspect pr 42 --json | jq '.impact'
+vibe3 inspect base origin/main --json | jq '.kernel.impact'
 RESULT=$(vibe3 inspect base main --json)
 ```
 
@@ -182,7 +182,7 @@ vibe3 flow blocked --reason "waiting on #42" --yes
 ```bash
 vibe3 -h
 vibe3 flow -h
-vibe3 inspect pr -h
+vibe3 inspect base -h
 ```
 
 ---

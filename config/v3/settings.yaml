@@ -99,9 +99,8 @@ review_scope:
     - ".claude/rules/"       # 项目规则
     - "config/"              # 配置真源
 
-  # Module growth warning threshold in lines of code
-  # When a module grows by more than this amount between snapshots,
-  # a module_growth warning is generated in the diff output.
+  # Legacy module growth threshold retained for configuration compatibility.
+  # Inspect does not consume it or infer module-growth impact.
   module_growth_threshold: 100
 
 # 质量标准
@@ -116,13 +115,13 @@ quality:
 # =====================
 # Data sources:
 # - Static: Read from config file at runtime
-# - Runtime: Injected by code (e.g., changed_symbols from inspect)
+# - Runtime: Injected by code when a command has verified runtime evidence
 #
 # Configuration boundaries:
 # - This file: Static policy path and agent execution config
 # - config/prompts/prompts.yaml: Prompt text/output contracts/retry guidance
 # - config/prompts/prompt-recipes.yaml: Prompt section assembly order
-# - Runtime code: AST analysis (changed_symbols, symbol_dag)
+# - Runtime code: verified Git, AST, Kernel and symbol-reference observations
 # - Command line: Task guidance (--message option)
 review:
   # Static: Path to review policy markdown file

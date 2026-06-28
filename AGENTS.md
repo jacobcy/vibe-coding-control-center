@@ -112,7 +112,7 @@ This project has **two parallel implementations**:
 
 - **Tier 3 (Cognitive / Governance Layer)**: 认知与治理层。负责全局策略、规则、Supervisor 治理、Issue 分检与 Roadmap 规划。对应执行等级 **L1/L2**。核心命令：`serve`, `scan`, `check`, `mcp`。
 - **Tier 2 (Skill Layer)**: 技能/编排层。负责 Flow 状态机、任务编排、Agent 执行 （Plan/Run/Review）。对应执行等级 **L3**。核心命令：`flow`, `task`, `run`, `plan`, `review`。
-- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。对应执行等级 **L3/L4**。核心命令：`handoff`, `inspect`, `pr`, `snapshot`, `ask`。
+- **Tier 1 (Shell Layer)**: 壳层/原子能力。提供原子级能力访问、状态读取与项目信息检索。对应执行等级 **L3/L4**。核心命令：`handoff`, `inspect`, `pr`, `ask`。
 
 
 ## 🤖 Protocol
@@ -158,7 +158,7 @@ Install via respective tools, then create symlinks in `.claude/skills/`. See [DE
 
 ## 代码分析工具
 
-- `vibe3 inspect symbols/files/base/pr/commit` — 代码结构与影响分析
+- `vibe3 inspect base/files/symbols` — Git 改动、Review Kernel、单文件 AST 与已验证符号引用证据
 
 - `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
 - 详细用法见 [supervisor/policies/common.md](supervisor/policies/common.md)

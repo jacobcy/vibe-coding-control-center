@@ -301,7 +301,7 @@ gh pr list --search "issue:<issue_number>" --state merged --json number,title,me
 git log --oneline -10 --all --grep="<关键词>"
 git diff main...HEAD --stat
 uv run python src/vibe3/cli.py inspect base --json
-uv run python src/vibe3/cli.py inspect commit <sha>
+uv run python src/vibe3/cli.py inspect symbols <file.py>:<symbol>
 ```
 
 **Flow / PR 现场**：
@@ -478,7 +478,7 @@ Steps:
        - 若发现重复，记录重复 Issue 编号
      - **已解决判断**：**必须验证代码实际**，不能仅凭 issue 文本判断
        - 搜索相关提交（`git log --oneline --all --grep="<关键词>"`）
-       - 检查相关文件当前状态：`uv run python src/vibe3/cli.py inspect files <path>`
+       - 检查相关 Python 文件当前状态：`uv run python src/vibe3/cli.py inspect files <file.py>`
        - 确认代码中是否已包含 issue 要求的功能/修复
        - **Merged PR 覆盖检测（强制）**：
          ```bash
@@ -599,15 +599,7 @@ Steps:
     gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
     ```
 
-     - **保存 snapshot baseline**（记录开发起点）：
-
-     ```bash
-     uv run python src/vibe3/cli.py snapshot save --as-baseline
-     ```
-
-    说明：baseline 记录了分支创建时的代码库结构，供后续 `snapshot diff` 对比分析开发过程中的结构变化。
-
-**Baseline 在 Scope Validation 中的作用**：此 baseline 作为 "claim-time baseline"，供后续 `handle_claimed()` 的 Gate 1 验证和 `handle_handoff()` 的 Gate 2 验证使用，用于检测分支是否有 pre-existing unrelated changes 或 scope violation。
+    Scope validation 不保存结构 snapshot。后续使用 Git merge-base、`inspect base --json` 的精确 change partitions 和 plan scope 进行即时比对。
 
 8. 再次读取当前 labels/state
 9. 如果 `state/claimed` 未生效：
@@ -664,7 +656,7 @@ Steps:
        - 列出具体变化文件和 commit 数量
        - 进入 `state/blocked`
        - `exit()`
-2.5. **Pre-execution Scope Baseline Validation（新增）**：
+2.5. **Pre-execution Scope Evidence Validation**：
    - **目的**：检测分支上是否已存在与当前 issue scope 无关的改动，避免执行继承无关工作。
    - **执行时机**：在架构风险评估后、确认 claimed 状态前。
    - **操作步骤**：
@@ -672,32 +664,16 @@ Steps:
         ```bash
         uv run python src/vibe3/cli.py inspect base --json
         ```
-        **注意**：`inspect base` 使用 `BaseResolutionUsecase` 自动检测父分支（通过 `git merge-base`、parent branch、或 scene 中的 base branch 信息），避免使用过时的基准分支。若检测到的基准分支落后 origin/main 超过 50 commits，会在输出中警告。
+        **注意**：先核对 `comparison.resolved_base` 与 `comparison.merge_base_sha` 是否符合现场预期。
      b. 分析评估结果：
-        - **主要信号**：`score.level` 字段
-          - `HIGH`: 高风险，很可能存在 unrelated changes
-          - `MEDIUM`: 中等风险，需要人工判断
-          - `LOW`: 低风险，可能都是相关改动
-        - **辅助信号**：
-          - `total_changed`: 改动文件总数
-          - `code_changed`: 代码文件改动数
-          - `score.dimensions`: 详细维度（changed_lines, changed_files, impacted_modules, public_api_touch 等）
-          - `base_branch`: 实际使用的基准分支（验证是否为预期的分支）
+        - `changes.committed/staged/unstaged/untracked`：精确文件证据
+        - `changes.summary.unique_paths`：去重后的改动文件数
+        - `kernel.hits` 与 `review.minimum_depth`：核心文件命中和最低审查深度
+        - `diagnostics`：配置或 Git 证据是否不完整
      c. 判断是否需要 block：
-        - **必须 block**：`score.level == HIGH`
-          - 写 handoff append：详细说明 pre-existing changes（文件数量、风险等级、涉及模块、base_branch）
-          - Comment：`[manager] Branch has pre-existing changes that may conflict with issue scope. <N> files changed vs base. Score: HIGH. Base branch: <base_branch>. Need human confirmation before planning.`
-          - Block：`vibe3 flow blocked --reason "Pre-existing branch changes detected: <N> files changed vs base. Score: HIGH. Scope baseline validation requires human review."`
-          - `exit()`
-        - **建议 block**：`score.level == MEDIUM` 且满足以下任一条件：
-          - `total_changed > 10` 或 `code_changed > 5`
-          - `public_api_touch == true`
-          - 基准分支落后 origin/main 超过 50 commits（可能有误判风险）
-          - 写 handoff append：说明中等风险及具体原因
-          - Comment：`[manager] Branch has medium-risk pre-existing changes. <details>. Need human confirmation.`
-          - Block：`vibe3 flow blocked --reason "Medium-risk pre-existing changes detected. <details>"`
-          - `exit()`
-        - **允许通过**：`score.level == LOW` 或改动明显在 issue scope 内
+        - Kernel impact 或 review depth 本身不触发 block，它们只提高人工审查深度。
+        - 只有精确改动文件与 issue/plan scope 确认冲突，或 comparison/diagnostics 使证据不可用时，才记录具体文件与 SHA 后 block。
+        - 不根据文件数量、静态引用数或任意风险分数自动推断 scope violation。
    - **理由**：这是最早能检测问题的时机。Plan agent 尚未启动，不会浪费执行时间。提前发现分支复用残留或无关改动，可让人类决定是清理分支还是接受改动。
 3. 复述当前已进入 claimed
 4. 明确记录：拆分窗口已关闭，后续 plan/run/review 不得再改变为 sub-issue 拆分；若 plan agent 发现 scope 无法执行，应 blocked 回 manager/人类，而不是自行拆分
@@ -826,19 +802,16 @@ Decision sketch:
          ```bash
          uv run python src/vibe3/cli.py inspect base --json
          ```
-         **优势**：
-         - 自动检测正确的 base branch（避免使用过时的基准分支）
-         - 提供详细的风险评估（score.level, dimensions）
-         - 输出 `total_changed`, `code_changed`, `changed_symbols` 等结构化信息
+         读取 `comparison`、四类 change partitions、`kernel` 与 `review.minimum_depth`；不要寻找 risk score、changed_symbols 或 impacted_modules。
       2. 从 plan 的 "Scope Boundary" / "Changes" 部分提取声明的文件列表
       3. 比对：检查 `inspect base` 输出的改动文件是否都在 plan 声明的 scope 内
       4. 若发现疑似 scope violation：
-         - 先写 handoff append：列出 out-of-scope 文件清单、score.level、base_branch，以及这些文件是否属于当前 issue 的实际变更
+         - 先写 handoff append：列出 out-of-scope 文件清单、resolved base、merge-base SHA，以及这些文件是否属于当前 issue 的实际变更
          - 核查 plan 是否遗漏了当前 issue 必要文件，或 `inspect base` 是否包含已合并 PR/main 前进带来的非当前变更
       5. 只有确认当前 issue 的实际变更违反 plan Scope Boundary 时：
          - 写 handoff append：指出真实 scope violation 的具体内容和核查证据
-         - Comment：`[manager] Branch changes exceed plan scope boundary after verification. Out-of-scope files: <list>. Score: <level>. Base branch: <base_branch>.`
-         - Block：`vibe3 flow blocked --reason "Verified scope baseline violation: branch has <N> out-of-scope files vs plan scope. Score: <level>."`
+         - Comment：`[manager] Branch changes exceed plan scope boundary after verification. Out-of-scope files: <list>. Base: <resolved_base>. Merge-base: <sha>.`
+         - Block：`vibe3 flow blocked --reason "Verified scope violation: branch has <N> out-of-scope files vs plan scope."`
          - `exit()`
       6. 若分支改动与 plan scope 一致：继续批准 plan
     - **理由**：即使 Gate 1 通过，plan agent 可能创建与分支状态不匹配的 scope 边界。这个检查在执行前捕获不匹配。使用 `inspect base` 而非 `git diff` 可以自动处理 base branch 检测问题（Issue #2076 自身遇到的误判）。
@@ -888,12 +861,12 @@ Decision sketch:
         gh issue create --title "系统改进：<改进点>" --body "<改进建议详情>"
         ```
       - 记录已创建的改进 issue 编号（用于 state/done 阶段检查）
-      - **检查 baseline 变化**：对比当前代码库结构与 baseline（开发起点）：
+      - **复核 review 证据**：读取当前 Git 改动与 Kernel 命中：
         ```bash
-        uv run python src/vibe3/cli.py snapshot diff
+        uv run python src/vibe3/cli.py inspect base --json
         ```
-        若发现重大结构变化（新增模块、依赖大幅增长、LOC 异常增加等），在 handoff 中记录发现。
-      - 写 handoff append：确认通过 + 遗漏点清单 + baseline 变化摘要，提醒 executor 在发布阶段注意
+        对 `review.minimum_depth` 要求的审查强度是否满足进行确认；不要从 inspect 推导运行时影响。
+      - 写 handoff append：确认通过 + 遗漏点清单 + Git/Kernel 证据摘要，提醒 executor 在发布阶段注意
       - 进入 `state/merge-ready`
       - comment：Review passed with notes，列出遗漏点
       - `exit()`
@@ -904,12 +877,12 @@ Decision sketch:
         gh issue create --title "系统改进：<改进点>" --body "<改进建议详情>"
         ```
       - 记录已创建的改进 issue 编号（用于 state/done 阶段检查）
-      - **检查 baseline 变化**：对比当前代码库结构与 baseline（开发起点）：
+      - **复核 review 证据**：读取当前 Git 改动与 Kernel 命中：
         ```bash
-        uv run python src/vibe3/cli.py snapshot diff
+        uv run python src/vibe3/cli.py inspect base --json
         ```
-        若发现重大结构变化（新增模块、依赖大幅增长、LOC 异常增加等），在 handoff 中记录发现。
-      - 写 handoff append：确认审核通过 + baseline 变化摘要，说明进入 merge-ready 后的发布注意事项
+        对 `review.minimum_depth` 要求的审查强度是否满足进行确认；不要从 inspect 推导运行时影响。
+      - 写 handoff append：确认审核通过 + Git/Kernel 证据摘要，说明进入 merge-ready 后的发布注意事项
       - 进入 `state/merge-ready`
       - comment：Review passed, moving to merge-ready
       - `exit()`
@@ -1309,7 +1282,7 @@ handoff 不应用来：
 
 - **Review 是否有足够证据？**
   - 是否基于代码实际，而不是凭经验？
-  - 是否用 inspect 确认影响面？
+  - 是否用 inspect 确认精确改动、Kernel 命中和正向引用，并用测试/运行时证据补足影响判断？
   - verdict 是否有明确的代码证据？
 
 ### 2. 发现哪些系统性问题？

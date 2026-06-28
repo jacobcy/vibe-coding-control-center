@@ -58,36 +58,35 @@ vibe3 task show
 
 ## 工具选择顺序
 
-### 1. 影响评估与符号引用
+### 1. Review 证据与符号引用
 
 优先使用 `vibe3 inspect`。
 
-它是本项目最有价值的专用工具，适合回答这些问题：
-- 这个函数/类/命令被谁调用？
-- 这次改动会波及哪些符号和模块？
-- 这个分支风险为什么高？
-- 提交里的改动是否触及关键路径或公开入口？
+它提供可回指 Git object、当前文件或有效源码范围的观察证据，适合回答：
+- 当前分支相对 base 精确改了哪些文件？
+- 改动是否命中仓库定义的 Review Kernel？
+- 单个 Python 文件声明了哪些符号、直接 import 了什么？
+- provider 观察到了哪些经范围校验的符号引用？
 
 首选命令：
 
 ```bash
-vibe3 inspect symbols <file>
 vibe3 inspect symbols <file>:<symbol>
-vibe3 inspect files <file>
-vibe3 inspect commit <sha>
+vibe3 inspect files <file.py>
 vibe3 inspect base --json
 ```
 
 使用规则：
 - 改函数前，先跑 `inspect symbols <file>:<symbol>` 看引用位置。
-- 理解单文件职责、LOC、imports 与 imported-by 时，先跑 `inspect files`。
-- 评估一组提交或 review 范围时，优先 `inspect commit`。
-- 判断当前分支风险和影响面时，优先 `inspect base --json`。
-- `inspect commands` 只在分析 CLI 拓扑、命令注册关系时使用，不作为默认第一选择。
+- 理解单个 Python 文件的 LOC、声明范围与直接 imports 时，跑 `inspect files`。
+- 评估当前分支 review 范围时，跑 `inspect base --json`，读取精确 change partitions、Kernel 命中和最低 review depth。
+- `inspect symbols` 的零观察不等于 unused；它只提供 provider 观察到的正向引用。
 
 注意：
-- 当前实际 CLI 中**没有** `inspect structure` 子命令，不要继续引用它。
-- `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把"symbol-only 全仓搜索"当默认能力。
+- 公共子命令只有 `base`、`files`、`symbols`。
+- `inspect symbols` 只接受 `<file.py>:<symbol>`，且 `complete=false`；不得据此证明完整影响面或 dead code。
+- `inspect files` 只接受一个 Python 文件，不输出 imported-by 或跨模块扩散。
+- `inspect base` 的 Kernel impact 是精确核心文件命中，不是运行时影响预测或风险分数。
 
 ### 2. 精确字符串与配置项查找
 
@@ -194,10 +193,9 @@ vibe3 inspect files path/to/file.py
 
 ```bash
 vibe3 inspect base --json
-vibe3 inspect commit <sha>
 ```
 
-如果 inspect 已提供足够上下文，不要再把 review 退化成机械扫代码风格。
+将 inspect 与 diff、测试和运行时验证组合使用；inspect 不替代它们，也不证明运行时影响。
 
 **分支一致性验证**：
 
@@ -257,7 +255,7 @@ uv run ruff check
 ## 禁止事项
 
 - 不要把 `rg` 当主分析工具。
-- 不要跳过 `inspect` 直接给出影响判断。
+- 不要把 `inspect` 的静态正向证据扩写成完整影响判断。
 - 不要在缺少上下文时直接规划或直接审查。
 - 不要默认所有问题都需要大范围搜索；先选最能回答当前问题的最小工具。
 - 不要把本地草稿文件当当前 flow 的主 handoff 入口。
