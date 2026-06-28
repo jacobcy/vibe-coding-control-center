@@ -7,7 +7,6 @@ tests that reference these constants will not need individual changes.
 # Subpackage module paths — use these to compose full patch targets
 PR_CREATE = "vibe3.services.pr.create"
 PR_SERVICE = "vibe3.services.pr.service"
-PR_ANALYSIS = "vibe3.services.pr.analysis"
 PR_BASE_RESOLUTION = "vibe3.services.pr.base_resolution"
 PR_RESOLVER = "vibe3.services.pr.resolver"
 PR_VERDICT_SERVICE = "vibe3.services.pr.verdict_service"

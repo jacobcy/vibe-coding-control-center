@@ -2,7 +2,7 @@
 
 import pytest
 
-from vibe3.models import ReviewRequest, ReviewScope
+from vibe3.models import ReviewObservation, ReviewRequest, ReviewScope
 
 
 class TestReviewScope:
@@ -45,22 +45,20 @@ class TestReviewRequest:
         scope = ReviewScope.for_base("main")
         request = ReviewRequest(scope=scope)
         assert request.scope == scope
-        assert request.changed_symbols is None
-        assert request.symbol_dag is None
+        assert request.observation is None
         assert request.task_guidance is None
 
     def test_create_review_request_with_all_fields(self) -> None:
         """Should create request with all fields."""
         scope = ReviewScope.for_base("origin/main")
+        observation = ReviewObservation(status="ready")
         request = ReviewRequest(
             scope=scope,
-            changed_symbols={"src/foo.py": ["func1", "func2"]},
-            symbol_dag={"func1": ["caller1", "caller2"]},
+            observation=observation,
             task_guidance="Focus on security issues",
         )
         assert request.scope.base_branch == "origin/main"
-        assert request.changed_symbols == {"src/foo.py": ["func1", "func2"]}
-        assert request.symbol_dag == {"func1": ["caller1", "caller2"]}
+        assert request.observation is observation
         assert request.task_guidance == "Focus on security issues"
 
     def test_request_is_frozen(self) -> None:

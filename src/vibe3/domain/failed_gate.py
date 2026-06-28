@@ -56,10 +56,12 @@ class FailedGate:
 
             if row[0] == 0:
                 # Insert default row (OPEN state)
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO failed_gate_state (id, is_active, blocked_ticks)
                     VALUES (1, 0, 0)
-                    """)
+                    """
+                )
 
     def check(self) -> GateResult:
         """Check if orchestra dispatch should be frozen.
@@ -76,11 +78,13 @@ class FailedGate:
 
         # Read current state from database
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT is_active, reason, blocked_ticks
                 FROM failed_gate_state
                 WHERE id = 1
-                """).fetchone()
+                """
+            ).fetchone()
 
         if not row:
             log.warning("Failed gate state row missing, assuming OPEN")
@@ -245,11 +249,13 @@ class FailedGate:
     def increment_blocked_ticks(self) -> None:
         """Increment blocked_ticks counter (called each tick when ACTIVE)."""
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE failed_gate_state
                 SET blocked_ticks = blocked_ticks + 1
                 WHERE id = 1 AND is_active = 1
-                """)
+                """
+            )
 
     def get_status(self) -> GateStatus:
         """Get full gate status for display.
@@ -258,12 +264,14 @@ class FailedGate:
             GateStatus dataclass with all fields
         """
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT is_active, reason, triggered_at, triggered_by_error_code,
                        cleared_at, cleared_by, cleared_reason, blocked_ticks
                 FROM failed_gate_state
                 WHERE id = 1
-                """).fetchone()
+                """
+            ).fetchone()
 
         if not row:
             return GateStatus(

@@ -4,15 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
-
-from loguru import logger
+from typing import Sequence
 
 from vibe3.config import get_source_root
-
-if TYPE_CHECKING:
-    from vibe3.analysis.serena_service import SerenaService
-    from vibe3.models import ChangeSource
 
 
 @dataclass(frozen=True)
@@ -129,34 +123,3 @@ def count_changed_lines(diff_text: str) -> int:
             changed_lines += 1
 
     return changed_lines
-
-
-def collect_changed_symbols(
-    serena_service: "SerenaService",
-    source: "ChangeSource",
-    changed_files: Sequence[str],
-    fail_fast: bool = False,
-) -> tuple[dict[str, list[str]], int]:
-    """Extract changed Python symbols while skipping tests."""
-    changed_symbols_by_file: dict[str, list[str]] = {}
-    skipped_tests = 0
-
-    for file in changed_files:
-        if is_test_file(file):
-            skipped_tests += 1
-            continue
-        if not file.endswith(".py"):
-            continue
-
-        try:
-            changed_funcs = serena_service.get_changed_functions(file, source=source)
-        except Exception as error:  # noqa: BLE001
-            if fail_fast:
-                raise
-            logger.debug(f"Skipping symbol extraction for {file}: {error}")
-            continue
-
-        if changed_funcs:
-            changed_symbols_by_file[file] = changed_funcs
-
-    return changed_symbols_by_file, skipped_tests

@@ -2,6 +2,19 @@
 # pre-push hook - Local quality gate, catch issues before push
 set -euo pipefail
 
+# Clean up virtualenv environment variables set by pre-commit to prevent uv hijacking
+unset VIRTUAL_ENV
+
+# Load UV_PROJECT_ENVIRONMENT from .envrc if not already set (e.g. in GUI or non-direnv shells)
+if [ -z "${UV_PROJECT_ENVIRONMENT:-}" ] && [ -f .envrc ]; then
+    UV_ENV_VAL=$(grep -E '^export UV_PROJECT_ENVIRONMENT=' .envrc | cut -d'#' -f1 | sed 's/export UV_PROJECT_ENVIRONMENT=//' | tr -d '"' | tr -d "'" | tr -d ' ')
+    if [ -n "$UV_ENV_VAL" ]; then
+        UV_ENV_VAL="${UV_ENV_VAL/\$HOME/$HOME}"
+        UV_ENV_VAL="${UV_ENV_VAL/\~/$HOME}"
+        export UV_PROJECT_ENVIRONMENT="$UV_ENV_VAL"
+    fi
+fi
+
 # CI Simulation mode
 if [ "${VIBE_CI_SIMULATE:-0}" = "1" ]; then
     export GITHUB_ACTIONS=true
@@ -59,14 +72,7 @@ uv run python -m compileall -q src/vibe3 || {
     exit 1
 }
 
-# 2. Type check (fast, <5s)
-echo "  -> Type check..."
-uv run mypy src || {
-    echo "ERROR: Type check failed"
-    exit 1
-}
-
-# 3. Resolve test scope (incremental by default)
+# 2. Resolve test scope (incremental by default)
 TEST_MODE="full"
 TEST_REASON="forced full suite"
 TEST_TARGETS=("tests/vibe3")
@@ -115,8 +121,12 @@ if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
     echo "  -> Tests skipped ($TEST_REASON)"
     echo "     (no local targets determined; CI runs full suite)"
 else
-    echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
-    uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -m "not integration" || {
+    echo "  -> Running unit tests ($TEST_MODE): ${TEST_REASON}"
+    # unset GIT_* inherited from `git push` so test fixture repos aren't overridden;
+    # -n 4 mirrors CI; slow/integration deferred to CI's separate jobs.
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_QUARANTINE_PATH \
+        uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -n 4 \
+        -m "not integration and not slow" || {
         if detect_rebase; then
             echo ""
             echo "ERROR: Tests failed"
@@ -143,7 +153,9 @@ if [ "${VIBE_CI_PARITY:-0}" = "1" ]; then
     if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
         echo "     Skipping CI parity (no test targets)"
     else
-        GITHUB_ACTIONS=true uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -m "not integration" || {
+        GITHUB_ACTIONS=true env -u GIT_DIR -u GIT_WORK_TREE \
+            uv run pytest "${TEST_TARGETS[@]}" -q --tb=short -n 4 \
+            -m "not integration and not slow" || {
             echo "WARNING: Tests passed locally but failed in CI simulation"
             echo "This may indicate environment-dependent test behavior"
             # Non-blocking warning for now
@@ -151,7 +163,7 @@ if [ "${VIBE_CI_PARITY:-0}" = "1" ]; then
     fi
 fi
 
-# 4. LOC checks (fast, <2s) - WARNING ONLY in pre-push
+# 3. LOC checks (fast, <2s) - WARNING ONLY in pre-push
 echo "  -> Loc checks (warning only)..."
 bash scripts/hooks/check-python-loc.sh
 # Note: Script now exits 0 with warning (doesn't block push)

@@ -9,6 +9,7 @@ Removed from public CLI:
 
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -17,20 +18,17 @@ from rich.console import Console
 
 from vibe3.analysis import (
     LocalReviewReport,
-    as_list,
-    dag,
+    build_review_observation,
     find_latest_prepush_report,
-    impact,
-    pr_analysis_summary,
-    score,
 )
 from vibe3.commands.common import enable_method_trace
+from vibe3.commands.inspect_base_helpers import render_review_observation
 from vibe3.commands.output_format import (
     add_execution_step,
     create_trace_output,
     output_result,
 )
-from vibe3.models import PRResponse, PRState, TraceOutput
+from vibe3.models import PRResponse, PRState, ReviewObservation, TraceOutput
 from vibe3.services.flow import FlowService
 from vibe3.services.handoff import HandoffService
 from vibe3.services.pr import PRService
@@ -228,12 +226,26 @@ def _build_missing_pr_message(
     return f"{target} not found"
 
 
-def _load_pr_analysis_summary(pr_number: int) -> dict[str, Any]:
-    """Load inspect summary used by command outputs."""
-    from vibe3.analysis import build_change_analysis
-
-    analysis = build_change_analysis("pr", str(pr_number))
-    return pr_analysis_summary(analysis)
+def _load_local_review_observation(
+    pr: "PRResponse", git_client: Any
+) -> ReviewObservation | None:
+    """Load exact observation only when the PR head is this worktree."""
+    try:
+        if git_client.get_current_branch() != pr.head_branch:
+            return None
+        repo_root = Path(git_client.get_worktree_root())
+        observation = build_review_observation(
+            requested_base=pr.base_branch,
+            resolved_base=pr.base_branch,
+            git=git_client,
+            manifest_path=repo_root / "config" / "v3" / "review_kernel.yaml",
+        )
+        return None if observation.status == "error" else observation
+    except Exception as exc:
+        logger.bind(domain="pr", action="load_review_observation").debug(
+            f"Local review observation unavailable: {exc}"
+        )
+        return None
 
 
 def _fetch_and_record_external_events(
@@ -305,28 +317,24 @@ def _fetch_and_record_external_events(
 
 def _build_pr_output_payload(
     pr: "PRResponse",
-    analysis_summary: dict[str, Any] | None = None,
+    review_observation: ReviewObservation | None = None,
     local_review: "LocalReviewReport | None" = None,
 ) -> dict[str, Any]:
-    """Merge PR data with optional analysis summary and local review.
+    """Merge PR data with optional exact observation and local verdict.
 
     Args:
         pr: PR response data
-        analysis_summary: Optional analysis summary from inspect
+        review_observation: Exact local review observation when available
         local_review: Optional local review report data
 
     Returns:
         Dictionary with merged payload for structured output
     """
     payload = pr.model_dump()
-    if analysis_summary:
-        payload["analysis"] = {
-            key: value for key, value in analysis_summary.items() if key != "raw"
-        }
+    if review_observation:
+        payload["review_observation"] = review_observation.model_dump(mode="json")
     if local_review:
         payload["local_review"] = {
-            "risk_level": local_review.risk_level,
-            "risk_score": local_review.risk_score,
             "verdict": local_review.verdict,
             "report_path": str(local_review.report_path),
             "created_at": (
@@ -355,7 +363,7 @@ def register_query_commands(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Show PR details with change analysis."""
+        """Show PR details with exact local review evidence when available."""
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
             raise typer.Exit(1)
@@ -413,10 +421,7 @@ def register_query_commands(app: typer.Typer) -> None:
             )
             raise typer.Exit(1) from None
 
-        analysis_summary = None
-        if pr_number:
-            analysis_summary = _load_pr_analysis_summary(pr_number)
-            logger.debug("Successfully retrieved change analysis")
+        review_observation = _load_local_review_observation(pr, pr_svc.git_client)
 
         # Find local pre-push review report
         local_review = find_latest_prepush_report()
@@ -445,7 +450,7 @@ def register_query_commands(app: typer.Typer) -> None:
             )
 
         if trace_output or json_output or yaml_output:
-            result = _build_pr_output_payload(pr, analysis_summary, local_review)
+            result = _build_pr_output_payload(pr, review_observation, local_review)
             output_result(
                 result=result,
                 trace_output=trace_output,
@@ -496,49 +501,10 @@ def register_query_commands(app: typer.Typer) -> None:
                     for task_num in bound_tasks:
                         console.print(f"  - #{task_num}")
 
-            # Show change analysis
-            if analysis_summary:
-                analysis = analysis_summary.get("raw")
-                if not isinstance(analysis, dict):
-                    analysis = {}
-
+            if review_observation:
                 console = Console()
-
-                console.print("\n[bold]### Change Analysis[/]")
-                score_items = score(analysis)
-                console.print(
-                    f"- [cyan]Risk Level[/]: {score_items.get('level', 'N/A')}"
-                )
-                console.print(
-                    f"- [cyan]Risk Score[/]: {score_items.get('score', 'N/A')}"
-                )
-                reason = score_items.get("reason")
-                if reason:
-                    console.print(f"- [cyan]Reason[/]: {reason}")
-                trigger_factors = as_list(score_items.get("trigger_factors"))
-                if trigger_factors:
-                    console.print("- [cyan]Trigger Factors[/]:")
-                    for factor in trigger_factors:
-                        console.print(f"  - {factor}")
-
-                impact_items = impact(analysis)
-                changed_files = as_list(impact_items.get("changed_files"))
-                console.print(f"- [cyan]Changed Files[/]: {len(changed_files)}")
-
-                dag_items = dag(analysis)
-                impacted_modules = as_list(dag_items.get("impacted_modules"))
-                console.print(f"- [cyan]Impacted Modules[/]: {len(impacted_modules)}")
-                recommendations = as_list(score_items.get("recommendations"))
-                if recommendations:
-                    console.print("- [cyan]Recommendations[/]:")
-                    for item in recommendations:
-                        console.print(f"  - {item}")
-
-                # Show top changed files
-                if changed_files:
-                    console.print("\n[bold]### Top Changed Files[/]")
-                    for file in changed_files[:5]:
-                        console.print(f"  - {file}")
+                console.print("\n[bold]### Review Observation[/]")
+                console.print(render_review_observation(review_observation))
 
             # Show local review summary
             render_local_review_summary(local_review)

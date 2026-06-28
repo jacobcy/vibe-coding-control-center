@@ -137,7 +137,7 @@ vibe3 internal bootstrap <issue-number> \
 - `vibe3 flow update` / `vibe3 flow bind` 手工组装 flow
 - `git pull origin main && git checkout -b ...` 手工拉取建分支
 
-**原因**：bootstrap 命令保证幂等性、统一的 actor 签名、完整的 baseline snapshot 和 flow 关系绑定。手工拼接会绕过这些契约，导致 flow 状态不一致。
+**原因**：bootstrap 命令保证幂等性、统一的 actor 签名和 flow 关系绑定。手工拼接会绕过这些契约，导致 flow 状态不一致。
 
 **如遇 bootstrap 失败**：先诊断问题（网络、权限、分支冲突），不要回退到手工拼接。
 

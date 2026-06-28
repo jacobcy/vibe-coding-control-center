@@ -84,6 +84,12 @@ class TestGitStateIndependence:
         # Create a mock GitClient instance
         mock_git_instance = MagicMock()
         mock_git_instance.get_changed_files.return_value = []
+        mock_git_instance.get_diff_metadata.return_value = ("", "")
+        mock_git_instance.get_untracked_files.return_value = []
+        mock_git_instance.get_current_branch.return_value = "test-branch"
+        mock_git_instance.get_worktree_root.return_value = "."
+        mock_git_instance.resolve_revision.return_value = "abc123commitsha"
+        mock_git_instance.get_merge_base.return_value = "abc123mergebase"
         mock_git_instance._run.return_value = "abc123"  # Fake commit SHA for rev-parse
 
         # Create a mock GitHubClient instance

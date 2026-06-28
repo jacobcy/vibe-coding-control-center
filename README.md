@@ -41,7 +41,7 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 ```bash
 # 1. 查看 V3 运行时与任务状态 (这是 Agent 的首选入口)
 vibe3 task status      # 全局任务面板（推荐，覆盖 Tier 3/2 概览）
-vibe3 inspect base      # 查看项目结构概览 (Tier 1)
+vibe3 inspect base      # 查看分支改动与 Kernel review 等级 (Tier 1)
 vibe3 flow show        # 查看当前分支 Flow 详情 (Tier 2)
 ```
 
@@ -137,12 +137,12 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - V2: `bin/`, `lib/`, `config/`
 - `lib3/` (V3 Hub)
 
-这一层只提供原子能力与状态读写，不负责隐藏 workflow 或进行重型决策。核心动作包括 `handoff`, `inspect`, `pr`, `snapshot`, `ask`。
+这一层只提供原子能力与状态读写，不负责隐藏 workflow 或进行重型决策。核心动作包括 `handoff`, `inspect`, `pr`, `ask`。
 
 ## V3 关键模块
 
 - `agents/`: plan / run / review agent pipeline
-- `analysis/`: symbol、snapshot、change scope
+- `analysis/`: Git change evidence、Review Kernel、单文件 AST、symbol reference evidence
 - `clients/`: 外部系统客户端（Git, GitHub, SQLite, Serena 等）
 - `commands/`: CLI 子命令
 - `config/`: 配置加载、Profile 管理与 Pydantic schema 验证

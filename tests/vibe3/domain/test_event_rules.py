@@ -31,7 +31,8 @@ class TestLoadRules:
     def test_load_rules_parses_yaml(self, tmp_path: Path) -> None:
         """Valid YAML → correct EventRule tuples."""
         rules_file = tmp_path / "event-rules.yaml"
-        rules_file.write_text("""
+        rules_file.write_text(
+            """
 rules:
   - event: TestEvent
     action: log
@@ -42,7 +43,8 @@ rules:
     params:
       command: "test command"
     enabled: false
-""")
+"""
+        )
 
         rules = load_rules(tmp_path)
 
@@ -71,7 +73,8 @@ rules:
     def test_load_rules_skips_missing_required_fields(self, tmp_path: Path) -> None:
         """Rules missing event/action are skipped."""
         rules_file = tmp_path / "event-rules.yaml"
-        rules_file.write_text("""
+        rules_file.write_text(
+            """
 rules:
   - event: TestEvent
     # missing action
@@ -81,7 +84,8 @@ rules:
     action: log
     params:
       message: "good"
-""")
+"""
+        )
 
         rules = load_rules(tmp_path)
 

@@ -112,7 +112,7 @@ src/vibe3/
 
 **验收标准**:
 - [ ] `vibe3 review pr 42 --trace` 输出调用链路
-- [ ] `vibe3 inspect pr 42 --trace` 输出调用链路
+- [x] `vibe3 inspect base origin/main --trace` 支持命令执行调试追踪（不表示影响分析）
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 
@@ -218,13 +218,12 @@ vibe3
 ├── flow: blocked, rebuild, show, status, update, bind, list-deleted, restore
 ├── task: show, status, intake, resume
 ├── handoff: show, status, init, append, plan, report, indicate, audit, next, verdict
-├── inspect: pr, base, symbols, files, commit
+├── inspect: base, files, symbols
 ├── review: pr
 ├── check
 ├── plan
 ├── pr
 ├── scan
-├── snapshot
 ├── serve
 ├── mcp
 ├── ask

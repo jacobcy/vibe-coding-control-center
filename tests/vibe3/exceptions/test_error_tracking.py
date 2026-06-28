@@ -15,14 +15,18 @@ def test_cleanup_deletes_old_records(temp_store: SQLiteClient) -> None:
 
     # Insert old records (older than 7 days)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (1, 'E_API_TIMEOUT', 'Old error 1', datetime('now', '-8 days'))
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (2, 'E_API_RATE_LIMIT', 'Old error 2', datetime('now', '-10 days'))
-            """)
+            """
+        )
         conn.commit()
 
     # Run cleanup
@@ -50,14 +54,18 @@ def test_cleanup_preserves_recent_records(temp_store: SQLiteClient) -> None:
 
     # Insert recent records (within 7 days)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (1, 'E_API_TIMEOUT', 'Recent error 1', datetime('now', '-1 day'))
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (2, 'E_API_RATE_LIMIT', 'Recent error 2', datetime('now', '-3 days'))
-            """)
+            """
+        )
         conn.commit()
 
     # Run cleanup
@@ -78,14 +86,18 @@ def test_cleanup_returns_correct_count(temp_store: SQLiteClient) -> None:
 
     # Insert mixed records (old and new)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (1, 'E_API_TIMEOUT', 'Old error', datetime('now', '-8 days'))
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (2, 'E_API_RATE_LIMIT', 'Recent error', datetime('now', '-1 day'))
-            """)
+            """
+        )
         conn.commit()
 
     # Run cleanup
@@ -113,15 +125,19 @@ def test_cleanup_with_custom_retention(temp_store: SQLiteClient) -> None:
     # Insert records
     with sqlite3.connect(temp_store.db_path) as conn:
         # Should be deleted (older than 3 days)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (1, 'E_API_TIMEOUT', 'Old error', datetime('now', '-4 days'))
-            """)
+            """
+        )
         # Should be preserved (within 3 days)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (2, 'E_API_RATE_LIMIT', 'Recent error', datetime('now', '-2 days'))
-            """)
+            """
+        )
         conn.commit()
 
     # Run cleanup with 3-day retention
@@ -160,10 +176,12 @@ def test_cleanup_does_not_affect_threshold_detection(
 
     # Insert old API error (outside threshold window but within retention)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, created_at)
             VALUES (3, 'E_API_ERROR', 'Old API error', datetime('now', '-15 minutes'))
-            """)
+            """
+        )
         conn.commit()
 
     # Verify threshold detection before cleanup
@@ -221,11 +239,13 @@ def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
 
     # Verify database state - record should be persisted
     with sqlite3.connect(temp_store.db_path) as conn:
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT tick_id, error_code, error_message, issue_number, branch, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
-            """).fetchone()
+            """
+        ).fetchone()
         assert row is not None
         assert row[0] == 0  # tick_id defaults to 0
         assert row[1] == "E_EXEC_NO_OUTPUT"
@@ -251,11 +271,13 @@ def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
 
     # Verify database state - record should be persisted
     with sqlite3.connect(temp_store.db_path) as conn:
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT tick_id, error_code, error_message, issue_number, branch, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
-            """).fetchone()
+            """
+        ).fetchone()
         assert row is not None
         assert row[0] == 42  # tick_id preserved
         assert row[1] == "E_EXEC_NO_OUTPUT"
@@ -284,11 +306,13 @@ def test_record_error_with_explicit_severity(temp_store: SQLiteClient) -> None:
 
     # Verify severity stored in database
     with sqlite3.connect(temp_store.db_path) as conn:
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT error_code, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
-            """).fetchone()
+            """
+        ).fetchone()
         assert row is not None
         assert row[0] == "E_API_RATE_LIMIT"
         assert row[1] == "ERROR"
@@ -310,11 +334,13 @@ def test_record_error_infers_severity_from_registry(
 
     # Verify severity inferred correctly
     with sqlite3.connect(temp_store.db_path) as conn:
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT error_code, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
-            """).fetchone()
+            """
+        ).fetchone()
         assert row is not None
         assert row[0] == "E_MODEL_NOT_FOUND"
         assert row[1] == "CRITICAL"  # Inferred from registry
@@ -416,11 +442,13 @@ def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
 
     # Insert old error outside window
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log
             (tick_id, error_code, error_message, severity, created_at)
             VALUES (1, 'E_API_TIMEOUT', 'Old', 'ERROR', datetime('now', '-15 minutes'))
-        """)
+        """
+        )
         conn.commit()
 
     # Count should only include recent error
@@ -438,7 +466,8 @@ def test_migration_backfills_severity_column(tmp_path: Path) -> None:
     cursor = conn.cursor()
 
     # Create error_log table without severity column (pre-migration schema)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE error_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tick_id INTEGER NOT NULL,
@@ -448,21 +477,28 @@ def test_migration_backfills_severity_column(tmp_path: Path) -> None:
             branch TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
-    """)
+    """
+    )
 
     # Insert error records with known error codes
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO error_log (tick_id, error_code, error_message)
         VALUES (1, 'E_MODEL_NOT_FOUND', 'Model not found')
-    """)
-    cursor.execute("""
+    """
+    )
+    cursor.execute(
+        """
         INSERT INTO error_log (tick_id, error_code, error_message)
         VALUES (2, 'E_API_RATE_LIMIT', 'Rate limit')
-    """)
-    cursor.execute("""
+    """
+    )
+    cursor.execute(
+        """
         INSERT INTO error_log (tick_id, error_code, error_message)
         VALUES (3, 'E_EXEC_NO_OUTPUT', 'No output')
-    """)
+    """
+    )
     conn.commit()
 
     # Verify severity column does NOT exist
@@ -481,9 +517,11 @@ def test_migration_backfills_severity_column(tmp_path: Path) -> None:
     assert "severity" in columns_after
 
     # Verify severity values are populated from error registry
-    rows = cursor.execute("""
+    rows = cursor.execute(
+        """
         SELECT error_code, severity FROM error_log ORDER BY tick_id
-    """).fetchall()
+    """
+    ).fetchall()
 
     assert len(rows) == 3
     # E_MODEL_NOT_FOUND → CRITICAL
@@ -517,10 +555,12 @@ def test_get_all_errors_status_total_includes_unknown_severity(
 
     # Insert unknown severity error via direct SQL (simulating future severity values)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, severity)
             VALUES (1, 'E_CUSTOM', 'Info severity error', 'INFO')
-        """)
+        """
+        )
         conn.commit()
 
     # Call get_all_errors_status via the query function
@@ -544,10 +584,12 @@ def test_get_all_errors_status_null_severity_defaults_to_error(
 
     # Insert row with NULL severity via direct SQL
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message, severity)
             VALUES (1, 'E_CUSTOM', 'Null severity', NULL)
-        """)
+        """
+        )
         conn.commit()
 
     from vibe3.services.orchestra.error_tracking.queries import get_all_errors_status

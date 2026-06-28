@@ -491,7 +491,8 @@ def test_get_recent_updates_returns_chronological_order(tmp_path: Path) -> None:
 
     # Use isoformat timestamps without tz offset (matching production format)
     handoff_file = handoff_dir / "current.md"
-    handoff_file.write_text("""# Handoff: task/issue-304
+    handoff_file.write_text(
+        """# Handoff: task/issue-304
 
 ## Updates
 
@@ -503,7 +504,8 @@ Second entry - middle
 
 ### 2026-06-24T12:00:00 | reviewer | review
 Third entry - newest
-""")
+"""
+    )
 
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(
@@ -539,7 +541,8 @@ def test_get_recent_updates_limit_returns_recent_n(tmp_path: Path) -> None:
     handoff_dir.mkdir(parents=True)
 
     handoff_file = handoff_dir / "current.md"
-    handoff_file.write_text("""# Handoff: task/issue-304
+    handoff_file.write_text(
+        """# Handoff: task/issue-304
 
 ## Updates
 
@@ -551,7 +554,8 @@ Second entry
 
 ### 2026-06-24T12:00:00 | reviewer | review
 Third entry
-""")
+"""
+    )
 
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     service = HandoffService(

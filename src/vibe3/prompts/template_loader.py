@@ -45,7 +45,8 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
         "assignee_dispatch": {
             "manager": "Implement issue #{issue_number}: {issue_title}",
         },
-        "governance": {"plan": """# Orchestra Governance Scan
+        "governance": {
+            "plan": """# Orchestra Governance Scan
 
 ## Governance Material
 
@@ -77,8 +78,10 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 2. 当前哪些 issue 值得建议启动
 3. 是否需要最小 label 调整来表达上述判断
 4. 如果暂不建议启动，说明原因
-"""},
-        "supervisor": {"apply": """# Supervisor Apply Scan
+"""
+        },
+        "supervisor": {
+            "apply": """# Supervisor Apply Scan
 
 ## Supervisor Material
 
@@ -107,7 +110,8 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 
 你当前处于 supervisor/apply 场景。只围绕 Supervisor 材料处理 handoff 或治理 issue。
 不要进入 governance 巡检模式，也不要进入 run / plan / review 执行模式。
-"""},
+"""
+        },
         "explorer": """# Project Explorer
 
 {supervisor_content}

@@ -29,9 +29,6 @@ from vibe3.clients.git_branch_ops import (
     delete_remote_branch as _delete_remote_branch,
 )
 from vibe3.clients.git_branch_ops import (
-    get_merge_base as _get_merge_base,
-)
-from vibe3.clients.git_branch_ops import (
     switch_branch as _switch_branch,
 )
 from vibe3.clients.git_status_ops import (
@@ -443,7 +440,28 @@ class GitClient:
 
     def get_merge_base(self, branch1: str, branch2: str) -> str:
         """Get merge-base commit between two branches."""
-        return _get_merge_base(branch1, branch2)
+        return self._run(["merge-base", branch1, branch2])
+
+    def resolve_revision(self, ref: str) -> str:
+        """Resolve a revision to an exact object ID in this client's worktree."""
+        return self._run(["rev-parse", "--verify", ref])
+
+    def get_diff_metadata(
+        self,
+        base: str | None = None,
+        head: str | None = None,
+        *,
+        cached: bool = False,
+    ) -> tuple[str, str]:
+        """Return name-status and numstat for one exact Git diff partition."""
+        common = ["diff"]
+        if cached:
+            common.append("--cached")
+        common.append("--find-renames")
+        revisions = [ref for ref in (base, head) if ref is not None]
+        name_status = self._run([*common, "--name-status", "-z", *revisions])
+        numstat = self._run([*common, "--numstat", "-z", *revisions])
+        return name_status, numstat
 
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""

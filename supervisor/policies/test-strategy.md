@@ -26,7 +26,7 @@
 - 错误码映射（如 exit code → exception type）
 
 #### 业务规则计算
-- 风险评分计算（如 `calculate_risk_score()`）
+- Review Kernel 分类（如 `classify_review_kernel()`）
 - 状态判断逻辑（如 `should_trigger_flow()`）
 - 优先级排序（如 `sort_by_priority()`）
 - 条件分支逻辑（如 `if-else` 决策树）
@@ -179,19 +179,19 @@ def get_issue_comments(issue_number: int) -> list[Comment]:
 - ✅ 真实测试（可选）：使用测试 token 发送真实请求（CI 环境或手动验证）
 - ❌ 不应 mock 结果解析逻辑本身
 
-### 场景 3：风险评分计算
+### 场景 3：Review Kernel 分类
 
 ```python
-# src/vibe3/analysis/risk.py
-def calculate_risk_score(changes: list[Change]) -> int:
-    """基于变更集计算风险评分"""
+# src/vibe3/analysis/review_kernel.py
+def classify_review_kernel(paths, manifest):
+    """基于精确路径命中计算最低 review depth"""
     ...
 ```
 
 **测试策略**：
-- ✅ 真实测试：使用真实的变更集数据，验证评分计算逻辑
+- ✅ 真实测试：使用真实 manifest 和路径集合，验证分类逻辑
 - ❌ Mock 测试：不应 mock 计算逻辑本身
-- ✅ 边界测试：空变更集、单个变更、大量变更
+- ✅ 边界测试：空变更集、Architecture Kernel 命中、非法目录条目
 
 ## 6. 反模式警示
 

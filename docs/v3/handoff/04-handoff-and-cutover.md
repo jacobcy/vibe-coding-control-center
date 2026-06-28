@@ -285,7 +285,7 @@ handoff command 不负责：
 
 - report 文件路径
 - report verdict
-- risk score
+- exact Git and Review Kernel evidence
 - 关键 finding 摘要
 - `SESSION_ID`
 

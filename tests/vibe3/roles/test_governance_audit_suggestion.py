@@ -45,13 +45,15 @@ class TestBuildAuditSuggestionContext:
         # Create sample observation files
         for i in range(3):
             obs_file = obs_dir / f"audit-observation-20260623T{i:02d}0000.yaml"
-            obs_file.write_text(f"""
+            obs_file.write_text(
+                f"""
 audit_observation:
   schema_version: 1
   observation_id: "obs-001-{i}"
   observed_failure_mode: "scope_mismatch"
   confidence: "medium"
-""")
+"""
+            )
 
         with patch(
             "vibe3.utils.get_git_common_dir",
@@ -72,13 +74,15 @@ audit_observation:
         # Create 25 observation files
         for i in range(25):
             obs_file = obs_dir / f"audit-observation-202606{i:02d}T{i:06d}.yaml"
-            obs_file.write_text(f"""
+            obs_file.write_text(
+                f"""
 audit_observation:
   schema_version: 1
   observation_id: "obs-{i}"
   observed_failure_mode: "missing_output"
   confidence: "low"
-""")
+"""
+            )
 
         with patch(
             "vibe3.utils.get_git_common_dir",
@@ -101,12 +105,14 @@ audit_observation:
         failure_modes = ["scope_mismatch", "missing_output", "state_loop"]
         for i, mode in enumerate(failure_modes):
             obs_file = obs_dir / f"audit-observation-20260623T{i:02d}0000.yaml"
-            obs_file.write_text(f"""
+            obs_file.write_text(
+                f"""
 audit_observation:
   schema_version: 1
   observed_failure_mode: "{mode}"
   confidence: "medium"
-""")
+"""
+            )
 
         with patch(
             "vibe3.utils.get_git_common_dir",
@@ -142,10 +148,12 @@ audit_observation:
 
         # Valid file
         obs_file = obs_dir / "audit-observation-20260623T010000.yaml"
-        obs_file.write_text("""
+        obs_file.write_text(
+            """
 audit_observation:
   observed_failure_mode: "scope_mismatch"
-""")
+"""
+        )
 
         # Invalid file (no failure mode field)
         invalid_file = obs_dir / "audit-observation-20260623T020000.yaml"

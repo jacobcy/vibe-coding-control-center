@@ -372,10 +372,10 @@ gh issue edit <number> --add-label "roadmap-reviewed"
 ✅ 正确：
 用户: "我们看下现有issue，哪些成熟可以执行了"
 → 我: 
-   - 读取 snapshot_service.py:370-426 实际代码
-   - 检查 SQLiteClient 是否有 list_snapshots 方法
-   - 检查 snapshot_registry 表结构和索引
-   - 检查所有写入路径（save_snapshot、save_branch_baseline、auto-register）
+   - 读取目标 service 和直接消费方的实际代码
+   - 检查持久化接口、数据模型和索引是否支持目标语义
+   - 检查所有读写入口与失败路径
+   - 用 Git/AST/测试证据核对 issue 的前提假设
    - 给出完整评估报告（问题确认、数据库能力、改动方案、风险评估、ROI）
    - 明确结论："可行性：完全可行，建议加 state/ready"
 → 用户: "通过"

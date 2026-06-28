@@ -48,11 +48,7 @@ def mock_pr_svc_for_sorting():
 def _invoke_pr_show(pr_number: int, mock_pr_svc: MagicMock):
     """Invoke pr show command with standard patches."""
     with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
-        with patch(
-            "vibe3.commands.pr_query._load_pr_analysis_summary",
-            return_value={},
-        ):
-            return runner.invoke(app, ["pr", "show", str(pr_number)])
+        return runner.invoke(app, ["pr", "show", str(pr_number)])
 
 
 class TestPRShowCommentSorting:

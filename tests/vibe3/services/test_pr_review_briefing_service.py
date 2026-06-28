@@ -1,98 +1,71 @@
-"""Tests for PR review briefing service."""
+"""Tests for evidence-only PR reviewer briefing."""
 
 from unittest.mock import ANY, MagicMock, patch
 
-from tests.vibe3.pr_patch_constants import PR_ANALYSIS
-from vibe3.services.pr.review import (
-    SENTINEL,
-    PRReviewBriefingService,
+from vibe3.models import (
+    KernelImpact,
+    KernelObservation,
+    ReviewDepth,
+    ReviewObservation,
+    ReviewPolicy,
 )
+from vibe3.services.pr.review import SENTINEL, PRReviewBriefingService
 
 
-def test_render_briefing_contains_essential_sections():
-    # Mock analysis object
-    analysis = MagicMock()
-    analysis.pr_number = 123
-    analysis.total_files = 5
-    analysis.total_commits = 3
-    analysis.score = {
-        "score": {
-            "score": 5.5,
-            "level": "RiskLevel.MEDIUM",
-            "reason": "Risk found",
-        }
-    }
-    analysis.critical_files = [{"path": "src/core.py", "public_api": True}]
-    analysis.critical_symbols = {"src/core.py": ["process_data"]}
-    analysis.impacted_modules = ["vibe3.core", "vibe3.api"]
+def _pr() -> MagicMock:
+    pr = MagicMock()
+    pr.base_branch = "main"
+    pr.head_branch = "feat/test"
+    pr.metadata.task_issue = 42
+    return pr
 
-    gh_client = MagicMock()
-    pr_details = MagicMock()
-    pr_details.base_branch = "main"
-    pr_details.head_branch = "feat/test"
-    pr_details.metadata.task_issue = 42
-    gh_client.get_pr.return_value = pr_details
 
-    service = PRReviewBriefingService(gh_client)
-    body = service._render_briefing(analysis)
+def _observation() -> ReviewObservation:
+    return ReviewObservation(
+        status="ready",
+        kernel=KernelObservation(impact=KernelImpact.LARGE),
+        review=ReviewPolicy(minimum_depth=ReviewDepth.REPEATED),
+    )
+
+
+def test_render_briefing_contains_review_evidence_without_risk_claims() -> None:
+    service = PRReviewBriefingService(MagicMock())
+
+    body = service._render_briefing(123, _pr(), _observation())
 
     assert SENTINEL in body
-    assert "MEDIUM" in body
-    assert "5.5" in body
-    assert "Files Changed:** 5" in body
     assert "Route:** `main` ← `feat/test`" in body
+    assert "Kernel impact:** `large`" in body
+    assert "Minimum review depth:** `repeated`" in body
+    assert "Risk" not in body
+    assert "Impacted Modules" not in body
 
 
-def test_publish_briefing_creates_new_if_no_sentinel_exists():
-    gh_client = MagicMock()
-    # Existing comment WITHOUT sentinel
-    other_comment = {
-        "id": "111",
-        "body": "Normal comment",
-        "author": {"login": "other-user"},
-    }
-    gh_client.list_pr_comments.return_value = [other_comment]
-    gh_client.create_pr_comment.return_value = "https://github.com/comment/new"
-    gh_client.get_pr.return_value = MagicMock()
+def test_publish_briefing_creates_new_if_no_sentinel_exists() -> None:
+    client = MagicMock()
+    client.get_pr.return_value = _pr()
+    client.list_pr_comments.return_value = [{"id": "111", "body": "Normal"}]
+    client.create_pr_comment.return_value = "https://github.com/comment/new"
 
-    analysis = MagicMock()
-    analysis.score = {}
-    analysis.critical_files = []
-    analysis.critical_symbols = []
-    analysis.impacted_modules = []
-
-    patch_path = f"{PR_ANALYSIS}.build_pr_analysis"
-    with patch(patch_path, return_value=analysis):
-        service = PRReviewBriefingService(gh_client)
+    service = PRReviewBriefingService(client)
+    with patch.object(service, "_load_observation", return_value=_observation()):
         url = service.publish_briefing(123)
 
-        assert url == "https://github.com/comment/new"
-        gh_client.create_pr_comment.assert_called_once()
+    assert url == "https://github.com/comment/new"
+    client.create_pr_comment.assert_called_once_with(123, ANY)
 
 
-def test_publish_briefing_updates_any_existing_sentinel_regardless_of_author():
-    gh_client = MagicMock()
-    # Existing briefing by DIFFERENT author
-    existing_briefing = {
-        "id": "999",
-        "body": f"Old briefing {SENTINEL}",
-        "author": {"login": "other-user"},
-    }
-    gh_client.list_pr_comments.return_value = [existing_briefing]
-    gh_client.update_pr_comment.return_value = "https://github.com/comment/999"
-    gh_client.get_pr.return_value = MagicMock()
+def test_publish_briefing_updates_existing_sentinel() -> None:
+    client = MagicMock()
+    client.get_pr.return_value = _pr()
+    client.list_pr_comments.return_value = [
+        {"id": "999", "body": f"Old briefing {SENTINEL}"}
+    ]
+    client.update_pr_comment.return_value = "https://github.com/comment/999"
 
-    analysis = MagicMock()
-    analysis.score = {}
-    analysis.critical_files = []
-    analysis.critical_symbols = []
-    analysis.impacted_modules = []
-
-    patch_path = f"{PR_ANALYSIS}.build_pr_analysis"
-    with patch(patch_path, return_value=analysis):
-        service = PRReviewBriefingService(gh_client)
+    service = PRReviewBriefingService(client)
+    with patch.object(service, "_load_observation", return_value=None):
         url = service.publish_briefing(123)
 
-        assert url == "https://github.com/comment/999"
-        gh_client.create_pr_comment.assert_not_called()
-        gh_client.update_pr_comment.assert_called_once_with("999", ANY)
+    assert url == "https://github.com/comment/999"
+    client.update_pr_comment.assert_called_once_with("999", ANY)

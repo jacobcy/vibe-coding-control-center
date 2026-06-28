@@ -43,14 +43,7 @@ if TYPE_CHECKING:
         resolve_runtime_asset,
         runtime_assets_root,
     )
-    from vibe3.clients.serena_client import (
-        SerenaClient,
-        count_references,
-        extract_class_locations,
-        extract_class_names,
-        extract_function_locations,
-        extract_function_names,
-    )
+    from vibe3.clients.serena_client import SerenaClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.clients.sqlite_schema import init_schema
     from vibe3.clients.store_context import get_store
@@ -94,11 +87,6 @@ _LAZY_IMPORTS = {
     "TriggerableRoleDefinitionProtocol": "vibe3.clients.protocols.role",
     "bundled_project_root": "vibe3.clients.runtime_assets",
     "collect_label_anomalies": "vibe3.clients.label_utils",
-    "count_references": "vibe3.clients.serena_client",
-    "extract_class_locations": "vibe3.clients.serena_client",
-    "extract_class_names": "vibe3.clients.serena_client",
-    "extract_function_locations": "vibe3.clients.serena_client",
-    "extract_function_names": "vibe3.clients.serena_client",
     "find_repo_root": "vibe3.clients.git_client",
     "get_store": "vibe3.clients.store_context",
     "has_manager_assignee": "vibe3.clients.label_utils",
@@ -164,11 +152,6 @@ __all__ = [
     "TriggerableRoleDefinitionProtocol",
     "bundled_project_root",
     "collect_label_anomalies",
-    "count_references",
-    "extract_class_locations",
-    "extract_class_names",
-    "extract_function_locations",
-    "extract_function_names",
     "find_repo_root",
     "get_store",
     "has_manager_assignee",

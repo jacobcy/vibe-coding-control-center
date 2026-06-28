@@ -1,27 +1,31 @@
-"""Inspect symbols command - 符号引用分析."""
+"""Validated positive symbol evidence for ``vibe3 inspect symbols``."""
+
+from __future__ import annotations
 
 import json
-import sys
-from io import StringIO
+from pathlib import Path
 from typing import Annotated
 
 import typer
 import yaml
-from loguru import logger
 
-from vibe3.analysis import SerenaService
+from vibe3.analysis import (
+    SerenaSymbolReferenceProvider,
+    SymbolInspectionResult,
+    inspect_symbol,
+)
 from vibe3.commands.common import enable_method_trace
 
 
 def register(app: typer.Typer) -> None:
-    """Register the symbols command on the given app."""
+    """Register the evidence-only symbols command."""
 
     @app.command()
     def symbols(
         symbol_spec: Annotated[
             str,
-            typer.Argument(help="Symbol specification: <file>:<symbol> or <file>"),
-        ] = "",
+            typer.Argument(help="Explicit symbol query: <file>:<symbol>"),
+        ],
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
@@ -36,125 +40,69 @@ def register(app: typer.Typer) -> None:
             typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
-        """Show symbol references with detailed locations.
+        """Show validated definition and observed static references."""
+        from vibe3.clients import GitClient, SerenaClient
 
-        Two query modes (file context required):
-
-        1. <file>:<symbol>  - Find specific symbol in file
-           vibe inspect symbols src/vibe3/services/dag_service.py:build_module_graph
-
-        2. <file>           - List all symbols in file
-           vibe inspect symbols src/vibe3/services/dag_service.py
-
-        Reference counts show:
-        - Regular functions: Number of times called in code
-        - CLI commands: Marked as "CLI command" (invoked via CLI, not code)
-
-        Output includes:
-        - Total reference count
-        - Each reference location (file:line)
-        - Context snippet showing the usage
-
-        Examples:
-            vibe inspect symbols src/vibe3/services/dag_service.py:_file_to_module
-            vibe inspect symbols src/vibe3/commands/inspect.py --json
-        """
+        del quiet
         if trace:
             enable_method_trace()
+        if ":" not in symbol_spec:
+            typer.echo("Error: expected <file>:<symbol>", err=True)
+            raise typer.Exit(1)
+        file_name, symbol = symbol_spec.rsplit(":", 1)
+        if not file_name or not symbol:
+            typer.echo("Error: expected <file>:<symbol>", err=True)
+            raise typer.Exit(1)
 
-        # Suppress Serena warnings by redirecting stderr temporarily
-        old_stderr = sys.stderr
-        sys.stderr = StringIO()
-
-        try:
-            if not symbol_spec:
-                sys.stderr = old_stderr
-                typer.echo("Error: Please provide a symbol specification.", err=True)
-                typer.echo("\nUsage:")
-                typer.echo("  vibe inspect symbols <file>:<symbol>")
-                typer.echo("  vibe inspect symbols <file>")
-                raise typer.Exit(code=1)
-
-            svc = SerenaService()
-
-            if ":" in symbol_spec:
-                parts = symbol_spec.split(":", 1)
-                file_path, symbol_name = parts[0], parts[1]
-                result = svc.analyze_symbol(symbol_name, file_path)
-            elif symbol_spec.endswith(".py"):
-                result = svc.analyze_file(symbol_spec)
-            else:
-                sys.stderr = old_stderr
-                typer.echo(
-                    "Error: Symbol-only search requires file context.",
-                    err=True,
-                )
-                typer.echo(f"Use: vibe inspect symbols <file>:{symbol_spec}")
-                raise typer.Exit(code=1)
-
-            sys.stderr = old_stderr
-
-            if json_out:
-                typer.echo(json.dumps(result, indent=2))
-                return
-            elif yaml_out:
-                typer.echo(
-                    yaml.dump(result, default_flow_style=False, allow_unicode=True)
-                )
-                return
-
-            if "symbols" in result:
-                _print_symbols_table(result)
-            else:
-                _print_symbol_references(result)
-
-            from vibe3.commands.inspect_helpers import suggest_next_step
-
-            suggest_next_step("inspect_symbols", quiet)
-
-        except Exception as e:
-            sys.stderr = old_stderr
-            logger.debug(f"Skipping: {e}")
-            raise
+        repo_root = Path(GitClient().get_worktree_root())
+        path = Path(file_name)
+        if not path.is_absolute():
+            path = repo_root / path
+        provider = SerenaSymbolReferenceProvider(
+            SerenaClient(project_root=str(repo_root))
+        )
+        result = inspect_symbol(
+            path,
+            symbol,
+            provider=provider,
+            repo_root=repo_root,
+        )
+        _render(result, json_out=json_out, yaml_out=yaml_out)
+        if result.status in {"disabled", "error", "not_found"}:
+            raise typer.Exit(1)
 
 
-def _print_symbol_references(result: dict) -> None:
-    """Print single symbol references in simple format."""
-    symbol = result["symbol"]
-    defined_in = result["defined_in"]
-    ref_count = result["reference_count"]
-    symbol_type = result.get("type", "function")
+def _render(
+    result: SymbolInspectionResult,
+    *,
+    json_out: bool,
+    yaml_out: bool,
+) -> None:
+    if json_out:
+        typer.echo(result.model_dump_json(indent=2))
+        return
+    payload = json.loads(result.model_dump_json())
+    if yaml_out:
+        typer.echo(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True))
+        return
 
-    typer.echo(f"=== Symbol: {symbol} ===")
-    typer.echo(f"  Defined in: {defined_in}")
-
-    if symbol_type == "cli_command":
-        typer.echo("  Type: CLI command (invoked via CLI, not in code)")
-    else:
-        typer.echo(f"  References: {ref_count}")
-
-    if result["references"]:
-        typer.echo("\n  Referenced by:")
-        for ref in result["references"]:
-            typer.echo(f"    {ref['file']}:{ref['line']}")
-            if ref.get("context"):
-                ctx_lines = ref["context"].split("\n")
-                for line in ctx_lines[:2]:
-                    typer.echo(f"      {line.strip()}")
-
-
-def _print_symbols_table(result: dict) -> None:
-    """Print file symbols in simple format (like inspect files)."""
-    typer.echo(f"=== Symbols: {result['file']} ===")
-    symbols = result.get("symbols", [])
-    typer.echo(f"  Total symbols: {len(symbols)}")
-
-    for sym in symbols:
-        name = sym["name"]
-        refs = sym.get("references", 0)
-        symbol_type = sym.get("type", "function")
-
-        if symbol_type == "cli_command":
-            typer.echo(f"    {name}  (CLI command, 0 code refs)")
-        else:
-            typer.echo(f"    {name}  ({refs} refs)")
+    query = result.query
+    typer.echo(f"Status: {result.status}")
+    if query is not None:
+        typer.echo(f"Query: {query.file}:{query.symbol}")
+    typer.echo(f"Provider: {result.provenance.provider} {result.provenance.version}")
+    if result.definition is not None:
+        source_range = result.definition.range
+        typer.echo(
+            f"Definition: {result.definition.path}:"
+            f"{source_range.start_line}-{source_range.end_line}"
+        )
+    if result.observation is not None:
+        typer.echo(
+            "Observed static references: "
+            f"{result.observation.observed_reference_count} (not complete)"
+        )
+    for reference in result.references:
+        typer.echo(f"Reference: {reference.path}:{reference.range.start_line}")
+    for unknown in result.unknowns:
+        typer.echo(f"Unknown: {unknown.code}: {unknown.message}")

@@ -270,10 +270,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules@project
-          - key: review.ast_analysis
+          - key: review.observation
             source:
               kind: provider
-              provider: review.ast_analysis
+              provider: review.observation
           - key: review.output_format
             source:
               kind: provider
@@ -301,10 +301,10 @@ recipes:
             source:
               kind: provider
               provider: common.rules@project
-          - key: review.ast_analysis
+          - key: review.observation
             source:
               kind: provider
-              provider: review.ast_analysis
+              provider: review.observation
           - key: review.output_format
             source:
               kind: provider

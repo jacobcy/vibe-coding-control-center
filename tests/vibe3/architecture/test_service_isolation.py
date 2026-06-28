@@ -22,21 +22,10 @@ PUBLIC_APIS = {
         "PRReviewBriefingService",
         # Functions
         "create_pr",
-        "analyze_critical_files",
-        "build_pr_analysis",
-        "calculate_pr_risk_score",
-        "filter_critical_files",
-        "get_pr_changed_files",
-        "get_pr_commit_count",
-        "get_recent_commits",
         "resolve_branch_from_pr",
         "resolve_command_branch",
-        "generate_score_report",
         # Types
         "PRCreateResult",
-        "PRDimensions",
-        "RiskLevel",
-        "RiskScore",
     },
     "services.issue": {
         "IssueService",

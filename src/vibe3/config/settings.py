@@ -14,17 +14,6 @@ from pathlib import Path
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 from vibe3.config.settings_check_cleanup import CheckCleanupSettings
-from vibe3.config.settings_pr import (
-    FileChangeWeights,
-    LineChangeWeights,
-    MergeGateConfig,
-    ModuleChangeWeights,
-    PRScoringConfig,
-    PRScoringThresholds,
-    PRScoringWeights,
-    SizeThreshold,
-    SizeThresholds,
-)
 from vibe3.models import OrchestraConfig
 
 
@@ -55,14 +44,17 @@ class FlowConfig(BaseModel):
     )
 
 
-# fmt: off
-__all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
-           "PRScoringWeights", "PRScoringThresholds", "LineChangeWeights",
-           "FileChangeWeights", "ModuleChangeWeights", "SizeThreshold",
-           "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig",
-           "CheckCleanupSettings", "PathsConfig", "get_source_root",
-           "get_commands_root"]
-# fmt: on
+__all__ = [
+    "AIConfig",
+    "CheckCleanupSettings",
+    "CodeLimitsConfig",
+    "DocLimitsConfig",
+    "FlowConfig",
+    "PathsConfig",
+    "VibeConfig",
+    "get_commands_root",
+    "get_source_root",
+]
 
 # Prompt content fields in prompts.yaml that map to VibeConfig sections.
 # Template-only keys (like "default", "plan", "skill") are excluded.
@@ -313,7 +305,6 @@ class VibeConfig(BaseModel):
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
-    pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)
     plan: PlanConfig = Field(default_factory=PlanConfig)
     run: RunConfig = Field(default_factory=RunConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
