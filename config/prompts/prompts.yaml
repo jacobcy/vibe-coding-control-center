@@ -858,7 +858,11 @@ review:
     Use `--comments` flag to load the latest human instruction in full.
 
     Review only changed code, focus on correctness, regression, and security.
-    Use AST analysis to understand impact scope.
+    Treat `inspect` as an optional evidence query, not as an impact oracle:
+    - Run `uv run python src/vibe3/cli.py inspect files <file.py> --json` when declaration ranges or direct imports would materially clarify a changed Python file.
+    - Run `uv run python src/vibe3/cli.py inspect symbols <file.py>:<symbol> --json` only for deletions, renames, signature changes, or Kernel files where positive static references would help.
+    - Symbol evidence is incomplete (`complete=false`); zero observed references do not mean unused.
+    Do not run these commands mechanically for every file or symbol. Do not infer runtime impact or risk from their output.
     Prioritize actionable findings with clear severity.
     Follow the repository review contract.
     You must directly output the review result in stdout.

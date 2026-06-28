@@ -15,6 +15,29 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "serena project config is query-only and schema-stable" {
+  run grep -F "read_only: true" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -F "line_ending:" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -F "ignored_memory_patterns:" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -F "ls_specific_settings:" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -F "runtime impact, risk, or dead code" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -F "Zero dead code" "$REPO_ROOT/.serena/project.yml"
+  [ "$status" -ne 0 ]
+
+  run git -C "$REPO_ROOT" check-ignore .serena/project.local.yml
+  [ "$status" -eq 0 ]
+}
+
 @test "serena gate bootstraps cold cache via uvx" {
   local fixture home_dir cache_dir bin_dir uvx_log
   fixture="$(mktemp -d)"

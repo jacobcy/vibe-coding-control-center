@@ -148,6 +148,20 @@ class TestBuildReviewPromptBody:
         assert "risk score" not in context.lower()
         assert "total_changed" not in context.lower()
 
+    def test_review_prompt_recommends_bounded_inspect_queries(self) -> None:
+        scope = ReviewScope.for_base("main")
+        request = ReviewRequest(scope=scope)
+
+        context = build_review_prompt_body(request)
+
+        assert "inspect files <file.py> --json" in context
+        assert "inspect symbols <file.py>:<symbol> --json" in context
+        assert "deletions, renames, signature changes, or Kernel files" in context
+        assert "complete=false" in context
+        assert "zero observed references do not mean unused" in context
+        assert "Do not run these commands mechanically" in context
+        assert "Do not infer runtime impact or risk" in context
+
     def test_build_review_prompt_body_handles_missing_policy(self) -> None:
         """Should complete without policy (returns None for missing file)."""
         scope = ReviewScope.for_base("main")
