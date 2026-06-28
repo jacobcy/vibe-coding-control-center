@@ -455,9 +455,6 @@ class TestBuildPrBody:
         mock_diff_summary.files_removed = 1
         mock_diff_summary.files_modified = 3
         mock_diff_summary.total_loc_delta = 150
-        mock_diff_summary.total_functions_delta = 5
-        mock_diff_summary.dependencies_added = 2
-        mock_diff_summary.dependencies_removed = 1
 
         with patch(
             "vibe3.analysis.git_diff_summary.get_git_diff_summary",
@@ -545,9 +542,6 @@ class TestFormatDiffSummary:
         summary = DiffSummary(
             files_added=1,
             total_loc_delta=100,
-            total_functions_delta=5,
-            dependencies_added=2,
-            dependencies_removed=1,
         )
 
         result = _format_diff_summary(summary)

@@ -26,7 +26,7 @@ def get_git_diff_summary(
         merge_base = git.get_merge_base(base_branch, branch)
     except Exception as e:
         logger.bind(
-            domain="snapshot",
+            domain="git_diff",
             action="git_merge_base",
             branch=branch,
             base=base_branch,
@@ -72,7 +72,7 @@ def get_git_diff_summary(
                         pass
         except Exception as e:
             logger.bind(
-                domain="snapshot",
+                domain="git_diff",
                 action="git_numstat",
                 branch=branch,
             ).warning(f"Failed to get git numstat for {source.type}: {e}")
@@ -100,7 +100,7 @@ def get_git_diff_summary(
                     file_statuses[filepath] = status
         except Exception as e:
             logger.bind(
-                domain="snapshot",
+                domain="git_diff",
                 action="git_name_status",
                 branch=branch,
             ).warning(f"Failed to get git name-status for {source.type}: {e}")

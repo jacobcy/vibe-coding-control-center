@@ -9,26 +9,14 @@ def test_diff_summary_addition():
         files_added=2,
         files_removed=1,
         files_modified=3,
-        modules_added=1,
-        modules_removed=0,
-        modules_modified=2,
-        dependencies_added=3,
-        dependencies_removed=1,
         total_loc_delta=150,
-        total_functions_delta=5,
     )
 
     summary2 = DiffSummary(
         files_added=1,
         files_removed=2,
         files_modified=1,
-        modules_added=0,
-        modules_removed=1,
-        modules_modified=1,
-        dependencies_added=2,
-        dependencies_removed=0,
         total_loc_delta=50,
-        total_functions_delta=2,
     )
 
     result = summary1 + summary2
@@ -36,13 +24,7 @@ def test_diff_summary_addition():
     assert result.files_added == 3
     assert result.files_removed == 3
     assert result.files_modified == 4
-    assert result.modules_added == 1
-    assert result.modules_removed == 1
-    assert result.modules_modified == 3
-    assert result.dependencies_added == 5
-    assert result.dependencies_removed == 1
     assert result.total_loc_delta == 200
-    assert result.total_functions_delta == 7
 
 
 def test_diff_summary_default_values():
@@ -52,13 +34,7 @@ def test_diff_summary_default_values():
     assert summary.files_added == 0
     assert summary.files_removed == 0
     assert summary.files_modified == 0
-    assert summary.modules_added == 0
-    assert summary.modules_removed == 0
-    assert summary.modules_modified == 0
-    assert summary.dependencies_added == 0
-    assert summary.dependencies_removed == 0
     assert summary.total_loc_delta == 0
-    assert summary.total_functions_delta == 0
 
 
 def test_diff_summary_add_with_empty():

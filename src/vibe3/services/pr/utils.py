@@ -162,7 +162,11 @@ def check_upstream_conflicts(
 
 
 def _format_diff_summary(summary: DiffSummary) -> str:
-    """Render DiffSummary as a Markdown table (git-based fields only)."""
+    """Render DiffSummary as a Markdown table.
+
+    Only files and LOC are shown — module/dependency/function analysis was
+    retired with the snapshot subsystem (#3215).
+    """
     lines = [
         "## Change Summary",
         "",
