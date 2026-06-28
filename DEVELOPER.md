@@ -121,24 +121,14 @@ uv run pytest tests/vibe3
 
 **违反即拒绝。** CI Pipeline 会自动检测并阻止合并。
 
-#### 🟡 Layer 1：Serena AST 检索（修改前的影响分析）
+#### 🟡 Layer 1：修改前的引用核查
 
-Serena 是一个 MCP 工具，提供代码结构的 AST 级查询能力。
-
-**强制场景：**
-
-| 操作 | 必须调用的工具 |
-|---|---|
-| 修改任何函数前 | `find_referencing_symbols("<函数名>")` ← 查调用者 |
-| 删除任何函数前 | `find_referencing_symbols("<函数名>")` ← 确认无人调用 |
-| 新增函数后 | `get_symbols_overview("lib/<文件>.sh")` ← 检查总函数数 |
+修改函数前必须核查引用，避免调用断裂。
 
 **禁止：**
 - ❌ 不查引用直接修改函数签名
 - ❌ 不查引用直接删除函数
 - ❌ 用 `cat` 读整个文件来"理解上下文"
-
-详见 [docs/standards/serena-usage.md](standards/serena-usage.md)。
 
 #### 🟢 Layer 2：双层 Lint（修改后验证语法和质量）
 

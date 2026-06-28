@@ -121,7 +121,6 @@ tests/
     ├── integration/           # Integration tests
     │   ├── test_install.bats
     │   ├── test_install_gh_noninteractive.bats
-    │   ├── test_serena_gate.bats
     │   └── test_vibe_integration.bats
     ├── roadmap/               # Roadmap command behavior tests
     │   ├── test_roadmap_query.bats

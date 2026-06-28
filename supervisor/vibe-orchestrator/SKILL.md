@@ -179,7 +179,7 @@ input_examples:
   - 完整流程模式：创建分支 → `vibe3 flow update` → `vibe3 flow bind <issue>` 初始化 flow context。
 - 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
 - 严禁 Vibe Skills 直接操作 `.vibe/` 缓存文件夹，必须通过 CLI 读取。
-- 在进入执行前，先读取并遵循：`docs/standards/serena-usage.md`、`.github/workflows/ci.yml`
+- 在进入执行前，先读取并遵循：`.github/workflows/ci.yml`
 - 质量检查必须至少覆盖：`scripts/hooks/lint.sh`、`scripts/tools/metrics.sh`、项目相关测试命令
 - 对 `scripts/hooks/lint.sh` 与 `scripts/tools/metrics.sh` 执行 3 次重试上限：
   - 第 1-2 次失败：记录错误并重试
