@@ -36,9 +36,6 @@ INSPECT_SUBCOMMANDS = [
     "files",
     "symbols",
     "base",
-    "uncommit",
-    "commands",
-    "dead-code",
 ]
 
 
