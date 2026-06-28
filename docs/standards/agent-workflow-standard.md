@@ -153,14 +153,14 @@ codeagent-wrapper cleanup
 
 **重要说明**：
 - **必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径**，禁止手工拼接。
-- 该命令保证幂等性、统一的 actor 签名、完整的 baseline snapshot 和 flow 关系绑定。
+- 该命令保证幂等性、统一的 actor 签名和 flow 关系绑定。
 
 ### 3.1 新功能开发
 
 **推荐流程**：
 ```bash
 # 1. 使用 internal bootstrap 创建并注册 flow (自动完成 git checkout + flow update + bind)
-#    Worktree 是强制的：bootstrap 总是创建隔离的 worktree 用于 flow/baseline/handoff
+#    Worktree 是强制的：bootstrap 总是创建隔离的 worktree 用于 flow/handoff
 vibe3 internal bootstrap <issue_number> --branch feature/api-v2
 
 # 2. 创建 plan
