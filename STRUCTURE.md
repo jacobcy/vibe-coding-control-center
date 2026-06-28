@@ -267,7 +267,6 @@ from vibe3.services.flow_reader import FlowReader
 
 **内容**：
 - `init.sh` / `install.sh` - 项目初始化与依赖安装脚本。
-- `serena_gate.sh` / `serena_gate.py` - Serena 治理网关。
 - `trace_manager.py` - 链路追踪管理工具。
 - `openspec_bridge.sh` - OpenSpec 桥接工具。
 - `github/` - GitHub 特定集成脚本（如标签同步）。

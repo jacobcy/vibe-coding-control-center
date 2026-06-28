@@ -126,7 +126,6 @@ git log main..origin/main --oneline | wc -l
 ```bash
 vibe3 internal bootstrap <issue-number> \
   --branch dev/issue-<id> \
-  [--worktree] \
   [--related <issue-number>]... \
   [--dependency <issue-number>]... \
   [--reactivate-existing]
@@ -146,7 +145,7 @@ vibe3 internal bootstrap <issue-number> \
 - task issue 绑定
 - related issue 绑定
 - dependency issue 阻塞登记（仅 open 状态的依赖）
-- worktree context 准备（如果传了 `--worktree`）
+- worktree 创建（bootstrap 总是创建隔离 worktree）
 
 ## 7. 留痕（Trace）
 
