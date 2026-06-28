@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -12,12 +13,14 @@ from vibe3.clients import GitClient
 
 
 def _git(repo: Path, *args: str) -> str:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     result = subprocess.run(
         ["git", *args],
         cwd=repo,
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     return result.stdout.strip()
 
