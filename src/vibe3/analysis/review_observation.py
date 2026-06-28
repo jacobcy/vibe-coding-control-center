@@ -11,7 +11,7 @@ from vibe3.analysis.review_kernel import (
 )
 from vibe3.clients import GitClient
 from vibe3.exceptions import GitError
-from vibe3.models.inspect_evidence import (
+from vibe3.models import (
     ChangedFileFact,
     ChangeObservation,
     ChangePartitionSummary,

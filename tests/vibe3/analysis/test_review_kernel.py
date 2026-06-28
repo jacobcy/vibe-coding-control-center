@@ -20,7 +20,14 @@ def _write_manifest(
     path = root / "config" / "v3" / "review_kernel.yaml"
     path.parent.mkdir(parents=True)
     path.write_text(
-        yaml.safe_dump({"version": 1, "entries": entries}, sort_keys=False),
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "architecture_packages": ["runtime", "orchestra"],
+                "entries": entries,
+            },
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
     return path

@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 import yaml
 
-from vibe3.analysis.review_observation import build_review_observation
+from vibe3.analysis import build_review_observation
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base_helpers import render_review_observation
 from vibe3.commands.pr_helpers import build_base_resolution_usecase

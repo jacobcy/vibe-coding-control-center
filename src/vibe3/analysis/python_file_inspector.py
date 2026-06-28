@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from vibe3.models.inspect_evidence import Diagnostic, SourceRange
+from vibe3.models import Diagnostic, SourceRange
 
 
 class InspectedFile(BaseModel):

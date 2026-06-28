@@ -49,6 +49,7 @@ def _manifest(repo: Path, protected_path: str = "staged.py") -> Path:
         yaml.safe_dump(
             {
                 "version": 1,
+                "architecture_packages": ["runtime", "orchestra"],
                 "entries": [
                     {
                         "path": protected_path,

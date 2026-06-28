@@ -11,7 +11,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from vibe3.models.inspect_evidence import Diagnostic, SourceRange
+from vibe3.models import Diagnostic, SourceRange
 
 _REFERENCE_MARKER = re.compile(r"^\s*>\s*(\d+):\s?(.*)$", re.MULTILINE)
 

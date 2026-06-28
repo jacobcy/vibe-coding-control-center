@@ -8,7 +8,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field, ValidationError
 
-from vibe3.models.inspect_evidence import (
+from vibe3.models import (
     Diagnostic,
     KernelHit,
     KernelImpact,
@@ -16,7 +16,6 @@ from vibe3.models.inspect_evidence import (
     ReviewDepth,
     ReviewPolicy,
 )
-from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
 
 
 class ReviewKernelConfigError(ValueError):
@@ -36,6 +35,7 @@ class ReviewKernelManifest(BaseModel):
     """Versioned collection of exact Review Kernel entries."""
 
     version: int = 1
+    architecture_packages: list[str] = Field(min_length=1)
     entries: list[ReviewKernelEntry]
 
 
@@ -99,14 +99,13 @@ def load_review_kernel(
     return manifest
 
 
-def is_architecture_path(path: str) -> bool:
+def is_architecture_path(path: str, manifest: ReviewKernelManifest) -> bool:
     """Return whether a repo-relative path belongs to strict runtime kernel."""
 
     parts = PurePosixPath(path).parts
     if len(parts) < 4 or parts[:2] != ("src", "vibe3"):
         return False
-    package = parts[2]
-    return MODULE_CATEGORY_MAP.get(package) == ModuleCategory.KERNEL
+    return parts[2] in manifest.architecture_packages
 
 
 def _hit(entry: ReviewKernelEntry, sources: set[str]) -> KernelHit:
@@ -138,7 +137,7 @@ def classify_review_kernel(
     for path in sorted(changed_paths):
         sources = changed_paths[path]
         entry = entries.get(path)
-        architecture = is_architecture_path(path)
+        architecture = is_architecture_path(path, manifest)
         if entry is None:
             if architecture:
                 minimum_depth = ReviewDepth.REPEATED
@@ -158,7 +157,9 @@ def classify_review_kernel(
         else:
             review_hits.append(hit)
 
-    has_architecture_change = any(is_architecture_path(path) for path in changed_paths)
+    has_architecture_change = any(
+        is_architecture_path(path, manifest) for path in changed_paths
+    )
     if has_architecture_change:
         impact = KernelImpact.LARGE
     elif review_hits:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vibe3.models.inspect_evidence import ReviewObservation
+from vibe3.models import ReviewObservation
 
 
 def render_review_observation(observation: ReviewObservation) -> str:

@@ -132,8 +132,17 @@ def extract_file_imports(file_path: str) -> list[str]:
     except (SyntaxError, OSError):
         return []
 
+    type_checking_ids: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            test = node.test
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                type_checking_ids.update(id(child) for child in ast.walk(node))
+
     imports: list[str] = []
     for node in ast.walk(tree):
+        if id(node) in type_checking_ids:
+            continue
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith("vibe3"):

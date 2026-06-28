@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 import yaml
 
-from vibe3.analysis.symbol_reference_service import (
+from vibe3.analysis import (
     SerenaSymbolReferenceProvider,
     SymbolInspectionResult,
     inspect_symbol,
