@@ -88,7 +88,7 @@ async def test_collect_frozen_queue_executor_shutdown_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
-    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh = MagicMock(interval_ticks=10)
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -142,7 +142,7 @@ async def test_collect_frozen_queue_re_raises_other_runtime_error():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
-    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh = MagicMock(interval_ticks=10)
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -194,7 +194,7 @@ async def test_collect_frozen_queue_cancelled_error_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
-    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh = MagicMock(interval_ticks=10)
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -246,7 +246,7 @@ async def test_collect_frozen_queue_unexpected_exception_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
-    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh = MagicMock(interval_ticks=10)
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -301,8 +301,7 @@ async def test_coordinate_consumes_queue_dirty_signal():
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
-    mock_config.queue_refresh = MagicMock()
-    mock_config.queue_refresh.enabled = False
+    mock_config.queue_refresh = MagicMock(interval_ticks=10, enabled=False)
     mock_capacity = MagicMock()
     mock_capacity.get_capacity_status.return_value = {"remaining": 0}
     mock_github = MagicMock()
@@ -357,7 +356,7 @@ def test_has_preflight_passing_entries_excludes_aborted_flows():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
-    mock_config.queue_refresh = MagicMock()
+    mock_config.queue_refresh = MagicMock(interval_ticks=10)
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -440,8 +439,7 @@ async def test_exhausted_refresh_pauses_on_aborted_only_queue():
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
     mock_config.manager_usernames = ()
-    mock_config.queue_refresh = MagicMock()
-    mock_config.queue_refresh.enabled = False
+    mock_config.queue_refresh = MagicMock(interval_ticks=10, enabled=False)
 
     mock_capacity = MagicMock()
     mock_capacity.get_capacity_status.return_value = {"remaining": 1}
