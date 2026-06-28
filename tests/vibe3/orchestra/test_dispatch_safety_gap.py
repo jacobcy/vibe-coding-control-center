@@ -9,6 +9,7 @@ re-dispatched to their next phase.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from unittest.mock import MagicMock
 
 from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
@@ -38,10 +39,10 @@ def _review_issue(assignees: list[str]) -> IssueInfo:
 
 
 def test_inprogress_entry_kicked_on_non_manager_assignee(
-    make_coordinator: object,
+    make_coordinator: Callable[..., GlobalDispatchCoordinator],
 ) -> None:
     """In-progress entry re-assigned to a non-manager must be popped."""
-    coordinator: GlobalDispatchCoordinator = make_coordinator("manager")  # type: ignore[assignment]
+    coordinator = make_coordinator("manager")
     coordinator._frozen_queue = [_review_entry()]
     coordinator._load_issue = lambda n: _review_issue(["someone-else"])
     coordinator._emit_dispatch_intent = MagicMock()
@@ -54,11 +55,11 @@ def test_inprogress_entry_kicked_on_non_manager_assignee(
 
 
 def test_inprogress_entry_reaches_preflight_when_no_session(
-    make_coordinator: object,
+    make_coordinator: Callable[..., GlobalDispatchCoordinator],
 ) -> None:
     """In-progress entry with no live session must reach preflight (not
     short-circuited by waiting_state). A failing preflight pops it."""
-    coordinator: GlobalDispatchCoordinator = make_coordinator("manager")  # type: ignore[assignment]
+    coordinator = make_coordinator("manager")
     coordinator._frozen_queue = [_review_entry()]
     coordinator._load_issue = lambda n: _review_issue(["manager-bot"])
     coordinator._run_dispatch_preflight = lambda issue: DispatchPreflightDecision(
@@ -74,11 +75,11 @@ def test_inprogress_entry_reaches_preflight_when_no_session(
 
 
 def test_inprogress_entry_skipped_when_live_session(
-    make_coordinator: object,
+    make_coordinator: Callable[..., GlobalDispatchCoordinator],
 ) -> None:
     """In-progress entry with an active live session is retained (skipped,
     not re-dispatched) via the active-session-gate."""
-    coordinator: GlobalDispatchCoordinator = make_coordinator("manager")  # type: ignore[assignment]
+    coordinator = make_coordinator("manager")
     coordinator._frozen_queue = [_review_entry()]
     coordinator._load_issue = lambda n: _review_issue(["manager-bot"])
     registry = MagicMock()

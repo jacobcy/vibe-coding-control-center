@@ -158,6 +158,7 @@ class GlobalDispatchCoordinator:
         self._remote_check_runner = remote_check_runner
         self._remote_check_interval = remote_check_interval
         self._last_remote_check_tick: int = 0
+        self._current_tick_id: int = 0
 
         def _emit(category: str, message: str, *, color: str | None = None) -> None:
             append_orchestra_event(category, message, color=color)
@@ -362,6 +363,13 @@ class GlobalDispatchCoordinator:
         exhausted_refresh from triggering collection, which causes the
         exhausted counter to reset — the server never auto-stops.
         """
+        # Sleep mode: once the FSM is sleeping (sustained inactivity),
+        # throttle collection to scheduled refresh ticks to save API calls.
+        # Like the paused gate below, this intentionally precedes the
+        # capacity check (capacity does not gate sleep/paused decisions).
+        if self._dispatch_lifecycle.is_sleeping:
+            return self._dispatch_lifecycle.should_collect(self._current_tick_id)
+
         # If already paused, always collect to maintain paused state verification
         if self._dispatch_paused:
             return True
@@ -533,6 +541,7 @@ class GlobalDispatchCoordinator:
             are exhausted AFTER dispatch. This avoids wasted GitHub API calls.
         """
         # Step 1: Restore from persistence on cold start
+        self._current_tick_id = tick_id
         self._queue_startup_restore()
 
         # Step 2: Promote state-changed entries
