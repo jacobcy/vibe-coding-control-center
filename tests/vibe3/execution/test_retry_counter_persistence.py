@@ -204,10 +204,12 @@ class TestRetryCounterPersistence:
                 )
 
         with sqlite3.connect(temp_db.db_path) as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT tick_id, error_code
                 FROM error_log
                 ORDER BY id DESC
                 LIMIT 1
-                """).fetchall()
+                """
+            ).fetchall()
         assert rows == [(9, "E_API_UNAVAILABLE")]

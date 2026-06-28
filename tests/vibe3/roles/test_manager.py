@@ -191,7 +191,8 @@ recipes:
         from vibe3.prompts import manifest
 
         recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text("""
+        recipes_path.write_text(
+            """
 recipes:
   manager.default:
     kind: section_recipe
@@ -203,7 +204,8 @@ recipes:
       retry.resume:
         sections:
           - manager.retry_task
-""")
+"""
+        )
 
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
@@ -243,7 +245,8 @@ recipes:
         from vibe3.prompts import manifest
 
         recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text("""
+        recipes_path.write_text(
+            """
 recipes:
   manager.default:
     kind: section_recipe
@@ -258,7 +261,8 @@ recipes:
       retry.resume:
         sections:
           - manager.retry_task
-""")
+"""
+        )
 
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(
@@ -300,7 +304,8 @@ recipes:
         from vibe3.prompts import manifest
 
         recipes_path = tmp_path / "prompt-recipes.yaml"
-        recipes_path.write_text("""
+        recipes_path.write_text(
+            """
 recipes:
   manager.default:
     kind: section_recipe
@@ -308,7 +313,8 @@ recipes:
       first.bootstrap:
         sections:
           - key: manager.target
-""")
+"""
+        )
 
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
         monkeypatch.setattr(

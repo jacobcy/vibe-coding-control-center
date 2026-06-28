@@ -70,13 +70,15 @@ class TestBuildGovernanceRecipe:
 
         recipes_path = tmp_path / "prompt-recipes.yaml"
         recipes_path.write_text(
-            textwrap.dedent("""\
+            textwrap.dedent(
+                """\
                 recipes:
                   governance.scan:
                     kind: template_recipe
                     template_key: orchestra.governance.plan
                     variables: {}
-            """),
+            """
+            ),
             encoding="utf-8",
         )
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
@@ -91,14 +93,18 @@ class TestRenderGovernancePrompt:
     @pytest.mark.slow
     def test_renders_template(self, tmp_path):
         prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(textwrap.dedent("""\
+        prompts_path.write_text(
+            textwrap.dedent(
+                """\
             orchestra:
               governance:
                 plan: |
                   Supervisor={supervisor_name}
                   Status={server_status}
                   Count={active_count}
-        """))
+        """
+            )
+        )
         config = _make_config()
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
@@ -110,13 +116,17 @@ class TestRenderGovernancePrompt:
     @pytest.mark.slow
     def test_template_controls_whether_supervisor_content_is_rendered(self, tmp_path):
         prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(textwrap.dedent("""\
+        prompts_path.write_text(
+            textwrap.dedent(
+                """\
             orchestra:
               governance:
                 plan: |
                   Supervisor={supervisor_name}
                   Status={server_status}
-        """))
+        """
+            )
+        )
         config = _make_config()
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
@@ -128,13 +138,15 @@ class TestRenderGovernancePrompt:
     ):
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(
-            textwrap.dedent("""\
+            textwrap.dedent(
+                """\
                 orchestra:
                   governance:
                     plan: |
                       Supervisor={supervisor_name}
                       Material={supervisor_content}
-            """),
+            """
+            ),
             encoding="utf-8",
         )
         material_path = tmp_path / "supervisor/governance/assignee-pool.md"

@@ -366,7 +366,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
         "blocked_by_issue" not in existing or "blocked_reason" not in existing
     ):
         # Parse blocked_by values and migrate
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE flow_state
             SET
                 blocked_by_issue = CASE
@@ -379,7 +380,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
                     ELSE blocked_by
                 END
             WHERE blocked_by IS NOT NULL
-        """)
+        """
+        )
         logger.bind(external="sqlite", operation="migration").info(
             "Migrated blocked_by data to blocked_by_issue and blocked_reason fields"
         )
@@ -488,7 +490,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     if existing_transitions == 0:
         # Migrate historical state_transitioned events from flow_events.refs JSON
         before_changes = conn.total_changes
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO transition_history
                 (branch, from_state, to_state, created_at, actor, event_id)
             SELECT
@@ -504,7 +507,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
               AND json_valid(refs)
               AND json_extract(refs, '$.before_state') IS NOT NULL
               AND json_extract(refs, '$.after_state') IS NOT NULL
-        """)
+        """
+        )
 
         migrated = conn.total_changes - before_changes
         if migrated > 0:
@@ -521,19 +525,23 @@ def init_schema(conn: sqlite3.Connection) -> None:
     }
     legacy_cols = {"retry_count", "last_attempted_at", "enqueued_at"}
     if legacy_cols & queue_columns:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE orchestra_queue_new (
                 issue_number INTEGER PRIMARY KEY,
                 collected_state TEXT,
                 waiting_state TEXT,
                 updated_at TEXT NOT NULL
             )
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             INSERT INTO orchestra_queue_new
             SELECT issue_number, collected_state, waiting_state, updated_at
             FROM orchestra_queue
-        """)
+        """
+        )
         cursor.execute("DROP TABLE orchestra_queue")
         cursor.execute("ALTER TABLE orchestra_queue_new RENAME TO orchestra_queue")
         removed = sorted(legacy_cols & queue_columns)
@@ -563,13 +571,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Migration: Backfill task_issue_number to flow_issue_links if legacy column exists
     if "task_issue_number" in existing:
         before_changes = conn.total_changes
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR IGNORE INTO flow_issue_links
                 (branch, issue_number, issue_role, created_at)
             SELECT branch, task_issue_number, 'task', datetime('now')
             FROM flow_state
             WHERE task_issue_number IS NOT NULL
-            """)
+            """
+        )
         inserted = conn.total_changes - before_changes
         if inserted:
             logger.bind(external="sqlite", operation="migration").debug(

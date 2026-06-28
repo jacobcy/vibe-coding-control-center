@@ -85,10 +85,12 @@ def test_get_all_errors_status_null_severity_via_service_defaults_to_error(
 
     # Insert row with NULL severity via raw SQL (omitting severity column)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log (tick_id, error_code, error_message)
             VALUES (1, 'E_CUSTOM_ERROR', 'Error without severity')
-        """)
+        """
+        )
         conn.commit()
 
     status = ErrorTrackingService._instance.get_all_errors_status()
@@ -115,14 +117,16 @@ def test_get_all_errors_status_ignores_time_window(temp_store: SQLiteClient) -> 
 
     # Insert old error outside window (>10 min)
     with sqlite3.connect(temp_store.db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO error_log
             (tick_id, error_code, error_message, severity, created_at)
             VALUES (
                 2, 'E_API_TIMEOUT', 'Old error', 'ERROR',
                 datetime('now', '-15 minutes')
             )
-        """)
+        """
+        )
         conn.commit()
 
     # get_all_errors_status should count BOTH errors (no time filter)

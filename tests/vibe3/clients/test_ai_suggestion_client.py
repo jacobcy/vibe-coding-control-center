@@ -24,7 +24,8 @@ class TestAISuggestionClient:
 
     def test_suggest_pr_content_success(self, tmp_path: Path) -> None:
         prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
+        prompts_file.write_text(
+            """
 pr:
   title_suggestion:
     system: "You are a helpful assistant."
@@ -32,7 +33,8 @@ pr:
   body_suggestion:
     system: "You are a helpful assistant."
     user: "Commits: {commits}"
-""")
+"""
+        )
 
         ai_client = AIClient(api_key="test-key", model="deepseek/deepseek-chat")
         with patch.object(AIClient, "generate_text") as mock_generate:
@@ -47,7 +49,8 @@ pr:
 
     def test_suggest_pr_content_with_changed_files(self, tmp_path: Path) -> None:
         prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
+        prompts_file.write_text(
+            """
 pr:
   title_suggestion:
     system: "You are a helpful assistant."
@@ -55,7 +58,8 @@ pr:
   body_suggestion:
     system: "You are a helpful assistant."
     user: "Commits: {commits}\n{changed_files}"
-""")
+"""
+        )
 
         ai_client = AIClient(api_key="test-key", model="deepseek/deepseek-chat")
         with patch.object(AIClient, "generate_text") as mock_generate:
@@ -70,7 +74,8 @@ pr:
 
     def test_suggest_pr_content_title_fails_returns_none(self, tmp_path: Path) -> None:
         prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
+        prompts_file.write_text(
+            """
 pr:
   title_suggestion:
     system: "You are a helpful assistant."
@@ -78,7 +83,8 @@ pr:
   body_suggestion:
     system: "You are a helpful assistant."
     user: "Commits: {commits}"
-""")
+"""
+        )
 
         ai_client = AIClient(api_key="test-key", model="deepseek/deepseek-chat")
         with patch.object(AIClient, "generate_text") as mock_generate:
@@ -92,7 +98,8 @@ pr:
         self, tmp_path: Path
     ) -> None:
         prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
+        prompts_file.write_text(
+            """
 pr:
   title_suggestion:
     system: "You are a helpful assistant."
@@ -100,7 +107,8 @@ pr:
   body_suggestion:
     system: "You are a helpful assistant."
     user: "Commits: {commits}"
-""")
+"""
+        )
 
         ai_client = AIClient(api_key="test-key", model="deepseek/deepseek-chat")
         with patch.object(AIClient, "generate_text") as mock_generate:

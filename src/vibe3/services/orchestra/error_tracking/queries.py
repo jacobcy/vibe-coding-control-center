@@ -24,11 +24,13 @@ def get_error_counts(db_path: str) -> dict[str, int]:
         Dict mapping error_code -> count
     """
     with sqlite3.connect(db_path) as conn:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT error_code, COUNT(*) as count
             FROM error_log
             GROUP BY error_code
-        """).fetchall()
+        """
+        ).fetchall()
 
     return {row[0]: row[1] for row in rows}
 
@@ -85,10 +87,12 @@ def has_model_config_error(db_path: str) -> bool:
 
     # Fallback to prefix check for backward compatibility
     with sqlite3.connect(db_path) as conn:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT COUNT(*) FROM error_log
             WHERE error_code LIKE 'E_MODEL_%'
-        """).fetchone()
+        """
+        ).fetchone()
 
     return rows[0] > 0 if rows else False
 

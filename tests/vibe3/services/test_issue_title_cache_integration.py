@@ -17,7 +17,8 @@ def temp_db():
         db_path = Path(tmpdir) / "test.db"
         conn = sqlite3.connect(str(db_path))
         # Create schema
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS flow_context_cache (
                 branch TEXT PRIMARY KEY,
                 task_issue_number INTEGER,
@@ -26,7 +27,8 @@ def temp_db():
                 pr_title TEXT,
                 updated_at TEXT NOT NULL
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
         yield str(db_path)
@@ -41,11 +43,13 @@ class TestIssueTitleCacheIntegration:
         cursor = conn.cursor()
 
         # Insert test data
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO flow_context_cache
             (branch, task_issue_number, issue_title, pr_number, pr_title, updated_at)
             VALUES ('task/issue-123', 123, 'Test', NULL, NULL, '2024-01-01')
-        """)
+        """
+        )
         conn.commit()
 
         # Verify lookup works

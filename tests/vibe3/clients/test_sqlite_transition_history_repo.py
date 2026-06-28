@@ -131,12 +131,14 @@ class TestTransitionHistoryRepo:
 
         # Verify it was inserted
         cursor = db_conn.cursor()
-        row = cursor.execute("""
+        row = cursor.execute(
+            """
             SELECT COUNT(*) FROM transition_history
             WHERE branch = 'new-branch'
               AND from_state = 'state/ready'
               AND to_state = 'state/claimed'
-            """).fetchone()
+            """
+        ).fetchone()
 
         assert row[0] == 1
 

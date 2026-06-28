@@ -73,7 +73,8 @@ class TestIndependentImport:
                 continue
 
             # Import module and check sys.modules in subprocess
-            check_script = textwrap.dedent(f"""
+            check_script = textwrap.dedent(
+                f"""
 import sys
 import vibe3.{module_name}
 
@@ -103,7 +104,8 @@ if unexpected:
     print('UNEXPECTED:', ','.join(unexpected))
 else:
     print('OK')
-""")
+"""
+            )
             result = subprocess.run(
                 [sys.executable, "-c", check_script],
                 capture_output=True,
@@ -149,7 +151,8 @@ class TestMockFeasibility:
                 continue
 
             # Check mockability in subprocess
-            check_script = textwrap.dedent(f"""
+            check_script = textwrap.dedent(
+                f"""
 import sys
 from unittest.mock import Mock, patch
 
@@ -183,7 +186,8 @@ try:
 except Exception as e:
     print(f'ERROR: {{e}}')
     sys.exit(1)
-""")
+"""
+            )
             result = subprocess.run(
                 [sys.executable, "-c", check_script],
                 capture_output=True,

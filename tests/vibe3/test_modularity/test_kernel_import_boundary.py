@@ -58,7 +58,8 @@ ALLOWED_MODULES = [
 def _check_kernel_import_boundary() -> list[str]:
     """Run kernel import in subprocess and return list of forbidden modules found."""
     forbidden_repr = repr(FORBIDDEN_MODULES)
-    check_script = textwrap.dedent(f"""\
+    check_script = textwrap.dedent(
+        f"""\
 import sys
 
 # Import the kernel entry point
@@ -79,7 +80,8 @@ if forbidden:
     print("FORBIDDEN:" + ",".join(forbidden))
 else:
     print("OK")
-""")
+"""
+    )
 
     result = subprocess.run(
         [sys.executable, "-c", check_script],
