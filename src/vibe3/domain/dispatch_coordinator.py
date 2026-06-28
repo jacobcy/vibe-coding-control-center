@@ -456,10 +456,6 @@ class GlobalDispatchCoordinator:
 
             entry.collected_state = issue.state.value
 
-            if entry.waiting_state is not None:
-                index += 1
-                continue
-
             # Per-issue active session gate
             if self._registry is not None:
                 active = self._registry.get_live_sessions_for_issue(
