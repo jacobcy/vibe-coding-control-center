@@ -1,46 +1,94 @@
-"""Tests for vibe inspect symbols subcommand.
+"""CLI contract tests for validated symbol evidence."""
 
-Tests CLI surface: argument validation, help output, exit codes.
-All external services are mocked.
-"""
+from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
+from vibe3.analysis.symbol_reference_service import (
+    ProviderProvenance,
+    SymbolInspectionResult,
+    SymbolObservation,
+    SymbolQuery,
+)
 from vibe3.commands.inspect import app
 
 runner = CliRunner()
 
 
-def test_inspect_symbols_no_args_uses_dot():
-    """symbols 不传参数时应提示错误。"""
-    mock_svc = MagicMock()
-    mock_svc.analyze_file.return_value = {"status": "ok", "symbols": []}
-    with patch("vibe3.commands.inspect_symbols.SerenaService", return_value=mock_svc):
-        result = runner.invoke(app, ["symbols"])
-    assert result.exit_code != 0
-    assert "Please provide a symbol specification" in result.output
+def _result(status: str = "ready") -> SymbolInspectionResult:
+    return SymbolInspectionResult(
+        status=status,  # type: ignore[arg-type]
+        query=SymbolQuery(
+            file="src/vibe3/commands/inspect_base.py",
+            symbol="register",
+            content_sha256="a" * 64,
+        ),
+        observation=(
+            SymbolObservation(observed_reference_count=0) if status == "ready" else None
+        ),
+        provenance=ProviderProvenance(provider="serena", version="1.1.1"),
+    )
 
 
-def test_inspect_symbols_with_file():
-    mock_svc = MagicMock()
-    mock_svc.analyze_file.return_value = {
-        "file": "src/vibe3/cli.py",
-        "symbols": [{"name": "my_func", "references": 2, "type": "function"}],
-    }
-    with patch("vibe3.commands.inspect_symbols.SerenaService", return_value=mock_svc):
-        result = runner.invoke(app, ["symbols", "src/vibe3/cli.py"])
+def test_inspect_symbols_requires_file_and_symbol() -> None:
+    result = runner.invoke(app, ["symbols", "src/vibe3/commands/inspect_base.py"])
+
+    assert result.exit_code == 1
+    assert "<file>:<symbol>" in result.output
+
+
+def test_inspect_symbols_json_uses_evidence_schema() -> None:
+    with (
+        patch(
+            "vibe3.commands.inspect_symbols.SerenaSymbolReferenceProvider",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "vibe3.commands.inspect_symbols.inspect_symbol",
+            return_value=_result(),
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "symbols",
+                "src/vibe3/commands/inspect_base.py:register",
+                "--json",
+            ],
+        )
+
     assert result.exit_code == 0
-    assert "my_func" in result.output
+    payload = json.loads(result.output)
+    assert payload["schema_version"] == 1
+    assert payload["status"] == "ready"
+    assert payload["observation"]["observed_reference_count"] == 0
+    assert payload["observation"]["complete"] is False
+    assert "reference_count" not in payload
+    assert "unused" not in result.output
 
 
-def test_inspect_symbols_json():
-    mock_svc = MagicMock()
-    mock_svc.analyze_file.return_value = {
-        "file": "src/vibe3/cli.py",
-        "symbols": [],
-    }
-    with patch("vibe3.commands.inspect_symbols.SerenaService", return_value=mock_svc):
-        result = runner.invoke(app, ["symbols", "src/vibe3/cli.py", "--json"])
-    assert result.exit_code == 0
+def test_inspect_symbols_disabled_returns_nonzero_and_valid_json() -> None:
+    with (
+        patch(
+            "vibe3.commands.inspect_symbols.SerenaSymbolReferenceProvider",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "vibe3.commands.inspect_symbols.inspect_symbol",
+            return_value=_result(status="disabled"),
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "symbols",
+                "src/vibe3/commands/inspect_base.py:register",
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert json.loads(result.output)["status"] == "disabled"

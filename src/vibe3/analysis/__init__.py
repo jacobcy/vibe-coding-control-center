@@ -70,9 +70,22 @@ if TYPE_CHECKING:
     from vibe3.analysis.review_observation import build_review_observation
     from vibe3.analysis.serena_service import SerenaService
 
+    from vibe3.analysis.symbol_reference_service import (
+        ProviderSymbol,
+        SerenaSymbolReferenceProvider,
+        SymbolInspectionResult,
+        SymbolReferenceProvider,
+        inspect_symbol,
+    )
+
 # Lazy imports
 _LAZY_IMPORTS = {
     "SerenaService": "vibe3.analysis.serena_service",
+    "ProviderSymbol": "vibe3.analysis.symbol_reference_service",
+    "SerenaSymbolReferenceProvider": "vibe3.analysis.symbol_reference_service",
+    "SymbolInspectionResult": "vibe3.analysis.symbol_reference_service",
+    "SymbolReferenceProvider": "vibe3.analysis.symbol_reference_service",
+    "inspect_symbol": "vibe3.analysis.symbol_reference_service",
     "build_change_analysis": "vibe3.analysis.inspect_query_service",
     "command_analyzer": "vibe3.analysis.command_analyzer",
     "CoverageService": "vibe3.analysis.coverage_service",
@@ -129,6 +142,11 @@ def __getattr__(name: str) -> object:
 __all__ = [
     # Core services
     "SerenaService",
+    "ProviderSymbol",
+    "SerenaSymbolReferenceProvider",
+    "SymbolInspectionResult",
+    "SymbolReferenceProvider",
+    "inspect_symbol",
     "build_change_analysis",
     "command_analyzer",
     "CoverageService",

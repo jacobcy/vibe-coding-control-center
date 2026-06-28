@@ -2,6 +2,8 @@
 
 import json
 import sys
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 from typing import Any, Union, cast
 
@@ -305,7 +307,10 @@ class SerenaClient:
         try:
             agent = self._get_agent()
             tool = agent.get_tool_by_name("get_symbols_overview")
-            result = agent.execute_task(lambda: tool.apply(relative_path=relative_file))  # type: ignore[union-attr]
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                result = agent.execute_task(  # type: ignore[union-attr]
+                    lambda: tool.apply(relative_path=relative_file)
+                )
             return cast(dict[str, Union[str, int, list]], json.loads(result))
         except Exception as e:
             logger.bind(
@@ -316,9 +321,31 @@ class SerenaClient:
             ).error("Failed to get symbols overview")
             raise SerenaError("get_symbols_overview", str(e)) from e
 
-    def find_references(
-        self, name_path: str, relative_file: str
-    ) -> dict[str, Union[str, int, list]]:
+    def find_symbol(self, name_path: str, relative_file: str) -> Any:
+        """Find a symbol definition constrained to one source file."""
+        try:
+            agent = self._get_agent()
+            tool = agent.get_tool_by_name("find_symbol")
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                result = agent.execute_task(  # type: ignore[union-attr]
+                    lambda: tool.apply(
+                        name_path_pattern=name_path,
+                        relative_path=relative_file,
+                        include_body=False,
+                    )
+                )
+            return json.loads(result)
+        except Exception as e:
+            logger.bind(
+                external="serena",
+                operation="find_symbol",
+                symbol=name_path,
+                file=relative_file,
+                error=str(e),
+            ).error("Failed to find symbol")
+            raise SerenaError("find_symbol", str(e)) from e
+
+    def find_references(self, name_path: str, relative_file: str) -> Any:
         """Find references to a symbol.
 
         Args:
@@ -334,10 +361,14 @@ class SerenaClient:
         try:
             agent = self._get_agent()
             tool = agent.get_tool_by_name("find_referencing_symbols")
-            result = agent.execute_task(
-                lambda: tool.apply(name_path=name_path, relative_path=relative_file)  # type: ignore[union-attr]
-            )
-            return cast(dict[str, Union[str, int, list]], json.loads(result))
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                result = agent.execute_task(  # type: ignore[union-attr]
+                    lambda: tool.apply(
+                        name_path=name_path,
+                        relative_path=relative_file,
+                    )
+                )
+            return json.loads(result)
         except Exception as e:
             logger.bind(
                 external="serena",
