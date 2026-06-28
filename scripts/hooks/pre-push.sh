@@ -2,6 +2,19 @@
 # pre-push hook - Local quality gate, catch issues before push
 set -euo pipefail
 
+# Clean up virtualenv environment variables set by pre-commit to prevent uv hijacking
+unset VIRTUAL_ENV
+
+# Load UV_PROJECT_ENVIRONMENT from .envrc if not already set (e.g. in GUI or non-direnv shells)
+if [ -z "${UV_PROJECT_ENVIRONMENT:-}" ] && [ -f .envrc ]; then
+    UV_ENV_VAL=$(grep -E '^export UV_PROJECT_ENVIRONMENT=' .envrc | cut -d'#' -f1 | sed 's/export UV_PROJECT_ENVIRONMENT=//' | tr -d '"' | tr -d "'" | tr -d ' ')
+    if [ -n "$UV_ENV_VAL" ]; then
+        UV_ENV_VAL="${UV_ENV_VAL/\$HOME/$HOME}"
+        UV_ENV_VAL="${UV_ENV_VAL/\~/$HOME}"
+        export UV_PROJECT_ENVIRONMENT="$UV_ENV_VAL"
+    fi
+fi
+
 # CI Simulation mode
 if [ "${VIBE_CI_SIMULATE:-0}" = "1" ]; then
     export GITHUB_ACTIONS=true
