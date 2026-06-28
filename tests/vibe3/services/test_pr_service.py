@@ -460,7 +460,7 @@ class TestBuildPrBody:
         mock_diff_summary.dependencies_removed = 1
 
         with patch(
-            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
+            "vibe3.analysis.git_diff_summary.get_git_diff_summary",
             return_value=mock_diff_summary,
         ):
             result = build_pr_body("Original body", metadata)
@@ -504,7 +504,7 @@ class TestBuildPrBody:
         )
 
         with patch(
-            "vibe3.analysis.snapshot_diff_facade.get_diff_summary",
+            "vibe3.analysis.git_diff_summary.get_git_diff_summary",
             side_effect=Exception("Error"),
         ):
             result = build_pr_body("Original body", metadata)
@@ -537,8 +537,8 @@ class TestFormatDiffSummary:
         assert "~3 modified" in result
         assert "| LOC | +150 |" in result
 
-    def test_includes_functions_and_dependencies(self) -> None:
-        """Should include functions and dependencies when present."""
+    def test_git_only_format_omits_functions_and_dependencies(self) -> None:
+        """Git-only format shows files and LOC, not functions/dependencies."""
         from vibe3.models import DiffSummary
         from vibe3.services.pr.utils import _format_diff_summary
 
@@ -552,5 +552,9 @@ class TestFormatDiffSummary:
 
         result = _format_diff_summary(summary)
 
-        assert "| Functions | +5 |" in result
-        assert "| Dependencies | +2, -1 |" in result
+        # Git-only format: files and LOC only
+        assert "| Files | +1 added |" in result
+        assert "| LOC | +100 |" in result
+        # Functions and dependencies are NOT shown in git-only format
+        assert "| Functions |" not in result
+        assert "| Dependencies |" not in result
